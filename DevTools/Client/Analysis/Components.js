@@ -1,12 +1,13 @@
+InspectorModules.analysis = function(context) {
 // Source links are client-side editor URLs. The host never opens files or
 // executes a command, and state values are never included in profiling causes.
 const analysisEl = id => document.getElementById(id);
 const milliseconds = value => `${Number(value || 0).toFixed(3)} ms`;
 
-function nodeAncestry(target, node = state.tree, parents = []) {
+function nodeAncestry(target, node = context.session.tree.tree, parents = []) {
   if (!node) return [];
   const path = [...parents, node];
-  if (nodeId(node) === target || node.id === target) return path;
+  if (context.tree.nodeId(node) === target || node.id === target) return path;
   for (const child of node.children ?? []) {
     const found = nodeAncestry(target, child, path);
     if (found.length) return found;
@@ -15,7 +16,7 @@ function nodeAncestry(target, node = state.tree, parents = []) {
 }
 function sourceForNode(node) {
   if (!node) return null;
-  return nodeAncestry(nodeId(node)).reverse().find(n => n.source) ?? null;
+  return nodeAncestry(context.tree.nodeId(node)).reverse().find(n => n.source) ?? null;
 }
 function normalizedSourcePath(value) {
   if (typeof value !== "string" || /[\x00-\x1f\x7f]/.test(value)) return null;
@@ -66,11 +67,11 @@ function renderSourceAnalysis(node) {
   if (breakpointURL) breakpoint.href = breakpointURL; else breakpoint.removeAttribute("href");
   breakpoint.setAttribute("aria-disabled", String(!breakpointURL));
   breakpoint.title = "Requires the GuavaUI DevTools extension. Adds a source breakpoint to the editor's existing Swift/LLDB debugger.";
-  const owner = node?.ownerScopeID ? findNode(state.tree, node.ownerScopeID) : null;
+  const owner = node?.ownerScopeID ? context.tree.findNode(context.session.tree.tree, node.ownerScopeID) : null;
   const metrics = owner?.recomposition, button = analysisEl("recompositionOwner");
   button.hidden = !owner;
-  button.textContent = owner ? `Component: ${compactTag(owner.viewTag) || nodeId(owner)}` : "";
-  button.onclick = owner ? () => selectNode(owner) : null;
+  button.textContent = owner ? `Component: ${context.tree.compactTag(owner.viewTag) || context.tree.nodeId(owner)}` : "";
+  button.onclick = owner ? () => context.tree.selectNode(owner) : null;
   analysisEl("recompositionStats").textContent = metrics
     ? `Recompositions: ${metrics.count}\nLast: ${milliseconds(metrics.lastMs)} · Average: ${milliseconds(metrics.count ? metrics.totalMs / metrics.count : 0)}\nTotal: ${milliseconds(metrics.totalMs)} · Max: ${milliseconds(metrics.maxMs)}\nInitial mount: ${milliseconds(metrics.initialMs)}`
     : node ? "No user-component body at this node. Select a component with profiling enabled." : "No component selected.";
@@ -83,14 +84,14 @@ function renderSourceAnalysis(node) {
       const row = document.createElement("div");
       row.textContent = `${reason.kind}${reason.detail ? ": " + reason.detail : ""}`;
       if (reason.originScopeID) {
-        const origin = findNode(state.tree, reason.originScopeID);
-        const ref = document.createElement("button"); ref.textContent = origin ? compactTag(origin.viewTag) : `scope ${reason.originScopeID} (removed)`;
-        ref.disabled = !origin; ref.onclick = () => selectNode(origin); row.append(" ← ", ref);
+        const origin = context.tree.findNode(context.session.tree.tree, reason.originScopeID);
+        const ref = document.createElement("button"); ref.textContent = origin ? context.tree.compactTag(origin.viewTag) : `scope ${reason.originScopeID} (removed)`;
+        ref.disabled = !origin; ref.onclick = () => context.tree.selectNode(origin); row.append(" ← ", ref);
       }
       causes.append(row);
     }
   }
-  analysisEl("resetRecomposition").disabled = !state.connected || !hasCapability("recomposition");
+  analysisEl("resetRecomposition").disabled = !context.session.connection.connected || !context.controls.hasCapability("recomposition");
 }
 function renderRecompositionTable() {
   const nodes = [];
@@ -99,7 +100,7 @@ function renderRecompositionTable() {
     if (node.recomposition) nodes.push(node);
     for (const child of node.children ?? []) collect(child);
   }
-  collect(state.tree);
+  collect(context.session.tree.tree);
   const sort = analysisEl("recompositionSort").value;
   nodes.sort((a, b) => b.recomposition[sort] - a.recomposition[sort]);
   analysisEl("recompositionCount").textContent = String(nodes.length);
@@ -107,9 +108,9 @@ function renderRecompositionTable() {
   for (const node of nodes.slice(0, 100)) {
     const row = document.createElement("button"); row.className = "recompositionRow";
     const name = document.createElement("span"), stats = document.createElement("span");
-    name.textContent = compactTag(node.viewTag) || nodeId(node); name.title = node.viewTag ?? "";
+    name.textContent = context.tree.compactTag(node.viewTag) || context.tree.nodeId(node); name.title = node.viewTag ?? "";
     stats.textContent = `${node.recomposition.count} × · ${milliseconds(node.recomposition[sort === "count" ? "totalMs" : sort])}`;
-    row.append(name, stats); row.onclick = () => selectNode(node); table.append(row);
+    row.append(name, stats); row.onclick = () => context.tree.selectNode(node); table.append(row);
   }
   if (nodes.length > 100) table.append(`Showing the first 100 of ${nodes.length} components.`);
 }
@@ -119,10 +120,13 @@ document.addEventListener("DOMContentLoaded", () => {
     try { field.value = localStorage.getItem("guava.inspector." + id) ?? field.value; } catch {}
     field.addEventListener(id === "sourceEditor" ? "change" : "input", () => {
       try { localStorage.setItem("guava.inspector." + id, field.value); } catch {}
-      renderSourceAnalysis(findNode(state.tree, state.selectedId));
+      renderSourceAnalysis(context.tree.findNode(context.session.tree.tree, context.session.tree.selectedId));
     });
   }
   analysisEl("recompositionSort").addEventListener("change", renderRecompositionTable);
-  analysisEl("resetRecomposition").addEventListener("click", () => send("inspect.recomposition.reset"));
+  analysisEl("resetRecomposition").addEventListener("click", () => context.connection.send("inspect.recomposition.reset"));
   renderSourceAnalysis(null); renderRecompositionTable();
 });
+
+return { nodeAncestry, sourceForNode, normalizedSourcePath, editorSourceURL, breakpointSourceURL, renderSourceAnalysis, renderRecompositionTable };
+};

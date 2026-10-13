@@ -1,6 +1,7 @@
+InspectorModules.observation = function(context) {
 // Observation is deliberately separate from checkpoint/restore: read-only,
 // explicitly registered fields, and values only for the checked watch list.
-const observation = { registered: [], values: new Map(), watched: new Set(), events: [], recording: false, pending: false, dropped: 0, watchRequestID: null };
+const observation = context.session.observation = { registered: [], values: new Map(), watched: new Set(), events: [], recording: false, pending: false, dropped: 0, watchRequestID: null };
 const observationEl = id => document.getElementById(id);
 function handleObservationEnvelope(env) {
   if (["state.list.ok", "state.subscribe.ok", "state.observation"].includes(env.type)) {
@@ -9,7 +10,7 @@ function handleObservationEnvelope(env) {
     const live = new Set(observation.registered.map(item => item.id));
     const removed = [...observation.watched].filter(id => !live.has(id));
     for (const id of removed) { observation.watched.delete(id); observation.values.delete(id); }
-    if (removed.length) observation.watchRequestID = send("state.subscribe", {ids: [...observation.watched]});
+    if (removed.length) observation.watchRequestID = context.connection.send("state.subscribe", {ids: [...observation.watched]});
     if (env.type !== "state.list.ok") observation.values = new Map((env.payload?.values ?? []).map(v => [v.id, v]));
     renderStateRegistry(); observationControls(); return true;
   }
@@ -33,14 +34,14 @@ function handleObservationEnvelope(env) {
 }
 function watchState(id, enabled) {
   if (enabled) observation.watched.add(id); else { observation.watched.delete(id); observation.values.delete(id); }
-  observation.watchRequestID = send("state.subscribe", { ids: [...observation.watched] }); renderStateRegistry(); observationControls();
+  observation.watchRequestID = context.connection.send("state.subscribe", { ids: [...observation.watched] }); renderStateRegistry(); observationControls();
 }
 function renderStateRegistry() {
   const list = observationEl("registeredStates");
-  const selected = findNode(state.tree, state.selectedId);
-  const scope = selected?.ownerScopeID ?? (selected?.recomposition ? nodeId(selected) : null);
+  const selected = context.tree.findNode(context.session.tree.tree, context.session.tree.selectedId);
+  const scope = selected?.ownerScopeID ?? (selected?.recomposition ? context.tree.nodeId(selected) : null);
   const onlySelected = observationEl("stateSelectedOnly").checked;
-  const signature = JSON.stringify([state.connected, onlySelected ? scope : null, onlySelected,
+  const signature = JSON.stringify([context.session.connection.connected, onlySelected ? scope : null, onlySelected,
     observation.registered, [...observation.watched], [...observation.values]]);
   if (signature === observation.registrySignature) return;
   observation.registrySignature = signature;
@@ -51,7 +52,7 @@ function renderStateRegistry() {
     const row = document.createElement("label"); row.className = "stateWatchRow";
     const checkbox = document.createElement("input"); checkbox.type = "checkbox";
     checkbox.checked = observation.watched.has(item.id);
-    checkbox.disabled = !state.connected || (!checkbox.checked && observation.watched.size >= 128);
+    checkbox.disabled = !context.session.connection.connected || (!checkbox.checked && observation.watched.size >= 128);
     checkbox.addEventListener("change", () => watchState(item.id, checkbox.checked));
     const label = document.createElement("span"); label.textContent = `${item.name}${item.scopeID ? ' · scope ' + item.scopeID : ''}`;
     label.title = item.valueType;
@@ -62,11 +63,11 @@ function renderStateRegistry() {
   if (!entries.length) list.textContent = onlySelected ? "No exposed state in this component." : "No exposed state. Register providers or use @State(expose: true).";
 }
 function observationControls() {
-  const active = state.connected && hasCapability("state.observe");
+  const active = context.session.connection.connected && context.controls.hasCapability("state.observe");
   observationEl("refreshStates").disabled = !active;
   observationEl("stopWatching").disabled = !active || !observation.watched.size;
-  observationEl("startTimeline").disabled = !state.connected || !hasCapability("timeline") || observation.recording || observation.pending;
-  observationEl("stopTimeline").disabled = !observation.recording || observation.pending || !state.connected;
+  observationEl("startTimeline").disabled = !context.session.connection.connected || !context.controls.hasCapability("timeline") || observation.recording || observation.pending;
+  observationEl("stopTimeline").disabled = !observation.recording || observation.pending || !context.session.connection.connected;
   observationEl("exportTimeline").disabled = !observation.events.length;
 }
 function queueTimelineRender() {
@@ -84,11 +85,11 @@ function renderTimeline() {
   for (const event of events) {
     const row = document.createElement("button"); row.className = "timelineRow";
     row.title = `Start ${event.startMs.toFixed(3)} ms · ${event.name}\n${(event.reasons ?? []).map(r => r.kind + (r.detail ? ': ' + r.detail : '')).join('\n')}`;
-    row.disabled = !event.scopeID || !findNode(state.tree, event.scopeID);
-    row.onclick = () => { const node = findNode(state.tree, event.scopeID); if (node) selectNode(node); };
-    const label = document.createElement("span"); label.textContent = `${event.phase} · ${compactTag(event.name)} · ${event.durationMs.toFixed(3)} ms`;
+    row.disabled = !event.scopeID || !context.tree.findNode(context.session.tree.tree, event.scopeID);
+    row.onclick = () => { const node = context.tree.findNode(context.session.tree.tree, event.scopeID); if (node) context.tree.selectNode(node); };
+    const label = document.createElement("span"); label.textContent = `${event.phase} · ${context.tree.compactTag(event.name)} · ${event.durationMs.toFixed(3)} ms`;
     const track = document.createElement("span"); track.className = "timelineTrack";
-    const bar = document.createElement("span"); bar.className = "timelineBar " + escapeClass(event.phase);
+    const bar = document.createElement("span"); bar.className = "timelineBar " + context.format.escapeClass(event.phase);
     bar.style.marginLeft = `${(event.startMs - start) / span * 100}%`;
     bar.style.width = `${Math.max(0.3, event.durationMs / span * 100)}%`; track.append(bar);
     row.append(label, track); list.append(row);
@@ -108,16 +109,16 @@ function timelineTrace() {
     args: { scopeID: e.scopeID, reasons: e.reasons ?? [] } })) };
 }
 document.addEventListener("DOMContentLoaded", () => {
-  observationEl("refreshStates").onclick = () => send("state.list");
+  observationEl("refreshStates").onclick = () => context.connection.send("state.list");
   observationEl("stateSelectedOnly").onchange = renderStateRegistry;
   observationEl("stopWatching").onclick = () => {
-    send("state.unsubscribe"); observation.watchRequestID = null; observation.watched.clear(); observation.values.clear(); renderStateRegistry(); observationControls();
+    context.connection.send("state.unsubscribe"); observation.watchRequestID = null; observation.watched.clear(); observation.values.clear(); renderStateRegistry(); observationControls();
   };
   observationEl("startTimeline").onclick = () => {
     observation.events = []; observation.dropped = 0; observation.pending = true;
-    send("timeline.subscribe"); observationControls(); renderTimeline();
+    context.connection.send("timeline.subscribe"); observationControls(); renderTimeline();
   };
-  observationEl("stopTimeline").onclick = () => { observation.pending = true; send("timeline.unsubscribe"); observationControls(); };
+  observationEl("stopTimeline").onclick = () => { observation.pending = true; context.connection.send("timeline.unsubscribe"); observationControls(); };
   observationEl("timelinePhase").onchange = renderTimeline;
   observationEl("exportTimeline").onclick = () => {
     const url = URL.createObjectURL(new Blob([JSON.stringify(timelineTrace())], {type: "application/json"}));
@@ -126,3 +127,6 @@ document.addEventListener("DOMContentLoaded", () => {
   };
   resetObservations();
 });
+
+return { handleObservationEnvelope, watchState, renderStateRegistry, observationControls, queueTimelineRender, renderTimeline, resetObservations, timelineTrace };
+};

@@ -7,6 +7,7 @@ import NIOWebSocket
 /// Desktop WebSocket transport for macOS, Linux and Windows. NIO handles the
 /// HTTP upgrade and RFC 6455 framing; no platform-specific socket code is needed.
 public final class NIODevToolsTransport: DevToolsTransport, @unchecked Sendable {
+    private let accessToken: String?
     private let lock = NSLock()
     private var group: MultiThreadedEventLoopGroup?
     private var listener: Channel?
@@ -15,7 +16,7 @@ public final class NIODevToolsTransport: DevToolsTransport, @unchecked Sendable 
         lock.withLock { listener?.localAddress?.port.flatMap(UInt16.init(exactly:)) }
     }
 
-    public init() {}
+    public init(accessToken: String? = nil) { self.accessToken = accessToken }
 
     public func start(host: String, port: UInt16,
                       onEvent: @escaping @Sendable (DevToolsTransportEvent) -> Void) throws {
@@ -40,18 +41,25 @@ public final class NIODevToolsTransport: DevToolsTransport, @unchecked Sendable 
                     .childChannelOption(ChannelOptions.writeBufferWaterMark,
                                         value: WriteBufferWaterMark(low: 256 * 1024, high: 4 * 1024 * 1024))
                     .childChannelInitializer { channel in
+                        let accessToken = self.accessToken
                         let upgrader = NIOWebSocketServerUpgrader(
                             maxFrameSize: DevToolsWebSocketHandler.maximumMessageBytes,
                             shouldUpgrade: { channel, request in
-                                channel.eventLoop.makeSucceededFuture(
-                                    request.uri == "/" ? HTTPHeaders() : nil)
+                                let url = URLComponents(string: "http://localhost" + request.uri)
+                                let supplied = url?.queryItems?.first { $0.name == "token" }?.value
+                                let allowed = url?.path == "/" && (accessToken == nil || supplied == accessToken)
+                                return channel.eventLoop.makeSucceededFuture(allowed ? HTTPHeaders() : nil)
                             },
                             upgradePipelineHandler: { channel, _ in
-                                channel.pipeline.addHandler(DevToolsWebSocketHandler(onEvent: onEvent))
+                                channel.pipeline.removeHandler(name: "httpFallback").flatMap {
+                                    channel.pipeline.addHandler(DevToolsWebSocketHandler(onEvent: onEvent))
+                                }
                             }
                         )
                         return channel.pipeline.configureHTTPServerPipeline(
-                            withServerUpgrade: (upgraders: [upgrader], completionHandler: { _ in }))
+                            withServerUpgrade: (upgraders: [upgrader], completionHandler: { _ in })).flatMap {
+                                channel.pipeline.addHandler(DevToolsHTTPFallback(), name: "httpFallback")
+                            }
                     }
                     .bind(host: address, port: Int(port)).wait()
                 self.group = group
@@ -165,4 +173,17 @@ final class DevToolsWebSocketHandler: ChannelInboundHandler {
     }
 
     func errorCaught(context: ChannelHandlerContext, error: Error) { context.close(promise: nil) }
+}
+
+/// Rejected upgrades receive a response and close instead of waiting indefinitely.
+private final class DevToolsHTTPFallback: ChannelInboundHandler, RemovableChannelHandler, @unchecked Sendable {
+    typealias InboundIn = HTTPServerRequestPart
+    typealias OutboundOut = HTTPServerResponsePart
+    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+        guard case .end = unwrapInboundIn(data) else { return }
+        let head = HTTPResponseHead(version: .http1_1, status: .forbidden, headers: HTTPHeaders([("Content-Length", "0"), ("Connection", "close")]))
+        context.write(wrapOutboundOut(.head(head)), promise: nil)
+        let channel = context.channel
+        context.writeAndFlush(wrapOutboundOut(.end(nil))).whenComplete { _ in _ = channel.close() }
+    }
 }

@@ -25,7 +25,7 @@ public final class DevTools {
     public let timing = TimingPublisher()
     public var stateRegistry: StateRegistry? {
         didSet {
-            server.stateObservationProvider = stateRegistry.map { registry in { @MainActor ids in registry.observation(ids: ids) } }
+            server.host.observation.state = stateRegistry.map { registry in { @MainActor ids in registry.observation(ids: ids) } }
         }
     }
 
@@ -37,17 +37,8 @@ public final class DevTools {
     /// host should forward the result to its platform window session.
     public var inputDelivery: ((InputEvent) -> Void)?
 
-    /// Captures application state when DevTools requests a checkpoint.
-    /// The dictionary is opaque to DevTools; the host owns its schema.
-    public var stateCheckpointProvider: (() -> [String: String])?
-
-    /// Restores application state from a previously-captured checkpoint.
-    public var inputRecordingStart: (() -> Bool)?
-    public var inputRecordingStop: (() -> InputRecording?)?
-    public var inputReplay: ((InputRecording) -> Bool)?
-
-    public var stateRestoreResultHandler: (([String: String]) -> Bool)?
-    public var stateRestoreHandler: (([String: String]) -> Void)?
+    public var checkpoint = DevToolsHost.Checkpoint()
+    public var recording = DevToolsHost.Recording()
 
     /// `true` between `mirror.start` and `mirror.stop`. Application can poll
     /// this to keep requesting redisplay so the mirror stays live even when
@@ -77,15 +68,15 @@ public final class DevTools {
                                     renderTree: renderTree)
 
         let scene = self.scene
-        server.snapshotProvider = { @MainActor in scene.snapshot() }
-        server.selectionHandler = { @MainActor [weak self] id in
+        server.host.scene.snapshot = { @MainActor in scene.snapshot() }
+        server.host.scene.select = { @MainActor [weak self] id in
             self?.handleSelection(id: id)
         }
-        server.selectionClearHandler = { @MainActor [weak self] in
+        server.host.scene.clearSelection = { @MainActor [weak self] in
             self?.handleSelection(id: nil)
         }
-        server.inspectionHandler = { @MainActor request in scene.editor.handle(request) }
-        server.inspectionResetHandler = { @MainActor in scene.editor.reset() }
+        server.host.scene.inspect = { @MainActor request in scene.editor.handle(request) }
+        server.host.scene.reset = { @MainActor in scene.editor.reset() }
         scene.editor.onChange = { [weak self] in
             MainActor.assumeIsolated {
                 self?.onSelectionChanged?()
@@ -94,27 +85,30 @@ public final class DevTools {
         }
 
         wireMirror()
-        wireState()
-        server.timelineProvider = { @MainActor [weak tree] after in tree?.timeline.snapshot(after: after) ?? TimelineSnapshotPayload(events: []) }
-        server.timelineCaptureHandler = { @MainActor [weak tree] in tree?.timeline.setEnabled($0) }
+        server.host.observation.timeline = { @MainActor [weak tree] after in tree?.timeline.snapshot(after: after) ?? TimelineSnapshotPayload(events: []) }
+        server.host.observation.capture = { @MainActor [weak tree] in tree?.timeline.setEnabled($0) }
     }
 
     public func start() throws {
         guard config.enabled else { return }
+        server.host.checkpoint = checkpoint
+        server.host.recording = recording
         var capabilities = ["tree", "select", "log", "timing", "inspect", "style", "source", "recomposition", "timeline"]
         if stateRegistry != nil { capabilities.append("state.observe") }
         if frameTap != nil { capabilities.append("mirror") }
-        if stateCheckpointProvider != nil, stateRestoreHandler != nil || stateRestoreResultHandler != nil {
+        if checkpoint.capture != nil, checkpoint.restore != nil {
             capabilities.append("state")
         }
-        if inputRecordingStart != nil, inputRecordingStop != nil, inputReplay != nil {
+        if recording.start != nil, recording.stop != nil, recording.replay != nil {
             capabilities.append("recording")
         }
         server.advertisedCapabilities = capabilities
         wireSinks()
         do {
             try server.start()
+            try publishDiscovery()
         } catch {
+            server.stop()
             unwireSinks()
             throw error
         }
@@ -124,6 +118,7 @@ public final class DevTools {
         timeline.setEnabled(false)
         frameTap?.stop()
         server.stop()
+        if let path = config.launch?.descriptorPath { try? FileManager.default.removeItem(atPath: path) }
         scene.editor.reset()
         unwireSinks()
     }
@@ -198,7 +193,7 @@ public final class DevTools {
     }
 
     private func wireMirror() {
-        server.mirrorStartHandler = { @MainActor [weak self] payload in
+        server.host.mirror.start = { @MainActor [weak self] payload in
             guard let self else { return }
             self.frameTap?.start(
                 fps: payload.fps ?? 15,
@@ -206,30 +201,14 @@ public final class DevTools {
             )
             self.onMirrorStart?()
         }
-        server.mirrorStopHandler = { @MainActor [weak self] in
+        server.host.mirror.stop = { @MainActor [weak self] in
             self?.frameTap?.stop()
             self?.server.broadcastMirrorStopped(reason: "client")
         }
-        server.mirrorInputHandler = { @MainActor [weak self] payload in
+        server.host.mirror.input = { @MainActor [weak self] payload in
             guard let event = InputBridge.event(from: payload) else { return }
             self?.inputDelivery?(event)
         }
     }
 
-    private func wireState() {
-        server.stateRestoreResultHandler = { @MainActor [weak self] values in
-            guard let self else { return false }
-            if let restore = self.stateRestoreResultHandler { return restore(values) }
-            self.stateRestoreHandler?(values); return true
-        }
-        server.recordingStartHandler = { @MainActor [weak self] in self?.inputRecordingStart?() ?? false }
-        server.recordingStopHandler = { @MainActor [weak self] in self?.inputRecordingStop?() }
-        server.recordingReplayHandler = { @MainActor [weak self] recording in self?.inputReplay?(recording) ?? false }
-        server.stateCheckpointHandler = { @MainActor [weak self] in
-            self?.stateCheckpointProvider?() ?? [:]
-        }
-        server.stateRestoreHandler = { @MainActor [weak self] payload in
-            self?.stateRestoreHandler?(payload)
-        }
-    }
 }
