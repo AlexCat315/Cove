@@ -1,5 +1,4 @@
 import Foundation
-import Network
 import Testing
 @testable import GuavaUIRuntime
 @testable import GuavaUICompose
@@ -236,82 +235,4 @@ private final class ImageTestUIQueue: @unchecked Sendable {
     var count: Int { lock.withLock { jobs.count } }
     func enqueue(_ work: @escaping () -> Void) { lock.withLock { jobs.append(work) } }
     func drain() { let jobs = lock.withLock { let result = self.jobs; self.jobs = []; return result }; jobs.forEach { $0() } }
-}
-private struct ImageHTTPFixture {
-    private let server: ImageHTTPServer
-    init() throws { server = try ImageHTTPServer() }
-    func url(_ path: String) -> URL { server.url(path) }
-    func stop() { server.stop() }
-}
-
-/// A minimal localhost HTTP server so the transport test exercises real sockets
-/// instead of a mock. It serves `/ok`, `/missing`, `/large`, a held `/slow`
-/// request and the `/slow-started` probe that reports when `/slow` arrived.
-private final class ImageHTTPServer: @unchecked Sendable {
-    private(set) var port = 0
-    private let listener: NWListener
-    private let lock = NSLock()
-    private var slowStarted = false
-    private var held: [NWConnection] = []
-
-    init() throws {
-        listener = try NWListener(using: .tcp, on: .any)
-        let ready = DispatchSemaphore(value: 0)
-        listener.stateUpdateHandler = { if case .ready = $0 { ready.signal() } }
-        listener.newConnectionHandler = { [weak self] connection in self?.accept(connection) }
-        listener.start(queue: .global())
-        guard ready.wait(timeout: .now() + 10) == .success, let port = listener.port?.rawValue else {
-            throw AsyncImageError.networkFailed("HTTP fixture did not start")
-        }
-        self.port = Int(port)
-    }
-
-    func url(_ path: String) -> URL { URL(string: "http://127.0.0.1:\(port)/\(path)")! }
-
-    func stop() {
-        listener.cancel()
-        let connections = lock.withLock { let value = held; held = []; return value }
-        connections.forEach { $0.cancel() }
-    }
-
-    private func accept(_ connection: NWConnection) {
-        connection.start(queue: .global())
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 4096) { [weak self] data, _, _, _ in
-            guard let self, let data, let request = String(data: data, encoding: .utf8),
-                  let target = request.split(separator: " ").dropFirst().first else {
-                connection.cancel(); return
-            }
-            let path = String(target.split(separator: "?").first ?? target)
-            switch path {
-            case "/slow":
-                // Held open until the client cancels; the connection must stay retained.
-                self.lock.withLock { self.slowStarted = true; self.held.append(connection) }
-            case "/slow-started":
-                let started = self.lock.withLock { self.slowStarted }
-                self.respond(connection, status: 200, body: Data((started ? "started" : "pending").utf8))
-            case "/missing":
-                self.respond(connection, status: 404, body: Data())
-            case "/large":
-                self.respond(connection, status: 200, body: Data(repeating: UInt8(ascii: "x"), count: 2048))
-            case "/vector", "/vector.jpg", "/fallback.svg":
-                let svg = Data("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"160\" height=\"80\"><rect width=\"160\" height=\"80\" fill=\"red\"/></svg>".utf8)
-                self.respond(connection, status: 200, body: svg, headers: [
-                    "Content-Type": path == "/fallback.svg" ? "application/octet-stream" : "image/svg+xml; charset=utf-8"
-                ])
-            case "/redirect":
-                self.respond(connection, status: 302, body: Data(), headers: ["Location": self.url("fallback.svg").absoluteString])
-            default:
-                self.respond(connection, status: 200, body: Data("image data".utf8))
-            }
-        }
-    }
-
-    private func respond(_ connection: NWConnection, status: Int, body: Data, headers: [String: String] = [:]) {
-        let head = "HTTP/1.1 \(status) \(status == 200 ? "OK" : "Not Found")\r\n"
-            + headers.sorted { $0.key < $1.key }.map { "\($0.key): \($0.value)\r\n" }.joined()
-            + "Content-Length: \(body.count)\r\nConnection: close\r\n\r\n"
-        var payload = Data(head.utf8)
-        payload.append(body)
-        connection.send(content: payload, completion: .contentProcessed { _ in connection.cancel() })
-    }
 }

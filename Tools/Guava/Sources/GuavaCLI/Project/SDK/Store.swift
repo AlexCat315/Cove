@@ -36,7 +36,7 @@ struct SDKStore {
         try Files.directory(staging.deletingLastPathComponent())
         defer { try? Files.remove(staging) }
         try Shell.run(["git", "clone", "--depth", "1", "--branch", "v" + version,
-                       "--recurse-submodules", "--", try SDKRelease.current.repository, staging.path])
+                       "--recurse-submodules", "--shallow-submodules", "--", try SDKRelease.current.repository, staging.path])
         guard try SDKRelease.read(at: staging).version == version else { throw ToolError.invalid("SDK tag and manifest version disagree") }
         try Files.directory(target.deletingLastPathComponent())
         try FileManager.default.moveItem(at: staging, to: target)
