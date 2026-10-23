@@ -41,11 +41,11 @@ enum VulkanLayoutFormats {
 
     static func stageFlags(_ stage: ShaderStage) -> VkShaderStageFlags {
         switch stage {
-        case .vertex: return VkShaderStageFlags(VK_SHADER_STAGE_VERTEX_BIT.rawValue)
-        case .fragment: return VkShaderStageFlags(VK_SHADER_STAGE_FRAGMENT_BIT.rawValue)
-        case .compute: return VkShaderStageFlags(VK_SHADER_STAGE_COMPUTE_BIT.rawValue)
-        case .task: return VkShaderStageFlags(VK_SHADER_STAGE_TASK_BIT_EXT.rawValue)
-        case .mesh: return VkShaderStageFlags(VK_SHADER_STAGE_MESH_BIT_EXT.rawValue)
+        case .vertex: return VkShaderStageFlags(UInt32(VK_SHADER_STAGE_VERTEX_BIT.rawValue))
+        case .fragment: return VkShaderStageFlags(UInt32(VK_SHADER_STAGE_FRAGMENT_BIT.rawValue))
+        case .compute: return VkShaderStageFlags(UInt32(VK_SHADER_STAGE_COMPUTE_BIT.rawValue))
+        case .task: return VkShaderStageFlags(UInt32(VK_SHADER_STAGE_TASK_BIT_EXT.rawValue))
+        case .mesh: return VkShaderStageFlags(UInt32(VK_SHADER_STAGE_MESH_BIT_EXT.rawValue))
         }
     }
 }

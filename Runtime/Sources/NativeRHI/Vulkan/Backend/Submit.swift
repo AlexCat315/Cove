@@ -112,7 +112,7 @@ extension VulkanBackend {
         var info = VkCommandPoolCreateInfo()
         info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO
         info.queueFamilyIndex = family
-        info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT.rawValue
+        info.flags = UInt32(VK_COMMAND_POOL_CREATE_TRANSIENT_BIT.rawValue)
         guard let handle = vkWithOutHandle({ _ = context.resources.createCommandPool(context.device, &info, nil, $0) }) else { throw RHIError.outOfMemory }
         let pool = VulkanCommandPool(handle: handle)
         frame.commandPools[family] = pool
@@ -242,7 +242,7 @@ extension VulkanBackend {
         var submitted = false
         let cmd = try pool.commandBuffer(context: context)
         var begin = VkCommandBufferBeginInfo(); begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO
-        begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT.rawValue
+        begin.flags = UInt32(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT.rawValue)
         try rhiRequire(draw.beginCommandBuffer(cmd, &begin) == VK_SUCCESS, "present command begin failed")
         let previous = registries.textures[image.texture.id]!
         try transitionTexture(cmd: cmd, handle: image.texture, state: .present)
@@ -316,7 +316,7 @@ extension VulkanBackend {
         let signalValues = signals.map(\.value)
         let waitHandles: [VkSemaphore?] = waits.map(\.semaphore)
         let signalHandles: [VkSemaphore?] = signals.map(\.semaphore)
-        let stages = waits.map { _ in VkPipelineStageFlags(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT.rawValue) }
+        let stages = waits.map { _ in VkPipelineStageFlags(UInt32(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT.rawValue)) }
         var commandHandle: VkCommandBuffer? = command
         return waitValues.withUnsafeBufferPointer { waitValuePointer in
             signalValues.withUnsafeBufferPointer { signalValuePointer in
@@ -380,9 +380,9 @@ extension VulkanBackend {
         var info = VkBufferCreateInfo()
         info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO
         info.size = VkDeviceSize(size)
-        info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT.rawValue | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT.rawValue
-            | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT.rawValue | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT.rawValue
-            | VK_BUFFER_USAGE_INDEX_BUFFER_BIT.rawValue | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT.rawValue
+        info.usage = UInt32(VK_BUFFER_USAGE_TRANSFER_SRC_BIT.rawValue) | UInt32(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT.rawValue)
+            | UInt32(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT.rawValue) | UInt32(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT.rawValue)
+            | UInt32(VK_BUFFER_USAGE_INDEX_BUFFER_BIT.rawValue) | UInt32(VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT.rawValue)
         let arena = VulkanScratch()
         let families = Array(Set([context.queues.graphics.family, context.queues.compute.family, context.queues.transfer.family]))
         info.sharingMode = families.count > 1 ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE
@@ -395,8 +395,8 @@ extension VulkanBackend {
         let allocation = try allocator.allocate(
             size: req.size, alignment: req.alignment,
             memoryTypeBits: req.memoryTypeBits,
-            requiredFlags: VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT.rawValue
-                | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT.rawValue))
+            requiredFlags: VkMemoryPropertyFlags(UInt32(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT.rawValue)
+                | UInt32(VK_MEMORY_PROPERTY_HOST_COHERENT_BIT.rawValue)))
         _ = context.core.bindBufferMemory(context.device, buffer, allocation.memory, allocation.offset)
         return VulkanUploadChunk(buffer: buffer, allocation: allocation, capacity: size)
     }

@@ -206,20 +206,20 @@ final class VulkanSwapchain {
         info.imageColorSpace = chosen.colorSpace
         info.imageExtent = extent
         info.imageArrayLayers = 1
-        guard caps.supportedUsageFlags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT.rawValue != 0 else {
+        guard caps.supportedUsageFlags & UInt32(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT.rawValue) != 0 else {
             throw RHIError.unsupportedFeature("Vulkan surface images do not support color rendering")
         }
-        info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT.rawValue
+        info.imageUsage = UInt32(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT.rawValue)
         info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE
         // NativeRHI callers render in window coordinates. Passing a rotated
         // currentTransform promises pre-rotated shader output, which our public
         // render-pass contract does not provide. Let the compositor orient it.
-        guard caps.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR.rawValue != 0 else {
+        guard caps.supportedTransforms & UInt32(VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR.rawValue) != 0 else {
             throw RHIError.unsupportedFeature("Vulkan surface requires an unsupported pre-rotation transform")
         }
         info.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR
         let alphaBits = caps.supportedCompositeAlpha
-        info.compositeAlpha = VkCompositeAlphaFlagBitsKHR(rawValue: alphaBits & (~alphaBits &+ 1))
+        info.compositeAlpha = VkCompositeAlphaFlagBitsKHR(rawValue: numericCast(alphaBits & (~alphaBits &+ 1)))
         info.presentMode = presentMode
         info.clipped = VK_TRUE
         info.oldSwapchain = oldSwapchain
@@ -254,7 +254,7 @@ final class VulkanSwapchain {
             let id = registries.nextInternalID()
             var viewInfo = VkImageViewCreateInfo()
             viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO; viewInfo.image = image; viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D
-            viewInfo.format = chosen.format; viewInfo.subresourceRange = VkImageSubresourceRange(aspectMask: VK_IMAGE_ASPECT_COLOR_BIT.rawValue, baseMipLevel: 0, levelCount: 1, baseArrayLayer: 0, layerCount: 1)
+            viewInfo.format = chosen.format; viewInfo.subresourceRange = VkImageSubresourceRange(aspectMask: UInt32(VK_IMAGE_ASPECT_COLOR_BIT.rawValue), baseMipLevel: 0, levelCount: 1, baseArrayLayer: 0, layerCount: 1)
             guard let view = vkWithOutHandle({ _ = context.core.createImageView(context.device, &viewInfo, nil, $0) }) else { throw RHIError.outOfMemory }
             registries.textures[id] = VulkanTextureRecord(
                 image: image,

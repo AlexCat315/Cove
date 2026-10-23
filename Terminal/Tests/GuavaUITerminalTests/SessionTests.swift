@@ -1,4 +1,10 @@
+#if !os(Windows)
 import Foundation
+#if canImport(Darwin)
+private import Darwin
+#elseif canImport(Glibc)
+private import Glibc
+#endif
 import Testing
 @testable import GuavaUITerminal
 
@@ -94,3 +100,5 @@ struct SessionTests {
         #expect(session.frame.scroll.isAtBottom)
     }
 }
+
+#endif

@@ -65,9 +65,9 @@ enum VulkanFormats {
 
     static func vkCullMode(_ mode: CullMode) -> VkCullModeFlags {
         switch mode {
-        case .none: return VK_CULL_MODE_NONE.rawValue
-        case .front: return VK_CULL_MODE_FRONT_BIT.rawValue
-        case .back: return VK_CULL_MODE_BACK_BIT.rawValue
+        case .none: return UInt32(VK_CULL_MODE_NONE.rawValue)
+        case .front: return UInt32(VK_CULL_MODE_FRONT_BIT.rawValue)
+        case .back: return UInt32(VK_CULL_MODE_BACK_BIT.rawValue)
         }
     }
 
@@ -141,7 +141,7 @@ enum VulkanFormats {
 
     static func vkSampleCount(_ count: Int) throws -> VkSampleCountFlagBits {
         try rhiValidateSampleCount(count)
-        return VkSampleCountFlagBits(rawValue: UInt32(count))
+        return VkSampleCountFlagBits(rawValue: .init(count))
     }
 }
 

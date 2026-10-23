@@ -88,7 +88,7 @@ final class VulkanMemoryAllocator {
         var properties = memoryProperties
         let coherent = withUnsafePointer(to: &properties.memoryTypes) { raw in
             let flags = UnsafeRawPointer(raw).assumingMemoryBound(to: VkMemoryType.self)[Int(typeIndex)].propertyFlags
-            let required = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT.rawValue | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT.rawValue
+            let required = UInt32(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT.rawValue) | UInt32(VK_MEMORY_PROPERTY_HOST_COHERENT_BIT.rawValue)
             return flags & required == required
         }
         let block = try createBlock(size: blockSize, typeIndex: typeIndex, hostVisible: coherent)
@@ -167,7 +167,7 @@ final class VulkanMemoryAllocator {
         if context.features.accelerationStructures {
             var flags = VkMemoryAllocateFlagsInfo()
             flags.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO
-            flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT.rawValue
+            flags.flags = UInt32(VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT.rawValue)
             allocInfo.pNext = UnsafeRawPointer(arena.make(flags))
         }
         guard let memory: VkDeviceMemory = withExtendedLifetime(arena, { vkWithOutHandle({

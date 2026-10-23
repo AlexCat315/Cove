@@ -56,7 +56,7 @@ extension VulkanBackend {
     func shaderStage(_ module: VulkanShaderModuleRecord, arena: VulkanScratch) throws -> VkPipelineShaderStageCreateInfo {
         var stage = VkPipelineShaderStageCreateInfo()
         stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO
-        stage.stage = VkShaderStageFlagBits(rawValue: VulkanLayoutFormats.stageFlags(module.stage))
+        stage.stage = VkShaderStageFlagBits(rawValue: numericCast(VulkanLayoutFormats.stageFlags(module.stage)))
         stage.module = module.module
         stage.pName = arena.string(module.entryPoint)
         if !module.specializationConstants.isEmpty {

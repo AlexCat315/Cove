@@ -192,13 +192,13 @@ extension VulkanBackend {
                 let limit = context.limits.maxComputeWorkGroupCount
                 try rhiRequire(x <= Int(limit.0) && y <= Int(limit.1) && z <= Int(limit.2), "dispatch exceeds Vulkan workgroup limits")
                 draw.cmdDispatch(cmd, try rhiCount(x), try rhiCount(y), try rhiCount(z))
-                memoryDependency(cmd: cmd, source: VK_ACCESS_SHADER_WRITE_BIT.rawValue, destination: VK_ACCESS_SHADER_READ_BIT.rawValue | VK_ACCESS_SHADER_WRITE_BIT.rawValue)
+                memoryDependency(cmd: cmd, source: UInt32(VK_ACCESS_SHADER_WRITE_BIT.rawValue), destination: UInt32(VK_ACCESS_SHADER_READ_BIT.rawValue) | UInt32(VK_ACCESS_SHADER_WRITE_BIT.rawValue))
             case .dispatchIndirect(let handle, let offset):
                 guard let buffer = registries.buffers[handle.id], layoutID != nil else { throw RHIError.invalidArgument("invalid indirect dispatch") }
                 try rhiByteRange(offset: offset, size: 12, capacity: buffer.size)
                 try rhiRequire(offset % 4 == 0, "indirect dispatch offset must be aligned")
                 context.auxiliary.dispatchIndirect(cmd, buffer.buffer, VkDeviceSize(offset))
-                memoryDependency(cmd: cmd, source: VK_ACCESS_SHADER_WRITE_BIT.rawValue, destination: VK_ACCESS_SHADER_READ_BIT.rawValue | VK_ACCESS_SHADER_WRITE_BIT.rawValue)
+                memoryDependency(cmd: cmd, source: UInt32(VK_ACCESS_SHADER_WRITE_BIT.rawValue), destination: UInt32(VK_ACCESS_SHADER_READ_BIT.rawValue) | UInt32(VK_ACCESS_SHADER_WRITE_BIT.rawValue))
             }
         }
     }
@@ -262,7 +262,7 @@ extension VulkanBackend {
                 try transitionTexture(cmd: cmd, handle: source, state: .copySource)
                 try transitionTexture(cmd: cmd, handle: destination, state: .copyDestination)
                 var region = VkImageCopy()
-                region.srcSubresource = VkImageSubresourceLayers(aspectMask: VK_IMAGE_ASPECT_COLOR_BIT.rawValue,
+                region.srcSubresource = VkImageSubresourceLayers(aspectMask: UInt32(VK_IMAGE_ASPECT_COLOR_BIT.rawValue),
                     mipLevel: 0,baseArrayLayer: 0,layerCount: 1)
                 region.dstSubresource = region.srcSubresource
                 region.extent = VkExtent3D(width: UInt32(width),height: UInt32(height),depth: 1)
@@ -283,7 +283,7 @@ extension VulkanBackend {
                 try textureCopy(cmd: cmd, buffer: buffer, offset: offset, rowBytes: rowBytes, texture: texture,
                     region: .init(width: width, height: height), subresource: .init(), upload: false)
             }
-            memoryDependency(cmd: cmd, source: VK_ACCESS_TRANSFER_WRITE_BIT.rawValue, destination: VK_ACCESS_TRANSFER_READ_BIT.rawValue | VK_ACCESS_TRANSFER_WRITE_BIT.rawValue)
+            memoryDependency(cmd: cmd, source: UInt32(VK_ACCESS_TRANSFER_WRITE_BIT.rawValue), destination: UInt32(VK_ACCESS_TRANSFER_READ_BIT.rawValue) | UInt32(VK_ACCESS_TRANSFER_WRITE_BIT.rawValue))
         }
     }
 

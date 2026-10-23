@@ -91,9 +91,9 @@ extension VulkanBackend: GPUTimestampRecording {
         context.resources.queries.cmdWriteTimestamp(cmd, stage, recording.pool, query)
         var barrier = VkMemoryBarrier()
         barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER
-        barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT.rawValue
-        barrier.dstAccessMask = VK_ACCESS_HOST_READ_BIT.rawValue
-        let host = VkPipelineStageFlags(VK_PIPELINE_STAGE_HOST_BIT.rawValue)
+        barrier.srcAccessMask = UInt32(VK_ACCESS_HOST_WRITE_BIT.rawValue)
+        barrier.dstAccessMask = UInt32(VK_ACCESS_HOST_READ_BIT.rawValue)
+        let host = VkPipelineStageFlags(UInt32(VK_PIPELINE_STAGE_HOST_BIT.rawValue))
         draw.cmdPipelineBarrier(cmd, host, host, 0, 1, &barrier, 0, nil, 0, nil)
     }
 
@@ -121,7 +121,7 @@ extension VulkanBackend: GPUTimestampRecording {
             context.resources.queries.getQueryPoolResults(
                 context.device, recording.pool, 0, recording.queryCount,
                 byteStride * count, bytes.baseAddress, VkDeviceSize(byteStride),
-                VkQueryResultFlags(VK_QUERY_RESULT_64_BIT.rawValue | VK_QUERY_RESULT_WAIT_BIT.rawValue))
+                VkQueryResultFlags(UInt32(VK_QUERY_RESULT_64_BIT.rawValue) | UInt32(VK_QUERY_RESULT_WAIT_BIT.rawValue)))
         }
         guard status == VK_SUCCESS else {
             recording.profile.note("vkGetQueryPoolResults returned \(status)")

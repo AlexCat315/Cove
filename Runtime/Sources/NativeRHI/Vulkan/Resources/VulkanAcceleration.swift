@@ -64,7 +64,7 @@ extension VulkanBackend {
                 var native = VkAccelerationStructureGeometryKHR()
                 native.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR
                 native.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR
-                native.flags = VK_GEOMETRY_OPAQUE_BIT_KHR.rawValue
+                native.flags = UInt32(VK_GEOMETRY_OPAQUE_BIT_KHR.rawValue)
                 var data = VkAccelerationStructureGeometryTrianglesDataKHR()
                 data.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR
                 data.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT
@@ -108,7 +108,7 @@ extension VulkanBackend {
         var input = VkAccelerationStructureBuildGeometryInfoKHR()
         input.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR
         input.type = topLevel ? VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR : VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR
-        input.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR.rawValue
+        input.flags = UInt32(VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR.rawValue)
         input.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR
         input.geometryCount = UInt32(geometry.count); input.pGeometries = arena.store(geometry)
         var allocation = VkAccelerationStructureBuildSizesInfoKHR()
@@ -137,18 +137,18 @@ extension VulkanBackend {
         guard let structure = registries.accelerationStructures[handle.id], let build = context.advanced.build else {
             throw RHIError.invalidArgument("unknown acceleration build")
         }
-        memoryDependency(cmd: cmd, source: VK_ACCESS_MEMORY_WRITE_BIT.rawValue, destination: VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR.rawValue | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR.rawValue)
+        memoryDependency(cmd: cmd, source: UInt32(VK_ACCESS_MEMORY_WRITE_BIT.rawValue), destination: UInt32(VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR.rawValue) | UInt32(VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR.rawValue))
         let arena = VulkanScratch()
         var info = VkAccelerationStructureBuildGeometryInfoKHR()
         info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR
         info.type = structure.topLevel ? VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR : VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR
-        info.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR.rawValue; info.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR
+        info.flags = UInt32(VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR.rawValue); info.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR
         info.dstAccelerationStructure = structure.native; info.geometryCount = UInt32(structure.geometry.count)
         info.pGeometries = arena.store(structure.geometry); info.scratchData.deviceAddress = structure.scratchAddress
         let ranges = arena.store(structure.ranges)
         withExtendedLifetime(arena) { build(cmd, 1, &info, arena.store([ranges])) }
-        memoryDependency(cmd: cmd, source: VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR.rawValue,
-                         destination: VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR.rawValue | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR.rawValue)
+        memoryDependency(cmd: cmd, source: UInt32(VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR.rawValue),
+                         destination: UInt32(VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR.rawValue) | UInt32(VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR.rawValue))
     }
 }
 #endif

@@ -2,30 +2,30 @@
 import CVulkanHeaders
 
 enum VulkanSynchronization {
-    static let stages = VkPipelineStageFlags(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT.rawValue)
+    static let stages = VkPipelineStageFlags(UInt32(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT.rawValue))
 
     static func aspect(_ format: TextureFormat) -> VkImageAspectFlags {
         if format == .depth24UnormStencil8 {
-            return VkImageAspectFlags(VK_IMAGE_ASPECT_DEPTH_BIT.rawValue | VK_IMAGE_ASPECT_STENCIL_BIT.rawValue)
+            return VkImageAspectFlags(UInt32(VK_IMAGE_ASPECT_DEPTH_BIT.rawValue) | UInt32(VK_IMAGE_ASPECT_STENCIL_BIT.rawValue))
         }
-        return VkImageAspectFlags(format.isDepth ? VK_IMAGE_ASPECT_DEPTH_BIT.rawValue : VK_IMAGE_ASPECT_COLOR_BIT.rawValue)
+        return VkImageAspectFlags(format.isDepth ? UInt32(VK_IMAGE_ASPECT_DEPTH_BIT.rawValue) : UInt32(VK_IMAGE_ASPECT_COLOR_BIT.rawValue))
     }
 
     static func access(_ state: ResourceState) -> VkAccessFlags {
         var flags: VkAccessFlags = 0
-        if state.contains(.constantBuffer) { flags |= VK_ACCESS_UNIFORM_READ_BIT.rawValue }
-        if state.contains(.vertexBuffer) { flags |= VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT.rawValue }
-        if state.contains(.indexBuffer) { flags |= VK_ACCESS_INDEX_READ_BIT.rawValue }
-        if state.contains(.indirectArgument) { flags |= VK_ACCESS_INDIRECT_COMMAND_READ_BIT.rawValue }
-        if state.contains(.shaderResource) { flags |= VK_ACCESS_SHADER_READ_BIT.rawValue }
-        if state.contains(.unorderedAccess) { flags |= VK_ACCESS_SHADER_READ_BIT.rawValue | VK_ACCESS_SHADER_WRITE_BIT.rawValue }
-        if state.contains(.renderTarget) { flags |= VK_ACCESS_COLOR_ATTACHMENT_READ_BIT.rawValue | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT.rawValue }
-        if state.contains(.depthWrite) { flags |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT.rawValue | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT.rawValue }
-        if state.contains(.depthRead) { flags |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT.rawValue }
-        if state.contains(.copySource) { flags |= VK_ACCESS_TRANSFER_READ_BIT.rawValue }
-        if state.contains(.copyDestination) { flags |= VK_ACCESS_TRANSFER_WRITE_BIT.rawValue }
-        if state.contains(.accelerationStructureRead) { flags |= VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR.rawValue }
-        if state.contains(.accelerationStructureWrite) { flags |= VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR.rawValue }
+        if state.contains(.constantBuffer) { flags |= UInt32(VK_ACCESS_UNIFORM_READ_BIT.rawValue) }
+        if state.contains(.vertexBuffer) { flags |= UInt32(VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT.rawValue) }
+        if state.contains(.indexBuffer) { flags |= UInt32(VK_ACCESS_INDEX_READ_BIT.rawValue) }
+        if state.contains(.indirectArgument) { flags |= UInt32(VK_ACCESS_INDIRECT_COMMAND_READ_BIT.rawValue) }
+        if state.contains(.shaderResource) { flags |= UInt32(VK_ACCESS_SHADER_READ_BIT.rawValue) }
+        if state.contains(.unorderedAccess) { flags |= UInt32(VK_ACCESS_SHADER_READ_BIT.rawValue) | UInt32(VK_ACCESS_SHADER_WRITE_BIT.rawValue) }
+        if state.contains(.renderTarget) { flags |= UInt32(VK_ACCESS_COLOR_ATTACHMENT_READ_BIT.rawValue) | UInt32(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT.rawValue) }
+        if state.contains(.depthWrite) { flags |= UInt32(VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT.rawValue) | UInt32(VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT.rawValue) }
+        if state.contains(.depthRead) { flags |= UInt32(VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT.rawValue) }
+        if state.contains(.copySource) { flags |= UInt32(VK_ACCESS_TRANSFER_READ_BIT.rawValue) }
+        if state.contains(.copyDestination) { flags |= UInt32(VK_ACCESS_TRANSFER_WRITE_BIT.rawValue) }
+        if state.contains(.accelerationStructureRead) { flags |= UInt32(VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR.rawValue) }
+        if state.contains(.accelerationStructureWrite) { flags |= UInt32(VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR.rawValue) }
         return flags
     }
 
@@ -44,13 +44,13 @@ enum VulkanSynchronization {
     static func layoutAccess(_ layout: VkImageLayout) -> VkAccessFlags {
         switch layout {
         case VK_IMAGE_LAYOUT_UNDEFINED: return 0
-        case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL: return VK_ACCESS_TRANSFER_WRITE_BIT.rawValue
-        case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL: return VK_ACCESS_TRANSFER_READ_BIT.rawValue
-        case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL: return VK_ACCESS_SHADER_READ_BIT.rawValue
-        case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL: return VK_ACCESS_COLOR_ATTACHMENT_READ_BIT.rawValue | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT.rawValue
-        case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL: return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT.rawValue | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT.rawValue
-        case VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL: return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT.rawValue
-        default: return VK_ACCESS_MEMORY_READ_BIT.rawValue | VK_ACCESS_MEMORY_WRITE_BIT.rawValue
+        case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL: return UInt32(VK_ACCESS_TRANSFER_WRITE_BIT.rawValue)
+        case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL: return UInt32(VK_ACCESS_TRANSFER_READ_BIT.rawValue)
+        case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL: return UInt32(VK_ACCESS_SHADER_READ_BIT.rawValue)
+        case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL: return UInt32(VK_ACCESS_COLOR_ATTACHMENT_READ_BIT.rawValue) | UInt32(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT.rawValue)
+        case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL: return UInt32(VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT.rawValue) | UInt32(VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT.rawValue)
+        case VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL: return UInt32(VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT.rawValue)
+        default: return UInt32(VK_ACCESS_MEMORY_READ_BIT.rawValue) | UInt32(VK_ACCESS_MEMORY_WRITE_BIT.rawValue)
         }
     }
 }

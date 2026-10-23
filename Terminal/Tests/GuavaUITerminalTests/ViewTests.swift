@@ -1,3 +1,4 @@
+#if !os(Windows)
 import Foundation
 import Testing
 import GuavaUIRuntime
@@ -282,3 +283,5 @@ final class WorkQueue: @unchecked Sendable {
         return !batch.isEmpty
     }
 }
+
+#endif
