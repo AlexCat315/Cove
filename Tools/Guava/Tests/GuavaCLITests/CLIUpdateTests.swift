@@ -2,6 +2,12 @@ import Foundation
 import Testing
 @testable import GuavaCLI
 
+@Test func desktopCompilerAcceptsAppleAndOfficialSwiftDistributions() {
+    #expect(ToolchainRequirements.supportsCompiler("Apple Swift version 6.4 (swiftlang-6.4.1.42 clang-1800.0)"))
+    #expect(ToolchainRequirements.supportsCompiler("Swift version 6.4.1 (swift-6.4.1-RELEASE)"))
+    #expect(!ToolchainRequirements.supportsCompiler("Swift version 6.3.1 (swift-6.3.1-RELEASE)"))
+}
+
 @Test func updateRequiresOneExactChecksumEntry() throws {
     let digest = String(repeating: "a", count: 64)
     let name = "guava-macos-arm64.tar.gz"

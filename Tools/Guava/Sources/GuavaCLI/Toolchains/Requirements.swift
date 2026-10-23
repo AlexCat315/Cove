@@ -12,6 +12,10 @@ struct ToolchainCheck {
 }
 
 enum ToolchainRequirements {
+    static func supportsCompiler(_ version: String) -> Bool {
+        version.range(of: #"Swift version 6\.4(?:\.[0-9]+)?(?:\s|$)"#, options: .regularExpression) != nil
+    }
+
     static func inspect(_ arguments: Arguments, root: URL) -> [ToolchainCheck] {
         let common = "Install Git, CMake and Ninja. macOS: brew install git cmake ninja; "
             + "Ubuntu/Debian: sudo apt-get install git cmake ninja-build build-essential pkg-config. "
@@ -20,7 +24,7 @@ enum ToolchainRequirements {
         let commands = prebuilt ? ["git"] : ["git", "cmake", "ninja", "zig"]
         var checks = commands.map { ToolchainCheck.executable($0, remedy: common) }
         let version = (try? Shell.run([GuavaSDK.swift, "--version"], capture: true, quiet: true)) ?? ""
-        checks.append(.init(name: "Swift 6.4.1", ready: version.contains("swift-6.4.1-RELEASE"),
+        checks.append(.init(name: "Swift 6.4", ready: supportsCompiler(version),
             remedy: "Install Swift 6.4.1 from https://www.swift.org/install/. With Swiftly: swiftly install 6.4.1; swiftly use 6.4.1. GUAVA_SWIFT_EXECUTABLE can select an existing compiler."))
         #if os(macOS)
         checks.append(.init(name: "Apple platform SDK", ready: (try? Shell.run(["xcrun", "--show-sdk-path"], capture: true, quiet: true)) != nil,
