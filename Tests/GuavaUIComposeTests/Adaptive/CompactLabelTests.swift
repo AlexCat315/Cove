@@ -31,7 +31,7 @@ struct CompactLabelTests: GuavaUIComposeSerializedSuite {
                                 graph.install(root: Box(direction: .column, alignItems: .stretch, spacing: 16) {
                                     Badge(title, tone: .warning) { $0.showsDot = true }.debugName("long-badge")
                                     Tag(title) { $0.icon = UIIcons.File.folder; $0.onRemove = {} }.debugName("long-tag")
-                                    KeyCap(["⌘", "⇧", key]).debugName("long-caps")
+                                    KeyCap(["⌘", "⇧", key], platform: .macOS).debugName("long-caps")
                                     FieldLabel(title) { $0.targetID = "name" }
                                     TextField("Name", text: .constant("")).accessibility { $0.identifier = "name" }
                                 }.frame(width: 220).surfaceEnvironment(surface).textScaler(.init(scale))

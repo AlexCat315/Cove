@@ -45,13 +45,15 @@ extension VulkanBackend {
         try rhiByteRange(offset: offset, size: data.count, capacity: record.size)
         if data.isEmpty { return }
         if let base = record.allocation.mappedBase {
-            base.advanced(by: Int(record.allocation.offset) + offset).copyMemory(
-                from: (data as NSData).bytes, byteCount: data.count)
+            data.withUnsafeBytes { bytes in
+                base.advanced(by: Int(record.allocation.offset) + offset).copyMemory(
+                    from: bytes.baseAddress!, byteCount: bytes.count)
+            }
             return
         }
         let staging = try makeStagingBuffer(size: data.count)
         defer { destroyStagingBuffer(staging) }
-        staging.pointer.copyMemory(from: (data as NSData).bytes, byteCount: data.count)
+        data.withUnsafeBytes { staging.pointer.copyMemory(from: $0.baseAddress!, byteCount: $0.count) }
 
         var copy = VkBufferCopy()
         copy.srcOffset = 0
@@ -73,7 +75,7 @@ extension VulkanBackend {
             textureWidth: extent.width, textureHeight: extent.height, capacity: data.count)
         let staging = try makeStagingBuffer(size: data.count)
         defer { destroyStagingBuffer(staging) }
-        staging.pointer.copyMemory(from: (data as NSData).bytes, byteCount: data.count)
+        data.withUnsafeBytes { staging.pointer.copyMemory(from: $0.baseAddress!, byteCount: $0.count) }
 
         var region = VkBufferImageCopy()
         region.bufferOffset = 0

@@ -89,6 +89,9 @@ private struct TerminalSurface: _PrimitiveView {
             let grid = metrics.grid(width: Float(node.frame.width), height: Float(node.frame.height))
             session.fit(columns: grid.columns, rows: grid.rows,
                         cellWidth: Int(metrics.width.rounded()), cellHeight: Int(metrics.height))
+            // Spawn only after the first fitted grid exists, so programs see
+            // the actual window size even when they query it immediately.
+            if session.status == .idle { try? session.start() }
             let frame = session.frame
             let isFocused = FocusChainHolder.current?.focused === node
             state.blink.update(active: isFocused && frame.cursor.isBlinking && !node.prefersReducedMotion)

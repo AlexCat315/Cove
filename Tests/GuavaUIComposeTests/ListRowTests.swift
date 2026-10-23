@@ -107,8 +107,19 @@ struct ListRowTests: GuavaUIComposeSerializedSuite {
                         h.width = width; h.scale = scale; h.input = input; h.dark = dark; h.rtl = rtl; settle(graph, h)
                         let title = try text(Self.title(0), graph), trailing = try named("row-trailing-0", graph), icon = try named("row-icon-0", graph)
                         #expect(title === original && title.clipsToBounds && title.frame.width > 0)
-                        #expect(trailing.absoluteFrame.minX >= -0.5 && trailing.absoluteFrame.maxX <= CGFloat(width) + 0.5,
-                                "\(kind), width \(width), scale \(scale), RTL \(rtl): title \(title.absoluteFrame), trailing \(trailing.absoluteFrame), icon \(icon.absoluteFrame)")
+                        // System fonts have different fixed-slot widths. When
+                        // they exceed the viewport the documented horizontal
+                        // scrolling behavior must keep every slot reachable.
+                        if trailing.absoluteFrame.minX < -0.5 || trailing.absoluteFrame.maxX > CGFloat(width) + 0.5 {
+                            let viewport = try #require(nodes(graph.tree.root).first {
+                                $0.accessibility?.role == .scrollArea && $0.accessibility?.combinesChildren == true
+                                    && nodes($0).contains { $0 === title }
+                            })
+                            #expect(viewport.absoluteFrame.minX >= -0.5 && viewport.absoluteFrame.maxX <= CGFloat(width) + 0.5)
+                            viewport.accessibilityActions.increment?(); settle(graph, h)
+                            #expect(viewport.contentOffset.x > 0)
+                            viewport.contentOffset = .zero; settle(graph, h)
+                        }
                         if rtl {
                             #expect(trailing.absoluteFrame.maxX <= title.absoluteFrame.minX + 0.5)
                             #expect(title.absoluteFrame.maxX <= icon.absoluteFrame.minX + 0.5)

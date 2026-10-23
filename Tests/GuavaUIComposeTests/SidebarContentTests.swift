@@ -36,7 +36,7 @@ private struct SidebarSlotScene: View {
             Divider()
             Row(alignment: .center, spacing: 8) {
                 Icon(UIIcons.Shape.circleDot, size: .small)
-                Text("All changes saved").font(.caption)
+                Text("All changes saved").font(.caption).flex(1, shrink: 1).frame(minWidth: 0)
             }.padding(14).debugName("sidebar-slot-footer")
         }).frame(width: 260, height: 420).textScaler(.init(scale))
     }

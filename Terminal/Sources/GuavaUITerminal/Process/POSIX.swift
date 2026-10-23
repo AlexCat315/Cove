@@ -26,12 +26,29 @@ final class POSIXPseudoTerminal: PseudoTerminalBackend, @unchecked Sendable {
         guard let executable = argv.pointers[0] else { throw TerminalError.spawnFailed(code: ENOMEM) }
         let directory = command.workingDirectory.map { strdup($0.path) } ?? nil
         defer { free(directory) }
+        var defaultAction = sigaction()
+        #if canImport(Darwin)
+        defaultAction.__sigaction_u.__sa_handler = SIG_DFL
+        #else
+        defaultAction.__sigaction_handler.sa_handler = SIG_DFL
+        #endif
+        sigemptyset(&defaultAction.sa_mask)
+        var childMask = sigset_t()
+        sigemptyset(&childMask)
 
         var window = windowSize(size)
         var master: Int32 = -1
         let pid = forkpty(&master, nil, nil, &window)
         if pid < 0 { throw TerminalError.spawnFailed(code: errno) }
         if pid == 0 {
+            // The host or test runner may ignore or block these signals.
+            // A terminal child must receive normal shell/job-control behavior.
+            _ = sigaction(SIGHUP, &defaultAction, nil)
+            _ = sigaction(SIGINT, &defaultAction, nil)
+            _ = sigaction(SIGQUIT, &defaultAction, nil)
+            _ = sigaction(SIGTERM, &defaultAction, nil)
+            _ = sigaction(SIGPIPE, &defaultAction, nil)
+            _ = sigprocmask(SIG_SETMASK, &childMask, nil)
             if let directory { _ = chdir(directory) }
             execve(executable, argv.pointers, envp.pointers)
             _exit(127)

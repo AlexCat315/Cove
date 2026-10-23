@@ -12,6 +12,7 @@ final class ConPTY: PseudoTerminalBackend, @unchecked Sendable {
     private let lock = NSLock()
     private var console: HPCON?
     private let input: HANDLE
+    private let output: HANDLE
     private let process: HANDLE
 
     /// `ProcThreadAttributeValue(22, FALSE, TRUE, FALSE)`; the macro is not imported.
@@ -44,7 +45,7 @@ final class ConPTY: PseudoTerminalBackend, @unchecked Sendable {
         var listSize: SIZE_T = 0
         _ = InitializeProcThreadAttributeList(nil, 1, 0, &listSize)
         let listStorage = UnsafeMutableRawPointer.allocate(byteCount: Int(listSize), alignment: 16)
-        let attributes = LPPROC_THREAD_ATTRIBUTE_LIST(OpaquePointer(listStorage))
+        let attributes = OpaquePointer(listStorage)
         defer { DeleteProcThreadAttributeList(attributes); listStorage.deallocate() }
         guard InitializeProcThreadAttributeList(attributes, 1, 0, &listSize),
               UpdateProcThreadAttribute(attributes, 0, pseudoConsoleAttribute, console,
@@ -84,21 +85,26 @@ final class ConPTY: PseudoTerminalBackend, @unchecked Sendable {
         if let thread = information.hThread { CloseHandle(thread) }
 
         let terminal = ConPTY(processID: Int32(bitPattern: information.dwProcessId),
-                              console: console, input: inputWrite, process: process)
-        terminal.startReading(outputRead, onOutput: onOutput, onExit: onExit)
+                              console: console, input: inputWrite, output: outputRead, process: process)
+        terminal.startReading(onOutput: onOutput, onExit: onExit)
         return terminal
     }
 
-    private init(processID: Int32, console: HPCON, input: HANDLE, process: HANDLE) {
+    private init(processID: Int32, console: HPCON, input: HANDLE, output: HANDLE, process: HANDLE) {
         self.processID = processID
         self.console = console
         self.input = input
+        self.output = output
         self.process = process
     }
 
-    private func startReading(_ output: HANDLE, onOutput: @escaping @Sendable ([UInt8]) -> Void,
+    deinit {
+        CloseHandle(input)
+        CloseHandle(process)
+    }
+
+    private func startReading(onOutput: @escaping @Sendable ([UInt8]) -> Void,
                               onExit: @escaping @Sendable (Int32) -> Void) {
-        let process = process
         let reader = Thread { [self] in
             var buffer = [UInt8](repeating: 0, count: 64 * 1024)
             while true {
@@ -112,8 +118,6 @@ final class ConPTY: PseudoTerminalBackend, @unchecked Sendable {
             WaitForSingleObject(process, INFINITE)
             GetExitCodeProcess(process, &code)
             self.closeConsole()
-            lock.withLock { CloseHandle(input) }
-            CloseHandle(process)
             onExit(Int32(bitPattern: code))
         }
         reader.name = "guava.terminal.conpty.read"

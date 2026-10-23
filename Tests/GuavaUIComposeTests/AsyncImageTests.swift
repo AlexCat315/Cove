@@ -193,7 +193,7 @@ struct AsyncImageTests {
     private func makeServices(gate: ImageDecodeGate, ui: ImageTestUIQueue) -> ImageLoadServices {
         .init(id: "test-images", cached: { _ in nil }, decode: { request, _ in .still(try await gate.decode(request)) },
               register: { _, decoded in
-                  #expect(Thread.isMainThread)
+                  #expect(ui.isDraining)
                   ui.registrations += 1
                   let asset = try ImageAssetRegistry.Asset(image: decoded)
                   ui.asset = asset
@@ -232,7 +232,13 @@ private final class ImageTestUIQueue: @unchecked Sendable {
     private var jobs: [() -> Void] = []
     var registrations = 0
     var asset: ImageAssetRegistry.Asset?
+    private(set) var isDraining = false
     var count: Int { lock.withLock { jobs.count } }
     func enqueue(_ work: @escaping () -> Void) { lock.withLock { jobs.append(work) } }
-    func drain() { let jobs = lock.withLock { let result = self.jobs; self.jobs = []; return result }; jobs.forEach { $0() } }
+    func drain() {
+        let jobs = lock.withLock { let result = self.jobs; self.jobs = []; return result }
+        isDraining = true
+        defer { isDraining = false }
+        jobs.forEach { $0() }
+    }
 }

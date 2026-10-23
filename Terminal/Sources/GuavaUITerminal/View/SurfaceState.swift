@@ -65,8 +65,6 @@ final class SurfaceState: NodeResource {
 
     private func observe() {
         guard node != nil, let session else { return }
-        // Failures land in `status` and on screen; nothing to rethrow here.
-        if session.status == .idle { try? session.start() }
         session.observe(self) { [weak self] in
             // New output may have moved or replaced the hovered text.
             self?.hoveredLink = nil
