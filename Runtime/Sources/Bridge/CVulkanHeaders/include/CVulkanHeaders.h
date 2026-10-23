@@ -1,7 +1,8 @@
-// Native Windows/Linux/Android Vulkan SDK headers and loader interop.
+// Pinned Vulkan headers and native driver-loader interop.
 #pragma once
 
-#include <vulkan/vulkan.h>
+#define VK_NO_PROTOTYPES
+#include "vulkan/vulkan.h"
 
 #ifdef __cplusplus
 extern "C" {

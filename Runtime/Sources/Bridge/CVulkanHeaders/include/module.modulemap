@@ -1,0 +1,4 @@
+module CVulkanHeaders {
+    header "CVulkanHeaders.h"
+    export *
+}

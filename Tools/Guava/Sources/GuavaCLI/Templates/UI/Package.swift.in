@@ -5,8 +5,9 @@ import PackageDescription
 let directory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
 let document = try JSONSerialization.jsonObject(with: Data(contentsOf: directory.appendingPathComponent("guava.json"))) as! [String: Any]
 let toolchain = document["toolchain"] as! [String: String]
+let sdkVersion = Version(toolchain["sdkVersion"]!)!
 let sdk: Package.Dependency = ProcessInfo.processInfo.environment["GUAVA_SDK_ROOT"].map { .package(name: "GuavaUI", path: $0) }
-    ?? .package(url: "https://github.com/AlexCat315/GuavaUI.git", exact: toolchain["sdkVersion"]!)
+    ?? .package(url: "https://github.com/AlexCat315/GuavaUI.git", exact: sdkVersion)
 
 #if os(macOS)
 let nativeDirectory = "Platforms/macOS/Sources"

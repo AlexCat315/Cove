@@ -19,15 +19,6 @@ enum ToolchainSetup {
             // SDK native archives are built once, shared by all application projects.
             try NativeSDK.prepare(root: root)
         }
-        #if os(Windows)
-        if ProcessInfo.processInfo.environment["VULKAN_SDK"] == nil {
-            let vulkan = root.appendingPathComponent("Runtime/vendor/vulkan-sdk")
-            if !FileManager.default.fileExists(atPath: vulkan.appendingPathComponent("include/vulkan/vulkan.h").path) {
-                try DeveloperTool.run(["vulkan", "bootstrap", "--destination", vulkan.path], root: root,
-                    environment: SwiftPackage.environment(root: root))
-            }
-        }
-        #endif
         print("Ready. guava create app MyApp; guava run MyApp --\(arguments.platform.rawValue)")
     }
 }

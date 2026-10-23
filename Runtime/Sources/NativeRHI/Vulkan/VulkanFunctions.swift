@@ -1,8 +1,7 @@
 // NativeRHI Vulkan — runtime function-pointer table and C-interop helpers.
 //
-// The native Vulkan loader is supplied by the Windows/Linux/Android SDK and
-// linked at build time. We bind its `vkGetInstanceProcAddr` from the linked
-// image and then build a table of the instance/device entry points we use,
+// The native Vulkan loader is supplied by the graphics driver. We load its
+// `vkGetInstanceProcAddr` at runtime and then build a table of the instance/device entry points we use,
 // grouped so each struct stays well under the maintainability limit. Handles
 // imported from the headers are `OpaquePointer` (non-optional); a null handle
 // is made by bit-casting a nil optional, and C out-handles are written through

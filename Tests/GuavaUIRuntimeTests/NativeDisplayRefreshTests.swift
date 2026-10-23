@@ -16,7 +16,12 @@ final class NativeDisplayRefreshTests: XCTestCase {
             let deadline = TimingTrace.now() + 1
             while ticks.count < count && TimingTrace.now() < deadline {
                 shell.pollWindowEvents()
-                XCTAssertTrue(shell.setDisplayRefreshEnabled(true, windowID: window.id))
+                // Native visibility can arrive after the initial window event.
+                // The tick-count assertions below still require a live display link.
+                guard shell.setDisplayRefreshEnabled(true, windowID: window.id) else {
+                    shell.waitForEvents(timeout: 0.01)
+                    continue
+                }
                 if let tick = shell.takeDisplayRefresh(windowID: window.id) { ticks.append(tick) }
                 if ticks.count < count { shell.waitForEvents(timeout: 0.1) }
             }

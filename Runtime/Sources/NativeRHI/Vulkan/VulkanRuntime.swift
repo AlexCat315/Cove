@@ -1,6 +1,6 @@
 // NativeRHI Vulkan — runtime loader and backend entry point.
 //
-// The native Windows/Linux/Android Vulkan SDK provides the linked loader. Instance
+// The graphics driver provides the native Vulkan loader. Instance
 // and device commands are resolved through their respective dispatch tables.
 // A GPU driver is discovered by the loader at runtime. macOS uses Metal.
 
@@ -8,7 +8,7 @@
 import CVulkanHeaders
 import Foundation
 
-/// Binds the linked loader's global `vkGetInstanceProcAddr` entry point.
+/// Binds the driver loader's global `vkGetInstanceProcAddr` entry point.
 final class VulkanLoader {
     private let getInstanceProcAddr: GIPASelf
 
@@ -18,8 +18,7 @@ final class VulkanLoader {
 
     private typealias GIPASelf = @convention(c) (VkInstance?, UnsafePointer<CChar>?) -> OpaquePointer?
 
-    /// The loader is linked into the process, so its symbols are found in the
-    /// global image table. Returns nil only if the linked entry point is absent.
+    /// Returns nil when the native Vulkan driver loader is unavailable.
     static func open() -> VulkanLoader? {
         guard let sym = grhi_vulkan_get_instance_proc_addr() else { return nil }
         let gipa = unsafeBitCast(OpaquePointer(sym), to: GIPASelf.self)

@@ -35,13 +35,6 @@ enum SwiftPackage {
         environment["GUAVA_SDK_ROOT"] = root.path
         #if os(Windows)
         try WindowsBuildEnvironment.activate(&environment)
-        let vulkan = URL(fileURLWithPath: environment["VULKAN_SDK"] ?? root.appendingPathComponent("Runtime/vendor/vulkan-sdk").path)
-        let include = vulkan.appendingPathComponent("include").path
-        let library = vulkan.appendingPathComponent("lib").path
-        environment["INCLUDE"] = include + ";" + (environment["INCLUDE"] ?? "")
-        environment["CPATH"] = include + ";" + (environment["CPATH"] ?? "")
-        environment["LIB"] = library + ";" + (environment["LIB"] ?? "")
-        environment["PATH"] = vulkan.appendingPathComponent("bin").path + ";" + (environment["PATH"] ?? "")
         #endif
         return environment
     }

@@ -194,9 +194,15 @@ struct TextSelectionRoot<Content: View>: View {
 }
 
 enum TextBoundaries {
+    #if !canImport(Darwin)
+    private static let words = try! NSRegularExpression(
+        pattern: #"[\p{L}\p{M}\p{N}_]+(?:['’][\p{L}\p{M}\p{N}_]+)*"#)
+    #endif
+
     /// The word (or, outside words, the single character) around a UTF-8 offset.
     static func word(in text: String, at offset: Int) -> Range<Int> {
         var result: Range<Int>?
+        #if canImport(Darwin)
         text.enumerateSubstrings(in: text.startIndex..<text.endIndex, options: .byWords) { _, range, _, stop in
             let lower = text.utf8.distance(from: text.startIndex, to: range.lowerBound)
             let upper = text.utf8.distance(from: text.startIndex, to: range.upperBound)
@@ -205,10 +211,25 @@ enum TextBoundaries {
                 stop = true
             }
         }
+        #else
+        for match in words.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
+            guard let range = Range(match.range, in: text) else { continue }
+            let lower = text.utf8.distance(from: text.startIndex, to: range.lowerBound)
+            let upper = text.utf8.distance(from: text.startIndex, to: range.upperBound)
+            if offset >= lower && offset < upper || offset == upper && upper == text.utf8.count {
+                result = lower..<upper
+                break
+            }
+        }
+        #endif
         if let result { return result }
-        let utf8 = text.utf8
-        guard offset < utf8.count, let index = utf8.index(utf8.startIndex, offsetBy: offset, limitedBy: utf8.endIndex),
-              let character = text[index...].first else { return offset..<offset }
-        return offset..<(offset + character.utf8.count)
+        var lower = 0
+        for character in text {
+            let upper = lower + character.utf8.count
+            if offset >= lower && offset < upper { return lower..<upper }
+            lower = upper
+        }
+        let end = max(0, min(offset, text.utf8.count))
+        return end..<end
     }
 }

@@ -1,4 +1,131 @@
 {
   "version": "0.1.0",
-  "platforms": {}
+  "platforms": {
+    "linux-x86_64": {
+      "CFreeType": {
+        "directory": "vendor",
+        "sha256": "a7735dcaac81b298a34fc576ca9e91beda17ced0b1a7a6aa0ed6f2e217ed1da8",
+        "url": "https://github.com/AlexCat315/GuavaUI/releases/download/native-v0.1.0/CFreeType-linux-x86_64.zip"
+      },
+      "CHarfBuzz": {
+        "directory": "vendor",
+        "sha256": "d26495a211e6856f60e409f401875cd26a5a35473d73240bbd1ae6691913b5d3",
+        "url": "https://github.com/AlexCat315/GuavaUI/releases/download/native-v0.1.0/CHarfBuzz-linux-x86_64.zip"
+      },
+      "GhosttyVt": {
+        "directory": "vendor",
+        "sha256": "0b520992d981b2838d8faa4b743e733048b0b57a156be95b116dfb61d24939cb",
+        "url": "https://github.com/AlexCat315/GuavaUI/releases/download/native-v0.1.0/GhosttyVt-linux-x86_64.zip"
+      },
+      "SDL3": {
+        "directory": "Runtime/vendor",
+        "sha256": "b5bbbe9b0f84433e9bb974ac20f7a25d61f0cb210e1bccc643ea832c3378040c",
+        "url": "https://github.com/AlexCat315/GuavaUI/releases/download/native-v0.1.0/SDL3-linux-x86_64.zip"
+      },
+      "lunasvg": {
+        "directory": "Runtime/vendor",
+        "sha256": "c826f553b7b7f15dae641f009358028479b9cd11c4393ad30492395664ab7c2e",
+        "url": "https://github.com/AlexCat315/GuavaUI/releases/download/native-v0.1.0/lunasvg-linux-x86_64.zip"
+      },
+      "plutovg": {
+        "directory": "Runtime/vendor",
+        "sha256": "9020bade766ce31238b15315c63dc79ac5e936c7b5304be263505fb69667f5f5",
+        "url": "https://github.com/AlexCat315/GuavaUI/releases/download/native-v0.1.0/plutovg-linux-x86_64.zip"
+      },
+      "sharpyuv": {
+        "directory": "Runtime/vendor",
+        "sha256": "1c4bc99c04d1953eafee07b5f454723807b40b565aa81f5b09474046bc170019",
+        "url": "https://github.com/AlexCat315/GuavaUI/releases/download/native-v0.1.0/sharpyuv-linux-x86_64.zip"
+      },
+      "webp": {
+        "directory": "Runtime/vendor",
+        "sha256": "97f691528992addd6c0f7eb28bc2db19ff53c0571c003e4f661ea21b3843565f",
+        "url": "https://github.com/AlexCat315/GuavaUI/releases/download/native-v0.1.0/webp-linux-x86_64.zip"
+      }
+    },
+    "macos-arm64": {
+      "CFreeType": {
+        "directory": "vendor",
+        "sha256": "2c7713617f3fe73b924c33c6c50138931e0011b045df2a9554eea3c74c372430",
+        "url": "https://github.com/AlexCat315/GuavaUI/releases/download/native-v0.1.0/CFreeType-macos-arm64.zip"
+      },
+      "CHarfBuzz": {
+        "directory": "vendor",
+        "sha256": "dc177615c8888f9a94d1555551a4651fca39d009fae0770b2ad9d03c5c5af104",
+        "url": "https://github.com/AlexCat315/GuavaUI/releases/download/native-v0.1.0/CHarfBuzz-macos-arm64.zip"
+      },
+      "GhosttyVt": {
+        "directory": "vendor",
+        "sha256": "cad036f587feb6baaccb0ed902492e37567627ba5405d74ac0b13e7313cecb13",
+        "url": "https://github.com/AlexCat315/GuavaUI/releases/download/native-v0.1.0/GhosttyVt-macos-arm64.zip"
+      },
+      "SDL3": {
+        "directory": "Runtime/vendor",
+        "sha256": "5c43094dcd619052b6189ef49d99a5a649626310eae83bd6254a74b3d40c8880",
+        "url": "https://github.com/AlexCat315/GuavaUI/releases/download/native-v0.1.0/SDL3-macos-arm64.zip"
+      },
+      "lunasvg": {
+        "directory": "Runtime/vendor",
+        "sha256": "7e583622062855edddc703561628aef230175db56a8f8f2095cdbfb513afbe02",
+        "url": "https://github.com/AlexCat315/GuavaUI/releases/download/native-v0.1.0/lunasvg-macos-arm64.zip"
+      },
+      "plutovg": {
+        "directory": "Runtime/vendor",
+        "sha256": "acc4c5a3125725a9e81b77e35eae99a3d39150383921cc2562d0c1300fded8bf",
+        "url": "https://github.com/AlexCat315/GuavaUI/releases/download/native-v0.1.0/plutovg-macos-arm64.zip"
+      },
+      "sharpyuv": {
+        "directory": "Runtime/vendor",
+        "sha256": "75152495358134367e107516eba4db155aa2fa2f78340bef849dfe8ad071d9e9",
+        "url": "https://github.com/AlexCat315/GuavaUI/releases/download/native-v0.1.0/sharpyuv-macos-arm64.zip"
+      },
+      "webp": {
+        "directory": "Runtime/vendor",
+        "sha256": "b31c662b547f0612c922a71b4b8b5b016b6fb3a64bc6c686812259dcda87ee8c",
+        "url": "https://github.com/AlexCat315/GuavaUI/releases/download/native-v0.1.0/webp-macos-arm64.zip"
+      }
+    },
+    "windows-x86_64": {
+      "CFreeType": {
+        "directory": "vendor",
+        "sha256": "3a66835fa111c6169704ff2843c1bdf04417eda59e49928646554d5c5e141dad",
+        "url": "https://github.com/AlexCat315/GuavaUI/releases/download/native-v0.1.0/CFreeType-windows-x86_64.zip"
+      },
+      "CHarfBuzz": {
+        "directory": "vendor",
+        "sha256": "1303873e2c32a35e2d6f16a2f8259b260e2960da4a53132b075ed4a4fb3e63d1",
+        "url": "https://github.com/AlexCat315/GuavaUI/releases/download/native-v0.1.0/CHarfBuzz-windows-x86_64.zip"
+      },
+      "GhosttyVt": {
+        "directory": "vendor",
+        "sha256": "e502b8565e2887b1e0434f220ca22a5504219f8bcba98ba9408520d35d94fcaa",
+        "url": "https://github.com/AlexCat315/GuavaUI/releases/download/native-v0.1.0/GhosttyVt-windows-x86_64.zip"
+      },
+      "SDL3": {
+        "directory": "Runtime/vendor",
+        "sha256": "a6816cf1ea6d756f309a289f6c5a701b8a30dd214cca1f503b568e512a8d355b",
+        "url": "https://github.com/AlexCat315/GuavaUI/releases/download/native-v0.1.0/SDL3-windows-x86_64.zip"
+      },
+      "lunasvg": {
+        "directory": "Runtime/vendor",
+        "sha256": "de8f697caf9cb8581213df4c3829351f3bdc9fbdbd10e0cded8e6184c3775991",
+        "url": "https://github.com/AlexCat315/GuavaUI/releases/download/native-v0.1.0/lunasvg-windows-x86_64.zip"
+      },
+      "plutovg": {
+        "directory": "Runtime/vendor",
+        "sha256": "55234ca90b390edea1a81ba44301b48f46aa51167fb06206166df3ad3397b43b",
+        "url": "https://github.com/AlexCat315/GuavaUI/releases/download/native-v0.1.0/plutovg-windows-x86_64.zip"
+      },
+      "sharpyuv": {
+        "directory": "Runtime/vendor",
+        "sha256": "adfefb97a43bf7d392dd5c66b1f67a90ed4dde61c3eab04fd200e5abd951ffff",
+        "url": "https://github.com/AlexCat315/GuavaUI/releases/download/native-v0.1.0/sharpyuv-windows-x86_64.zip"
+      },
+      "webp": {
+        "directory": "Runtime/vendor",
+        "sha256": "0a601459ce8971ec44ad3c689f419d7705747e84131f30bba436de8a647611a9",
+        "url": "https://github.com/AlexCat315/GuavaUI/releases/download/native-v0.1.0/webp-windows-x86_64.zip"
+      }
+    }
+  }
 }

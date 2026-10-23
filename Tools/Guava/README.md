@@ -23,6 +23,6 @@ guava devtools MyApp
 guava doctor
 ```
 
-桌面应用在对应操作系统上构建。Windows 编译环境由 CLI 从 Visual Studio C++ Build Tools 自动加载；Linux 使用系统编译器、Vulkan 开发包和图形驱动。`guava setup` 安装预编译原生依赖；源码版本可用 CMake、Ninja 和 Zig 构建它们。
+桌面应用在对应操作系统上构建。Windows 编译环境由 CLI 从 Visual Studio C++ Build Tools 自动加载；Linux 使用系统编译器和图形驱动。Vulkan C 头文件随 SDK 固定版本提供，运行时从系统图形驱动加载 Vulkan。`guava setup` 安装预编译原生依赖；源码版本可用 CMake、Ninja 和 Zig 构建它们。
 
 CLI 发布使用 `guava internal package-cli`；原生依赖发布使用 `guava internal package-native`。

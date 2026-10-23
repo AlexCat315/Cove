@@ -35,9 +35,6 @@ enum ToolchainRequirements {
             remedy: "Install Visual Studio Build Tools with Desktop development with C++ and a Windows SDK."))
         #else
         checks.append(.executable("cc", remedy: common))
-        if arguments.platform == .linux {
-            checks.append(.executable("glslc", remedy: "Install the Vulkan SDK from https://vulkan.lunarg.com/ and a Vulkan-capable GPU driver; export VULKAN_SDK."))
-        }
         #endif
         if arguments.platform == .ios {
             for name in ["xcodebuild", "xcrun"] {
