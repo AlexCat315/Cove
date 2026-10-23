@@ -1,5 +1,4 @@
 import Foundation
-import CoreGraphics
 import Testing
 import GuavaUIRuntime
 @testable import GuavaUICompose

@@ -19,13 +19,8 @@ struct DesktopBuild {
 
     private func compile() throws -> URL {
         let package = try DesktopLauncher(project: project, root: root).prepare()
-        var command = SwiftPackage.command(directory: package, configuration: arguments.configuration,
+        let command = SwiftPackage.command(directory: package, configuration: arguments.configuration,
             scratchPath: project.buildDirectory.appendingPathComponent("swift"))
-        #if os(macOS)
-        // Preserve .copy resources, including embedded executables. Swift Build
-        // strips unsigned binary resources in optimized configurations.
-        command += ["--build-system", "native"]
-        #endif
         try Shell.run(command + ["--product", project.desktopProduct], environment: SwiftPackage.environment(root: root))
         for helper in project.configuration.targets.desktopHelpers {
             try Shell.run(command + ["--product", helper], environment: SwiftPackage.environment(root: root))

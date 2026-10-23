@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:GuavaUI}",
+            "name": "Debug GuavaUIDevToolsProbe",
+            "target": "GuavaUIDevToolsProbe",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug GuavaUIDevToolsProbe"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:GuavaUI}",
+            "name": "Release GuavaUIDevToolsProbe",
+            "target": "GuavaUIDevToolsProbe",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release GuavaUIDevToolsProbe"
+        }
+    ]
+}
