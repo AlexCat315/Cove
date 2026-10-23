@@ -145,10 +145,10 @@ extension VulkanBackend {
         info.size = VkDeviceSize(max(1, size))
         // Transient uploads are also bound directly by renderer passes. Vulkan
         // requires each binding use to be declared when the buffer is created.
-        info.usage = UInt32(VK_BUFFER_USAGE_TRANSFER_SRC_BIT.rawValue | UInt32(VK_BUFFER_USAGE_TRANSFER_DST_BIT.rawValue)
+        info.usage = UInt32(VK_BUFFER_USAGE_TRANSFER_SRC_BIT.rawValue) | UInt32(VK_BUFFER_USAGE_TRANSFER_DST_BIT.rawValue)
             | UInt32(VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT.rawValue) | UInt32(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT.rawValue)
             | UInt32(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT.rawValue) | UInt32(VK_BUFFER_USAGE_INDEX_BUFFER_BIT.rawValue)
-            | UInt32(VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT.rawValue))
+            | UInt32(VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT.rawValue)
         info.sharingMode = VK_SHARING_MODE_EXCLUSIVE
         guard let buffer = vkWithOutHandle({
             context.core.createBuffer(context.device, &info, nil, $0)
@@ -161,7 +161,7 @@ extension VulkanBackend {
         let allocation = try allocator.allocate(
             size: req.size, alignment: req.alignment,
             memoryTypeBits: req.memoryTypeBits,
-            requiredFlags: UInt32(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT.rawValue | UInt32(VK_MEMORY_PROPERTY_HOST_COHERENT_BIT.rawValue)))
+            requiredFlags: UInt32(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT.rawValue) | UInt32(VK_MEMORY_PROPERTY_HOST_COHERENT_BIT.rawValue))
         defer { if !stored { allocator.free(allocation) } }
         guard context.core.bindBufferMemory(context.device,buffer,allocation.memory,allocation.offset) == VK_SUCCESS else {
             throw RHIError.outOfMemory

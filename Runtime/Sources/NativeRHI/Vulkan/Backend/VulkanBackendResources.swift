@@ -96,7 +96,7 @@ extension VulkanBackend {
             || descriptor.usage.contains(.storageWrite)
         let flags: VkMemoryPropertyFlags = isGpuResource
             ? UInt32(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT.rawValue)
-            : UInt32(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT.rawValue | UInt32(VK_MEMORY_PROPERTY_HOST_COHERENT_BIT.rawValue))
+            : UInt32(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT.rawValue) | UInt32(VK_MEMORY_PROPERTY_HOST_COHERENT_BIT.rawValue)
 
         let allocation = try allocator.allocate(
             size: req.size, alignment: req.alignment,
@@ -284,7 +284,7 @@ extension VulkanBackend {
     // MARK: Usage flag mapping
 
     private static func bufferUsageFlags(_ usage: BufferUsage) -> VkBufferUsageFlags {
-        var flags: VkBufferUsageFlags = UInt32(VK_BUFFER_USAGE_TRANSFER_SRC_BIT.rawValue | UInt32(VK_BUFFER_USAGE_TRANSFER_DST_BIT.rawValue))
+        var flags: VkBufferUsageFlags = UInt32(VK_BUFFER_USAGE_TRANSFER_SRC_BIT.rawValue) | UInt32(VK_BUFFER_USAGE_TRANSFER_DST_BIT.rawValue)
         if usage.contains(.vertex) { flags |= UInt32(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT.rawValue) }
         if usage.contains(.index) { flags |= UInt32(VK_BUFFER_USAGE_INDEX_BUFFER_BIT.rawValue) }
         if usage.contains(.indirect) { flags |= UInt32(VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT.rawValue) }
@@ -298,7 +298,7 @@ extension VulkanBackend {
     }
 
     private static func textureUsageFlags(_ usage: TextureUsage) -> VkImageUsageFlags {
-        var flags: VkImageUsageFlags = UInt32(VK_IMAGE_USAGE_TRANSFER_SRC_BIT.rawValue | UInt32(VK_IMAGE_USAGE_TRANSFER_DST_BIT.rawValue))
+        var flags: VkImageUsageFlags = UInt32(VK_IMAGE_USAGE_TRANSFER_SRC_BIT.rawValue) | UInt32(VK_IMAGE_USAGE_TRANSFER_DST_BIT.rawValue)
         if usage.contains(.sampled) { flags |= UInt32(VK_IMAGE_USAGE_SAMPLED_BIT.rawValue) }
         if usage.contains(.colorTarget) { flags |= UInt32(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT.rawValue) }
         if usage.contains(.depthStencilTarget) { flags |= UInt32(VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT.rawValue) }

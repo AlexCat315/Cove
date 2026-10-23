@@ -169,6 +169,6 @@ struct ContainerQueryTests: GuavaUIComposeSerializedSuite {
 
 private extension CGFloat {
     func isApproximatelyEqual(to other: CGFloat) -> Bool {
-        abs(self - other) <= 0.05
+        Swift.abs(self - other) <= 0.05
     }
 }
