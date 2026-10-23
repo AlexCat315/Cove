@@ -6,13 +6,17 @@ let package = Package(
     platforms: [.macOS(.v13), .iOS(.v16)],
     products: [
         .library(name: "GalleryContent", targets: ["GalleryContent"]),
+        .library(name: "CounterExample", targets: ["CounterExample"]),
         .executable(name: "GuavaUIDemo", targets: ["GuavaUIDemo"]),
         .executable(name: "PetDemo", targets: ["PetDemo"]),
     ],
-    dependencies: [.package(name: "GuavaUI", path: ".."), .package(path: "Counter")],
+    dependencies: [.package(name: "GuavaUI", path: "..")],
     targets: [
+        .target(name: "CounterExample", dependencies: [
+            .product(name: "GuavaUIComposeCore", package: "GuavaUI"),
+        ], path: "Counter/Sources/CounterExample"),
         .target(name: "GalleryContent", dependencies: [
-            .product(name: "CounterExample", package: "Counter"),
+            "CounterExample",
             .product(name: "GuavaUI", package: "GuavaUI"),
             .product(name: "GuavaUIWebView", package: "GuavaUI"),
             .product(name: "GuavaUIWorkspace", package: "GuavaUI"),
@@ -20,7 +24,7 @@ let package = Package(
         .executableTarget(name: "GuavaUIDemo", dependencies: [
             "GalleryContent",
             .product(name: "GuavaUI", package: "GuavaUI"),
-            .product(name: "CounterExample", package: "Counter"),
+            "CounterExample",
         ]),
         .executableTarget(name: "PetDemo", dependencies: [
             .product(name: "GuavaUI", package: "GuavaUI"),

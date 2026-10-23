@@ -6,7 +6,7 @@ let package = Package(
     name: "CounterExample",
     platforms: [.macOS(.v13), .iOS(.v16)],
     products: [.library(name: "CounterExample", targets: ["CounterExample"])],
-    dependencies: [.package(path: "../../GuavaUI/Portable")],
+    dependencies: [.package(path: "../../Portable")],
     targets: [
         .target(name: "CounterExample", dependencies: [
             .product(name: "GuavaUIComposeCore", package: "Portable"),

@@ -10,7 +10,6 @@ internal import Foundation
 final class POSIXPseudoTerminal: PseudoTerminalBackend, @unchecked Sendable {
     let processID: Int32
     private let channel: Channel
-    private let readSource: any DispatchSourceRead
 
     static func spawn(_ command: TerminalCommand,
                       size: PseudoTerminal.Size,
@@ -24,6 +23,7 @@ final class POSIXPseudoTerminal: PseudoTerminalBackend, @unchecked Sendable {
         // and exec only async-signal-safe calls are allowed.
         let argv = CStringArray([path] + command.arguments)
         let envp = CStringArray(environment.map { "\($0.key)=\($0.value)" }.sorted())
+        guard let executable = argv.pointers[0] else { throw TerminalError.spawnFailed(code: ENOMEM) }
         let directory = command.workingDirectory.map { strdup($0.path) } ?? nil
         defer { free(directory) }
 
@@ -33,7 +33,7 @@ final class POSIXPseudoTerminal: PseudoTerminalBackend, @unchecked Sendable {
         if pid < 0 { throw TerminalError.spawnFailed(code: errno) }
         if pid == 0 {
             if let directory { _ = chdir(directory) }
-            execve(argv.pointers[0], argv.pointers, envp.pointers)
+            execve(executable, argv.pointers, envp.pointers)
             _exit(127)
         }
         return POSIXPseudoTerminal(processID: pid, master: master, onOutput: onOutput, onExit: onExit)
@@ -48,15 +48,15 @@ final class POSIXPseudoTerminal: PseudoTerminalBackend, @unchecked Sendable {
         self.channel = channel
         let source = DispatchSource.makeReadSource(fileDescriptor: master,
                                                    queue: DispatchQueue(label: "guava.terminal.pty.read"))
-        readSource = source
-        source.setEventHandler { [unowned source] in
+        channel.attach(source)
+        source.setEventHandler { [channel] in
             var buffer = [UInt8](repeating: 0, count: 64 * 1024)
             let count = buffer.withUnsafeMutableBytes { read(master, $0.baseAddress, $0.count) }
             if count > 0 {
                 onOutput(Array(buffer.prefix(count)))
             } else if count == 0 || (errno != EAGAIN && errno != EINTR) {
                 // EOF (macOS) or EIO (Linux): every slave descriptor closed.
-                source.cancel()
+                channel.stopReading()
             }
         }
         source.setCancelHandler {
@@ -97,8 +97,20 @@ final class POSIXPseudoTerminal: PseudoTerminalBackend, @unchecked Sendable {
 private final class Channel: @unchecked Sendable {
     private let lock = NSLock()
     private var descriptor: Int32?
+    private var readSource: (any DispatchSourceRead)?
 
     init(descriptor: Int32) { self.descriptor = descriptor }
+
+    func attach(_ source: any DispatchSourceRead) { lock.withLock { readSource = source } }
+
+    func stopReading() {
+        let source = lock.withLock {
+            let source = readSource
+            readSource = nil
+            return source
+        }
+        source?.cancel()
+    }
 
     func write(_ bytes: [UInt8]) {
         lock.withLock {
