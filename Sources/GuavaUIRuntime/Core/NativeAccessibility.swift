@@ -33,6 +33,23 @@ final class MacAccessibilityBridge: NodeResource {
     private var elements: [ElementID: MacSceneAccessibilityElement] = [:]
     private var rootIDs: [ElementID]?
     private(set) var updatedElementCount = 0
+
+    /// A snapshot walk reads every node. Most frames only move geometry, or do
+    /// not touch the scene at all, so the bridge publishes at most one geometry
+    /// update per interval and skips identical frames entirely.
+    private struct Signature: Equatable {
+        let roots: [ElementID]
+        let focused: ElementID?
+        let rootFrame: CGRect
+        let viewBounds: NSRect
+        let windowFrame: NSRect
+    }
+    private var lastSignature: Signature?
+    private var lastStructureRevision: UInt64 = .max
+    private var lastGeometryRevision: UInt64 = .max
+    private var lastGeometryUpdate: Double = 0
+    private static let geometryInterval: Double = 1.0 / 30.0
+
     init(view: NSView) { self.view = view; originalChildren = view.accessibilityChildren(); originalIsElement = view.isAccessibilityElement() }
     nonisolated func mount(node: Node) {}
     nonisolated func unmount(node: Node) {
@@ -40,11 +57,41 @@ final class MacAccessibilityBridge: NodeResource {
             view?.setAccessibilityChildren(originalChildren)
             view?.setAccessibilityElement(originalIsElement)
             elements.values.forEach { $0.invalidate() }; elements.removeAll(); rootIDs = nil; view = nil
+            lastSignature = nil
         }
     }
     func update(root: Node, focus: FocusChain, perform: @escaping (() -> Void) -> Void) {
         guard let view, let window = view.window else { return }
         let roots = focus.modalRoot.map { [$0] + focus.accessoryRoots } ?? [root]
+        let signature = Signature(roots: roots.map(\.id),
+                                  focused: focus.focused?.id,
+                                  rootFrame: root.frame,
+                                  viewBounds: view.bounds,
+                                  windowFrame: window.frame)
+        let structureRevision = AccessibilityRevision.structure
+        let geometryRevision = AccessibilityRevision.geometry
+        let now = ProcessInfo.processInfo.systemUptime
+        let structureChanged = structureRevision != lastStructureRevision
+        let signatureChanged = signature != lastSignature
+        let geometryChanged = geometryRevision != lastGeometryRevision
+        guard structureChanged || signatureChanged || geometryChanged else {
+            updatedElementCount = 0
+            // Host context (session, display request) is passed as a fresh
+            // closure each frame. Refreshing it is O(elements), not the
+            // O(nodes) snapshot, and keeps actions live on a skipped frame.
+            for element in elements.values { element.updatePerform(perform) }
+            return
+        }
+        guard structureChanged || signatureChanged || now - lastGeometryUpdate >= Self.geometryInterval else {
+            updatedElementCount = 0
+            for element in elements.values { element.updatePerform(perform) }
+            return
+        }
+        lastStructureRevision = structureRevision
+        lastGeometryRevision = geometryRevision
+        lastSignature = signature
+        lastGeometryUpdate = now
+
         let snapshot = roots.flatMap { AccessibilityTree.snapshot(root: $0, viewport: root.absoluteFrame, resolveValues: false) }
         var next: [ElementID: MacSceneAccessibilityElement] = [:]
         updatedElementCount = 0
@@ -90,6 +137,9 @@ private final class MacSceneAccessibilityElement: NSAccessibilityElement, @unche
     private var presentation: Presentation?
     private var childIDs: [ElementID]?
     private var permitted: (() -> Bool)?
+    func updatePerform(_ perform: @escaping (() -> Void) -> Void) {
+        self.perform = perform
+    }
     func update(item: AccessibilityElement, parent: Any, frame: NSRect, focused: Bool, acceptsInput: Bool,
                 perform: @escaping (() -> Void) -> Void, permitted: @escaping () -> Bool, focus: @escaping () -> Void) -> Bool {
         // Actions and their host context stay live even when native properties

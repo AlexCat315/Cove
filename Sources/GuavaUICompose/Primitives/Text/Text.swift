@@ -263,7 +263,12 @@ public struct Text: _PrimitiveView {
     public func _updateNode(_ node: Node) {
         node.syncTextStyleEnvironment()
         node.clipsToBounds = truncates
-        node.accessibility = AccessibilitySemantics(.staticText) { $0.label = string }
+        // Rebuilding the full semantics struct for an unchanged label is a hot
+        // path during list/table scrolling. Compare the fields this primitive
+        // owns before allocating a new value.
+        if node.accessibility?.role != .staticText || node.accessibility?.label != string {
+            node.accessibility = AccessibilitySemantics(.staticText) { $0.label = string }
+        }
         // Bind the draw callback. Captures `string` etc by value.
         let snapshot = self
         node.updateDraw(identity: PaintIdentity(string: string,

@@ -276,8 +276,22 @@ public final class ViewGraph {
             key = modified._inheritedSlotKey
         }
         return SlotInfo(view: view,
-                        tag: String(reflecting: type(of: current)),
+                        tag: cachedSlotTag(for: current),
                         key: key)
+    }
+
+    /// `String(reflecting:)` on these deeply nested generic view types is one
+    /// of the most expensive operations in a debug reconciliation, and the tag
+    /// only depends on the dynamic type. Cache one shared string per type.
+    nonisolated(unsafe) private static var slotTagCache: [ObjectIdentifier: String] = [:]
+
+    private static func cachedSlotTag(for view: any View) -> String {
+        let type = type(of: view)
+        let identity = ObjectIdentifier(type)
+        if let cached = slotTagCache[identity] { return cached }
+        let tag = String(reflecting: type)
+        slotTagCache[identity] = tag
+        return tag
     }
 
     /// Flatten structural views (Tuple / Conditional / Optional / Array) and

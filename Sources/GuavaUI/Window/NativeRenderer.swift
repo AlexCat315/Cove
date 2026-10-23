@@ -57,28 +57,29 @@ final class NativeAppWindowRenderer: AppWindowRenderer {
                 multisample = try TextureResource(device: device, descriptor: descriptor)
             }
             let clear = settings.clearColor
-            // With frost, the frame lives in an owned texture rather than
-            // straight in the drawable: a panel samples whatever is already
-            // behind it, and a swapchain image is a render target that cannot
-            // be sampled. The drawable then gets the frame in one final pass.
-            // A backend without the backdrop program renders into the drawable
-            // exactly as before, and loses nothing but the frost.
-            let frosted = renderer.supportsBackdrop
-            if !frosted { framebuffer = nil }
+            // A frosted panel or a reveal samples the frame already drawn, so
+            // those frames live in an owned texture and reach the drawable in a
+            // final blit. Ordinary frames draw straight into the drawable: the
+            // blit is a full-screen pass and the owned texture is a full-size
+            // allocation, neither of which pays for itself when no pass needs
+            // to sample the result.
+            let samplesFrame = renderer.supportsBackdrop
+                && (list.reveal != nil || list.batches.contains { $0.backdrop != nil })
+            if !samplesFrame { framebuffer = nil }
             else if framebuffer?.descriptor.width != pixels.x || framebuffer?.descriptor.height != pixels.y {
                 framebuffer = try TextureResource(device: device, descriptor: TextureDescriptor(
                     width: pixels.x, height: pixels.y, format: .bgra8UnormSRGB,
                     usage: [.colorTarget, .sampled], label: "ui-framebuffer"))
             }
-            let surface = framebuffer?.texture ?? image.texture
+            let surface = samplesFrame ? framebuffer?.texture ?? image.texture : image.texture
             var target = RenderColorTarget(texture: multisample?.texture ?? surface,
                 loadAction: .clear(clear))
             target.resolveTexture = multisample == nil ? nil : surface
             let commands = CommandBuffer()
             let frame = try renderer.record(list: list, into: commands, target: target,
                 viewport: NativeUIViewport(pixels: pixels, logical: logical),
-                backdropSource: framebuffer?.texture)
-            if let source = framebuffer?.texture {
+                backdropSource: samplesFrame ? framebuffer?.texture : nil)
+            if samplesFrame, let source = framebuffer?.texture {
                 let present = RenderColorTarget(texture: image.texture, loadAction: .dontCare, store: true)
                 try renderer.recordBlit(source: source, into: commands, target: present, size: pixels)
             }

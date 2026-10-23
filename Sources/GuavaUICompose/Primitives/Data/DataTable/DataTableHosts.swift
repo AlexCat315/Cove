@@ -41,6 +41,21 @@ struct DataTableClippedPane<Content: View>: _PrimitiveView {
     var _children: [any View] { [content] }
 }
 
+private struct RowHostUpdate: Equatable {
+    let index: Int
+    let isSelected: Bool
+    let isStriped: Bool
+    let isEnabled: Bool
+    let isFrozenLane: Bool
+}
+private struct CellHostUpdate: Equatable {
+    let title: String
+    let isActive: Bool
+    let isEnabled: Bool
+}
+private let rowHostUpdateKey = "dataTable.rowHostUpdate"
+private let cellHostUpdateKey = "dataTable.cellHostUpdate"
+
 struct DataTableRowHost<Content: View>: _PrimitiveView {
     let index: Int
     let isSelected: Bool
@@ -51,6 +66,10 @@ struct DataTableRowHost<Content: View>: _PrimitiveView {
     func _makeNode() -> Node { let node = Node(); node.isHitTestable = false; return node }
     func _makeLayoutNode() -> LayoutNode? { let layout = LayoutNode(); layout.alignItems = .stretch; return layout }
     func _updateNode(_ node: Node) {
+        let update = RowHostUpdate(index: index, isSelected: isSelected, isStriped: isStriped,
+                                   isEnabled: isEnabled, isFrozenLane: isFrozenLane)
+        guard node.attachments[rowHostUpdateKey] as? RowHostUpdate != update else { return }
+        node.attachments[rowHostUpdateKey] = update
         node.attachments["dataTable.rowIndex"] = index
         node.backgroundColor = isSelected ? node.theme.colors.selection : isStriped && index % 2 == 1 ? node.theme.colors.surfaceVariant : node.theme.colors.surface
         node.accessibility = AccessibilitySemantics(isFrozenLane ? .group : .row) {
@@ -76,6 +95,9 @@ struct DataTableCellHost<Content: View>: _PrimitiveView {
     }
     func _makeLayoutNode() -> LayoutNode? { let layout = LayoutNode(); layout.alignItems = .stretch; layout.flexGrow = 1; return layout }
     func _updateNode(_ node: Node) {
+        let update = CellHostUpdate(title: title, isActive: isActive, isEnabled: isEnabled)
+        guard node.attachments[cellHostUpdateKey] as? CellHostUpdate != update else { return }
+        node.attachments[cellHostUpdateKey] = update
         node.accessibility = AccessibilitySemantics(.cell) { $0.label = title; $0.state.isSelected = isActive; $0.state.isEnabled = isEnabled }
         node.accessibilityActions.activate = isEnabled ? { onSelect([]) } : nil
         node.backgroundColor = nil; node.borderWidth = isActive ? 1 : 0; node.borderColor = node.theme.colors.focusRing

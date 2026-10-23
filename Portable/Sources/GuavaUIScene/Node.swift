@@ -45,7 +45,10 @@ public final class Node: @unchecked Sendable {
     /// Disables input for this entire subtree while retaining it for an exit transition.
     public var isInteractionEnabled: Bool = true {
         didSet {
-            if oldValue != isInteractionEnabled { AccessibilityRevision.bump() }
+            if oldValue != isInteractionEnabled {
+                Self.invalidateInputCache()
+                AccessibilityRevision.bumpStructure()
+            }
         }
     }
     /// Current layout presentation, independent of authored opacity and input.
@@ -57,7 +60,10 @@ public final class Node: @unchecked Sendable {
     /// pointer-capture and focus release that follows a hide.
     public internal(set) var isLayoutVisible: Bool = true {
         didSet {
-            if oldValue != isLayoutVisible { AccessibilityRevision.bump() }
+            if oldValue != isLayoutVisible {
+                Self.invalidateInputCache()
+                AccessibilityRevision.bumpStructure()
+            }
         }
     }
     /// Semantics for this node; nil means "not an accessibility element".
@@ -69,14 +75,17 @@ public final class Node: @unchecked Sendable {
     /// six-string struct costs more than the value itself.
     public internal(set) var accessibilitySemantics: AccessibilitySemantics? {
         didSet {
-            if oldValue != accessibilitySemantics { AccessibilityRevision.bump() }
+            if oldValue != accessibilitySemantics { AccessibilityRevision.bumpStructure() }
         }
     }
     /// Alpha applied to the complete rendered subtree, including cached layers.
     public var subtreeOpacity: Float = 1 {
         didSet {
             guard oldValue != subtreeOpacity else { return }
-            AccessibilityRevision.bump()
+            // The accessibility walk only tests "more than zero". Intermediate
+            // fades do not change what it publishes, so they must not force a
+            // full snapshot every animated frame.
+            if (oldValue > 0) != (subtreeOpacity > 0) { AccessibilityRevision.bumpStructure() }
             markRenderDirty(reason: .styleSet(field: "subtreeOpacity"))
         }
     }
@@ -137,18 +146,42 @@ public final class Node: @unchecked Sendable {
     /// Disable interaction for an entire subtree during a removal transition.
     public var allowsHitTesting: Bool = true {
         didSet {
-            if oldValue != allowsHitTesting { AccessibilityRevision.bump() }
+            if oldValue != allowsHitTesting {
+                Self.invalidateInputCache()
+                AccessibilityRevision.bumpStructure()
+            }
         }
     }
 
     public var acceptsSubtreeInput: Bool {
-        isLayoutVisible && allowsHitTesting && isInteractionEnabled && (parent?.acceptsSubtreeInput ?? true)
+        let revision = Self.inputRevision
+        if cachedInputRevision == revision { return cachedAcceptsSubtreeInput }
+        let value = isLayoutVisible && allowsHitTesting && isInteractionEnabled
+            && (parent?.acceptsSubtreeInput ?? true)
+        cachedInputRevision = revision
+        cachedAcceptsSubtreeInput = value
+        return value
+    }
+
+    /// Bumped whenever an input-eligibility bit changes anywhere in the process.
+    /// A process-wide generation keeps the hot path O(1) without parent-chain
+    /// recomputation; eligibility changes are rare compared with hit-testing,
+    /// focus traversal and scroll updates that read this flag.
+    nonisolated(unsafe) private static var inputRevision: UInt64 = 0
+    private var cachedInputRevision: UInt64 = .max
+    private var cachedAcceptsSubtreeInput = false
+    private static func invalidateInputCache() {
+        inputRevision &+= 1
+        FocusRevision.bump()
     }
 
     /// When true, this node may receive keyboard focus (FocusChain consideration).
     public var isFocusable: Bool = false {
         didSet {
-            if oldValue != isFocusable { AccessibilityRevision.bump() }
+            if oldValue != isFocusable {
+                FocusRevision.bump()
+                AccessibilityRevision.bumpStructure()
+            }
         }
     }
 
@@ -326,6 +359,7 @@ public final class Node: @unchecked Sendable {
     public var opacity: Float = 1 {
         didSet {
             if oldValue != opacity {
+                if (oldValue > 0) != (opacity > 0) { AccessibilityRevision.bumpStructure() }
                 markRenderDirty(reason: .styleSet(field: "opacity"))
             }
         }
@@ -560,6 +594,8 @@ public final class Node: @unchecked Sendable {
             childrenMayNeedZSort = true
         }
         bumpSubtreeStructureVersion()
+        Self.invalidateInputCache()
+        AccessibilityRevision.bumpStructure()
         markRenderDirty(reason: .structuralChange)
     }
 
@@ -578,6 +614,8 @@ public final class Node: @unchecked Sendable {
                 recomputeChildrenMayNeedZSort()
             }
             bumpSubtreeStructureVersion()
+            Self.invalidateInputCache()
+            AccessibilityRevision.bumpStructure()
             markRenderDirty(reason: .structuralChange)
         }
     }
@@ -609,6 +647,7 @@ public final class Node: @unchecked Sendable {
         // second one that can drift). Hit-testing reads this order live.
         children = ordered
         bumpSubtreeStructureVersion()
+        AccessibilityRevision.bumpStructure()
         markRenderDirty(reason: .structuralChange)
     }
 
@@ -646,8 +685,9 @@ public final class Node: @unchecked Sendable {
     /// place that maps a geometry change to render invalidation.
     private func invalidateGeometry(reason: InvalidationSource) {
         // Frame, transform, scroll offset and clip all move or reshape the
-        // rectangles the accessibility snapshot publishes.
-        AccessibilityRevision.bump()
+        // rectangles the accessibility snapshot publishes. Geometry moves are
+        // coalesced by the native bridge; they do not change the element set.
+        AccessibilityRevision.bumpGeometry()
         markRenderDirty(reason: reason)
     }
 

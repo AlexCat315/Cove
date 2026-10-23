@@ -873,11 +873,29 @@ public final class SDL3Shell: Shell {
 
     @discardableResult
     public func waitForEvents(timeout: TimeInterval) -> Bool {
-        guard didInitializeSDL, timeout > 0 else { return false }
-        let milliseconds = Int32(min(Double(Int32.max), ceil(timeout * 1000)))
-        // Passing nil waits without removing the event. The next poll therefore
-        // processes the exact native event that woke the host.
-        return SDL_WaitEventTimeout(nil, max(1, milliseconds))
+        guard didInitializeSDL, timeout.isFinite, timeout > 0 else { return false }
+        // SDL's public wait API takes whole milliseconds. Rounding a 5.56 ms
+        // high-refresh deadline up used to add most of a millisecond to every
+        // frame, which is exactly the gap between a 180 Hz target and the
+        // ~170 Hz the loop settled at. Wait only the whole milliseconds SDL can
+        // honour, then sleep the sub-millisecond remainder natively. Any event
+        // that arrives during that final remainder stays queued for the next
+        // poll, so delivery is delayed by well under one millisecond.
+        let deadline = SDL_GetTicksNS() &+ UInt64(min(timeout, 86_400) * 1_000_000_000)
+        while true {
+            let now = SDL_GetTicksNS()
+            guard now < deadline else { return false }
+            let remaining = deadline - now
+            let milliseconds = remaining / 1_000_000
+            if milliseconds > 0 {
+                // Passing nil waits without removing the event. The next poll
+                // therefore processes the exact native event that woke us.
+                if SDL_WaitEventTimeout(nil, Int32(min(milliseconds, UInt64(Int32.max)))) { return true }
+                continue
+            }
+            SDL_DelayNS(remaining)
+            return false
+        }
     }
 
     nonisolated public func wakeEventLoop() {

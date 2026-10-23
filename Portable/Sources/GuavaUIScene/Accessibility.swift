@@ -54,14 +54,18 @@ public struct AccessibilityValueProvider {
     }
 }
 
-/// Monotonic counter for mutations that can change the accessibility tree.
+/// Monotonic counters for mutations that can change the accessibility tree.
 ///
 /// The snapshot visits every node and the native bridge rebuilds the element
 /// tree from it. A frame that only repaints — a spinner, a cursor blink, a
-/// hover fade — changes nothing the walk reads, so the counter stays put and
+/// hover fade — changes nothing the walk reads, so the counters stay put and
 /// the bridge keeps the tree it already published. It is deliberately *not*
 /// bumped by `markRenderDirty` alone: that fires on every animated frame and
 /// would bring the cost straight back.
+///
+/// Structure covers membership, semantics and input eligibility; it demands an
+/// immediate snapshot. Geometry covers movement alone, which can be coalesced:
+/// assistive clients poll frames, they do not need 180 updates per second.
 ///
 /// Over-invalidating costs one rebuild; under-invalidating leaves a stale
 /// native tree, which an assistive client reads as wrong content. Every hook
@@ -69,8 +73,10 @@ public struct AccessibilityValueProvider {
 /// VoiceOver sees?" is the test for adding another.
 public enum AccessibilityRevision {
     /// Main-thread only, like every other scene mutation.
-    nonisolated(unsafe) public private(set) static var current: UInt64 = 0
-    static func bump() { current &+= 1 }
+    nonisolated(unsafe) public private(set) static var structure: UInt64 = 0
+    nonisolated(unsafe) public private(set) static var geometry: UInt64 = 0
+    static func bumpStructure() { structure &+= 1; geometry &+= 1 }
+    static func bumpGeometry() { geometry &+= 1 }
 }
 
 public extension Node {
@@ -80,11 +86,11 @@ public extension Node {
     }
     var accessibilityActions: AccessibilityActions {
         get { attachments["__accessibility.actions"] as? AccessibilityActions ?? AccessibilityActions() }
-        set { attachments["__accessibility.actions"] = newValue; AccessibilityRevision.bump() }
+        set { attachments["__accessibility.actions"] = newValue; AccessibilityRevision.bumpStructure() }
     }
     var accessibilityValueProvider: AccessibilityValueProvider? {
         get { attachments["__accessibility.valueProvider"] as? AccessibilityValueProvider }
-        set { attachments["__accessibility.valueProvider"] = newValue; AccessibilityRevision.bump() }
+        set { attachments["__accessibility.valueProvider"] = newValue; AccessibilityRevision.bumpStructure() }
     }
     var resolvedAccessibilityValue: String {
         let value = accessibilityValueProvider?.read() ?? accessibility?.value ?? ""
