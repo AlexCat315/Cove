@@ -6,6 +6,11 @@ enum NativeArchive {
         try NativeSDK.prepare(root: root, fromSource: true)
         try Files.directory(output)
         let release = try SDKRelease.read(at: root)
+        let revision = ProcessInfo.processInfo.environment["GUAVA_NATIVE_RELEASE_REVISION"] ?? "1"
+        guard let number = Int(revision), number > 0, String(number) == revision else {
+            throw ToolError.invalid("Native release revision must be a positive integer")
+        }
+        let tag = "native-v\(release.version)-r\(revision)"
         let repository = release.repository.replacingOccurrences(of: ".git", with: "")
         var archives: [String: NativeArtifacts.Archive] = [:]
         for directory in ["Runtime/vendor", "vendor"] {
@@ -23,7 +28,7 @@ enum NativeArchive {
                 try Shell.run(["zip", "-qr", archive.path, bundle.lastPathComponent], at: vendor)
                 #endif
                 archives[name] = NativeArtifacts.Archive(
-                    url: URL(string: "\(repository)/releases/download/native-v\(release.version)/\(filename)")!,
+                    url: URL(string: "\(repository)/releases/download/\(tag)/\(filename)")!,
                     sha256: try SHA256.hex(file: archive), directory: directory)
             }
         }

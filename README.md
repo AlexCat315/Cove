@@ -60,4 +60,4 @@ cd GuavaUI
 2. 将成功构建的 `native.json` 写入 `Artifacts/native.json` 并提交，等待三平台 CI 通过。
 3. 推送对应的 `vVERSION` 标签。CLI 发布流程测试并打包三个平台，全部成功后发布安装器、程序与校验和。
 
-原生依赖单独使用 `native-vVERSION` 预发布标签，SDK 与 CLI 使用 `vVERSION` 正式标签。已发布标签与资源保持不可变。
+原生依赖单独使用 `native-vVERSION-rREVISION` 预发布标签，SDK 与 CLI 使用 `vVERSION` 正式标签。已发布标签与资源保持不可变。

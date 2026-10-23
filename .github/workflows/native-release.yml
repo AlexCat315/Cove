@@ -1,6 +1,13 @@
 name: Native SDK release
 on:
   workflow_dispatch:
+    inputs:
+      revision:
+        description: Immutable native artifact revision
+        required: true
+        default: '1'
+env:
+  GUAVA_NATIVE_RELEASE_REVISION: ${{ inputs.revision }}
 permissions:
   contents: write
 jobs:
@@ -26,6 +33,13 @@ jobs:
       - uses: ./.github/actions/setup-toolchains
       - name: Build and archive native libraries
         run: ./guava internal package-native --output "$PWD/dist"
+      - name: Verify SDK against staged native libraries
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a ./guava test . --no-parallel
+          else
+            ./guava test . --no-parallel
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: native-${{ matrix.platform }}
@@ -51,7 +65,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version=$(node -p 'JSON.parse(require("fs").readFileSync("dist/native.json")).version')
-          gh release create "native-v$version" dist/* --target "$GITHUB_SHA" --title "Native libraries $version" --notes "Native dependency archives for GuavaUI $version. Download native.json and commit it to Artifacts/native.json before tagging the SDK." --prerelease --latest=false
+          gh release create "native-v$version-r$GUAVA_NATIVE_RELEASE_REVISION" dist/* --target "$GITHUB_SHA" --title "Native libraries $version revision $GUAVA_NATIVE_RELEASE_REVISION" --notes "Native dependency archives verified by the complete SDK tests. Download native.json and commit it to Artifacts/native.json before tagging the SDK." --prerelease --latest=false
       - uses: actions/upload-artifact@v4
         with:
           name: native-manifest

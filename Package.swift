@@ -4,6 +4,9 @@ import Foundation
 
 let runtimeArtifacts = ProcessInfo.processInfo.environment["GUAVA_RUNTIME_ARTIFACT_ROOT"] ?? "Runtime/vendor"
 let textArtifacts = ProcessInfo.processInfo.environment["GUAVA_TEXT_ARTIFACT_ROOT"] ?? "vendor"
+let windowsCxxRuntime: [LinkerSetting] = ["msvcrt", "msvcprt"].map {
+    .linkedLibrary($0, .when(platforms: [.windows]))
+}
 
 
 let packageDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
@@ -56,7 +59,7 @@ let portableTargets: [Target] = [
             "GuavaUIAgentTransport", .product(name: "NIOEmbedded", package: "swift-nio"),
         ], path: "Portable/Tests/GuavaUIAgentTransportTests"),
     .testTarget(name: "GuavaUIAgentCoreTests", dependencies: ["GuavaUIAgentCore"], path: "Portable/Tests/GuavaUIAgentCoreTests"),
-    .target(name: "CYoga", dependencies: [.product(name: "yoga", package: "yoga")], path: "Portable/Sources/CYoga", publicHeadersPath: "include"),
+    .target(name: "CYoga", dependencies: [.product(name: "yoga", package: "yoga")], path: "Portable/Sources/CYoga", publicHeadersPath: "include", linkerSettings: windowsCxxRuntime),
     .target(name: "GuavaUIScene", dependencies: ["GuavaUICore", "CYoga", .target(name: "GuavaPlatformCore")], path: "Portable/Sources/GuavaUIScene"),
     .target(name: "GuavaUIComposeCore", dependencies: ["GuavaUIScene"], path: "Portable/Sources/GuavaUIComposeCore"),
     .target(name: "GuavaUIDevToolsScene", dependencies: ["GuavaUIScene", "GuavaUIDevToolsProtocol", "GuavaUIAgentCore"], path: "Portable/Sources/GuavaUIDevToolsScene"),
@@ -89,7 +92,7 @@ let runtimeTargets: [Target] = [
     nativeTarget("webp", directory: runtimeArtifacts),
     nativeTarget("sharpyuv", directory: runtimeArtifacts),
     .target(name: "CDX12Bridge", path: "Runtime/Sources/Bridge/CDX12Bridge", publicHeadersPath: "include",
-                linkerSettings: [.linkedLibrary("d3d12", .when(platforms: [.windows])),
+                linkerSettings: windowsCxxRuntime + [.linkedLibrary("d3d12", .when(platforms: [.windows])),
                                  .linkedLibrary("dxgi", .when(platforms: [.windows])),
                                  .linkedLibrary("dxguid", .when(platforms: [.windows]))]),
     .target(name: "CVulkanHeaders", path: "Runtime/Sources/Bridge/CVulkanHeaders", publicHeadersPath: "include",
@@ -139,7 +142,7 @@ let runtimeTargets: [Target] = [
             .target(name: "GuavaLogging")], path: "Runtime/Sources/PlatformShell"),
     .target(name: "CImageDecodeBridge", dependencies: ["lunasvg", "plutovg", "webp", "sharpyuv"],
                 path: "Runtime/Sources/Bridge/CImageDecodeBridge", publicHeadersPath: "include",
-                cxxSettings: [.define("LUNASVG_BUILD_STATIC")]),
+                cxxSettings: [.define("LUNASVG_BUILD_STATIC")], linkerSettings: windowsCxxRuntime),
 ]
 
 let textTargets: [Target] = [
