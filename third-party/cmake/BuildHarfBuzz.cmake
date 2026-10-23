@@ -69,7 +69,7 @@ guava_add_artifact_build_manifest(
     LIB_REL_PATH "${GUAVA_TRIPLE}/lib/${HARFBUZZ_LIB_FILENAME}"
     BUILD_SYSTEM "CMake ExternalProject"
     SOURCE_KIND "git-submodule"
-    SOURCE_URL "GuavaUI/third-party/harfbuzz"
+    SOURCE_URL "third-party/harfbuzz"
     SOURCE_REF "14.5.1"
     SOURCE_REVISION ${HARFBUZZ_SOURCE_REVISION}
     NOTES "HB_HAVE_FREETYPE=ON, HB_BUILD_TESTS=OFF, static library"

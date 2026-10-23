@@ -1,0 +1,12 @@
+[submodule "third-party/freetype"]
+	path = third-party/freetype
+	url = https://github.com/freetype/freetype.git
+[submodule "third-party/harfbuzz"]
+	path = third-party/harfbuzz
+	url = https://github.com/harfbuzz/harfbuzz.git
+[submodule "third-party/ghostty"]
+	path = third-party/ghostty
+	url = https://github.com/ghostty-org/ghostty.git
+[submodule "Runtime/third-party/sdl3"]
+	path = Runtime/third-party/sdl3
+	url = https://github.com/libsdl-org/SDL.git

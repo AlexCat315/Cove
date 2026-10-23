@@ -3,7 +3,7 @@
 #if canImport(Network)
 import XCTest
 import Foundation
-import EngineKernel
+import GuavaPlatformCore
 @testable import GuavaUIDevTools
 @testable import GuavaUIRuntime
 

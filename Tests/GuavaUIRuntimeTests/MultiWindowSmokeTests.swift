@@ -2,7 +2,7 @@
 import CoreGraphics
 #endif
 import Foundation
-import EngineKernel
+import GuavaPlatformCore
 import PlatformShell
 import Testing
 @testable import GuavaUIRuntime

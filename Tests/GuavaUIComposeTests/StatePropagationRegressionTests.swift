@@ -1,6 +1,6 @@
 import Testing
 import GuavaUIRuntime
-import EngineKernel
+import GuavaPlatformCore
 @testable import GuavaUICompose
 
 @Suite("State propagation regressions", .serialized)

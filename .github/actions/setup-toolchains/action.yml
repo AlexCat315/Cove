@@ -1,0 +1,31 @@
+name: Guava SDK toolchains
+description: Prepare the Swift and native build tools used by the SDK.
+runs:
+  using: composite
+  steps:
+    - name: Select Xcode
+      if: runner.os == 'macOS'
+      shell: bash
+      run: |
+        sudo xcode-select -s /Applications/Xcode_27.0.app
+        echo "DEVELOPER_DIR=/Applications/Xcode_27.0.app/Contents/Developer" >> "$GITHUB_ENV"
+        echo "TOOLCHAINS=com.apple.dt.toolchain.XcodeDefault" >> "$GITHUB_ENV"
+    - uses: SwiftyLab/setup-swift@v1.14.1
+      if: runner.os != 'macOS'
+      with:
+        swift-version: '6.4.1'
+    - uses: lukka/get-cmake@latest
+      with:
+        cmakeVersion: '4.4.4'
+        ninjaVersion: '1.13.2'
+    - uses: ilammy/msvc-dev-cmd@v1
+      if: runner.os == 'Windows'
+    - uses: mlugg/setup-zig@v2
+      with:
+        version: '0.16.0'
+    - name: Linux build and test dependencies
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libvulkan-dev mesa-vulkan-drivers glslc patchelf xvfb libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxss-dev libxtst-dev libwayland-dev libxkbcommon-dev libasound2-dev libpulse-dev

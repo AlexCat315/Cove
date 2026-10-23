@@ -5,7 +5,7 @@ import CoreGraphics
 import Foundation
 #endif
 import GuavaUIRuntime
-import EngineKernel
+import GuavaPlatformCore
 @testable import GuavaUICompose
 
 /// Verifies that pointer-driven press transitions on a real `Button` update

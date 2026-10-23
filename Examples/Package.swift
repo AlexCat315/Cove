@@ -9,7 +9,7 @@ let package = Package(
         .executable(name: "GuavaUIDemo", targets: ["GuavaUIDemo"]),
         .executable(name: "PetDemo", targets: ["PetDemo"]),
     ],
-    dependencies: [.package(path: ".."), .package(path: "../../examples/Counter")],
+    dependencies: [.package(name: "GuavaUI", path: ".."), .package(path: "Counter")],
     targets: [
         .target(name: "GalleryContent", dependencies: [
             .product(name: "CounterExample", package: "Counter"),

@@ -6,7 +6,7 @@ import Foundation
 #endif
 import PlatformShell
 @testable import GuavaUIRuntime
-import EngineKernel
+import GuavaPlatformCore
 
 @Suite("EventDispatcher cursor sink")
 struct EventDispatcherCursorTests {

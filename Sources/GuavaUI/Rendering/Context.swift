@@ -16,13 +16,11 @@ struct AppWindowRenderSettings {
 final class AppRenderingContext {
     private let device: Device
     private let renderer: NativeDrawListRenderer
-    let viewportTextures: ViewportTextureRegistry
 
     init(device: Device?, config: ApplicationConfiguration) throws {
         let device = try device ?? Device.make(config.rendering.device)
         self.device = device
         renderer = try device.withFrameSession { try NativeDrawListRenderer(device: device) }
-        viewportTextures = ViewportTextureRegistry(renderer: renderer)
     }
 
     func makeWindow(settings: AppWindowRenderSettings) throws -> any AppWindowRenderer {

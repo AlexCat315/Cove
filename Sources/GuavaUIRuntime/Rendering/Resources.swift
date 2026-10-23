@@ -1,4 +1,4 @@
-import EngineKernel
+import GuavaPlatformCore
 
 /// Shared by UI and backdrop shaders in desktop apps and unpacked Android APKs.
 enum ShaderResourcesBundle {

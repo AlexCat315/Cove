@@ -3,7 +3,7 @@ import AppKit
 import CSDL3
 import Testing
 @testable import PlatformShell
-import EngineKernel
+import GuavaPlatformCore
 
 @Suite("AppKit scroll decoding", .serialized)
 struct AppKitScrollInputTests {

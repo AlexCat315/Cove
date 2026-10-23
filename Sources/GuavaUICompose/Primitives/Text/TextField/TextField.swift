@@ -1,7 +1,7 @@
 #if canImport(CoreGraphics)
 import CoreGraphics
 #endif
-import EngineKernel
+import GuavaPlatformCore
 import GuavaUIRuntime
 
 /// Text input field. The default horizontal axis is single-line; the

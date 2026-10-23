@@ -4,19 +4,25 @@ import GuavaUICore
 /// clear/unmount can reclaim residency; already recorded frames own GPU slots.
 struct UIAssetResidency {
     private final class Owner {
-        weak var asset: (any UITextureAsset)?
-        init(_ asset: any UITextureAsset) { self.asset = asset }
+        weak var asset: AnyObject?
+        init(_ asset: AnyObject) { self.asset = asset }
     }
     private var owners: [TextureID: Owner] = [:]
 
     mutating func prepare(_ resources: DrawListResources,
-        register: (any UITextureAsset) throws -> Void, unregister: (TextureID) -> Void) throws {
+        register: (any UITextureAsset) throws -> Void,
+        registerTexture: (TextureImage) throws -> Void, unregister: (TextureID) -> Void) throws {
         for id in owners.keys.filter({ owners[$0]?.asset == nil }) {
             unregister(id); owners.removeValue(forKey: id)
         }
         try resources.forEach(of: (any UITextureAsset).self) { asset in
             guard owners[asset.textureID]?.asset !== asset else { return }
             try register(asset)
+            owners[asset.textureID] = Owner(asset)
+        }
+        try resources.forEach(of: TextureImage.self) { asset in
+            guard owners[asset.textureID]?.asset !== asset else { return }
+            try registerTexture(asset)
             owners[asset.textureID] = Owner(asset)
         }
     }

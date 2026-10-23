@@ -59,7 +59,7 @@ guava_add_artifact_build_manifest(
     LIB_REL_PATH "${GUAVA_TRIPLE}/lib/${FREETYPE_LIB_FILENAME}"
     BUILD_SYSTEM "CMake ExternalProject"
     SOURCE_KIND "git-submodule"
-    SOURCE_URL "GuavaUI/third-party/freetype"
+    SOURCE_URL "third-party/freetype"
     SOURCE_REF "VER-2-14-3"
     SOURCE_REVISION ${FREETYPE_SOURCE_REVISION}
     NOTES "FT_DISABLE_ZLIB=ON, FT_DISABLE_PNG=ON, FT_DISABLE_HARFBUZZ=ON, static library"

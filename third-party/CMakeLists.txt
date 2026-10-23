@@ -4,8 +4,8 @@ if(POLICY CMP0177)
 endif()
 project(guavaui-third-party LANGUAGES C CXX)
 
-include(${CMAKE_SOURCE_DIR}/../../cmake/NativePlatform.cmake)
-include(${CMAKE_SOURCE_DIR}/../../cmake/ArtifactBundleManifest.cmake)
+include(${CMAKE_SOURCE_DIR}/../cmake/NativePlatform.cmake)
+include(${CMAKE_SOURCE_DIR}/../cmake/ArtifactBundleManifest.cmake)
 
 message(STATUS "GuavaUI third-party target triple: ${GUAVA_TRIPLE} (SPM: ${GUAVA_SPM_TRIPLE})")
 

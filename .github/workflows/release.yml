@@ -1,0 +1,67 @@
+name: CLI release
+on:
+  push:
+    tags: ['v[0-9]*']
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: xcode-27
+            platform: macos-arm64
+          - runner: windows-2025-vs2026
+            platform: windows-x86_64
+          - runner: ubuntu-24.04
+            platform: linux-x86_64
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/setup-toolchains
+      - name: Verify tag and SDK metadata
+        run: node Tools/Release/check-version.mjs "$GITHUB_REF_NAME"
+      - name: Test CLI
+        run: ./guava test Tools/Guava
+      - name: Package CLI and runtime libraries
+        run: ./guava internal package-cli --output "$PWD/dist"
+      - name: Verify independent startup
+        run: |
+          mkdir smoke
+          tar -xf "dist/guava-${{ matrix.platform }}.tar.gz" -C smoke
+          if [ "$RUNNER_OS" = Windows ]; then
+            smoke/guava/guava.exe --version
+          else
+            env -i PATH=/usr/bin:/bin smoke/guava/guava --version
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.platform }}
+          path: dist/*
+          if-no-files-found: error
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cli-*
+          path: dist
+      - name: Publish after every platform passes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          mkdir release
+          find dist -name '*.tar.gz' -exec cp {} release/ \;
+          find dist -name SHA256SUMS -exec cat {} \; | sort > release/SHA256SUMS
+          cp Tools/Guava/install.sh Tools/Guava/install.ps1 release/
+          gh release create "$RELEASE_TAG" release/* --verify-tag --title "$RELEASE_TAG" --generate-notes

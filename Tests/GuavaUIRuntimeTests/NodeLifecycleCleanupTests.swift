@@ -4,7 +4,7 @@ import CoreGraphics
 #else
 import Foundation
 #endif
-import EngineKernel
+import GuavaPlatformCore
 @testable import GuavaUIRuntime
 
 /// Phase 6 acceptance: every node-keyed external registration is released by the

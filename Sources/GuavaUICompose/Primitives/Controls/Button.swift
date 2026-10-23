@@ -1,6 +1,6 @@
 import Foundation
 import GuavaUIRuntime
-import EngineKernel
+import GuavaPlatformCore
 
 // NOTE: This file used to host a primitive `Button` that wrapped a label and
 // emitted no visual state. Phase 7.5 promotes `Button` to a stateful composite

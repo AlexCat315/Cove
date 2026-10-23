@@ -4,7 +4,7 @@ import CoreGraphics
 #else
 import Foundation
 #endif
-import EngineKernel
+import GuavaPlatformCore
 import GuavaUIRuntime
 @testable import GuavaUICompose
 

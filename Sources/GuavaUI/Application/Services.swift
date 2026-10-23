@@ -11,7 +11,6 @@ struct ApplicationServices {
     private let capture = PointerCaptureHolder.current
     private let clipboardRead = ClipboardHolder.read
     private let clipboardWrite = ClipboardHolder.write
-    private let viewport = ViewportTextureBridgeHolder.current
     private let images = ImageAssetRegistryHolder.current
     private let drops = AssetDropRegistryHolder.current
     private let work = UIWorkSchedulerHolder.enqueue
@@ -24,7 +23,6 @@ struct ApplicationServices {
         PointerCaptureHolder.current = capture
         ClipboardHolder.read = clipboardRead
         ClipboardHolder.write = clipboardWrite
-        ViewportTextureBridgeHolder.current = viewport
         ImageAssetRegistryHolder.current = images
         AssetDropRegistryHolder.current = drops
         UIWorkSchedulerHolder.enqueue = work

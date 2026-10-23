@@ -8,7 +8,7 @@
     "build": 1
   },
   "toolchain": {
-    "enginePath": "../.."
+    "sdkVersion": "0.1.0"
   },
   "targets": {
     "platforms": [

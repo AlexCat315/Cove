@@ -155,7 +155,7 @@ public enum ContentScaleHolder {
 
 /// Reserve one process-wide namespace, distinct from caller/font IDs and
 /// viewport leases. Assets from independent registries can coexist in a frame.
-private final class ImageAssetIDs: @unchecked Sendable {
+final class ImageAssetIDs: @unchecked Sendable {
     static let shared = ImageAssetIDs()
     private let lock = NSLock()
     private var next: TextureID = 0x1000_0000

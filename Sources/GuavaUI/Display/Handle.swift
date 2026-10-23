@@ -1,4 +1,4 @@
-import EngineKernel
+import GuavaPlatformCore
 import GuavaUICompose
 import GuavaUIRuntime
 import PlatformShell

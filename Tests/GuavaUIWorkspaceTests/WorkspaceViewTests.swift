@@ -4,7 +4,7 @@ import CoreGraphics
 import Foundation
 #endif
 import XCTest
-import EngineKernel
+import GuavaPlatformCore
 import GuavaUICompose
 import GuavaUIRuntime
 @testable import GuavaUIWorkspace

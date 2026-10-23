@@ -1,4 +1,4 @@
-import EngineKernel
+import GuavaPlatformCore
 import Foundation
 import GuavaUICompose
 import GuavaUIRuntime
@@ -174,7 +174,6 @@ public final class Application {
             callbacks.diagnosticsReady?(diagnostics.queries)
         }
 
-        ViewportTextureBridgeHolder.current = rendering.viewportTextures
         ImageAssetRegistryHolder.current = composition.imageAssets
         AssetDropRegistryHolder.current = composition.assetDropRegistry
         UIWorkSchedulerHolder.enqueue = { [weak host] work in
@@ -500,7 +499,6 @@ public final class Application {
         }
         if config.diagnostics.showsPerformanceHUD { performanceHUD.draw(into: composition.drawList) }
         drawDevToolsOverlay(into: composition.drawList)
-        rendering.viewportTextures.prune()
         let drawEnd = TimingTrace.now()
         composition.tree.timeline.end(drawTrace, phase: "draw", name: "Encode draw list")
 

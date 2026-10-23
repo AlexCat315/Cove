@@ -1,6 +1,6 @@
 import GuavaUIDevToolsProtocol
 import Foundation
-import EngineKernel
+import GuavaPlatformCore
 import GuavaUIRuntime
 
 /// Translates `MirrorInputPayload` into `InputEvent` and injects them into

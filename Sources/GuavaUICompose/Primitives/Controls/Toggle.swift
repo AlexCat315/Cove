@@ -1,7 +1,7 @@
 #if canImport(CoreGraphics)
 import CoreGraphics
 #endif
-import EngineKernel
+import GuavaPlatformCore
 import GuavaUIRuntime
 
 /// Boolean on/off control rendered as a switch track with a movable thumb.

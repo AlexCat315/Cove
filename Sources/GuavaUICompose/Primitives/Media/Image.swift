@@ -29,18 +29,28 @@ public struct Image: _PrimitiveView {
     public enum Source: Sendable, Equatable {
         case texture(TextureID, size: SIMD2<Float>? = nil)
         case asset(ImageAssetRegistry.Asset)
+        case rendered(TextureImage)
 
         var textureID: TextureID {
-            switch self { case .texture(let id, _): id; case .asset(let asset): asset.textureID }
+            switch self {
+            case .texture(let id, _): id
+            case .asset(let asset): asset.textureID
+            case .rendered(let image): image.textureID
+            }
         }
         var sourcePixelSize: (width: Float, height: Float)? {
             switch self {
             case .texture(_, let size): size.map { ($0.x, $0.y) }
             case .asset(let asset): (Float(asset.image.width), Float(asset.image.height))
+            case .rendered(let image): (Float(image.pixelSize.x), Float(image.pixelSize.y))
             }
         }
         func retain(in list: DrawList) {
-            if case .asset(let asset) = self { list.retainResource(asset) }
+            switch self {
+            case .asset(let asset): list.retainResource(asset)
+            case .rendered(let image): list.retainResource(image)
+            case .texture: break
+            }
         }
     }
     public let source: Source

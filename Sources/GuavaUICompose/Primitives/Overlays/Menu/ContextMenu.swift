@@ -1,5 +1,5 @@
 import Foundation
-import EngineKernel
+import GuavaPlatformCore
 import GuavaUIRuntime
 
 public extension View {

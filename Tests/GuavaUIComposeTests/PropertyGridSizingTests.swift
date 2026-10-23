@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 import GuavaUIRuntime
-import EngineKernel
+import GuavaPlatformCore
 @testable import GuavaUICompose
 
 @Suite("Property grid sizing", .serialized)

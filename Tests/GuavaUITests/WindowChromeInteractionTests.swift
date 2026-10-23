@@ -1,5 +1,5 @@
 import XCTest
-import EngineKernel
+import GuavaPlatformCore
 @testable import GuavaUI
 import GuavaUICompose
 import GuavaUIRuntime

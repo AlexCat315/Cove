@@ -1,4 +1,4 @@
-import EngineKernel
+import GuavaPlatformCore
 import Foundation
 
 enum GuavaUIComposeResourceBundle {

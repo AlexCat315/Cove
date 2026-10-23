@@ -1,5 +1,5 @@
 import Foundation
-import EngineKernel
+import GuavaPlatformCore
 import Testing
 import GuavaUIRuntime
 @testable import GuavaUICompose

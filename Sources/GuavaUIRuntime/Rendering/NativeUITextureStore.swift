@@ -148,6 +148,8 @@ final class NativeUITextureStore {
             }
             try stage(id: asset.textureID, pixels: Data(image.pixels), size: SIMD2(w, h),
                 region: .init(width: w, height: h), format: .rgba8Unorm)
+        }, registerTexture: { asset in
+            try register(id: asset.textureID, resource: asset.resource)
         }, unregister: { id in
             if let placement = placements.removeValue(forKey: id),
                atlases.indices.contains(placement.atlasIndex) {

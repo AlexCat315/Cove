@@ -1,5 +1,4 @@
-import EngineKernel
-import RenderBackend
+import GuavaPlatformCore
 
 public final class PlatformEventBridge: @unchecked Sendable {
     public struct SubscriptionToken: Hashable, Sendable {
@@ -28,15 +27,4 @@ public final class PlatformEventBridge: @unchecked Sendable {
             handler(event)
         }
     }
-}
-
-public protocol ViewportTextureBridge: AnyObject {
-    /// Resolve a published viewport surface to a `TextureID` the renderer
-    /// can sample. Geometry must retain `surface.image` for as long as it uses
-    /// the returned ID, including cached layers and render-thread snapshots.
-    func textureID(for surface: ViewportSurfaceState) -> TextureID?
-}
-
-public enum ViewportTextureBridgeHolder {
-    nonisolated(unsafe) public static var current: ViewportTextureBridge?
 }

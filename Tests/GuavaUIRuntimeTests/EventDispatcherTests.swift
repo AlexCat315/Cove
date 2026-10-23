@@ -5,7 +5,7 @@ import CoreGraphics
 import Foundation
 #endif
 @testable import GuavaUIRuntime
-import EngineKernel
+import GuavaPlatformCore
 
 @Suite("EventDispatcher")
 struct EventDispatcherTests {

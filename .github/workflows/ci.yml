@@ -1,0 +1,36 @@
+name: SDK CI
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: xcode-27
+            platform: macos-arm64
+          - runner: windows-2025-vs2026
+            platform: windows-x86_64
+          - runner: ubuntu-24.04
+            platform: linux-x86_64
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/setup-toolchains
+      - name: Prepare native dependencies
+        run: ./guava setup
+      - name: Test standalone CLI
+        run: ./guava test Tools/Guava
+      - name: Test SDK
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a ./guava test . --no-parallel
+          else
+            ./guava test . --no-parallel
+          fi

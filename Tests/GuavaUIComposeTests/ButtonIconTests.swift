@@ -5,7 +5,7 @@ import CoreGraphics
 import Foundation
 #endif
 import GuavaUIRuntime
-import EngineKernel
+import GuavaPlatformCore
 @testable import GuavaUICompose
 
 /// Coverage for icon-only `Button` — verifies the texture-source path materialises

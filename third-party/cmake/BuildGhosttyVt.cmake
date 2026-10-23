@@ -108,7 +108,7 @@ guava_add_artifact_build_manifest(
     LIB_REL_PATH "${GUAVA_TRIPLE}/lib/${GHOSTTY_LIB_FILENAME}"
     BUILD_SYSTEM "Zig ${GHOSTTY_ZIG_VERSION} (zig build -Demit-lib-vt=true)"
     SOURCE_KIND "git-submodule"
-    SOURCE_URL "GuavaUI/third-party/ghostty"
+    SOURCE_URL "third-party/ghostty"
     SOURCE_REF "main"
     SOURCE_REVISION ${GHOSTTY_SOURCE_REVISION}
     C_COMPILER "${GUAVA_ZIG} (${GHOSTTY_ZIG_TARGET})"

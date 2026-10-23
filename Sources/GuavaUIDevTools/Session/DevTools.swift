@@ -4,7 +4,7 @@ import Foundation
 import GuavaLogging
 import NativeRHI
 import GuavaUIRuntime
-import EngineKernel
+import GuavaPlatformCore
 
 /// One-stop entry for hosts that want to enable DevTools. Wires the
 /// SceneInspector into a DevServer and exposes a single `start` /

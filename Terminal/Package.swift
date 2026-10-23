@@ -12,7 +12,7 @@ let package = Package(
         .executable(name: "TerminalDemo", targets: ["TerminalDemo"]),
     ],
     dependencies: [
-        .package(path: ".."),
+        .package(name: "GuavaUI", path: ".."),
     ],
     targets: [
         // Ghostty's VT emulator as a static C library. Only Engine/ imports it;

@@ -1,5 +1,5 @@
 import Foundation
-import EngineKernel
+import GuavaPlatformCore
 
 /// Resolves SwiftPM resources using the same rules on desktop and Android.
 public enum ApplicationResources {

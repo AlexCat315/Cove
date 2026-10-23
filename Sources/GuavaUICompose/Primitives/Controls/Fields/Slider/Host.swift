@@ -1,4 +1,4 @@
-import EngineKernel
+import GuavaPlatformCore
 import GuavaUIRuntime
 
 // MARK: - Primitive host
