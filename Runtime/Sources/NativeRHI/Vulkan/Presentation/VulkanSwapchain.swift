@@ -124,7 +124,7 @@ final class VulkanSwapchain {
 
     private static func state(_ caps: VkSurfaceCapabilitiesKHR) -> VulkanSurfaceState {
         VulkanSurfaceState(extent: SIMD2(caps.currentExtent.width, caps.currentExtent.height),
-                           transform: caps.currentTransform.rawValue)
+                           transform: UInt32(caps.currentTransform.rawValue))
     }
 
     func destroy(registries: VulkanRegistries) {

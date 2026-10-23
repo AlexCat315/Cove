@@ -30,6 +30,17 @@ jobs:
         run: ./guava setup
       - name: Test standalone CLI
         run: ./guava test Tools/Guava
+      - name: Package standalone CLI
+        run: ./guava internal package-cli --output "$PWD/dist"
+      - name: Verify CLI without a developer toolchain on PATH
+        run: |
+          mkdir smoke
+          tar -xf "dist/guava-${{ matrix.platform }}.tar.gz" -C smoke
+          if [ "$RUNNER_OS" = Windows ]; then
+            env -i SystemRoot="$SYSTEMROOT" WINDIR="$WINDIR" PATH=/c/Windows/System32 smoke/guava/guava.exe --version
+          else
+            env -i PATH=/usr/bin:/bin smoke/guava/guava --version
+          fi
       - name: Test SDK
         run: |
           if [ "$RUNNER_OS" = Linux ]; then

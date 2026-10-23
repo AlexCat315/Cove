@@ -10,7 +10,7 @@ struct WindowsSessionTests {
     func outputAndExit() async throws {
         let session = TerminalSession(command: TerminalCommand(executable: "cmd.exe",
             arguments: ["/d", "/c", "echo hello-guava&exit /b 3"]), scrollbackLines: 100) {
-                DispatchQueue.main.async(execute: $0)
+                DispatchQueue.main.async(execute: DispatchWorkItem(block: $0))
             }
         try session.start()
         let deadline = ContinuousClock.now + .seconds(10)

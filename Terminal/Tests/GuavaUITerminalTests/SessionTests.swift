@@ -14,7 +14,9 @@ import Testing
 @MainActor
 struct SessionTests {
     private func session(_ command: TerminalCommand) -> TerminalSession {
-        TerminalSession(command: command, scrollbackLines: 100) { DispatchQueue.main.async(execute: $0) }
+        TerminalSession(command: command, scrollbackLines: 100) {
+            DispatchQueue.main.async(execute: DispatchWorkItem(block: $0))
+        }
     }
 
     private func screen(_ session: TerminalSession) -> String {

@@ -105,7 +105,9 @@ public final class TerminalSession {
     public func start() throws {
         guard status == .idle else { throw TerminalError.alreadyStarted }
         guard let command else { status = .running; return }
-        inbox.schedule = schedule ?? UIWorkSchedulerHolder.enqueue ?? { DispatchQueue.main.async(execute: $0) }
+        inbox.schedule = schedule ?? UIWorkSchedulerHolder.enqueue ?? {
+            DispatchQueue.main.async(execute: DispatchWorkItem(block: $0))
+        }
         let inbox = inbox
         do {
             process = try PseudoTerminal.spawn(

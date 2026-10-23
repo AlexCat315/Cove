@@ -33,7 +33,9 @@ final class BlinkTimer {
 
     private func start() {
         let schedule: (@escaping () -> Void) -> Void =
-            UIWorkSchedulerHolder.enqueue ?? { work in DispatchQueue.main.async(execute: work) }
+            UIWorkSchedulerHolder.enqueue ?? { work in
+                DispatchQueue.main.async(execute: DispatchWorkItem(block: work))
+            }
         let timer = DispatchSource.makeTimerSource(queue: DispatchQueue(label: "guava.terminal.blink"))
         timer.schedule(deadline: .now() + Self.interval, repeating: Self.interval)
         timer.setEventHandler { [weak self] in
