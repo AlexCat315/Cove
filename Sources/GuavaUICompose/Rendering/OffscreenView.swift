@@ -1,5 +1,5 @@
-import Foundation
-import GuavaUIRuntime
+private import Foundation
+public import GuavaUIRuntime
 
 /// Main-thread owner of an offscreen view tree. Rendering returns an owned
 /// snapshot that can be recorded later on the renderer's thread.
@@ -10,22 +10,21 @@ public final class OffscreenView {
     private let graph: ViewGraph
     private let layerRenderer = LayerAwareNodeRenderer()
     private let drawList = DrawList()
-    private let atlasTextureID: TextureID
+    private let atlasTextureID: TextureID = 1
     private let imageAssets = ImageAssetRegistry()
 
     private var textEnv: TextEnvironment?
     private var lastScale: Float = 0
     private var didInstallRoot = false
 
-    public init(atlasTextureID: TextureID = 1) {
-        self.atlasTextureID = atlasTextureID
+    public init() {
         self.graph = ViewGraph(tree: tree, recomposer: recomposer)
     }
 
     // MARK: - Main-thread API
 
-    /// Install a GuavaUI `View` tree as the in-game HUD. Call once before the
-    /// first `tick`. Subsequent calls are ignored — swap the root via `@State`
+    /// Install the root view before the first render. Subsequent calls are
+    /// ignored; swap the root via `@State`
     /// on a wrapping view if dynamic root changes are needed.
     public func setRootView<V: View>(_ view: V) {
         guard !didInstallRoot else { return }
@@ -36,7 +35,7 @@ public final class OffscreenView {
         didInstallRoot = true
     }
 
-    /// Advance the in-game UI by one frame. Must be called on the main thread,
+    /// Render one frame. Must be called on the main thread,
     /// after all observed state
     /// writes for this frame have been applied.
     ///

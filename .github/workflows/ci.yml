@@ -27,6 +27,7 @@ jobs:
           submodules: recursive
       - uses: ./.github/actions/setup-toolchains
       - name: Prepare native dependencies
+        id: native
         run: ./guava setup
       - name: Test standalone CLI
         run: ./guava test Tools/Guava
@@ -42,6 +43,7 @@ jobs:
             env -i PATH=/usr/bin:/bin smoke/guava/guava --version
           fi
       - name: Test SDK
+        if: ${{ !cancelled() && steps.native.conclusion == 'success' }}
         run: |
           if [ "$RUNNER_OS" = Linux ]; then
             xvfb-run -a ./guava test . --no-parallel

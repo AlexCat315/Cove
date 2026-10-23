@@ -26,7 +26,13 @@ enum CLIArchive {
         try Shell.run([payload.appendingPathComponent(executable.lastPathComponent).path, "--version"])
         try Files.directory(output)
         let archive = output.appendingPathComponent("guava-\(CLIUpdate.platform).tar.gz")
-        try Shell.run(["tar", "-C", staging.path, "-czf", archive.path, "guava"])
+        #if os(Windows)
+        let tar = URL(fileURLWithPath: ProcessInfo.processInfo.environment["SystemRoot"] ?? "C:\\Windows")
+            .appendingPathComponent("System32/tar.exe").path
+        #else
+        let tar = "tar"
+        #endif
+        try Shell.run([tar, "-C", staging.path, "-czf", archive.path, "guava"])
         try Files.text(try SHA256.hex(file: archive) + "  " + archive.lastPathComponent + "\n",
                        to: output.appendingPathComponent("SHA256SUMS"))
         print(archive.path)
