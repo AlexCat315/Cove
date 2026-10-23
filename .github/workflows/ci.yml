@@ -2,6 +2,9 @@ name: SDK CI
 on: [push, pull_request]
 permissions:
   contents: read
+concurrency:
+  group: sdk-ci-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   verify:
     runs-on: ${{ matrix.runner }}

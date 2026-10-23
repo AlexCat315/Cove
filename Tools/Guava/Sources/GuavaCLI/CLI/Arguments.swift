@@ -2,7 +2,7 @@ import Foundation
 
 enum Operation: Equatable {
     case androidExport
-    case selfUpdate, installCLI, packageCLI, packageNative
+    case selfUpdate, installCLI, packageCLI, packageNative, packageBuild
     case setup, sdkInstall, sdkUse, sdkList, create, build, run, clean, test, doctor, devices, showcase, androidCompile, androidPrepare, devtools
 }
 
@@ -63,6 +63,7 @@ struct Arguments {
             case "install-cli": operation = .installCLI
             case "package-cli": operation = .packageCLI
             case "package-native": operation = .packageNative
+            case "build-package": operation = .packageBuild
             case "android-export": operation = .androidExport
             case "android-compile": operation = .androidCompile
             case "android-prepare": operation = .androidPrepare
@@ -110,7 +111,7 @@ struct Arguments {
         if [.create, .clean, .test].contains(operation), platform != nil {
             throw ToolError.invalid("\(verb) is project-wide and does not take a platform flag")
         }
-        if configuration != nil, ![.build, .run, .test, .showcase, .androidCompile, .androidExport, .androidPrepare].contains(operation) {
+        if configuration != nil, ![.build, .run, .test, .showcase, .androidCompile, .androidExport, .androidPrepare, .packageBuild].contains(operation) {
             throw ToolError.invalid("\(verb) does not take a build configuration")
         }
         let selectedPlatform = platform ?? ([.androidCompile, .androidExport, .androidPrepare, .showcase].contains(operation) ? .android : .host)
@@ -185,6 +186,7 @@ struct Arguments {
         case .sdkInstall, .selfUpdate: return []
         case .installCLI: return [.binDirectory]
         case .packageCLI, .packageNative: return common.union([.output])
+        case .packageBuild: return common.union([.product, .scratchPath])
         case .sdkUse, .sdkList: return []
         case .setup, .doctor: return common.union([.androidSDK, .ndk])
         case .devices: return [.androidSDK]

@@ -33,6 +33,12 @@ enum GuavaCLI {
         case .installCLI: try CLIInstaller.install(payload: InstallationReceipt.executableDirectory, directory: arguments.directory, commands: URL(fileURLWithPath: try arguments.required(.binDirectory)))
         case .packageCLI: try CLIArchive.create(root: GuavaSDK.locate(arguments), output: arguments.url(.output) ?? arguments.directory.appendingPathComponent("dist"))
         case .packageNative: try NativeArchive.create(root: GuavaSDK.locate(arguments), output: arguments.url(.output) ?? arguments.directory.appendingPathComponent("dist"))
+        case .packageBuild:
+            let root = try GuavaSDK.locate(arguments)
+            var command = SwiftPackage.command(directory: arguments.directory, configuration: arguments.configuration,
+                scratchPath: arguments.url(.scratchPath))
+            if let product = arguments.value(.product) { command += ["--product", product] }
+            try Shell.run(command, environment: SwiftPackage.environment(root: root))
         case .create: try CreateApplication.run(arguments, root: GuavaSDK.locate(arguments))
         case .clean:
             let project = try AppProject(at: arguments.directory)
