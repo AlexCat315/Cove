@@ -473,7 +473,13 @@ public final class SDL3PlatformHost: PlatformHost {
         frameDrive.driver = driver
         driver.start()
         #else
-        while _isRunning && shell.isRunning && !sessions.isEmpty { runFrame(wait: true) }
+        while _isRunning && shell.isRunning && !sessions.isEmpty {
+            #if canImport(ObjectiveC)
+            autoreleasepool { runFrame(wait: true) }
+            #else
+            runFrame(wait: true)
+            #endif
+        }
         finishRunLoop()
         #endif
     }

@@ -9,6 +9,28 @@ import Testing
 
 @Suite("Multi-window smoke")
 struct MultiWindowSmokeTests {
+    #if os(macOS)
+    @MainActor
+    @Test("Temporary native objects are released before the next event-loop iteration")
+    func drainsFrameObjects() throws {
+        let shell = MockShell(eventBatches: [[], [], []])
+        let host = SDL3PlatformHost(shellFactory: { shell })
+        _ = try host.openWindow(title: "Lifetime", tree: NodeTree())
+        weak var previous: NSObject?
+        var iterations = 0
+        shell.onPoll = {
+            #expect(previous == nil)
+            let object = NSObject()
+            previous = object
+            _ = Unmanaged.passRetained(object).autorelease()
+            iterations += 1
+        }
+        host.run()
+        #expect(iterations == 3)
+        #expect(previous == nil)
+    }
+    #endif
+
     @MainActor
     @Test("Each routed event reaches only its own window session")
     func routesEventsPerWindow() throws {

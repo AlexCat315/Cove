@@ -22,13 +22,12 @@ public final class ManagedFont {
 
     public var rawFace: FT_Face { ftFace }
 
-    // Pinned buffer — must stay alive as long as ftFace.
-    private let buffer: UnsafeMutablePointer<UInt8>
-    private let bufferSize: Int
+    // Immutable file storage stays alive for FreeType's borrowed bytes.
+    private let buffer: NSData
 
     init(id: Int, postScriptName: String, pointSize: Float, rasterScale: Float,
             ftFace: FT_Face, hbFont: OpaquePointer,
-         buffer: UnsafeMutablePointer<UInt8>, bufferSize: Int) {
+         buffer: NSData) {
         self.id = id
         self.postScriptName = postScriptName
         self.pointSize = pointSize
@@ -36,13 +35,11 @@ public final class ManagedFont {
         self.ftFace = ftFace
         self.hbFont = hbFont
         self.buffer = buffer
-        self.bufferSize = bufferSize
     }
 
     deinit {
         hb_font_destroy(hbFont)
         FT_Done_Face(ftFace)
-        buffer.deallocate()
     }
 }
 
@@ -296,7 +293,7 @@ public final class FontProvider {
 
 #if !canImport(CoreText)
     private func loadPrimaryFontDirect(name: String) -> ManagedFont? {
-        if name.hasPrefix("/"), let data = try? Data(contentsOf: URL(fileURLWithPath: name)) {
+        if name.hasPrefix("/"), let data = try? NSData(contentsOf: URL(fileURLWithPath: name), options: .mappedIfSafe) {
             return loadFontFromData(data, psName: name, faceIndex: 0)
         }
         // 1. If `name` happens to match a font file by basename, load it.
@@ -313,7 +310,7 @@ public final class FontProvider {
             for dir in systemDirs {
                 for ext in extensions {
                     let path = dir + name + "." + ext
-                    if let data = try? Data(contentsOf: URL(fileURLWithPath: path)) {
+                    if let data = try? NSData(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe) {
                         return loadFontFromData(data, psName: name, faceIndex: 0)
                     }
                 }
@@ -323,7 +320,7 @@ public final class FontProvider {
         //    a common sans on Linux). The system pairs this with its own CJK
         //    fallback (e.g. YaHei) so mixed scripts stay visually consistent.
         for path in Self.systemPrimaryFontPaths() {
-            if let data = try? Data(contentsOf: URL(fileURLWithPath: path)) {
+            if let data = try? NSData(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe) {
                 return loadFontFromData(data,
                                         psName: name.isEmpty ? "system-ui" : name,
                                         faceIndex: 0)
@@ -359,16 +356,13 @@ public final class FontProvider {
 #endif
     }
 
-    private func loadFontFromData(_ data: Data, psName: String, faceIndex: Int) -> ManagedFont? {
+    private func loadFontFromData(_ data: NSData, psName: String, faceIndex: Int) -> ManagedFont? {
         if let existing = fonts[psName] { return existing }
 
-        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: data.count)
-        data.copyBytes(to: buffer, count: data.count)
-
         var face: FT_Face?
-        let err = FT_New_Memory_Face(ftLibrary, buffer, FT_Long(data.count), FT_Long(faceIndex), &face)
+        let err = FT_New_Memory_Face(ftLibrary, data.bytes.assumingMemoryBound(to: UInt8.self),
+                                   FT_Long(data.length), FT_Long(faceIndex), &face)
         guard err == 0, let ftFace = face else {
-            buffer.deallocate()
             return nil
         }
 
@@ -377,7 +371,6 @@ public final class FontProvider {
 
         guard let hbFont = hb_ft_font_create_referenced(ftFace) else {
             FT_Done_Face(ftFace)
-            buffer.deallocate()
             return nil
         }
 
@@ -395,7 +388,7 @@ public final class FontProvider {
         let managed = ManagedFont(
             id: id, postScriptName: resolvedPSName, pointSize: size, rasterScale: rasterScale,
             ftFace: ftFace, hbFont: hbFont,
-            buffer: buffer, bufferSize: data.count
+            buffer: data
         )
         if FreeTypeColorGlyphFace.hasColorGlyphs(ftFace) {
             managed.freeTypeColorFont = FreeTypeColorGlyphFace(face: ftFace, size: size, rasterScale: rasterScale)
@@ -431,7 +424,7 @@ public final class FontProvider {
     private func loadFallbackFont(path: String) -> ManagedFont? {
         let cacheKey = "fallback:" + path
         if let existing = fonts[cacheKey] { return existing }
-        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else { return nil }
+        guard let data = try? NSData(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe) else { return nil }
         return loadFontFromData(data, psName: cacheKey, faceIndex: 0)
     }
 
@@ -592,18 +585,15 @@ public final class FontProvider {
         let descriptor = CTFontCopyFontDescriptor(ctFont)
         guard let urlRef = CTFontDescriptorCopyAttribute(descriptor, kCTFontURLAttribute),
               let url = urlRef as? URL else { return nil }
-        guard let data = try? Data(contentsOf: url) else { return nil }
+        guard let data = try? NSData(contentsOf: url, options: .mappedIfSafe) else { return nil }
 
         let resolvedFaceIndex = findFaceIndex(in: data, targetPSName: actualPSName)
         let faceIndex = resolvedFaceIndex ?? 0
 
-        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: data.count)
-        data.copyBytes(to: buffer, count: data.count)
-
         var face: FT_Face?
-        let err = FT_New_Memory_Face(ftLibrary, buffer, FT_Long(data.count), FT_Long(faceIndex), &face)
+        let err = FT_New_Memory_Face(ftLibrary, data.bytes.assumingMemoryBound(to: UInt8.self),
+                                   FT_Long(data.length), FT_Long(faceIndex), &face)
         guard err == 0, let ftFace = face else {
-            buffer.deallocate()
             return nil
         }
 
@@ -612,14 +602,12 @@ public final class FontProvider {
             let loadedPSName = String(cString: loadedNamePtr)
             if loadedPSName != actualPSName {
                 FT_Done_Face(ftFace)
-                buffer.deallocate()
                 return nil
             }
         }
 
         guard applyFontVariations(from: ctFont, to: ftFace, library: ftLibrary) else {
             FT_Done_Face(ftFace)
-            buffer.deallocate()
             return nil
         }
         _ = FT_Select_Charmap(ftFace, FT_ENCODING_UNICODE)
@@ -627,7 +615,6 @@ public final class FontProvider {
 
         guard let hbFont = hb_ft_font_create_referenced(ftFace) else {
             FT_Done_Face(ftFace)
-            buffer.deallocate()
             return nil
         }
 
@@ -638,7 +625,7 @@ public final class FontProvider {
         let managed = ManagedFont(
             id: id, postScriptName: actualPSName, pointSize: size, rasterScale: rasterScale,
             ftFace: ftFace, hbFont: hbFont,
-            buffer: buffer, bufferSize: data.count
+            buffer: data
         )
         if ftFace.pointee.face_flags & FT_Long(FT_FACE_FLAG_COLOR) != 0 {
             managed.colorGlyphFont = NativeColorGlyphFont(font: ctFont, size: size, rasterScale: rasterScale)
@@ -737,19 +724,17 @@ public final class FontProvider {
         }
     }
 
-    private func findFaceIndex(in data: Data, targetPSName: String) -> Int? {
-        let probe = UnsafeMutablePointer<UInt8>.allocate(capacity: data.count)
-        data.copyBytes(to: probe, count: data.count)
-        defer { probe.deallocate() }
+    private func findFaceIndex(in data: NSData, targetPSName: String) -> Int? {
+        let probe = data.bytes.assumingMemoryBound(to: UInt8.self)
 
         var face: FT_Face?
-        let err = FT_New_Memory_Face(ftLibrary, probe, FT_Long(data.count), 0, &face)
+        let err = FT_New_Memory_Face(ftLibrary, probe, FT_Long(data.length), 0, &face)
         guard err == 0, let f = face else { return nil }
         let numFaces = Int(f.pointee.num_faces)
         FT_Done_Face(f)
         for index in 0..<numFaces {
             var candidate: FT_Face?
-            guard FT_New_Memory_Face(ftLibrary, probe, FT_Long(data.count), FT_Long(index), &candidate) == 0,
+            guard FT_New_Memory_Face(ftLibrary, probe, FT_Long(data.length), FT_Long(index), &candidate) == 0,
                   let face = candidate else { continue }
             defer { FT_Done_Face(face) }
             if let name = FT_Get_Postscript_Name(face), String(cString: name) == targetPSName { return index }

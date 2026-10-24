@@ -6,6 +6,22 @@ import Testing
 
 @Suite("System font instances")
 struct SystemFontInstanceTests {
+    @Test("Font backing remains valid after temporary autoreleased objects drain")
+    func backingLifetime() throws {
+        let provider = FontProvider(size: 14, rasterScale: 2)
+        try autoreleasepool {
+            _ = try #require(provider.loadPrimaryFont(name: SystemFontDefaults.primaryFontName))
+            #expect(!provider.resolveRuns(text: "Muing 中文").isEmpty)
+        }
+        let atlas = FontAtlas()
+        let runs = provider.resolveRuns(text: "Muing 中文")
+        provider.registerAllFonts(in: atlas)
+        for glyph in runs.flatMap(provider.shapeRun) {
+            #expect(atlas.rasterizeGlyph(glyphIndex: glyph.glyphID, fontID: glyph.fontID) != nil)
+        }
+        #expect(atlas.atlasData.contains { $0 != 0 })
+    }
+
     private func coordinates(_ font: ManagedFont) throws -> [UInt32: Double] {
         var descriptor: UnsafeMutablePointer<FT_MM_Var>?
         let face = font.rawFace
