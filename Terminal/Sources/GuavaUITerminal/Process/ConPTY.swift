@@ -66,18 +66,19 @@ final class ConPTY: PseudoTerminalBackend, @unchecked Sendable {
         var environmentBlock = WindowsCommandLine.environmentBlockUTF16(environment)
         let directory = command.workingDirectory.map { Array($0.path.utf16) + [0] }
         let flags = DWORD(EXTENDED_STARTUPINFO_PRESENT) | DWORD(CREATE_UNICODE_ENVIRONMENT)
-        // ConPTY conveys the console through the thread attribute list; the
-        // parent's std handles are irrelevant. bInheritHandles must be true so
-        // the child can attach to the pseudoconsole, matching the Win32 sample.
+        // ConPTY conveys the console through the thread attribute list. Keep
+        // inheritable handles off so the child's standard streams connect to
+        // the pseudoconsole (as in the CreatePseudoConsole sample); enable it
+        // and the child's output stops reaching the console.
         let launched = withUnsafeMutablePointer(to: &startup.StartupInfo) { startupInfo in
             environmentBlock.withUnsafeMutableBufferPointer { block in
                 if let directory {
                     return directory.withUnsafeBufferPointer { cwd in
-                        CreateProcessW(nil, &commandLine, nil, nil, true, flags, block.baseAddress,
+                        CreateProcessW(nil, &commandLine, nil, nil, false, flags, block.baseAddress,
                                        cwd.baseAddress, startupInfo, &information)
                     }
                 }
-                return CreateProcessW(nil, &commandLine, nil, nil, true, flags, block.baseAddress,
+                return CreateProcessW(nil, &commandLine, nil, nil, false, flags, block.baseAddress,
                                       nil, startupInfo, &information)
             }
         }
