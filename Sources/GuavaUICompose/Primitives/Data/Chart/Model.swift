@@ -258,6 +258,21 @@ public enum ChartStacking: Sendable, Equatable {
     case percent
 }
 
+/// Which screen direction the value axis runs.
+///
+/// A vertical chart puts categories across the bottom and values up the side.
+/// A horizontal one puts categories down the left and values along the bottom,
+/// which is what long category names and ranked bars need.
+///
+/// Orientation is a drawing decision, not a config change: `axis.y` still
+/// configures the value axis and `axis.x` the independent one, whichever edge
+/// each is drawn against. A log value axis stays `axis.y.kind = .log` when the
+/// chart turns.
+public enum ChartOrientation: Sendable, Equatable {
+    case vertical
+    case horizontal
+}
+
 public struct ChartStyle: Sendable {
     public var minValue: Float?
     public var maxValue: Float?
@@ -272,6 +287,8 @@ public struct ChartStyle: Sendable {
     public var stacking: ChartStacking
     /// Donut hole as a fraction of the radius; 0 draws a full pie.
     public var innerRadiusRatio: Float
+    /// Which way the value axis runs. Ignored by a pie.
+    public var orientation: ChartOrientation
 
     public init(minValue: Float? = nil,
                 maxValue: Float? = nil,
@@ -282,7 +299,8 @@ public struct ChartStyle: Sendable {
                 background: SemanticColorRef? = nil,
                 gridColor: SemanticColorRef = .divider,
                 stacking: ChartStacking = .none,
-                innerRadiusRatio: Float = 0.6) {
+                innerRadiusRatio: Float = 0.6,
+                orientation: ChartOrientation = .vertical) {
         self.minValue = minValue
         self.maxValue = maxValue
         self.showsGrid = showsGrid
@@ -293,6 +311,7 @@ public struct ChartStyle: Sendable {
         self.gridColor = gridColor
         self.stacking = stacking
         self.innerRadiusRatio = min(max(innerRadiusRatio.isFinite ? innerRadiusRatio : 0, 0), 0.9)
+        self.orientation = orientation
     }
 
     /// A compact trend line: no grid, a thin stroke and a small inset. Pair it

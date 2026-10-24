@@ -14,71 +14,115 @@ struct ChartPaint {
         if let background = style.background { list.addRect(bounds, color: background.resolve(theme)) }
     }
 
-    /// One line per value-axis tick, so the grid reads the same numbers as the
+    /// One rule per value-axis tick, so the grid reads the same numbers as the
     /// labels instead of dividing the domain into arbitrary fractions.
     func grid(list: DrawList) {
-        guard style.showsGrid, !frame.yTicks.isEmpty else { return }
+        guard style.showsGrid, !frame.valueTicks.isEmpty else { return }
+        let plot = frame.plot
         let color = style.gridColor.resolve(theme).multipliedAlpha(0.55)
-        for tick in frame.yTicks {
-            list.addLine(fromX: frame.plot.minX, fromY: tick.position,
-                         toX: frame.plot.maxX, toY: tick.position, thickness: 1, color: color)
+        for tick in frame.valueTicks {
+            switch frame.orientation {
+            case .vertical:
+                list.addLine(fromX: plot.minX, fromY: tick.position,
+                             toX: plot.maxX, toY: tick.position, thickness: 1, color: color)
+            case .horizontal:
+                list.addLine(fromX: tick.position, fromY: plot.minY,
+                             toX: tick.position, toY: plot.maxY, thickness: 1, color: color)
+            }
         }
-        // The baseline closes the grid into an axis.
-        list.addLine(fromX: frame.plot.minX, fromY: frame.plot.maxY,
-                     toX: frame.plot.maxX, toY: frame.plot.maxY, thickness: 1,
+        // The baseline closes the grid into an axis. The bottom edge is the
+        // independent axis on a vertical chart and the value axis on a
+        // horizontal one, so the line lands on the axis either way.
+        list.addLine(fromX: plot.minX, fromY: plot.maxY,
+                     toX: plot.maxX, toY: plot.maxY, thickness: 1,
                      color: style.gridColor.resolve(theme).multipliedAlpha(0.9))
     }
 
     /// Tick labels in the gutters, plus the axis titles.
+    ///
+    /// A value tick sits in the left gutter on a vertical chart and under the
+    /// plot on a horizontal one; the category ticks swap. Text itself is never
+    /// rotated, which is the point of turning the chart instead.
     func axisLabels(list: DrawList) {
         guard let environment = text.environment else { return }
         let color = theme.colors.onSurfaceMuted
         let bounds = frame.bounds, plot = frame.plot
-        for tick in frame.yTicks where !tick.label.isEmpty {
-            guard let layout = text.layout(tick.label) else { continue }
-            // Right-aligned against the plot, nudged inside the box at the edges.
-            let x = max(bounds.minX, plot.minX - ChartFrame.labelGap - layout.totalWidth)
-            let y = min(max(bounds.minY, tick.position - layout.totalHeight / 2),
-                        bounds.maxY - layout.totalHeight)
+        let vertical = frame.orientation == .vertical
+        func draw(_ layout: TextLayoutResult, _ x: Float, _ y: Float) {
             list.addText(layout, origin: (x, y), color: color,
                          textureID: environment.atlasTextureID, atlas: environment.atlas)
         }
-        for tick in frame.xTicks where !tick.label.isEmpty {
+        for tick in frame.valueTicks where !tick.label.isEmpty {
             guard let layout = text.layout(tick.label) else { continue }
-            let x = min(max(bounds.minX, tick.position - layout.totalWidth / 2),
-                        bounds.maxX - layout.totalWidth)
-            list.addText(layout, origin: (x, plot.maxY + 4), color: color,
-                         textureID: environment.atlasTextureID, atlas: environment.atlas)
+            if vertical {
+                // Right-aligned against the plot, nudged inside the box at the edges.
+                draw(layout, max(bounds.minX, plot.minX - ChartFrame.labelGap - layout.totalWidth),
+                     min(max(bounds.minY, tick.position - layout.totalHeight / 2),
+                         bounds.maxY - layout.totalHeight))
+            } else {
+                draw(layout, min(max(bounds.minX, tick.position - layout.totalWidth / 2),
+                                 bounds.maxX - layout.totalWidth),
+                     plot.maxY + 4)
+            }
         }
-        // The right-hand axis labels grow away from the plot, into its gutter.
+        for tick in frame.categoryTicks where !tick.label.isEmpty {
+            guard let layout = text.layout(tick.label) else { continue }
+            if vertical {
+                draw(layout, min(max(bounds.minX, tick.position - layout.totalWidth / 2),
+                                 bounds.maxX - layout.totalWidth),
+                     plot.maxY + 4)
+            } else {
+                draw(layout, max(bounds.minX, plot.minX - ChartFrame.labelGap - layout.totalWidth),
+                     min(max(bounds.minY, tick.position - layout.totalHeight / 2),
+                         bounds.maxY - layout.totalHeight))
+            }
+        }
+        // The second value axis grows away from the plot, into its own gutter:
+        // right of the plot when vertical, above it when horizontal.
         for tick in frame.secondaryTicks where !tick.label.isEmpty {
             guard let layout = text.layout(tick.label) else { continue }
-            let x = min(plot.maxX + ChartFrame.labelGap, bounds.maxX - layout.totalWidth)
-            let y = min(max(bounds.minY, tick.position - layout.totalHeight / 2),
-                        bounds.maxY - layout.totalHeight)
-            list.addText(layout, origin: (x, y), color: color,
-                         textureID: environment.atlasTextureID, atlas: environment.atlas)
+            if vertical {
+                draw(layout, min(plot.maxX + ChartFrame.labelGap, bounds.maxX - layout.totalWidth),
+                     min(max(bounds.minY, tick.position - layout.totalHeight / 2),
+                         bounds.maxY - layout.totalHeight))
+            } else {
+                draw(layout, min(max(bounds.minX, tick.position - layout.totalWidth / 2),
+                                 bounds.maxX - layout.totalWidth),
+                     bounds.minY)
+            }
         }
-        if !frame.yTitle.isEmpty, let layout = text.layout(frame.yTitle) {
-            list.addText(layout, origin: (bounds.minX, bounds.minY), color: color,
-                         textureID: environment.atlasTextureID, atlas: environment.atlas)
+        if !frame.valueTitle.isEmpty, let layout = text.layout(frame.valueTitle) {
+            if vertical {
+                draw(layout, bounds.minX, bounds.minY)
+            } else {
+                draw(layout, plot.minX + (plot.width - layout.totalWidth) / 2, bounds.maxY - layout.totalHeight)
+            }
         }
         if !frame.secondaryTitle.isEmpty, let layout = text.layout(frame.secondaryTitle) {
-            list.addText(layout, origin: (bounds.maxX - layout.totalWidth, bounds.minY), color: color,
-                         textureID: environment.atlasTextureID, atlas: environment.atlas)
+            draw(layout, bounds.maxX - layout.totalWidth, bounds.minY)
         }
-        if !frame.xTitle.isEmpty, let layout = text.layout(frame.xTitle) {
-            list.addText(layout, origin: (plot.minX + (plot.width - layout.totalWidth) / 2,
-                                          bounds.maxY - layout.totalHeight),
-                         color: color, textureID: environment.atlasTextureID, atlas: environment.atlas)
+        if !frame.categoryTitle.isEmpty, let layout = text.layout(frame.categoryTitle) {
+            if vertical {
+                draw(layout, plot.minX + (plot.width - layout.totalWidth) / 2, bounds.maxY - layout.totalHeight)
+            } else {
+                draw(layout, bounds.minX, bounds.minY)
+            }
         }
     }
 
     func thresholds(_ thresholds: [ChartThreshold], geometry: ChartGeometry, list: DrawList) {
+        let plot = geometry.plot
         for threshold in thresholds where threshold.value.isFinite {
-            let y = geometry.y(threshold.value, axis: threshold.axis)
-            list.addLine(fromX: geometry.plot.minX, fromY: y, toX: geometry.plot.maxX, toY: y,
-                         thickness: 1, color: threshold.color.resolve(theme).multipliedAlpha(0.8))
+            let at = geometry.along(threshold.value, axis: threshold.axis)
+            let color = threshold.color.resolve(theme).multipliedAlpha(0.8)
+            switch geometry.orientation {
+            case .vertical:
+                list.addLine(fromX: plot.minX, fromY: at, toX: plot.maxX, toY: at,
+                             thickness: 1, color: color)
+            case .horizontal:
+                list.addLine(fromX: at, fromY: plot.minY, toX: at, toY: plot.maxY,
+                             thickness: 1, color: color)
+            }
         }
     }
 
@@ -87,9 +131,13 @@ struct ChartPaint {
     func bands(_ bands: [ChartBand], geometry: ChartGeometry, list: DrawList) {
         let plot = geometry.plot
         for band in bands where band.from.isFinite && band.to.isFinite {
-            let top = geometry.y(band.to, axis: band.axis), bottom = geometry.y(band.from, axis: band.axis)
-            let rect = UIRect(x: plot.minX, y: top, width: plot.width, height: max(0, bottom - top))
-            guard rect.height > 0.5 else { continue }
+            let a = geometry.along(band.to, axis: band.axis)
+            let b = geometry.along(band.from, axis: band.axis)
+            let low = min(a, b), high = max(a, b)
+            let rect = geometry.orientation == .vertical
+                ? UIRect(x: plot.minX, y: low, width: plot.width, height: high - low)
+                : UIRect(x: low, y: plot.minY, width: high - low, height: plot.height)
+            guard rect.width > 0.5, rect.height > 0.5 else { continue }
             list.addRect(rect, color: band.color.resolve(theme).multipliedAlpha(0.12))
         }
     }
@@ -107,13 +155,15 @@ struct ChartPaint {
     func series(_ series: [ChartSeries], geometry: ChartGeometry, list: DrawList) {
         // Fills first, so lines and points of every series stay on top.
         for (index, item) in series.enumerated() where item.mark == .area {
-            area(geometry.marks[index], color: item.color.resolve(theme), seriesStyle: item.style, list: list)
+            area(geometry.marks[index], color: item.color.resolve(theme), seriesStyle: item.style,
+                 geometry: geometry, list: list)
         }
         for (index, item) in series.enumerated() where item.mark == .bar {
             bars(geometry.marks[index], color: item.color.resolve(theme), list: list)
         }
         for (index, item) in series.enumerated() where item.mark == .line || item.mark == .area {
-            line(geometry.marks[index], color: item.color.resolve(theme), seriesStyle: item.style, list: list)
+            line(geometry.marks[index], color: item.color.resolve(theme), seriesStyle: item.style,
+                 geometry: geometry, list: list)
         }
         for (index, item) in series.enumerated() where item.mark == .point {
             // Two points in one pixel are one dot; drawing both only costs fill.
@@ -128,19 +178,33 @@ struct ChartPaint {
 
     func markers(_ markers: [ChartMarker], geometry: ChartGeometry, list: DrawList) {
         guard geometry.sampleCount > 0 else { return }
+        let plot = geometry.plot
         for marker in markers {
             let index = max(0, min(marker.index, geometry.sampleCount - 1))
-            guard let x = geometry.columnX(index) else { continue }
-            list.addLine(fromX: x, fromY: geometry.plot.minY, toX: x, toY: geometry.plot.maxY,
-                         thickness: marker.width, color: marker.color.resolve(theme))
+            guard let at = geometry.across(index: index) else { continue }
+            switch geometry.orientation {
+            case .vertical:
+                list.addLine(fromX: at, fromY: plot.minY, toX: at, toY: plot.maxY,
+                             thickness: marker.width, color: marker.color.resolve(theme))
+            case .horizontal:
+                list.addLine(fromX: plot.minX, fromY: at, toX: plot.maxX, toY: at,
+                             thickness: marker.width, color: marker.color.resolve(theme))
+            }
         }
     }
 
-    /// A vertical rule through the selected column and a ringed dot on the value.
+    /// A rule through the selected column and a ringed dot on the value.
     func selection(_ series: [ChartSeries], geometry: ChartGeometry, list: DrawList) {
         guard let selection, let mark = geometry.mark(selection) else { return }
+        let plot = geometry.plot
         let rule = theme.colors.onSurfaceMuted.multipliedAlpha(0.35)
-        list.addLine(fromX: mark.x, fromY: geometry.plot.minY, toX: mark.x, toY: geometry.plot.maxY, thickness: 1, color: rule)
+        let at = geometry.across(mark)
+        switch geometry.orientation {
+        case .vertical:
+            list.addLine(fromX: at, fromY: plot.minY, toX: at, toY: plot.maxY, thickness: 1, color: rule)
+        case .horizontal:
+            list.addLine(fromX: plot.minX, fromY: at, toX: plot.maxX, toY: at, thickness: 1, color: rule)
+        }
         guard mark.bar == nil, mark.y.isFinite else { return }
         dot(x: mark.x, y: mark.y, radius: 6, color: theme.colors.surface, list: list)
         dot(x: mark.x, y: mark.y, radius: 4, color: series[mark.series].color.resolve(theme), list: list)
@@ -162,24 +226,34 @@ struct ChartPaint {
     // MARK: Primitives
 
     private func line(_ marks: [ChartGeometry.Mark], color: Color, seriesStyle: ChartSeriesStyle,
-                      list: DrawList) {
+                      geometry: ChartGeometry, list: DrawList) {
         let width = seriesStyle.lineWidth ?? style.lineWidth
+        let length = geometry.orientation.breadth(geometry.plot)
         for run in runs(marks) {
-            let points = sampled(ChartGeometry.decimated(run, width: frame.plot.width),
-                                 curved: seriesStyle.curve)
+            let points = sampled(ChartGeometry.decimated(run, orientation: geometry.orientation, length: length),
+                                 curved: seriesStyle.curve, geometry: geometry)
             stroke(points, color: color, width: width, dash: seriesStyle.dash, list: list)
         }
     }
 
+    /// One point of a filled run: where the value is, and where the fill meets
+    /// the baseline. Keeping both as points makes the fill independent of which
+    /// way the chart is turned.
+    private struct FillPoint {
+        let value: (x: Float, y: Float)
+        let base: (x: Float, y: Float)
+    }
+
     private func area(_ marks: [ChartGeometry.Mark], color: Color, seriesStyle: ChartSeriesStyle,
-                      list: DrawList) {
+                      geometry: ChartGeometry, list: DrawList) {
         let fill = color.multipliedAlpha(seriesStyle.fillOpacity)
+        let length = geometry.orientation.breadth(geometry.plot)
         for run in runs(marks) {
-            let points = sampledArea(ChartGeometry.decimated(run, width: frame.plot.width),
-                                     curved: seriesStyle.curve)
+            let points = sampledArea(ChartGeometry.decimated(run, orientation: geometry.orientation, length: length),
+                                     curved: seriesStyle.curve, geometry: geometry)
             for (a, b) in zip(points, points.dropFirst()) {
-                list.addTriangle(a.x, a.y, b.x, b.y, b.x, b.base, color: fill)
-                list.addTriangle(a.x, a.y, b.x, b.base, a.x, a.base, color: fill)
+                list.addTriangle(a.value.x, a.value.y, b.value.x, b.value.y, b.base.x, b.base.y, color: fill)
+                list.addTriangle(a.value.x, a.value.y, b.base.x, b.base.y, a.base.x, a.base.y, color: fill)
             }
         }
     }
@@ -246,12 +320,24 @@ struct ChartPaint {
         }
     }
 
-    /// Straight segments, or a monotone cubic through them. A cubic needs
-    /// strictly increasing x, so anything else stays straight rather than
-    /// looping back on itself.
-    private func sampled(_ marks: [ChartGeometry.Mark], curved: Bool) -> [(x: Float, y: Float)] {
-        let points = marks.map { (x: $0.x, y: $0.y) }
-        guard curved, points.count > 2, isIncreasing(points) else { return points }
+    /// Straight segments, or a monotone cubic through them.
+    ///
+    /// The curve is built where the independent axis always increases — across
+    /// the categories, with the value on the other axis — and then projected
+    /// back, so a horizontal chart curves exactly like a vertical one. A run
+    /// whose categories do not increase stays straight rather than looping back
+    /// on itself.
+    private func sampled(_ marks: [ChartGeometry.Mark], curved: Bool,
+                         geometry: ChartGeometry) -> [(x: Float, y: Float)] {
+        let orientation = geometry.orientation
+        let logical = marks.map { mark in orientation.axes(of: (mark.x, mark.y)) }
+            .map { (x: $0.across, y: $0.along) }
+        guard curved else { return logical.map { orientation.point(across: $0.x, along: $0.y) } }
+        return curve(logical).map { orientation.point(across: $0.x, along: $0.y) }
+    }
+
+    private func curve(_ points: [(x: Float, y: Float)]) -> [(x: Float, y: Float)] {
+        guard points.count > 2, isIncreasing(points) else { return points }
         let tangents = tangents(for: points)
         var result: [(x: Float, y: Float)] = [points[0]]
         for i in 0..<points.count - 1 {
@@ -268,24 +354,25 @@ struct ChartPaint {
     }
 
     /// The same curve, carrying an interpolated baseline for the fill.
-    private func sampledArea(_ marks: [ChartGeometry.Mark], curved: Bool) -> [(x: Float, y: Float, base: Float)] {
-        let points = sampled(marks, curved: curved)
+    private func sampledArea(_ marks: [ChartGeometry.Mark], curved: Bool,
+                             geometry: ChartGeometry) -> [FillPoint] {
+        let points = sampled(marks, curved: curved, geometry: geometry)
         guard points.count > marks.count else {
-            var straight: [(x: Float, y: Float, base: Float)] = []
-            for (mark, point) in zip(marks, points) {
-                straight.append((x: point.x, y: point.y, base: mark.baseY))
-            }
-            return straight
+            return zip(marks, points).map { FillPoint(value: $1, base: geometry.basePoint($0)) }
         }
         // A curve added samples between marks; the baseline only moves linearly.
-        var result: [(x: Float, y: Float, base: Float)] = []
+        let orientation = geometry.orientation
+        var result: [FillPoint] = []
         var segment = 0
         for point in points {
-            while segment < marks.count - 2, point.x > marks[segment + 1].x { segment += 1 }
+            let across = orientation.axes(of: point).across
+            while segment < marks.count - 2, across > geometry.across(marks[segment + 1]) { segment += 1 }
             let a = marks[segment], b = marks[min(segment + 1, marks.count - 1)]
-            let span = b.x - a.x
-            let t = span > 0.0001 ? max(0, min((point.x - a.x) / span, 1)) : 0
-            result.append((x: point.x, y: point.y, base: a.baseY + (b.baseY - a.baseY) * t))
+            let span = geometry.across(b) - geometry.across(a)
+            let t = span > 0.0001 ? max(0, min((across - geometry.across(a)) / span, 1)) : 0
+            result.append(FillPoint(value: point,
+                                    base: orientation.point(across: across,
+                                                            along: a.base + (b.base - a.base) * t)))
         }
         return result
     }
@@ -334,9 +421,28 @@ struct ChartPaint {
             guard mark.isOuterEnd else { list.addRect(rect, color: fill); continue }
             let radius = min(3, rect.width / 2, rect.height / 2)
             list.addRoundedRect(rect, radius: radius, color: fill)
-            let towardBase = mark.y <= mark.baseY
-            let square = UIRect(x: rect.minX, y: towardBase ? rect.maxY - radius : rect.minY, width: rect.width, height: radius)
-            if radius > 0 { list.addRect(square, color: fill) }
+            if let squared = squaredEnd(rect, base: mark.base) { list.addRect(squared, color: fill) }
+        }
+    }
+
+    /// The strip of a bar that stays square, so a stacked segment butts against
+    /// the one below it instead of leaving a rounded notch.
+    ///
+    /// Which end that is follows the baseline: the bar grows away from it, so
+    /// the square half is the one nearer it — on whichever axis the values run.
+    private func squaredEnd(_ rect: UIRect, base: Float) -> UIRect? {
+        guard base.isFinite else { return nil }
+        let radius = min(3, rect.width / 2, rect.height / 2)
+        guard radius > 0 else { return nil }
+        switch frame.orientation {
+        case .vertical:
+            let towardBase = base >= rect.minY + rect.height / 2
+            return UIRect(x: rect.minX, y: towardBase ? rect.maxY - radius : rect.minY,
+                          width: rect.width, height: radius)
+        case .horizontal:
+            let towardBase = base <= rect.minX + rect.width / 2
+            return UIRect(x: towardBase ? rect.minX : rect.maxX - radius, y: rect.minY,
+                          width: radius, height: rect.height)
         }
     }
 

@@ -227,15 +227,21 @@ struct ChartPlot: _PrimitiveView {
             for band in guides.bands where !band.label.isEmpty && band.from.isFinite && band.to.isFinite {
                 add(ChartOverlayItem(kind: .band, title: band.label),
                     geometry.map { g in
-                        ChartOverlayPlacement(point(g.plot.minX + 4, g.y(band.to, axis: band.axis)),
-                                              horizontal: 0, vertical: 0, gap: 2)
+                        g.orientation == .vertical
+                            ? ChartOverlayPlacement(point(g.plot.minX + 4, g.along(band.to, axis: band.axis)),
+                                                    horizontal: 0, vertical: 0, gap: 2)
+                            : ChartOverlayPlacement(point(g.along(band.to, axis: band.axis), g.plot.minY + 4),
+                                                    horizontal: 0, vertical: 0, gap: 2)
                     })
             }
             for threshold in guides.thresholds where !threshold.label.isEmpty && threshold.value.isFinite {
                 add(ChartOverlayItem(kind: .threshold, title: threshold.label),
                     geometry.map { g in
-                        ChartOverlayPlacement(point(g.plot.maxX - 2, g.y(threshold.value, axis: threshold.axis)),
-                                              horizontal: 1, vertical: 1, gap: 2)
+                        g.orientation == .vertical
+                            ? ChartOverlayPlacement(point(g.plot.maxX - 2, g.along(threshold.value, axis: threshold.axis)),
+                                                    horizontal: 1, vertical: 1, gap: 2)
+                            : ChartOverlayPlacement(point(g.along(threshold.value, axis: threshold.axis), g.plot.minY),
+                                                    horizontal: 0, vertical: 0, gap: 2)
                     })
             }
             for note in guides.annotations {
@@ -245,10 +251,9 @@ struct ChartPlot: _PrimitiveView {
                       series[note.series].data.indices.contains(note.index),
                       series[note.series].data[note.index].y.isFinite else { continue }
                 var placement: ChartOverlayPlacement?
-                if let mark = geometry?.mark(ChartPoint(series: note.series, index: note.index)),
+                if let geometry, let mark = geometry.mark(ChartPoint(series: note.series, index: note.index)),
                    mark.y.isFinite {
-                    placement = ChartOverlayPlacement(point(mark.x, mark.bar.map(\.minY) ?? mark.y),
-                                                      horizontal: 0.5, vertical: 1, gap: 5, flips: true)
+                    placement = endPlacement(mark, geometry: geometry, gap: 5)
                 }
                 add(ChartOverlayItem(kind: .annotation, title: note.text, tint: note.color), placement)
             }
@@ -257,12 +262,9 @@ struct ChartPlot: _PrimitiveView {
                     let datum = series[index].data[i]
                     guard datum.y.isFinite else { continue }
                     var placement: ChartOverlayPlacement?
-                    if let mark = geometry?.mark(ChartPoint(series: index, index: i)), mark.y.isFinite {
-                        // A bar below the baseline is labelled underneath.
-                        let below = mark.y > mark.baseY
-                        let top = mark.bar.map { below ? $0.maxY : $0.minY } ?? mark.y
-                        placement = ChartOverlayPlacement(point(mark.x, top), horizontal: 0.5,
-                                                          vertical: below ? 0 : 1, gap: 3, flips: true)
+                    if let geometry, let mark = geometry.mark(ChartPoint(series: index, index: i)),
+                       mark.y.isFinite {
+                        placement = endPlacement(mark, geometry: geometry, gap: 3)
                     }
                     add(ChartOverlayItem(kind: .value, title: format(datum.y)), placement)
                 }
@@ -304,9 +306,8 @@ struct ChartPlot: _PrimitiveView {
 
         if let selection, let callout = callout(selection) {
             var placement: ChartOverlayPlacement?
-            if let mark = resolution?.cartesian?.mark(callout.point) {
-                placement = ChartOverlayPlacement(point(mark.x, mark.bar.map(\.minY) ?? mark.y),
-                                                  horizontal: 0.5, vertical: 1, gap: 10, flips: true)
+            if let geometry = resolution?.cartesian, let mark = geometry.mark(callout.point) {
+                placement = endPlacement(mark, geometry: geometry, gap: 10)
             } else if let pie = resolution?.pie,
                       let wedge = pie.wedges.first(where: { $0.index == callout.point.index }) {
                 let anchor = pie.anchor(of: wedge)
@@ -317,6 +318,24 @@ struct ChartPlot: _PrimitiveView {
                 placement, reserving: false)
         }
         return slots
+    }
+
+    /// Where a label sits at the far end of a mark: above it on a vertical
+    /// chart, to its right on a horizontal one — and on the other side when the
+    /// value runs below or left of the baseline.
+    private func endPlacement(_ mark: ChartGeometry.Mark, geometry: ChartGeometry,
+                              gap: CGFloat) -> ChartOverlayPlacement {
+        let bar = mark.bar
+        switch geometry.orientation {
+        case .vertical:
+            let below = mark.y > mark.base
+            return ChartOverlayPlacement(point(mark.x, bar.map { below ? $0.maxY : $0.minY } ?? mark.y),
+                                         horizontal: 0.5, vertical: below ? 0 : 1, gap: gap, flips: true)
+        case .horizontal:
+            let negative = mark.x < mark.base
+            return ChartOverlayPlacement(point(bar.map { negative ? $0.minX : $0.maxX } ?? mark.x, mark.y),
+                                         horizontal: negative ? 1 : 0, vertical: 0.5, gap: gap, flips: true)
+        }
     }
 
     /// The pie configuration, when this plot is a pie.
@@ -359,7 +378,8 @@ struct ChartPlot: _PrimitiveView {
                                              style: style, axis: axis,
                                              size: size, origin: origin, text: text)
             let geometry = ChartGeometry(series: series, axes: axes, xDomain: xDomain, xScale: xScale,
-                                         barSpacing: style.barSpacing, plot: frame.plot)
+                                         barSpacing: style.barSpacing, orientation: style.orientation,
+                                         plot: frame.plot)
             return ChartResolution(frame: frame, cartesian: geometry, pie: nil)
         case .pie(let slices):
             let frame = ChartFrame.pie(style: style, size: size, origin: origin)
@@ -654,7 +674,7 @@ private struct ChartGeometrySignature: Equatable {
         let style = plot.style
         self.style = [style.minValue ?? .nan, style.maxValue ?? .nan, style.showsGrid ? 1 : 0, style.lineWidth,
                       style.barSpacing, style.contentInset, style.innerRadiusRatio,
-                      Self.stackingCode(style.stacking)]
+                      Self.stackingCode(style.stacking), style.orientation == .horizontal ? 1 : 0]
         let axis = plot.axis
         self.axis = [axis.y.title, axis.x.title, "\(axis.y.tickCount)", "\(axis.x.tickCount)",
                      axis.y.isLabeled ? "y" : "", axis.x.isLabeled ? "x" : "",

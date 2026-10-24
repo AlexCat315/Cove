@@ -48,6 +48,12 @@ import GuavaUIRuntime
 /// axis snaps to decades and ticks 1, 2 and 5 × 10ⁿ; values at or below zero
 /// have no place on it and clamp to the bottom edge.
 ///
+/// `style.orientation` turns the chart on its side: `.horizontal` puts the
+/// categories down the left and the values along the bottom, which is what long
+/// category names and ranked bars need. `axis.y` keeps configuring the value
+/// axis and `axis.x` the independent one — only the edges they are drawn
+/// against move, so a log value axis stays `axis.y.kind = .log` when it turns.
+///
 /// `ChartHistogram` counts samples into bins and hands back the bars plus their
 /// edge labels, so a distribution needs no hand-rolled counting.
 ///

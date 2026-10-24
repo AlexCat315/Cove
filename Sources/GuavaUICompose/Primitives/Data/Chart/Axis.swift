@@ -31,9 +31,13 @@ struct ChartText {
 /// The chart has to know the label widths before it can size the plot, so this
 /// is resolved from the data-derived scale rather than from the final frame:
 /// domain → ticks → label widths → plot.
+///
+/// Ticks are named for the axis they belong to, not the edge they sit on: a
+/// horizontal chart draws `valueTicks` along the bottom and `categoryTicks`
+/// down the left, and nothing else in the renderer has to care which is which.
 struct ChartFrame {
     struct Tick {
-        /// y for the value axis, x for the category axis.
+        /// Screen coordinate along the axis this tick belongs to.
         let position: Float
         let label: String
     }
@@ -41,13 +45,14 @@ struct ChartFrame {
     /// The chart box after `contentInset`, before the axis gutters.
     let bounds: UIRect
     let plot: UIRect
-    let yTicks: [Tick]
-    /// Ticks for the right-hand axis; empty when the chart has none.
+    let valueTicks: [Tick]
+    /// Ticks for the second value axis; empty when the chart has none.
     let secondaryTicks: [Tick]
-    let xTicks: [Tick]
-    let yTitle: String
+    let categoryTicks: [Tick]
+    let valueTitle: String
     let secondaryTitle: String
-    let xTitle: String
+    let categoryTitle: String
+    let orientation: ChartOrientation
 
     /// Space between a tick label and the plot edge.
     static let labelGap: Float = 6
@@ -56,70 +61,116 @@ struct ChartFrame {
                           style: ChartStyle, axis: ChartConfiguration.Axis,
                           size: CGSize, origin: CGPoint, text: ChartText) -> ChartFrame {
         let bounds = inset(size: size, origin: origin, style: style)
-        let primaryLabels = labels(axes.primaryScale, labeled: axis.y.isLabeled,
-                                   format: axis.y.format, percent: axes.primary.isPercent)
-        let left = axis.y.isLabeled
-            ? (primaryLabels.map { text.size($0).width }.max() ?? 0) + labelGap
-            : 0
-        // The right gutter only exists when a series reads that axis.
+        let orientation = style.orientation
+        let valueLabels = labels(axes.primaryScale, labeled: axis.y.isLabeled,
+                                 format: axis.y.format, percent: axes.primary.isPercent)
+        // The second value axis only exists when a series reads it.
         let hasSecondary = axes.usesSecondary && axis.secondary.isLabeled
         let secondaryLabels = hasSecondary
             ? labels(axes.scale(.right), labeled: true, format: axis.secondary.format,
                      percent: axes.secondary?.isPercent ?? false)
             : []
-        let right = hasSecondary
-            ? (secondaryLabels.map { text.size($0).width }.max() ?? 0) + labelGap
-            : 0
+        let categoryTexts = axis.x.isLabeled
+            ? categoryTexts(xDomain, count: axes.sampleCount, scale: xScale, axis: axis)
+            : []
+        let hasCategories = !categoryTexts.isEmpty
+
         let lineHeight = text.size("0").height
-        let primaryTitleHeight = axis.y.title.isEmpty ? 0 : text.size(axis.y.title).height
+        let valueWidth = valueLabels.map { text.size($0).width }.max() ?? 0
+        let secondaryWidth = secondaryLabels.map { text.size($0).width }.max() ?? 0
+        let categoryWidth = categoryTexts.map { text.size($0).width }.max() ?? 0
+        let valueTitleHeight = axis.y.title.isEmpty ? 0 : text.size(axis.y.title).height
         let secondaryTitleHeight = hasSecondary && !axis.secondary.title.isEmpty
             ? text.size(axis.secondary.title).height
             : 0
-        let titleHeight = max(primaryTitleHeight, secondaryTitleHeight)
-        // The topmost label is centred on its grid line, so the box keeps half a
-        // line above the plot for it; a title stacks on top of that.
-        let labelPad = axis.y.isLabeled || hasSecondary ? lineHeight / 2 : 0
-        let top = titleHeight > 0 ? titleHeight + labelPad + 2 : labelPad
+        let categoryTitleHeight = hasCategories && !axis.x.title.isEmpty
+            ? text.size(axis.x.title).height
+            : 0
 
-        let hasXLabels = axis.x.isLabeled && xLabelsExist(xDomain, count: axes.sampleCount, scale: xScale)
-        let bottom = (hasXLabels ? lineHeight + 4 : 0)
-            + (axis.x.title.isEmpty ? 0 : text.size(axis.x.title).height + 2)
+        // Each gutter is reserved only where something is drawn in it. The
+        // extreme label is centred on its grid line, so the box keeps half a
+        // line beyond the plot for it; a title stacks on top of that.
+        var left: Float = 0, right: Float = 0, top: Float = 0, bottom: Float = 0
+        switch orientation {
+        case .vertical:
+            left = axis.y.isLabeled ? valueWidth + labelGap : 0
+            right = hasSecondary ? secondaryWidth + labelGap : 0
+            let pad = axis.y.isLabeled || hasSecondary ? lineHeight / 2 : 0
+            let title = max(valueTitleHeight, secondaryTitleHeight)
+            top = title > 0 ? title + pad + 2 : pad
+            bottom = (hasCategories ? lineHeight + 4 : 0)
+                + (categoryTitleHeight > 0 ? categoryTitleHeight + 2 : 0)
+        case .horizontal:
+            // Categories run down the left; values along the bottom, with the
+            // second value axis and the category title sharing the top edge.
+            left = hasCategories ? categoryWidth + labelGap : 0
+            bottom = (axis.y.isLabeled ? lineHeight + 4 : 0)
+                + (valueTitleHeight > 0 ? valueTitleHeight + 2 : 0)
+                + (axis.y.isLabeled ? lineHeight / 2 : 0)
+            let title = max(categoryTitleHeight, secondaryTitleHeight)
+            top = (hasSecondary ? lineHeight / 2 + lineHeight + labelGap : 0)
+                + (title > 0 ? title + 2 : 0)
+        }
         let leftInset = min(left, bounds.width * 0.4)
         let rightInset = min(right, bounds.width * 0.3)
-        let topInset = min(top, bounds.height * 0.3)
+        let topInset = min(top, bounds.height * 0.35)
+        let bottomInset = min(bottom, bounds.height * 0.4)
 
         let plot = UIRect(x: bounds.minX + leftInset,
                           y: bounds.minY + topInset,
                           width: max(0, bounds.width - leftInset - rightInset),
-                          height: max(0, bounds.height - topInset - min(bottom, bounds.height * 0.4)))
-        let yTicks = zip(axes.primaryScale.ticks, primaryLabels).map { value, label in
-            Tick(position: axes.primaryScale.y(value, in: plot), label: label)
+                          height: max(0, bounds.height - topInset - bottomInset))
+        let valueTicks = zip(axes.primaryScale.ticks, valueLabels).map { value, label in
+            Tick(position: orientation.along(axes.primaryScale, value, in: plot), label: label)
         }
         let secondaryTicks = axes.secondaryScale.map { scale in
             zip(scale.ticks, secondaryLabels).map { value, label in
-                Tick(position: scale.y(value, in: plot), label: label)
+                Tick(position: orientation.along(scale, value, in: plot), label: label)
             }
         } ?? []
-        var xTicks: [Tick] = []
-        if axis.x.isLabeled {
-            switch xDomain {
-            case .categorical(let labels):
-                xTicks = labelIndices(labels, count: axes.sampleCount, width: plot.width, text: text).map { index in
-                    Tick(position: ChartGeometry.x(index: index, count: axes.sampleCount,
-                                                   hasBars: axes.hasBars, plot: plot),
-                         label: labels[index])
-                }
-            case .numeric:
-                if let xScale {
-                    xTicks = xScale.ticks.map { value in
-                        Tick(position: xScale.x(value, in: plot), label: axis.x.format?(value) ?? xScale.label(value))
-                    }
-                }
+        return ChartFrame(bounds: bounds, plot: plot, valueTicks: valueTicks,
+                          secondaryTicks: secondaryTicks,
+                          categoryTicks: hasCategories
+                            ? ticks(categoryTexts, xDomain: xDomain, xScale: xScale,
+                                    count: axes.sampleCount, hasBars: axes.hasBars,
+                                    plot: plot, orientation: orientation, text: text)
+                            : [],
+                          valueTitle: axis.y.title,
+                          secondaryTitle: hasSecondary ? axis.secondary.title : "",
+                          categoryTitle: hasCategories ? axis.x.title : "",
+                          orientation: orientation)
+    }
+
+    /// Every label the independent axis would show, before thinning.
+    private static func categoryTexts(_ domain: ChartXDomain, count: Int, scale: ChartScale?,
+                                      axis: ChartConfiguration.Axis) -> [String] {
+        switch domain {
+        case .categorical(let labels):
+            return Array(labels.prefix(max(0, count)))
+        case .numeric:
+            guard let scale else { return [] }
+            return scale.ticks.map { axis.x.format?($0) ?? scale.label($0) }
+        }
+    }
+
+    /// Ticks on the independent axis, thinned to what the plot can hold apart.
+    private static func ticks(_ texts: [String], xDomain: ChartXDomain, xScale: ChartScale?,
+                              count: Int, hasBars: Bool, plot: UIRect,
+                              orientation: ChartOrientation, text: ChartText) -> [Tick] {
+        guard !texts.isEmpty else { return [] }
+        if xDomain.isNumeric, let xScale {
+            // A numeric axis ticks on round values, so it never needs thinning.
+            return zip(texts, xScale.ticks).map { label, value in
+                Tick(position: orientation.across(xScale, value, in: plot), label: label)
             }
         }
-        return ChartFrame(bounds: bounds, plot: plot, yTicks: yTicks, secondaryTicks: secondaryTicks,
-                          xTicks: xTicks, yTitle: axis.y.title,
-                          secondaryTitle: hasSecondary ? axis.secondary.title : "", xTitle: axis.x.title)
+        let step = labelStep(texts, slot: orientation.breadth(plot) / Float(max(1, count)),
+                             orientation: orientation, text: text)
+        return stride(from: 0, to: texts.count, by: step).map { index in
+            Tick(position: ChartGeometry.across(index: index, count: count, hasBars: hasBars,
+                                                plot: plot, orientation: orientation),
+                 label: texts[index])
+        }
     }
 
     /// Tick labels for one axis. A percent axis reads as shares even though the
@@ -134,31 +185,23 @@ struct ChartFrame {
         }
     }
 
-    /// Whether an x axis has anything to label, and so needs the bottom gutter.
-    private static func xLabelsExist(_ domain: ChartXDomain, count: Int, scale: ChartScale?) -> Bool {
-        switch domain {
-        case .categorical(let labels): return !labels.isEmpty && count > 0
-        case .numeric: return !(scale?.ticks.isEmpty ?? true)
-        }
-    }
-
     /// A pie or donut has no axes: the plot fills the inset box.
     static func pie(style: ChartStyle, size: CGSize, origin: CGPoint) -> ChartFrame {
         let bounds = inset(size: size, origin: origin, style: style)
-        return ChartFrame(bounds: bounds, plot: bounds, yTicks: [], secondaryTicks: [], xTicks: [],
-                          yTitle: "", secondaryTitle: "", xTitle: "")
+        return ChartFrame(bounds: bounds, plot: bounds, valueTicks: [], secondaryTicks: [],
+                          categoryTicks: [], valueTitle: "", secondaryTitle: "", categoryTitle: "",
+                          orientation: style.orientation)
     }
 
-    /// Indices whose labels fit side by side; every other one is dropped so
-    /// dense category axes stay readable.
-    private static func labelIndices(_ labels: [String], count: Int, width: Float,
-                                     text: ChartText) -> [Int] {
-        let usable = min(labels.count, count)
-        guard usable > 0, width > 0 else { return [] }
-        let slot = width / Float(max(1, count))
-        let widest = (0..<usable).map { text.size(labels[$0]).width }.max() ?? 0
-        let step = max(1, Int(((widest + 8) / max(slot, 1)).rounded(.up)))
-        return Array(stride(from: 0, to: usable, by: step))
+    /// The stride that keeps labels apart: side by side they need the widest
+    /// label's width, stacked they need a line's height.
+    private static func labelStep(_ texts: [String], slot: Float,
+                                  orientation: ChartOrientation, text: ChartText) -> Int {
+        guard slot > 0 else { return max(1, texts.count) }
+        let needed = orientation == .vertical
+            ? (texts.map { text.size($0).width }.max() ?? 0) + 8
+            : text.size("0").height + 2
+        return max(1, Int((needed / slot).rounded(.up)))
     }
 
     private static func inset(size: CGSize, origin: CGPoint, style: ChartStyle) -> UIRect {

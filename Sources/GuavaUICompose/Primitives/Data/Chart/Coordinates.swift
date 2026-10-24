@@ -1,6 +1,39 @@
 internal import Foundation
 import GuavaUIRuntime
 
+/// The two screen directions a chart reads in.
+///
+/// Everything below is written once and projected through these helpers: a
+/// mark has a position *across* the categories and a position *along* the
+/// value axis, and only `point(across:along:)` decides which screen coordinate
+/// each one lands on. That is what keeps a horizontal chart from being a second
+/// copy of the renderer.
+extension ChartOrientation {
+    /// Plot extent across the categories.
+    func breadth(_ plot: UIRect) -> Float { self == .vertical ? plot.width : plot.height }
+    /// Plot extent along the values.
+    func length(_ plot: UIRect) -> Float { self == .vertical ? plot.height : plot.width }
+    /// The plot's origin along the across axis.
+    func acrossOrigin(_ plot: UIRect) -> Float { self == .vertical ? plot.minX : plot.minY }
+    /// Screen coordinate of a value on the value axis.
+    func along(_ scale: ChartScale, _ value: Float, in plot: UIRect) -> Float {
+        self == .vertical ? scale.y(value, in: plot) : scale.x(value, in: plot)
+    }
+    /// Screen coordinate of a value on the independent axis.
+    func across(_ scale: ChartScale, _ value: Float, in plot: UIRect) -> Float {
+        self == .vertical ? scale.x(value, in: plot) : scale.y(value, in: plot)
+    }
+    /// Screen point for a position across the categories and one along the
+    /// value axis. The one place the two directions swap.
+    func point(across: Float, along: Float) -> (x: Float, y: Float) {
+        self == .vertical ? (across, along) : (along, across)
+    }
+    /// A screen point taken apart into its two chart directions.
+    func axes(of point: (x: Float, y: Float)) -> (across: Float, along: Float) {
+        self == .vertical ? (point.x, point.y) : (point.y, point.x)
+    }
+}
+
 /// Plot coordinates for one chart, shared by drawing, hit-testing and the
 /// selection callout so all three agree on where a value is.
 struct ChartGeometry {
@@ -8,19 +41,20 @@ struct ChartGeometry {
         let series: Int
         let index: Int
         let value: Float
-        /// Center x and the y of the value (top of a bar or stacked segment).
+        /// Screen position of the value.
         let x: Float
         let y: Float
-        /// The y the mark rests on: the zero line, or the segment below when stacked.
-        let baseY: Float
-        /// Bar column; empty for other marks.
+        /// Screen coordinate along the value axis where the mark rests: the
+        /// zero line, or the segment below it when stacked.
+        let base: Float
+        /// Bar rectangle in screen space; nil for other marks.
         let bar: UIRect?
         /// The bar end away from the baseline is exposed (not covered by a stacked segment).
         let isOuterEnd: Bool
     }
 
     let plot: UIRect
-    /// Both value axes: a mark resolves its y through the one its series reads.
+    /// Both value axes: a mark resolves its value through the one its series reads.
     let axes: ChartValueAxes
     /// Marks per visible series, in series order. Hidden series have none.
     let marks: [[Mark]]
@@ -28,13 +62,16 @@ struct ChartGeometry {
     let sampleCount: Int
     /// A numeric x domain hit-tests by true distance.
     let isScatter: Bool
+    /// Which screen direction the value axis runs.
+    let orientation: ChartOrientation
 
     var domain: ClosedRange<Float> { axes.primaryScale.domain }
 
     init(series: [ChartSeries], axes: ChartValueAxes, xDomain: ChartXDomain, xScale: ChartScale?,
-         barSpacing: Float, plot: UIRect) {
+         barSpacing: Float, orientation: ChartOrientation = .vertical, plot: UIRect) {
         self.plot = plot
         self.axes = axes
+        self.orientation = orientation
         let shown = axes.shown
         let slotCount = axes.sampleCount
         hasBars = axes.hasBars
@@ -45,13 +82,15 @@ struct ChartGeometry {
 
         let barSeries = shown.filter { series[$0].mark == .bar }
         let groups = stacked ? 1 : max(1, barSeries.count)
-        let slot = numericX.map { scale in Self.numericSlot(series: series, shown: shown, scale: scale, plot: plot) }
-            ?? (plot.width / Float(max(1, sampleCount)))
+        let slot = numericX.map {
+            Self.numericSlot(series: series, shown: shown, scale: $0, plot: plot, orientation: orientation)
+        } ?? (orientation.breadth(plot) / Float(max(1, sampleCount)))
         // Wide categories breathe (a quarter of the slot, at most 24pt); dense
         // ones keep the authored spacing. Bars inside a group sit 2pt apart.
         let categoryGap = max(barSpacing, min(slot * 0.25, 24))
         let innerGap: Float = groups > 1 ? 2 : 0
-        let barWidth = max(1, (slot - categoryGap - Float(groups - 1) * innerGap) / Float(groups))
+        let thickness = max(1, (slot - categoryGap - Float(groups - 1) * innerGap) / Float(groups))
+        let origin = orientation.acrossOrigin(plot)
 
         var marks = [[Mark]](repeating: [], count: series.count)
         for index in shown {
@@ -60,72 +99,91 @@ struct ChartGeometry {
             let scale = axes.scale(item.axis)
             let group = stacked ? 0 : (barSeries.firstIndex(of: index) ?? 0)
             // Only bars take a group offset; lines keep the slot center.
-            let groupOffset = (Float(group) - Float(groups - 1) / 2) * (barWidth + innerGap)
+            let groupOffset = (Float(group) - Float(groups - 1) / 2) * (thickness + innerGap)
             marks[index] = item.data.indices.map { i in
                 let datum = item.data[i]
-                let baseX: Float
+                let center: Float
                 if let numericX {
-                    baseX = numericX.x(datum.x, in: plot)
+                    center = orientation.across(numericX, datum.x, in: plot)
                 } else if item.mark == .bar || stack.hasBars {
-                    baseX = plot.minX + (Float(i) + 0.5) * slot
+                    center = origin + (Float(i) + 0.5) * slot
                 } else {
-                    baseX = Self.x(index: i, count: slotCount, hasBars: false, plot: plot)
+                    center = Self.across(index: i, count: slotCount, hasBars: false,
+                                         plot: plot, orientation: orientation)
                 }
-                let x = item.mark == .bar ? baseX + groupOffset : baseX
+                let across = item.mark == .bar ? center + groupOffset : center
                 guard datum.y.isFinite else {
-                    return Mark(series: index, index: i, value: datum.y, x: x,
-                                y: .nan, baseY: .nan, bar: nil, isOuterEnd: false)
+                    return Mark(series: index, index: i, value: datum.y, x: .nan, y: .nan,
+                                base: .nan, bar: nil, isOuterEnd: false)
                 }
-                let y = scale.y(stack.tops[index][i], in: plot)
-                let baseY = scale.y(stack.bases[index][i], in: plot)
+                let along = orientation.along(scale, stack.tops[index][i], in: plot)
+                let base = orientation.along(scale, stack.bases[index][i], in: plot)
+                let point = orientation.point(across: across, along: along)
                 var bar: UIRect?
                 if item.mark == .bar {
-                    bar = UIRect(x: x - barWidth / 2, y: min(y, baseY),
-                                 width: barWidth, height: max(1, abs(baseY - y)))
+                    // Two opposite corners of the bar, whichever way it runs.
+                    let a = orientation.point(across: across - thickness / 2, along: min(along, base))
+                    let b = orientation.point(across: across + thickness / 2, along: max(along, base))
+                    bar = UIRect(x: min(a.x, b.x), y: min(a.y, b.y),
+                                 width: max(1, abs(b.x - a.x)), height: max(1, abs(b.y - a.y)))
                 }
-                return Mark(series: index, index: i, value: datum.y, x: x,
-                            y: y, baseY: baseY, bar: bar,
+                return Mark(series: index, index: i, value: datum.y, x: point.x, y: point.y,
+                            base: base, bar: bar,
                             isOuterEnd: stack.isOuterEnd(series: index, at: i, value: datum.y))
             }
         }
         self.marks = marks
     }
 
-    /// Bars on a numeric axis are as wide as the closest pair of x values.
+    /// Bars on a numeric axis are as thick as the closest pair of x values.
     private static func numericSlot(series: [ChartSeries], shown: [Int], scale: ChartScale,
-                                    plot: UIRect) -> Float {
+                                    plot: UIRect, orientation: ChartOrientation) -> Float {
         let xs = shown.flatMap { series[$0].data.map(\.x) }.filter(\.isFinite).sorted()
         var gap = Float.greatestFiniteMagnitude
         if xs.count > 1 {
             for i in 1..<xs.count {
-                let delta = scale.x(xs[i], in: plot) - scale.x(xs[i - 1], in: plot)
+                let delta = orientation.across(scale, xs[i], in: plot)
+                    - orientation.across(scale, xs[i - 1], in: plot)
                 if delta > 0.001 { gap = min(gap, delta) }
             }
         }
-        return gap.isFinite ? gap : plot.width / Float(max(1, xs.count))
+        return gap.isFinite ? gap : orientation.breadth(plot) / Float(max(1, xs.count))
     }
 
-    static func x(index: Int, count: Int, hasBars: Bool, plot: UIRect) -> Float {
-        if hasBars { return plot.minX + (Float(index) + 0.5) * plot.width / Float(max(1, count)) }
-        guard count > 1 else { return plot.minX + plot.width / 2 }
-        return plot.minX + Float(index) / Float(count - 1) * plot.width
+    /// Where a sample index sits across the categories.
+    static func across(index: Int, count: Int, hasBars: Bool, plot: UIRect,
+                       orientation: ChartOrientation = .vertical) -> Float {
+        let origin = orientation.acrossOrigin(plot), length = orientation.breadth(plot)
+        if hasBars { return origin + (Float(index) + 0.5) * length / Float(max(1, count)) }
+        guard count > 1 else { return origin + length / 2 }
+        return origin + Float(index) / Float(count - 1) * length
     }
 
-    func y(_ value: Float, axis: ChartValueAxis = .left) -> Float {
-        axes.scale(axis).y(value, in: plot)
+    /// The screen coordinate along the value axis for a value.
+    func along(_ value: Float, axis: ChartValueAxis = .left) -> Float {
+        orientation.along(axes.scale(axis), value, in: plot)
     }
 
-    /// The x a sample index sits at, from the first visible series.
-    func columnX(_ index: Int) -> Float? {
+    /// A mark's screen coordinate across the categories.
+    func across(_ mark: Mark) -> Float { orientation.axes(of: (mark.x, mark.y)).across }
+    /// A mark's screen coordinate along the value axis.
+    func along(_ mark: Mark) -> Float { orientation.axes(of: (mark.x, mark.y)).along }
+    /// The screen point a mark's base sits at.
+    func basePoint(_ mark: Mark) -> (x: Float, y: Float) {
+        orientation.point(across: across(mark), along: mark.base)
+    }
+
+    /// The across coordinate a sample index sits at, from the first visible series.
+    func across(index: Int) -> Float? {
         for marks in marks where marks.indices.contains(index) {
-            let x = marks[index].x
-            if x.isFinite { return x }
+            let value = across(marks[index])
+            if value.isFinite { return value }
         }
         return nil
     }
 
-    /// The mark nearest a plot-space point: the closest x column, then the
-    /// series whose value is closest vertically (a numeric axis uses true
+    /// The mark nearest a screen point: the closest column, then the series
+    /// whose value is closest along the value axis (a numeric axis uses true
     /// distance). Gaps take no part.
     func nearest(x: Float, y: Float) -> Mark? {
         let all = marks.flatMap { $0 }.filter { $0.y.isFinite }
@@ -133,9 +191,10 @@ struct ChartGeometry {
         if isScatter {
             return all.min { hypotf($0.x - x, $0.y - y) < hypotf($1.x - x, $1.y - y) }
         }
-        let column = all.min { abs($0.x - x) < abs($1.x - x) }!.x
-        let candidates = all.filter { abs($0.x - column) < 0.5 }
-        return candidates.min { abs($0.y - y) < abs($1.y - y) }
+        let target = orientation.axes(of: (x: x, y: y))
+        let column = all.min { abs(across($0) - target.across) < abs(across($1) - target.across) }!
+        let candidates = all.filter { abs(across($0) - across(column)) < 0.5 }
+        return candidates.min { abs(along($0) - target.along) < abs(along($1) - target.along) }
     }
 
     func mark(_ point: ChartPoint) -> Mark? {
@@ -147,18 +206,20 @@ struct ChartGeometry {
 extension ChartGeometry {
     /// Reduces a run to what the plot can actually resolve.
     ///
-    /// Each horizontal pixel keeps its lowest and highest point, in x order, so
-    /// the drawn envelope is unchanged while the stroke costs one segment per
-    /// column instead of one per sample. Picking extremes rather than every
-    /// n-th sample is what keeps a spike from vanishing between two samples. A
-    /// run that already fits the width comes back untouched.
-    static func decimated(_ marks: [Mark], width: Float) -> [Mark] {
-        guard marks.count > 2, width >= 1 else { return marks }
-        let columns = max(1, Int(width.rounded(.up)))
+    /// Each pixel column across the categories keeps its lowest and highest
+    /// value, in run order, so the drawn envelope is unchanged while the stroke
+    /// costs one segment per column instead of one per sample. Picking extremes
+    /// rather than every n-th sample is what keeps a spike from vanishing
+    /// between two samples. A run that already fits comes back untouched.
+    static func decimated(_ marks: [Mark], orientation: ChartOrientation = .vertical,
+                          length: Float) -> [Mark] {
+        guard marks.count > 2, length >= 1 else { return marks }
+        let columns = max(1, Int(length.rounded(.up)))
         guard marks.count > columns * 2 else { return marks }
         // Rounding the bucket up keeps the bucket count at or below the column
         // count, so the result never exceeds two points per pixel.
         let bucket = max(2, Int((Float(marks.count) / Float(columns)).rounded(.up)))
+        func value(_ mark: Mark) -> Float { orientation == .vertical ? mark.y : mark.x }
         var result: [Mark] = []
         result.reserveCapacity(columns * 2 + 2)
         result.append(marks[0])
@@ -167,10 +228,10 @@ extension ChartGeometry {
             let end = min(start + bucket, marks.count - 1)
             var low = start, high = start
             for i in start..<end {
-                if marks[i].y < marks[low].y { low = i }
-                if marks[i].y > marks[high].y { high = i }
+                if value(marks[i]) < value(marks[low]) { low = i }
+                if value(marks[i]) > value(marks[high]) { high = i }
             }
-            // Emitted in x order, which is the order the stroke needs.
+            // Emitted in run order, which is the order the stroke needs.
             result.append(marks[min(low, high)])
             if low != high { result.append(marks[max(low, high)]) }
             start = end

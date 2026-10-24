@@ -94,7 +94,7 @@ struct ChartAxisTests {
         let series: [ChartSeries] = [.line([0, 47])]
         let bare = frame(series, axis: unlabeled)
         #expect(bare.plot == bare.bounds)
-        #expect(bare.yTicks.count == 6 && bare.yTicks.allSatisfy { $0.label.isEmpty })
+        #expect(bare.valueTicks.count == 6 && bare.valueTicks.allSatisfy { $0.label.isEmpty })
 
         var axis = unlabeled
         axis.y.isLabeled = true
@@ -102,7 +102,7 @@ struct ChartAxisTests {
         #expect(labeled.plot.minX > labeled.bounds.minX)
         #expect(labeled.plot.maxX == labeled.bounds.maxX)
         #expect(labeled.plot.width < bare.plot.width)
-        #expect(labeled.yTicks.allSatisfy { !$0.label.isEmpty })
+        #expect(labeled.valueTicks.allSatisfy { !$0.label.isEmpty })
     }
 
     @Test("Tick labels sit on the value they name")
@@ -113,8 +113,8 @@ struct ChartAxisTests {
         let frame = frame(series, axis: axis)
         let stack = ChartStack(series: series, visible: [true], style: ChartStyle(contentInset: 0))
         let scale = ChartScale.fit(stack: stack, thresholds: [], style: ChartStyle(contentInset: 0), tickCount: 4)
-        #expect(frame.yTicks.map(\.position) == scale.ticks.map { scale.y($0, in: frame.plot) })
-        #expect(frame.yTicks.map(\.position) == frame.yTicks.map(\.position).sorted(by: >))
+        #expect(frame.valueTicks.map(\.position) == scale.ticks.map { scale.y($0, in: frame.plot) })
+        #expect(frame.valueTicks.map(\.position) == frame.valueTicks.map(\.position).sorted(by: >))
     }
 
     @Test("Crowded category labels thin out instead of overlapping")
@@ -125,9 +125,9 @@ struct ChartAxisTests {
         let series: [ChartSeries] = [.line((0..<12).map { Float($0) })]
         let wide = frame(series, axis: axis, x: .categorical(labels), size: CGSize(width: 900, height: 120))
         let narrow = frame(series, axis: axis, x: .categorical(labels), size: CGSize(width: 220, height: 120))
-        #expect(wide.xTicks.count == 12)
-        #expect(narrow.xTicks.count < 12 && !narrow.xTicks.isEmpty)
-        #expect(narrow.xTicks.first?.label == "Month 1")
+        #expect(wide.categoryTicks.count == 12)
+        #expect(narrow.categoryTicks.count < 12 && !narrow.categoryTicks.isEmpty)
+        #expect(narrow.categoryTicks.first?.label == "Month 1")
         // The reserved gutter follows the label row either way.
         #expect(narrow.plot.maxY < narrow.bounds.maxY)
     }
@@ -138,13 +138,13 @@ struct ChartAxisTests {
         axis.x.isLabeled = true
         let series: [ChartSeries] = [.points(x: [0, 120, 240, 360, 480], y: [1, 2, 3, 4, 5])]
         let plain = frame(series, axis: axis, x: .numeric, size: CGSize(width: 240, height: 120))
-        #expect(plain.xTicks.map(\.label) == ["0", "100", "200", "300", "400", "500"])
-        #expect(plain.xTicks.map(\.position).first == plain.plot.minX)
+        #expect(plain.categoryTicks.map(\.label) == ["0", "100", "200", "300", "400", "500"])
+        #expect(plain.categoryTicks.map(\.position).first == plain.plot.minX)
         #expect(plain.plot.maxY < plain.bounds.maxY)
         // A custom formatter drives the labels.
         axis.x.format = { "\(Int($0))ms" }
         let formatted = frame(series, axis: axis, x: .numeric, size: CGSize(width: 240, height: 120))
-        #expect(formatted.xTicks.first?.label == "0ms")
+        #expect(formatted.categoryTicks.first?.label == "0ms")
     }
 
     @Test("Axis titles reserve their own room")
@@ -157,7 +157,7 @@ struct ChartAxisTests {
         let without = frame([.line([1, 2])], axis: unlabeled)
         #expect(withTitles.plot.minY > without.plot.minY)
         #expect(withTitles.plot.height < without.plot.height)
-        #expect(withTitles.yTitle == "Revenue" && withTitles.xTitle == "Month")
+        #expect(withTitles.valueTitle == "Revenue" && withTitles.categoryTitle == "Month")
     }
 
     @Test("A right-hand axis reserves its own gutter and labels only when used")
@@ -212,9 +212,9 @@ struct ChartAxisTests {
         axis.y.isLabeled = true
         axis.y.kind = .log
         let frame = frame([.line([0.01, 100])], axis: axis)
-        #expect(frame.yTicks.contains { $0.label == "0.01" })
-        #expect(frame.yTicks.contains { $0.label == "100" })
-        #expect(frame.yTicks.allSatisfy { !$0.label.isEmpty })
+        #expect(frame.valueTicks.contains { $0.label == "0.01" })
+        #expect(frame.valueTicks.contains { $0.label == "100" })
+        #expect(frame.valueTicks.allSatisfy { !$0.label.isEmpty })
     }
 
     @Test("A percent stack stays linear even when the axis asks for log")
@@ -234,9 +234,9 @@ struct ChartAxisTests {
         axis.y.isLabeled = true
         let series: [ChartSeries] = [.bar([1]), .bar([3])]
         let percent = frame(series, axis: axis, style: ChartStyle(contentInset: 0, stacking: .percent))
-        #expect(percent.yTicks.map(\.label) == ["0%", "25%", "50%", "75%", "100%"])
+        #expect(percent.valueTicks.map(\.label) == ["0%", "25%", "50%", "75%", "100%"])
         axis.y.format = { "\(Int($0))" }
         let formatted = frame(series, axis: axis, style: ChartStyle(contentInset: 0, stacking: .percent))
-        #expect(formatted.yTicks.map(\.label) == ["0", "25", "50", "75", "100"])
+        #expect(formatted.valueTicks.map(\.label) == ["0", "25", "50", "75", "100"])
     }
 }

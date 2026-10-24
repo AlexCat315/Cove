@@ -55,7 +55,7 @@ struct ChartPerformanceTests {
     func decimationKeepsEnvelope() {
         let values = (0..<2_000).map { sinf(Float($0) / 40) * 10 + 20 }
         let full = marks(values, width: 120)
-        let reduced = ChartGeometry.decimated(full, width: 120)
+        let reduced = ChartGeometry.decimated(full, length: 120)
         #expect(reduced.count <= 242)
         #expect(reduced.count < full.count / 4)
         // Extremes survive exactly: that is what picking per-column min/max buys.
@@ -71,7 +71,7 @@ struct ChartPerformanceTests {
         var values = [Float](repeating: 5, count: 1_000)
         values[500] = 100
         let full = marks(values, width: 120)
-        let reduced = ChartGeometry.decimated(full, width: 120)
+        let reduced = ChartGeometry.decimated(full, length: 120)
         #expect(reduced.contains { abs($0.y - full[500].y) < 0.001 })
     }
 
@@ -79,7 +79,7 @@ struct ChartPerformanceTests {
     func decimationLeavesSmallRuns() {
         let full = marks((0..<40).map { Float($0) }, width: 120)
         #expect(full.count == 40)
-        #expect(ChartGeometry.decimated(full, width: 120).count == full.count)
+        #expect(ChartGeometry.decimated(full, length: 120).count == full.count)
     }
 
     @Test("A dense line draws segments per pixel, not per sample")

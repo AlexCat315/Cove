@@ -154,10 +154,10 @@ struct ChartTests {
         let stacked = geometry(series, style: ChartStyle(barSpacing: 0, stacking: .stacked), plot: plot)
         let zero = stacked.y(0)
         // The loss hangs from zero rather than being subtracted from the gain.
-        #expect(abs(stacked.marks[1][0].baseY - zero) < 0.01)
+        #expect(abs(stacked.marks[1][0].base - zero) < 0.01)
         #expect(stacked.marks[1][0].y > zero)
         // A gain still stacks on the gain.
-        #expect(abs(stacked.marks[1][1].baseY - stacked.marks[0][1].y) < 0.01)
+        #expect(abs(stacked.marks[1][1].base - stacked.marks[0][1].y) < 0.01)
         #expect(stacked.domain.lowerBound <= -2 && stacked.domain.upperBound >= 4)
         // Each direction rounds only its own outermost segment.
         #expect(stacked.marks[0][0].isOuterEnd && stacked.marks[1][0].isOuterEnd)

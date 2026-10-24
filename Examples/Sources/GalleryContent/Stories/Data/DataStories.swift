@@ -228,6 +228,19 @@ struct ChartStory: View {
                 }
                 .frame(width: 160, height: 40)
             }
+            StorySection("Horizontal bars", "Long category names have no room under a column, so the chart turns: categories down the left, values along the bottom. `axis.y` still configures the value axis — the title and ticks just move to the bottom edge. Selection rules across the row instead of down the column.") {
+                Chart([.bar([42, 31, 18, 9], color: .accent, title: "Sessions"),
+                       .bar([38, 26, 21, 5], color: .accentSecondary, title: "Last year")],
+                      x: .categorical(["Northern Territory", "Western Australia", "New South Wales", "Tasmania"]),
+                      style: ChartStyle(orientation: .horizontal)) {
+                    $0.label = "Sessions by state"
+                    $0.selection.point = $point8
+                    $0.legend.placement = .bottom
+                    $0.axis.y.title = "Sessions"
+                    $0.axis.x.title = "State"
+                }
+                .frame(height: 220).debugName("chart-horizontal-bars")
+            }
             StorySection("Data table", "A plot is a picture of a table, and a picture is the one thing a screen reader cannot describe. ChartDataTable is the table itself: one row per month, one column per series, carrying the table, row and cell roles that let a reader move by row and column and hear which series a number belongs to. The charts above already read value by value on their own; this is the same data in one pass.") {
                 ChartDataTable([.area(revenue, color: .accent, title: "Revenue"),
                                 .line(signups, color: .success, title: "Signups")],
@@ -245,6 +258,7 @@ struct ChartStory: View {
     @State private var point5: ChartPoint?
     @State private var point6: ChartPoint?
     @State private var point7: ChartPoint?
+    @State private var point8: ChartPoint?
 
     private var histogram: ChartHistogram.Result {
         ChartHistogram(binCount: 8, range: 40...120).build(samples, color: .accentSecondary, title: "Requests")
