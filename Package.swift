@@ -147,7 +147,9 @@ let runtimeTargets: [Target] = [
 
 let textTargets: [Target] = [
     nativeTarget("GhosttyVt", directory: "vendor"),
-    .target(name: "GuavaUITerminal", dependencies: ["GhosttyVt", "GuavaUICompose", "GuavaUIRuntime"], path: "Terminal/Sources/GuavaUITerminal"),
+    .target(name: "GuavaUITerminal", dependencies: ["GhosttyVt", "GuavaUICompose", "GuavaUIRuntime"], path: "Terminal/Sources/GuavaUITerminal",
+                linkerSettings: [.linkedLibrary("ntdll", .when(platforms: [.windows])),
+                                 .linkedLibrary("kernel32", .when(platforms: [.windows]))]),
     .testTarget(name: "GuavaUITerminalTests", dependencies: ["GuavaUITerminal", "GuavaUICompose", "GuavaUIRuntime"], path: "Terminal/Tests/GuavaUITerminalTests"),
     nativeTarget("CFreeType", directory: textArtifacts),
     nativeTarget("CHarfBuzz", directory: textArtifacts),
