@@ -8,7 +8,7 @@
     "build": 1
   },
   "toolchain": {
-    "sdkVersion": "0.1.0"
+    "sdkVersion": "0.1.3"
   },
   "targets": {
     "platforms": [
