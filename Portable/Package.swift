@@ -1,11 +1,11 @@
-// swift-tools-version: 6.1
+// swift-tools-version: 6.4
 import PackageDescription
 
 // Shared UI and DevTools build without SDL, GPU drivers or native font libraries.
 // Browser targets depend only on the protocol, never on the socket transport.
 let package = Package(
     name: "GuavaUIPortable",
-    platforms: [.macOS(.v13), .iOS(.v16)],
+    platforms: [.macOS(.v26), .iOS(.v26)],
     products: [
         .library(name: "GuavaUIAgentCore", targets: ["GuavaUIAgentCore"]),
         .library(name: "GuavaUIAgentTransport", targets: ["GuavaUIAgentTransport"]),

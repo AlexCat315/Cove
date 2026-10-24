@@ -23,8 +23,8 @@ endif()
 
 # GUAVA_TRIPLE → Zig target. Deployment floors match NativePlatform.cmake.
 set(_ghostty_targets
-    "macos-arm64=aarch64-macos.13.0"
-    "macos-x86_64=x86_64-macos.13.0"
+    "macos-arm64=aarch64-macos.26.0"
+    "macos-x86_64=x86_64-macos.26.0"
     "linux-x86_64=x86_64-linux-gnu"
     "linux-aarch64=aarch64-linux-gnu"
     "windows-x86_64=x86_64-windows-msvc"

@@ -11,7 +11,7 @@ struct DesktopLauncher {
         let package = """
         // swift-tools-version: 6.4
         import PackageDescription
-        let package = Package(name: "GuavaLauncher", platforms: [.macOS(.v13)],
+        let package = Package(name: "GuavaLauncher", platforms: [.macOS(.v26), .iOS(.v26)],
             dependencies: [.package(name: "Content", path: \(Files.swiftLiteral(project.directory.path))),
                            .package(name: "GuavaUI", path: \(Files.swiftLiteral(root.path)))],
             targets: [.executableTarget(name: "Application", dependencies: [

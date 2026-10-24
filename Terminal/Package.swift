@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "GuavaTerminalDemo",
-    platforms: [.macOS(.v13)],
+    platforms: [.macOS(.v26), .iOS(.v26)],
     products: [.executable(name: "TerminalDemo", targets: ["TerminalDemo"])],
     dependencies: [.package(name: "GuavaUI", path: "..")],
     targets: [

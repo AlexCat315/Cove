@@ -1,9 +1,9 @@
-// swift-tools-version: 6.1
+// swift-tools-version: 6.4
 import PackageDescription
 
 let package = Package(
     name: "GuavaUIExamples",
-    platforms: [.macOS(.v13), .iOS(.v16)],
+    platforms: [.macOS(.v26), .iOS(.v26)],
     products: [
         .library(name: "GalleryContent", targets: ["GalleryContent"]),
         .library(name: "CounterExample", targets: ["CounterExample"]),

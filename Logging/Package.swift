@@ -1,7 +1,7 @@
 // swift-tools-version: 6.4
 import PackageDescription
 
-let package = Package(name: "GuavaLogging", platforms: [.macOS(.v13)], products: [
+let package = Package(name: "GuavaLogging", platforms: [.macOS(.v26), .iOS(.v26)], products: [
     .library(name: "GuavaLogging", targets: ["GuavaLogging"]),
     .library(name: "GuavaLogCore", targets: ["GuavaLogCore"]),
     .library(name: "CGuavaLog", targets: ["CGuavaLog"]),

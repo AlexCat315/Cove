@@ -7,7 +7,8 @@ let contentPackages: [Package.Dependency] = contentPath.map { [.package(path: $0
 let contentTargets: [Target.Dependency] = contentPath.map {
     [.product(name: "AppContent", package: URL(fileURLWithPath: $0).lastPathComponent)]
 } ?? []
-let package = Package(name: "GuavaAndroid", products: [
+let package = Package(name: "GuavaAndroid",
+    platforms: [.macOS(.v26), .iOS(.v26)], products: [
     .executable(name: "GuavaAndroidProbe", targets: ["GuavaAndroidProbe"]),
     .library(name: "GuavaAndroidApp", type: .dynamic, targets: ["GuavaAndroidApp"])
 ], dependencies: [.package(path: "../.."), .package(path: "Contract")]

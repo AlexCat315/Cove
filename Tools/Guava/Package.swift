@@ -4,7 +4,7 @@ import PackageDescription
 // The developer-facing CLI owns project workflows; platform backends are internal.
 let package = Package(
     name: "GuavaTools",
-    platforms: [.macOS(.v13)],
+    platforms: [.macOS(.v26), .iOS(.v26)],
     products: [.executable(name: "guava", targets: ["GuavaCLI"])],
     dependencies: [
         .package(path: "../Support"),

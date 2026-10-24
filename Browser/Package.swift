@@ -1,9 +1,9 @@
-// swift-tools-version: 6.1
+// swift-tools-version: 6.4
 import PackageDescription
 
 let package = Package(
     name: "GuavaUIBrowser",
-    platforms: [.macOS(.v13)],
+    platforms: [.macOS(.v26), .iOS(.v26)],
     dependencies: [.package(path: "../Portable"), .package(path: "../Examples/Counter"), .package(path: "../Text"), .package(path: "../Logging")],
     targets: [
         .executableTarget(name: "GuavaUIBrowserPrototype", dependencies: [

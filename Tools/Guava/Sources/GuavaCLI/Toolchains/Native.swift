@@ -27,7 +27,7 @@ enum NativeSDK {
             if let apple {
                 let sysroot = try Shell.run(["xcrun", "--sdk", apple.sdk, "--show-sdk-path"], capture: true)
                 configure += ["-G", "Ninja", "-DCMAKE_SYSTEM_NAME=iOS", "-DCMAKE_OSX_SYSROOT=\(sysroot)",
-                              "-DCMAKE_OSX_ARCHITECTURES=\(apple.architecture)", "-DCMAKE_OSX_DEPLOYMENT_TARGET=16.0"]
+                              "-DCMAKE_OSX_ARCHITECTURES=\(apple.architecture)", "-DCMAKE_OSX_DEPLOYMENT_TARGET=26.0"]
             }
             try Shell.run(configure, environment: environment)
             try Shell.run(["cmake", "--build", build.path, "--config", "Release", "--parallel", "4"], environment: environment)

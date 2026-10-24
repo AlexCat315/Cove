@@ -14,7 +14,7 @@ import Testing
     #expect(main.contains("makeApplicationContent()"))
     #expect(!main.contains("UIApplicationDelegate"))
     let package = try String(contentsOf: directory.appendingPathComponent("Package.swift"), encoding: .utf8)
-    #expect(package.contains(".iOS(.v16)"))
+    #expect(package.contains("platforms: [.macOS(.v26), .iOS(.v26)]"))
 }
 
 @Test func iosSigningAndSimulatorArgumentsAreDistinct() throws {

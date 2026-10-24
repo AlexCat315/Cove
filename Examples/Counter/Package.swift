@@ -1,10 +1,10 @@
-// swift-tools-version: 6.1
+// swift-tools-version: 6.4
 import PackageDescription
 
 // Portable example content, deliberately outside the production UI package.
 let package = Package(
     name: "CounterExample",
-    platforms: [.macOS(.v13), .iOS(.v16)],
+    platforms: [.macOS(.v26), .iOS(.v26)],
     products: [.library(name: "CounterExample", targets: ["CounterExample"])],
     dependencies: [.package(path: "../../Portable")],
     targets: [
