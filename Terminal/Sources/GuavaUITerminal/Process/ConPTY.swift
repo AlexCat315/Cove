@@ -66,18 +66,19 @@ final class ConPTY: PseudoTerminalBackend, @unchecked Sendable {
         var environmentBlock = WindowsCommandLine.environmentBlockUTF16(environment)
         let directory = command.workingDirectory.map { Array($0.path.utf16) + [0] }
         let flags = DWORD(EXTENDED_STARTUPINFO_PRESENT) | DWORD(CREATE_UNICODE_ENVIRONMENT)
-        let launched = withUnsafeMutablePointer(to: &startup) { startupPointer in
-            startupPointer.withMemoryRebound(to: STARTUPINFOW.self, capacity: 1) { startupInfo in
-                environmentBlock.withUnsafeMutableBufferPointer { block in
-                    if let directory {
-                        return directory.withUnsafeBufferPointer { cwd in
-                            CreateProcessW(nil, &commandLine, nil, nil, false, flags, block.baseAddress,
-                                           cwd.baseAddress, startupInfo, &information)
-                        }
+        // ConPTY conveys the console through the thread attribute list; the
+        // parent's std handles are irrelevant. bInheritHandles must be true so
+        // the child can attach to the pseudoconsole, matching the Win32 sample.
+        let launched = withUnsafeMutablePointer(to: &startup.StartupInfo) { startupInfo in
+            environmentBlock.withUnsafeMutableBufferPointer { block in
+                if let directory {
+                    return directory.withUnsafeBufferPointer { cwd in
+                        CreateProcessW(nil, &commandLine, nil, nil, true, flags, block.baseAddress,
+                                       cwd.baseAddress, startupInfo, &information)
                     }
-                    return CreateProcessW(nil, &commandLine, nil, nil, false, flags, block.baseAddress,
-                                          nil, startupInfo, &information)
                 }
+                return CreateProcessW(nil, &commandLine, nil, nil, true, flags, block.baseAddress,
+                                      nil, startupInfo, &information)
             }
         }
         guard launched, let process = information.hProcess else {
