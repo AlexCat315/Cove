@@ -16,3 +16,19 @@ import GuavaLogging
     #expect(inherited.contains("GUAVA_LOG_RUN_ID=" + LogSystem.launch.runID))
 }
 #endif
+
+#if os(Windows)
+@Test func windowsExecutableSearchAcceptsMixedCaseEnvironmentKeys() throws {
+    let root = try #require(ProcessInfo.processInfo.environment.first {
+        $0.key.caseInsensitiveCompare("SystemRoot") == .orderedSame
+    }?.value)
+    let system = URL(fileURLWithPath: root).appendingPathComponent("System32")
+    let environment = ["Path": system.path, "PathExt": ".EXE;.CMD;.BAT"]
+    let executable = try Shell.executable("cmd", environment: environment)
+    #expect(executable.lastPathComponent.lowercased() == "cmd.exe")
+    #expect(FileManager.default.fileExists(atPath: executable.path))
+    #expect(throws: (any Error).self) {
+        try Shell.executable("guava-missing-" + UUID().uuidString, environment: environment)
+    }
+}
+#endif

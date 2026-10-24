@@ -1,16 +1,7 @@
 import GuavaLogging
 import Foundation
 
-/// Whether `path` names a file this platform could actually execute.
-///
-/// `FileManager.isExecutableFile` only classifies by extension on Windows
-/// (`SHGetFileInfoW` with `SHGFI_EXETYPE` never touches the disk), so a
-/// candidate that merely ends in `.exe` passes even when nothing is there.
-/// Pairing it with `fileExists` keeps PATH search honest on every platform;
-/// on POSIX the extra check is implied and free.
-private func isRunnable(_ path: String) -> Bool {
-    FileManager.default.fileExists(atPath: path) && FileManager.default.isExecutableFile(atPath: path)
-}
+private import ToolSupport
 
 enum ToolError: Error, LocalizedError {
     case invalid(String)
@@ -26,25 +17,10 @@ enum ToolError: Error, LocalizedError {
 
 enum Shell {
     static func executable(_ name: String, environment: [String: String] = ProcessInfo.processInfo.environment) throws -> URL {
-        if name.contains("/") || name.contains("\\") {
-            let file = URL(fileURLWithPath: name)
-            guard isRunnable(file.path) else { throw ToolError.invalid("Executable not found: \(name)") }
-            return file
+        guard let executable = ToolSupport.Shell.executable(name, environment: environment) else {
+            throw ToolError.invalid("Executable not found on PATH: \(name)")
         }
-        #if os(Windows)
-        let separator: Character = ";"
-        let extensions = [""] + (environment["PATHEXT"] ?? ".EXE;.CMD;.BAT").split(separator: ";").map(String.init)
-        #else
-        let separator: Character = ":"
-        let extensions = [""]
-        #endif
-        for directory in (environment["PATH"] ?? "").split(separator: separator) {
-            for suffix in extensions {
-                let candidate = URL(fileURLWithPath: String(directory)).appendingPathComponent(name + suffix)
-                if isRunnable(candidate.path) { return candidate }
-            }
-        }
-        throw ToolError.invalid("Executable not found on PATH: \(name)")
+        return executable
     }
 
     static func start(_ arguments: [String], at directory: URL? = nil,

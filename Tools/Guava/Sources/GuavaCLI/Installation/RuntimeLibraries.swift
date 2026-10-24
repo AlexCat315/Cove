@@ -4,7 +4,8 @@ enum CLIRuntimeLibraries {
     static func stage(executable: URL, into payload: URL) throws {
         #if os(Windows)
         let environment = ProcessInfo.processInfo.environment
-        let paths = [executable.deletingLastPathComponent().path] + (environment["PATH"] ?? "").components(separatedBy: ";")
+        let searchPath = environment.first { $0.key.caseInsensitiveCompare("PATH") == .orderedSame }?.value ?? ""
+        let paths = [executable.deletingLastPathComponent().path] + searchPath.components(separatedBy: ";")
         var copied: Set<String> = []
         let pattern = #"^(swift|BlocksRuntime|dispatch|Foundation|CoreFoundation|_Foundation|icu|libxml2|curl|zlib|vcruntime|msvcp|concrt).*\.dll$"#
         for path in paths where !path.isEmpty {
