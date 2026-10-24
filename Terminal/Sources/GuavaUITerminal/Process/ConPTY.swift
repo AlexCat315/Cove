@@ -131,7 +131,7 @@ final class ConPTY: PseudoTerminalBackend, @unchecked Sendable {
             // Let the pseudoconsole flush the child's final writes before the
             // console is closed; closing on the instant of exit can drop the
             // tail of fast-exiting output.
-            Thread.sleep(forTimeInterval: 0.25)
+            Thread.sleep(forTimeInterval: 0.5)
             closeConsole()
         }
         watcher.name = "guava.terminal.conpty.exit"
