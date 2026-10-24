@@ -4,7 +4,10 @@ import PackageDescription
 let diagnostics: [Target] = []
 let client: [Target.Dependency] = []
 #else
-let diagnostics: [Target] = [.target(name: "DevTools", dependencies: [.product(name: "ToolSupport", package: "Support")])]
+let diagnostics: [Target] = [
+    .target(name: "DevTools", dependencies: [.product(name: "ToolSupport", package: "Support")]),
+    .testTarget(name: "DevToolsTests", dependencies: ["DevTools"]),
+]
 let client: [Target.Dependency] = ["DevTools"]
 #endif
 let package = Package(name: "GuavaSDKTools",

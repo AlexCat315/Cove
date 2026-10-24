@@ -30,6 +30,9 @@ jobs:
         run: ./guava setup
       - name: Test standalone CLI
         run: ./guava test Tools/Guava
+      - name: Test standalone developer tools
+        if: runner.os != 'Windows'
+        run: ./guava test Tools/Developer
       - name: Package standalone CLI
         run: ./guava internal package-cli --output "$PWD/dist"
       - name: Verify CLI without a developer toolchain on PATH

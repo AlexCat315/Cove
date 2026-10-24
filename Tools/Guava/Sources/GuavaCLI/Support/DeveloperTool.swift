@@ -17,7 +17,7 @@ enum DeveloperTool {
         // SwiftPM expands @file response arguments even after the product name.
         // Build first, then pass session/event files literally to the executable.
         let build = [swift, "build", "--package-path", package.path, "--jobs", "4"]
-        try Shell.run(build + ["--product", "guava-dev"], at: root, environment: environment, quiet: quiet)
+        try Shell.run(build + ["--product", "guava-dev"], at: root, environment: environment, quiet: quiet, stdout: .standardError)
         let products = try Shell.run(build + ["--show-bin-path"], at: root, environment: environment, capture: true, quiet: true)
         #if os(Windows)
         let name = "guava-dev.exe"

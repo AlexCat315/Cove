@@ -1,4 +1,4 @@
-private import Foundation
+import Foundation
 import GuavaUI
 
 struct ChartExplorationStory: View {

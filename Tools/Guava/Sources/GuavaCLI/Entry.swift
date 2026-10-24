@@ -65,7 +65,7 @@ enum GuavaCLI {
         case .doctor: try Diagnostics.doctor(arguments, root: GuavaSDK.locate(arguments))
         case .devices: try Diagnostics.devices(arguments)
         case .showcase:
-            guard arguments.platform == .android else { throw ToolError.invalid("Use swift run --package-path GuavaUI/Examples GuavaUIDemo for the desktop gallery; showcase currently targets --android") }
+            guard arguments.platform == .android else { throw ToolError.invalid("Use guava run <SDK>/Examples for the desktop gallery; showcase currently targets --android") }
             try BuildAndroidApplication.run(arguments, root: GuavaSDK.locate(arguments))
         case .androidExport: try AndroidArtifact.export(arguments, root: GuavaSDK.locate(arguments))
         case .androidCompile: try compile(arguments, root: GuavaSDK.locate(arguments))

@@ -24,7 +24,7 @@ enum QueryUI {
     #if !canImport(Darwin)
       throw ToolError.message("DevTools queries require macOS")
     #else
-      try AsyncBridge.wait {
+      try BlockingRequest.run {
         var payload: [String: Any] = [:]
         if !listing {
           guard let object = (try? JSON.parse(input)) as? [String: Any] else {

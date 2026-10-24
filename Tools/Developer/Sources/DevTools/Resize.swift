@@ -21,7 +21,7 @@ enum ResizeWindow {
     #if !canImport(Darwin)
       throw ToolError.message("DevTools window control requires macOS")
     #else
-      try AsyncBridge.wait {
+      try BlockingRequest.run {
         let connection = DevToolsSocket(url: endpoint, timeout: 15, maximumMessageSize: 1_048_576)
         defer { connection.close() }
         let hello = try await connection.receive()

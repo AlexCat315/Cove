@@ -15,6 +15,6 @@ private import DevTools
     case "--help": print("guava-dev devtools")
     default: throw ToolError.message("Unknown SDK tool: \(command)")
    }
-  } catch { Terminal.fail(error.localizedDescription) }
+  } catch { Terminal.fail(error) }
  }
 }

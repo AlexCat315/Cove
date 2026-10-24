@@ -4,6 +4,7 @@ layout.buildDirectory.set(rootProject.projectDir.resolve("../../.guava/build/and
 android {
     namespace = "com.guava.runtime"
     compileSdk = 36
+    buildToolsVersion = "36.1.0"
     defaultConfig { minSdk = 28 }
     buildTypes { create("profile") { initWith(getByName("release")) } }
     sourceSets.getByName("main") {

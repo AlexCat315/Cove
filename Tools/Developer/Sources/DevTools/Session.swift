@@ -55,7 +55,7 @@ enum DevelopmentSession {
     #if !canImport(Darwin)
       throw ToolError.message("Development session verification requires macOS")
     #else
-      try AsyncBridge.wait {
+      try BlockingRequest.run {
         try await check(
           authenticated: authenticated, endpoint: endpoint, runtimePID: pid, sessionID: id, platform: platform)
       }
@@ -91,7 +91,7 @@ enum DevelopmentSession {
         throw ToolError.message("No hello")
       }
       let host = try JSON.object(helloPayload["host"], "host")
-      try Check.require(
+      try require(
         JSON.int(host["pid"]) == runtimePID,
         "The session belongs to another process")
       let capabilities = JSON.strings(helloPayload["capabilities"]) ?? []
@@ -99,7 +99,7 @@ enum DevelopmentSession {
         "log", "tree", "select", "inspect", "style", "source", "recomposition", "timeline",
         "state.observe",
       ] {
-        try Check.require(capabilities.contains(capability), "Missing capability \(capability)")
+        try require(capabilities.contains(capability), "Missing capability \(capability)")
       }
 
       var identifier = 0
@@ -125,20 +125,20 @@ enum DevelopmentSession {
       }
       let logPayload = try JSON.object(logs["payload"], "log payload")
       let records = try JSON.objects(logPayload["records"] ?? [Any](), "records")
-      try Check.require(!records.isEmpty, "Startup logs were not replayed")
+      try require(!records.isEmpty, "Startup logs were not replayed")
       for record in records {
         let process = JSON.dict(record["process"])
         let location = JSON.dict(record["location"])
-        try Check.require(
+        try require(
           JSON.int(record["sequence"]).map { $0 > 0 } == true
             && !(process?["runID"] as? String ?? "").isEmpty
             && !(location?["file"] as? String ?? "").isEmpty,
           "Incomplete log record")
       }
-      try Check.require(
+      try require(
         records.contains { $0["label"] as? String == "com.guava.engine.rhi" },
         "Engine logs did not join the application journal")
-      try Check.require(
+      try require(
         (try await request("log.unsubscribe"))["type"] as? String == "log.unsubscribe.ok",
         "log.unsubscribe failed")
 
@@ -154,18 +154,18 @@ enum DevelopmentSession {
         for child in JSON.objects(node["children"]) ?? [] { visit(child) }
       }
       visit(root)
-      try Check.require(identifiers.count > 5, "Expected real application nodes")
-      try Check.require(
+      try require(identifiers.count > 5, "Expected real application nodes")
+      try require(
         (try await request("select.node", ["id": identifiers.last ?? NSNull()]))["type"] as? String
           == "select.node.ok",
         "select.node failed")
-      try Check.require(
+      try require(
         (try await request("select.clear"))["type"] as? String == "select.clear.ok",
         "select.clear failed")
-      try Check.require(
+      try require(
         (try await request("state.list"))["type"] as? String == "state.list.ok", "state.list failed"
       )
-      try Check.require(
+      try require(
         (try await request("timeline.subscribe"))["type"] as? String == "timeline.events",
         "timeline.subscribe failed")
 
@@ -181,20 +181,20 @@ enum DevelopmentSession {
           styled = true
           break
         }
-        try Check.equal(
-          (reply["payload"] as? [String: Any])?["code"] as? String, "unsupported", JSON.text(reply))
+        try require(
+          (reply["payload"] as? [String: Any])?["code"] as? String == "unsupported", JSON.text(reply))
       }
-      try Check.require(styled, "Expected an editable layout node")
-      try Check.require(
+      try require(styled, "Expected an editable layout node")
+      try require(
         (try await request("inspect.style.undo"))["type"] as? String == "inspect.style.undo.ok",
         "inspect.style.undo failed")
-      try Check.require(
+      try require(
         (try await request("inspect.style.clearAll"))["type"] as? String
           == "inspect.style.clearAll.ok", "inspect.style.clearAll failed")
-      try Check.require(
+      try require(
         (try await request("timeline.unsubscribe"))["type"] as? String == "timeline.unsubscribe.ok",
         "timeline.unsubscribe failed")
-      try Check.require(
+      try require(
         (try await request("tree.unsubscribe"))["type"] as? String == "tree.unsubscribe.ok",
         "tree.unsubscribe failed")
 
@@ -221,4 +221,8 @@ enum DevelopmentSession {
       throw ToolError.message("Unauthenticated client connected")
     }
   #endif
+  private static func require(_ condition: Bool, _ message: @autoclosure () -> String) throws {
+    if !condition { throw ToolError.message(message()) }
+  }
+
 }

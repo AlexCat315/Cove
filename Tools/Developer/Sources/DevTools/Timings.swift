@@ -26,7 +26,7 @@ enum RecordTimings {
     #if !canImport(Darwin)
       throw ToolError.message("DevTools timing requires macOS")
     #else
-      try AsyncBridge.wait {
+      try BlockingRequest.run {
         try await perform(endpoint: endpoint, destination: destination, count: count, warmup: warmup)
       }
     #endif

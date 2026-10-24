@@ -1,5 +1,6 @@
 internal import Foundation
 internal import ToolSupport
+private import Synchronization
 
 #if canImport(FoundationNetworking)
   internal import FoundationNetworking
@@ -13,7 +14,7 @@ internal import ToolSupport
   final class DevToolsSocket {
     private let session: URLSession
     private let socket: URLSessionWebSocketTask
-    private let expired = Box(false)
+    private let expired = Mutex(false)
     private var deadline: DispatchWorkItem?
 
     init(url: URL, timeout: TimeInterval?, maximumMessageSize: Int) {
@@ -24,16 +25,15 @@ internal import ToolSupport
       if let timeout { armTimeout(timeout) }
     }
 
-    var hasExpired: Bool { expired.get() == true }
+    var hasExpired: Bool { expired.withLock { $0 } }
 
     /// Cancels the connection if it is still alive after `interval`.
     func armTimeout(_ interval: TimeInterval) {
       deadline?.cancel()
-      let expired = self.expired
-      let socket = self.socket
-      let item = DispatchWorkItem {
-        expired.set(true)
-        socket.cancel(with: .goingAway, reason: nil)
+      let item = DispatchWorkItem { [weak self] in
+        guard let self else { return }
+        self.expired.withLock { $0 = true }
+        self.socket.cancel(with: .goingAway, reason: nil)
       }
       deadline = item
       DispatchQueue.global().asyncAfter(deadline: .now() + interval, execute: item)

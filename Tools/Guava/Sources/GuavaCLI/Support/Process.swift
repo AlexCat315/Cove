@@ -40,7 +40,7 @@ enum Shell {
     @discardableResult
     static func run(_ arguments: [String], at directory: URL? = nil,
                     environment: [String: String] = ProcessInfo.processInfo.environment,
-                    capture: Bool = false, quiet: Bool = false) throws -> String {
+                    capture: Bool = false, quiet: Bool = false, stdout: FileHandle = .standardOutput) throws -> String {
         guard let command = arguments.first else { throw ToolError.invalid("Empty command") }
         let logger = LogSystem.logger("com.guava.cli.process")
         if !quiet { logger.debug("Starting command", metadata: ["command": "\(URL(fileURLWithPath: command).lastPathComponent)", "arguments": "\(arguments.count - 1)"]) }
@@ -51,7 +51,7 @@ enum Shell {
         var childEnvironment = environment
         childEnvironment["GUAVA_LOG_RUN_ID"] = childEnvironment["GUAVA_LOG_RUN_ID"] ?? LogSystem.launch.runID
         process.environment = childEnvironment
-        let output = ProcessStream(command: command, stream: "stdout", destination: capture ? nil : .standardOutput, collect: capture)
+        let output = ProcessStream(command: command, stream: "stdout", destination: capture ? nil : stdout, collect: capture)
         let errors = ProcessStream(command: command, stream: "stderr", destination: .standardError)
         process.standardOutput = output.pipe; process.standardError = errors.pipe
         let started = ContinuousClock.now

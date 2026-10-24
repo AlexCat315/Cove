@@ -67,7 +67,7 @@ enum CaptureUI {
     #if !canImport(Darwin)
       throw ToolError.message("DevTools capture requires macOS")
     #else
-      try AsyncBridge.wait { try await perform(endpoint: endpoint, destination: destination, settleMilliseconds: settleMilliseconds, scale: scale, crop: crop) }
+      try BlockingRequest.run { try await perform(endpoint: endpoint, destination: destination, settleMilliseconds: settleMilliseconds, scale: scale, crop: crop) }
     #endif
   }
 

@@ -24,7 +24,7 @@ enum InputUI {
     #if !canImport(Darwin)
       throw ToolError.message("DevTools input requires macOS")
     #else
-      try AsyncBridge.wait {
+      try BlockingRequest.run {
         let connection = DevToolsSocket(
           url: endpoint, timeout: 30, maximumMessageSize: 32 * 1024 * 1024)
         defer { connection.close() }
