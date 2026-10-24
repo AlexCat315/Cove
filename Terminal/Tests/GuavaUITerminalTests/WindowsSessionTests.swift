@@ -41,5 +41,12 @@ struct WindowsSessionTests {
         #expect(result.status == .exited(code: 0))
         #expect(result.screen.contains("hello-guava"))
     }
+
+    @Test("ConPTY forwards cmd switches and their command")
+    func cmdCommandLine() async throws {
+        let result = try await run("cmd.exe", ["/d", "/c", "echo", "hello-guava"])
+        #expect(result.status == .exited(code: 0))
+        #expect(result.screen.contains("hello-guava"))
+    }
 }
 #endif

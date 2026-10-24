@@ -51,6 +51,10 @@ extension TerminalCommand {
         let separator: Character = ";", slashes: Set<Character> = ["/", "\\"]
         let extensions = executable.contains(".") ? [""]
             : [""] + (pathExtensions ?? ".COM;.EXE;.BAT;.CMD").split(separator: ";").map(String.init)
+        // CreateProcess and cmd re-parse the first token of the command line;
+        // forward slashes in the executable path can be mistaken for a switch
+        // and corrupt cmd's /c parsing. Report Windows paths with backslashes.
+        let windowsPath = { (value: String) -> String in value.replacingOccurrences(of: "/", with: "\\") }
         func runnable(_ candidate: String) -> Bool { manager.fileExists(atPath: candidate) }
         #else
         let separator: Character = ":", slashes: Set<Character> = ["/"]
@@ -58,11 +62,11 @@ extension TerminalCommand {
         func runnable(_ candidate: String) -> Bool { manager.isExecutableFile(atPath: candidate) }
         #endif
         if executable.contains(where: slashes.contains) {
-            return runnable(executable) ? executable : nil
+            return runnable(executable) ? windowsPath(executable) : nil
         }
         for directory in (path ?? "/usr/bin:/bin").split(separator: separator) {
             for suffix in extensions {
-                let candidate = "\(directory)/\(executable)\(suffix)"
+                let candidate = windowsPath("\(directory)/\(executable)\(suffix)")
                 if runnable(candidate) { return candidate }
             }
         }
