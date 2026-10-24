@@ -11,7 +11,7 @@ enum WindowsAtomicFile {
         try staging.path.withCString(encodedAs: UTF16.self) { source in
             try destination.path.withCString(encodedAs: UTF16.self) { target in
                 for attempt in 0..<5 {
-                    if MoveFileExW(source, target, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) { return }
+                    if MoveFileExW(source, target, DWORD(MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) { return }
                     let code = GetLastError()
                     guard attempt < 4,
                           code == DWORD(ERROR_SHARING_VIOLATION) || code == DWORD(ERROR_LOCK_VIOLATION) else {

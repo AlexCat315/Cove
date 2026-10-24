@@ -18,9 +18,12 @@ final class ProcessStream: @unchecked Sendable {
         self.destination = destination; self.collect = collect; context = LogContext.current
     }
     func start(pid: Int32) {
+        // The child owns its inherited writer. Keeping a parent writer open
+        // can prevent EOF after the child exits on Foundation implementations.
+        try? pipe.fileHandleForWriting.close()
         group.enter()
-        DispatchQueue.global(qos: .utility).async { [self] in
-            defer { group.leave() }
+        let reader = Thread { [self] in
+            defer { try? pipe.fileHandleForReading.close(); group.leave() }
             LogContext.withValues(context) {
                 var buffered = Data()
                 while true {
@@ -39,6 +42,8 @@ final class ProcessStream: @unchecked Sendable {
                 if !buffered.isEmpty { record(buffered, pid: pid) }
             }
         }
+        reader.name = "guava.cli.\(stream)"
+        reader.start()
     }
     func finish() -> Data { group.wait(); return collected }
     private func record(_ data: some DataProtocol, pid: Int32) {

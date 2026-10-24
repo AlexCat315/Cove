@@ -4,6 +4,15 @@ import GuavaLogging
 @testable import GuavaCLI
 
 #if !os(Windows)
+@Test func parallelChildProcessesDeliverEOFWithoutDependingOnDispatchWorkers() async throws {
+    try await withThrowingTaskGroup(of: String.self) { group in
+        for _ in 0..<16 {
+            group.addTask { try Shell.run(["/bin/sh", "-c", "printf complete"], capture: true, quiet: true) }
+        }
+        for try await value in group { #expect(value == "complete") }
+    }
+}
+
 @Test func childStreamsDrainConcurrentlyAndMachineStdoutStaysPrivate() throws {
     let marker = UUID().uuidString
     let output = try Shell.run(["/bin/sh", "-c", "i=0; while [ $i -lt 12000 ]; do printf 'machine-data-0123456789\\n'; i=$((i+1)); done; printf 'stream-\(marker)\\n' >&2"], capture: true, quiet: true)
