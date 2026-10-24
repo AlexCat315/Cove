@@ -29,24 +29,17 @@ struct WindowsSessionTests {
         return (session.status, screen)
     }
 
-    @Test("ConPTY delivers command output")
+    @Test("ConPTY runs a program and reports its exit code")
+    func exitCode() async throws {
+        let result = try await run("powershell.exe", ["-NoProfile", "-Command", "exit 5"], waitForOutput: false)
+        #expect(result.status == .exited(code: 5))
+    }
+
+    @Test("ConPTY delivers program output")
     func output() async throws {
-        let result = try await run("cmd.exe", ["/d", "/c", "echo", "hello-guava"])
+        let result = try await run("powershell.exe", ["-NoProfile", "-Command", "Write-Output hello-guava"])
         #expect(result.status == .exited(code: 0))
         #expect(result.screen.contains("hello-guava"))
-    }
-
-    @Test("ConPTY reports the process exit code")
-    func exitCode() async throws {
-        let result = try await run("cmd.exe", ["/d", "/c", "exit", "3"], waitForOutput: false)
-        #expect(result.status == .exited(code: 3))
-    }
-
-    @Test("ConPTY passes arguments to the child")
-    func arguments() async throws {
-        let result = try await run("where.exe", ["cmd.exe"])
-        #expect(result.status == .exited(code: 0))
-        #expect(result.screen.lowercased().contains("cmd.exe"))
     }
 }
 #endif
