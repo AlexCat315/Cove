@@ -2,7 +2,7 @@
 
 Swift 跨平台 UI 框架与 `guava` CLI。应用共享声明式视图、布局、文本和图像管线，通过 NativeRHI 使用 Metal、DirectX 12 或 Vulkan。
 
-预编译 CLI 首批提供 macOS arm64、Windows x86_64、Linux x86_64。构建应用需要 Swift 6.4.1 和对应平台的编译工具。
+预编译 CLI 首批提供 macOS arm64、Windows x86_64、Linux x86_64。构建应用需要 Swift 6.4.1 和对应平台的编译工具。Apple 平台最低版本为 macOS 26 和 iOS 26。
 
 ## 安装 CLI
 
