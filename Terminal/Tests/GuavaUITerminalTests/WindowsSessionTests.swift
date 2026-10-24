@@ -6,11 +6,11 @@ import Testing
 @Suite("Windows terminal session", .serialized)
 @MainActor
 struct WindowsSessionTests {
-    private func run(_ arguments: [String], waitForOutput: Bool = true) async throws -> (status: TerminalSession.Status, screen: String) {
-        // No quoted arguments: this exercises ConPTY itself, not cmd's /c
-        // quote rewriting.
-        let session = TerminalSession(command: TerminalCommand(executable: "cmd.exe",
-            arguments: ["/d", "/c"] + arguments), scrollbackLines: 100) {
+    private func run(
+        _ executable: String, _ arguments: [String], waitForOutput: Bool = true
+    ) async throws -> (status: TerminalSession.Status, screen: String) {
+        let session = TerminalSession(command: TerminalCommand(executable: executable,
+            arguments: arguments), scrollbackLines: 100) {
                 DispatchQueue.main.async(execute: DispatchWorkItem(block: $0))
             }
         try session.start()
@@ -31,15 +31,22 @@ struct WindowsSessionTests {
 
     @Test("ConPTY delivers command output")
     func output() async throws {
-        let result = try await run(["echo", "hello-guava"])
+        let result = try await run("cmd.exe", ["/d", "/c", "echo", "hello-guava"])
         #expect(result.status == .exited(code: 0))
         #expect(result.screen.contains("hello-guava"))
     }
 
     @Test("ConPTY reports the process exit code")
     func exitCode() async throws {
-        let result = try await run(["exit", "3"], waitForOutput: false)
+        let result = try await run("cmd.exe", ["/d", "/c", "exit", "3"], waitForOutput: false)
         #expect(result.status == .exited(code: 3))
+    }
+
+    @Test("ConPTY passes arguments to the child")
+    func arguments() async throws {
+        let result = try await run("where.exe", ["cmd.exe"])
+        #expect(result.status == .exited(code: 0))
+        #expect(result.screen.lowercased().contains("cmd.exe"))
     }
 }
 #endif

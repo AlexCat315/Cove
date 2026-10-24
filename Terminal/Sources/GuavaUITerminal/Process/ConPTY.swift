@@ -59,7 +59,10 @@ final class ConPTY: PseudoTerminalBackend, @unchecked Sendable {
         startup.StartupInfo.cb = DWORD(MemoryLayout<STARTUPINFOEXW>.size)
         startup.lpAttributeList = attributes
         var information = PROCESS_INFORMATION()
-        var commandLine = Array(WindowsCommandLine.commandLineString([path] + command.arguments).utf16) + [0]
+        let launchLine = WindowsCommandLine.commandLineString([path] + command.arguments)
+        // Temporary diagnostics for the Windows ConPTY launch path.
+        FileHandle.standardError.write(Data("ConPTY launch [\(command.arguments.count)]: \(launchLine)\n".utf8))
+        var commandLine = Array(launchLine.utf16) + [0]
         var environmentBlock = WindowsCommandLine.environmentBlockUTF16(environment)
         let directory = command.workingDirectory.map { Array($0.path.utf16) + [0] }
         let flags = DWORD(EXTENDED_STARTUPINFO_PRESENT) | DWORD(CREATE_UNICODE_ENVIRONMENT)
