@@ -59,6 +59,8 @@ extension TerminalCommand {
         #else
         let separator: Character = ":", slashes: Set<Character> = ["/"]
         let extensions = [""]
+        // POSIX paths already use /; leave them untouched.
+        let windowsPath = { (value: String) -> String in value }
         func runnable(_ candidate: String) -> Bool { manager.isExecutableFile(atPath: candidate) }
         #endif
         if executable.contains(where: slashes.contains) {
