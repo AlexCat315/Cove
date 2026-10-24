@@ -1,5 +1,8 @@
 name: SDK CI
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
 permissions:
   contents: read
 concurrency:
@@ -29,6 +32,7 @@ jobs:
         id: native
         run: ./guava setup
       - name: Test standalone CLI
+        timeout-minutes: 10
         run: ./guava test Tools/Guava
       - name: Test standalone developer tools
         if: runner.os != 'Windows'

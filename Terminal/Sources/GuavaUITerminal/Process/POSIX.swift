@@ -6,7 +6,7 @@ internal import Glibc
 #endif
 internal import Foundation
 
-/// macOS / Linux backend: `forkpty`, with output read by a dispatch source.
+/// macOS / Linux backend: `forkpty`, drained through EOF by one reader thread.
 final class POSIXPseudoTerminal: PseudoTerminalBackend, @unchecked Sendable {
     let processID: Int32
     private let channel: Channel
@@ -63,26 +63,21 @@ final class POSIXPseudoTerminal: PseudoTerminalBackend, @unchecked Sendable {
         _ = fcntl(master, F_SETFD, FD_CLOEXEC)
         let channel = Channel(descriptor: master)
         self.channel = channel
-        let source = DispatchSource.makeReadSource(fileDescriptor: master,
-                                                   queue: DispatchQueue(label: "guava.terminal.pty.read"))
-        channel.attach(source)
-        source.setEventHandler { [channel] in
+        let reader = Thread { [channel] in
             var buffer = [UInt8](repeating: 0, count: 64 * 1024)
-            let count = buffer.withUnsafeMutableBytes { read(master, $0.baseAddress, $0.count) }
-            if count > 0 {
-                onOutput(Array(buffer.prefix(count)))
-            } else if count == 0 || (errno != EAGAIN && errno != EINTR) {
-                // EOF (macOS) or EIO (Linux): every slave descriptor closed.
-                channel.stopReading()
+            while true {
+                let count = buffer.withUnsafeMutableBytes { read(master, $0.baseAddress, $0.count) }
+                if count > 0 { onOutput(Array(buffer.prefix(count))); continue }
+                if count < 0, errno == EINTR { continue }
+                break
             }
-        }
-        source.setCancelHandler {
             channel.close()
             var status: Int32 = 0
             while waitpid(processID, &status, 0) < 0, errno == EINTR {}
             onExit(Self.exitCode(status))
         }
-        source.resume()
+        reader.name = "guava.terminal.pty.read"
+        reader.start()
     }
 
     deinit {
@@ -114,20 +109,8 @@ final class POSIXPseudoTerminal: PseudoTerminalBackend, @unchecked Sendable {
 private final class Channel: @unchecked Sendable {
     private let lock = NSLock()
     private var descriptor: Int32?
-    private var readSource: (any DispatchSourceRead)?
 
     init(descriptor: Int32) { self.descriptor = descriptor }
-
-    func attach(_ source: any DispatchSourceRead) { lock.withLock { readSource = source } }
-
-    func stopReading() {
-        let source = lock.withLock {
-            let source = readSource
-            readSource = nil
-            return source
-        }
-        source?.cancel()
-    }
 
     func write(_ bytes: [UInt8]) {
         lock.withLock {

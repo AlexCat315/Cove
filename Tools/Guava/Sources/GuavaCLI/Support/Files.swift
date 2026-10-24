@@ -19,7 +19,7 @@ enum Files {
 
     static func text(_ value: String, to url: URL) throws {
         try directory(url.deletingLastPathComponent())
-        try value.write(to: url, atomically: true, encoding: .utf8)
+        try writeAtomically(Data(value.utf8), to: url)
     }
 
     static func json<T: Encodable>(_ value: T, to url: URL) throws {
@@ -28,7 +28,15 @@ enum Files {
         try directory(url.deletingLastPathComponent())
         var data = try encoder.encode(value)
         data.append(0x0A)
+        try writeAtomically(data, to: url)
+    }
+
+    private static func writeAtomically(_ data: Data, to url: URL) throws {
+        #if os(Windows)
+        try WindowsAtomicFile.write(data, to: url)
+        #else
         try data.write(to: url, options: .atomic)
+        #endif
     }
 
     static func children(_ url: URL) throws -> [URL] {

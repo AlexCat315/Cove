@@ -12,6 +12,8 @@ struct InstallationReceipt: Codable {
     }
 
     static func read(at directory: URL) throws -> Self {
-        try JSONDecoder().decode(Self.self, from: Data(contentsOf: directory.appendingPathComponent(filename)))
+        let handle = try FileHandle(forReadingFrom: directory.appendingPathComponent(filename))
+        defer { try? handle.close() }
+        return try JSONDecoder().decode(Self.self, from: handle.readToEnd() ?? Data())
     }
 }

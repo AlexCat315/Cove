@@ -27,6 +27,7 @@ jobs:
       - name: Verify tag and SDK metadata
         run: node Tools/Release/check-version.mjs "$GITHUB_REF_NAME"
       - name: Test CLI
+        timeout-minutes: 10
         run: ./guava test Tools/Guava
       - name: Package CLI and runtime libraries
         run: ./guava internal package-cli --output "$PWD/dist"
