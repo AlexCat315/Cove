@@ -305,9 +305,9 @@ struct DiagnosticsTests {
         let queries = UIDiagnostics(tree: tree)
         tree.timeline.setEnabled(true)
         tree.timeline.end(tree.timeline.begin(), phase: "old", name: "Before capture")
-        let capture = Task { try await queries.captureTrace(durationMilliseconds: 50) }
-        await Task.yield()
-        try await Task.sleep(for: .milliseconds(10))
+        // Enter the recording scope before emitting the event. A scheduled
+        // task plus a short sleep races the capture deadline on busy runners.
+        let capture = Task.immediate { try await queries.captureTrace(durationMilliseconds: 50) }
         tree.timeline.end(tree.timeline.begin(), phase: "layout", name: "Actual layout")
         let first = try await capture.value
         #expect(tree.timeline.enabled)
@@ -316,7 +316,8 @@ struct DiagnosticsTests {
         let second = try await queries.captureTrace(durationMilliseconds: 50)
         #expect(second.eventCount == 0)
         let comparison = try queries.compareTraces(baselineID: first.id, candidateID: second.id)
-        #expect(comparison.changes[0].candidate == nil && comparison.changes[0].averageDeltaMs == nil)
+        let change = try #require(comparison.changes.first)
+        #expect(change.candidate == nil && change.averageDeltaMs == nil)
         queries.resetCaptures()
         #expect(throws: AgentError.self) { _ = try queries.queryTrace(id: first.id) }
         tree.timeline.setEnabled(false)
@@ -325,9 +326,7 @@ struct DiagnosticsTests {
 
     @Test func cancellationReleasesOwnRecordingAndDoesNotPublishCapture() async throws {
         let tree = NodeTree(), queries = UIDiagnostics(tree: NodeTree())
-        let capture = Task { try await UIDiagnostics(tree: tree).captureTrace(durationMilliseconds: 5000) }
-        await Task.yield()
-        try await Task.sleep(for: .milliseconds(10))
+        let capture = Task.immediate { try await UIDiagnostics(tree: tree).captureTrace(durationMilliseconds: 5000) }
         #expect(tree.timeline.enabled)
         capture.cancel()
         await #expect(throws: CancellationError.self) { _ = try await capture.value }

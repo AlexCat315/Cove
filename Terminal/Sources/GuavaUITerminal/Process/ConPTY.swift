@@ -32,11 +32,10 @@ final class ConPTY: PseudoTerminalBackend, @unchecked Sendable {
               let inputRead, let inputWrite, let outputRead, let outputWrite else {
             throw TerminalError.spawnFailed(code: Int32(bitPattern: GetLastError()))
         }
+        // Keep the console's pipe ends alive until the client is attached.
+        defer { CloseHandle(inputRead); CloseHandle(outputWrite) }
         var console: HPCON?
         let created = CreatePseudoConsole(coord(size), inputRead, outputWrite, 0, &console)
-        // The console holds its own references to these ends.
-        CloseHandle(inputRead)
-        CloseHandle(outputWrite)
         guard created == S_OK, let console else {
             CloseHandle(inputWrite); CloseHandle(outputRead)
             throw TerminalError.spawnFailed(code: created)
@@ -60,26 +59,23 @@ final class ConPTY: PseudoTerminalBackend, @unchecked Sendable {
         startup.lpAttributeList = attributes
         var information = PROCESS_INFORMATION()
         let launchLine = WindowsCommandLine.commandLineString([path] + command.arguments)
-        // Temporary diagnostics for the Windows ConPTY launch path.
-        FileHandle.standardError.write(Data("ConPTY launch [\(command.arguments.count)]: \(launchLine)\n".utf8))
         var commandLine = Array(launchLine.utf16) + [0]
         var environmentBlock = WindowsCommandLine.environmentBlockUTF16(environment)
         let directory = command.workingDirectory.map { Array($0.path.utf16) + [0] }
         let flags = DWORD(EXTENDED_STARTUPINFO_PRESENT) | DWORD(CREATE_UNICODE_ENVIRONMENT)
-        // ConPTY conveys the console through the thread attribute list. Keep
-        // inheritable handles off so the child's standard streams connect to
-        // the pseudoconsole (as in the CreatePseudoConsole sample); enable it
-        // and the child's output stops reaching the console.
-        let launched = withUnsafeMutablePointer(to: &startup.StartupInfo) { startupInfo in
-            environmentBlock.withUnsafeMutableBufferPointer { block in
-                if let directory {
-                    return directory.withUnsafeBufferPointer { cwd in
-                        CreateProcessW(nil, &commandLine, nil, nil, false, flags, block.baseAddress,
-                                       cwd.baseAddress, startupInfo, &information)
+        // The console is conveyed through the attribute list, without inheriting handles.
+        let launched = withUnsafeMutablePointer(to: &startup) { extendedInfo in
+            extendedInfo.withMemoryRebound(to: STARTUPINFOW.self, capacity: 1) { startupInfo in
+                environmentBlock.withUnsafeMutableBufferPointer { block in
+                    if let directory {
+                        return directory.withUnsafeBufferPointer { cwd in
+                            CreateProcessW(nil, &commandLine, nil, nil, false, flags, block.baseAddress,
+                                           cwd.baseAddress, startupInfo, &information)
+                        }
                     }
+                    return CreateProcessW(nil, &commandLine, nil, nil, false, flags, block.baseAddress,
+                                          nil, startupInfo, &information)
                 }
-                return CreateProcessW(nil, &commandLine, nil, nil, false, flags, block.baseAddress,
-                                      nil, startupInfo, &information)
             }
         }
         guard launched, let process = information.hProcess else {
@@ -129,10 +125,8 @@ final class ConPTY: PseudoTerminalBackend, @unchecked Sendable {
         reader.start()
         let watcher = Thread { [self] in
             WaitForSingleObject(process, INFINITE)
-            // Let the pseudoconsole flush the child's final writes before the
-            // console is closed; closing on the instant of exit can drop the
-            // tail of fast-exiting output.
-            Thread.sleep(forTimeInterval: 0.5)
+            // Closing emits the final console frame; the reader remains alive
+            // until that frame is drained and the pipe reaches EOF.
             closeConsole()
         }
         watcher.name = "guava.terminal.conpty.exit"
