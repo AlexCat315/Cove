@@ -64,14 +64,16 @@ struct ChartGeometry {
     let isScatter: Bool
     /// Which screen direction the value axis runs.
     let orientation: ChartOrientation
+    let window: ChartWindow?
 
     var domain: ClosedRange<Float> { axes.primaryScale.domain }
 
     init(series: [ChartSeries], axes: ChartValueAxes, xDomain: ChartXDomain, xScale: ChartScale?,
-         barSpacing: Float, orientation: ChartOrientation = .vertical, plot: UIRect) {
+         barSpacing: Float, orientation: ChartOrientation = .vertical, plot: UIRect, window: ChartWindow? = nil) {
         self.plot = plot
         self.axes = axes
         self.orientation = orientation
+        self.window = window
         let shown = axes.shown
         let slotCount = axes.sampleCount
         hasBars = axes.hasBars
@@ -82,8 +84,11 @@ struct ChartGeometry {
 
         let barSeries = shown.filter { series[$0].mark == .bar }
         let groups = stacked ? 1 : max(1, barSeries.count)
-        let slot = numericX.map {
-            Self.numericSlot(series: series, shown: shown, scale: $0, plot: plot, orientation: orientation)
+        let slot = window.flatMap { window -> Float? in
+            guard !xDomain.isNumeric else { return nil }
+            return orientation.breadth(plot) / max(0.001, window.range.upperBound - window.range.lowerBound)
+        } ?? numericX.map {
+            Self.numericSlot(series: series, shown: shown, scale: $0, plot: plot, orientation: orientation, window: window)
         } ?? (orientation.breadth(plot) / Float(max(1, sampleCount)))
         // Wide categories breathe (a quarter of the slot, at most 24pt); dense
         // ones keep the authored spacing. Bars inside a group sit 2pt apart.
@@ -103,7 +108,9 @@ struct ChartGeometry {
             marks[index] = item.data.indices.map { i in
                 let datum = item.data[i]
                 let center: Float
-                if let numericX {
+                if let window {
+                    center = window.position(xDomain.isNumeric ? datum.x : Float(i), plot: plot, orientation: orientation)
+                } else if let numericX {
                     center = orientation.across(numericX, datum.x, in: plot)
                 } else if item.mark == .bar || stack.hasBars {
                     center = origin + (Float(i) + 0.5) * slot
@@ -112,7 +119,7 @@ struct ChartGeometry {
                                          plot: plot, orientation: orientation)
                 }
                 let across = item.mark == .bar ? center + groupOffset : center
-                guard datum.y.isFinite else {
+                guard datum.y.isFinite, !xDomain.isNumeric || (datum.x.isFinite && (window?.kind != .log || datum.x > 0)) else {
                     return Mark(series: index, index: i, value: datum.y, x: .nan, y: .nan,
                                 base: .nan, bar: nil, isOuterEnd: false)
                 }
@@ -137,17 +144,18 @@ struct ChartGeometry {
 
     /// Bars on a numeric axis are as thick as the closest pair of x values.
     private static func numericSlot(series: [ChartSeries], shown: [Int], scale: ChartScale,
-                                    plot: UIRect, orientation: ChartOrientation) -> Float {
+                                    plot: UIRect, orientation: ChartOrientation, window: ChartWindow?) -> Float {
         let xs = shown.flatMap { series[$0].data.map(\.x) }.filter(\.isFinite).sorted()
         var gap = Float.greatestFiniteMagnitude
         if xs.count > 1 {
             for i in 1..<xs.count {
-                let delta = orientation.across(scale, xs[i], in: plot)
-                    - orientation.across(scale, xs[i - 1], in: plot)
+                let a = window?.position(xs[i], plot: plot, orientation: orientation) ?? orientation.across(scale, xs[i], in: plot)
+                let b = window?.position(xs[i - 1], plot: plot, orientation: orientation) ?? orientation.across(scale, xs[i - 1], in: plot)
+                let delta = abs(a - b)
                 if delta > 0.001 { gap = min(gap, delta) }
             }
         }
-        return gap.isFinite ? gap : orientation.breadth(plot) / Float(max(1, xs.count))
+        return gap < Float.greatestFiniteMagnitude ? gap : orientation.breadth(plot) / Float(max(1, xs.count))
     }
 
     /// Where a sample index sits across the categories.
@@ -186,7 +194,10 @@ struct ChartGeometry {
     /// whose value is closest along the value axis (a numeric axis uses true
     /// distance). Gaps take no part.
     func nearest(x: Float, y: Float) -> Mark? {
-        let all = marks.flatMap { $0 }.filter { $0.y.isFinite }
+        let all = marks.flatMap { $0 }.filter {
+            $0.x.isFinite && $0.y.isFinite && across($0) >= orientation.acrossOrigin(plot)
+                && across($0) <= orientation.acrossOrigin(plot) + orientation.breadth(plot)
+        }
         guard !all.isEmpty else { return nil }
         if isScatter {
             return all.min { hypotf($0.x - x, $0.y - y) < hypotf($1.x - x, $1.y - y) }
@@ -204,6 +215,21 @@ struct ChartGeometry {
 }
 
 extension ChartGeometry {
+    /// Crop before downsampling so zooming reveals detail instead of keeping
+    /// the full dataset's coarse buckets. Crossing segments retain both ends.
+    func visibleRun(_ run: [Mark]) -> [Mark] {
+        let lower = orientation.acrossOrigin(plot), upper = lower + orientation.breadth(plot)
+        func inside(_ mark: Mark) -> Bool { across(mark) >= lower && across(mark) <= upper }
+        return run.indices.compactMap { i in
+            if inside(run[i]) { return run[i] }
+            for adjacent in [i - 1, i + 1] where run.indices.contains(adjacent) {
+                let a = across(run[i]), b = across(run[adjacent])
+                if min(a, b) <= upper && max(a, b) >= lower { return run[i] }
+            }
+            return nil
+        }
+    }
+
     /// Reduces a run to what the plot can actually resolve.
     ///
     /// Each pixel column across the categories keeps its lowest and highest

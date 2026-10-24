@@ -152,7 +152,7 @@ struct ChartTests {
         let series: [ChartSeries] = [.bar([3, 3], title: "Gain"), .bar([-2, 1], color: .success, title: "Loss")]
         let plot = UIRect(x: 0, y: 0, width: 100, height: 100)
         let stacked = geometry(series, style: ChartStyle(barSpacing: 0, stacking: .stacked), plot: plot)
-        let zero = stacked.y(0)
+        let zero = stacked.along(0)
         // The loss hangs from zero rather than being subtracted from the gain.
         #expect(abs(stacked.marks[1][0].base - zero) < 0.01)
         #expect(stacked.marks[1][0].y > zero)
@@ -190,7 +190,7 @@ struct ChartTests {
         #expect(axes.primaryScale.domain == -100...100)
         let plot = UIRect(x: 0, y: 0, width: 40, height: 100)
         let stacked = geometry(series, style: style, plot: plot)
-        let zero = stacked.y(0)
+        let zero = stacked.along(0)
         #expect(abs(zero - plot.maxY / 2) < 0.5)
         // The loss is the taller side, so it takes the full drop to -100 and the
         // gain keeps its 2/3 share of the half above zero.

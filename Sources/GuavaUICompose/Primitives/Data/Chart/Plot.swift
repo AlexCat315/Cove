@@ -62,6 +62,11 @@ struct ChartPlot: _PrimitiveView {
     /// the pointer never visited.
     var callout: (ChartPoint) -> ChartCallout? = { _ in nil }
     var accessibility = ChartConfiguration.Accessibility()
+    var viewport = ChartConfiguration.Viewport()
+    var visibleRange: ClosedRange<Float>?
+    var brush: Binding<ClosedRange<Float>?>?
+    var brushedRange: ClosedRange<Float>?
+    var animation: Animation?
     let input: ChartPlotInput
 
     func _makeNode() -> Node {
@@ -89,12 +94,8 @@ struct ChartPlot: _PrimitiveView {
         // cursor only moves under assistive control, so an unrelated
         // recomposition must not wipe it back to the summary.
         if input.isEnabled { session.reading = selection }
-        let choose: (ChartPoint?) -> Void = { next in
-            session.current = next
-            snapshot.input.select(next)
-        }
-        node.isHitTestable = input.isEnabled
-        node.isFocusable = input.isEnabled
+        node.isHitTestable = isInteractive
+        node.isFocusable = isInteractive
         node.cursor = input.isEnabled ? .crosshair : .arrow
         publishAccessibility(node: node, session: session)
         let theme = node.theme
@@ -105,64 +106,13 @@ struct ChartPlot: _PrimitiveView {
             session.signature = identity.geometry
             session.cache.invalidate()
         }
+        session.navigation.window = nil
+        session.transition.update(content: content, animation: animation, node: node, cache: session.cache)
         node.updateDraw(identity: identity) { [weak node] list, origin in
             guard let node else { return }
             snapshot.draw(node: node, origin: origin, list: list)
         }
-        guard input.isEnabled, let registry = InteractionRegistryHolder.current else {
-            InteractionRegistryHolder.current?.remove(node)
-            return
-        }
-        registry.setHover(node) { [weak node] phase in
-            guard let node, phase == .leave, !session.isPinned, !session.isPressed, node.supportsControlHover else { return }
-            choose(nil)
-        }
-        registry.setMotion(node) { [weak node] event, phase in
-            guard let node, phase == .target else { return .ignored }
-            guard session.isPressed || (node.supportsControlHover && !session.isPinned) else { return .ignored }
-            let hit = snapshot.hit(x: event.x, y: event.y, node: node)
-            // A drag scrubs; leaving the plot keeps the last value.
-            if hit != nil || !session.isPressed, hit != session.current { choose(hit) }
-            return session.isPressed ? .handled : .ignored
-        }
-        registry.setPointer(node) { [weak node] event, phase, route in
-            guard let node, event.button == .left, route == .target else { return .ignored }
-            switch phase {
-            case .down:
-                let hit = snapshot.hit(x: event.x, y: event.y, node: node)
-                // Pressing the pinned point again releases it.
-                session.releasesPin = session.isPinned && hit != nil && hit == session.current
-                session.press(node: node)
-                choose(session.releasesPin ? nil : hit)
-            case .up:
-                session.release(node: node)
-                session.isPinned = !session.releasesPin && session.current != nil
-                session.releasesPin = false
-            }
-            return .handled
-        }
-        registry.setKey(node) { event, phase in
-            guard phase == .target, event.modifiers.isDisjoint(with: [.ctrl, .gui, .alt]) else { return .ignored }
-            let current = session.current
-            switch event.scancode {
-            case Scancode.arrowRight: choose(snapshot.stepped(index: 1, from: current))
-            case Scancode.arrowLeft: choose(snapshot.stepped(index: -1, from: current))
-            case Scancode.arrowDown: choose(snapshot.stepped(series: 1, from: current))
-            case Scancode.arrowUp: choose(snapshot.stepped(series: -1, from: current))
-            case Scancode.home: choose(snapshot.jumped(toEnd: false, from: current))
-            case Scancode.end: choose(snapshot.jumped(toEnd: true, from: current))
-            case Scancode.escape:
-                guard current != nil else { return .ignored }
-                session.isPinned = false
-                session.reading = nil
-                choose(nil)
-                return .handled
-            default: return .ignored
-            }
-            // A keyboard selection stays until Escape or a pointer moves it.
-            session.isPinned = session.current != nil
-            return .handled
-        }
+        installInput(node: node, session: session)
     }
 
     /// Text drawn over the plot: the callout, guide labels, pinned notes, value
@@ -324,7 +274,10 @@ struct ChartPlot: _PrimitiveView {
     /// chart, to its right on a horizontal one — and on the other side when the
     /// value runs below or left of the baseline.
     private func endPlacement(_ mark: ChartGeometry.Mark, geometry: ChartGeometry,
-                              gap: CGFloat) -> ChartOverlayPlacement {
+                              gap: CGFloat) -> ChartOverlayPlacement? {
+        let across = geometry.across(mark), start = geometry.orientation.acrossOrigin(geometry.plot)
+        guard across.isFinite, across >= start,
+              across <= start + geometry.orientation.breadth(geometry.plot) else { return nil }
         let bar = mark.bar
         switch geometry.orientation {
         case .vertical:
@@ -358,28 +311,38 @@ struct ChartPlot: _PrimitiveView {
     /// the text metrics are unchanged; the caller drops it when the data moves.
     func resolve(in size: CGSize, origin: CGPoint = .zero, text: ChartText,
                  cache: ChartResolutionCache? = nil) -> ChartResolution {
-        guard let cache else { return buildResolution(in: size, origin: origin, text: text) }
+        guard let cache else { return buildResolution(in: size, origin: origin, text: text, content: content) }
         return cache.resolution(size: size, origin: origin, text: text.token) {
-            buildResolution(in: size, origin: origin, text: text)
+            buildResolution(in: size, origin: origin, text: text, content: cache.samples?.applying(to: content) ?? content)
         }
     }
 
-    private func buildResolution(in size: CGSize, origin: CGPoint, text: ChartText) -> ChartResolution {
+    private func buildResolution(in size: CGSize, origin: CGPoint, text: ChartText, content: ChartContent) -> ChartResolution {
         switch content {
         case .cartesian(let series, let guides, let xDomain):
             let axes = ChartValueAxes.resolve(series: series, visible: visible, style: style,
                                               guides: guides, axis: axis)
-            let xScale = xDomain.isNumeric
+            let fullScale = xDomain.isNumeric
                 ? ChartScale.fit(extent: axes.shown.flatMap { series[$0].data.map(\.x) },
                                  lower: nil, upper: nil, tickCount: axis.x.tickCount,
                                  kind: axis.x.kind)
                 : nil
+            let full: ClosedRange<Float> = fullScale?.domain
+                ?? (axes.hasBars || axes.sampleCount < 2 ? -0.5...Float(max(1, axes.sampleCount)) - 0.5 : 0...Float(axes.sampleCount - 1))
+            let minimum = xDomain.isNumeric ? viewport.minimumFraction
+                : max(viewport.minimumFraction, 1 / max(1, Float(axes.sampleCount)))
+            let window = ChartWindow(full: full, range: visibleRange, kind: xDomain.isNumeric ? axis.x.kind : .linear,
+                                     minimumFraction: minimum, isCategorical: !xDomain.isNumeric)
+            let xScale = fullScale.map { _ in
+                ChartScale.fit(extent: [], lower: window.range.lowerBound, upper: window.range.upperBound,
+                               tickCount: axis.x.tickCount, kind: axis.x.kind)
+            }
             let frame = ChartFrame.cartesian(axes: axes, xDomain: xDomain, xScale: xScale,
                                              style: style, axis: axis,
-                                             size: size, origin: origin, text: text)
+                                             size: size, origin: origin, text: text, window: window)
             let geometry = ChartGeometry(series: series, axes: axes, xDomain: xDomain, xScale: xScale,
                                          barSpacing: style.barSpacing, orientation: style.orientation,
-                                         plot: frame.plot)
+                                         plot: frame.plot, window: window)
             return ChartResolution(frame: frame, cartesian: geometry, pie: nil)
         case .pie(let slices):
             let frame = ChartFrame.pie(style: style, size: size, origin: origin)
@@ -391,7 +354,7 @@ struct ChartPlot: _PrimitiveView {
         }
     }
 
-    private func hit(x: Float, y: Float, node: Node) -> ChartPoint? {
+    func hit(x: Float, y: Float, node: Node) -> ChartPoint? {
         let text = ChartText(theme: node.theme, environment: TextEnvironmentHolder.current)
         // Pointer coordinates are absolute, so the plot resolves in the same
         // space the draw pass used — one cache entry serves both.
@@ -561,15 +524,20 @@ struct ChartPlot: _PrimitiveView {
                   case .cartesian(let series, let guides, _) = content else { return nil }
             return (series, guides, geometry)
         }()
+        if let marks { list.pushClip(marks.geometry.plot) }
         // Bands sit under the grid so the grid still reads as the top rule.
         if let marks { paint.bands(marks.guides.bands, geometry: marks.geometry, list: list) }
         paint.grid(list: list)
+        if let marks, let brushedRange, let window = marks.geometry.window {
+            paint.brush(brushedRange, window: window, list: list)
+        }
         if let marks {
             paint.thresholds(marks.guides.thresholds, geometry: marks.geometry, list: list)
             paint.series(marks.series, geometry: marks.geometry, list: list)
             paint.markers(marks.guides.markers, geometry: marks.geometry, list: list)
             paint.selection(marks.series, geometry: marks.geometry, list: list)
         }
+        if marks != nil { list.popClip() }
         if let geometry = resolution.pie, case .pie(let slices) = content {
             if pie.showsLabels { paint.pieLeaders(slices, geometry: geometry, list: list) }
             paint.pie(slices, geometry: geometry, list: list)
@@ -598,12 +566,16 @@ final class ChartSession: NodeResource {
     /// The geometry the cached resolution was built from.
     fileprivate var signature: ChartGeometrySignature?
     let cache = ChartResolutionCache()
+    let navigation = ChartNavigation()
+    let transition = ChartTransition()
     private weak var capture: PointerCapture?
     private weak var focus: FocusChain?
 
     func mount(node: Node) { capture = PointerCaptureHolder.current; focus = FocusChainHolder.current }
     func unmount(node: Node) {
         release(node: node)
+        node.cancelAnimation(for: "chart.samples")
+        navigation.cancel()
         if focus?.focused === node { focus?.clear() }
     }
     func press(node: Node) { isPressed = true; capture?.acquire(node) }
@@ -622,6 +594,7 @@ private struct ChartPaintIdentity: Equatable {
     let geometry: ChartGeometrySignature
     let colors: [Color]
     let selection: ChartPoint?
+    let brush: ClosedRange<Float>?
 
     init(plot: ChartPlot, theme: Theme) {
         geometry = ChartGeometrySignature(plot: plot, theme: theme)
@@ -638,6 +611,7 @@ private struct ChartPaintIdentity: Equatable {
         colors += [plot.style.background?.resolve(theme) ?? .clear, plot.style.gridColor.resolve(theme)]
         self.colors = colors
         selection = plot.selection
+        brush = plot.brushedRange
     }
 }
 
@@ -657,6 +631,7 @@ private struct ChartGeometrySignature: Equatable {
     let sides: [String]
     let visible: [Bool]
     let xDomain: ChartXDomain?
+    let visibleRange: ClosedRange<Float>?
     let thresholds: [[Float]]
     let bands: [[Float]]
     let markers: [Int]
@@ -670,11 +645,13 @@ private struct ChartGeometrySignature: Equatable {
 
     init(plot: ChartPlot, theme: Theme) {
         visible = plot.visible
+        visibleRange = plot.visibleRange
         text = ChartText(theme: theme, environment: nil).token
         let style = plot.style
         self.style = [style.minValue ?? .nan, style.maxValue ?? .nan, style.showsGrid ? 1 : 0, style.lineWidth,
                       style.barSpacing, style.contentInset, style.innerRadiusRatio,
-                      Self.stackingCode(style.stacking), style.orientation == .horizontal ? 1 : 0]
+                      Self.stackingCode(style.stacking), style.orientation == .horizontal ? 1 : 0,
+                      plot.viewport.minimumFraction]
         let axis = plot.axis
         self.axis = [axis.y.title, axis.x.title, "\(axis.y.tickCount)", "\(axis.x.tickCount)",
                      axis.y.isLabeled ? "y" : "", axis.x.isLabeled ? "x" : "",
@@ -721,7 +698,7 @@ private struct ChartGeometrySignature: Equatable {
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.data == rhs.data && lhs.pieValues == rhs.pieValues && lhs.marks == rhs.marks
             && lhs.styles == rhs.styles && lhs.sides == rhs.sides && lhs.visible == rhs.visible
-            && lhs.xDomain == rhs.xDomain && lhs.thresholds == rhs.thresholds
+            && lhs.xDomain == rhs.xDomain && lhs.visibleRange == rhs.visibleRange && lhs.thresholds == rhs.thresholds
             && lhs.bands == rhs.bands && lhs.markers == rhs.markers
             && lhs.axis == rhs.axis && lhs.pie == rhs.pie && lhs.text == rhs.text
             && lhs.style.elementsEqual(rhs.style) { $0 == $1 || ($0.isNaN && $1.isNaN) }

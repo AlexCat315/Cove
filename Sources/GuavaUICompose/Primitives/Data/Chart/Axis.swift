@@ -59,7 +59,7 @@ struct ChartFrame {
 
     static func cartesian(axes: ChartValueAxes, xDomain: ChartXDomain, xScale: ChartScale?,
                           style: ChartStyle, axis: ChartConfiguration.Axis,
-                          size: CGSize, origin: CGPoint, text: ChartText) -> ChartFrame {
+                          size: CGSize, origin: CGPoint, text: ChartText, window: ChartWindow? = nil) -> ChartFrame {
         let bounds = inset(size: size, origin: origin, style: style)
         let orientation = style.orientation
         let valueLabels = labels(axes.primaryScale, labeled: axis.y.isLabeled,
@@ -133,7 +133,7 @@ struct ChartFrame {
                           categoryTicks: hasCategories
                             ? ticks(categoryTexts, xDomain: xDomain, xScale: xScale,
                                     count: axes.sampleCount, hasBars: axes.hasBars,
-                                    plot: plot, orientation: orientation, text: text)
+                                    plot: plot, orientation: orientation, text: text, window: window)
                             : [],
                           valueTitle: axis.y.title,
                           secondaryTitle: hasSecondary ? axis.secondary.title : "",
@@ -156,7 +156,7 @@ struct ChartFrame {
     /// Ticks on the independent axis, thinned to what the plot can hold apart.
     private static func ticks(_ texts: [String], xDomain: ChartXDomain, xScale: ChartScale?,
                               count: Int, hasBars: Bool, plot: UIRect,
-                              orientation: ChartOrientation, text: ChartText) -> [Tick] {
+                              orientation: ChartOrientation, text: ChartText, window: ChartWindow?) -> [Tick] {
         guard !texts.isEmpty else { return [] }
         if xDomain.isNumeric, let xScale {
             // A numeric axis ticks on round values, so it never needs thinning.
@@ -164,12 +164,15 @@ struct ChartFrame {
                 Tick(position: orientation.across(xScale, value, in: plot), label: label)
             }
         }
-        let step = labelStep(texts, slot: orientation.breadth(plot) / Float(max(1, count)),
+        let span = window.map { $0.range.upperBound - $0.range.lowerBound } ?? Float(max(1, count))
+        let step = labelStep(texts, slot: orientation.breadth(plot) / max(1, span),
                              orientation: orientation, text: text)
-        return stride(from: 0, to: texts.count, by: step).map { index in
-            Tick(position: ChartGeometry.across(index: index, count: count, hasBars: hasBars,
-                                                plot: plot, orientation: orientation),
-                 label: texts[index])
+        return stride(from: 0, to: texts.count, by: step).compactMap { index in
+            let position = window?.position(Float(index), plot: plot, orientation: orientation)
+                ?? ChartGeometry.across(index: index, count: count, hasBars: hasBars, plot: plot, orientation: orientation)
+            guard position >= orientation.acrossOrigin(plot),
+                  position <= orientation.acrossOrigin(plot) + orientation.breadth(plot) else { return nil }
+            return Tick(position: position, label: texts[index])
         }
     }
 

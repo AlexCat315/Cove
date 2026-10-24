@@ -54,6 +54,13 @@ import GuavaUIRuntime
 /// axis and `axis.x` the independent one — only the edges they are drawn
 /// against move, so a log value axis stays `axis.y.kind = .log` when it turns.
 ///
+/// Bind `viewport.range` to enable wheel zoom, horizontal scroll/Alt-drag pan
+/// and +/- keys (0 or double-click resets). Bind `selection.range` to brush an
+/// interval by dragging; numeric charts return x values, categories return
+/// zero-based indices. Both features follow a horizontal chart's category axis.
+/// `animation` animates data changes, including interruptions, and also works
+/// through `withAnimation`. Reduced motion snaps to the final values.
+///
 /// `ChartHistogram` counts samples into bins and hands back the bars plus their
 /// edge labels, so a distribution needs no hand-rolled counting.
 ///
@@ -128,6 +135,9 @@ public struct Chart: View {
                       summary: summary(visible: visible, selection: selection),
                       callout: { self.callout(for: $0, visible: visible) },
                       accessibility: configuration.accessibility,
+                      viewport: configuration.viewport, visibleRange: configuration.viewport.range?.wrappedValue,
+                      brush: configuration.selection.range, brushedRange: configuration.selection.range?.wrappedValue,
+                      animation: configuration.animation,
                       input: ChartPlotInput(isEnabled: point != nil) { next in
                           if point?.wrappedValue != next { point?.wrappedValue = next }
                       })

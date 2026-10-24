@@ -14,6 +14,18 @@ struct ChartPaint {
         if let background = style.background { list.addRect(bounds, color: background.resolve(theme)) }
     }
 
+    func brush(_ range: ClosedRange<Float>, window: ChartWindow, list: DrawList) {
+        guard range.lowerBound.isFinite, range.upperBound.isFinite else { return }
+        let a = window.position(range.lowerBound, plot: frame.plot, orientation: frame.orientation)
+        let b = window.position(range.upperBound, plot: frame.plot, orientation: frame.orientation)
+        guard a.isFinite, b.isFinite else { return }
+        let rect = frame.orientation == .vertical
+            ? UIRect(x: min(a, b), y: frame.plot.minY, width: abs(b - a), height: frame.plot.height)
+            : UIRect(x: frame.plot.minX, y: min(a, b), width: frame.plot.width, height: abs(b - a))
+        list.addRect(rect, color: theme.colors.accent.multipliedAlpha(0.14))
+        list.addRoundedRectStroke(rect, radius: 0, width: 1, color: theme.colors.accent)
+    }
+
     /// One rule per value-axis tick, so the grid reads the same numbers as the
     /// labels instead of dividing the domain into arbitrary fractions.
     func grid(list: DrawList) {
@@ -230,7 +242,7 @@ struct ChartPaint {
         let width = seriesStyle.lineWidth ?? style.lineWidth
         let length = geometry.orientation.breadth(geometry.plot)
         for run in runs(marks) {
-            let points = sampled(ChartGeometry.decimated(run, orientation: geometry.orientation, length: length),
+            let points = sampled(ChartGeometry.decimated(geometry.visibleRun(run), orientation: geometry.orientation, length: length),
                                  curved: seriesStyle.curve, geometry: geometry)
             stroke(points, color: color, width: width, dash: seriesStyle.dash, list: list)
         }
@@ -249,7 +261,7 @@ struct ChartPaint {
         let fill = color.multipliedAlpha(seriesStyle.fillOpacity)
         let length = geometry.orientation.breadth(geometry.plot)
         for run in runs(marks) {
-            let points = sampledArea(ChartGeometry.decimated(run, orientation: geometry.orientation, length: length),
+            let points = sampledArea(ChartGeometry.decimated(geometry.visibleRun(run), orientation: geometry.orientation, length: length),
                                      curved: seriesStyle.curve, geometry: geometry)
             for (a, b) in zip(points, points.dropFirst()) {
                 list.addTriangle(a.value.x, a.value.y, b.value.x, b.value.y, b.base.x, b.base.y, color: fill)

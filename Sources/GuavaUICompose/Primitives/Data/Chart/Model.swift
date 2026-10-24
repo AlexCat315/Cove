@@ -335,6 +335,10 @@ public struct ChartConfiguration {
     public struct Selection {
         /// Enables hover, tap/drag scrubbing, keyboard and assistive selection.
         public var point: Binding<ChartPoint?>?
+        /// Drag to brush an interval on the independent axis. Numeric charts
+        /// return x values; categorical charts return zero-based indices.
+        /// Supplying this binding makes a primary drag brush instead of scrub.
+        public var range: Binding<ClosedRange<Float>?>?
         /// Formats values in the callout and accessibility value.
         public var valueText: (Float) -> String = Selection.defaultText
 
@@ -451,6 +455,10 @@ public struct ChartConfiguration {
     public var dataLabels = DataLabels()
     public var pie = Pie()
     public var accessibility = Accessibility()
+    public var viewport = Viewport()
+    /// Data changes interpolate using this animation, or the surrounding
+    /// `withAnimation` transaction. Reduced motion always reaches the target immediately.
+    public var animation: Animation?
     /// Accessible name of the chart.
     public var label = "Chart"
 

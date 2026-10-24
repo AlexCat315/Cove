@@ -37,6 +37,8 @@ public enum Scancode {
     public static let backspace: UInt32 = 42
     public static let tab: UInt32 = 43
     public static let space: UInt32 = 44
+    public static let minus: UInt32 = 45
+    public static let equals: UInt32 = 46
     public static let home: UInt32 = 74
     public static let pageUp: UInt32 = 75
     public static let delete: UInt32 = 76

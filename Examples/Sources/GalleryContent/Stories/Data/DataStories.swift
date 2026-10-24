@@ -241,6 +241,7 @@ struct ChartStory: View {
                 }
                 .frame(height: 220).debugName("chart-horizontal-bars")
             }
+            ChartExplorationStory()
             StorySection("Data table", "A plot is a picture of a table, and a picture is the one thing a screen reader cannot describe. ChartDataTable is the table itself: one row per month, one column per series, carrying the table, row and cell roles that let a reader move by row and column and hear which series a number belongs to. The charts above already read value by value on their own; this is the same data in one pass.") {
                 ChartDataTable([.area(revenue, color: .accent, title: "Revenue"),
                                 .line(signups, color: .success, title: "Signups")],

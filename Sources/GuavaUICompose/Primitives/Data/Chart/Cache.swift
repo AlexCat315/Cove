@@ -21,6 +21,7 @@ final class ChartResolutionCache {
     }
 
     private var slots: [Slot] = []
+    var samples: ChartSamples?
     /// How many resolutions have been built. A repeat resolve leaves it alone,
     /// which is the whole point of the cache.
     private(set) var builds = 0
