@@ -127,8 +127,6 @@ This implies the following:
 Default behavior: If no modifier is specified, the implicit access level for an import remains `public`, meaning the imported module can be referenced throughout the entire module (target). 
 Restricting import scope: You can use `private import SomeModule`, which limits the use of symbols imported from `SomeModule` to that specific source file, preventing them from being referenced by other files within the same target. This achieves the "file-level import scoping" you mentioned.
 
-I will not allow Python to pollute my project!
-
 Avoid unnecessary supporting text, descriptive copy, and redundant UI microcopy.
 
 Please use the `guava cli` command to run the program; do not use the `swift` command.
