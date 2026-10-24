@@ -1,0 +1,25 @@
+name: Checkout sources
+description: Check out the repository, then fetch recursive submodules with retries for flaky networks.
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v7.0.1
+      with:
+        submodules: false
+    - name: Fetch submodules
+      shell: bash
+      env:
+        GIT_CONFIG_COUNT: '1'
+        GIT_CONFIG_KEY_0: http.version
+        GIT_CONFIG_VALUE_0: HTTP/1.1
+      run: |
+        for attempt in 1 2 3 4 5; do
+          if git submodule sync --recursive && git submodule update --init --recursive; then
+            exit 0
+          fi
+          delay=$((attempt * 15))
+          echo "::warning::Submodule fetch attempt $attempt failed; retrying in ${delay}s."
+          sleep "$delay"
+        done
+        echo "::error::Submodule fetch failed after 5 attempts."
+        exit 1

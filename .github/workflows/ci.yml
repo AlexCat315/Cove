@@ -22,9 +22,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          submodules: recursive
+      - uses: ./.github/actions/checkout-sources
       - uses: ./.github/actions/setup-toolchains
       - name: Prepare native dependencies
         id: native
