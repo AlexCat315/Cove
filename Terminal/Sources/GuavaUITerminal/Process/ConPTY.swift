@@ -56,6 +56,9 @@ final class ConPTY: PseudoTerminalBackend, @unchecked Sendable {
 
         var startup = STARTUPINFOEXW()
         startup.StartupInfo.cb = DWORD(MemoryLayout<STARTUPINFOEXW>.size)
+        // Otherwise Windows duplicates redirected parent stdio even with
+        // handle inheritance disabled, bypassing the pseudoconsole.
+        startup.StartupInfo.dwFlags = DWORD(STARTF_USESTDHANDLES)
         startup.lpAttributeList = attributes
         var information = PROCESS_INFORMATION()
         let launchLine = WindowsCommandLine.commandLineString([path] + command.arguments)
