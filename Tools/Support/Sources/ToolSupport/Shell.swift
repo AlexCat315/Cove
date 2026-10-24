@@ -11,6 +11,17 @@ private func isRunnable(_ path: String) -> Bool {
   FileManager.default.fileExists(atPath: path) && FileManager.default.isExecutableFile(atPath: path)
 }
 
+/// Windows preserves the casing a variable was created with, so PowerShell
+/// launches expose `Path` while the POSIX spelling is `PATH`.
+private func environmentValue(_ name: String, in environment: [String: String]) -> String? {
+  if let direct = environment[name] { return direct }
+  #if os(Windows)
+    return environment.first { $0.key.caseInsensitiveCompare(name) == .orderedSame }?.value
+  #else
+    return nil
+  #endif
+}
+
 /// Thin, explicit process launching. Arguments are always passed as a vector;
 /// no tool in this public interprets a shell string.
 public enum Shell {
@@ -25,12 +36,16 @@ public enum Shell {
     #if os(Windows)
       let separator: Character = ";"
       let extensions =
-        [""] + (environment["PATHEXT"] ?? ".EXE;.CMD;.BAT").split(separator: ";").map(String.init)
+        [""]
+        + (environmentValue("PATHEXT", in: environment) ?? ".EXE;.CMD;.BAT")
+        .split(separator: ";").map(String.init)
     #else
       let separator: Character = ":"
       let extensions = [""]
     #endif
-    for directory in (environment["PATH"] ?? "").split(separator: separator) {
+    for directory in (environmentValue("PATH", in: environment) ?? "")
+      .split(separator: separator)
+    {
       for suffix in extensions {
         let candidate = URL(fileURLWithPath: String(directory)).appendingPathComponent(
           name + suffix)
