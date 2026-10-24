@@ -10,22 +10,30 @@ import GuavaUIRuntime
 @Suite("Chart scale and axis frame")
 struct ChartAxisTests {
     private func scale(_ series: [ChartSeries], style: ChartStyle = ChartStyle(), tickCount: Int = 4,
-                       thresholds: [ChartThreshold] = []) -> ChartScale {
-        let stack = ChartStack(series: series, visible: Array(repeating: true, count: series.count), style: style)
-        return ChartScale.fit(stack: stack, thresholds: thresholds, style: style, tickCount: tickCount)
+                       thresholds: [ChartThreshold] = [],
+                       kind: ChartScaleKind = .linear) -> ChartScale {
+        var axis = ChartConfiguration.Axis()
+        axis.y.tickCount = tickCount
+        axis.y.kind = kind
+        let axes = ChartValueAxes.resolve(series: series,
+                                          visible: Array(repeating: true, count: series.count),
+                                          style: style, guides: ChartGuides(thresholds: thresholds),
+                                          axis: axis)
+        return axes.primaryScale
     }
 
     private func frame(_ series: [ChartSeries], axis: ChartConfiguration.Axis,
                        x: ChartXDomain = .categorical([]),
                        style: ChartStyle = ChartStyle(contentInset: 0),
                        size: CGSize = CGSize(width: 200, height: 100)) -> ChartFrame {
-        let stack = ChartStack(series: series, visible: Array(repeating: true, count: series.count), style: style)
-        let yScale = ChartScale.fit(stack: stack, thresholds: [], style: style, tickCount: axis.y.tickCount)
+        let axes = ChartValueAxes.resolve(series: series,
+                                          visible: Array(repeating: true, count: series.count),
+                                          style: style, guides: ChartGuides(), axis: axis)
         let xScale = x.isNumeric
-            ? ChartScale.fit(extent: stack.shown.flatMap { series[$0].data.map(\.x) },
+            ? ChartScale.fit(extent: axes.shown.flatMap { series[$0].data.map(\.x) },
                              lower: nil, upper: nil, tickCount: axis.x.tickCount)
             : nil
-        return ChartFrame.cartesian(stack: stack, xDomain: x, xScale: xScale, yScale: yScale,
+        return ChartFrame.cartesian(axes: axes, xDomain: x, xScale: xScale,
                                     style: style, axis: axis, size: size, origin: .zero,
                                     text: ChartText(theme: .defaultLight, environment: nil))
     }
@@ -150,5 +158,85 @@ struct ChartAxisTests {
         #expect(withTitles.plot.minY > without.plot.minY)
         #expect(withTitles.plot.height < without.plot.height)
         #expect(withTitles.yTitle == "Revenue" && withTitles.xTitle == "Month")
+    }
+
+    @Test("A right-hand axis reserves its own gutter and labels only when used")
+    func secondaryGutter() {
+        var axis = unlabeled
+        axis.y.isLabeled = true
+        axis.secondary.isLabeled = true
+        axis.secondary.title = "ms"
+        let dual = frame([.bar([2, 4]), .line([1000, 2000], axis: .right)], axis: axis)
+        let single = frame([.bar([2, 4])], axis: axis)
+        #expect(dual.plot.maxX < dual.bounds.maxX)
+        #expect(single.plot.maxX == single.bounds.maxX)
+        #expect(dual.plot.width < single.plot.width)
+        #expect(dual.secondaryTicks.count > 1 && dual.secondaryTicks.allSatisfy { !$0.label.isEmpty })
+        #expect(dual.secondaryTitle == "ms" && single.secondaryTitle.isEmpty)
+        #expect(single.secondaryTicks.isEmpty)
+        // The right labels grow away from the plot, inside the box.
+        #expect(dual.secondaryTicks.allSatisfy { $0.position >= dual.plot.minY && $0.position <= dual.plot.maxY })
+    }
+
+    @Test("A log axis snaps to decades and keeps the tick count countable")
+    func logTicks() {
+        let scale = scale([.line([1, 500])], kind: .log)
+        #expect(scale.domain == 1...1000)
+        #expect(scale.kind == .log)
+        #expect(scale.ticks.contains(1) && scale.ticks.contains(10) && scale.ticks.contains(100))
+        #expect(scale.ticks.allSatisfy { $0 >= 1 && $0 <= 1000 })
+        #expect(scale.ticks.count <= 9)
+    }
+
+    @Test("A log axis spaces values by their power of ten")
+    func logSpacing() {
+        let scale = scale([.line([1, 100])], kind: .log)
+        let plot = UIRect(x: 0, y: 0, width: 100, height: 100)
+        #expect(abs(scale.y(1, in: plot) - 100) < 0.01)
+        #expect(abs(scale.y(10, in: plot) - 50) < 0.01)
+        #expect(abs(scale.y(100, in: plot) - 0) < 0.01)
+        // Zero has no place on a log axis; it clamps to the bottom.
+        #expect(scale.y(0, in: plot) == 100)
+    }
+
+    @Test("A log axis fits only positive values")
+    func logIgnoresNonPositive() {
+        let scale = scale([.line([-5, 0, 20, 2000])], kind: .log)
+        #expect(scale.domain == 10...10_000)
+        #expect(scale.ticks.allSatisfy { $0 > 0 })
+    }
+
+    @Test("A log axis labels sub-unit ticks with enough decimals")
+    func logLabels() {
+        var axis = unlabeled
+        axis.y.isLabeled = true
+        axis.y.kind = .log
+        let frame = frame([.line([0.01, 100])], axis: axis)
+        #expect(frame.yTicks.contains { $0.label == "0.01" })
+        #expect(frame.yTicks.contains { $0.label == "100" })
+        #expect(frame.yTicks.allSatisfy { !$0.label.isEmpty })
+    }
+
+    @Test("A percent stack stays linear even when the axis asks for log")
+    func percentStaysLinear() {
+        var axis = ChartConfiguration.Axis()
+        axis.y.kind = .log
+        let axes = ChartValueAxes.resolve(series: [.bar([1]), .bar([3])], visible: [true, true],
+                                          style: ChartStyle(stacking: .percent),
+                                          guides: ChartGuides(), axis: axis)
+        #expect(axes.primaryScale.kind == .linear)
+        #expect(axes.primaryScale.domain == 0...100)
+    }
+
+    @Test("A percent axis labels its ticks as shares, and a custom format wins")
+    func percentLabels() {
+        var axis = unlabeled
+        axis.y.isLabeled = true
+        let series: [ChartSeries] = [.bar([1]), .bar([3])]
+        let percent = frame(series, axis: axis, style: ChartStyle(contentInset: 0, stacking: .percent))
+        #expect(percent.yTicks.map(\.label) == ["0%", "25%", "50%", "75%", "100%"])
+        axis.y.format = { "\(Int($0))" }
+        let formatted = frame(series, axis: axis, style: ChartStyle(contentInset: 0, stacking: .percent))
+        #expect(formatted.yTicks.map(\.label) == ["0", "25", "50", "75", "100"])
     }
 }

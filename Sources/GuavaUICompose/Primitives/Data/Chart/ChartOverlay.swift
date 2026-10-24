@@ -99,6 +99,9 @@ struct ChartOverlayLayout: Layout {
     let plot: ChartPlot
     let theme: Theme
     let environment: TextEnvironment?
+    /// Shared with the draw pass, so placing labels reuses the geometry it
+    /// already built instead of resolving the chart a third time.
+    let cache: ChartResolutionCache?
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: [LayoutSubview]) -> CGSize {
         CGSize(width: proposal.width ?? 0, height: proposal.height ?? 0)
@@ -106,7 +109,7 @@ struct ChartOverlayLayout: Layout {
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: [LayoutSubview]) {
         let text = ChartText(theme: theme, environment: environment)
-        let slots = plot.overlaySlots(in: bounds.size, text: text)
+        let slots = plot.overlaySlots(in: bounds.size, text: text, cache: cache)
         for (index, subview) in subviews.enumerated() {
             guard slots.indices.contains(index), let placement = slots[index].placement else {
                 // Retained but not painted, hit-tested or announced.

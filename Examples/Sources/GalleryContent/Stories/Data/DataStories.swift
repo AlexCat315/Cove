@@ -93,11 +93,21 @@ struct ChartStory: View {
     private let retail: [Float] = [9, 7, 11, 8, 12, 10]
     private let latency: [Float] = [120, 180, 240, 310, 360, 420, 470, 520, 610, 700]
     private let errors: [Float] = [1.2, 1.6, 2.1, 2.0, 2.9, 3.4, 3.1, 4.2, 4.8, 5.6]
+    private let gains: [Float] = [18, -6, 22, -9, 14, -11]
+    private let visits: [Float] = [40, 95, 60, 180, 420, 1300, 900, 2600, 5400, 3100, 9000, 7200]
+    private let samples: [Float] = [42, 55, 61, 63, 68, 70, 72, 74, 75, 77, 78, 79, 80,
+                                    81, 82, 84, 85, 86, 88, 90, 92, 95, 98, 104, 112, 118]
+    private static let signal: [Float] = (0..<2_000).map { index in
+        let t = Float(index) / 2_000
+        return sinf(t * 60) * 12 + sinf(t * 7) * 6 + 20
+    }
+    private let losses: [Float] = [-7, -12, -5, -8, -9, -6]
     private static let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
                                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
     @State private var point: ChartPoint?
     @State private var hidden: Set<String> = []
     @State private var stacked = false
+    @State private var percent = false
     @State private var slice: ChartPoint?
 
     var body: some View {
@@ -134,6 +144,61 @@ struct ChartStory: View {
                 }
                 .frame(height: 180).debugName("chart-bars")
             }
+            StorySection("Below the baseline", "Values under zero stack downward instead of cancelling the surplus above them, so one column carries both a gain and a loss. Percent mode scales every column to 100, and the axis reads as shares.") {
+                Row(alignment: .center, spacing: 8) {
+                    Checkbox("Percent", isOn: $percent).debugName("chart-percent")
+                }
+                Chart([.bar(gains, color: .success, title: "Gain"), .bar(losses, color: .error, title: "Loss")],
+                      x: .categorical(Array(Self.months.prefix(gains.count))),
+                      style: ChartStyle(stacking: percent ? .percent : .stacked)) {
+                    $0.label = "Monthly gain and loss"
+                    $0.selection.point = $point4
+                    $0.legend.placement = .bottom
+                    $0.axis.y.title = percent ? "Share" : "Amount"
+                }
+                .frame(height: 180).debugName("chart-stacking")
+            }
+            StorySection("Dual axis", "A series can read the right-hand axis, which fits only its own data: a count and a rate share one plot without flattening each other. Grid lines follow the left axis.") {
+                Chart([.bar(online, color: .accent, title: "Sessions"),
+                       .line(errors, color: .error, title: "Error rate", axis: .right)],
+                      x: .categorical(Array(Self.months.prefix(online.count)))) {
+                    $0.label = "Sessions and error rate"
+                    $0.selection.point = $point5
+                    $0.legend.placement = .bottom
+                    $0.axis.y.title = "Sessions"
+                    $0.axis.secondary.title = "Error %"
+                    $0.axis.secondary.format = { String(format: "%.1f", $0) }
+                }
+                .frame(height: 180).debugName("chart-dual-axis")
+            }
+            StorySection("Log axis", "When values span orders of magnitude, a log axis spaces them by power of ten. Ticks land on 1, 2 and 5 × 10ⁿ, so a small early value still reads next to a large late one.") {
+                Chart([.line(visits, color: .accentSecondary, title: "Visits")],
+                      x: .categorical(Self.months)) {
+                    $0.label = "Visits on a log axis"
+                    $0.selection.point = $point6
+                    $0.legend.placement = .bottom
+                    $0.axis.y.kind = .log
+                    $0.axis.y.title = "Visits"
+                }
+                .frame(height: 180).debugName("chart-log-axis")
+            }
+            StorySection("Histogram", "Binning is a data step, so the chart only draws bars: ChartHistogram counts the samples and labels each bin's edges. Bars touch with no bar spacing.") {
+                Chart([histogram.series], x: .categorical(histogram.labels),
+                      style: ChartStyle(showsGrid: false, barSpacing: 0)) {
+                    $0.label = "Latency distribution"
+                    $0.axis.y.title = "Requests"
+                    $0.axis.x.title = "Latency (ms)"
+                }
+                .frame(height: 160).debugName("chart-histogram")
+            }
+            StorySection("Large series", "Two thousand samples across a narrow plot. The line keeps its envelope — every pixel column keeps its highest and lowest sample — while the stroke only covers what the pixels can resolve. Hover to see the geometry being reused rather than rebuilt.") {
+                Chart([.line(Self.signal, color: .accentSecondary, title: "Signal")], x: .numeric) {
+                    $0.label = "A two-thousand-sample signal"
+                    $0.selection.point = $point7
+                    $0.axis.y.title = "Level"
+                }
+                .frame(height: 150).debugName("chart-large-series")
+            }
             StorySection("Scatter", "A numeric x domain puts every series on one value axis and ticks it on round values. Selection picks the nearest point.") {
                 Chart([.points(x: latency, y: errors, color: .error, title: "Error rate")], x: .numeric) {
                     $0.label = "Error rate by latency"
@@ -163,11 +228,27 @@ struct ChartStory: View {
                 }
                 .frame(width: 160, height: 40)
             }
+            StorySection("Data table", "A plot is a picture of a table, and a picture is the one thing a screen reader cannot describe. ChartDataTable is the table itself: one row per month, one column per series, carrying the table, row and cell roles that let a reader move by row and column and hear which series a number belongs to. The charts above already read value by value on their own; this is the same data in one pass.") {
+                ChartDataTable([.area(revenue, color: .accent, title: "Revenue"),
+                                .line(signups, color: .success, title: "Signups")],
+                               x: .categorical(Self.months),
+                               label: "Monthly revenue and signups",
+                               axisLabel: "Month")
+                    .debugName("chart-data-table")
+            }
         }
     }
 
     @State private var point2: ChartPoint?
     @State private var point3: ChartPoint?
+    @State private var point4: ChartPoint?
+    @State private var point5: ChartPoint?
+    @State private var point6: ChartPoint?
+    @State private var point7: ChartPoint?
+
+    private var histogram: ChartHistogram.Result {
+        ChartHistogram(binCount: 8, range: 40...120).build(samples, color: .accentSecondary, title: "Requests")
+    }
 }
 
 /// Browses the whole bundled icon set: every glyph, its name, and the size it

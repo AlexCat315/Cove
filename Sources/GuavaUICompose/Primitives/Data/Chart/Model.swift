@@ -42,6 +42,26 @@ public enum ChartXDomain: Sendable, Equatable {
     }
 }
 
+/// Which value axis a series reads.
+///
+/// The left axis fits itself to the series on it and the right axis to its own,
+/// so a count and a rate share one plot without either flattening the other.
+/// Stacking, thresholds and bands are per axis too.
+public enum ChartValueAxis: Sendable, Equatable {
+    case left
+    case right
+}
+
+/// How an axis spaces its values.
+public enum ChartScaleKind: Sendable, Equatable {
+    /// Even spacing per unit of value.
+    case linear
+    /// Even spacing per power of ten, for data that spans orders of magnitude.
+    /// Ticks land on 1, 2 and 5 × 10ⁿ. Values at or below zero have no place on
+    /// the axis and clamp to the bottom edge.
+    case log
+}
+
 /// Per-series drawing overrides. `ChartStyle` holds the chart-wide defaults.
 public struct ChartSeriesStyle: Sendable, Equatable {
     /// Stroke width; nil follows `ChartStyle.lineWidth`.
@@ -79,16 +99,21 @@ public struct ChartSeries: Sendable {
     public var mark: ChartMark
     /// Legend and selection name. An empty title keeps the series out of the legend.
     public var title: String
+    /// The value axis this series reads. A chart with any `.right` series grows
+    /// a right-hand axis fitted to those series alone.
+    public var axis: ChartValueAxis
     public var style: ChartSeriesStyle
 
     /// A series on evenly spaced slots; each datum's x is its index.
     public init(_ values: [Float], color: SemanticColorRef = .accent,
                 mark: ChartMark = .line, title: String = "",
+                axis: ChartValueAxis = .left,
                 style: ChartSeriesStyle = ChartSeriesStyle()) {
         self.data = values.enumerated().map { ChartDatum(x: Float($0.offset), y: $0.element) }
         self.color = color
         self.mark = mark
         self.title = title
+        self.axis = axis
         self.style = style
     }
 
@@ -96,41 +121,48 @@ public struct ChartSeries: Sendable {
     /// area series is drawn in data order, so sort by x first.
     public init(points: [ChartDatum], color: SemanticColorRef = .accent,
                 mark: ChartMark = .line, title: String = "",
+                axis: ChartValueAxis = .left,
                 style: ChartSeriesStyle = ChartSeriesStyle()) {
         self.data = points
         self.color = color
         self.mark = mark
         self.title = title
+        self.axis = axis
         self.style = style
     }
 
     public static func line(_ values: [Float], color: SemanticColorRef = .accent, title: String = "",
+                            axis: ChartValueAxis = .left,
                             style: ChartSeriesStyle = ChartSeriesStyle()) -> ChartSeries {
-        ChartSeries(values, color: color, mark: .line, title: title, style: style)
+        ChartSeries(values, color: color, mark: .line, title: title, axis: axis, style: style)
     }
 
     public static func area(_ values: [Float], color: SemanticColorRef = .accent, title: String = "",
+                            axis: ChartValueAxis = .left,
                             style: ChartSeriesStyle = ChartSeriesStyle()) -> ChartSeries {
-        ChartSeries(values, color: color, mark: .area, title: title, style: style)
+        ChartSeries(values, color: color, mark: .area, title: title, axis: axis, style: style)
     }
 
     public static func bar(_ values: [Float], color: SemanticColorRef = .accent, title: String = "",
+                           axis: ChartValueAxis = .left,
                            style: ChartSeriesStyle = ChartSeriesStyle()) -> ChartSeries {
-        ChartSeries(values, color: color, mark: .bar, title: title, style: style)
+        ChartSeries(values, color: color, mark: .bar, title: title, axis: axis, style: style)
     }
 
     /// A scatter series; `x` and `y` are paired by index and truncated to the shorter one.
     public static func points(x: [Float], y: [Float], color: SemanticColorRef = .accent,
-                              title: String = "", style: ChartSeriesStyle = ChartSeriesStyle()) -> ChartSeries {
+                              title: String = "", axis: ChartValueAxis = .left,
+                              style: ChartSeriesStyle = ChartSeriesStyle()) -> ChartSeries {
         let count = min(x.count, y.count)
         let points = (0..<count).map { ChartDatum(x: x[$0], y: y[$0]) }
-        return ChartSeries(points: points, color: color, mark: .point, title: title, style: style)
+        return ChartSeries(points: points, color: color, mark: .point, title: title, axis: axis, style: style)
     }
 
     /// A scatter series over prepared points.
     public static func points(_ points: [ChartDatum], color: SemanticColorRef = .accent,
-                              title: String = "", style: ChartSeriesStyle = ChartSeriesStyle()) -> ChartSeries {
-        ChartSeries(points: points, color: color, mark: .point, title: title, style: style)
+                              title: String = "", axis: ChartValueAxis = .left,
+                              style: ChartSeriesStyle = ChartSeriesStyle()) -> ChartSeries {
+        ChartSeries(points: points, color: color, mark: .point, title: title, axis: axis, style: style)
     }
 }
 
@@ -153,11 +185,16 @@ public struct ChartThreshold: Sendable {
     public var color: SemanticColorRef
     /// Drawn at the right end of the rule. Empty draws no text.
     public var label: String
+    /// The value axis the rule belongs to; a rule on the right axis measures
+    /// against that axis, not the left one.
+    public var axis: ChartValueAxis
 
-    public init(value: Float, color: SemanticColorRef = .warning, label: String = "") {
+    public init(value: Float, color: SemanticColorRef = .warning, label: String = "",
+                axis: ChartValueAxis = .left) {
         self.value = value
         self.color = color
         self.label = label
+        self.axis = axis
     }
 }
 
@@ -168,12 +205,16 @@ public struct ChartBand: Sendable {
     public var color: SemanticColorRef
     /// Drawn at the top-left corner of the band. Empty draws no text.
     public var label: String
+    /// The value axis the band belongs to.
+    public var axis: ChartValueAxis
 
-    public init(from: Float, to: Float, color: SemanticColorRef = .accent, label: String = "") {
+    public init(from: Float, to: Float, color: SemanticColorRef = .accent, label: String = "",
+                axis: ChartValueAxis = .left) {
         self.from = min(from, to)
         self.to = max(from, to)
         self.color = color
         self.label = label
+        self.axis = axis
     }
 }
 
@@ -208,7 +249,13 @@ public struct ChartMarker: Sendable {
 /// Whether bar and area series accumulate per index.
 public enum ChartStacking: Sendable, Equatable {
     case none
+    /// Series accumulate on each other: positives rise from zero, negatives
+    /// fall from it, so a bar can cross the baseline.
     case stacked
+    /// Like `stacked`, but each index is scaled so its taller side reaches 100.
+    /// The axis then reads 0…100 (or −100…100 with negatives), and every
+    /// series takes part — a line in a percent chart is its own share.
+    case percent
 }
 
 public struct ChartStyle: Sendable {
@@ -270,7 +317,13 @@ public struct ChartConfiguration {
         /// Enables hover, tap/drag scrubbing, keyboard and assistive selection.
         public var point: Binding<ChartPoint?>?
         /// Formats values in the callout and accessibility value.
-        public var valueText: (Float) -> String = { value in
+        public var valueText: (Float) -> String = Selection.defaultText
+
+        /// Whole numbers without decimals, the rest to two places.
+        ///
+        /// The chart, its data labels and `ChartDataTable` all start here, so
+        /// one value never reads two ways in the same chart.
+        public static func defaultText(_ value: Float) -> String {
             value.rounded() == value && abs(value) < 1e9 ? String(Int(value)) : String(format: "%.2f", value)
         }
     }
@@ -330,6 +383,8 @@ public struct ChartConfiguration {
             /// Draws the labels under the plot. Labels also reserve the bottom
             /// gutter, so a sparkline turns this off.
             public var isLabeled: Bool = true
+            /// Linear or logarithmic spacing. Only a numeric domain reads it.
+            public var kind: ChartScaleKind = .linear
             /// Formats numeric tick labels. Without it the scale picks the
             /// precision that renders the tick step exactly.
             public var format: ((Float) -> String)?
@@ -342,6 +397,8 @@ public struct ChartConfiguration {
             public var tickCount: Int = 4
             /// Draws the tick labels in the left gutter.
             public var isLabeled: Bool = true
+            /// Linear or logarithmic spacing.
+            public var kind: ChartScaleKind = .linear
             /// Formats tick labels. Without it the scale picks the precision
             /// that renders the tick step exactly.
             public var format: ((Float) -> String)?
@@ -349,6 +406,22 @@ public struct ChartConfiguration {
 
         public var x = X()
         public var y = Y()
+        /// The right-hand value axis. It is only drawn — and only reserves a
+        /// gutter — when some series reads it.
+        public var secondary = Y()
+
+        public init() {}
+    }
+
+    /// What a reader who cannot see the plot is given instead.
+    public struct Accessibility {
+        /// Gives every x position its own stop: a screen reader steps through
+        /// the values and hears each visible series at each one. Off leaves the
+        /// chart a single sentence describing the range.
+        ///
+        /// This needs no selection binding — a read-only chart still reads
+        /// value by value, it just cannot be clicked.
+        public var exposesValues = true
 
         public init() {}
     }
@@ -358,6 +431,7 @@ public struct ChartConfiguration {
     public var axis = Axis()
     public var dataLabels = DataLabels()
     public var pie = Pie()
+    public var accessibility = Accessibility()
     /// Accessible name of the chart.
     public var label = "Chart"
 

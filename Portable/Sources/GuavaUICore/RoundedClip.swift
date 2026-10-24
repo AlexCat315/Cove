@@ -1,3 +1,6 @@
+#if os(Android)
+private import Android
+#endif
 import Foundation
 
 /// A clip for a container's content: the GPU scissor rectangle plus an
@@ -59,7 +62,9 @@ public struct UIRoundedRect: Equatable, Sendable {
             let start = -Float.pi / 2 + Float(corner) * .pi / 2
             for step in 0...segments {
                 let angle = start + Float(step) / Float(segments) * .pi / 2
-                points.append((center.0 + cos(angle) * r, center.1 + sin(angle) * r))
+                let x: Float = center.0 + cos(angle) * r
+                let y: Float = center.1 + sin(angle) * r
+                points.append((x: x, y: y))
             }
         }
         return points

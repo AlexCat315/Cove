@@ -50,8 +50,21 @@ struct ChartPaint {
             list.addText(layout, origin: (x, plot.maxY + 4), color: color,
                          textureID: environment.atlasTextureID, atlas: environment.atlas)
         }
+        // The right-hand axis labels grow away from the plot, into its gutter.
+        for tick in frame.secondaryTicks where !tick.label.isEmpty {
+            guard let layout = text.layout(tick.label) else { continue }
+            let x = min(plot.maxX + ChartFrame.labelGap, bounds.maxX - layout.totalWidth)
+            let y = min(max(bounds.minY, tick.position - layout.totalHeight / 2),
+                        bounds.maxY - layout.totalHeight)
+            list.addText(layout, origin: (x, y), color: color,
+                         textureID: environment.atlasTextureID, atlas: environment.atlas)
+        }
         if !frame.yTitle.isEmpty, let layout = text.layout(frame.yTitle) {
             list.addText(layout, origin: (bounds.minX, bounds.minY), color: color,
+                         textureID: environment.atlasTextureID, atlas: environment.atlas)
+        }
+        if !frame.secondaryTitle.isEmpty, let layout = text.layout(frame.secondaryTitle) {
+            list.addText(layout, origin: (bounds.maxX - layout.totalWidth, bounds.minY), color: color,
                          textureID: environment.atlasTextureID, atlas: environment.atlas)
         }
         if !frame.xTitle.isEmpty, let layout = text.layout(frame.xTitle) {
@@ -63,7 +76,7 @@ struct ChartPaint {
 
     func thresholds(_ thresholds: [ChartThreshold], geometry: ChartGeometry, list: DrawList) {
         for threshold in thresholds where threshold.value.isFinite {
-            let y = geometry.y(threshold.value)
+            let y = geometry.y(threshold.value, axis: threshold.axis)
             list.addLine(fromX: geometry.plot.minX, fromY: y, toX: geometry.plot.maxX, toY: y,
                          thickness: 1, color: threshold.color.resolve(theme).multipliedAlpha(0.8))
         }
@@ -74,7 +87,7 @@ struct ChartPaint {
     func bands(_ bands: [ChartBand], geometry: ChartGeometry, list: DrawList) {
         let plot = geometry.plot
         for band in bands where band.from.isFinite && band.to.isFinite {
-            let top = geometry.y(band.to), bottom = geometry.y(band.from)
+            let top = geometry.y(band.to, axis: band.axis), bottom = geometry.y(band.from, axis: band.axis)
             let rect = UIRect(x: plot.minX, y: top, width: plot.width, height: max(0, bottom - top))
             guard rect.height > 0.5 else { continue }
             list.addRect(rect, color: band.color.resolve(theme).multipliedAlpha(0.12))
@@ -103,7 +116,10 @@ struct ChartPaint {
             line(geometry.marks[index], color: item.color.resolve(theme), seriesStyle: item.style, list: list)
         }
         for (index, item) in series.enumerated() where item.mark == .point {
+            // Two points in one pixel are one dot; drawing both only costs fill.
+            var drawn = Set<UInt64>()
             for mark in geometry.marks[index] where mark.y.isFinite {
+                guard drawn.insert(Self.pixel(mark.x, mark.y)).inserted else { continue }
                 dot(x: mark.x, y: mark.y, radius: item.style.pointRadius,
                     color: item.color.resolve(theme).multipliedAlpha(0.85), list: list)
             }
@@ -149,14 +165,9 @@ struct ChartPaint {
                       list: DrawList) {
         let width = seriesStyle.lineWidth ?? style.lineWidth
         for run in runs(marks) {
-            let points = sampled(run, curved: seriesStyle.curve)
+            let points = sampled(ChartGeometry.decimated(run, width: frame.plot.width),
+                                 curved: seriesStyle.curve)
             stroke(points, color: color, width: width, dash: seriesStyle.dash, list: list)
-            // Round joins hide the notches butt-capped segments leave at bends.
-            if width > 1, !seriesStyle.curve, seriesStyle.dash.count < 2 {
-                for point in points.dropFirst().dropLast() {
-                    dot(x: point.x, y: point.y, radius: width / 2, color: color, list: list)
-                }
-            }
         }
     }
 
@@ -164,7 +175,8 @@ struct ChartPaint {
                       list: DrawList) {
         let fill = color.multipliedAlpha(seriesStyle.fillOpacity)
         for run in runs(marks) {
-            let points = sampledArea(run, curved: seriesStyle.curve)
+            let points = sampledArea(ChartGeometry.decimated(run, width: frame.plot.width),
+                                     curved: seriesStyle.curve)
             for (a, b) in zip(points, points.dropFirst()) {
                 list.addTriangle(a.x, a.y, b.x, b.y, b.x, b.base, color: fill)
                 list.addTriangle(a.x, a.y, b.x, b.base, a.x, a.base, color: fill)
@@ -190,6 +202,10 @@ struct ChartPaint {
     }
 
     /// Emits a polyline, split into on/off runs when a dash pattern is set.
+    ///
+    /// `addLine` rounds both ends of every segment, so consecutive segments
+    /// already meet in a round join — no extra join geometry is needed, and on a
+    /// decimated run that would be thousands of redundant discs.
     private func stroke(_ points: [(x: Float, y: Float)], color: Color, width: Float,
                         dash: [Float], list: DrawList) {
         guard points.count > 1 else {
@@ -326,6 +342,17 @@ struct ChartPaint {
 
     private func dot(x: Float, y: Float, radius: Float, color: Color, list: DrawList) {
         list.addRoundedRect(UIRect(x: x - radius, y: y - radius, width: radius * 2, height: radius * 2), radius: radius, color: color)
+    }
+
+    /// The pixel a plot point lands in, packed so two dots that would cover the
+    /// same pixel compare equal.
+    private static func pixel(_ x: Float, _ y: Float) -> UInt64 {
+        func packed(_ value: Float) -> UInt64 {
+            guard value.isFinite else { return 0 }
+            let clamped = max(-1_000_000, min(value, 1_000_000)).rounded()
+            return UInt64(UInt32(bitPattern: Int32(clamped)))
+        }
+        return packed(x) << 32 | packed(y)
     }
 
     private func ring(_ geometry: PieGeometry, wedge: PieGeometry.Wedge, outer: Float, gap: Float, color: Color, list: DrawList) {

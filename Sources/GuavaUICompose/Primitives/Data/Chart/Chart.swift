@@ -19,6 +19,13 @@ import GuavaUIRuntime
 ///     $0.axis.x.title = "Latency (ms)"
 /// }
 ///
+/// Chart([.bar(orders, title: "Orders"),
+///        .line(errorRate, color: .error, title: "Error rate", axis: .right)],
+///       x: .categorical(months),
+///       style: ChartStyle(stacking: .percent)) {
+///     $0.axis.secondary.title = "Error %"
+/// }
+///
 /// Chart(slices: [ChartSlice("Desktop", value: 58), ChartSlice("Mobile", value: 31)]) {
 ///     $0.legend.placement = .bottom
 ///     $0.pie.center = .init("89", label: "Total")
@@ -31,6 +38,24 @@ import GuavaUIRuntime
 /// labels reserve their own gutters: the plot shrinks to whatever the labels
 /// leave.
 ///
+/// Each side of the value axis fits its own series. `ChartSeries.axis` moves a
+/// series to the right-hand axis, which only exists — and only reserves a
+/// gutter — when something reads it. `ChartStyle.stacking` accumulates series
+/// on each other, with positives rising from zero and negatives falling from
+/// it; `.percent` scales every index to 100 so columns compare by share.
+///
+/// `axis.y.kind` (and `axis.x.kind`) picks linear or logarithmic spacing. A log
+/// axis snaps to decades and ticks 1, 2 and 5 × 10ⁿ; values at or below zero
+/// have no place on it and clamp to the bottom edge.
+///
+/// `ChartHistogram` counts samples into bins and hands back the bars plus their
+/// edge labels, so a distribution needs no hand-rolled counting.
+///
+/// A series with more samples than the plot has pixels is drawn at the plot's
+/// resolution: each column keeps its highest and lowest sample, so the envelope
+/// survives while the stroke stays cheap. The resolved geometry is also cached
+/// per size, so a pointer move repaints without rebuilding the stacks.
+///
 /// Reference geometry annotates the data without replacing it: a threshold is a
 /// labelled rule, a band a shaded corridor, an annotation a note pinned to one
 /// value, and `ChartSeriesStyle.showsValues` writes each value beside its mark.
@@ -41,6 +66,11 @@ import GuavaUIRuntime
 /// step, Escape clears. The callout lists every visible series at the selected
 /// x. Legend items toggle series visibility. A non-finite value is a gap: the
 /// line and its fill break there.
+///
+/// A screen reader steps through the values with or without a binding: each x
+/// is one stop, announced as its category, every visible series at it, and its
+/// position in the series. `accessibility.exposesValues` turns that off, and
+/// `ChartDataTable` offers the same data as a table for reading it all at once.
 public struct Chart: View {
     private let content: ChartContent
     private let style: ChartStyle
@@ -90,7 +120,8 @@ public struct Chart: View {
                       format: configuration.dataLabels.format ?? configuration.selection.valueText,
                       selection: selection,
                       summary: summary(visible: visible, selection: selection),
-                      callout: selection.flatMap { callout(for: $0, visible: visible) },
+                      callout: { self.callout(for: $0, visible: visible) },
+                      accessibility: configuration.accessibility,
                       input: ChartPlotInput(isEnabled: point != nil) { next in
                           if point?.wrappedValue != next { point?.wrappedValue = next }
                       })

@@ -138,7 +138,7 @@ struct ChartInteractionTests {
             // Desktop is 3/4: everything but the upper-left quarter.
             press(frame.midX + 40, frame.midY + 40, input); settle(graph, harness)
             #expect(harness.point == ChartPoint(series: 0, index: 0))
-            #expect(try plot(graph).accessibility?.value == "Desktop: 3 · 75%")
+            #expect(try plot(graph).accessibility?.value == "Desktop: 3, 75%. Slice 1 of 2")
             press(frame.midX, frame.midY, input); settle(graph, harness)
             #expect(harness.point == nil)
         }

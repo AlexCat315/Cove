@@ -53,7 +53,7 @@ struct ChartTests {
             let plot = ChartPlot(content: content, visible: Array(repeating: true, count: content.count), style: style,
                                  axis: axis ?? Self.unlabeled, pie: pie,
                                  format: { String(Int($0.rounded())) }, selection: selection,
-                                 summary: ("Chart", ""), callout: nil,
+                                 summary: ("Chart", ""),
                                  input: ChartPlotInput(isEnabled: false, select: { _ in }))
             let node = plot._makeNode()
             node.frame = CGRect(origin: .zero, size: size)
@@ -70,14 +70,15 @@ struct ChartTests {
                           x: ChartXDomain = .categorical([]),
                           plot: UIRect) -> ChartGeometry {
         let visible = visible ?? Array(repeating: true, count: series.count)
-        let stack = ChartStack(series: series, visible: visible, style: style)
-        let yScale = ChartScale.fit(stack: stack, thresholds: thresholds, style: style, tickCount: 4)
+        let axes = ChartValueAxes.resolve(series: series, visible: visible, style: style,
+                                          guides: ChartGuides(thresholds: thresholds),
+                                          axis: ChartConfiguration.Axis())
         let xScale = x.isNumeric
-            ? ChartScale.fit(extent: stack.shown.flatMap { series[$0].data.map(\.x) },
+            ? ChartScale.fit(extent: axes.shown.flatMap { series[$0].data.map(\.x) },
                              lower: nil, upper: nil, tickCount: 5)
             : nil
-        return ChartGeometry(series: series, stack: stack, xDomain: x, xScale: xScale,
-                             yScale: yScale, barSpacing: style.barSpacing, plot: plot)
+        return ChartGeometry(series: series, axes: axes, xDomain: x, xScale: xScale,
+                             barSpacing: style.barSpacing, plot: plot)
     }
 
     private func flat(_ style: ChartStyle = ChartStyle(showsGrid: false, contentInset: 0)) -> ChartStyle { style }
@@ -90,7 +91,7 @@ struct ChartTests {
             let plot = ChartPlot(content: content, visible: Array(repeating: true, count: content.count), style: style,
                                  axis: Self.unlabeled, pie: pie,
                                  format: { String(Int($0.rounded())) }, selection: nil,
-                                 summary: ("Chart", ""), callout: nil,
+                                 summary: ("Chart", ""),
                                  input: ChartPlotInput(isEnabled: false, select: { _ in }))
             let node = plot._makeNode()
             node.frame = CGRect(origin: .zero, size: size)
@@ -107,7 +108,7 @@ struct ChartTests {
             let plot = ChartPlot(content: cartesian(series: [.line([1, 2, 3])], thresholds: [], markers: []), visible: [true],
                                  style: ChartStyle(), axis: Self.unlabeled, pie: .init(),
                                  format: { String(Int($0.rounded())) }, selection: nil,
-                                 summary: ("Sales", "1 to 3"), callout: nil,
+                                 summary: ("Sales", "1 to 3"),
                                  input: ChartPlotInput(isEnabled: false, select: { _ in }))
             let node = plot._makeNode(), layout = plot._makeLayoutNode()!
             plot._updateLayout(layout); plot._updateNode(node)
@@ -144,6 +145,83 @@ struct ChartTests {
         // Hidden series take no space and leave the domain.
         let hidden = geometry(series, visible: [true, false], style: ChartStyle(minValue: 0, barSpacing: 0), plot: plot)
         #expect(hidden.marks[1].isEmpty && hidden.marks[0][0].bar!.width > a.width)
+    }
+
+    @Test("A negative value stacks under the baseline instead of cancelling the surplus")
+    func negativeStacking() {
+        let series: [ChartSeries] = [.bar([3, 3], title: "Gain"), .bar([-2, 1], color: .success, title: "Loss")]
+        let plot = UIRect(x: 0, y: 0, width: 100, height: 100)
+        let stacked = geometry(series, style: ChartStyle(barSpacing: 0, stacking: .stacked), plot: plot)
+        let zero = stacked.y(0)
+        // The loss hangs from zero rather than being subtracted from the gain.
+        #expect(abs(stacked.marks[1][0].baseY - zero) < 0.01)
+        #expect(stacked.marks[1][0].y > zero)
+        // A gain still stacks on the gain.
+        #expect(abs(stacked.marks[1][1].baseY - stacked.marks[0][1].y) < 0.01)
+        #expect(stacked.domain.lowerBound <= -2 && stacked.domain.upperBound >= 4)
+        // Each direction rounds only its own outermost segment.
+        #expect(stacked.marks[0][0].isOuterEnd && stacked.marks[1][0].isOuterEnd)
+        #expect(!stacked.marks[0][1].isOuterEnd && stacked.marks[1][1].isOuterEnd)
+    }
+
+    @Test("Percent stacking fills each index to 100 and reads as shares")
+    func percentStacking() {
+        let series: [ChartSeries] = [.bar([1, 3]), .bar([3, 1], color: .success)]
+        let style = ChartStyle(barSpacing: 0, stacking: .percent)
+        let plot = UIRect(x: 0, y: 0, width: 100, height: 100)
+        let axes = ChartValueAxes.resolve(series: series, visible: [true, true], style: style,
+                                          guides: ChartGuides(), axis: ChartConfiguration.Axis())
+        #expect(axes.primaryScale.domain == 0...100)
+        let stacked = geometry(series, style: style, plot: plot)
+        // Both indexes reach the top of the plot, whichever series is larger.
+        #expect(abs(stacked.marks[1][0].y - plot.minY) < 0.01)
+        #expect(abs(stacked.marks[1][1].y - plot.minY) < 0.01)
+        // The first segment covers its share: 1 of 4 is a quarter of the height.
+        #expect(abs(stacked.marks[0][0].y - (plot.maxY - plot.height * 0.25)) < 0.5)
+        #expect(abs(stacked.marks[0][1].y - (plot.maxY - plot.height * 0.75)) < 0.5)
+    }
+
+    @Test("Percent stacking keeps a negative side and spans -100 to 100")
+    func percentWithNegatives() {
+        let series: [ChartSeries] = [.bar([2]), .bar([-3], color: .error)]
+        let style = ChartStyle(barSpacing: 0, stacking: .percent)
+        let axes = ChartValueAxes.resolve(series: series, visible: [true, true], style: style,
+                                          guides: ChartGuides(), axis: ChartConfiguration.Axis())
+        #expect(axes.primaryScale.domain == -100...100)
+        let plot = UIRect(x: 0, y: 0, width: 40, height: 100)
+        let stacked = geometry(series, style: style, plot: plot)
+        let zero = stacked.y(0)
+        #expect(abs(zero - plot.maxY / 2) < 0.5)
+        // The loss is the taller side, so it takes the full drop to -100 and the
+        // gain keeps its 2/3 share of the half above zero.
+        #expect(abs(stacked.marks[1][0].y - plot.maxY) < 0.5)
+        #expect(abs(stacked.marks[0][0].y - (zero - (zero - plot.minY) * 2 / 3)) < 0.5)
+    }
+
+    @Test("A right-axis series fits its own scale and never stretches the left one")
+    func dualAxis() {
+        let series: [ChartSeries] = [.bar([2, 4], title: "Orders"),
+                                     .line([1000, 2000], color: .warning, title: "Latency", axis: .right)]
+        let style = ChartStyle(barSpacing: 0)
+        let axes = ChartValueAxes.resolve(series: series, visible: [true, true], style: style,
+                                          guides: ChartGuides(), axis: ChartConfiguration.Axis())
+        #expect(axes.usesSecondary)
+        #expect(axes.primaryScale.domain.upperBound == 4)
+        #expect(axes.secondaryScale?.domain.upperBound == 2000)
+        let plot = UIRect(x: 0, y: 0, width: 100, height: 100)
+        let geometry = geometry(series, style: style, plot: plot)
+        #expect(abs(geometry.marks[1][1].y - plot.minY) < 0.01)
+        // A rule on the right axis widens only that side.
+        let withRule = ChartValueAxes.resolve(
+            series: series, visible: [true, true], style: style,
+            guides: ChartGuides(thresholds: [ChartThreshold(value: 4000, axis: .right)]),
+            axis: ChartConfiguration.Axis())
+        #expect(withRule.primaryScale.domain.upperBound == 4)
+        #expect((withRule.secondaryScale?.domain.upperBound ?? 0) >= 4000)
+        // Without a right-axis series there is no second axis at all.
+        let single = ChartValueAxes.resolve(series: [.bar([2, 4])], visible: [true], style: style,
+                                            guides: ChartGuides(), axis: ChartConfiguration.Axis())
+        #expect(!single.usesSecondary && single.secondaryScale == nil)
     }
 
     @Test("Lines and bars in one chart share slot centers; markers follow the same x")
@@ -359,5 +437,27 @@ struct ChartTests {
         let center = try #require(items.first { $0.item.kind == .center })
         #expect(center.item.title == "4" && center.item.subtitle == "Total")
         #expect(center.placement?.anchor == CGPoint(x: 60, y: 60))
+    }
+
+    @Test("A histogram bins samples into even widths and labels the edges")
+    func histogramBins() {
+        let histogram = ChartHistogram(binCount: 4).build([0, 1, 1, 2, 3, 3, 3, 4])
+        #expect(histogram.counts == [1, 2, 1, 4])
+        #expect(histogram.labels == ["0–1", "1–2", "2–3", "3–4"])
+        #expect(histogram.series.mark == .bar)
+        #expect(histogram.series.data.map(\.y) == [1, 2, 1, 4])
+    }
+
+    @Test("A histogram drops samples outside an explicit range and skips non-finite ones")
+    func histogramRange() {
+        let histogram = ChartHistogram(binCount: 2, range: 0...10).build([-5, 0, 4, 6, 10, 99, .nan])
+        #expect(histogram.counts == [2, 2])
+    }
+
+    @Test("A histogram of identical samples still divides a width")
+    func histogramConstant() {
+        let histogram = ChartHistogram(binCount: 3).build([5, 5, 5])
+        #expect(histogram.counts.reduce(0, +) == 3)
+        #expect(histogram.labels.count == 3)
     }
 }

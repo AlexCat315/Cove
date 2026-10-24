@@ -11,7 +11,7 @@ let package = Package(name: "GuavaAndroid",
     platforms: [.macOS(.v26), .iOS(.v26)], products: [
     .executable(name: "GuavaAndroidProbe", targets: ["GuavaAndroidProbe"]),
     .library(name: "GuavaAndroidApp", type: .dynamic, targets: ["GuavaAndroidApp"])
-], dependencies: [.package(path: "../.."), .package(path: "Contract")]
+], dependencies: [.package(name: "GuavaUI", path: "../.."), .package(path: "Contract")]
     + contentPackages + (showcase ? [.package(path: "../../Examples")] : []),
  targets: [
     .target(name: "CAndroidHost", dependencies: [.product(name: "CGuavaLog", package: "GuavaUI")], publicHeadersPath: "include", linkerSettings: [.linkedLibrary("android"), .linkedLibrary("log")]),

@@ -44,3 +44,20 @@ import Testing
         #expect(throws: (any Error).self) { try Arguments(args) }
     }
 }
+
+@Test func androidHostManifestWorksFromAVersionNamedSDKDirectory() throws {
+    var source = URL(fileURLWithPath: #filePath)
+    for _ in 0..<5 { source.deleteLastPathComponent() }
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? Files.remove(directory) }
+    let sdk = directory.appendingPathComponent("0.1.2")
+    let host = sdk.appendingPathComponent("Hosts/Android")
+    try Files.text(String(contentsOf: source.appendingPathComponent("Hosts/Android/Package.swift"), encoding: .utf8),
+                   to: host.appendingPathComponent("Package.swift"))
+    var environment = ProcessInfo.processInfo.environment
+    environment.removeValue(forKey: "GUAVA_ANDROID_UI_PACKAGE")
+    let output = try Shell.run([GuavaSDK.swift, "package", "--package-path", host.path, "dump-package"],
+                               environment: environment, capture: true, quiet: true)
+    let manifest = try #require(try JSONSerialization.jsonObject(with: Data(output.utf8)) as? [String: Any])
+    #expect(manifest["name"] as? String == "GuavaAndroid")
+}
