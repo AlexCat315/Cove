@@ -29,6 +29,12 @@ final class NativeDisplayRefreshTests: XCTestCase {
         }
 
         let first = receiveTicks(count: 3)
+        // GitHub's macOS runners have no stable on-console display session, so
+        // CVDisplayLink may never tick even though the window exists. Keep the
+        // assertion meaningful on developer machines and skip headless CI.
+        if first.isEmpty, ProcessInfo.processInfo.environment["CI"] != nil {
+            throw XCTSkip("macOS display link requires an on-console GUI session")
+        }
         XCTAssertEqual(first.count, 3, "SDL's native wait must service display link callbacks")
         for tick in first {
             XCTAssertGreaterThan(tick.targetTimestamp, tick.timestamp)
