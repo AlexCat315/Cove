@@ -67,7 +67,7 @@ final class NativeMultisampleTests: XCTestCase {
     }
 
     private func draw(_ api: GraphicsAPI, target: String) throws {
-        let device = try Device.make(DeviceConfig(preferredBackends: [api]))
+        let device = try makeTestDevice(api)
         let shaders = try PackedColorShaders(device: device, target: target)
         // SIMD2 aligns the struct to eight bytes; color has offset 8, stride 16.
         XCTAssertEqual(MemoryLayout<PackedColorVertex>.offset(of: \.color), 8)
@@ -114,7 +114,7 @@ final class NativeMultisampleTests: XCTestCase {
     }
 
     private func hdrAndDepth(_ api: GraphicsAPI) throws {
-        let device = try Device.make(DeviceConfig(preferredBackends: [api]))
+        let device = try makeTestDevice(api)
         let source = try device.makeTexture(TextureDescriptor(width: 8, height: 6, format: .rgba16Float,
             usage: .colorTarget, sampleCount: 4))
         let depth = try device.makeTexture(TextureDescriptor(width: 8, height: 6, format: .depth32Float,
@@ -151,7 +151,7 @@ final class NativeMultisampleTests: XCTestCase {
     }
 
     private func clearAndReject(_ api: GraphicsAPI, target: String) throws {
-        let device = try Device.make(DeviceConfig(preferredBackends: [api]))
+        let device = try makeTestDevice(api)
         let shaders = try PackedColorShaders(device: device, target: target)
         let source = try device.makeTexture(TextureDescriptor(width: 24, height: 20, format: .rgba8Unorm,
             usage: [.colorTarget, .transferSource, .transferDestination], sampleCount: 4))

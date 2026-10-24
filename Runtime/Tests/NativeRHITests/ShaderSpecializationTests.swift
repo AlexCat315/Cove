@@ -27,7 +27,7 @@ final class ShaderSpecializationTests: XCTestCase {
     private func run(_ api: GraphicsAPI) throws {
         let artifact = try ShaderFixtures.compile("specialization",entry: "specializedCompute",stage: .compute,
             target: api == .metal ? "metal" : "spirv",groups: [37,1,1],groupConstants: [0,-1,-1])
-        let device = try Device.make(DeviceConfig(preferredBackends: [api],enableValidation: false))
+        let device = try makeTestDevice(api, enableValidation: false)
         for (size,enabled) in [(1,true),(37,true),(64,false),(255,true),(256,true)] {
             var constants: [ShaderSpecializationConstant] = [.init(id: 1,value: .int32(-3)),
                 .init(id: 2,value: .float32(0.5)),.init(id: 3,value: .bool(enabled))]

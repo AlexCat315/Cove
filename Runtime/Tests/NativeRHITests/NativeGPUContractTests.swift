@@ -5,11 +5,7 @@ import XCTest
 /// The same shader/resource contract is exercised on the available native APIs.
 final class NativeGPUContractTests: XCTestCase {
     private func makeDevice(_ api: GraphicsAPI) throws -> Device {
-        guard NativeRHI.isCompiledIn(api) else { throw XCTSkip("Backend is not compiled") }
-        #if (os(Windows) || os(Linux)) && canImport(CVulkanHeaders)
-        if api == .vulkan && !VulkanBackend.isAvailable { throw XCTSkip("No Vulkan ICD") }
-        #endif
-        return try Device.make(DeviceConfig(preferredBackends: [api], enableValidation: false))
+        return try makeTestDevice(api, enableValidation: false)
     }
     private func mipSampling(_ api: GraphicsAPI, target: String) throws {
         let device = try makeDevice(api)

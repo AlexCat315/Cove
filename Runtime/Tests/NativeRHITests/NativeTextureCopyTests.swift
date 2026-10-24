@@ -23,7 +23,7 @@ final class NativeTextureCopyTests: XCTestCase {
     func testDX12ChainedTextureCopiesPreservePixelsAndUnusedRegion() throws { try copy(.dx12) }
     #endif
     private func copy(_ api: GraphicsAPI) throws {
-        let device = try Device.make(DeviceConfig(preferredBackends: [api],enableValidation: false))
+        let device = try makeTestDevice(api, enableValidation: false)
         let usage: TextureUsage = [.transferSource,.transferDestination,.sampled]
         let source = try device.makeTexture(TextureDescriptor(width: 4,height: 4,format: .rgba16Float,usage: usage))
         let middle = try device.makeTexture(TextureDescriptor(width: 6,height: 6,format: .rgba16Float,usage: usage))

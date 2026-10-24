@@ -14,7 +14,7 @@ final class NativeRecordedTextureUploadTests: XCTestCase {
     #endif
 
     private func regionsAndRecovery(_ api: GraphicsAPI) throws {
-        let device = try Device.make(DeviceConfig(preferredBackends: [api]))
+        let device = try makeTestDevice(api)
         for format in [TextureFormat.r8Unorm, .rgba8Unorm, .bgra8UnormSRGB, .rgba16Float] {
             let texture = try TextureResource(device: device, descriptor: TextureDescriptor(width: 12, height: 8,
                 format: format, usage: [.sampled, .transferDestination, .transferSource], dimension: .texture2DArray,

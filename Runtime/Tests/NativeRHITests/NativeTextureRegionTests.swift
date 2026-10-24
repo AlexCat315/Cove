@@ -35,7 +35,7 @@ final class NativeTextureRegionTests: XCTestCase {
     #endif
 
     private func patches(_ api: GraphicsAPI) throws {
-        let device = try Device.make(DeviceConfig(preferredBackends: [api]))
+        let device = try makeTestDevice(api)
         for format in [TextureFormat.r8Unorm, .rgba8Unorm, .bgra8UnormSRGB, .rgba16Float] {
             let texture = try device.makeTexture(TextureDescriptor(width: 10, height: 8, format: format,
                 usage: [.sampled, .transferDestination, .transferSource], dimension: .texture2DArray, layers: 2, mipLevels: 3))
