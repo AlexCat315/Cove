@@ -1,6 +1,6 @@
 import Foundation
 #if os(Android)
-import Android
+private import Android
 #endif
 
 extension AnimationCurve {

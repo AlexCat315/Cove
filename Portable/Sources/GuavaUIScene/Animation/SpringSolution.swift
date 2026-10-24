@@ -1,3 +1,6 @@
+#if os(Android)
+private import Android
+#endif
 import Foundation
 
 /// The closed-form solution of a damped spring released from a given position

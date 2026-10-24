@@ -5,7 +5,8 @@ import Foundation
 extension VulkanBackend {
     func registerBindingLayout(_ handle: BindingLayout, descriptor: BindingLayoutDescriptor) throws {
         let bindings = descriptor.entries.map {
-            VkDescriptorSetLayoutBinding(binding: $0.slot, descriptorType: VulkanLayoutFormats.descriptorType($0.type),
+            VkDescriptorSetLayoutBinding(binding: $0.slot, descriptorType: VulkanLayoutFormats.descriptorType($0.type,
+                dynamic: $0.buffer.hasDynamicOffset),
                 descriptorCount: $0.arraySize, stageFlags: VulkanLayoutFormats.stageFlags($0.visibility), pImmutableSamplers: nil)
         }
         let native: VkDescriptorSetLayout? = bindings.withUnsafeBufferPointer { pointer in

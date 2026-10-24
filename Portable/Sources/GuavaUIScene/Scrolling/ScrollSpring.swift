@@ -1,5 +1,5 @@
 #if os(Android)
-import Android
+private import Android
 #endif
 import Foundation
 

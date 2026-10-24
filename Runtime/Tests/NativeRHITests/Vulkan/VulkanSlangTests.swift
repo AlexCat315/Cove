@@ -34,26 +34,36 @@ final class VulkanSlangTests: XCTestCase {
     }
 
     func testRasterPipelineBindsUniformsAndPreservesLoadAction() throws {
+        try rasterUniforms(dynamic: false)
+    }
+
+    func testRasterPipelineReadsUniformsAtDynamicOffset() throws {
+        try rasterUniforms(dynamic: true)
+    }
+
+    private func rasterUniforms(dynamic: Bool) throws {
         let device = try device()
         let vertex = try ShaderFixtures.compile("raster", entry: "vertexMain", stage: .vertex, target: "spirv")
         let fragment = try ShaderFixtures.compile("raster", entry: "fragmentMain", stage: .fragment, target: "spirv")
         var bindingDescriptor = try fragment.bindingLayoutDescriptor()
         bindingDescriptor.entries[0].visibility = .graphics
+        bindingDescriptor.entries[0].buffer.hasDynamicOffset = dynamic
         let binding = try device.makeBindingLayout(bindingDescriptor)
         let layout = try device.makePipelineLayout(PipelineLayoutDescriptor(setLayouts: [binding]))
         let pipeline = try device.makeGraphicsPipeline(GraphicsPipelineDescriptor(layout: layout,
             vertex: device.makeShaderModule(vertex.moduleDescriptor()), fragment: device.makeShaderModule(fragment.moduleDescriptor()),
             colorAttachments: [ColorAttachmentDescriptor(format: .rgba8Unorm)], depthFormat: nil, depthStencil: nil))
-        let buffer = try device.makeBuffer(BufferDescriptor(size: 256, usage: [.uniform]))
+        let buffer = try device.makeBuffer(BufferDescriptor(size: 512, usage: [.uniform]))
+        let offset = dynamic ? 256 : 0
         var color = SIMD4<Float>(0, 1, 0, 1)
-        try withUnsafeBytes(of: &color) { try device.uploadBufferData(buffer, data: Data($0)) }
+        try withUnsafeBytes(of: &color) { try device.uploadBufferData(buffer, offset: offset, data: Data($0)) }
         let set = try device.makeBindingSet(layout: binding, descriptor: BindingSetDescriptor(entries: [
-            BindingSetEntry(slot: 0, resource: .uniformBuffer(buffer: buffer))]))
+            BindingSetEntry(slot: 0, resource: .uniformBuffer(buffer: buffer, size: 16))]))
         let target = try device.makeTexture(TextureDescriptor(width: 8, height: 8, format: .rgba8Unorm, usage: [.colorTarget, .transferSource]))
         let commands = CommandBuffer()
         commands.renderPass(descriptor: RenderPassDescriptor(colorTargets: [
             RenderColorTarget(texture: target, loadAction: .clear(SIMD4(1, 0, 0, 1)))])) {
-            $0.setPipeline(pipeline); $0.setBindingSet(set); $0.draw(vertexCount: 3)
+            $0.setPipeline(pipeline); $0.setBindingSet(set, dynamicOffsets: dynamic ? [256] : []); $0.draw(vertexCount: 3)
         }
         commands.renderPass(descriptor: RenderPassDescriptor(colorTargets: [RenderColorTarget(texture: target, loadAction: .load)])) { _ in }
         try device.beginFrame()
