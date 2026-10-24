@@ -1,11 +1,8 @@
-name: Checkout sources
-description: Check out the repository, then fetch recursive submodules with retries for flaky networks.
+name: Fetch submodules
+description: Initialize recursive submodules with retries for flaky networks. Run after actions/checkout.
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v7.0.1
-      with:
-        submodules: false
     - name: Fetch submodules
       shell: bash
       env:

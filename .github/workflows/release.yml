@@ -21,7 +21,8 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: ./.github/actions/checkout-sources
+      - uses: actions/checkout@v7.0.1
+      - uses: ./.github/actions/fetch-submodules
       - uses: ./.github/actions/setup-toolchains
       - name: Verify tag and SDK metadata
         run: node Tools/Release/check-version.mjs "$GITHUB_REF_NAME"
