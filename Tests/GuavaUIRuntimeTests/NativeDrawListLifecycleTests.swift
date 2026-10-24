@@ -14,6 +14,19 @@ struct NativeDrawListLifecycleTests {
         return list
     }
 
+    @Test("reconfiguring retains warmed pipeline states")
+    func reconfigureRetainsPipelines() throws {
+        let context = try NativeUIDrawTestContext()
+        let before = context.device.pipelineStatistics.graphics.cold.count
+        try context.native.configure(format: .rgba8Unorm, sampleCount: 4)
+        let afterNewState = context.device.pipelineStatistics.graphics.cold.count
+        #expect(afterNewState > before)
+        try context.native.configure(format: .bgra8Unorm, sampleCount: 1)
+        #expect(context.device.pipelineStatistics.graphics.cold.count == afterNewState)
+        try context.native.configure(format: .rgba8Unorm, sampleCount: 4)
+        #expect(context.device.pipelineStatistics.graphics.cold.count == afterNewState)
+    }
+
     @Test("empty geometry still clears and resolves the attachment")
     func emptyFrame() throws {
         let context = try NativeUIDrawTestContext()

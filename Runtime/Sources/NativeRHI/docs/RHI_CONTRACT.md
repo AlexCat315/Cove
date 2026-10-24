@@ -81,6 +81,12 @@ MSAA texture 当前要求一个 2D layer、一个 mip，并具备 color/depth at
 
 Metal 通过 graphics command buffer 排队 present，保证它在先前绘制之后；drawable texture ID 按 frame slot 复用，注册和 planner 历史保持有界。Vulkan 的每个窗口分别持有按 frame slot 组织的 acquire semaphore 和按 image 组织的 ready semaphore；第一次 graphics submission 消费所有待用 acquisition，直接 present 也会消费尚未使用的 acquisition。最终 layout transition 的 pool 保留到 fence 完成，该 completion 纳入 frame ring。OUT_OF_DATE／SUBOPTIMAL 延后到下次 acquire 重建，并改变 generation 以清除旧 planner 记录。DX12 每个 swapchain 保留自己的 back buffers、extent 和 vsync；最终 transition 的 fence completion 也纳入 frame ring。提交排队后的呈现错误保存到原生 execution status，completion 仍只发生一次。
 
+## Pipeline 创建与缓存
+
+`makeGraphicsPipeline`、`makeComputePipeline` 与 `makeMeshPipeline` 按完整不可变状态 intern：graphics 包含 shader module、pipeline layout、attachment 格式与 blend、sample count、primitive、rasterization、depth/stencil 和 vertex layout；mesh 包含 shader module、pipeline layout、attachment、rasterization 与 depth/stencil；compute 包含 pipeline layout 与 shader。label 只用于诊断，不参与 key。相同描述符返回同一句柄并增加引用计数，`destroy` 只在最后一个引用释放后退休后端对象；调用方每次成功创建都必须恰好调用一次 `destroy`。
+
+`Device.pipelineStatistics` 暴露每种 pipeline 的冷创建次数、累计/最大耗时、热命中次数、当前存活数量和 `beginFrame`／`endFrame` 之间的创建次数。`resetPipelineStatistics()` 只清计数，不销毁已 intern 的 pipeline。管线创建应发生在加载／预热阶段；帧内创建会记录计数并写 warning，避免把编译重新放回逐帧路径。
+
 ## Shader 工具链
 
 `ShaderArtifact` 包含 stage、格式、entry point、code、编译器标识，以及 local workgroup size、目标绑定、push constant ranges。RHI 不加载 Slang runtime 或 reflection 类型。

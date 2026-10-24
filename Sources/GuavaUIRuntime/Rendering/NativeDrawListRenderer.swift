@@ -71,6 +71,16 @@ public final class NativeDrawListRenderer {
     private var geometry: NativeUIGeometry?
     private var pipeline: NativeUIPipeline?
     private var backdropPass: NativeUIBackdropPass?
+    /// Pipelines are retained per attachment state. Switching windows or
+    /// reconfiguring must not destroy and recompile a state that was already
+    /// warmed; the device also interns identical descriptors across renderers.
+    private struct PipelineStateKey: Hashable {
+        let format: TextureFormat
+        let samples: Int
+    }
+    private var pipelines: [PipelineStateKey: NativeUIPipeline] = [:]
+    private var backdropPasses: [PipelineStateKey: NativeUIBackdropPass] = [:]
+    private var configuredState: PipelineStateKey?
     /// The reveal run whose frame is already retained, so a long reveal
     /// composites one frame instead of re-retaining a half-revealed one.
     private struct FrameExtent: Equatable {
@@ -98,11 +108,25 @@ public final class NativeDrawListRenderer {
     }
 
     public func configure(format: TextureFormat, sampleCount: Int = 1) throws {
-        if pipeline?.format == format && pipeline?.samples == sampleCount { return }
-        pipeline = try NativeUIPipeline(shaders: shaders, format: format, samples: sampleCount)
-        backdropPass = try backdropShaders.map {
-            try NativeUIBackdropPass(device: device, shaders: $0, format: format, samples: sampleCount)
+        let key = PipelineStateKey(format: format, samples: sampleCount)
+        guard configuredState != key else { return }
+        let selectedPipeline: NativeUIPipeline
+        if let existing = pipelines[key] {
+            selectedPipeline = existing
+        } else {
+            selectedPipeline = try NativeUIPipeline(shaders: shaders, format: format, samples: sampleCount)
+            pipelines[key] = selectedPipeline
         }
+        var selectedBackdrop = backdropPasses[key]
+        if selectedBackdrop == nil, let backdropShaders {
+            let pass = try NativeUIBackdropPass(device: device, shaders: backdropShaders,
+                                                format: format, samples: sampleCount)
+            backdropPasses[key] = pass
+            selectedBackdrop = pass
+        }
+        pipeline = selectedPipeline
+        backdropPass = selectedBackdrop
+        configuredState = key
         retainedReveal = nil
         lastFrameExtent = nil
     }

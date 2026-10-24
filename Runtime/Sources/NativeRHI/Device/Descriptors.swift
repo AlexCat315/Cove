@@ -321,7 +321,7 @@ public struct ResolvedBindingEntry: Sendable {
     }
 }
 
-public struct DepthStencilState: Sendable, Equatable {
+public struct DepthStencilState: Hashable, Sendable {
     public var depthCompare: CompareOp
     public var depthWriteEnabled: Bool
 
@@ -331,7 +331,7 @@ public struct DepthStencilState: Sendable, Equatable {
     }
 }
 
-public struct RasterizationState: Sendable, Equatable {
+public struct RasterizationState: Hashable, Sendable {
     public var fillMode: FillMode
     public var cullMode: CullMode
     public var frontWinding: FrontWinding
@@ -348,13 +348,13 @@ public struct RasterizationState: Sendable, Equatable {
 }
 
 /// HLSL input semantic for DXIL. Slang's default user varying mapping uses TEXCOORD.
-public struct VertexSemantic: Sendable {
+public struct VertexSemantic: Hashable, Sendable {
     public var name = "TEXCOORD"
     public var index: UInt32
     public init(index: UInt32) { self.index = index }
 }
 
-public struct VertexAttribute: Sendable {
+public struct VertexAttribute: Hashable, Sendable {
     public var semantic: VertexSemantic
     public var location: UInt32
     public var format: VertexFormat
@@ -370,7 +370,7 @@ public struct VertexAttribute: Sendable {
     }
 }
 
-public struct VertexBufferLayout: Sendable {
+public struct VertexBufferLayout: Hashable, Sendable {
     public var stride: Int
     public var stepRate: VertexInputRate
 
@@ -380,7 +380,7 @@ public struct VertexBufferLayout: Sendable {
     }
 }
 
-public struct VertexLayoutDescriptor: Sendable {
+public struct VertexLayoutDescriptor: Hashable, Sendable {
     public var attributes: [VertexAttribute]
     public var bufferLayouts: [VertexBufferLayout]
 
@@ -392,7 +392,7 @@ public struct VertexLayoutDescriptor: Sendable {
 
 /// One color attachment slot of a graphics pipeline. Multiple entries give
 /// MRT rendering (the Zig original supported a single color target).
-public struct ColorAttachmentDescriptor: Sendable {
+public struct ColorAttachmentDescriptor: Hashable, Sendable {
     public var format: TextureFormat
     public var blend: AttachmentBlendState
 

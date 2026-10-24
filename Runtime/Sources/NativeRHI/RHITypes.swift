@@ -31,7 +31,7 @@ public enum ShaderStage: String, Codable, Hashable, Sendable {
     case mesh
 }
 
-public enum PrimitiveType: Sendable {
+public enum PrimitiveType: Hashable, Sendable {
     case triangleList
     case triangleStrip
     case lineList
@@ -39,23 +39,23 @@ public enum PrimitiveType: Sendable {
     case pointList
 }
 
-public enum FillMode: Sendable {
+public enum FillMode: Hashable, Sendable {
     case fill
     case lines
 }
 
-public enum CullMode: Sendable {
+public enum CullMode: Hashable, Sendable {
     case none
     case front
     case back
 }
 
-public enum FrontWinding: Sendable {
+public enum FrontWinding: Hashable, Sendable {
     case clockwise
     case counterClockwise
 }
 
-public enum CompareOp: Sendable {
+public enum CompareOp: Hashable, Sendable {
     case never
     case less
     case equal
@@ -66,7 +66,7 @@ public enum CompareOp: Sendable {
     case always
 }
 
-public enum BlendFactor: Sendable {
+public enum BlendFactor: Hashable, Sendable {
     case zero
     case one
     case sourceColor
@@ -82,7 +82,7 @@ public enum BlendFactor: Sendable {
     case sourceAlphaSaturate
 }
 
-public enum BlendOperation: Sendable {
+public enum BlendOperation: Hashable, Sendable {
     case add
     case subtract
     case reverseSubtract
@@ -90,7 +90,7 @@ public enum BlendOperation: Sendable {
     case max
 }
 
-public struct AttachmentBlendState: Sendable, Equatable {
+public struct AttachmentBlendState: Hashable, Sendable {
     public var enabled: Bool
     public var sourceColorBlendFactor: BlendFactor
     public var destinationColorBlendFactor: BlendFactor
@@ -137,12 +137,12 @@ public enum SamplerAddressMode: Sendable {
     case clampToEdge
 }
 
-public enum VertexInputRate: Sendable {
+public enum VertexInputRate: Hashable, Sendable {
     case perVertex
     case perInstance
 }
 
-public enum VertexFormat: Sendable {
+public enum VertexFormat: Hashable, Sendable {
     case float
     case float2
     case float3
@@ -162,7 +162,7 @@ public enum TextureDimension: Sendable {
     case texture2DArray
 }
 
-public enum TextureFormat: Sendable {
+public enum TextureFormat: Hashable, Sendable {
     case invalid
     case r8Unorm
     case rgba8Unorm

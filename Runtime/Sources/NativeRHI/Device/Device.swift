@@ -40,6 +40,7 @@ public final class Device {
     private let planner = SubmissionPlanner()
     private let caches = DeviceCaches()
     private let interfaces = PipelineInterfaces()
+    private let pipelineStore = PipelineStore()
     private var accelerationBuildInputs: [UInt32: [ResourceRef]] = [:]
     private let identifiers = IdentifierPool()
     private let lock = NSLock()
@@ -228,8 +229,17 @@ public final class Device {
                     throw RHIError.unsupportedFeature("mesh shading is not implemented by this backend")
                 }
             }
+            let clock = ContinuousClock()
+            let started = clock.now
             let handle = ShaderModule(id: identifiers.next())
             try backend.createShaderModule(handle, descriptor: descriptor)
+            let duration = started.duration(to: clock.now)
+            let duringFrame = currentSlot != nil
+            pipelineStore.recordShaderModule(duration, duringFrame: duringFrame)
+            logPipelineCreation(kind: "shader module", label: nil, duration: duration)
+            if duringFrame {
+                warnPipelineCreationDuringFrame(kind: "shader module", label: nil)
+            }
             return handle
         }
     }
@@ -314,10 +324,24 @@ public final class Device {
             try rhiRequire(interfaces.pipelines[descriptor.layout.id] != nil, "unknown pipeline layout")
             guard descriptor.stencilFormat == nil else { throw RHIError.unsupportedFeature("stencil pipeline state is not implemented") }
             try rhiValidateSampleCount(descriptor.sampleCount)
-            let handle = GraphicsPipeline(id: identifiers.next())
-            try backend.createGraphicsPipeline(handle, descriptor: descriptor)
-            interfaces.uses[handle.id] = PipelineUse(layout: descriptor.layout, kind: .graphics)
-            return handle
+            let clock = ContinuousClock()
+            let started = clock.now
+            let lease = try pipelineStore.graphics.acquire(GraphicsPipelineKey(descriptor)) {
+                let handle = GraphicsPipeline(id: identifiers.next())
+                try backend.createGraphicsPipeline(handle, descriptor: descriptor)
+                return handle
+            }
+            let duringFrame = currentSlot != nil
+            let duration = started.duration(to: clock.now)
+            pipelineStore.recordGraphics(duration, created: lease.created, duringFrame: duringFrame)
+            if lease.created {
+                interfaces.uses[lease.handle.id] = PipelineUse(layout: descriptor.layout, kind: .graphics)
+                logPipelineCreation(kind: "graphics", label: descriptor.label, duration: duration)
+                if duringFrame {
+                    warnPipelineCreationDuringFrame(kind: "graphics", label: descriptor.label)
+                }
+            }
+            return lease.handle
         }
     }
 
@@ -327,15 +351,33 @@ public final class Device {
                 throw RHIError.unsupportedFeature("mesh pipelines are not implemented by this backend")
             }
             try rhiRequire(interfaces.pipelines[descriptor.layout.id] != nil, "unknown pipeline layout")
-            let handle = MeshPipeline(id: identifiers.next())
-            try backend.createMeshPipeline(handle, descriptor: descriptor)
-            interfaces.uses[handle.id] = PipelineUse(layout: descriptor.layout, kind: .mesh)
-            return handle
+            let clock = ContinuousClock()
+            let started = clock.now
+            let lease = try pipelineStore.mesh.acquire(MeshPipelineKey(descriptor)) {
+                let handle = MeshPipeline(id: identifiers.next())
+                try backend.createMeshPipeline(handle, descriptor: descriptor)
+                return handle
+            }
+            let duringFrame = currentSlot != nil
+            let duration = started.duration(to: clock.now)
+            pipelineStore.recordMesh(duration, created: lease.created, duringFrame: duringFrame)
+            if lease.created {
+                interfaces.uses[lease.handle.id] = PipelineUse(layout: descriptor.layout, kind: .mesh)
+                logPipelineCreation(kind: "mesh", label: descriptor.label, duration: duration)
+                if duringFrame {
+                    warnPipelineCreationDuringFrame(kind: "mesh", label: descriptor.label)
+                }
+            }
+            return lease.handle
         }
     }
 
     public func destroy(_ pipeline: MeshPipeline) {
-        locked { interfaces.uses[pipeline.id] = nil; frameRing.retireCurrent { [backend] in backend.destroyMeshPipeline(pipeline) } }
+        locked {
+            guard pipelineStore.mesh.release(pipeline) else { return }
+            interfaces.uses[pipeline.id] = nil
+            frameRing.retireCurrent { [backend] in backend.destroyMeshPipeline(pipeline) }
+        }
     }
 
     public func makeComputePipeline(_ descriptor: ComputePipelineDescriptor) throws -> ComputePipeline {
@@ -344,19 +386,41 @@ public final class Device {
                 throw RHIError.unsupportedFeature("compute pipelines are not implemented by this backend")
             }
             try rhiRequire(interfaces.pipelines[descriptor.layout.id] != nil, "unknown pipeline layout")
-            let handle = ComputePipeline(id: identifiers.next())
-            try backend.createComputePipeline(handle, descriptor: descriptor)
-            interfaces.uses[handle.id] = PipelineUse(layout: descriptor.layout, kind: .compute)
-            return handle
+            let clock = ContinuousClock()
+            let started = clock.now
+            let lease = try pipelineStore.compute.acquire(ComputePipelineKey(descriptor)) {
+                let handle = ComputePipeline(id: identifiers.next())
+                try backend.createComputePipeline(handle, descriptor: descriptor)
+                return handle
+            }
+            let duringFrame = currentSlot != nil
+            let duration = started.duration(to: clock.now)
+            pipelineStore.recordCompute(duration, created: lease.created, duringFrame: duringFrame)
+            if lease.created {
+                interfaces.uses[lease.handle.id] = PipelineUse(layout: descriptor.layout, kind: .compute)
+                logPipelineCreation(kind: "compute", label: descriptor.label, duration: duration)
+                if duringFrame {
+                    warnPipelineCreationDuringFrame(kind: "compute", label: descriptor.label)
+                }
+            }
+            return lease.handle
         }
     }
 
     public func destroy(_ pipeline: GraphicsPipeline) {
-        locked { interfaces.uses[pipeline.id] = nil; frameRing.retireCurrent { [backend] in backend.destroyGraphicsPipeline(pipeline) } }
+        locked {
+            guard pipelineStore.graphics.release(pipeline) else { return }
+            interfaces.uses[pipeline.id] = nil
+            frameRing.retireCurrent { [backend] in backend.destroyGraphicsPipeline(pipeline) }
+        }
     }
 
     public func destroy(_ pipeline: ComputePipeline) {
-        locked { interfaces.uses[pipeline.id] = nil; frameRing.retireCurrent { [backend] in backend.destroyComputePipeline(pipeline) } }
+        locked {
+            guard pipelineStore.compute.release(pipeline) else { return }
+            interfaces.uses[pipeline.id] = nil
+            frameRing.retireCurrent { [backend] in backend.destroyComputePipeline(pipeline) }
+        }
     }
 
     // MARK: Binding layouts / sets / pipeline layouts
@@ -733,6 +797,17 @@ public final class Device {
         locked { caches.bindingSets.stats }
     }
 
+    /// Cold/warm pipeline creation counters, per kind. Reading this is
+    /// lock-protected and does not touch the GPU.
+    public var pipelineStatistics: PipelineStatistics {
+        locked { pipelineStore.snapshot }
+    }
+
+    /// Clears the counters but keeps interned pipelines alive.
+    public func resetPipelineStatistics() {
+        locked { pipelineStore.resetStatistics() }
+    }
+
     /// Blocks until all queued GPU work has completed.
     public func waitUntilIdle() throws {
         try locked {
@@ -745,6 +820,24 @@ public final class Device {
     }
 
     // MARK: Lock helper
+
+    /// Pipeline creation belongs on a load/prewarm path, not between
+    /// beginFrame and endFrame. This is a diagnostic rather than a hard
+    /// failure so a future background compiler can still run while frames
+    /// are in flight.
+    private func warnPipelineCreationDuringFrame(kind: String, label: String?) {
+        LogSystem.logger("com.guava.engine.rhi").warning(
+            "Pipeline created during an active frame",
+            metadata: ["kind": "\(kind)", "label": "\(label ?? "<unnamed>")"])
+    }
+
+    private func logPipelineCreation(kind: String, label: String?, duration: Duration) {
+        let milliseconds = Double(duration.rhiNanoseconds) / 1_000_000
+        LogSystem.logger("com.guava.engine.rhi").debug(
+            "Pipeline created",
+            metadata: ["kind": "\(kind)", "label": "\(label ?? "<unnamed>")",
+                       "ms": "\(milliseconds)"])
+    }
 
     private func locked<T>(_ body: () throws -> T) rethrows -> T {
         lock.lock()
