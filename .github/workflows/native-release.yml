@@ -30,8 +30,29 @@ jobs:
       - uses: actions/checkout@v7.0.1
       - uses: ./.github/actions/fetch-submodules
       - uses: ./.github/actions/setup-toolchains
+      - name: Identify native build inputs
+        id: native-inputs
+        run: |
+          digest=$(git ls-tree -r HEAD Runtime/third-party third-party cmake Tools/Guava/Sources/GuavaCLI/Toolchains/Native.swift .github/actions/setup-toolchains/action.yml | git hash-object --stdin)
+          echo "key=native-v1-${{ matrix.runner }}-$digest" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@v5
+        id: native-cache
+        with:
+          key: ${{ steps.native-inputs.outputs.key }}
+          path: |
+            Runtime/vendor
+            vendor
       - name: Build and archive native libraries
         run: ./guava internal package-native --output "$PWD/dist"
+      # Save before verification so a failed Swift test does not force another
+      # build of unchanged native dependencies. Publication still needs all tests.
+      - uses: actions/cache/save@v5
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        with:
+          key: ${{ steps.native-inputs.outputs.key }}
+          path: |
+            Runtime/vendor
+            vendor
       - name: Verify SDK against staged native libraries
         run: |
           if [ "$RUNNER_OS" = Linux ]; then
