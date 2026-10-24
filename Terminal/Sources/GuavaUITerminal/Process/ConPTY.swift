@@ -128,8 +128,11 @@ final class ConPTY: PseudoTerminalBackend, @unchecked Sendable {
         reader.start()
         let watcher = Thread { [self] in
             WaitForSingleObject(process, INFINITE)
-            // Lets the reader drain the last output and reach end-of-file.
-            self.closeConsole()
+            // Let the pseudoconsole flush the child's final writes before the
+            // console is closed; closing on the instant of exit can drop the
+            // tail of fast-exiting output.
+            Thread.sleep(forTimeInterval: 0.25)
+            closeConsole()
         }
         watcher.name = "guava.terminal.conpty.exit"
         watcher.start()
