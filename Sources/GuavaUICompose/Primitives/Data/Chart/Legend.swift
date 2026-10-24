@@ -98,26 +98,3 @@ struct ChartLegendLayout: Layout {
         return (positions, y + rowHeight)
     }
 }
-
-/// Positions one callout above an anchor point, inside the plot bounds;
-/// it flips below the point when there is no room above.
-struct ChartCalloutLayout: Layout {
-    let anchorX: CGFloat
-    let anchorY: CGFloat
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: [LayoutSubview]) -> CGSize {
-        CGSize(width: proposal.width ?? 0, height: proposal.height ?? 0)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: [LayoutSubview]) {
-        guard let callout = subviews.first else { return }
-        let size = callout.sizeThatFits(.unspecified)
-        let gap: CGFloat = 10
-        var x = bounds.minX + anchorX - size.width / 2
-        x = max(bounds.minX, min(x, bounds.maxX - size.width))
-        var y = bounds.minY + anchorY - gap - size.height
-        if y < bounds.minY { y = bounds.minY + anchorY + gap }
-        y = max(bounds.minY, min(y, bounds.maxY - size.height))
-        callout.place(at: CGPoint(x: x, y: y), proposal: .init(width: size.width, height: size.height))
-    }
-}

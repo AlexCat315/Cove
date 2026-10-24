@@ -77,7 +77,8 @@ struct ChartInteractionTests {
             // Second of four slots, near the top of its 4-high bar.
             press(frame.minX + frame.width * 0.375, frame.minY + 10, input); settle(graph, harness)
             #expect(harness.point == ChartPoint(series: 0, index: 1))
-            #expect(try plot(graph).accessibility?.value == "Revenue, point 2: 4")
+            // The callout lists every visible series at the selected x.
+            #expect(try plot(graph).accessibility?.value == "Point 2: Revenue 4, Signups 1, Conversion 1, Latency 3")
             let callout = nodes(graph.tree.root).first { $0.attachments[LayoutDebugAttachmentKey.debugName] as? String == "chart-callout" }
             #expect(callout != nil)
             #expect(callout.map { frame.contains($0.absoluteFrame) } == true)
@@ -141,5 +142,96 @@ struct ChartInteractionTests {
             press(frame.midX, frame.midY, input); settle(graph, harness)
             #expect(harness.point == nil)
         }
+    }
+
+    /// A chart whose overlay carries every kind of label.
+    private struct LabelHarness: View {
+        let donut: Bool
+        var body: some View {
+            if donut {
+                Chart(slices: [ChartSlice("Desktop", value: 3), ChartSlice("Mobile", value: 1)]) {
+                    $0.pie.center = .init("4", label: "Total")
+                    $0.pie.showsLabels = true
+                }
+                .frame(width: 300, height: 240)
+            } else {
+                Chart([.bar([1, 4, 2], title: "Revenue", style: ChartSeriesStyle(showsValues: true))],
+                      x: .categorical(["A", "B", "C"]),
+                      thresholds: [ChartThreshold(value: 3, label: "Target")],
+                      bands: [ChartBand(from: 1, to: 2, color: .success, label: "Slow")],
+                      annotations: [ChartAnnotation("Launch", index: 1)]) {
+                    $0.label = "Sales"
+                }
+                .frame(width: 400, height: 220)
+            }
+        }
+    }
+
+    private func debugNames(_ root: View) throws -> [String] {
+        try GlobalTestLock.locked {
+            let old = TextEnvironmentHolder.current
+            TextEnvironmentHolder.current = TestTextEnvironmentFactory.make()
+            defer { TextEnvironmentHolder.current = old }
+            let context = PlatformInputContext()
+            return try context.withCurrent {
+                let graph = ViewGraph(tree: NodeTree(), recomposer: Recomposer())
+                graph.install(root: root)
+                defer { graph.install(root: EmptyView()) }
+                for _ in 0..<6 { graph.recomposer.commitAll(); graph.computeLayout(width: 400, height: 240) }
+                return nodes(graph.tree.root).compactMap {
+                    $0.attachments[LayoutDebugAttachmentKey.debugName] as? String
+                }
+            }
+        }
+    }
+
+    /// Where the overlay labels actually landed, next to the plot they sit on.
+    private func overlayFrames(_ root: View) throws -> (plot: CGRect, annotation: CGRect?, labels: [CGRect]) {
+        try GlobalTestLock.locked {
+            let old = TextEnvironmentHolder.current
+            TextEnvironmentHolder.current = TestTextEnvironmentFactory.make()
+            defer { TextEnvironmentHolder.current = old }
+            let context = PlatformInputContext()
+            return try context.withCurrent {
+                let graph = ViewGraph(tree: NodeTree(), recomposer: Recomposer())
+                graph.install(root: root)
+                defer { graph.install(root: EmptyView()) }
+                for _ in 0..<6 { graph.recomposer.commitAll(); graph.computeLayout(width: 400, height: 240) }
+                let all = nodes(graph.tree.root)
+                func named(_ name: String) -> [CGRect] {
+                    all.filter { $0.attachments[LayoutDebugAttachmentKey.debugName] as? String == name }
+                        .map(\.absoluteFrame)
+                }
+                let plot = all.first { $0.accessibility?.label == "Sales" }?.absoluteFrame ?? .zero
+                return (plot, named("chart-annotation").first, named("chart-label"))
+            }
+        }
+    }
+
+    @Test("Guide, value and annotation labels all materialize over the plot")
+    func overlayLabels() throws {
+        let names = try debugNames(LabelHarness(donut: false))
+        // Three values, a threshold, a band and a note.
+        #expect(names.filter { $0 == "chart-label" }.count >= 4)
+        #expect(names.contains("chart-annotation"))
+        #expect(!names.contains("chart-center"))
+    }
+
+    @Test("An annotation is laid out above the mark it names, inside the plot")
+    func overlayPlacement() throws {
+        let probe = try overlayFrames(LabelHarness(donut: false))
+        let note = try #require(probe.annotation)
+        #expect(probe.plot.contains(note))
+        // The note names the tallest bar, so it sits above the plot's middle.
+        #expect(note.maxY <= probe.plot.midY)
+        #expect(abs(note.midX - probe.plot.midX) < probe.plot.width * 0.2)
+        #expect(probe.labels.allSatisfy { probe.plot.insetBy(dx: -1, dy: -1).contains($0) })
+    }
+
+    @Test("A donut's hole content and slice labels materialize over the ring")
+    func overlayPie() throws {
+        let names = try debugNames(LabelHarness(donut: true))
+        #expect(names.contains("chart-center"))
+        #expect(names.filter { $0 == "chart-label" }.count == 2)
     }
 }

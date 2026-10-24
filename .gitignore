@@ -21,3 +21,4 @@ zig-out/
 *.rej
 *.swp
 .idea/
+.workbuddy-ai/

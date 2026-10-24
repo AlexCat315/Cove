@@ -37,8 +37,11 @@ struct MetricCard: View {
             }
             if history.isEmpty { Spacer() }
             else {
-                Chart([.area(history, color: tone)], style: ChartStyle(minValue: 0, maxValue: 100, gridLineCount: 0, lineWidth: 2, contentInset: 2))
-                    .frame(height: 42).accessibilityHidden()
+                Chart([.area(history, color: tone)], style: ChartStyle(minValue: 0, maxValue: 100, showsGrid: false, lineWidth: 2, contentInset: 2)) {
+                    $0.axis.x.isLabeled = false
+                    $0.axis.y.isLabeled = false
+                }
+                .frame(height: 42).accessibilityHidden()
             }
             Text(detail).font(.caption).foregroundColor(.onSurfaceMuted)
         }.debugName("dashboard-metric-\(title)")

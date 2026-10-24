@@ -93,6 +93,8 @@ struct ChartStory: View {
     private let retail: [Float] = [9, 7, 11, 8, 12, 10]
     private let latency: [Float] = [120, 180, 240, 310, 360, 420, 470, 520, 610, 700]
     private let errors: [Float] = [1.2, 1.6, 2.1, 2.0, 2.9, 3.4, 3.1, 4.2, 4.8, 5.6]
+    private static let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
     @State private var point: ChartPoint?
     @State private var hidden: Set<String> = []
     @State private var stacked = false
@@ -100,23 +102,31 @@ struct ChartStory: View {
 
     var body: some View {
         Box(direction: .column, alignItems: .stretch, spacing: 24) {
-            StorySection("Trend", "Area and line marks with a threshold. Hover or drag to inspect a value; click or tap pins it, arrows step and Escape clears. Legend items show or hide a series.") {
-                Chart([.area(revenue, color: .accent, title: "Revenue"), .line(signups, color: .success, title: "Signups")],
-                      thresholds: [ChartThreshold(value: 30, color: .warning)]) {
+            StorySection("Trend", "Area and line marks with a labelled target, a shaded corridor and a pinned note. The value axis fits the data to round ticks, so grid lines and labels agree. Hover or drag to inspect a value; the callout lists every series at that month.") {
+                Chart([.area(revenue, color: .accent, title: "Revenue"),
+                       .line(signups, color: .success, title: "Signups",
+                             style: ChartSeriesStyle(showsValues: true))],
+                      x: .categorical(Self.months),
+                      thresholds: [ChartThreshold(value: 30, color: .warning, label: "Target")],
+                      bands: [ChartBand(from: 10, to: 20, color: .info, label: "Slow")],
+                      annotations: [ChartAnnotation("Launch", index: 3)]) {
                     $0.label = "Monthly revenue and signups"
                     $0.selection.point = $point
                     $0.legend.placement = .bottom
                     $0.legend.hiddenSeries = $hidden
+                    $0.axis.y.title = "Revenue"
+                    $0.dataLabels.format = { String(Int($0.rounded())) }
                 }
                 .frame(height: 200).debugName("chart-trend")
-                Text(point.map { "Selected: \($0.series == 0 ? "Revenue" : "Signups") · month \($0.index + 1)" } ?? "Nothing selected")
+                Text(point.map { "Selected: \($0.series == 0 ? "Revenue" : "Signups") · \(Self.months[$0.index])" } ?? "Nothing selected")
                     .font(.caption).foregroundColor(.onSurfaceMuted).debugName("chart-trend-selection")
             }
-            StorySection("Grouped and stacked bars", "Bar series sit side by side per category, or accumulate when stacked.") {
+            StorySection("Grouped and stacked bars", "Bar series sit side by side per category, or accumulate when stacked. Category labels drop out on their own when the columns get narrow.") {
                 Row(alignment: .center, spacing: 8) {
                     Checkbox("Stacked", isOn: $stacked).debugName("chart-stacked")
                 }
                 Chart([.bar(online, color: .accent, title: "Online"), .bar(retail, color: .warning, title: "Retail")],
+                      x: .categorical(Array(Self.months.prefix(online.count))),
                       style: ChartStyle(stacking: stacked ? .stacked : .none)) {
                     $0.label = "Sales by channel"
                     $0.selection.point = $point2
@@ -124,25 +134,34 @@ struct ChartStory: View {
                 }
                 .frame(height: 180).debugName("chart-bars")
             }
-            StorySection("Scatter", "Points use their own x values; selection picks the nearest point.") {
-                Chart([.points(x: latency, y: errors, color: .error, title: "Error rate")]) {
+            StorySection("Scatter", "A numeric x domain puts every series on one value axis and ticks it on round values. Selection picks the nearest point.") {
+                Chart([.points(x: latency, y: errors, color: .error, title: "Error rate")], x: .numeric) {
                     $0.label = "Error rate by latency"
                     $0.selection.point = $point3
                     $0.selection.valueText = { String(format: "%.1f%%", $0) }
+                    $0.axis.x.title = "Latency (ms)"
+                    $0.axis.y.title = "Error rate %"
                 }
                 .frame(height: 160).debugName("chart-scatter")
             }
-            StorySection("Donut", "Slices take the categorical palette. Selecting a slice lifts it and shows its share.") {
+            StorySection("Donut", "Slices take the categorical palette, largest first, with each share written outside the ring. The hole carries the total. Selecting a slice lifts it and shows its share.") {
                 Chart(slices: [ChartSlice("Desktop", value: 58), ChartSlice("Mobile", value: 31),
                                ChartSlice("Tablet", value: 8), ChartSlice("Other", value: 3)]) {
                     $0.label = "Sessions by device"
                     $0.selection.point = $slice
                     $0.legend.placement = .bottom
+                    $0.pie.sortsByValue = true
+                    $0.pie.showsLabels = true
+                    $0.pie.center = .init("100", label: "Sessions")
                 }
                 .frame(height: 220).debugName("chart-donut")
             }
-            StorySection("Sparkline", "A compact trend for cards and table cells.") {
-                Chart([.area(revenue, color: .success)], style: .sparkline).frame(width: 160, height: 40)
+            StorySection("Sparkline", "A compact trend for cards and table cells: no grid and no labels.") {
+                Chart([.area(revenue, color: .success)], style: .sparkline) {
+                    $0.axis.x.isLabeled = false
+                    $0.axis.y.isLabeled = false
+                }
+                .frame(width: 160, height: 40)
             }
         }
     }

@@ -1,25 +1,46 @@
 import GuavaUIRuntime
 
-/// Line, area, bar, scatter and pie/donut charts with an optional legend and
-/// point selection.
+/// Line, area, bar, scatter and pie/donut charts with labelled axes, an
+/// optional legend and point selection.
 ///
 /// ```swift
 /// Chart([.area(revenue, title: "Revenue"), .bar(orders, color: .success, title: "Orders")],
-///       thresholds: [ChartThreshold(value: 30)]) {
+///       x: .categorical(["Jan", "Feb", "Mar"]),
+///       thresholds: [ChartThreshold(value: 30, label: "Target")],
+///       bands: [ChartBand(from: 20, to: 40, color: .success, label: "Healthy")],
+///       annotations: [ChartAnnotation("Launch", index: 1)]) {
 ///     $0.selection.point = $selected
 ///     $0.legend.placement = .bottom
+///     $0.axis.y.title = "Revenue"
 /// }
 /// .frame(height: 180)
 ///
+/// Chart([.points(x: latency, y: errors)], x: .numeric) {
+///     $0.axis.x.title = "Latency (ms)"
+/// }
+///
 /// Chart(slices: [ChartSlice("Desktop", value: 58), ChartSlice("Mobile", value: 31)]) {
 ///     $0.legend.placement = .bottom
+///     $0.pie.center = .init("89", label: "Total")
 /// }
 /// ```
+///
+/// The x domain belongs to the chart, so a bar series and a scatter series in
+/// one chart read the same axis. Both axes fit their data to round tick values
+/// and draw a grid line at each value tick, so labels never read as 11.75. Tick
+/// labels reserve their own gutters: the plot shrinks to whatever the labels
+/// leave.
+///
+/// Reference geometry annotates the data without replacing it: a threshold is a
+/// labelled rule, a band a shaded corridor, an annotation a note pinned to one
+/// value, and `ChartSeriesStyle.showsValues` writes each value beside its mark.
 ///
 /// Width follows the parent; the plot takes the height left after the legend
 /// (64pt when unconstrained). Selection is interactive only with a binding:
 /// hover previews on pointer surfaces, click/tap pins, drag scrubs, arrows
-/// step, Escape clears. Legend items toggle series visibility.
+/// step, Escape clears. The callout lists every visible series at the selected
+/// x. Legend items toggle series visibility. A non-finite value is a gap: the
+/// line and its fill break there.
 public struct Chart: View {
     private let content: ChartContent
     private let style: ChartStyle
@@ -27,15 +48,22 @@ public struct Chart: View {
     @State private var ownHidden: Set<String> = []
 
     public init(_ series: [ChartSeries],
+                x: ChartXDomain = .categorical([]),
                 thresholds: [ChartThreshold] = [],
+                bands: [ChartBand] = [],
+                annotations: [ChartAnnotation] = [],
                 markers: [ChartMarker] = [],
                 style: ChartStyle = ChartStyle(),
                 configure: (inout ChartConfiguration) -> Void = { _ in }) {
-        self.init(.cartesian(series: series, thresholds: thresholds, markers: markers), style: style, configure: configure)
+        self.init(.cartesian(series: series,
+                             guides: ChartGuides(thresholds: thresholds, bands: bands,
+                                                 annotations: annotations, markers: markers),
+                             x: x),
+                  style: style, configure: configure)
     }
 
     public init(slices: [ChartSlice],
-                style: ChartStyle = ChartStyle(gridLineCount: 0),
+                style: ChartStyle = ChartStyle(showsGrid: false),
                 configure: (inout ChartConfiguration) -> Void = { _ in }) {
         self.init(.pie(slices), style: style, configure: configure)
     }
@@ -57,9 +85,12 @@ public struct Chart: View {
         let point = configuration.selection.point
         let selection = point?.wrappedValue.flatMap { visible.indices.contains(visibleIndex($0)) && visible[visibleIndex($0)] ? $0 : nil }
         Box(direction: .column, alignItems: .stretch, spacing: 10) {
-            ChartPlot(content: content, visible: visible, style: style, selection: selection,
+            ChartPlot(content: content, visible: visible, style: style, axis: configuration.axis,
+                      pie: configuration.pie,
+                      format: configuration.dataLabels.format ?? configuration.selection.valueText,
+                      selection: selection,
                       summary: summary(visible: visible, selection: selection),
-                      callout: selection.flatMap { callout(for: $0) },
+                      callout: selection.flatMap { callout(for: $0, visible: visible) },
                       input: ChartPlotInput(isEnabled: point != nil) { next in
                           if point?.wrappedValue != next { point?.wrappedValue = next }
                       })
@@ -91,40 +122,65 @@ public struct Chart: View {
         }
     }
 
-    private func value(at point: ChartPoint) -> (title: String, value: Float)? {
+    /// The callout for one point. On a cartesian chart it lists every visible
+    /// series at that x, so a reader compares them without moving the pointer.
+    private func callout(for point: ChartPoint, visible: [Bool]) -> ChartCallout? {
+        let format = configuration.dataLabels.format ?? configuration.selection.valueText
         switch content {
-        case .cartesian(let series, _, _):
-            guard series.indices.contains(point.series), series[point.series].values.indices.contains(point.index) else { return nil }
-            return (series[point.series].title, series[point.series].values[point.index])
+        case .cartesian(let series, _, let x):
+            guard series.indices.contains(point.series),
+                  series[point.series].data.indices.contains(point.index) else { return nil }
+            let rows = series.indices.compactMap { index -> ChartCallout.Row? in
+                guard visible.indices.contains(index), visible[index],
+                      series[index].data.indices.contains(point.index) else { return nil }
+                let value = series[index].data[point.index].y
+                guard value.isFinite else { return nil }
+                let name = series[index].title.isEmpty ? "Series \(index + 1)" : series[index].title
+                return ChartCallout.Row(title: name, value: format(value), color: series[index].color)
+            }
+            guard !rows.isEmpty else { return nil }
+            return ChartCallout(point: point, title: categoryLabel(x, index: point.index), rows: rows)
         case .pie(let slices):
             guard slices.indices.contains(point.index) else { return nil }
-            return (slices[point.index].title, slices[point.index].value)
+            let slice = slices[point.index]
+            let total = slices.map { max(0, $0.value) }.reduce(0, +)
+            var detail = format(slice.value)
+            if total > 0 { detail += " · \(Int((slice.value / total * 100).rounded()))%" }
+            let title = slice.title.isEmpty ? "Slice \(point.index + 1)" : slice.title
+            // One number: the name is already the callout's title.
+            return ChartCallout(point: point, title: title,
+                                rows: [ChartCallout.Row(title: "", value: detail,
+                                                        color: slice.resolvedColor(at: point.index))])
         }
     }
 
-    private func callout(for point: ChartPoint) -> ChartCallout? {
-        guard let entry = value(at: point) else { return nil }
-        let format = configuration.selection.valueText
-        var detail = format(entry.value)
-        if case .pie(let slices) = content {
-            let total = slices.map { max(0, $0.value) }.reduce(0, +)
-            if total > 0 { detail += " · \(Int((entry.value / total * 100).rounded()))%" }
+    /// What the x axis calls this position: the category name, the value on a
+    /// numeric axis, or a positional fallback.
+    private func categoryLabel(_ domain: ChartXDomain, index: Int) -> String {
+        switch domain {
+        case .categorical(let labels):
+            return labels.indices.contains(index) ? labels[index] : "Point \(index + 1)"
+        case .numeric:
+            guard case .cartesian(let series, _, _) = content, series.indices.contains(0),
+                  series[0].data.indices.contains(index) else { return "Point \(index + 1)" }
+            let x = series[0].data[index].x
+            return configuration.axis.x.format?(x) ?? configuration.selection.valueText(x)
         }
-        let title = entry.title.isEmpty ? (content.isPie ? "Slice \(point.index + 1)" : "Point \(point.index + 1)") : entry.title
-        return ChartCallout(point: point, title: title, value: detail)
     }
 
     private func summary(visible: [Bool], selection: ChartPoint?) -> (label: String, value: String) {
-        let format = configuration.selection.valueText
-        if let selection, let callout = callout(for: selection) {
-            let position = content.isPie ? "" : ", point \(selection.index + 1)"
-            return (configuration.label, "\(callout.title)\(position): \(callout.value)")
+        let format = configuration.dataLabels.format ?? configuration.selection.valueText
+        if let selection, let callout = callout(for: selection, visible: visible) {
+            let detail = callout.rows
+                .map { $0.title.isEmpty ? $0.value : "\($0.title) \($0.value)" }
+                .joined(separator: ", ")
+            return (configuration.label, callout.title.isEmpty ? detail : "\(callout.title): \(detail)")
         }
         switch content {
         case .cartesian(let series, _, _):
-            let shown = series.indices.filter { visible[$0] && !series[$0].values.isEmpty }
+            let shown = series.indices.filter { visible[$0] && !series[$0].data.isEmpty }
             let parts = shown.map { index -> String in
-                let values = series[index].values.filter(\.isFinite)
+                let values = series[index].data.map(\.y).filter(\.isFinite)
                 let name = series[index].title.isEmpty ? "Series \(index + 1)" : series[index].title
                 return "\(name) \(format(values.min() ?? 0)) to \(format(values.max() ?? 0))"
             }
@@ -143,9 +199,15 @@ extension ChartContent {
     }
 }
 
-/// The floating label for the selected value.
-struct ChartCallout: Equatable {
+/// The floating label for the selected value: the x it belongs to and one row
+/// per visible series.
+struct ChartCallout {
+    struct Row {
+        let title: String
+        let value: String
+        let color: SemanticColorRef
+    }
     let point: ChartPoint
     let title: String
-    let value: String
+    let rows: [Row]
 }

@@ -9,6 +9,16 @@ import GuavaUIRuntime
 
 @Suite("Chart drawing and geometry")
 struct ChartTests {
+    /// Every chart here is categorical; the numeric domain has its own suite.
+    private func cartesian(series: [ChartSeries], thresholds: [ChartThreshold] = [],
+                           bands: [ChartBand] = [], annotations: [ChartAnnotation] = [],
+                           markers: [ChartMarker] = []) -> ChartContent {
+        .cartesian(series: series,
+                   guides: ChartGuides(thresholds: thresholds, bands: bands,
+                                       annotations: annotations, markers: markers),
+                   x: .categorical([]))
+    }
+
     /// Test the rendered stroke rather than a particular tessellation budget.
     private func covers(_ point: CGPoint, in list: DrawList, color: Color? = nil) -> Bool {
         for start in stride(from: 0, to: list.indices.count, by: 3) {
@@ -27,11 +37,23 @@ struct ChartTests {
         return false
     }
 
+    /// The pixel assertions below assume the whole node is plot, so the axes
+    /// stay unlabelled here; `ChartAxisTests` covers the labelled gutters.
+    private static var unlabeled: ChartConfiguration.Axis {
+        var axis = ChartConfiguration.Axis()
+        axis.x.isLabeled = false
+        axis.y.isLabeled = false
+        return axis
+    }
+
     private func draw(_ content: ChartContent, style: ChartStyle, selection: ChartPoint? = nil,
+                      axis: ChartConfiguration.Axis? = nil, pie: ChartConfiguration.Pie = .init(),
                       size: CGSize = CGSize(width: 120, height: 40)) -> (DrawList, Node) {
         GlobalTestLock.locked {
             let plot = ChartPlot(content: content, visible: Array(repeating: true, count: content.count), style: style,
-                                 selection: selection, summary: ("Chart", ""), callout: nil,
+                                 axis: axis ?? Self.unlabeled, pie: pie,
+                                 format: { String(Int($0.rounded())) }, selection: selection,
+                                 summary: ("Chart", ""), callout: nil,
                                  input: ChartPlotInput(isEnabled: false, select: { _ in }))
             let node = plot._makeNode()
             node.frame = CGRect(origin: .zero, size: size)
@@ -42,13 +64,50 @@ struct ChartTests {
         }
     }
 
-    private func flat(_ style: ChartStyle = ChartStyle(gridLineCount: 0, contentInset: 0)) -> ChartStyle { style }
+    private func geometry(_ series: [ChartSeries], visible: [Bool]? = nil,
+                          thresholds: [ChartThreshold] = [],
+                          style: ChartStyle = ChartStyle(minValue: 0, barSpacing: 0),
+                          x: ChartXDomain = .categorical([]),
+                          plot: UIRect) -> ChartGeometry {
+        let visible = visible ?? Array(repeating: true, count: series.count)
+        let stack = ChartStack(series: series, visible: visible, style: style)
+        let yScale = ChartScale.fit(stack: stack, thresholds: thresholds, style: style, tickCount: 4)
+        let xScale = x.isNumeric
+            ? ChartScale.fit(extent: stack.shown.flatMap { series[$0].data.map(\.x) },
+                             lower: nil, upper: nil, tickCount: 5)
+            : nil
+        return ChartGeometry(series: series, stack: stack, xDomain: x, xScale: xScale,
+                             yScale: yScale, barSpacing: style.barSpacing, plot: plot)
+    }
+
+    private func flat(_ style: ChartStyle = ChartStyle(showsGrid: false, contentInset: 0)) -> ChartStyle { style }
+
+    /// The labels the plot keeps at a fixed size, with their placement.
+    private func overlay(_ content: ChartContent, style: ChartStyle,
+                         size: CGSize = CGSize(width: 200, height: 100),
+                         pie: ChartConfiguration.Pie = .init()) -> [ChartOverlaySlot] {
+        GlobalTestLock.locked {
+            let plot = ChartPlot(content: content, visible: Array(repeating: true, count: content.count), style: style,
+                                 axis: Self.unlabeled, pie: pie,
+                                 format: { String(Int($0.rounded())) }, selection: nil,
+                                 summary: ("Chart", ""), callout: nil,
+                                 input: ChartPlotInput(isEnabled: false, select: { _ in }))
+            let node = plot._makeNode()
+            node.frame = CGRect(origin: .zero, size: size)
+            plot._updateNode(node)
+            // Dropped labels keep their slot but lose their placement.
+            return plot.overlaySlots(in: size, text: ChartText(theme: node.theme, environment: nil))
+                .filter { $0.placement != nil }
+        }
+    }
 
     @Test("A chart without a selection binding is a passive image with a 64pt default height")
     func passive() {
         GlobalTestLock.locked {
-            let plot = ChartPlot(content: .cartesian(series: [.line([1, 2, 3])], thresholds: [], markers: []), visible: [true],
-                                 style: ChartStyle(), selection: nil, summary: ("Sales", "1 to 3"), callout: nil,
+            let plot = ChartPlot(content: cartesian(series: [.line([1, 2, 3])], thresholds: [], markers: []), visible: [true],
+                                 style: ChartStyle(), axis: Self.unlabeled, pie: .init(),
+                                 format: { String(Int($0.rounded())) }, selection: nil,
+                                 summary: ("Sales", "1 to 3"), callout: nil,
                                  input: ChartPlotInput(isEnabled: false, select: { _ in }))
             let node = plot._makeNode(), layout = plot._makeLayoutNode()!
             plot._updateLayout(layout); plot._updateNode(node)
@@ -60,11 +119,11 @@ struct ChartTests {
 
     @Test("Lines stroke between values; areas fill down to the baseline")
     func lineAndArea() {
-        let (line, _) = draw(.cartesian(series: [.line([0, 1, 0])], thresholds: [], markers: []), style: flat())
+        let (line, _) = draw(cartesian(series: [.line([0, 1, 0])], thresholds: [], markers: []), style: flat())
         #expect(covers(CGPoint(x: 15, y: 30), in: line))
         #expect(covers(CGPoint(x: 60, y: 1), in: line))
         #expect(!covers(CGPoint(x: 60, y: 30), in: line))
-        let (area, node) = draw(.cartesian(series: [.area([0, 1, 0])], thresholds: [], markers: []), style: flat())
+        let (area, node) = draw(cartesian(series: [.area([0, 1, 0])], thresholds: [], markers: []), style: flat())
         #expect(covers(CGPoint(x: 60, y: 30), in: area, color: node.theme.colors.accent))
         #expect(area.vertices.allSatisfy { $0.posX.isFinite && $0.posY.isFinite })
     }
@@ -73,35 +132,35 @@ struct ChartTests {
     func groupedAndStackedBars() {
         let series: [ChartSeries] = [.bar([2, 4], title: "A"), .bar([2, 2], color: .success, title: "B")]
         let plot = UIRect(x: 0, y: 0, width: 100, height: 100)
-        let grouped = ChartGeometry(series: series, visible: [true, true], thresholds: [], style: ChartStyle(minValue: 0, barSpacing: 0), plot: plot)
+        let grouped = geometry(series, style: ChartStyle(minValue: 0, barSpacing: 0), plot: plot)
         let a = grouped.marks[0][0].bar!, b = grouped.marks[1][0].bar!
         #expect(a.maxX <= b.minX + 0.5 && a.minY == b.minY)
         #expect(grouped.domain.upperBound == 4)
-        let stacked = ChartGeometry(series: series, visible: [true, true], thresholds: [],
-                                    style: ChartStyle(minValue: 0, barSpacing: 0, stacking: .stacked), plot: plot)
+        let stacked = geometry(series, style: ChartStyle(minValue: 0, barSpacing: 0, stacking: .stacked), plot: plot)
         let low = stacked.marks[0][1].bar!, high = stacked.marks[1][1].bar!
         #expect(stacked.domain.upperBound == 6)
         #expect(abs(low.minX - high.minX) < 0.01 && abs(high.maxY - low.minY) < 0.01)
         #expect(!stacked.marks[0][1].isOuterEnd && stacked.marks[1][1].isOuterEnd && grouped.marks[0][0].isOuterEnd)
         // Hidden series take no space and leave the domain.
-        let hidden = ChartGeometry(series: series, visible: [true, false], thresholds: [], style: ChartStyle(minValue: 0, barSpacing: 0), plot: plot)
+        let hidden = geometry(series, visible: [true, false], style: ChartStyle(minValue: 0, barSpacing: 0), plot: plot)
         #expect(hidden.marks[1].isEmpty && hidden.marks[0][0].bar!.width > a.width)
     }
 
     @Test("Lines and bars in one chart share slot centers; markers follow the same x")
     func mixedMarksAlign() {
-        let geometry = ChartGeometry(series: [.bar([1, 2, 3]), .line([1, 2, 3])], visible: [true, true], thresholds: [],
-                                     style: ChartStyle(minValue: 0, barSpacing: 0), plot: UIRect(x: 0, y: 0, width: 90, height: 30))
+        let geometry = geometry([.bar([1, 2, 3]), .line([1, 2, 3])],
+                                style: ChartStyle(minValue: 0, barSpacing: 0),
+                                plot: UIRect(x: 0, y: 0, width: 90, height: 30))
         #expect(geometry.marks[0].map(\.x) == geometry.marks[1].map(\.x))
         #expect(geometry.marks[1].map(\.x) == [15, 45, 75])
     }
 
     @Test("Scatter points use their own x values and the nearest point by distance")
     func scatter() {
-        let geometry = ChartGeometry(series: [.points(x: [0, 10, 20], y: [0, 10, 0])], visible: [true], thresholds: [],
-                                     style: ChartStyle(), plot: UIRect(x: 0, y: 0, width: 200, height: 100))
-        // Points keep a 4% inset from the plot edges.
-        #expect(geometry.marks[0].map { $0.x.rounded() } == [7, 100, 193])
+        let geometry = geometry([.points(x: [0, 10, 20], y: [0, 10, 0])], x: .numeric,
+                                plot: UIRect(x: 0, y: 0, width: 200, height: 100))
+        // A numeric axis fits x to round bounds, so the ends sit on the plot edges.
+        #expect(geometry.marks[0].map { $0.x.rounded() } == [0, 100, 200])
         #expect(geometry.nearest(x: 95, y: 5)?.index == 1)
         #expect(geometry.nearest(x: 190, y: 92)?.index == 2)
     }
@@ -115,7 +174,7 @@ struct ChartTests {
         #expect(pie.wedge(atX: 80, y: 80)?.index == 1)       // lower right
         #expect(pie.wedge(atX: 20, y: 54)?.index == 2)       // left half
         #expect(pie.wedge(atX: 54, y: 54) == nil)            // the hole
-        let (list, node) = draw(.pie(slices), style: ChartStyle(gridLineCount: 0, contentInset: 0, innerRadiusRatio: 0.5),
+        let (list, node) = draw(.pie(slices), style: ChartStyle(showsGrid: false, contentInset: 0, innerRadiusRatio: 0.5),
                                 size: CGSize(width: 108, height: 108))
         #expect(covers(CGPoint(x: 20, y: 54), in: list, color: node.theme.colors.warning))
         #expect(!covers(CGPoint(x: 54, y: 54), in: list))
@@ -125,7 +184,7 @@ struct ChartTests {
 
     @Test("Thresholds and markers add guide geometry")
     func thresholdAndMarker() {
-        let (list, node) = draw(.cartesian(series: [.line([0, 1, 2])], thresholds: [ChartThreshold(value: 1, color: .error)],
+        let (list, node) = draw(cartesian(series: [.line([0, 1, 2])], thresholds: [ChartThreshold(value: 1, color: .error)],
                                            markers: [ChartMarker(index: 2, color: .success)]), style: flat())
         #expect(covers(CGPoint(x: 15, y: 20), in: list, color: node.theme.colors.error))
         #expect(covers(CGPoint(x: 120, y: 30), in: list, color: node.theme.colors.success))
@@ -133,9 +192,172 @@ struct ChartTests {
 
     @Test("Selection draws a rule and a ringed point, and dims unselected bars")
     func selectionPaint() {
-        let (list, node) = draw(.cartesian(series: [.line([0, 2, 0])], thresholds: [], markers: []), style: flat(),
+        let (list, node) = draw(cartesian(series: [.line([0, 2, 0])], thresholds: [], markers: []), style: flat(),
                                 selection: ChartPoint(series: 0, index: 1))
         #expect(covers(CGPoint(x: 60, y: 30), in: list))   // rule
         #expect(covers(CGPoint(x: 64.5, y: 1), in: list, color: node.theme.colors.surface))
+    }
+
+    @Test("A non-finite value breaks the line instead of drawing a zero")
+    func gapBreaksLine() {
+        let values: [Float] = [0, 1, .nan, 1, 0]
+        let (list, _) = draw(cartesian(series: [.line(values)]), style: flat())
+        // A coerced zero would draw a V through (60, 40) and cross this point.
+        #expect(!covers(CGPoint(x: 45, y: 20), in: list))
+        // The runs on either side stay intact.
+        #expect(covers(CGPoint(x: 15, y: 20), in: list))
+        #expect(covers(CGPoint(x: 105, y: 20), in: list))
+    }
+
+    @Test("A dash pattern leaves gaps in the stroke")
+    func dashedStroke() {
+        let dashed = ChartSeriesStyle(dash: [6, 6])
+        let (list, _) = draw(cartesian(series: [.line([0.5, 0.5], style: dashed)]), style: flat())
+        var drawn = 0, skipped = 0
+        for x in stride(from: 2, through: 118, by: 2) {
+            if covers(CGPoint(x: x, y: 20), in: list) { drawn += 1 } else { skipped += 1 }
+        }
+        #expect(drawn > 0 && skipped > 0)
+    }
+
+    @Test("A curved series bulges past the straight chord")
+    func curvedLine() {
+        let values: [Float] = [0, 10, 10]
+        let straight = draw(cartesian(series: [.line(values)]), style: flat()).0
+        let curved = draw(cartesian(series: [.line(values, style: ChartSeriesStyle(curve: true))]), style: flat()).0
+        // Halfway along the first segment the chord reads 5 (y 20); the monotone
+        // cubic reads about 6.25 (y 15).
+        #expect(!covers(CGPoint(x: 30, y: 15), in: straight))
+        #expect(covers(CGPoint(x: 30, y: 15), in: curved))
+    }
+
+    @Test("A series can widen its own stroke and size its own points")
+    func perSeriesStyle() {
+        let thick = draw(cartesian(series: [.line([0.5, 0.5], style: ChartSeriesStyle(lineWidth: 10))]), style: flat()).0
+        let thin = draw(cartesian(series: [.line([0.5, 0.5])]), style: flat()).0
+        #expect(covers(CGPoint(x: 60, y: 16), in: thick))
+        #expect(!covers(CGPoint(x: 60, y: 16), in: thin))
+
+        let big = draw(cartesian(series: [.points(x: [0], y: [0.5], style: ChartSeriesStyle(pointRadius: 8))]), style: flat()).0
+        let small = draw(cartesian(series: [.points(x: [0], y: [0.5])]), style: flat()).0
+        #expect(covers(CGPoint(x: 60, y: 14), in: big))
+        #expect(!covers(CGPoint(x: 60, y: 14), in: small))
+    }
+
+    @Test("A numeric x domain puts bars and points on the same axis")
+    func numericMixesMarks() {
+        let bars = ChartSeries(points: [ChartDatum(x: 0, y: 5), ChartDatum(x: 10, y: 6)], mark: .bar)
+        let dot = ChartSeries(points: [ChartDatum(x: 10, y: 3)], mark: .point)
+        let geometry = geometry([bars, dot], x: .numeric, plot: UIRect(x: 0, y: 0, width: 200, height: 100))
+        #expect(abs(geometry.marks[0][1].x - geometry.marks[1][0].x) < 0.01)
+        #expect(geometry.isScatter)
+    }
+
+    @Test("A band shades its corridor and widens the domain to stay visible")
+    func bandShading() {
+        let (list, node) = draw(cartesian(series: [.line([0.5, 0.5])],
+                                          bands: [ChartBand(from: 0.25, to: 0.75, color: .success)]),
+                                style: flat())
+        #expect(covers(CGPoint(x: 60, y: 20), in: list, color: node.theme.colors.success))
+        // The corridor, not the data, decides the top of the domain here.
+        let stack = ChartStack(series: [.line([0.5])], visible: [true], style: ChartStyle())
+        let scale = ChartScale.fit(stack: stack, bands: [ChartBand(from: 0, to: 10)],
+                                   style: ChartStyle(), tickCount: 4)
+        #expect(scale.domain.upperBound >= 10)
+    }
+
+    @Test("A threshold label ends its rule; a band label opens its corridor")
+    func guideLabels() throws {
+        let items = overlay(cartesian(series: [.line([0, 10])],
+                                      thresholds: [ChartThreshold(value: 5, label: "Target")],
+                                      bands: [ChartBand(from: 2, to: 4, label: "Safe")]),
+                            style: flat())
+        let target = try #require(items.first { $0.item.kind == .threshold })
+        let safe = try #require(items.first { $0.item.kind == .band })
+        #expect(target.item.title == "Target" && safe.item.title == "Safe")
+        let rule = try #require(target.placement), corner = try #require(safe.placement)
+        // Right-aligned at the plot edge, above the rule; the band opens at the
+        // left edge, below its top.
+        #expect(rule.horizontal == 1 && rule.vertical == 1)
+        #expect(rule.anchor.x > corner.anchor.x)
+        #expect(corner.horizontal == 0 && corner.vertical == 0)
+        #expect(rule.anchor.y < corner.anchor.y)
+    }
+
+    @Test("Annotations pin a note above the mark they name")
+    func annotationAnchor() throws {
+        let items = overlay(cartesian(series: [.bar([1, 4, 2])],
+                                      annotations: [ChartAnnotation("Launch", index: 1)]),
+                            style: flat())
+        let note = try #require(items.first { $0.item.kind == .annotation })
+        let placement = try #require(note.placement)
+        #expect(note.item.title == "Launch")
+        #expect(placement.vertical == 1 && placement.flips)
+        #expect(abs(placement.anchor.x - 100) < 0.01)      // the middle slot
+        #expect(placement.anchor.y < 50)                   // the tallest bar
+    }
+
+    @Test("Value labels follow showsValues and drop the ones that would collide")
+    func valueLabels() {
+        #expect(!overlay(cartesian(series: [.line([1, 2, 3])]), style: flat()).contains { $0.item.kind == .value })
+
+        let shown = overlay(cartesian(series: [.line([1, 2, 3], style: ChartSeriesStyle(showsValues: true))]),
+                            style: flat())
+        let labels = shown.filter { $0.item.kind == .value }
+        #expect(labels.count == 3 && labels.map(\.item.title) == ["1", "2", "3"])
+        #expect(labels.allSatisfy { $0.placement?.vertical == 1 && $0.placement?.horizontal == 0.5 })
+
+        // Twenty-four points in 120pt cannot all be labelled.
+        let dense = (0..<24).map { Float($0 % 5) }
+        let crowded = overlay(cartesian(series: [.line(dense, style: ChartSeriesStyle(showsValues: true))]),
+                              style: flat(), size: CGSize(width: 120, height: 40))
+        #expect(crowded.filter { $0.item.kind == .value }.count < 24)
+    }
+
+    @Test("A pie starts at another angle and sorts by value without losing slice identity")
+    func pieOrdering() {
+        let slices = [ChartSlice("A", value: 1), ChartSlice("B", value: 3)]
+        let plot = UIRect(x: 0, y: 0, width: 100, height: 100)
+        let straight = PieGeometry(slices: slices, visible: [true, true], innerRatio: 0, plot: plot)
+        #expect(straight.wedges.map(\.index) == [0, 1])
+        #expect(abs(straight.wedges[0].start + .pi / 2) < 0.001)
+
+        let turned = PieGeometry(slices: slices, visible: [true, true], innerRatio: 0,
+                                 startAngle: .pi / 2, plot: plot)
+        #expect(abs(turned.wedges[0].start) < 0.001)
+
+        let sorted = PieGeometry(slices: slices, visible: [true, true], innerRatio: 0,
+                                 sortsByValue: true, plot: plot)
+        #expect(sorted.wedges.map(\.index) == [1, 0] && sorted.wedges[0].value == 3)
+        #expect(sorted.wedges.map(\.value).reduce(0, +) == sorted.total)
+    }
+
+    @Test("A pie writes a slice's name and share outside the ring when asked")
+    func pieLabels() throws {
+        let slices = [ChartSlice("A", value: 1), ChartSlice("B", value: 3)]
+        var pie = ChartConfiguration.Pie()
+        pie.showsLabels = true
+        let items = overlay(.pie(slices), style: ChartStyle(showsGrid: false, innerRadiusRatio: 0),
+                            size: CGSize(width: 120, height: 120), pie: pie)
+        let labels = items.filter { $0.item.kind == .slice }
+        #expect(labels.count == 2)
+        #expect(labels.map(\.item.title) == ["A", "B"])
+        #expect(labels.map(\.item.subtitle) == ["25%", "75%"])
+        // A label grows away from the ring, on the side its slice sits on.
+        let first = try #require(labels.first?.placement)
+        #expect(first.horizontal == 0 || first.horizontal == 1)
+        #expect(items.allSatisfy { $0.item.kind != .center })
+    }
+
+    @Test("A donut can carry content in its hole")
+    func pieCenter() throws {
+        var pie = ChartConfiguration.Pie()
+        pie.center = .init("4", label: "Total")
+        let items = overlay(.pie([ChartSlice("A", value: 1), ChartSlice("B", value: 3)]),
+                            style: ChartStyle(showsGrid: false, innerRadiusRatio: 0.6),
+                            size: CGSize(width: 120, height: 120), pie: pie)
+        let center = try #require(items.first { $0.item.kind == .center })
+        #expect(center.item.title == "4" && center.item.subtitle == "Total")
+        #expect(center.placement?.anchor == CGPoint(x: 60, y: 60))
     }
 }

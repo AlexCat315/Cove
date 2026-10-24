@@ -1,9 +1,19 @@
 internal import Foundation
 import GuavaUIRuntime
 
+/// Reference geometry drawn across or behind the series: rules, corridors,
+/// pinned notes and column markers. They share one value so a chart's content
+/// reads as data plus its annotations.
+struct ChartGuides {
+    var thresholds: [ChartThreshold] = []
+    var bands: [ChartBand] = []
+    var annotations: [ChartAnnotation] = []
+    var markers: [ChartMarker] = []
+}
+
 /// Cartesian series or pie slices, with per-item visibility from the legend.
 enum ChartContent {
-    case cartesian(series: [ChartSeries], thresholds: [ChartThreshold], markers: [ChartMarker])
+    case cartesian(series: [ChartSeries], guides: ChartGuides, x: ChartXDomain)
     case pie([ChartSlice])
 
     var count: Int {
@@ -19,14 +29,6 @@ enum ChartContent {
         case .pie(let slices): slices.indices.contains(index) ? slices[index].title : ""
         }
     }
-
-    /// The plot rectangle inside a node of `size`.
-    static func plotRect(size: CGSize, origin: CGPoint = .zero, style: ChartStyle) -> UIRect {
-        let width = Float(size.width), height = Float(size.height)
-        let inset = min(style.contentInset, min(width, height) * 0.35)
-        return UIRect(x: Float(origin.x) + inset, y: Float(origin.y) + inset,
-                      width: max(0, width - inset * 2), height: max(0, height - inset * 2))
-    }
 }
 
 /// Selection writes coming from input; the chart owns the binding.
@@ -36,12 +38,24 @@ struct ChartPlotInput {
     let select: (ChartPoint?) -> Void
 }
 
+/// A chart resolved against one node size: the frame the axis chrome leaves
+/// behind, plus the marks drawn inside it.
+struct ChartResolution {
+    let frame: ChartFrame
+    let cartesian: ChartGeometry?
+    let pie: PieGeometry?
+}
+
 /// The drawing and input surface of `Chart`. Hover previews a point on
 /// pointer surfaces; press/drag scrubs on touch; arrows step; Escape clears.
 struct ChartPlot: _PrimitiveView {
     let content: ChartContent
     let visible: [Bool]
     let style: ChartStyle
+    let axis: ChartConfiguration.Axis
+    let pie: ChartConfiguration.Pie
+    /// Formats a value for a data label and for a slice's share.
+    let format: (Float) -> String
     let selection: ChartPoint?
     let summary: (label: String, value: String)
     let callout: ChartCallout?
@@ -144,70 +158,233 @@ struct ChartPlot: _PrimitiveView {
         }
     }
 
-    /// The callout is laid over the plot at the selected value. Selection only
-    /// changes after layout, so the node's frame is current here.
+    /// Text drawn over the plot: the callout, guide labels, pinned notes, value
+    /// labels and pie labels. Text is content, so it goes in the view tree
+    /// rather than the draw list — the overlay only carries placement.
+    ///
+    /// Children are built before layout runs, so this only decides *what* the
+    /// labels say. `ChartOverlayLayout` resolves where they go, once the plot
+    /// rect exists.
     func _children(for node: Node) -> [any View] {
-        guard let callout else { return [] }
-        let size = node.frame.size
-        let anchor: (x: Float, y: Float)?
-        if let geometry = cartesian(in: size), let mark = geometry.mark(callout.point) {
-            anchor = (mark.x, mark.bar.map { $0.minY } ?? mark.y)
-        } else if let pie = pie(in: size), let wedge = pie.wedges.first(where: { $0.index == callout.point.index }) {
-            anchor = pie.anchor(of: wedge)
-        } else {
-            anchor = nil
-        }
-        guard let anchor else { return [] }
-        return [ChartCalloutLayout(anchorX: CGFloat(anchor.x), anchorY: CGFloat(anchor.y)) {
-            Box(direction: .column, alignItems: .flexStart, spacing: 1) {
-                Text(callout.title).lineLimit(1).font(.caption).foregroundColor(.onSurfaceMuted)
-                Text(callout.value).lineLimit(1).font(.bodyStrong).foregroundColor(.onSurface)
+        let environment = TextEnvironmentHolder.current
+        let text = ChartText(theme: node.theme, environment: environment)
+        let slots = overlaySlots(in: nil, text: text)
+        guard !slots.isEmpty else { return [] }
+        return [
+            ChartOverlayLayout(plot: self, theme: node.theme, environment: environment) {
+                for slot in slots {
+                    ChartOverlayLabel(item: slot.item)
+                }
             }
-            .padding(horizontal: 8, vertical: 5)
-            .background(.surfaceFloating).cornerRadius(.inputRadius).border(.border, width: 1).surfaceFinish()
-            .debugName("chart-callout")
+            .frame(width: .percent(100), height: .percent(100))
+            .absolutePosition(left: 0, top: 0)
+            .allowsHitTesting(false)
+            .accessibilityHidden()
+        ]
+    }
+
+    /// Every overlay label for one size, in back-to-front order.
+    ///
+    /// A nil `size` means the plot rect is not known yet: the labels are
+    /// returned in the same order, all without placement. The order is stable
+    /// across both passes, so slot *i* always belongs to the same label.
+    func overlaySlots(in size: CGSize?, text: ChartText) -> [ChartOverlaySlot] {
+        let resolution = size.map { resolve(in: $0, text: text) }
+        var slots: [ChartOverlaySlot] = []
+        var taken: [CGRect] = []
+
+        /// Records one label. `reserving` labels drop out when they would
+        /// overlap an earlier one, so a dense series stays readable instead of
+        /// piling text on itself.
+        func add(_ item: ChartOverlayItem, _ placement: ChartOverlayPlacement?, reserving: Bool = true) {
+            guard let placement else {
+                slots.append(ChartOverlaySlot(item: item, placement: nil))
+                return
+            }
+            if reserving {
+                let measured = text.size(item.title.isEmpty ? item.subtitle : item.title)
+                let box = placement.box(width: CGFloat(measured.width), height: CGFloat(measured.height))
+                guard !taken.contains(where: { $0.intersects(box.insetBy(dx: -2, dy: -2)) }) else {
+                    slots.append(ChartOverlaySlot(item: item, placement: nil))
+                    return
+                }
+                taken.append(box)
+            }
+            slots.append(ChartOverlaySlot(item: item, placement: placement))
         }
-        .frame(width: .percent(100), height: .percent(100))
-        .absolutePosition(left: 0, top: 0)
-        .allowsHitTesting(false)
-        .accessibilityHidden()]
+
+        if case .cartesian(let series, let guides, _) = content {
+            let geometry = resolution?.cartesian
+            for band in guides.bands where !band.label.isEmpty && band.from.isFinite && band.to.isFinite {
+                add(ChartOverlayItem(kind: .band, title: band.label),
+                    geometry.map { g in
+                        ChartOverlayPlacement(point(g.plot.minX + 4, g.y(band.to)),
+                                              horizontal: 0, vertical: 0, gap: 2)
+                    })
+            }
+            for threshold in guides.thresholds where !threshold.label.isEmpty && threshold.value.isFinite {
+                add(ChartOverlayItem(kind: .threshold, title: threshold.label),
+                    geometry.map { g in
+                        ChartOverlayPlacement(point(g.plot.maxX - 2, g.y(threshold.value)),
+                                              horizontal: 1, vertical: 1, gap: 2)
+                    })
+            }
+            for note in guides.annotations {
+                // The note exists as soon as its value does; where it sits
+                // waits for the plot rect.
+                guard series.indices.contains(note.series),
+                      series[note.series].data.indices.contains(note.index),
+                      series[note.series].data[note.index].y.isFinite else { continue }
+                var placement: ChartOverlayPlacement?
+                if let mark = geometry?.mark(ChartPoint(series: note.series, index: note.index)),
+                   mark.y.isFinite {
+                    placement = ChartOverlayPlacement(point(mark.x, mark.bar.map(\.minY) ?? mark.y),
+                                                      horizontal: 0.5, vertical: 1, gap: 5, flips: true)
+                }
+                add(ChartOverlayItem(kind: .annotation, title: note.text, tint: note.color), placement)
+            }
+            for index in series.indices where series[index].style.showsValues {
+                for i in series[index].data.indices {
+                    let datum = series[index].data[i]
+                    guard datum.y.isFinite else { continue }
+                    var placement: ChartOverlayPlacement?
+                    if let mark = geometry?.mark(ChartPoint(series: index, index: i)), mark.y.isFinite {
+                        // A bar below the baseline is labelled underneath.
+                        let below = mark.y > mark.baseY
+                        let top = mark.bar.map { below ? $0.maxY : $0.minY } ?? mark.y
+                        placement = ChartOverlayPlacement(point(mark.x, top), horizontal: 0.5,
+                                                          vertical: below ? 0 : 1, gap: 3, flips: true)
+                    }
+                    add(ChartOverlayItem(kind: .value, title: format(datum.y)), placement)
+                }
+            }
+        }
+
+        if case .pie(let slices) = content {
+            let pie = resolution?.pie
+            if let center = pieConfig?.center {
+                add(ChartOverlayItem(kind: .center, title: center.value, subtitle: center.label),
+                    pie.flatMap { g in
+                        // A full pie has no hole to write in.
+                        g.innerRadius > 4
+                            ? ChartOverlayPlacement(point(g.center.x, g.center.y), horizontal: 0.5, vertical: 0.5)
+                            : nil
+                    },
+                    reserving: false)
+            }
+            if pieConfig?.showsLabels == true {
+                let values = slices.indices.map { index -> Float in
+                    guard visible.indices.contains(index), visible[index], slices[index].value.isFinite else { return 0 }
+                    return max(0, slices[index].value)
+                }
+                let total = values.reduce(0, +)
+                for index in slices.indices where !slices[index].title.isEmpty && total > 0 && values[index] > 0 {
+                    let share = Int((values[index] / total * 100).rounded())
+                    add(ChartOverlayItem(kind: .slice, title: slices[index].title, subtitle: "\(share)%"),
+                        pie.flatMap { g -> ChartOverlayPlacement? in
+                            guard let wedge = g.wedges.first(where: { $0.index == index }) else { return nil }
+                            let anchor = g.labelAnchor(of: wedge)
+                            // Labels grow away from the ring on their own side.
+                            return ChartOverlayPlacement(point(anchor.x, anchor.y),
+                                                         horizontal: anchor.x >= g.center.x ? 0 : 1,
+                                                         vertical: 0.5)
+                        })
+                }
+            }
+        }
+
+        if let callout {
+            var placement: ChartOverlayPlacement?
+            if let mark = resolution?.cartesian?.mark(callout.point) {
+                placement = ChartOverlayPlacement(point(mark.x, mark.bar.map(\.minY) ?? mark.y),
+                                                  horizontal: 0.5, vertical: 1, gap: 10, flips: true)
+            } else if let pie = resolution?.pie,
+                      let wedge = pie.wedges.first(where: { $0.index == callout.point.index }) {
+                let anchor = pie.anchor(of: wedge)
+                placement = ChartOverlayPlacement(point(anchor.x, anchor.y),
+                                                  horizontal: 0.5, vertical: 1, gap: 10, flips: true)
+            }
+            add(ChartOverlayItem(kind: .callout, title: callout.title, rows: callout.rows),
+                placement, reserving: false)
+        }
+        return slots
+    }
+
+    /// The pie configuration, when this plot is a pie.
+    private var pieConfig: ChartConfiguration.Pie? {
+        if case .pie = content { return pie }
+        return nil
+    }
+
+    /// Plot space is `Float`; overlay placement is `CGFloat`.
+    private func point(_ x: Float, _ y: Float) -> CGPoint {
+        CGPoint(x: CGFloat(x), y: CGFloat(y))
     }
 
     // MARK: Geometry
 
-    func cartesian(in size: CGSize, origin: CGPoint = .zero) -> ChartGeometry? {
-        guard case .cartesian(let series, let thresholds, _) = content else { return nil }
-        return ChartGeometry(series: series, visible: visible, thresholds: thresholds, style: style,
-                             plot: ChartContent.plotRect(size: size, origin: origin, style: style))
-    }
-
-    func pie(in size: CGSize, origin: CGPoint = .zero) -> PieGeometry? {
-        guard case .pie(let slices) = content else { return nil }
-        return PieGeometry(slices: slices, visible: visible, innerRatio: style.innerRadiusRatio,
-                           plot: ChartContent.plotRect(size: size, origin: origin, style: style))
+    /// Resolves the stack, the scale, the axis frame and the marks for one size.
+    ///
+    /// Drawing, hit-testing and the callout all go through here so they agree on
+    /// where the plot is.
+    func resolve(in size: CGSize, origin: CGPoint = .zero, text: ChartText) -> ChartResolution {
+        switch content {
+        case .cartesian(let series, let guides, let xDomain):
+            let stack = ChartStack(series: series, visible: visible, style: style)
+            let yScale = ChartScale.fit(stack: stack, thresholds: guides.thresholds, bands: guides.bands,
+                                        style: style, tickCount: axis.y.tickCount)
+            let xScale = xDomain.isNumeric
+                ? ChartScale.fit(extent: stack.shown.flatMap { series[$0].data.map(\.x) },
+                                 lower: nil, upper: nil, tickCount: axis.x.tickCount)
+                : nil
+            let frame = ChartFrame.cartesian(stack: stack, xDomain: xDomain, xScale: xScale,
+                                             yScale: yScale, style: style, axis: axis,
+                                             size: size, origin: origin, text: text)
+            let geometry = ChartGeometry(series: series, stack: stack, xDomain: xDomain, xScale: xScale,
+                                         yScale: yScale, barSpacing: style.barSpacing, plot: frame.plot)
+            return ChartResolution(frame: frame, cartesian: geometry, pie: nil)
+        case .pie(let slices):
+            let frame = ChartFrame.pie(style: style, size: size, origin: origin)
+            let geometry = PieGeometry(slices: slices, visible: visible,
+                                       innerRatio: style.innerRadiusRatio,
+                                       startAngle: pie.startAngle, sortsByValue: pie.sortsByValue,
+                                       plot: frame.plot)
+            return ChartResolution(frame: frame, cartesian: nil, pie: geometry)
+        }
     }
 
     private func hit(x: Float, y: Float, node: Node) -> ChartPoint? {
         let local = (x - Float(node.absoluteOrigin.x), y - Float(node.absoluteOrigin.y))
-        if let geometry = cartesian(in: node.frame.size) {
+        let text = ChartText(theme: node.theme, environment: TextEnvironmentHolder.current)
+        let resolution = resolve(in: node.frame.size, text: text)
+        if let geometry = resolution.cartesian {
             return geometry.nearest(x: local.0, y: local.1).map { ChartPoint(series: $0.series, index: $0.index) }
         }
-        return pie(in: node.frame.size)?.wedge(atX: local.0, y: local.1).map { ChartPoint(series: 0, index: $0.index) }
+        return resolution.pie?.wedge(atX: local.0, y: local.1).map { ChartPoint(series: 0, index: $0.index) }
     }
 
     /// Visible (series, count) pairs in order; a pie is one series of slices.
     private var tracks: [(series: Int, count: Int)] {
         switch content {
         case .cartesian(let series, _, _):
-            series.indices.filter { visible[$0] && !series[$0].values.isEmpty }.map { ($0, series[$0].values.count) }
+            series.indices.filter { visible[$0] && !series[$0].data.isEmpty }
+                .map { ($0, series[$0].data.count) }
         case .pie(let slices):
-            slices.contains { _ in true } ? [(0, slices.count)] : []
+            slices.isEmpty ? [] : [(0, slices.count)]
         }
     }
 
+    /// Keyboard stepping skips gaps, which hold no value to read out.
     private func isVisible(_ point: ChartPoint) -> Bool {
-        if case .pie(let slices) = content { return visible[point.index] && slices[point.index].value > 0 }
-        return true
+        switch content {
+        case .cartesian(let series, _, _):
+            guard series.indices.contains(point.series),
+                  series[point.series].data.indices.contains(point.index) else { return false }
+            return series[point.series].data[point.index].y.isFinite
+        case .pie(let slices):
+            guard slices.indices.contains(point.index) else { return false }
+            return visible[point.index] && slices[point.index].value > 0
+        }
     }
 
     func stepped(index delta: Int, from current: ChartPoint?) -> ChartPoint? {
@@ -238,20 +415,30 @@ struct ChartPlot: _PrimitiveView {
     private func draw(node: Node, origin: CGPoint, list: DrawList) {
         let size = node.frame.size
         guard size.width > 0, size.height > 0 else { return }
-        let paint = ChartPaint(theme: node.theme, style: style, selection: selection)
+        let text = ChartText(theme: node.theme, environment: TextEnvironmentHolder.current)
+        let resolution = resolve(in: size, origin: origin, text: text)
+        let paint = ChartPaint(theme: node.theme, style: style, selection: selection,
+                               frame: resolution.frame, text: text)
         paint.background(UIRect(x: Float(origin.x), y: Float(origin.y), width: Float(size.width), height: Float(size.height)), list: list)
-        switch content {
-        case .cartesian(let series, let thresholds, let markers):
-            guard let geometry = cartesian(in: size, origin: origin), geometry.plot.width > 0, geometry.plot.height > 0 else { return }
-            paint.grid(geometry, list: list)
-            paint.thresholds(thresholds, geometry: geometry, list: list)
-            paint.series(series, geometry: geometry, list: list)
-            paint.markers(markers, geometry: geometry, list: list)
-            paint.selection(series, geometry: geometry, list: list)
-        case .pie(let slices):
-            guard let geometry = pie(in: size, origin: origin) else { return }
+        let marks: (series: [ChartSeries], guides: ChartGuides, geometry: ChartGeometry)? = {
+            guard let geometry = resolution.cartesian, geometry.plot.width > 0, geometry.plot.height > 0,
+                  case .cartesian(let series, let guides, _) = content else { return nil }
+            return (series, guides, geometry)
+        }()
+        // Bands sit under the grid so the grid still reads as the top rule.
+        if let marks { paint.bands(marks.guides.bands, geometry: marks.geometry, list: list) }
+        paint.grid(list: list)
+        if let marks {
+            paint.thresholds(marks.guides.thresholds, geometry: marks.geometry, list: list)
+            paint.series(marks.series, geometry: marks.geometry, list: list)
+            paint.markers(marks.guides.markers, geometry: marks.geometry, list: list)
+            paint.selection(marks.series, geometry: marks.geometry, list: list)
+        }
+        if let geometry = resolution.pie, case .pie(let slices) = content {
+            if pie.showsLabels { paint.pieLeaders(slices, geometry: geometry, list: list) }
             paint.pie(slices, geometry: geometry, list: list)
         }
+        paint.axisLabels(list: list)
         if FocusChainHolder.current?.focused === node, FocusChainHolder.current?.isFocusVisible == true {
             list.addRoundedRectStroke(UIRect(x: Float(origin.x), y: Float(origin.y), width: Float(size.width), height: Float(size.height)),
                                       radius: node.theme.radius.sm, width: 2, color: node.theme.colors.focusRing)
@@ -284,43 +471,68 @@ final class ChartSession: NodeResource {
     }
 }
 
-/// Repaint identity: values, resolved colors and selection.
+/// Repaint identity: values, resolved colors, per-series styling and selection.
 private struct ChartPaintIdentity: Equatable {
     let values: [[Float]]
+    let xs: [[Float]]
     var colors: [Color]
     let marks: [String]
+    let styles: [ChartSeriesStyle]
+    let xDomain: ChartXDomain?
     let visible: [Bool]
     let selection: ChartPoint?
     let thresholds: [Float]
+    let bands: [[Float]]
     let markers: [Int]
     let style: [Float]
+    /// Axis chrome that changes what is drawn: titles and tick counts.
+    let axis: [String]
+    /// Pie order and start angle, which decide every wedge.
+    let pie: [Float]
 
     init(plot: ChartPlot, theme: Theme) {
         switch plot.content {
-        case .cartesian(let series, let thresholds, let markers):
-            values = series.map { $0.values + ($0.xValues ?? []) }
-            colors = series.map { $0.color.resolve(theme) } + thresholds.map { $0.color.resolve(theme) } + markers.map { $0.color.resolve(theme) }
+        case .cartesian(let series, let guides, let x):
+            values = series.map { $0.data.map(\.y) }
+            xs = series.map { $0.data.map(\.x) }
+            colors = series.map { $0.color.resolve(theme) }
+                + guides.thresholds.map { $0.color.resolve(theme) }
+                + guides.bands.map { $0.color.resolve(theme) }
+                + guides.markers.map { $0.color.resolve(theme) }
             marks = series.map { "\($0.mark)" }
-            self.thresholds = thresholds.map(\.value)
-            self.markers = markers.map(\.index)
+            styles = series.map(\.style)
+            xDomain = x
+            thresholds = guides.thresholds.map(\.value)
+            bands = guides.bands.map { [$0.from, $0.to] }
+            markers = guides.markers.map(\.index)
         case .pie(let slices):
             values = [slices.map(\.value)]
+            xs = []
             colors = slices.indices.map { slices[$0].resolvedColor(at: $0).resolve(theme) }
             marks = ["pie"]
-            thresholds = []; markers = []
+            styles = []
+            xDomain = nil
+            thresholds = []; bands = []; markers = []
         }
         visible = plot.visible
         selection = plot.selection
         let style = plot.style
-        self.style = [style.minValue ?? .nan, style.maxValue ?? .nan, Float(style.gridLineCount), style.lineWidth,
+        self.style = [style.minValue ?? .nan, style.maxValue ?? .nan, style.showsGrid ? 1 : 0, style.lineWidth,
                       style.barSpacing, style.contentInset, style.innerRadiusRatio, style.stacking == .stacked ? 1 : 0]
+        let axis = plot.axis
+        self.axis = [axis.y.title, axis.x.title, "\(axis.y.tickCount)", "\(axis.x.tickCount)",
+                     axis.y.isLabeled ? "y" : "", axis.x.isLabeled ? "x" : ""]
+        let pie = plot.pie
+        self.pie = [pie.startAngle, pie.sortsByValue ? 1 : 0, pie.showsLabels ? 1 : 0]
 
         colors += [style.background?.resolve(theme) ?? .clear, style.gridColor.resolve(theme)]
     }
 
     static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.values == rhs.values && lhs.colors == rhs.colors && lhs.marks == rhs.marks && lhs.visible == rhs.visible
+        lhs.values == rhs.values && lhs.xs == rhs.xs && lhs.colors == rhs.colors && lhs.marks == rhs.marks
+            && lhs.styles == rhs.styles && lhs.xDomain == rhs.xDomain && lhs.visible == rhs.visible
             && lhs.selection == rhs.selection && lhs.thresholds == rhs.thresholds && lhs.markers == rhs.markers
+            && lhs.bands == rhs.bands && lhs.axis == rhs.axis && lhs.pie == rhs.pie
             && lhs.style.elementsEqual(rhs.style) { $0 == $1 || ($0.isNaN && $1.isNaN) }
     }
 }
