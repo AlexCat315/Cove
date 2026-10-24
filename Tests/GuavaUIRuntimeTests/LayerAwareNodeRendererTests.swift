@@ -9,6 +9,28 @@ import Foundation
 @Suite("Phase 4b LayerAwareNodeRenderer", .serialized)
 struct LayerAwareNodeRendererTests {
 
+    @Test("A painter's local clip follows its geometry when a cached leaf scrolls into view")
+    func localPainterClipMovesWithLeaf() {
+        let root = Node(); root.frame = CGRect(x: 0, y: 0, width: 100, height: 100)
+        root.clipsToBounds = true
+        let leaf = Node(); leaf.frame = CGRect(x: 0, y: 140, width: 20, height: 20)
+        leaf.draw = { list, origin in
+            list.pushClip(UIRect(x: Float(origin.x) + 5, y: Float(origin.y) + 5, width: 10, height: 10))
+            list.addRect(UIRect(x: Float(origin.x), y: Float(origin.y), width: 20, height: 20), color: .white)
+            list.popClip()
+        }
+        root.addChild(leaf)
+        let tree = RenderTree(); tree.install(rootNode: root)
+        let renderer = LayerAwareNodeRenderer()
+        for _ in 0..<3 { renderer.render(tree: tree, into: DrawList()) }
+        root.contentOffset.y = 100
+        let actual = DrawList(); renderer.render(tree: tree, into: actual)
+        let expected = DrawList(); NodeRenderer().render(root: root, into: expected)
+        #expect(!actual.indices.isEmpty)
+        #expect(actual.batches.map(\.scissor) == expected.batches.map(\.scissor))
+        #expect(actual.batches.contains { $0.scissor?.y == 45 && $0.scissor?.height == 10 })
+    }
+
     /// Holder that keeps strong references to every Node alive for the
     /// duration of a test. `RenderObject.node` is weak, so a test that
     /// drops a Node also drops the corresponding RenderObject's binding.

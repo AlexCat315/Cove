@@ -81,6 +81,10 @@ public final class DrawList {
 
     /// Stack of clip rectangles applied via `pushClip` / `popClip`.
     private var clipStack: [UIRect] = []
+    /// Monotonic recording metadata for retained painters. Parent clips are
+    /// established before a painter starts; any later push makes its scissors
+    /// depend on the painter's placement.
+    package private(set) var clipRevision: UInt64 = 0
     /// Rounded content masks applied to geometry on the CPU (`pushMask`).
     private var masks: [UIRoundedRect] = []
     /// Outlines for `masks`, tessellated once per push.
@@ -141,6 +145,7 @@ public final class DrawList {
     /// Push a clip rectangle. Subsequent draws will be intersected with the
     /// current clip stack until `popClip()` is called.
     public func pushClip(_ rect: UIRect) {
+        clipRevision &+= 1
         if let parent = clipStack.last {
             clipStack.append(intersect(parent, rect))
         } else {
@@ -221,6 +226,7 @@ public final class DrawList {
     /// Replace the draw list contents with pre-built data from a `DrawListSnapshot`.
     /// Used by the render thread to reconstruct a frame without re-walking the node tree.
     public func load(vertices: [UIVertex], indices: [UInt32], batches: [DrawBatch], resources: DrawListResources = .init()) {
+        if batches.contains(where: { $0.scissor != nil }) { clipRevision &+= 1 }
         self.vertices = vertices
         self.indices = indices
         self.batches = batches
@@ -288,6 +294,7 @@ public final class DrawList {
     private func appendUnmasked(_ other: DrawList,
                                 vertexTranslationX: Float,
                                 vertexTranslationY: Float) {
+        if other.clipRevision != 0 { clipRevision &+= 1 }
         resources.append(other.resources)
         // A reveal describes the whole frame, so it travels with the geometry
         // into the frame list even when the node that raised it was recorded

@@ -55,6 +55,7 @@ public final class RenderObject {
     /// Bounds of actual cached leaf vertices, including overdraw and shadows.
     /// Node.frame alone is not a safe culling boundary for custom painters.
     var cachedPaintBounds: UIRect?
+    var cachedLayerUsesLocalClips = false
 
     /// Parent clip stack snapshot at last record. Cache is only valid when
     /// the current parent clip stack equals this snapshot, otherwise scissor

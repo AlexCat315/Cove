@@ -91,6 +91,7 @@ public final class LayerAwareNodeRenderer {
                 // cannot resize them.
                 if obj.children.isEmpty,
                    !node.clipsToBounds,
+                   !obj.cachedLayerUsesLocalClips,
                    own.a == obj.lastPlacement?.a,
                    own.shadowScale == obj.lastPlacement?.shadowScale,
                    let cachedPlacement = obj.lastPlacement,
@@ -136,6 +137,7 @@ public final class LayerAwareNodeRenderer {
             layerList.setViewportBounds(frame.viewportBounds)
             // Push the parent clip stack so nested clips intersect properly.
             for clip in parentClipStack { layerList.pushClip(clip) }
+            let inheritedClips = layerList.clipRevision
             recordSelfAndDescendants(
                 obj,
                 node: node,
@@ -146,6 +148,7 @@ public final class LayerAwareNodeRenderer {
             )
             for clip in parentClipStack.reversed() { layerList.popClip(clip) }
             obj.cachedLayerList = layerList
+            obj.cachedLayerUsesLocalClips = layerList.clipRevision != inheritedClips
             obj.cachedPaintBounds = obj.children.isEmpty ? RenderCulling.bounds(of: layerList) : nil
             obj.lastPlacement = own
             obj.lastClipStack = parentClipStack
