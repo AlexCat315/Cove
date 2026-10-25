@@ -47,9 +47,9 @@ public enum PathIdentity {
     }
 
     public static func relativePath(_ file: URL, to root: URL) -> String {
-        let parts = components(file.standardizedFileURL), base = components(root.standardizedFileURL)
-        let comparable = comparableComponents(file.standardizedFileURL)
-        let comparableBase = comparableComponents(root.standardizedFileURL)
+        let parts = components(file), base = components(root)
+        let comparable = comparableComponents(file)
+        let comparableBase = comparableComponents(root)
         var common = 0
         while common < min(parts.count, base.count), comparable[common] == comparableBase[common] { common += 1 }
         return (Array(repeating: "..", count: base.count - common) + Array(parts.dropFirst(common))).joined(separator: "/")
@@ -74,7 +74,8 @@ public enum PathIdentity {
             suffix.append(ancestor.lastPathComponent)
             ancestor = parent
         }
-        var result = normalizedURL(ancestor.resolvingSymlinksInPath())
+        var result = normalizedURL(FileManager.default.fileExists(atPath: ancestor.path)
+            ? ancestor.resolvingSymlinksInPath() : ancestor)
         for component in suffix.reversed() { result.appendPathComponent(component) }
         return normalizedURL(result)
     }
@@ -92,11 +93,22 @@ public enum PathIdentity {
             if path.lowercased().hasPrefix("unc/") { path = "//" + path.dropFirst(4) }
             break
         }
+        let unc = path.hasPrefix("//")
+        var parts: [Substring] = []
+        let rootCount = unc ? 2 : 1
+        for part in path.split(separator: "/") {
+            if part == "." { continue }
+            if part == ".." {
+                if parts.count > rootCount { parts.removeLast() }
+            } else { parts.append(part) }
+        }
+        path = (unc ? "//" : "") + parts.joined(separator: "/")
         if isWindowsRoot(path) {
             if !path.hasSuffix("/") { path += "/" }
             return URL(fileURLWithPath: path, isDirectory: true)
         }
-        return URL(fileURLWithPath: path, isDirectory: url.hasDirectoryPath).standardizedFileURL
+        // Do not standardize UNC URLs: Foundation collapses their leading //.
+        return URL(fileURLWithPath: path, isDirectory: url.hasDirectoryPath)
         #else
         return url.standardizedFileURL
         #endif

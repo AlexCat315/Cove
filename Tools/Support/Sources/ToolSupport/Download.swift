@@ -9,9 +9,9 @@ public import Foundation
 public enum Download {
   public static func metadata(from remote: URL, to destination: URL) throws {
     guard remote.scheme == "https" else { throw ToolError.message("Metadata requires HTTPS") }
-    let downloaded = try fetch(remote)
-    defer { try? Fs.remove(downloaded) }
     try Fs.directory(destination.deletingLastPathComponent())
+    let downloaded = try fetch(remote, beside: destination)
+    defer { try? Fs.remove(downloaded) }
     try Fs.replace(downloaded, at: destination)
   }
 
@@ -30,17 +30,16 @@ public enum Download {
       {
         return
       }
-      try Fs.remove(destination)
     }
     try Fs.directory(destination.deletingLastPathComponent())
     Terminal.info("Downloading \(remote.absoluteString)")
-    let downloaded = try fetch(remote)
+    let downloaded = try fetch(remote, beside: destination)
     defer { try? Fs.remove(downloaded) }
     try verify(file: downloaded, sha256: sha256)
     try Fs.replace(downloaded, at: destination)
   }
 
-  private static func fetch(_ remote: URL) throws -> URL {
+  private static func fetch(_ remote: URL, beside destination: URL) throws -> URL {
     let semaphore = DispatchSemaphore(value: 0)
     let result = UncheckedBox<Result<URL, Error>>()
     let task = URLSession.shared.downloadTask(with: remote) { location, response, error in
@@ -58,12 +57,15 @@ public enum Download {
         result.set(.failure(ToolError.message("No data for \(remote.absoluteString)")))
         return
       }
-      let staging = FileManager.default.temporaryDirectory.appendingPathComponent(
-        "guava-download-\(UUID().uuidString)")
+      let staging = destination.deletingLastPathComponent().appendingPathComponent(
+        ".guava-download-\(UUID().uuidString)")
       do {
-        try FileManager.default.moveItem(at: location, to: staging)
+        // URLSession's temporary directory may be on a different volume.
+        // Copy while its callback owns the file, then publish the sibling staging file.
+        try FileManager.default.copyItem(at: location, to: staging)
         result.set(.success(staging))
       } catch {
+        try? FileManager.default.removeItem(at: staging)
         result.set(.failure(error))
       }
     }

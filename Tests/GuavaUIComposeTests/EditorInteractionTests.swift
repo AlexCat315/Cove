@@ -287,7 +287,8 @@ struct EditorInteractionTests: GuavaUIComposeSerializedSuite {
                 .contextMenu(entries: { [] }).flex(1, shrink: 1, basis: 0)
         }.frame(width: 600, height: 400))
         graph.computeLayout(width: 600, height: 400)
-        #expect(try field(rig.tree).absoluteFrame.height == 400)
+        let editable = try field(rig.tree)
+        #expect(editable.absoluteFrame.height == 400)
     } }
 
     @Test("context menu fits a small window, closes on outside click and cleans up on unmount")
