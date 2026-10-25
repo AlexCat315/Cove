@@ -1,4 +1,5 @@
 import Foundation
+private import GuavaFileSystem
 
 /// A managed SDK view binds the installed Swift libraries to the selected NDK.
 /// This never edits the installed SDK or the NDK, and different NDKs use separate caches.
@@ -46,7 +47,8 @@ struct AndroidSDKOverlay {
             + ["-L", URL(fileURLWithPath: `static`).appendingPathComponent("android").path,
                "-resource-dir", `static`, "-static-stdlib"]
         original["swiftCompiler"] = compiler
-        try JSONSerialization.data(withJSONObject: original, options: [.sortedKeys]).write(to: sdk.appendingPathComponent("swift-toolset.json"), options: .atomic)
+        try AtomicFile.write(JSONSerialization.data(withJSONObject: original, options: [.sortedKeys]),
+                             to: sdk.appendingPathComponent("swift-toolset.json"))
         let sysroot = sdk.appendingPathComponent("ndk-sysroot")
         try Files.directory(sysroot.appendingPathComponent("usr/lib"))
         try link(host.appendingPathComponent("sysroot/usr/include"), to: sysroot.appendingPathComponent("usr/include"))

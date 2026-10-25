@@ -2,6 +2,7 @@ import GuavaLogging
 import Foundation
 
 private import ToolSupport
+private import GuavaProcess
 
 enum ToolError: Error, LocalizedError {
     case invalid(String)
@@ -44,23 +45,32 @@ enum Shell {
         guard let command = arguments.first else { throw ToolError.invalid("Empty command") }
         let logger = LogSystem.logger("com.guava.cli.process")
         if !quiet { logger.debug("Starting command", metadata: ["command": "\(URL(fileURLWithPath: command).lastPathComponent)", "arguments": "\(arguments.count - 1)"]) }
-        let process = Process()
-        process.executableURL = try executable(command, environment: environment)
-        process.arguments = Array(arguments.dropFirst())
-        process.currentDirectoryURL = directory
-        var childEnvironment = environment
-        childEnvironment["GUAVA_LOG_RUN_ID"] = childEnvironment["GUAVA_LOG_RUN_ID"] ?? LogSystem.launch.runID
-        process.environment = childEnvironment
+        var request = ProcessCommand(executable: try executable(command, environment: environment),
+            directory: directory ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
+        request.arguments = Array(arguments.dropFirst())
+        request.environment = environment
+        request.environment["GUAVA_LOG_RUN_ID"] = request.environment["GUAVA_LOG_RUN_ID"] ?? LogSystem.launch.runID
+        var budget = ProcessBudget()
+        budget.outputBytes = 33_554_432
+        budget.lifetimeMilliseconds = nil
+        let session = try ProcessSession(command: request, budget: budget)
+        defer { session.cancel() }
+        session.closeInput()
         let output = ProcessStream(command: command, stream: "stdout", destination: capture ? nil : stdout, collect: capture)
         let errors = ProcessStream(command: command, stream: "stderr", destination: .standardError)
-        process.standardOutput = output.pipe; process.standardError = errors.pipe
-        let started = ContinuousClock.now
-        try process.run()
-        output.start(pid: process.processIdentifier); errors.start(pid: process.processIdentifier)
-        process.waitUntilExit()
-        let data = output.finish(); _ = errors.finish()
-        if !quiet { logger.debug("Command finished", metadata: ["command": "\(command)", "status": "\(process.terminationStatus)", "duration": "\(started.duration(to: .now))"]) }
-        guard process.terminationStatus == 0 else { throw ToolError.failed(command, process.terminationStatus) }
+        var status: Int32 = 0
+        while let event = try session.nextEvent() {
+            switch event {
+            case let .stdout(data): output.consume(data, pid: session.processIdentifier)
+            case let .stderr(data): errors.consume(data, pid: session.processIdentifier)
+            case let .exited(code): status = code
+            case .stdoutClosed, .stderrClosed: break
+            }
+        }
+        let data = output.finish(pid: session.processIdentifier)
+        _ = errors.finish(pid: session.processIdentifier)
+        guard status == 0 else { throw ToolError.failed(command, status) }
         return String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+
     }
 }

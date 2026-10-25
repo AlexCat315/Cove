@@ -1,4 +1,5 @@
 public import Foundation
+private import GuavaFileSystem
 
 public enum Fs {
   public static func directory(_ url: URL) throws {
@@ -35,12 +36,12 @@ public enum Fs {
 
   public static func write(_ text: String, to url: URL) throws {
     try directory(url.deletingLastPathComponent())
-    try text.write(to: url, atomically: true, encoding: .utf8)
+    try AtomicFile.write(Data(text.utf8), to: url)
   }
 
   public static func write(_ data: Data, to url: URL) throws {
     try directory(url.deletingLastPathComponent())
-    try data.write(to: url, options: .atomic)
+    try AtomicFile.write(data, to: url)
   }
 
   public static func json<T: Encodable>(_ value: T, to url: URL, pretty: Bool = true) throws {
@@ -82,31 +83,12 @@ public enum Fs {
 
   /// Relative path using forward slashes, matching archive and manifest conventions.
   public static func relative(_ file: URL, to root: URL) -> String {
-    let components = file.standardizedFileURL.pathComponents
-    let base = root.standardizedFileURL.pathComponents
-    var common = 0
-    while common < min(components.count, base.count), components[common] == base[common] {
-      common += 1
-    }
-    return
-      (Array(repeating: "..", count: base.count - common) + Array(components.dropFirst(common)))
-      .joined(separator: "/")
+    PathIdentity.relativePath(file, to: root)
   }
 
   /// Atomically publishes a staged file, matching "write temp then replace" semantics.
   public static func replace(_ staged: URL, at destination: URL) throws {
     try directory(destination.deletingLastPathComponent())
-    // `FileManager.replaceItemAt` traps on Windows ("not yet implemented" in
-    // corelibs-foundation), so publish with an explicit remove + move there.
-    #if os(Windows)
-      try remove(destination)
-      try FileManager.default.moveItem(at: staged, to: destination)
-    #else
-      if FileManager.default.fileExists(atPath: destination.path) {
-        _ = try FileManager.default.replaceItemAt(destination, withItemAt: staged)
-      } else {
-        try FileManager.default.moveItem(at: staged, to: destination)
-      }
-    #endif
+    try FileReplacement.replace(destination, with: staged)
   }
 }

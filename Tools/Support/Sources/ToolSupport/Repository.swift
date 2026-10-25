@@ -1,4 +1,5 @@
 public import Foundation
+private import GuavaFileSystem
 
 /// Locates the SDK checkout every tool operates on, independent of the caller's
 /// working directory, and exposes the small set of well-known roots.
@@ -7,17 +8,11 @@ public enum Repository {
     if let override = ProcessInfo.processInfo.environment["GUAVA_ROOT"], !override.isEmpty {
       return URL(fileURLWithPath: override).standardizedFileURL
     }
-    var directory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-      .standardizedFileURL
-    while directory.path != "/" {
-      if FileManager.default.fileExists(
-        atPath: directory.appendingPathComponent("Tools/Developer/Package.swift").path)
-      {
+    let current = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+    for directory in PathIdentity.ancestors(of: current) {
+      if FileManager.default.fileExists(atPath: directory.appendingPathComponent("Tools/Developer/Package.swift").path) {
         return directory
       }
-      let parent = directory.deletingLastPathComponent()
-      if parent.path == directory.path { break }
-      directory = parent
     }
     Terminal.fail("Run guava-dev from inside a source checkout or set GUAVA_ROOT")
   }

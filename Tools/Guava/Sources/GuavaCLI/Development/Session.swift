@@ -1,4 +1,5 @@
 import Foundation
+private import GuavaFileSystem
 import GuavaUIDevToolsProtocol
 
 struct ManagedSession: Codable {
@@ -32,9 +33,7 @@ final class DevelopmentSession {
         let id = UUID().uuidString
         directory = project.buildDirectory.appendingPathComponent("devtools/\(id)")
         try Files.directory(directory)
-        #if !os(Windows)
-        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
-        #endif
+        try FilePermissions.restrictToCurrentUser(directory)
         launch = DevToolsLaunch(id: id, token: UUID().uuidString + UUID().uuidString,
             descriptorPath: directory.appendingPathComponent("runtime.json").path, appTitle: project.configuration.application.name)
     }
@@ -61,9 +60,7 @@ final class DevelopmentSession {
                                      platform: platform, configuration: configuration, device: device)
         let file = directory.appendingPathComponent("session.json")
         try Files.json(session, to: file)
-        #if !os(Windows)
-        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
-        #endif
+        try FilePermissions.restrictToCurrentUser(file)
         return session
     }
 

@@ -38,7 +38,16 @@ enum GuavaCLI {
             var command = SwiftPackage.command(directory: arguments.directory, configuration: arguments.configuration,
                 scratchPath: arguments.url(.scratchPath))
             if let product = arguments.value(.product) { command += ["--product", product] }
+            if let target = arguments.value(.target) { command += ["--target", target] }
+            if let triple = arguments.value(.triple) { command += ["--triple", triple] }
+            if let sdk = arguments.value(.sdk) { command += ["--sdk", sdk] }
+            if arguments.flags.contains(.buildTests) { command.append("--build-tests") }
             try Shell.run(command, environment: SwiftPackage.environment(root: root))
+            if let result = arguments.url(.resultFile) {
+                struct Products: Encodable { let products: String }
+                let products = try Shell.run(command + ["--show-bin-path"], environment: SwiftPackage.environment(root: root), capture: true)
+                try Files.json(Products(products: products), to: result)
+            }
         case .create: try CreateApplication.run(arguments, root: GuavaSDK.locate(arguments))
         case .clean:
             let project = try AppProject(at: arguments.directory)
@@ -89,6 +98,8 @@ enum GuavaCLI {
           guava build [directory] [--mac|--win|--linux|--android|--ios|--web] [--debug|--profile|--release]
           guava run   [directory] [--mac|--win|--linux|--android|--ios|--web] [--debug|--profile|--release]
           guava test  [directory] [--debug|--profile|--release] [--filter TEST] [--no-parallel]
+                      [--build-only|--skip-build] [--testing-library xctest|swift-testing]
+                      [--timeout SECONDS] [--event-output FILE] [--scratch-path DIRECTORY]
           guava clean [directory]
           guava self update [VERSION]
           guava sdk install VERSION

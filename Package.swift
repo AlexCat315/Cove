@@ -42,6 +42,17 @@ let platformTargets: [Target] = [
     .testTarget(name: "GuavaPlatformCoreTests", dependencies: ["GuavaPlatformCore"], path: "PlatformCore/Tests/GuavaPlatformCoreTests")
 ]
 
+let systemTargets: [Target] = [
+    .target(name: "CGuavaSystem", path: "System/Sources/CGuavaSystem", linkerSettings: [
+        .linkedLibrary("advapi32", .when(platforms: [.windows])),
+    ]),
+    .target(name: "GuavaFileSystem", dependencies: ["CGuavaSystem"], path: "System/Sources/GuavaFileSystem"),
+    .target(name: "GuavaProcess", dependencies: ["CGuavaSystem"], path: "System/Sources/GuavaProcess"),
+    .executableTarget(name: "GuavaProcessFixture", dependencies: ["GuavaProcess"], path: "System/Sources/GuavaProcessFixture"),
+    .testTarget(name: "GuavaFileSystemTests", dependencies: ["GuavaFileSystem"], path: "System/Tests/GuavaFileSystemTests"),
+    .testTarget(name: "GuavaProcessTests", dependencies: ["GuavaProcess", "GuavaProcessFixture"], path: "System/Tests/GuavaProcessTests"),
+]
+
 let loggingTargets: [Target] = [
     .target(name: "CGuavaLog", path: "Logging/Sources/CGuavaLog", publicHeadersPath: "include", linkerSettings: [.linkedLibrary("log", .when(platforms: [.android]))]),
     .target(name: "GuavaLogCore", dependencies: [.product(name: "Logging", package: "swift-log")], path: "Logging/Sources/GuavaLogCore"),
@@ -50,7 +61,7 @@ let loggingTargets: [Target] = [
 ]
 
 let portableTargets: [Target] = [
-    .target(name: "GuavaUIAgentCore", path: "Portable/Sources/GuavaUIAgentCore"),
+    .target(name: "GuavaUIAgentCore", dependencies: ["GuavaFileSystem"], path: "Portable/Sources/GuavaUIAgentCore"),
     .target(name: "GuavaUIAgentTransport", dependencies: [
             "GuavaUIAgentCore", .product(name: "NIOCore", package: "swift-nio"),
             .product(name: "NIOPosix", package: "swift-nio"),
@@ -193,7 +204,7 @@ let uiTargets: [Target] = [
         ),
     .target(
             name: "GuavaUICompose",
-            dependencies: ["GuavaUIRuntime", .target(name: "GuavaLogging"),
+            dependencies: ["GuavaFileSystem", "GuavaUIRuntime", .target(name: "GuavaLogging"),
                            .product(name: "Markdown", package: "swift-markdown"),
                            .target(name: "GuavaUIScene"),
                            .target(name: "GuavaUIComposeCore"),
@@ -235,6 +246,7 @@ let uiTargets: [Target] = [
     .target(
             name: "GuavaUIDevTools",
             dependencies: [
+                "GuavaFileSystem",
                 .target(name: "GuavaUIDevToolsServer"),
                 .target(name: "GuavaUIDevToolsScene"),
                 .target(name: "GuavaUIDevToolsProtocol"),
@@ -307,6 +319,8 @@ let package = Package(
     platforms: [.macOS(.v26), .iOS(.v26)],
     products: [
 .library(name: "GuavaPlatformCore", targets: ["GuavaPlatformCore"]),
+.library(name: "GuavaFileSystem", targets: ["GuavaFileSystem"]),
+.library(name: "GuavaProcess", targets: ["GuavaProcess"]),
 .library(name: "GuavaLogging", targets: ["GuavaLogging"]),
     .library(name: "GuavaLogCore", targets: ["GuavaLogCore"]),
     .library(name: "CGuavaLog", targets: ["CGuavaLog"]),
@@ -343,6 +357,10 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-log.git", from: "1.15.1"),
         .package(url: "https://github.com/swiftlang/swift-markdown.git", from: "0.9.0"),
     ],
-    targets: platformTargets + loggingTargets + portableTargets + runtimeTargets + textTargets + uiTargets,
+    targets: platformTargets + systemTargets + loggingTargets + portableTargets + runtimeTargets + textTargets + uiTargets,
     cxxLanguageStandard: .cxx17
 )
+
+for target in systemTargets where target.name != "CGuavaSystem" {
+    target.swiftSettings = [.enableUpcomingFeature("InternalImportsByDefault")]
+}

@@ -8,9 +8,12 @@ let package = Package(
     products: [.executable(name: "guava", targets: ["GuavaCLI"])],
     dependencies: [
         .package(path: "../Support"),
+        .package(path: "../../System"),
         .package(path: "../../Logging"),.package(path: "../../Hosts/Android/Contract"), .package(path: "../../Portable")],
     targets: [
         .executableTarget(name: "GuavaCLI", dependencies: [.product(name: "ToolSupport", package: "Support"),.product(name: "GuavaLogging", package: "Logging"),
+            .product(name: "GuavaFileSystem", package: "System"),
+            .product(name: "GuavaProcess", package: "System"),
             .product(name: "GuavaAndroidContract", package: "Contract"),
             .product(name: "GuavaUIDevToolsProtocol", package: "Portable"),
         ], resources: [.copy("Templates"), .copy("SDK.json")]),

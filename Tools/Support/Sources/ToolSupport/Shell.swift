@@ -1,26 +1,5 @@
 public import Foundation
-
-/// Whether `path` names a file this platform could actually execute.
-///
-/// `FileManager.isExecutableFile` only classifies by extension on Windows
-/// (`SHGetFileInfoW` with `SHGFI_EXETYPE` never touches the disk), so a
-/// candidate that merely ends in `.exe` passes even when nothing is there.
-/// Pairing it with `fileExists` keeps PATH search honest on every platform;
-/// on POSIX the extra check is implied and free.
-private func isRunnable(_ path: String) -> Bool {
-  FileManager.default.fileExists(atPath: path) && FileManager.default.isExecutableFile(atPath: path)
-}
-
-/// Windows preserves the casing a variable was created with, so PowerShell
-/// launches expose `Path` while the POSIX spelling is `PATH`.
-private func environmentValue(_ name: String, in environment: [String: String]) -> String? {
-  if let direct = environment[name] { return direct }
-  #if os(Windows)
-    return environment.first { $0.key.caseInsensitiveCompare(name) == .orderedSame }?.value
-  #else
-    return nil
-  #endif
-}
+private import GuavaProcess
 
 /// Thin, explicit process launching. Arguments are always passed as a vector;
 /// no tool in this public interprets a shell string.
@@ -29,30 +8,7 @@ public enum Shell {
     _ name: String,
     environment: [String: String] = ProcessInfo.processInfo.environment
   ) -> URL? {
-    if name.contains("/") || name.contains("\\") {
-      let file = URL(fileURLWithPath: name)
-      return isRunnable(file.path) ? file : nil
-    }
-    #if os(Windows)
-      let separator: Character = ";"
-      let extensions =
-        [""]
-        + (environmentValue("PATHEXT", in: environment) ?? ".EXE;.CMD;.BAT")
-        .split(separator: ";").map(String.init)
-    #else
-      let separator: Character = ":"
-      let extensions = [""]
-    #endif
-    for directory in (environmentValue("PATH", in: environment) ?? "")
-      .split(separator: separator)
-    {
-      for suffix in extensions {
-        let candidate = URL(fileURLWithPath: String(directory)).appendingPathComponent(
-          name + suffix)
-        if isRunnable(candidate.path) { return candidate }
-      }
-    }
-    return nil
+    ToolLocator.executable(name, environment: environment)
   }
 
   public static func require(
@@ -105,31 +61,10 @@ public enum Shell {
       }
       return result.stdoutText
     }
-    let process = Process()
-    process.executableURL = try require(command, environment: environment)
-    process.arguments = Array(arguments.dropFirst())
-    process.currentDirectoryURL = directory
-    process.environment = environment
-    let inputPipe = input.map { _ in Pipe() }
-    process.standardOutput = FileHandle.standardOutput
-    process.standardError = FileHandle.standardError
-    if let inputPipe {
-      process.standardInput = inputPipe
-    } else if input != nil {
-      process.standardInput = FileHandle.standardInput
-    }
-    try process.run()
-    if let inputPipe {
-      let payload = Data((input ?? "").utf8)
-      DispatchQueue.global().async {
-        try? inputPipe.fileHandleForWriting.write(contentsOf: payload)
-        try? inputPipe.fileHandleForWriting.close()
-      }
-    }
-    process.waitUntilExit()
-    guard process.terminationStatus == 0 else {
-      throw ToolError.command(command, process.terminationStatus)
-    }
+    let result = try ProcessRunner.run(arguments, at: directory, environment: environment,
+      input: input.map { Data($0.utf8) }, stream: true)
+    guard result.status == 0 else { throw ToolError.command(command, result.status) }
+
     return ""
   }
 }

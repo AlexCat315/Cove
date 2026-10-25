@@ -125,7 +125,7 @@ extension TextField {
     /// the inserted text and clear any selection.
     func insertReplacingSelection(_ incoming: String, state: FieldState) {
         let selection = selectionRange(state)
-        let typing = incoming.count == 1 && incoming != "\n" && selection == nil && !state.composition.isActive
+        let typing = incoming.count == 1 && incoming.first?.isNewline == false && selection == nil && !state.composition.isActive
         beginEdit(state, kind: typing ? .typing : .atomic)
         defer { endEdit(state) }
         guard !incoming.isEmpty else { return }
