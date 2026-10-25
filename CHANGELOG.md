@@ -4,7 +4,7 @@ GuavaUI SDK 与 `guava` CLI 的发布记录。每个版本对应 git 标签 `vX.
 
 ## Unreleased
 
-- Windows 子进程参数只在需要时加引号，`cmd.exe /c` 等自行解析命令行的程序能识别开关并返回真实退出码。
+- Windows 子进程以反斜杠路径启动，参数只在需要时加引号：`cmd.exe` 会扫描整条命令行，曾把 `C:/…/cmd.exe` 里的 `/cmd.exe` 当作 `/c` 开关，现在能执行命令并返回真实退出码。
 - 文件与管道错误改用 `NSPOSIXErrorDomain`：Android 的 Foundation 没有 `POSIXErrorCode`，`System` 包恢复在 Android 上编译。
 
 ## 0.1.7 — 2026-10-25

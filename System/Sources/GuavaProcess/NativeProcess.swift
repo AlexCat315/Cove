@@ -40,7 +40,7 @@ final class NativeProcess: @unchecked Sendable {
         child = launch.executable.withCString(encodedAs: UTF16.self) { executable in
             launch.command.withCString(encodedAs: UTF16.self) { arguments in
                 launch.environment.withCString(encodedAs: UTF16.self) { environment in
-                    command.directory.path.withCString(encodedAs: UTF16.self) { directory in
+                    launch.directory.withCString(encodedAs: UTF16.self) { directory in
                         guava_process_start(executable, arguments, environment, directory,
                             input.fileHandleForReading._handle, output.fileHandleForWriting._handle,
                             errors.fileHandleForWriting._handle, &error)

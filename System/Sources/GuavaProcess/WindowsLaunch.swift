@@ -5,12 +5,14 @@ struct WindowsLaunch {
     let executable: String
     let command: String
     let environment: String
+    let directory: String
 
     init(_ request: ProcessCommand) throws {
         var values: [String: String] = [:]
         for (key, value) in request.environment { values[key.uppercased()] = value }
         environment = values.sorted { $0.key < $1.key }.map { $0.key + "=" + $0.value }.joined(separator: "\0") + "\0\0"
-        let path = request.executable.path
+        directory = Self.nativePath(request.directory)
+        let path = Self.nativePath(request.executable)
         if ["bat", "cmd"].contains(request.executable.pathExtension.lowercased()) {
             // Batch files have shell syntax, unlike native argv. Reject syntax-changing input.
             let unsafe = CharacterSet(charactersIn: "\"\r\n%!?^&|<>")
@@ -24,6 +26,14 @@ struct WindowsLaunch {
             executable = path
             command = ([path] + request.arguments).map(Self.quote).joined(separator: " ")
         }
+    }
+
+    /// Backslash-separated, as programs read their own argv[0]: cmd.exe scans
+    /// the whole command line for switches and takes `C:/…/cmd.exe` as `/c`.
+    private static func nativePath(_ url: URL) -> String {
+        var path = url.withUnsafeFileSystemRepresentation { $0.map { String(cString: $0) } } ?? url.path
+        if path.hasPrefix("/"), path.dropFirst().dropFirst().first == ":" { path.removeFirst() }
+        return path.replacingOccurrences(of: "/", with: "\\")
     }
 
     /// Microsoft CRT argv quoting; native arguments never pass through a shell.
