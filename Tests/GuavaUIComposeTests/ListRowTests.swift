@@ -110,7 +110,7 @@ struct ListRowTests: GuavaUIComposeSerializedSuite {
                         // System fonts have different fixed-slot widths. When
                         // they exceed the viewport the documented horizontal
                         // scrolling behavior must keep every slot reachable.
-                        if trailing.absoluteFrame.minX < -0.5 || trailing.absoluteFrame.maxX > CGFloat(width) + 0.5 {
+                        if !input.contains(.touch) && (trailing.absoluteFrame.minX < -0.5 || trailing.absoluteFrame.maxX > CGFloat(width) + 0.5) {
                             let viewport = try #require(nodes(graph.tree.root).first {
                                 $0.accessibility?.role == .scrollArea && $0.accessibility?.combinesChildren == true
                                     && nodes($0).contains { $0 === title }
@@ -120,7 +120,9 @@ struct ListRowTests: GuavaUIComposeSerializedSuite {
                             #expect(viewport.contentOffset.x > 0)
                             viewport.contentOffset = .zero; settle(graph, h)
                         }
-                        if rtl {
+                        if input.contains(.touch) {
+                            #expect(title.absoluteFrame.minX >= -0.5 && title.absoluteFrame.maxX <= CGFloat(width) + 0.5)
+                        } else if rtl {
                             #expect(trailing.absoluteFrame.maxX <= title.absoluteFrame.minX + 0.5)
                             #expect(title.absoluteFrame.maxX <= icon.absoluteFrame.minX + 0.5)
                         } else {

@@ -11,6 +11,7 @@ public struct ListRowStyleConfiguration {
     /// cell) push the painted row past its own slot.
     public let rowHeight: Float
     public let theme: Theme
+    public var input: UIEnvironment.Input = [.pointer, .keyboard]
 }
 
 /// Equatable interaction snapshot used by built-in list row styles to key

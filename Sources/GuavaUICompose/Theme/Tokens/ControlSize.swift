@@ -1,6 +1,6 @@
 import GuavaUIRuntime
 
-/// Shared desktop control density. Explicit per-control sizes take precedence;
+/// Shared control density. Touch chrome resolves its own geometry from this scale. Explicit per-control sizes take precedence;
 /// otherwise the nearest `.controlSize` provider sizes a whole toolbar or form.
 public enum ControlSize: Sendable, Hashable, CaseIterable {
     case mini, small, regular, large
@@ -20,6 +20,22 @@ public enum ControlSize: Sendable, Hashable, CaseIterable {
         case .small: 9
         case .regular: 12
         case .large: 16
+        }
+    }
+
+    var touchHeight: Float {
+        switch self {
+        case .mini, .small: 44
+        case .regular: 44
+        case .large: 56
+        }
+    }
+    var touchPadding: Float {
+        switch self {
+        case .mini: 12
+        case .small: 14
+        case .regular: 18
+        case .large: 24
         }
     }
 

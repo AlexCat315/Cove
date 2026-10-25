@@ -183,7 +183,7 @@ struct RowDensityTests: GuavaUIComposeSerializedSuite {
         }
     }
 
-    @Test("Menu portals inherit touch density, grow their viewport and restore retained rows on pointer input")
+    @Test("Touch menus use a modal level and pointer input restores an anchored menu")
     func menuRows() throws {
         try scene { graph, context, dispatcher, scheduler in
             let entries: [MenuEntry] = [
@@ -202,27 +202,23 @@ struct RowDensityTests: GuavaUIComposeSerializedSuite {
             graph.install(root: LayerRoot { harness })
             settle(graph, width: 390)
             scheduler.tick(deltaTime: 1); settle(graph, width: 390)
-            let branch = try #require(menuRow(AnyHashable("branch"), in: graph.tree.root!))
-            let disabled = try #require(menuRow(AnyHashable("disabled"), in: graph.tree.root!))
-            #expect(branch.frame.height == 44 && disabled.frame.height == 44)
-            let scroll = try #require(nodes(graph.tree.root!).first { $0.attachments[MenuScrollMarker.key] as? Bool == true })
-            #expect(scroll.frame.height >= 88)
+            let all = nodes(graph.tree.root!)
+            let branch = try #require(all.first { $0.accessibility?.label == "Tools" && $0.isFocusable })
+            let disabled = try #require(all.first { $0.accessibility?.label == "Unavailable" && $0.attachments[ButtonHost.markerKey] != nil })
+            #expect(branch.frame.height >= 48 && disabled.frame.height >= 48 && !disabled.isFocusable)
             context.focusChain.focus(branch)
             let press = MouseButtonEvent(button: .left, x: Float(branch.absoluteFrame.midX),
-                y: Float(branch.absoluteFrame.maxY - 1), clicks: 1)
+                                         y: Float(branch.absoluteFrame.midY), clicks: 1)
             dispatcher.dispatch(.mouseButtonDown(press)); dispatcher.dispatch(.mouseButtonUp(press))
             settle(graph, width: 390)
-            let leaf = try #require(menuRow(AnyHashable("leaf"), in: graph.tree.root!))
-            #expect(leaf.frame.height == 44 && leaf.accessibility?.label == "Build")
+            let leaf = try #require(nodes(graph.tree.root!).first { $0.accessibility?.label == "Build" && $0.isFocusable })
+            #expect(leaf.frame.height >= 48)
+            #expect(nodes(graph.tree.root!).contains { $0.attachments[LayoutDebugAttachmentKey.debugName] as? String == "touch-menu-back" })
             harness.input = [.pointer, .keyboard]
             settle(graph, width: 390)
-            #expect(menuRow(AnyHashable("branch"), in: graph.tree.root!) === branch)
-            #expect(menuRow(AnyHashable("leaf"), in: graph.tree.root!) === leaf)
-            #expect(branch.frame.height == 32 && disabled.frame.height == 32 && leaf.frame.height == 32)
-            #expect(branch.accessibility?.state.isExpanded == true)
-            dispatcher.dispatch(.keyDown(KeyEvent(scancode: Scancode.arrowLeft, keycode: 0, modifiers: [], isRepeat: false)))
-            settle(graph, width: 390)
-            #expect(menuRow(AnyHashable("leaf"), in: graph.tree.root!) == nil)
+            let anchored = try #require(menuRow(AnyHashable("branch"), in: graph.tree.root!))
+            #expect(anchored.frame.height == 32)
+            #expect(!nodes(graph.tree.root!).contains { $0.attachments[LayoutDebugAttachmentKey.debugName] as? String == "touch-overlay-sheet" })
             #expect(!graph.recomposer.hasPending)
         }
     }

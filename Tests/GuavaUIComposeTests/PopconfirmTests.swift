@@ -55,7 +55,7 @@ struct PopconfirmTests: GuavaUIComposeSerializedSuite {
     try #require(nodes(graph.tree.root).first { $0.accessibility?.label == label && $0.accessibility?.role == .button })
   }
   private func panel(_ graph: ViewGraph) throws -> Node {
-    try #require(nodes(graph.tree.root).first { $0.attachments[LayoutDebugAttachmentKey.debugName] as? String == "anchored-surface" })
+    try #require(nodes(graph.tree.root).first { $0.attachments[LayoutDebugAttachmentKey.debugName] as? String == "anchored-surface" || $0.attachments[LayoutDebugAttachmentKey.debugName] as? String == "touch-overlay-sheet" })
   }
   private func settle(_ graph: ViewGraph, _ h: Harness) {
     for _ in 0..<8 { graph.recomposer.commitAll(); graph.computeLayout(width: h.width, height: h.height) }
@@ -148,16 +148,21 @@ struct PopconfirmTests: GuavaUIComposeSerializedSuite {
             h.dark = dark; h.rtl = rtl; h.input = modality; h.placement = .bottomTrailing; settle(graph, h)
             let surface = try panel(graph), keep = try button("Keep", graph), remove = try button("Remove", graph)
             let frame = surface.absoluteFrame
-            #expect(frame.minX >= 8 && frame.maxX <= CGFloat(width) - 8 && frame.maxY <= 812)
+            let sheet = modality.contains(.touch) && !modality.contains(.pointer)
+            let inset: CGFloat = sheet ? 0 : 8
+            #expect(frame.minX >= inset && frame.maxX <= CGFloat(width) - inset && frame.maxY <= (sheet ? 820 : 812))
             let body = frame.insetBy(dx: 10, dy: 10)
             #expect(body.contains(keep.absoluteFrame) && body.contains(remove.absoluteFrame))
             #expect(!keep.absoluteFrame.intersects(remove.absoluteFrame))
-            if rtl { #expect(keep.absoluteFrame.minX >= remove.absoluteFrame.maxX) }
-            else { #expect(keep.absoluteFrame.maxX <= remove.absoluteFrame.minX) }
+            if abs(keep.absoluteFrame.minY - remove.absoluteFrame.minY) < 0.5 {
+              if rtl { #expect(keep.absoluteFrame.minX >= remove.absoluteFrame.maxX) }
+              else { #expect(keep.absoluteFrame.maxX <= remove.absoluteFrame.minX) }
+            } else { #expect(keep.absoluteFrame.maxY <= remove.absoluteFrame.minY) }
             #expect(keep.frame.height >= (modality.contains(.touch) ? 44 : 32))
             #expect(remove.frame.height >= (modality.contains(.touch) ? 44 : 32))
             #expect(nodes(graph.tree.root).contains { $0.accessibility?.role == .dialog && $0.accessibility?.label == h.title })
             #expect(portals.entries.count == 1 && !graph.recomposer.hasPending)
+            if sheet { continue } // Modal surfaces have their own rendering coverage.
             let list = DrawList(), origin = CGPoint(x: 600, y: 300)
             surface.draw?(list, origin)
             let fill = surface.theme.colors.surfaceFloating.rgba8

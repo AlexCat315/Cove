@@ -46,13 +46,18 @@ struct ListRowLayoutTests {
                             #expect(row.absoluteFrame.insetBy(dx: -1, dy: -1).contains(badge.absoluteFrame))
                         }
                     }
-                    let first = try #require(rows.first)
+                    // Virtualized stacks retain overscan rows whose centers can be outside the viewport.
+                    let first = try #require(rows.first { row in
+                        let frame = row.absoluteFrame
+                        return HitTester.hitTest(rootNode: root, point: .init(x: frame.midX, y: frame.midY))?
+                            .path.contains(where: { $0 === row }) == true
+                    })
                     let dispatcher = EventDispatcher(tree: graph.tree, interactions: context.interactions,
                         capture: context.pointerCapture, focusChain: context.focusChain)
                     let frame = first.absoluteFrame
                     let event = MouseButtonEvent(button: .left, x: Float(frame.midX), y: Float(frame.midY), clicks: 1)
                     dispatcher.dispatch(.mouseButtonDown(event)); dispatcher.dispatch(.mouseButtonUp(event)); settle()
-                    #expect(first.accessibility?.state.isSelected == true)
+                    #expect(first.accessibility?.state.isSelected == true, "page: \(page), width: \(width), scale: \(scale), dark: \(dark)")
                     let title = try #require(nodes(first).first { $0.layoutNode?.textInputs != nil })
                     #expect(title.frame.width > 0 && title.frame.height > 0 && !graph.recomposer.hasPending)
                 }

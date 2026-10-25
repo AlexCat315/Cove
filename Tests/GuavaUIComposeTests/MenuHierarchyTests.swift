@@ -105,18 +105,19 @@ struct MenuHierarchyTests: GuavaUIComposeSerializedSuite {
         surface.viewport.height = 600
         graph.install(root: harness.surfaceEnvironment(surface)); settle(graph)
         harness.$shown.wrappedValue = true; settle(graph); scheduler.tick(deltaTime: 1); settle(graph)
-        let parent = try row("branch", graph: graph)
+        let parent = try #require(nodes(graph.tree.root).first { $0.accessibility?.label == "Tools" && $0.isFocusable })
         let event = MouseButtonEvent(button: .left, x: Float(parent.absoluteFrame.midX),
                                      y: Float(parent.absoluteFrame.midY), clicks: 1)
         dispatcher.dispatch(.mouseButtonDown(event)); dispatcher.dispatch(.mouseButtonUp(event))
         settle(graph); scheduler.tick(deltaTime: 0.2); settle(graph)
-        #expect(portal.entries.count == 2)
-        #expect(parent.accessibility?.state.isExpanded == true)
-        let leaf = try row("leaf", graph: graph)
+        #expect(portal.entries.count == 1)
+        #expect(nodes(graph.tree.root).contains { $0.attachments[LayoutDebugAttachmentKey.debugName] as? String == "touch-menu-back" })
+        let leaf = try #require(nodes(graph.tree.root).first { $0.accessibility?.label == "Build" && $0.isFocusable })
         let leafEvent = MouseButtonEvent(button: .left, x: Float(leaf.absoluteFrame.midX),
                                          y: Float(leaf.absoluteFrame.midY), clicks: 1)
         dispatcher.dispatch(.mouseButtonDown(leafEvent)); dispatcher.dispatch(.mouseButtonUp(leafEvent))
         settle(graph)
+        scheduler.tick(deltaTime: 1); settle(graph)
         #expect(probe.actions == 1 && !harness.shown && portal.entries.isEmpty)
     } }
 

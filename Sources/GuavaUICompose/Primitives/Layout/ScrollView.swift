@@ -160,6 +160,7 @@ public struct ScrollView<Content: View>: _PrimitiveView {
     /// Embedded one-line controls merge text into their owning row. An idle
     /// viewport stays transparent to accessibility; overflow exposes scrolling.
     var combinesAccessibility = false
+    var isScrollEnabled = true
     /// A fallback scroller around content that usually fits (a portal entry)
     /// clips only while it actually overflows, so a floating panel inside
     /// keeps its shadow.
@@ -200,7 +201,8 @@ public struct ScrollView<Content: View>: _PrimitiveView {
         self.scrollRequest = scrollRequest
     }
 
-    private static func updateAccessibility(node: Node, label: String?, axes: ScrollAxis, combines: Bool) {
+    private static func updateAccessibility(node: Node, label: String?, axes: ScrollAxis, combines: Bool, enabled: Bool) {
+        guard enabled else { node.accessibility = nil; return }
         let size = visibleViewportRect(for: node).size
         let content = cachedScrollableContentSize(for: node)
         let maxX = max(0, content.width - size.width)
@@ -248,13 +250,13 @@ public struct ScrollView<Content: View>: _PrimitiveView {
             onViewportChange?(snapshot)
             onGeometryChange?(ScrollGeometry(offset: node.contentOffset, viewportSize: size,
                                             contentSize: Self.cachedScrollableContentSize(for: node)))
-            Self.updateAccessibility(node: node, label: accessibilityLabel, axes: axes, combines: combinesAccessibility)
+            Self.updateAccessibility(node: node, label: accessibilityLabel, axes: axes, combines: combinesAccessibility, enabled: isScrollEnabled)
             if let motion = node.attachments[_ScrollViewAttachmentKeys.motion] as? ScrollAnimator {
                 Self.updateAnchor(on: node, motion: motion, axes: axes)
             }
         }
         node.attachments[_ScrollViewAttachmentKeys.report] = report
-        Self.updateAccessibility(node: node, label: accessibilityLabel, axes: axes, combines: combinesAccessibility)
+        Self.updateAccessibility(node: node, label: accessibilityLabel, axes: axes, combines: combinesAccessibility, enabled: isScrollEnabled)
         node.accessibilityActions.increment = { [weak node] in
             guard let node else { return }
             Self.pageScroll(node, axes: axes, forward: true)
@@ -354,6 +356,13 @@ public struct ScrollView<Content: View>: _PrimitiveView {
             // subtree. Zero frames are not new scroll geometry: publishing
             // them would clamp the user's saved offset to zero while hidden.
             guard !Self.isLayoutSuppressed(node) else { return }
+            if !isScrollEnabled {
+                motion.cancel(); motion.adopt(.zero)
+                node.contentOffset = .zero
+                ScrollKeyboardFocus.update(node, canScroll: false)
+                report(node)
+                return
+            }
             Self.refreshScrollableContentSize(on: node)
             Self.publishScrollRange(to: motion, on: node)
             Self.updateAnchor(on: node, motion: motion, axes: axes)
@@ -377,6 +386,15 @@ public struct ScrollView<Content: View>: _PrimitiveView {
                 }
             }
             report(node)
+        }
+
+        if !isScrollEnabled {
+            motion.cancel(); motion.adopt(.zero); node.contentOffset = .zero
+            node.scrollReveal = nil
+            node.accessibilityActions.increment = nil; node.accessibilityActions.decrement = nil
+            InteractionRegistryHolder.current?.remove(node)
+            node.updateOverlayDraw(identity: false) { _, _ in }
+            return
         }
 
         if let registry = InteractionRegistryHolder.current {

@@ -86,9 +86,22 @@ public struct Menu: View {
         self.onItemActivated = onItemActivated; self.onDismiss = onDismiss
     }
     public var body: some View {
-        MenuLevel(configuration: MenuLevelConfiguration(entries: entries, width: width,
+        MenuPresentationHost(configuration: MenuLevelConfiguration(entries: entries, width: width,
             maxVisibleRows: maxVisibleRows, onItemActivated: { onItemActivated?() },
             onDismiss: { (onDismiss ?? onItemActivated)?() }))
+    }
+}
+
+private struct MenuPresentationHost: _PrimitiveView {
+    let configuration: MenuLevelConfiguration
+    func _makeNode() -> Node { let node = Node(); node.isHitTestable = false; return node }
+    func _makeLayoutNode() -> LayoutNode? { nil }
+    func _updateNode(_ node: Node) {}
+    func _children(for node: Node) -> [any View] {
+        if node.compositionValue(of: TouchPresentation.menu) {
+            return [TouchMenu(entries: configuration.entries, onItemActivated: configuration.onItemActivated)]
+        }
+        return [MenuLevel(configuration: configuration)]
     }
 }
 

@@ -5,34 +5,46 @@ private struct _ListRowVisualKey: Equatable, Sendable {
     let alpha: Float
 }
 
-/// List row default: a navigation pill on a fixed-height row.
-///
-/// The highlight is the shared `SelectionAppearance` navigation role — the same
-/// fill, radius and insets a sidebar destination uses — so a list and the
-/// navigation beside it read as one component instead of two. The row owns its
-/// height too: content taller than the slot is centred and clipped instead of
-/// pushing the painted row past the one below it.
+/// Pointer rows use the shared navigation highlight; touch rows use a full-width
+/// band with an inset separator. The host owns the fixed row slot so oversized
+/// content cannot expand the hit region into a neighboring row.
 public struct DefaultListRowStyle: ListRowStyle {
     public init() {}
 
     public func makeBody(configuration: ListRowStyleConfiguration) -> some View {
-        let t = configuration.theme
-        let appearance = SelectionAppearance.resolve(.navigation, theme: t)
-        let fill = appearance.fill(isSelected: configuration.isSelected,
-                                   isHovered: configuration.isHovered,
-                                   isPressed: false)
+        let theme = configuration.theme
+        let touch = configuration.input.contains(.touch)
+        let appearance = SelectionAppearance.resolve(touch ? .dataRow : .navigation, theme: theme)
+        let fill = appearance.fill(isSelected: configuration.isSelected, isHovered: configuration.isHovered, isPressed: false)
         let alpha: Float = configuration.isEnabled ? 1 : 0.55
-        return Row(alignment: .center, spacing: t.spacing.sm) {
+        return Row(alignment: .center, spacing: theme.spacing.sm) {
             configuration.content.frame(minWidth: 0).flex(1, shrink: 1, basis: 0)
         }
         .frame(height: max(0, configuration.rowHeight - 2 * appearance.verticalInset))
-        .selectionHighlight(.navigation,
-                            isSelected: configuration.isSelected,
-                            isHovered: configuration.isHovered)
-        .padding(horizontal: appearance.horizontalInset, vertical: 0)
+        .selectionHighlight(touch ? .dataRow : .navigation, isSelected: configuration.isSelected, isHovered: configuration.isHovered)
+        .padding(horizontal: touch ? 16 : appearance.horizontalInset, vertical: 0)
+        .modifier(ListRowSeparator(color: theme.colors.border, isEnabled: touch))
         .opacity(alpha)
-        // Keyed on the resolved fill, so a theme switch cross-fades the row at
-        // the same speed as a tap changes the selection.
-        .animation(.semantic(.fast, in: t), value: _ListRowVisualKey(fill: fill, alpha: alpha))
+        .animation(.semantic(.fast, in: theme), value: _ListRowVisualKey(fill: fill, alpha: alpha))
+    }
+}
+
+private struct ListRowSeparator: ViewModifier {
+    let color: Color
+    let isEnabled: Bool
+    func apply(node: Node) {
+        guard isEnabled else { node.draw = nil; return }
+        var parent: Node? = node
+        var rtl = false
+        while let current = parent {
+            if let value = current.layoutNode?.direction, value != .inherit { rtl = value == .rtl; break }
+            parent = current.parent
+        }
+        node.draw = { [weak node] list, origin in
+            guard let node else { return }
+            let left: Float = rtl ? 0 : 16
+            list.addRect(UIRect(x: Float(origin.x) + left, y: Float(origin.y + node.frame.height) - 1,
+                                width: max(0, Float(node.frame.width) - 16), height: 1), color: color)
+        }
     }
 }

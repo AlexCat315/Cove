@@ -97,7 +97,9 @@ public struct TabView<ID: Hashable>: View {
         let active = enabled.contains(selection.wrappedValue) ? selection.wrappedValue : enabled.first
         let tabStop = active ?? enabled.first
         return SurfaceReader { surface in
-            let placement = self.placement == .adaptive ? (surface.viewport.widthClass == .compact ? TabStripPlacement.bottom : .top) : self.placement
+            let mobile = self.placement == .adaptive && variant == .bar && tabs.allSatisfy { $0.onClose == nil }
+                && (surface.idiom == .phone || (surface.idiom == .tablet && surface.viewport.widthClass == .compact))
+            let placement = mobile ? TabStripPlacement.bottom : self.placement == .adaptive ? (surface.viewport.widthClass == .compact ? TabStripPlacement.bottom : .top) : self.placement
             RovingFocusHost(
                 enabledItems: enabled.map { AnyHashable($0) },
                 // Read the binding at call time, not the `active` snapshot: two key
@@ -108,7 +110,11 @@ public struct TabView<ID: Hashable>: View {
                 focusRequest: focusRequest
             ) {
                 Box(direction: placement == .top ? .column : .columnReverse, alignItems: .stretch, spacing: 0) {
-                    strip(tabStop: tabStop, placement: placement, surface: surface)
+                    if mobile {
+                        MobileTabBar(tabs: tabs, selection: selection, tabStop: tabStop, isEnabled: isEnabled)
+                    } else {
+                        strip(tabStop: tabStop, placement: placement, surface: surface)
+                    }
                     contentArea
                 }
             }

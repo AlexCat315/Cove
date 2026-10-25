@@ -23,7 +23,7 @@ public struct ListSection<SectionID: Hashable, Item> {
 public struct SectionedList<SectionID: Hashable, Item: Identifiable, RowContent: View>: View {
     public let sections: [ListSection<SectionID, Item>]
     public let selection: Binding<Item.ID?>
-    public let rowHeight: Float
+    public let rowHeight: Float?
     public let rowSpacing: Float
     public let stickyHeaders: Bool
     public let stickyHeaderBackground: SemanticColorRef
@@ -60,7 +60,7 @@ public struct SectionedList<SectionID: Hashable, Item: Identifiable, RowContent:
 
     public init(_ sections: [ListSection<SectionID, Item>],
                 selection: Binding<Item.ID?> = .constant(nil),
-                rowHeight: Float = 30,
+                rowHeight: Float? = nil,
                 rowSpacing: Float = 0,
                 stickyHeaders: Bool = false,
                 stickyHeaderBackground: SemanticColorRef = .surfaceRaised,
@@ -68,7 +68,7 @@ public struct SectionedList<SectionID: Hashable, Item: Identifiable, RowContent:
                 @ViewBuilder rowContent: @escaping (Item, Bool) -> RowContent) {
         self.sections = sections
         self.selection = selection
-        self.rowHeight = max(1, rowHeight)
+        self.rowHeight = rowHeight.map { $0.isFinite ? max(1, $0) : 30 }
         self.rowSpacing = max(0, rowSpacing)
         self.stickyHeaders = stickyHeaders
         self.stickyHeaderBackground = stickyHeaderBackground
@@ -80,7 +80,7 @@ public struct SectionedList<SectionID: Hashable, Item: Identifiable, RowContent:
         ContainerSizeReader { size in
             SurfaceReader { surface in
                 TextScalerReader { scaler in
-                    let effectiveHeight = max(scaler.scale(rowHeight),
+                    let effectiveHeight = max(scaler.scale(rowHeight ?? (surface.input.contains(.touch) ? 56 : 30)),
                                               surface.input.contains(.touch) ? surface.minimumControlExtent : 0)
                     let spacing = scaler.scale(rowSpacing)
                     let entries = makeEntries()

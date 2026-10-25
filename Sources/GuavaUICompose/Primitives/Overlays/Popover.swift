@@ -7,7 +7,8 @@ struct PopoverTriggerDescription {
     var value = ""
     var help: String?
 }
-/// Anchored overlay opened by a labelled trigger button.
+/// Overlay opened by a labelled trigger button. Touch surfaces use a bottom
+/// sheet; pointer surfaces anchor the overlay to its trigger.
 ///
 /// The popup is portal-rendered, so it escapes any clipping or stacking
 /// context the trigger sits in, and it is dismissed by Escape, by losing the
@@ -61,14 +62,20 @@ public struct Popover<Label: View, Content: View>: View {
                 trigger
             }
 
-            AnchoredOverlayHost(isPresented: isEnabled && isPresented.wrappedValue,
-                                width: width,
-                                placement: placement,
-                                sizing: sizing,
-                                surface: surface, overflow: overflow,
-                                onDismiss: { isPresented.wrappedValue = false },
-                                keyHandler: onKey) {
-                content
+            SurfaceReader { environment in
+                if TouchPresentation.usesSheet(environment) {
+                    TouchOverlay(isPresented: isPresented, content: content, onKey: onKey)
+                } else {
+                    AnchoredOverlayHost(isPresented: isEnabled && isPresented.wrappedValue,
+                                        width: width,
+                                        placement: placement,
+                                        sizing: sizing,
+                                        surface: surface, overflow: overflow,
+                                        onDismiss: { isPresented.wrappedValue = false },
+                                        keyHandler: onKey) {
+                        content
+                    }
+                }
             }
         }
         .zIndex(isPresented.wrappedValue ? 10_000 : 0)

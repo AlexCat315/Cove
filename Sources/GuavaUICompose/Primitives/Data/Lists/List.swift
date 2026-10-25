@@ -12,7 +12,7 @@ public struct List<Data: RandomAccessCollection, ID: Hashable, RowContent: View>
     private let id: KeyPath<Data.Element, ID>
     private let selection: CollectionSelection<ID>
     /// Authored logical height, before text scaling and the touch density floor.
-    private let rowHeight: Float
+    private let rowHeight: Float?
     /// Authored logical spacing, before text scaling.
     private let rowSpacing: Float
     private let onActivate: ((Data.Element) -> Void)?
@@ -23,12 +23,12 @@ public struct List<Data: RandomAccessCollection, ID: Hashable, RowContent: View>
     @State private var cursor: ID?
 
     private init(_ data: Data, id: KeyPath<Data.Element, ID>, selection: CollectionSelection<ID>,
-                 rowHeight: Float, rowSpacing: Float, onActivate: ((Data.Element) -> Void)?,
+                 rowHeight: Float?, rowSpacing: Float, onActivate: ((Data.Element) -> Void)?,
                  refresh: RefreshOptions?, rowContent: @escaping (Data.Element, Bool) -> RowContent) {
         self.data = data
         self.id = id
         self.selection = selection
-        self.rowHeight = max(1, rowHeight)
+        self.rowHeight = rowHeight.map { $0.isFinite ? max(1, $0) : 30 }
         self.rowSpacing = max(0, rowSpacing)
         self.onActivate = onActivate
         self.refresh = refresh
@@ -38,7 +38,7 @@ public struct List<Data: RandomAccessCollection, ID: Hashable, RowContent: View>
     public init(_ data: Data,
                 id: KeyPath<Data.Element, ID>,
                 selection: Binding<ID?> = .constant(nil),
-                rowHeight: Float = 30,
+                rowHeight: Float? = nil,
                 rowSpacing: Float = 0,
                 onActivate: ((Data.Element) -> Void)? = nil,
                 refresh: RefreshOptions? = nil,
@@ -50,7 +50,7 @@ public struct List<Data: RandomAccessCollection, ID: Hashable, RowContent: View>
     public init(_ data: Data,
                 id: KeyPath<Data.Element, ID>,
                 selection: Binding<Set<ID>>,
-                rowHeight: Float = 30,
+                rowHeight: Float? = nil,
                 rowSpacing: Float = 0,
                 onActivate: ((Data.Element) -> Void)? = nil,
                 refresh: RefreshOptions? = nil,
@@ -62,7 +62,7 @@ public struct List<Data: RandomAccessCollection, ID: Hashable, RowContent: View>
     public var body: some View {
         SurfaceReader { surface in
             TextScalerReader { scaler in
-                let effectiveHeight = max(scaler.scale(rowHeight), surface.input.contains(.touch) ? surface.minimumControlExtent : 0)
+                let effectiveHeight = max(scaler.scale(rowHeight ?? (surface.input.contains(.touch) ? 56 : 30)), surface.input.contains(.touch) ? surface.minimumControlExtent : 0)
                 SelectionKeyHost(onKey: handleKey) {
                     FixedVirtualStack(data, id: id, rowHeight: effectiveHeight, spacing: scaler.scale(rowSpacing),
                                  scrollToIndex: (cursor ?? selection.first).flatMap(index(of:)),
@@ -164,7 +164,7 @@ public struct List<Data: RandomAccessCollection, ID: Hashable, RowContent: View>
 public extension List where Data.Element: Identifiable, ID == Data.Element.ID {
     init(_ data: Data,
          selection: Binding<ID?> = .constant(nil),
-         rowHeight: Float = 30,
+         rowHeight: Float? = nil,
          rowSpacing: Float = 0,
          onActivate: ((Data.Element) -> Void)? = nil,
          refresh: RefreshOptions? = nil,
@@ -175,7 +175,7 @@ public extension List where Data.Element: Identifiable, ID == Data.Element.ID {
 
     init(_ data: Data,
          selection: Binding<Set<ID>>,
-         rowHeight: Float = 30,
+         rowHeight: Float? = nil,
          rowSpacing: Float = 0,
          onActivate: ((Data.Element) -> Void)? = nil,
          refresh: RefreshOptions? = nil,
@@ -215,12 +215,16 @@ struct _ListRowHost: _PrimitiveView {
         node.applyTouchControlExtent()
         node.accessibility = AccessibilitySemantics(.listItem) { $0.state.isSelected = isSelected; $0.combinesChildren = true }
         node.accessibilityActions.activate = onActivate
+        node.attachments[PointerCaptureAttachmentKey.didLoseCapture] = { [weak node] in
+            node?.attachments[Self.pressedKey] = false
+            node?.backgroundColor = .clear
+        }
         guard let registry = InteractionRegistryHolder.current else { return }
         node.cursor = .pointer
         // Hover is painted on the host so entering a row never recomposes it.
         // The radius comes from the shared selection appearance, so the hover
         // band is not the one square thing left on the row.
-        node.cornerRadius = SelectionAppearance.resolve(.navigation, theme: node.theme).cornerRadius
+        node.cornerRadius = node.compositionValue(of: SurfaceEnvironment.key).input.contains(.touch) ? 0 : SelectionAppearance.resolve(.navigation, theme: node.theme).cornerRadius
         let applyHover: (Bool) -> Void = { hovered in
             let hovered = hovered && node.supportsControlHover
             node.attachments[Self.hoveredKey] = hovered
@@ -236,11 +240,13 @@ struct _ListRowHost: _PrimitiveView {
             switch phase {
             case .down:
                 node.attachments[Self.pressedKey] = true
-                PointerCaptureHolder.current?.acquire(node)
+                if node.compositionValue(of: SurfaceEnvironment.key).input.contains(.touch) { node.backgroundColor = node.theme.colors.stateLayerPressed }
+                PointerCaptureHolder.current?.acquire(node, allowsGestureTransfer: true)
                 return .handled
             case .up:
                 let was = (node.attachments[Self.pressedKey] as? Bool) ?? false
                 node.attachments[Self.pressedKey] = false
+                applyHover(false)
                 if PointerCaptureHolder.current?.target === node { PointerCaptureHolder.current?.release() }
                 if was {
                     if node.absoluteFrame.contains(CGPoint(x: CGFloat(event.x), y: CGFloat(event.y))) {
@@ -265,7 +271,8 @@ struct _ListRowHost: _PrimitiveView {
             isHovered: false,
             isEnabled: true,
             rowHeight: rowHeight,
-            theme: node.theme
+            theme: node.theme,
+            input: node.compositionValue(of: SurfaceEnvironment.key).input
         )
         return [style.makeBody(cfg)]
     }

@@ -22,8 +22,16 @@ public struct ContextMenu<Content: View>: View {
         self.width = width.isFinite ? max(80, width) : 220; self.onOpen = onOpen
     }
     public var body: some View {
-        _ContextMenuHost(content: content, entries: point == nil ? [] : entries(), width: width, point: point,
-                         onOpen: { position in onOpen(); point = position }, onDismiss: { point = nil })
+        SurfaceReader { surface in
+            Box(direction: .column, alignItems: .stretch, spacing: 0) {
+                _ContextMenuHost(content: content, entries: point == nil ? [] : entries(), width: width, point: point,
+                                 onOpen: { position in onOpen(); point = position }, onDismiss: { point = nil })
+                if TouchPresentation.usesSheet(surface) {
+                    TouchOverlay(isPresented: Binding(get: { point != nil }, set: { if !$0 { point = nil } }),
+                        content: Menu(point == nil ? [] : entries(), onItemActivated: { point = nil }, onDismiss: { point = nil }))
+                }
+            }
+        }
     }
 }
 
@@ -42,14 +50,38 @@ struct _ContextMenuHost<Content: View>: _PrimitiveView {
         return layout
     }
     func _updateNode(_ node: Node) {
+        let hold: TouchLongPress
+        if let existing = node.firstResource(TouchLongPress.self) { hold = existing }
+        else { hold = TouchLongPress(); node.addResource(hold) }
+        hold.onRecognized = onOpen
+        node.attachments[PointerCaptureAttachmentKey.didLoseCapture] = { hold.cancel() }
+        let surface = node.compositionValue(of: SurfaceEnvironment.key)
+        if !surface.input.contains(.touch) { hold.cancel() }
+        InteractionRegistryHolder.current?.setMotion(node, route: .scrollChrome) { event, _ in
+            hold.move(CGPoint(x: CGFloat(event.x), y: CGFloat(event.y)))
+            return .ignored
+        }
+        InteractionRegistryHolder.current?.setWheel(node) { _, _ in hold.cancel(); return .ignored }
         let route = InputHandlerRoute(role: .control, priority: .chrome, debugName: "context-menu")
-        InteractionRegistryHolder.current?.setPointer(node, route: route) { event, phase, _ in
+        InteractionRegistryHolder.current?.setPointer(node, route: route) { event, phase, eventPhase in
+            if surface.input.contains(.touch), event.button == .left, event.modifiers.isDisjoint(with: .ctrl) {
+                if phase == .down {
+                    hold.begin(CGPoint(x: CGFloat(event.x), y: CGFloat(event.y)))
+                    if eventPhase != .capture, PointerCaptureHolder.current?.target == nil {
+                        PointerCaptureHolder.current?.acquire(node, allowsGestureTransfer: true)
+                    }
+                } else {
+                    hold.cancel()
+                    if PointerCaptureHolder.current?.target === node { PointerCaptureHolder.current?.release() }
+                }
+                return .ignored
+            }
             guard event.button == .right || (event.button == .left && !event.modifiers.isDisjoint(with: .ctrl)) else { return .ignored }
             if phase == .down { onOpen(CGPoint(x: CGFloat(event.x), y: CGFloat(event.y))) }
             return .handled
         }
         let resource = node.firstResource(PortalResource.self)
-        guard let point else { resource?.dismiss(node: node); return }
+        guard !TouchPresentation.usesSheet(surface), let point else { resource?.dismiss(node: node); return }
         resource?.present(in: node.compositionValue(of: PortalStoreEnvironment.key), position: point, width: width,
                           content: AnyView(_PopupMenu(entries: entries, width: width, onDismiss: onDismiss)),
                           // Opens at the pointer and extends right and down, so
