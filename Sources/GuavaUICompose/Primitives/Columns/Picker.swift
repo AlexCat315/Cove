@@ -16,11 +16,9 @@ struct ColumnVisibilityPicker: View {
                     .buttonStyle(.secondary).frame(minWidth: 44, minHeight: 44)
                     .compositionLocal(ActionControlAccessibility.label, "Column visibility")
                     .compositionLocal(ActionControlAccessibility.isExpanded, isPresented)
-                AnchoredOverlayHost(isPresented: isPresented, width: nil, placement: .bottomLeading,
-                    onDismiss: { isPresented = false }) {
+                AdaptiveOverlayHost(isPresented: $isPresented, content:
                     Menu(entries(visible: visible), onItemActivated: { isPresented = false }, onDismiss: { isPresented = false })
-                        .compositionLocal(MenuRowMetrics.minimumHeight, 44)
-                }
+                        .compositionLocal(MenuRowMetrics.minimumHeight, 44))
             }.flex(0, shrink: 0)
             Text("\(visible.count) of \(columns.count) columns").font(.caption).foregroundColor(.onSurfaceMuted)
                 .flex(1, shrink: 1).frame(minWidth: 0).accessibility { $0.role = .status }

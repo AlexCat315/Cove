@@ -2,7 +2,9 @@ import Foundation
 import GuavaUIRuntime
 
 /// Pointer detail with delayed opening and a grace period for crossing onto
-/// interactive content. Provide a click or inline equivalent for keyboard users.
+/// interactive content. Touch surfaces have no hover, so a tap on the label
+/// opens the detail as a sheet. Provide a click or inline equivalent for
+/// keyboard users.
 public struct HoverCard<Label: View, Content: View>: View {
     public var openDelay = 0.3
     public var closeDelay = 0.15
@@ -20,8 +22,14 @@ public struct HoverCard<Label: View, Content: View>: View {
     }
 
     public var body: some View {
-        HoverCardHost(label: label, content: AnyView(content), options: HoverCardTiming(
-            openDelay: openDelay, closeDelay: closeDelay, width: width, isEnabled: isEnabled))
+        SurfaceReader { surface in
+            if TouchPresentation.usesSheet(surface) {
+                TouchHoverCard(label: label, content: content, isEnabled: isEnabled)
+            } else {
+                HoverCardHost(label: label, content: AnyView(content), options: HoverCardTiming(
+                    openDelay: openDelay, closeDelay: closeDelay, width: width, isEnabled: isEnabled))
+            }
+        }
     }
 }
 
@@ -153,4 +161,21 @@ private struct HoverCardAccessory: _PrimitiveView {
     func _makeLayoutNode() -> LayoutNode? { nil }
     func _updateNode(_ node: Node) {}
     var _children: [any View] { [content] }
+}
+
+private struct TouchHoverCard<Label: View, Content: View>: View {
+    let label: Label
+    let content: Content
+    let isEnabled: Bool
+    @State private var isPresented = false
+
+    var body: some View {
+        if !isEnabled && isPresented { isPresented = false }
+        return Box(direction: .column, alignItems: .flexStart, spacing: 0) {
+            Button(isEnabled: isEnabled, action: { isPresented = true }) { label }
+                .buttonStyle(.plain)
+                .compositionLocal(ActionControlAccessibility.isExpanded, isPresented)
+            TouchOverlay(isPresented: $isPresented, content: content.padding(horizontal: 8))
+        }
+    }
 }

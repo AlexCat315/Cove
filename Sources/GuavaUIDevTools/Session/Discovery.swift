@@ -1,3 +1,4 @@
+private import GuavaFileSystem
 import Foundation
 import GuavaUIDevToolsProtocol
 
@@ -10,7 +11,7 @@ extension DevTools {
         let descriptor = DevToolsDiscovery(id: launch.id, pid: Int(ProcessInfo.processInfo.processIdentifier), endpoint: endpoint.string!)
         let destination = URL(fileURLWithPath: launch.descriptorPath)
         try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try JSONEncoder().encode(descriptor).write(to: destination, options: .atomic)
+        try AtomicFile.write(JSONEncoder().encode(descriptor), to: destination)
         #if !os(Windows)
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: destination.path)
         #endif

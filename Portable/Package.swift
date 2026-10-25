@@ -19,13 +19,14 @@ let package = Package(
         .executable(name: "GuavaUIDevToolsProbe", targets: ["GuavaUIDevToolsProbe"]),
     ],
     dependencies: [
+        .package(path: "../System"),
         .package(path: "../PlatformCore"),
         .package(url: "https://github.com/facebook/yoga.git", from: "3.2.1"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.103.0"),
         .package(path: "../Logging"),
     ],
     targets: [
-        .target(name: "GuavaUIAgentCore"),
+        .target(name: "GuavaUIAgentCore", dependencies: [.product(name: "GuavaFileSystem", package: "System")]),
         .target(name: "GuavaUIAgentTransport", dependencies: [
             "GuavaUIAgentCore", .product(name: "NIOCore", package: "swift-nio"),
             .product(name: "NIOPosix", package: "swift-nio"),

@@ -1,75 +1,44 @@
 public import Foundation
+public import GuavaProcess
 
-public struct ProcessOutput: Sendable {
-  public let status: Int32
-  public let stdout: Data
-  public let stderr: Data
-
-  public var stdoutText: String {
-    String(decoding: stdout, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-  }
-  public var stderrText: String { String(decoding: stderr, as: UTF8.self) }
-}
-
-/// Finite processes drain both streams and feed stdin concurrently. The deadline
-/// covers process exit as well as IO, including children that close their pipes
-/// before exiting. Callers decide whether a nonzero status is an error.
+/// Tool boundary: resolves PATH and chooses capture or live output; process IO is shared with applications.
 public enum ProcessRunner {
   public static func run(
     _ arguments: [String], at directory: URL? = nil,
     environment: [String: String] = ProcessInfo.processInfo.environment,
     input: Data? = nil, timeout: TimeInterval? = nil,
-    mergeError: Bool = false
+    mergeError: Bool = false, stream: Bool = false
   ) throws -> ProcessOutput {
-    guard let command = arguments.first else { throw ToolError.message("Empty command") }
-    let process = Process()
-    process.executableURL = try Shell.require(command, environment: environment)
-    process.arguments = Array(arguments.dropFirst())
-    process.currentDirectoryURL = directory
-    process.environment = environment
-    let stdout = Pipe()
-    let stderr = mergeError ? stdout : Pipe()
-    let stdin = input.map { _ in Pipe() }
-    process.standardOutput = stdout
-    process.standardError = stderr
-    process.standardInput = stdin.map { $0 as Any } ?? FileHandle.nullDevice
-
-    let completion = DispatchGroup()
-    completion.enter()
-    process.terminationHandler = { _ in completion.leave() }
-    try process.run()
-    let output = read(stdout, completion: completion)
-    let errors = mergeError ? nil : read(stderr, completion: completion)
-    if let stdin, let input {
-      completion.enter()
-      DispatchQueue.global().async {
-        defer {
-          try? stdin.fileHandleForWriting.close()
-          completion.leave()
-        }
-        try? stdin.fileHandleForWriting.write(contentsOf: input)
+    guard let executable = arguments.first else { throw ToolError.message("Empty command") }
+    var command = ProcessCommand(executable: try Shell.require(executable, environment: environment),
+      directory: directory ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
+    command.arguments = Array(arguments.dropFirst())
+    command.environment = environment
+    var budget = ProcessBudget()
+    budget.outputBytes = 33_554_432
+    budget.pendingInputBytes = 33_554_432
+    if let timeout {
+      guard timeout.isFinite, timeout > 0, timeout <= 86_400 else { throw ProcessError.invalidBudget }
+      budget.lifetimeMilliseconds = max(1, Int(timeout * 1000))
+    } else { budget.lifetimeMilliseconds = nil }
+    let session = try ProcessSession(command: command, budget: budget)
+    defer { session.cancel() }
+    if let input, !input.isEmpty { try session.write(input) }
+    session.closeInput()
+    var result = ProcessOutput()
+    while let event = try session.nextEvent() {
+      switch event {
+      case let .stdout(data):
+        if stream { try FileHandle.standardOutput.write(contentsOf: data) }
+        else { result.stdout.append(data) }
+      case let .stderr(data):
+        if stream { try FileHandle.standardError.write(contentsOf: data) }
+        else if mergeError { result.stdout.append(data) }
+        else { result.stderr.append(data) }
+      case let .exited(status): result.status = status
+      case .stdoutClosed, .stderrClosed: break
       }
-    }
-    let deadline = timeout.map { DispatchTime.now() + $0 } ?? .distantFuture
-    guard completion.wait(timeout: deadline) == .success else {
-      ProcessSignal.kill(process)
-      // A descendant may still own a pipe. Do not let its lifetime defeat
-      // the caller's deadline after the direct child has been killed.
-      _ = completion.wait(timeout: .now() + 2)
-      throw ToolError.message("\(command) did not finish within \(timeout ?? 0)s")
-    }
-    return ProcessOutput(
-      status: process.terminationStatus, stdout: output.get() ?? Data(),
-      stderr: errors?.get() ?? Data())
-  }
-
-  private static func read(_ pipe: Pipe, completion: DispatchGroup) -> UncheckedBox<Data> {
-    let result = UncheckedBox<Data>()
-    completion.enter()
-    DispatchQueue.global().async {
-      result.set(pipe.fileHandleForReading.readDataToEndOfFile())
-      try? pipe.fileHandleForReading.close()
-      completion.leave()
+      guard result.stdout.count + result.stderr.count <= budget.outputBytes else { throw ProcessError.outputLimit }
     }
     return result
   }

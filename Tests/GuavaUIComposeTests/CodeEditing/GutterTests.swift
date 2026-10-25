@@ -52,11 +52,12 @@ struct GutterTests: GuavaUIComposeSerializedSuite {
         try #require(nodes(graph.tree.root).first { $0.attachments[TextField.surfaceMarkerKey] != nil })
     }
     private func control(_ label: String, _ graph: ViewGraph) throws -> Node {
-        try #require(nodes(graph.tree.root).first { $0.isFocusable && $0.accessibility?.label == label })
+        try #require(nodes(graph.tree.root).first { $0.isFocusable && $0.accessibility?.label == label }, "Missing control: \(label)")
     }
     private func settle(_ graph: ViewGraph, _ h: Harness) {
         for _ in 0..<8 {
             graph.recomposer.commitAll(); graph.computeLayout(width: h.width, height: 340)
+            AnimatorScheduler.current.tick(deltaTime: 0.05)
             if let root = graph.tree.root { NodeRenderer().render(root: root, into: DrawList()) }
         }
     }

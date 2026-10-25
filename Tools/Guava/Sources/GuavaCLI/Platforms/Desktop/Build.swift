@@ -42,6 +42,11 @@ enum SwiftPackage {
     static func command(directory: URL, configuration: BuildConfiguration, verb: String = "build", scratchPath: URL? = nil) -> [String] {
         var command = [GuavaSDK.swift, verb, "--package-path", directory.path,
                        "--configuration", configuration.swiftConfiguration, "--jobs", "4"] + configuration.swiftFlags
+        #if os(macOS)
+        command += ["--build-system", "swiftbuild"]
+        #else
+        command += ["--build-system", "native"]
+        #endif
         if let scratchPath { command += ["--scratch-path", scratchPath.path] }
         return command
     }

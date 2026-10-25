@@ -192,4 +192,82 @@ struct MobilePresentationTests: GuavaUIComposeSerializedSuite {
             #expect(fixture.calls == before + 10_000)
         }
     }
+
+    @Test("Phone dialogs rise from the bottom edge above the home indicator; pointer dialogs stay centered")
+    func dialogs() throws {
+        try InteractiveScene.run(width: 390, height: 844) { scene in
+            let fixture = MobileFixture(.dialog); scene.install(fixture)
+            scene.click(try #require(scene.labelled("Show", role: .button)))
+            let dialog = try #require(scene.nodes.first { $0.accessibility?.role == .dialog })
+            #expect(dialog.absoluteFrame.width == 390 && dialog.absoluteFrame.maxY == 844)
+            #expect(scene.labelled("Close dialog", role: .button) == nil)
+            let save = try #require(scene.labelled("Save", role: .button))
+            #expect(save.absoluteFrame.maxY <= 820 && save.frame.height >= 44)
+            scene.click(save); #expect(fixture.calls == 1 && !fixture.presented)
+            fixture.surface.idiom = .desktop; fixture.surface.input = [.pointer, .keyboard]; scene.settle()
+            scene.click(try #require(scene.labelled("Show", role: .button)))
+            #expect(scene.labelled("Close dialog", role: .button) != nil)
+            let centered = try #require(scene.nodes.first { $0.accessibility?.role == .dialog })
+            #expect(centered.absoluteFrame.maxY < 844)
+        }
+    }
+
+    @Test("A tap opens hover card detail as a sheet when the surface cannot hover")
+    func hoverCards() throws {
+        try InteractiveScene.run(width: 390, height: 844) { scene in
+            let fixture = MobileFixture(.hoverCard); scene.install(fixture)
+            #expect(scene.labelled("Follow", role: .button) == nil)
+            scene.click(try #require(scene.nodes.first { $0.layoutNode?.textInputs?.text == "Profile" }))
+            #expect(scene.named("touch-overlay-sheet") != nil)
+            scene.click(try #require(scene.labelled("Follow", role: .button)))
+            #expect(fixture.calls == 1)
+        }
+    }
+
+    @Test("A drag from the leading edge pops the page; a short pull springs back")
+    func edgeSwipe() throws {
+        try InteractiveScene.run(width: 390, height: 844) { scene in
+            let fixture = MobileFixture(.navigation); scene.install(fixture)
+            scene.click(try #require(scene.labelled("Open", role: .button)))
+            #expect(fixture.route == [1])
+            let dispatcher = scene.dispatcher
+            func drag(to x: Float) {
+                dispatcher.dispatch(.mouseButtonDown(.init(button: .left, x: 4, y: 400, clicks: 1)))
+                dispatcher.dispatch(.mouseMotion(.init(x: 20, y: 401, deltaX: 16, deltaY: 1)))
+                scene.settle(ticks: 1, delta: 0.1)
+                dispatcher.dispatch(.mouseMotion(.init(x: x, y: 402, deltaX: x - 20, deltaY: 1)))
+                scene.settle(ticks: 1, delta: 0.5)
+                dispatcher.dispatch(.mouseButtonUp(.init(button: .left, x: x, y: 402, clicks: 1)))
+                scene.settle()
+            }
+            drag(to: 60)
+            #expect(fixture.route == [1])
+            #expect(scene.named("detail-page") != nil)
+            drag(to: 260)
+            #expect(fixture.route.isEmpty)
+            scene.click(try #require(scene.labelled("Open", role: .button)))
+            #expect(fixture.route == [1])
+            fixture.route = []; scene.settle()
+            #expect(fixture.route.isEmpty)
+            scene.click(try #require(scene.labelled("Open", role: .button)))
+            fixture.surface.input = [.pointer, .keyboard]; scene.settle()
+            drag(to: 260)
+            #expect(fixture.route == [1])
+        }
+    }
+
+    @Test("A tap opens a touch section row and its label lines up with the rows; pointer clicks only select")
+    func sectionRows() throws {
+        try InteractiveScene.run(width: 390, height: 844) { scene in
+            let fixture = MobileFixture(.sections); fixture.selectedRow = nil; scene.install(fixture)
+            let header = try #require(scene.nodes.first { $0.layoutNode?.textInputs?.text == "Recent" })
+            let row = try #require(scene.nodes.first { $0.layoutNode?.textInputs?.text == "Entry 0" })
+            #expect(header.absoluteFrame.minX == row.absoluteFrame.minX)
+            scene.click(try #require(scene.nodes.first { $0.layoutNode?.textInputs?.text == "Entry 2" }))
+            #expect(fixture.activated == 2 && fixture.selectedRow == 2)
+            fixture.activated = nil; fixture.surface.input = [.pointer, .keyboard]; scene.settle()
+            scene.click(try #require(scene.nodes.first { $0.layoutNode?.textInputs?.text == "Entry 1" }))
+            #expect(fixture.activated == nil && fixture.selectedRow == 1)
+        }
+    }
 }

@@ -314,6 +314,12 @@ private struct _SwipeGestureModifier: ViewModifier {
         }
         applyBackground()
         guard let registry = InteractionRegistryHolder.current else { return }
+        node.attachments[PointerCaptureAttachmentKey.didLoseCapture] = {
+            node.attachments.removeValue(forKey: _SwipeRowKeys.start)
+            node.attachments.removeValue(forKey: _SwipeRowKeys.base)
+            node.attachments[_SwipeRowKeys.active] = false
+            node.attachments[_SwipeRowKeys.rejected] = true
+        }
         registry.setHover(node) { phase in
             node.attachments[_SwipeRowKeys.hovered] = phase == .enter && node.supportsControlHover
             applyBackground()
@@ -326,8 +332,11 @@ private struct _SwipeGestureModifier: ViewModifier {
                 node.attachments[_SwipeRowKeys.base] = reveal.wrappedValue
                 node.attachments[_SwipeRowKeys.active] = false
                 node.attachments[_SwipeRowKeys.rejected] = false
-                // Observe without consuming: a vertical drag must still reach
-                // the ScrollView, while a horizontal one is captured below.
+                // Keep motion on the row instead of its ancestor's long-press host.
+                // Vertical scrolling may still take over this tentative capture.
+                if node.compositionValue(of: SurfaceEnvironment.key).input.contains(.touch) {
+                    PointerCaptureHolder.current?.acquire(node, allowsGestureTransfer: true)
+                }
                 return .ignored
             case .up:
                 let started = node.attachments[_SwipeRowKeys.start] != nil
@@ -337,10 +346,8 @@ private struct _SwipeGestureModifier: ViewModifier {
                 node.attachments.removeValue(forKey: _SwipeRowKeys.base)
                 node.attachments[_SwipeRowKeys.active] = false
                 node.attachments[_SwipeRowKeys.rejected] = false
+                if PointerCaptureHolder.current?.target === node { PointerCaptureHolder.current?.release() }
                 if active {
-                    if PointerCaptureHolder.current?.target === node {
-                        PointerCaptureHolder.current?.release()
-                    }
                     snap(node)
                     return .handled
                 }

@@ -15,6 +15,8 @@ enum Option: String, CaseIterable {
     case storePassword = "store-password-env", keyPassword = "key-password-env"
     case component, product, contentPackage = "content-package", gameplayPackage = "gameplay-package"
     case scratchPath = "scratch-path", resultFile = "result-file"
+    case testingLibrary = "testing-library", timeout, eventOutput = "event-output"
+    case triple, sdk, target
 }
 
 /// Parses one command grammar. Platform backends consume the same request.
@@ -169,7 +171,8 @@ struct Arguments {
         switch operation {
         case .run: [.devtools, .noOpen]
         case .devtools: [.noOpen]
-        case .test: [.noParallel]
+        case .test: [.noParallel, .skipBuild, .buildOnly]
+        case .packageBuild: [.buildTests]
         default: []
         }
     }
@@ -181,12 +184,12 @@ struct Arguments {
         case .create: return common.union([.id, .name, .platforms])
         case .build: return common.union(android).union([.output, .device, .simulator, .team])
         case .run: return common.union(android).union([.output, .device, .simulator, .team])
-        case .test: return common.union([.filter])
+        case .test: return common.union([.filter, .scratchPath, .testingLibrary, .timeout, .eventOutput])
         case .clean: return []
         case .sdkInstall, .selfUpdate: return []
         case .installCLI: return [.binDirectory]
         case .packageCLI, .packageNative: return common.union([.output])
-        case .packageBuild: return common.union([.product, .scratchPath])
+        case .packageBuild: return common.union([.product, .target, .triple, .sdk, .scratchPath, .resultFile])
         case .sdkUse, .sdkList: return []
         case .setup, .doctor: return common.union([.androidSDK, .ndk])
         case .devices: return [.androidSDK]
@@ -199,7 +202,10 @@ struct Arguments {
     }
 }
 
-enum Flag: String { case devtools, noOpen = "no-open", noParallel = "no-parallel" }
+enum Flag: String {
+    case devtools, noOpen = "no-open", noParallel = "no-parallel"
+    case skipBuild = "skip-build", buildOnly = "build-only", buildTests = "build-tests"
+}
 
 /// One AI/automation client request against the project's live DevTools
 /// session. The session file is resolved by the CLI, so callers never copy

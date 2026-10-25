@@ -1,3 +1,4 @@
+private import GuavaFileSystem
 import GuavaLogging
 import Foundation
 import GuavaUIRuntime
@@ -114,7 +115,7 @@ public final class FileAppStorageStore: AppStorageStore {
             let data = try JSONEncoder().encode(values)
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
                                                     withIntermediateDirectories: true)
-            try data.write(to: url, options: .atomic)
+            try AtomicFile.write(data, to: url)
             lastSaveError = nil
         } catch {
             lastSaveError = String(describing: error)

@@ -40,8 +40,7 @@ struct TabOverflowStrip<ID: Hashable>: View {
                             .buttonStyle(.ghost).frame(minWidth: 44, minHeight: 44)
                             .compositionLocal(ActionControlAccessibility.label, "More tabs")
                             .compositionLocal(ActionControlAccessibility.isExpanded, isPresented)
-                        AnchoredOverlayHost(isPresented: isPresented, width: nil, placement: .bottomTrailing,
-                                            onDismiss: { isPresented = false }) {
+                        AdaptiveOverlayHost(isPresented: $isPresented, placement: .bottomTrailing, content:
                             Menu(tabs.filter { hidden.contains($0.id) }.map { tab in
                                 .item(MenuItem(id: AnyHashable(tab.id), title: tab.label,
                                                isEnabled: isEnabled && tab.isEnabled,
@@ -51,8 +50,7 @@ struct TabOverflowStrip<ID: Hashable>: View {
                                     isPresented = false
                                 })
                             }, onItemActivated: { isPresented = false }, onDismiss: { isPresented = false })
-                            .compositionLocal(MenuRowMetrics.minimumHeight, 44)
-                        }
+                            .compositionLocal(MenuRowMetrics.minimumHeight, 44))
                     }
                 }.frame(width: .percent(100), minWidth: tabs.isEmpty ? 0 : tabs.count > 1 ? 90 : 44).flex(0, shrink: 0)
             }.flex(0, shrink: 0)

@@ -45,6 +45,20 @@ import Testing
     }
 }
 
+@Test func testPlansSeparateCompilationFromFrameworkExecution() throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? Files.remove(directory) }
+    try Files.text("// Package", to: directory.appendingPathComponent("Package.swift"))
+    let build = try PackageTests(Arguments(["test", directory.path, "--build-only"]))
+    #expect(build.command[1] == "build" && build.command.contains("--build-tests"))
+    let tests = try PackageTests(Arguments(["test", directory.path, "--skip-build", "--testing-library", "swift-testing", "--timeout", "30"]))
+    #expect(tests.helpers.isEmpty && tests.command.contains("--skip-build"))
+    #expect(tests.command.contains("--disable-xctest") && tests.timeout == 30)
+    for options in [["--build-only", "--skip-build"], ["--testing-library", "unknown"], ["--timeout", "nan"], ["--timeout", "0"]] {
+        #expect(throws: (any Error).self) { try PackageTests(Arguments(["test", directory.path] + options)) }
+    }
+}
+
 @Test func androidHostManifestWorksFromAVersionNamedSDKDirectory() throws {
     var source = URL(fileURLWithPath: #filePath)
     for _ in 0..<5 { source.deleteLastPathComponent() }

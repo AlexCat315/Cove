@@ -47,6 +47,8 @@ struct _ContextMenuHost<Content: View>: _PrimitiveView {
         let layout = LayoutNode()
         layout.flexDirection = .column
         layout.alignItems = .stretch
+        layout.flexGrow = 1
+        layout.flexShrink = 1
         return layout
     }
     func _updateNode(_ node: Node) {

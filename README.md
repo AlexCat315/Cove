@@ -52,6 +52,8 @@ cd GuavaUI
 ./guava test Tools/Guava
 ```
 
+`System` 提供独立的 `GuavaFileSystem`、`GuavaProcess` 产品，供应用、CLI 和 Studio 共用，不依赖 SDL 或图形环境；接口语义和移动端支持见 [GuavaSystem](System/README.md)。可直接运行 `./guava test System --no-parallel`。
+
 `Runtime` 管理 NativeRHI、窗口与输入宿主及原生图像解码；`PlatformCore` 管理平台值；`Sources`、`Portable`、`Text` 管理 UI。场景、物理、脚本 HUD 和编辑器集成由 GuavaStudio 管理。GPU 生产的图像通过 `TextureImage` 进入现有图像绘制和资源持有流程；离屏视图使用 `OffscreenView` 返回绘制快照。
 
 ## 发布
