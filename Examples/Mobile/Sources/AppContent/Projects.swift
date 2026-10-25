@@ -35,6 +35,7 @@ struct ProjectsScreen: View {
 private struct ProjectDetail: View {
     let project: Project
     let back: () -> Void
+    @State private var sharing = false
 
     var body: some View {
         Box(direction: .column, alignItems: .stretch, spacing: 0) {
@@ -43,9 +44,14 @@ private struct ProjectDetail: View {
                 Column(alignment: .leading, spacing: 16) {
                     ProjectCard(project: project)
                     Button("Open in Studio") {}.frame(width: .percent(100))
-                    Button("Share") {}.buttonStyle(.secondary).frame(width: .percent(100))
+                    Button("Share") { sharing = true }.buttonStyle(.secondary).frame(width: .percent(100))
                 }.padding(20).flex(0, shrink: 0).frame(width: .percent(100), minWidth: 0)
             }.flex().frame(minHeight: 0)
+            Dialog(isPresented: $sharing, title: "Share \(project.name)") {
+                Text("guava.studio/p/\(project.id)").foregroundColor(.onSurfaceMuted)
+            } footer: {
+                Button("Copy link") { sharing = false }.frame(width: .percent(100))
+            }
         }.flex().frame(minWidth: 0, minHeight: 0)
     }
 }

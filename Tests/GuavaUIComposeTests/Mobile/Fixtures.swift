@@ -2,7 +2,8 @@ import GuavaUIRuntime
 @testable import GuavaUICompose
 
 final class MobileFixture: View {
-    enum Sample { case button, tabs, list, menu, context, popover }
+    enum Sample { case button, tabs, list, menu, context, popover, dialog, hoverCard, navigation, sections }
+    struct Entry: Identifiable { let id: Int }
     let sample: Sample
     @State var surface: UIEnvironment
     @State var controlSize: ControlSize = .regular
@@ -13,6 +14,8 @@ final class MobileFixture: View {
     @State var documentTabs = false
     @State var extraTabs = false
     @State var variant = TabVariant.bar
+    @State var route: [Int] = []
+    @State var activated: Int?
 
     init(_ sample: Sample) {
         self.sample = sample
@@ -65,6 +68,28 @@ final class MobileFixture: View {
                 Button("Target") { self.calls += 1_000_000 }.accessibilityLabel("Target")
             }
         case .popover: popoverContent
+        case .dialog:
+            Button("Show") { self.presented = true }.accessibilityLabel("Show")
+            Dialog(isPresented: $presented, title: "Rename") {
+                Text("Dialog body")
+            } footer: {
+                Button("Save") { self.calls += 1; self.presented = false }.accessibilityLabel("Save")
+            }
+        case .hoverCard:
+            HoverCard(label: { Text("Profile") }) {
+                Button("Follow") { self.calls += 1 }.accessibilityLabel("Follow")
+            }
+        case .navigation:
+            NavigationStack(path: $route) {
+                Button("Open") { self.route.append(1) }.accessibilityLabel("Open")
+            } destination: { value in
+                Text("Page \(value)").debugName("detail-page")
+            }.flex(1, shrink: 1, basis: 0)
+        case .sections:
+            SectionedList([ListSection("recent", title: "Recent", items: (0..<4).map(Entry.init))],
+                          selection: $selectedRow, onActivate: { self.activated = $0.id }) { entry, _ in
+                ListRow("Entry \(entry.id)")
+            }.flex(1, shrink: 1, basis: 0)
         }
     }
 

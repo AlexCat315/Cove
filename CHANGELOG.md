@@ -7,6 +7,16 @@ GuavaUI SDK 与 `guava` CLI 的发布记录。每个版本对应 git 标签 `vX.
 - Windows 子进程以反斜杠路径启动，参数只在需要时加引号：`cmd.exe` 会扫描整条命令行，曾把 `C:/…/cmd.exe` 里的 `/cmd.exe` 当作 `/c` 开关，现在能执行命令并返回真实退出码。
 - 文件与管道错误改用 `NSPOSIXErrorDomain`：Android 的 Foundation 没有 `POSIXErrorCode`，`System` 包恢复在 Android 上编译。
 
+### 触摸与移动端
+
+- `NavigationStack` 在触摸表面支持从前缘拖动返回：顶层页面跟随手指移开，下层页面以视差露出；松手时超过宽度三分之一或快速轻扫则返回，否则回弹。从右到左布局从右缘开始。
+- `Dialog` 在手机上改为底部弹层：带拖动柄、贴合内容高度、避开 Home 指示条与键盘，去掉关闭按钮和分隔线；`AlertDialog` 仍居中显示。
+- `HoverCard` 在无法悬停的触摸表面改为点按标签打开底部弹层，内容不再只能靠悬停到达。
+- 标签栏的“更多标签”与列可见性菜单在触摸表面改用底部弹层，与 `Popover`、上下文菜单共用 `AdaptiveOverlayHost`。
+- `SectionedList` 在触摸表面点按行即激活（与 `List` 一致），分组标题与行内容对齐并贴近所属行。
+- 修复减弱动态效果时 `NavigationStack` 推入页面后无法再返回：没有过渡动画时不再等待过渡结束。
+- `Examples/Mobile` 的根视图放入 `LayerRoot`，底部弹层、对话框与菜单在移动端可以正常呈现；项目详情的“分享”改为打开对话框。
+
 ## 0.1.7 — 2026-10-25
 
 - 新增可独立构建的 `System` 包，提供 `GuavaFileSystem` 与 `GuavaProcess`，不依赖 SDL、窗口或渲染器；桌面与移动端共享文件、路径、权限语义，不支持的进程能力明确报错。

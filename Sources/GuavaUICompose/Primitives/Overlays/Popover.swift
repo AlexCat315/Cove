@@ -62,21 +62,9 @@ public struct Popover<Label: View, Content: View>: View {
                 trigger
             }
 
-            SurfaceReader { environment in
-                if TouchPresentation.usesSheet(environment) {
-                    TouchOverlay(isPresented: isPresented, content: content, onKey: onKey)
-                } else {
-                    AnchoredOverlayHost(isPresented: isEnabled && isPresented.wrappedValue,
-                                        width: width,
-                                        placement: placement,
-                                        sizing: sizing,
-                                        surface: surface, overflow: overflow,
-                                        onDismiss: { isPresented.wrappedValue = false },
-                                        keyHandler: onKey) {
-                        content
-                    }
-                }
-            }
+            AdaptiveOverlayHost(isPresented: isPresented, isEnabled: isEnabled, width: width,
+                                placement: placement, sizing: sizing, surface: surface,
+                                overflow: overflow, onKey: onKey, content: content)
         }
         .zIndex(isPresented.wrappedValue ? 10_000 : 0)
     }

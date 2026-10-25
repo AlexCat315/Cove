@@ -94,13 +94,13 @@ public struct SectionedList<SectionID: Hashable, Item: Identifiable, RowContent:
                                          let y = Float(value.y)
                                          if abs(y - scrollOffset) > 0.25 { scrollOffset = y }
                                      }) { entry in
-                            entryView(entry, height: effectiveHeight)
+                            entryView(entry, height: effectiveHeight, touch: surface.input.contains(.touch))
                         }
                         .frame(width: .percent(100), minHeight: 0)
                         .flex(1, shrink: 1, basis: 0)
                         .overlay(alignment: .top) {
                             if let sticky {
-                                stickyHeaderView(sticky, height: effectiveHeight,
+                                stickyHeaderView(sticky, height: effectiveHeight, touch: surface.input.contains(.touch),
                                                  width: Float(size.width), lane: ScrollView<EmptyView>.stableGutterWidth(on: surface))
                             }
                         }
@@ -113,23 +113,28 @@ public struct SectionedList<SectionID: Hashable, Item: Identifiable, RowContent:
         }
     }
 
+    /// Touch rows activate on tap, and section labels sit at the bottom of
+    /// their slot, aligned with the row content, so they read as the group's
+    /// heading rather than as a row of their own.
     @ViewBuilder
-    private func entryView(_ entry: Entry, height: Float) -> some View {
+    private func entryView(_ entry: Entry, height: Float, touch: Bool) -> some View {
         switch entry {
         case .header(let id, let title):
-            Text(title)
-                .lineLimit(1)
-                .font(.caption)
-                .foregroundColor(.onSurfaceMuted)
-                .padding(horizontal: 10)
+            Box(direction: .column, alignItems: .flexStart, justifyContent: touch ? .flexEnd : .center) {
+                Text(title)
+                    .lineLimit(1)
+                    .font(.caption)
+                    .foregroundColor(.onSurfaceMuted)
+            }
+                .padding(touch ? EdgeInsets(leading: 16, bottom: 6, trailing: 16) : EdgeInsets(leading: 10, trailing: 10))
                 .frame(height: height)
-                .accessibility { $0.role = .staticText; $0.label = title }
+                .accessibility { $0.role = .staticText; $0.label = title; $0.combinesChildren = true }
                 .id(id)
         case .footer(let id, let text):
             Text(text)
                 .font(.caption)
                 .foregroundColor(.onSurfaceMuted)
-                .padding(horizontal: 10)
+                .padding(horizontal: touch ? 16 : 10)
                 .frame(height: height)
                 .accessibility { $0.role = .staticText; $0.label = text }
                 .id(id)
@@ -137,24 +142,24 @@ public struct SectionedList<SectionID: Hashable, Item: Identifiable, RowContent:
             let selected = selection.wrappedValue == item.id
             _ListRowHost(isSelected: selected, rowHeight: height,
                          onActivate: { activate(item) },
-                         onTap: { _ in tap(item) },
+                         onTap: touch ? nil : { _ in tap(item) },
                          content: AnyView(rowContent(item, selected)))
                 .id(item.id)
         }
     }
 
-    private func stickyHeaderView(_ header: StickyHeader, height: Float, width: Float, lane: Float) -> some View {
+    private func stickyHeaderView(_ header: StickyHeader, height: Float, touch: Bool, width: Float, lane: Float) -> some View {
         // The overlay is measured at its intrinsic width, so a percentage frame
         // would only cover the label. Use the container query width and anchor
         // the opaque band physically at the leading edge, leaving the stable
         // scrollbar lane clear when the bar is visible.
         Box {
-            Box(direction: .row, alignItems: .center, spacing: 0) {
+            Box(direction: .row, alignItems: touch ? .flexEnd : .center, spacing: 0) {
                 Text(header.title)
                     .lineLimit(1)
                     .font(.caption)
                     .foregroundColor(.onSurfaceMuted)
-                    .padding(horizontal: 10)
+                    .padding(touch ? EdgeInsets(leading: 16, bottom: 6, trailing: 16) : EdgeInsets(leading: 10, trailing: 10))
                     .accessibility { $0.role = .staticText; $0.label = header.title }
                 Spacer(minLength: 0)
             }

@@ -7,6 +7,34 @@ enum TouchPresentation {
     static let menu = CompositionLocal<Bool>(defaultValue: false)
 }
 
+/// A trigger's overlay: a bottom sheet on touch surfaces, anchored to the
+/// trigger for pointer input.
+struct AdaptiveOverlayHost<Content: View>: View {
+    let isPresented: Binding<Bool>
+    var isEnabled = true
+    var width: Float?
+    var placement: PopoverPlacement = .bottomLeading
+    var sizing: PopoverSizing = .content
+    var surface: PopoverSurface = .bubble
+    var overflow: PopoverOverflow = .constrain
+    var onKey: ((KeyEvent, EventPhase) -> EventResult)?
+    let content: Content
+
+    var body: some View {
+        SurfaceReader { environment in
+            if TouchPresentation.usesSheet(environment) {
+                TouchOverlay(isPresented: isPresented, content: content, onKey: onKey)
+            } else {
+                AnchoredOverlayHost(isPresented: isEnabled && isPresented.wrappedValue, width: width,
+                                    placement: placement, sizing: sizing, surface: surface, overflow: overflow,
+                                    onDismiss: { isPresented.wrappedValue = false }, keyHandler: onKey) {
+                    content
+                }
+            }
+        }
+    }
+}
+
 struct TouchOverlay<Content: View>: View {
     let isPresented: Binding<Bool>
     let content: Content

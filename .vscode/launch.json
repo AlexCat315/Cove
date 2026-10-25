@@ -19,6 +19,26 @@
             "target": "GuavaUIDevToolsProbe",
             "configuration": "release",
             "preLaunchTask": "swift: Build Release GuavaUIDevToolsProbe"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:GuavaUI}",
+            "name": "Debug GuavaProcessFixture",
+            "target": "GuavaProcessFixture",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug GuavaProcessFixture"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:GuavaUI}",
+            "name": "Release GuavaProcessFixture",
+            "target": "GuavaProcessFixture",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release GuavaProcessFixture"
         }
     ]
 }
