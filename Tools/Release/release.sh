@@ -32,6 +32,7 @@ ALLOW_DIRTY=0
 RETRIES=5
 CI_RERUNS=2
 CI_TIMEOUT_MIN=45
+CHANGELOG=1
 
 usage() {
   sed -n '3,12p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
@@ -44,6 +45,7 @@ Options:
   -d, --dry-run                   Print the plan, change nothing
       --no-push                   Commit and tag locally, publish nothing
       --no-ci                     Do not wait for the release workflow
+      --no-changelog              Leave CHANGELOG.md alone
   -r, --retries <n>               Retries per network step (default: 5)
       --ci-reruns <n>             Workflow reruns before giving up (default: 2)
       --ci-timeout <minutes>      How long to wait for the workflow (default: 45)
@@ -141,6 +143,7 @@ while [ $# -gt 0 ]; do
     -d|--dry-run) DRY_RUN=1; shift ;;
     --no-push) PUSH=0; WAIT_CI=0; shift ;;
     --no-ci) WAIT_CI=0; shift ;;
+    --no-changelog) CHANGELOG=0; shift ;;
     -r|--retries) RETRIES=${2:?--retries needs a value}; shift 2 ;;
     --ci-reruns) CI_RERUNS=${2:?--ci-reruns needs a value}; shift 2 ;;
     --ci-timeout) CI_TIMEOUT_MIN=${2:?--ci-timeout needs a value}; shift 2 ;;
@@ -233,6 +236,9 @@ info "tag      $tag"
 info "commit   Release SDK and CLI $version"
 info "manifest ${#manifests[@]} files:"
 for file in "${manifests[@]}"; do info "  $file"; done
+if [ "$CHANGELOG" -eq 1 ] && [ -f CHANGELOG.md ]; then
+  info "changelog CHANGELOG.md: Unreleased -> $version"
+fi
 if [ "$WAIT_CI" -eq 1 ]; then
   info "then push and wait for the $WORKFLOW workflow"
 else
@@ -274,14 +280,38 @@ else
   node Tools/Release/check-version.mjs "$tag" || die "manifests disagree with $tag"
 fi
 
+# Rolls the notes already written under "## Unreleased" into this version, and
+# leaves a fresh empty section behind for the next one.
+step "Changelog"
+commit_paths=("${manifests[@]}")
+if [ "$CHANGELOG" -eq 0 ]; then
+  info "skipped (--no-changelog)"
+elif [ ! -f CHANGELOG.md ]; then
+  info "no CHANGELOG.md"
+elif grep -q "^## $version " CHANGELOG.md; then
+  commit_paths+=(CHANGELOG.md)
+  info "CHANGELOG.md already has $version"
+elif ! grep -q '^## Unreleased' CHANGELOG.md; then
+  warn "CHANGELOG.md has no '## Unreleased' section; leaving it alone"
+else
+  if ! awk '/^## Unreleased/{f=1;next} /^## /{f=0} f' CHANGELOG.md | grep -qE '^[-*] '; then
+    warn "CHANGELOG.md has no notes under '## Unreleased'; $version gets an empty entry"
+  fi
+  CHANGELOG_HEADING="## $version — $(date +%Y-%m-%d)" \
+    perl -0pi -e 's/^## Unreleased[ \t]*$/## Unreleased\n\n$ENV{CHANGELOG_HEADING}/m' CHANGELOG.md
+  grep -q "^## $version " CHANGELOG.md || die "could not add $version to CHANGELOG.md"
+  commit_paths+=(CHANGELOG.md)
+  info "CHANGELOG.md: Unreleased -> $version"
+fi
+
 step "Commit"
-git add -- "${manifests[@]}"
+git add -- "${commit_paths[@]}"
 if git diff --cached --quiet; then
   info "manifests already committed at $version"
 else
   message=(-m "Release SDK and CLI $version")
   [ -n "$changelog" ] && message+=(-m "$changelog")
-  git commit --quiet "${message[@]}" -- "${manifests[@]}"
+  git commit --quiet "${message[@]}" -- "${commit_paths[@]}"
   info "committed $(git rev-parse --short HEAD)"
 fi
 
