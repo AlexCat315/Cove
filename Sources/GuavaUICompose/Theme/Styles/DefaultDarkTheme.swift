@@ -39,9 +39,11 @@ public enum DefaultDarkTheme {
             error:            Color(red: 0xF5, green: 0x6E, blue: 0x6E),
             info:             Color(red: 0x72, green: 0xB4, blue: 0xFF),
 
-            border:           Color(red: 0x42, green: 0x46, blue: 0x4E),
-            borderStrong:     Color(red: 0x50, green: 0x54, blue: 0x5D),
-            divider:          Color(red: 0x42, green: 0x46, blue: 0x4E, alpha: 0x5C),
+            // Translucent white keeps edges soft on every surface: surfaces separate
+            // regions, and an edge only confirms a boundary already seen.
+            border:           Color(red: 0xFF, green: 0xFF, blue: 0xFF, alpha: 0x1C),
+            borderStrong:     Color(red: 0xFF, green: 0xFF, blue: 0xFF, alpha: 0x30),
+            divider:          Color(red: 0xFF, green: 0xFF, blue: 0xFF, alpha: 0x10),
             // Matches the light theme: a ring that can be told apart from the
             // fill it crosses, instead of a translucent wash.
             focusRing:        Color(red: 0x35, green: 0x74, blue: 0xF0, alpha: 0xE6),

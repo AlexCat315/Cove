@@ -10,6 +10,7 @@ public struct GalleryView: View {
   @State private var resetGeneration = 0
   @State private var textScale: Double?
   @State private var navigationOpen = false
+  @State private var navigationCollapsed = false
   @State private var navigationWidth: Float = 240
 
   public init(initialPage: GalleryPage = .introduction, appearance: Appearance = .light,
@@ -27,7 +28,7 @@ public struct GalleryView: View {
     SafeArea {
       LayerRoot {
         AdaptiveSidebar(
-          "GuavaUI navigation", isPresented: $navigationOpen,
+          "GuavaUI navigation", isPresented: $navigationOpen, isCollapsed: $navigationCollapsed,
           selection: Binding(get: { page }, set: { if let selected = $0 { page = selected } }),
           width: $navigationWidth,
           sections: navigationSections,
@@ -42,9 +43,10 @@ public struct GalleryView: View {
             navigationFooter
           }
         ) {
+          // The page is one soft pane on the window surface; no rules split it.
+          Box(direction: .column, alignItems: .stretch, spacing: 0) {
           Box(direction: .column, alignItems: .stretch, spacing: 0) {
             header
-            Divider()
             toolbar
             ScrollView(.vertical, scrollbarGutter: .stable) {
               TextScalerReader { inherited in
@@ -57,10 +59,12 @@ public struct GalleryView: View {
                   .frame(minWidth: 0)
               }
             }.flex(1, shrink: 1, basis: 0).frame(minHeight: 0).debugName("gallery-content")
-            Divider()
             Text("\(GalleryCatalog.entries.count) stories   ·   GuavaUI component showcase")
               .font(.caption).foregroundColor(.onSurfaceMuted).padding(horizontal: 24, vertical: 8)
-          }.flex(1, shrink: 1, basis: 0).frame(minWidth: 0)
+          }.flex(1, shrink: 1, basis: 0).frame(minWidth: 0, minHeight: 0)
+            .background(.surfaceSunken).cornerRadius(14).clipped()
+          }.padding(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 8))
+            .flex(1, shrink: 1, basis: 0).frame(minWidth: 0, minHeight: 0)
         }.flex(1, shrink: 1, basis: 0).frame(minHeight: 0).debugName("gallery-shell")
       }
     }
@@ -68,7 +72,7 @@ public struct GalleryView: View {
     .frame(minWidth: 0, minHeight: 0)
     // The app background paints behind the system bars; only the interactive
     // chrome is inset, so the surface never shows opaque bars or a letterbox.
-    .background(.background)
+    .background(.surface)
     .appearance(appearance, transition: .circular())
   }
 
@@ -117,7 +121,6 @@ public struct GalleryView: View {
       threshold: 120,
       wide: {
         Box(direction: .column, alignItems: .stretch) {
-          Divider()
           Button(appearance == .light ? "Switch to dark theme" : "Switch to light theme") {
             toggleTheme()
           }.buttonStyle(.ghost).padding(12).debugName("gallery-theme")
@@ -189,7 +192,7 @@ struct StorySection<Content: View>: View {
       Text(title).font(.headline).foregroundColor(.onSurface)
       Text(detail).font(.body).foregroundColor(.onSurfaceMuted)
       Box(direction: .column, alignItems: .stretch, spacing: 12) { content }
-        .padding(22).background(.surfaceRaised).cornerRadius(12).border(.border, width: 1)
+        .padding(22).background(.surface).cornerRadius(12)
     }.flex(0, shrink: 0).frame(minWidth: 0).debugName("story-section-\(title)")
   }
 }

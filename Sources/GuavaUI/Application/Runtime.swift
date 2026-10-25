@@ -83,6 +83,10 @@ public final class Application {
 
     private static let forceVSyncOff = ["off", "0", "false", "no"].contains(
         ProcessInfo.processInfo.environment["GUAVA_VSYNC"]?.lowercased() ?? "")
+    /// `GUAVA_PREVIEW_DEVICE=phone` opens a desktop build as a phone: a 390×844
+    /// window with touch input and the safe areas of a notched phone, so mobile
+    /// layouts can be built and checked without a simulator.
+    private static let previewsPhone = ProcessInfo.processInfo.environment["GUAVA_PREVIEW_DEVICE"]?.lowercased() == "phone"
     private static let fpsLogEnabled = ProcessInfo.processInfo.environment["GUAVA_FPS_LOG"] == "1"
     private static let forceContinuousFrameDrive = ProcessInfo.processInfo.environment["GUAVAUI_FORCE_CONTINUOUS_FRAMES"] == "1"
 
@@ -99,7 +103,8 @@ public final class Application {
         let input = PlatformInputContext()
         input.addScopedAmbient(PortalStoreAmbient(portalStore))
         host = SDL3PlatformHost(title: config.window.title,
-            mainWindowOptions: WindowOptions(width: max(1, config.window.width), height: max(1, config.window.height), titleBarStyle: config.window.titleBarStyle.platformStyle,
+            mainWindowOptions: WindowOptions(width: Self.previewsPhone ? 390 : max(1, config.window.width),
+                                            height: Self.previewsPhone ? 844 : max(1, config.window.height), titleBarStyle: config.window.titleBarStyle.platformStyle,
                                             showsDockIcon: config.window.showsDockIcon), inputContext: input)
         composition = MainComposition(recomposer: host.recomposer, portalStore: portalStore)
         configureHostFrameDrive()
@@ -620,7 +625,14 @@ public final class Application {
         #elseif os(Android)
         environment.input = [.touch, .keyboard]
         #else
-        environment.idiom = .desktop
+        if Self.previewsPhone {
+            environment.input = [.touch, .keyboard]
+            environment.idiom = .phone
+            environment.safeArea.top = max(insets.top, 47)
+            environment.safeArea.bottom = max(insets.bottom, 34)
+        } else {
+            environment.idiom = .desktop
+        }
         #endif
         if environment != composition.environment.wrappedValue { composition.environment.wrappedValue = environment }
     }

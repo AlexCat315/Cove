@@ -64,10 +64,12 @@ struct SidebarResizeHandle: _PrimitiveView {
       guard let node, node.isLayoutVisible else { return }
       let focused = chain?.focused === node && chain?.isFocusVisible == true
       let hot = node.attachments[Self.hoverKey] as? Bool == true || node.attachments[Self.startKey] != nil
-      let thickness: Float = focused || hot ? 2 : 1
+      // At rest the edge is the change of surface; the line appears only to grab.
+      guard focused || hot else { return }
+      let thickness: Float = 2
       list.addRect(.init(x: Float(origin.x) + (Float(node.frame.width) - thickness) / 2,
                          y: Float(origin.y), width: thickness, height: Float(node.frame.height)),
-                   color: (focused ? node.theme.colors.focusRing : hot ? node.theme.colors.accent : node.theme.colors.divider)
+                   color: (focused ? node.theme.colors.focusRing : node.theme.colors.accent)
                     .multipliedAlpha(node.opacity))
     }
     guard let registry = InteractionRegistryHolder.current else { return }

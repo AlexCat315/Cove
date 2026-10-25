@@ -407,7 +407,7 @@ struct BoolControlHost: _PrimitiveView {
     private func resolvedFillColor(node: Node, colors: ColorScheme) -> Color {
         if let fill = node.attachments["__bool_visual_fill"] as? Color { return fill.multipliedAlpha(node.opacity) }
         if !isEnabled {
-            return colors.surfaceVariant
+            return colors.onSurface.multipliedAlpha(0.08)
         }
         let isPressed = node.attachments[Self.pressedKey] as? Bool ?? false
         let isHovered = node.attachments[Self.hoveredKey] as? Bool ?? false
@@ -417,17 +417,17 @@ struct BoolControlHost: _PrimitiveView {
             return colors.accent
         }
 
-        let base = colors.surfaceVariant
+        // Off is a translucent ink track, so it stays visible on any surface.
+        let base = colors.onSurface.multipliedAlpha(0.18)
         if isPressed { return base.composited(over: colors.stateLayerPressed) }
         if isHovered { return base.composited(over: colors.stateLayerHover) }
         return base
     }
 
+    /// A white disc in both states, as on phones: on a raised surface a surface-
+    /// coloured thumb vanishes into the card.
     private func resolvedToggleThumbColor(colors: ColorScheme) -> Color {
-        if !isEnabled {
-            return colors.surfaceRaised
-        }
-        return isOn.wrappedValue ? colors.onAccent : colors.surfaceRaised
+        isEnabled ? .white : Color.white.multipliedAlpha(0.6)
     }
 }
 
@@ -444,7 +444,7 @@ private func updateBoolControlAppearance(_ node: Node, isOn: Bool, isEnabled: Bo
     let colors = node.theme.colors
     let pressed = node.attachments[BoolControlHost.pressedKey] as? Bool == true
     let hovered = node.attachments[BoolControlHost.hoveredKey] as? Bool == true
-    let base = !isEnabled ? colors.surfaceVariant : isOn ? colors.accent : colors.surfaceVariant
+    let base = !isEnabled ? colors.onSurface.multipliedAlpha(0.08) : isOn ? colors.accent : colors.onSurface.multipliedAlpha(0.18)
     let fill = !isEnabled ? base : pressed ? (isOn ? colors.accentPressed : base.composited(over: colors.stateLayerPressed))
         : hovered ? (isOn ? colors.accentHover : base.composited(over: colors.stateLayerHover)) : base
     let previous = node.attachments["__bool_visual_progress"] as? Float

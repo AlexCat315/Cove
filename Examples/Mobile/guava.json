@@ -1,0 +1,23 @@
+{
+  "application" : {
+    "id" : "com.guava.mobile",
+    "name" : "GuavaUI Mobile"
+  },
+  "targets" : {
+    "desktopHelpers" : [
+
+    ],
+    "platforms" : [
+      "ios",
+      "android",
+      "mac"
+    ]
+  },
+  "toolchain" : {
+    "sdkVersion" : "0.1.5"
+  },
+  "version" : {
+    "build" : 1,
+    "name" : "0.1.0"
+  }
+}

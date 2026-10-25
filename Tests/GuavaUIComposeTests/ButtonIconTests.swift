@@ -188,6 +188,13 @@ struct ButtonIconTests: GuavaUIComposeSerializedSuite {
             let explicit = try #require(findButtonHost(graph.tree.root!))
             context.interactions.handlers(for: explicit).hover?(.enter); scheduler.tick(deltaTime: 0.5)
             #expect(portal.entries.count == 1 && explicit.accessibility?.help == "Keep the current document")
+            // A tooltip that only repeats the visible title adds nothing, so it never opens.
+            graph.install(root: EmptyView())
+            graph.install(root: LayerRoot { Button("Workbench", tooltip: "Workbench") {} })
+            graph.computeLayout(width: 320, height: 180)
+            let repeated = try #require(findButtonHost(graph.tree.root!))
+            context.interactions.handlers(for: repeated).hover?(.enter); scheduler.tick(deltaTime: 1)
+            #expect(portal.entries.isEmpty && repeated.accessibility?.help == "Workbench")
         } }
     } }
 

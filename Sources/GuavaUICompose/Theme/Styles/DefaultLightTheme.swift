@@ -36,9 +36,9 @@ public enum DefaultLightTheme {
             error:            Color(red: 0xD6, green: 0x45, blue: 0x41),
             info:             Color(red: 0x2E, green: 0x70, blue: 0xD6),
 
-            border:           Color(red: 0xDA, green: 0xE0, blue: 0xE6),
-            borderStrong:     Color(red: 0xB9, green: 0xC2, blue: 0xCC),
-            divider:          Color(red: 0xDA, green: 0xE0, blue: 0xE6, alpha: 0x7A),
+            border:           Color(red: 0x10, green: 0x20, blue: 0x30, alpha: 0x1A),
+            borderStrong:     Color(red: 0x10, green: 0x20, blue: 0x30, alpha: 0x30),
+            divider:          Color(red: 0x10, green: 0x20, blue: 0x30, alpha: 0x10),
             // Near-opaque on purpose. At 0xAA the ring is a wash of blue over
             // whatever it crosses, which on a light canvas reads as a glow
             // around the control rather than as a ring drawn around it.

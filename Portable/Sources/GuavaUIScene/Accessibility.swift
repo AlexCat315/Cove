@@ -226,6 +226,11 @@ public enum AccessibilityTree {
         return text.isEmpty ? semantic.help : text
     }
 
+    /// The text a combined control shows, the way its accessibility label reads it.
+    package static func visibleText(in node: Node) -> String {
+        labelText(in: node).joined(separator: " ")
+    }
+
     private static func labelText(in node: Node) -> [String] {
         node.children.flatMap { child -> [String] in
             guard child.isLayoutVisible, child.isInteractionEnabled, child.opacity > 0, child.subtreeOpacity > 0 else { return [] }

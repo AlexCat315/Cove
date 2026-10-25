@@ -79,7 +79,9 @@ struct ButtonStyleTests: GuavaUIComposeSerializedSuite {
         )
 
         let filled = findFilled(tree.root!)
-        #expect(filled?.backgroundColor == Theme.defaultDark.colors.surfaceVariant)
+        // A translucent ink wash, and no outline at rest.
+        #expect(filled?.backgroundColor == Theme.defaultDark.colors.onSurface.multipliedAlpha(0.08))
+        #expect(filled?.borderWidth == 0)
     } }
 
     @Test(".buttonStyle(.destructive) uses the error color slot")

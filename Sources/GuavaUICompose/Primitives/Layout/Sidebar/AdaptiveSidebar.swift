@@ -7,6 +7,7 @@ private import GuavaUIRuntime
 public struct AdaptiveSidebar<ID: Hashable, Header: View, Footer: View, Content: View>: View {
   private let title: String
   private let presentation: Binding<Bool>?
+  private let collapse: Binding<Bool>?
   private let selection: Binding<ID?>
   private let width: Binding<Float>?
   private let expanded: Binding<Set<ID>>?
@@ -16,10 +17,12 @@ public struct AdaptiveSidebar<ID: Hashable, Header: View, Footer: View, Content:
   private let footer: Footer
   private let content: Content
   @State private var localPresentation = false
+  @State private var localCollapse = false
   @State private var focus = SidebarFocusHandoff()
 
   public init(
-    _ title: String, isPresented: Binding<Bool>? = nil, selection: Binding<ID?>, width: Binding<Float>? = nil,
+    _ title: String, isPresented: Binding<Bool>? = nil, isCollapsed: Binding<Bool>? = nil,
+    selection: Binding<ID?>, width: Binding<Float>? = nil,
     expanded: Binding<Set<ID>>? = nil,
     sections: [SidebarSection<ID>], configure: (inout AdaptiveSidebarOptions) -> Void = { _ in },
     @ViewBuilder header: () -> Header, @ViewBuilder footer: () -> Footer,
@@ -27,6 +30,7 @@ public struct AdaptiveSidebar<ID: Hashable, Header: View, Footer: View, Content:
   ) {
     self.title = title
     presentation = isPresented
+    collapse = isCollapsed
     self.selection = selection
     self.width = width
     self.expanded = expanded
@@ -46,7 +50,7 @@ public struct AdaptiveSidebar<ID: Hashable, Header: View, Footer: View, Content:
       ContainerSizeReader { size in
         let geometry = SidebarGeometry(
           width: size.width > 0 ? Float(size.width) : surface.viewport.width,
-          policy: options.layout, isPresented: isPresented.wrappedValue,
+          policy: options.layout, isPresented: isPresented.wrappedValue, isCollapsed: isCollapsed.wrappedValue,
           requestedWidth: width?.wrappedValue, resizing: options.resizing,
           handleExtent: surface.input.contains(.touch) ? surface.minimumControlExtent : 7)
         SidebarShellHost(geometry: geometry, focus: focus) {
@@ -104,6 +108,7 @@ public struct AdaptiveSidebar<ID: Hashable, Header: View, Footer: View, Content:
   }
 
   private var isPresented: Binding<Bool> { presentation ?? $localPresentation }
+  private var isCollapsed: Binding<Bool> { collapse ?? $localCollapse }
 
   private var openButton: some View {
     SidebarToggle(label: options.openLabel, isExpanded: isPresented.wrappedValue) {
@@ -112,11 +117,23 @@ public struct AdaptiveSidebar<ID: Hashable, Header: View, Footer: View, Content:
     }
   }
 
+  /// A collapsed rail expands in place; a rail the window forces opens as a drawer.
+  private func railButton(_ geometry: SidebarGeometry) -> some View {
+    Box(direction: .column, alignItems: .stretch) {
+      if geometry.isCollapsed {
+        SidebarToggle(label: options.expandLabel, isExpanded: false) { isCollapsed.wrappedValue = false }
+      } else {
+        openButton
+      }
+    }
+  }
+
   private func navigation(_ geometry: SidebarGeometry) -> some View {
     HorizontalSwipeHost(
       onSwipe: { if $0 == .left { isPresented.wrappedValue = false } },
       isEnabled: geometry.isModal && options.drawer.allowsSwipeDismissal
     ) {
+      Box(direction: .column, alignItems: .stretch) {
       Sidebar(
         selection: selection, sections: sections,
         presentation: geometry.mode == .rail && !geometry.isModal
@@ -134,7 +151,7 @@ public struct AdaptiveSidebar<ID: Hashable, Header: View, Footer: View, Content:
               isVisible: geometry.mode == .rail && !geometry.isModal, transition: .identity,
               retainsContent: true
             ) {
-              openButton
+              railButton(geometry)
             }
             AnimatedVisibility(
               isVisible: geometry.isModal, transition: .identity, retainsContent: true
@@ -150,6 +167,12 @@ public struct AdaptiveSidebar<ID: Hashable, Header: View, Footer: View, Content:
           }
         }, footer: { footer }
       ).flex(1, shrink: 1, basis: 0).frame(minWidth: 0, minHeight: 0)
+      // At a width that fits the full sidebar, the person can still fold it to a rail.
+      if geometry.mode == .expanded {
+        SidebarToggle(label: options.collapseLabel, isExpanded: true) { isCollapsed.wrappedValue = true }
+          .absolutePosition(top: 6, right: 4)
+      }
+      }.flex(1, shrink: 1, basis: 0).frame(minWidth: 0, minHeight: 0)
     }.accessibility {
       $0.role = geometry.isModal ? .dialog : .group
       $0.label = title
@@ -159,13 +182,15 @@ public struct AdaptiveSidebar<ID: Hashable, Header: View, Footer: View, Content:
 
 extension AdaptiveSidebar where Header == EmptyView, Footer == EmptyView {
   public init(
-    _ title: String, isPresented: Binding<Bool>? = nil, selection: Binding<ID?>, width: Binding<Float>? = nil,
+    _ title: String, isPresented: Binding<Bool>? = nil, isCollapsed: Binding<Bool>? = nil,
+    selection: Binding<ID?>, width: Binding<Float>? = nil,
     expanded: Binding<Set<ID>>? = nil,
     sections: [SidebarSection<ID>], configure: (inout AdaptiveSidebarOptions) -> Void = { _ in },
     @ViewBuilder content: () -> Content
   ) {
     self.init(
-      title, isPresented: isPresented, selection: selection, width: width, expanded: expanded, sections: sections,
+      title, isPresented: isPresented, isCollapsed: isCollapsed, selection: selection, width: width,
+      expanded: expanded, sections: sections,
       configure: configure,
       header: { EmptyView() }, footer: { EmptyView() }, content: content)
   }

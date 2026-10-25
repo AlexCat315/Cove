@@ -30,7 +30,8 @@ public struct ListRow<Leading: View, Trailing: View>: View {
                 }
                 scroll.combinesAccessibility = true
                 scroll.isScrollEnabled = !touch
-                return scroll.frame(minWidth: 0)
+                // A touch row is a finger-sized target that spans its container.
+                return scroll.frame(width: touch ? .percent(100) : .auto, minWidth: 0)
             }
         }
     }
@@ -60,7 +61,7 @@ public struct ListRow<Leading: View, Trailing: View>: View {
             Box(direction: .row, alignItems: .center, spacing: 0) { leading }
             titleContent
             trailingContent
-        }.accessibility { $0.combinesChildren = true }
+        }.frame(minHeight: allowsOverflow ? 0 : 44).accessibility { $0.combinesChildren = true }
     }
 }
 

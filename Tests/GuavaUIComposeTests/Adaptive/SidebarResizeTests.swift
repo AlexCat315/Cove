@@ -98,6 +98,17 @@ struct SidebarResizeTests: GuavaUIComposeSerializedSuite {
     #expect(fixed.resizeHandleWidth == 0 && fixed.dockedWidth == 500)
   }
 
+  @Test("A sidebar that fits can still fold to a rail; one the window forces into a rail stays forced")
+  func collapse() {
+    let policy = SidebarLayoutPolicy()
+    let wide = SidebarGeometry(width: 1280, policy: policy, isPresented: false, isCollapsed: true, requestedWidth: 260)
+    #expect(wide.mode == .rail && wide.isCollapsed && wide.resizeHandleWidth == 0 && wide.dockedWidth == 72)
+    let narrow = SidebarGeometry(width: 800, policy: policy, isPresented: false, isCollapsed: true)
+    #expect(narrow.mode == .rail && !narrow.isCollapsed)
+    let open = SidebarGeometry(width: 1280, policy: policy, isPresented: false, requestedWidth: 260)
+    #expect(open.mode == .expanded && open.dockedWidth == 260)
+  }
+
   @Test("An explicitly bounded sidebar keeps its height and cannot collapse adjacent story content")
   func embeddedHeight() throws {
     try scene { h, graph, _, _ in

@@ -23,7 +23,7 @@ public struct DefaultListRowStyle: ListRowStyle {
         .frame(height: max(0, configuration.rowHeight - 2 * appearance.verticalInset))
         .selectionHighlight(touch ? .dataRow : .navigation, isSelected: configuration.isSelected, isHovered: configuration.isHovered)
         .padding(horizontal: touch ? 16 : appearance.horizontalInset, vertical: 0)
-        .modifier(ListRowSeparator(color: theme.colors.border, isEnabled: touch))
+        .modifier(ListRowSeparator(color: theme.colors.divider, isEnabled: touch))
         .opacity(alpha)
         .animation(.semantic(.fast, in: theme), value: _ListRowVisualKey(fill: fill, alpha: alpha))
     }
@@ -43,8 +43,9 @@ private struct ListRowSeparator: ViewModifier {
         node.draw = { [weak node] list, origin in
             guard let node else { return }
             let left: Float = rtl ? 0 : 16
-            list.addRect(UIRect(x: Float(origin.x) + left, y: Float(origin.y + node.frame.height) - 1,
-                                width: max(0, Float(node.frame.width) - 16), height: 1), color: color)
+            // A hairline, as on phones: it marks the row edge without drawing a rule.
+            list.addRect(UIRect(x: Float(origin.x) + left, y: Float(origin.y + node.frame.height) - 0.5,
+                                width: max(0, Float(node.frame.width) - 16), height: 0.5), color: color)
         }
     }
 }

@@ -21,6 +21,8 @@ public struct AdaptiveSidebarOptions {
   public var resizing = SidebarResizeOptions()
   public var drawer = NavigationDrawerOptions()
   public var openLabel = "Open navigation"
+  public var collapseLabel = "Collapse sidebar"
+  public var expandLabel = "Expand sidebar"
   /// A rightward gesture beginning within the leading 24pt opens compact navigation.
   /// Enabled only on surfaces that support touch; ordinary taps still reach content.
   public var allowsEdgeSwipe = false
@@ -37,14 +39,18 @@ struct SidebarGeometry {
   let isModal: Bool
   let resizeHandleWidth: Float
   let resizeRange: ClosedRange<Float>
+  /// A rail the person chose at a width that fits the full sidebar.
+  let isCollapsed: Bool
   var isVisible: Bool { mode != .compact || isModal }
 
-  init(width: Float, policy: SidebarLayoutPolicy, isPresented: Bool,
+  init(width: Float, policy: SidebarLayoutPolicy, isPresented: Bool, isCollapsed: Bool = false,
        requestedWidth: Float? = nil, resizing: SidebarResizeOptions = .init(), handleExtent: Float = 7) {
     viewportWidth = max(0, width)
-    mode =
+    let fitting: SidebarMode =
       width < policy.compactMaximumWidth
       ? .compact : width < policy.expandedMinimumWidth ? .rail : .expanded
+    self.isCollapsed = fitting == .expanded && isCollapsed
+    mode = self.isCollapsed ? .rail : fitting
     let initialRange = resizing.range(in: viewportWidth, handle: handleExtent)
     resizeHandleWidth = mode == .expanded && requestedWidth != nil && initialRange.upperBound > initialRange.lowerBound
       ? handleExtent : 0

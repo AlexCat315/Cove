@@ -301,7 +301,7 @@ struct ButtonHost: _PrimitiveView {
             guard let node else { return }
             updateBuiltinButtonChromeDescendants(of: node, animated: true)
             node.firstResource(TooltipSession.self)?.setFocused(
-                focused && FocusChainHolder.current?.isFocusVisible == true)
+                focused && FocusChainHolder.current?.isFocusVisible == true && ButtonHost.tooltipAddsText(to: node))
             if requiresInteractionRecompose { focusChange(focused) }
         }
         if requiresInteractionRecompose {
@@ -357,7 +357,8 @@ struct ButtonHost: _PrimitiveView {
                                  requiresRecompose: requiresInteractionRecompose, onChange: pressChange)
         } as () -> Void
         registry.setHover(node) { phase in
-            node.firstResource(TooltipSession.self)?.setHovered(phase == .enter && node.supportsControlHover)
+            node.firstResource(TooltipSession.self)?.setHovered(phase == .enter && node.supportsControlHover
+                && ButtonHost.tooltipAddsText(to: node))
             switch phase {
             case .enter:
                 setButtonInteraction(node,
@@ -496,6 +497,19 @@ struct ButtonHost: _PrimitiveView {
             input: node.compositionValue(of: SurfaceEnvironment.key).input
         )
         return [style.makeBody(config)]
+    }
+
+    /// A tooltip that repeats the button's own text tells nothing new, so it stays
+    /// hidden; it still reaches assistive technology as the button's help.
+    static func tooltipAddsText(to node: Node) -> Bool {
+        let tooltip = comparable(node.accessibility?.help ?? "")
+        guard !tooltip.isEmpty else { return false }
+        let visible = comparable(AccessibilityTree.visibleText(in: node))
+        return visible.isEmpty || !visible.contains(tooltip)
+    }
+
+    private static func comparable(_ text: String) -> String {
+        text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ".…:：")))
     }
 
     static let markerKey = "__button_host"

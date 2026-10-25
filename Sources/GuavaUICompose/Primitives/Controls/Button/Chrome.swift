@@ -198,20 +198,21 @@ private func builtinButtonChromeValues(state: BuiltinButtonChromeState,
         border = focused ? theme.colors.focusRing : clear
         borderWidth = focused ? 2 : 0
     case .secondary:
+        // A translucent ink wash, so the button stands out from whatever surface
+        // it sits on instead of matching a card of the same tone.
+        let ink = theme.colors.onSurface
         if !state.isEnabled {
-            background = theme.colors.surfaceSunken
+            background = ink.multipliedAlpha(0.04)
+        } else if pressed {
+            background = ink.multipliedAlpha(0.16)
+        } else if hovered {
+            background = ink.multipliedAlpha(0.12)
         } else {
-            let base = theme.colors.surfaceVariant
-            if pressed {
-                background = base.composited(over: theme.colors.stateLayerPressed)
-            } else if hovered {
-                background = base.composited(over: theme.colors.stateLayerHover)
-            } else {
-                background = base
-            }
+            background = ink.multipliedAlpha(0.08)
         }
-        border = focused ? theme.colors.focusRing : theme.colors.border
-        borderWidth = focused ? 2 : 1
+        // The tonal fill already reads as a button; an outline only adds noise.
+        border = focused ? theme.colors.focusRing : clear
+        borderWidth = focused ? 2 : 0
     case .ghost:
         if pressed {
             background = theme.colors.stateLayerPressed

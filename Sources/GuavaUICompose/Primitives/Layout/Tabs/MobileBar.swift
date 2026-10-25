@@ -11,8 +11,8 @@ struct MobileTabBar<ID: Hashable>: View {
         let visible = visibleTabs
         let ids = Set(visible.map(\.id))
         let hidden = tabs.filter { !ids.contains($0.id) }
+        // The bar's own surface marks its edge; it reaches under the home indicator.
         return Box(direction: .column, alignItems: .stretch, spacing: 0) {
-            Divider()
             SafeArea([.horizontal, .bottom]) {
                 Row(alignment: .center, spacing: 0) {
                     for tab in visible { AnyView(item(tab).id(tab.id)) }
