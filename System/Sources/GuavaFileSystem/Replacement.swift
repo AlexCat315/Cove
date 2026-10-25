@@ -34,7 +34,7 @@ public enum FileReplacement {
         let status = staging.path.withCString { source in
             destination.path.withCString { target in rename(source, target) }
         }
-        guard status == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+        guard status == 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno == 0 ? EIO : errno)) }
         #endif
     }
 }

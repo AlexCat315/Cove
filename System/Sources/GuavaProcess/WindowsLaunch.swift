@@ -27,7 +27,10 @@ struct WindowsLaunch {
     }
 
     /// Microsoft CRT argv quoting; native arguments never pass through a shell.
+    /// Plain arguments stay bare: programs with their own parsers, such as
+    /// cmd.exe, do not recognise a quoted `/c`.
     private static func quote(_ argument: String) -> String {
+        guard argument.isEmpty || argument.contains(where: { " \t\n\u{0B}\"".contains($0) }) else { return argument }
         var result = "\"", slashes = 0
         for character in argument.unicodeScalars {
             if character == "\\" { slashes += 1; continue }

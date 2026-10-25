@@ -21,7 +21,7 @@ public enum FilePermissions {
             #if os(Windows)
             throw NSError(domain: "NSWin32ErrorDomain", code: Int(code), userInfo: [NSFilePathErrorKey: url.path])
             #else
-            throw POSIXError(POSIXErrorCode(rawValue: Int32(code)) ?? .EACCES)
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(code), userInfo: [NSFilePathErrorKey: url.path])
             #endif
         }
     }

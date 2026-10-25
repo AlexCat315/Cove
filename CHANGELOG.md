@@ -4,6 +4,9 @@ GuavaUI SDK 与 `guava` CLI 的发布记录。每个版本对应 git 标签 `vX.
 
 ## Unreleased
 
+- Windows 子进程参数只在需要时加引号，`cmd.exe /c` 等自行解析命令行的程序能识别开关并返回真实退出码。
+- 文件与管道错误改用 `NSPOSIXErrorDomain`：Android 的 Foundation 没有 `POSIXErrorCode`，`System` 包恢复在 Android 上编译。
+
 ## 0.1.7 — 2026-10-25
 
 - 新增可独立构建的 `System` 包，提供 `GuavaFileSystem` 与 `GuavaProcess`，不依赖 SDL、窗口或渲染器；桌面与移动端共享文件、路径、权限语义，不支持的进程能力明确报错。

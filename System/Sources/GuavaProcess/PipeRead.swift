@@ -40,7 +40,7 @@ public enum PipeRead {
                 #endif
             }
             if count < 0, errno == EINTR { continue }
-            guard count >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+            guard count >= 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno == 0 ? EIO : errno)) }
             return Data(buffer.prefix(count))
         }
         #endif

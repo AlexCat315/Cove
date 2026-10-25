@@ -73,6 +73,17 @@ struct ProcessContracts {
         #expect(try JSONDecoder().decode([String].self, from: result.stdout) == arguments)
     }
 
+    #if os(Windows)
+    @Test func commandProcessorSwitchesReachCmd() throws {
+        let system = ProcessInfo.processInfo.environment["SystemRoot"] ?? "C:\\Windows"
+        var request = ProcessCommand(executable: URL(fileURLWithPath: system + "\\System32\\cmd.exe"),
+            directory: URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
+        request.arguments = ["/c", "exit 7"]
+        request.environment = ProcessInfo.processInfo.environment
+        #expect(try ProcessRunner.runSynchronously(request).status == 7)
+    }
+    #endif
+
     @Test func queuedInputDoesNotKeepAnAbandonedSessionAlive() throws {
         var budget = ProcessBudget()
         budget.lifetimeMilliseconds = nil
