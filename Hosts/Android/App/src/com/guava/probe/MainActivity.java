@@ -5,9 +5,14 @@ import android.content.Intent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.IntentFilter;
+import android.content.res.Configuration;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Build;
+import android.view.View;
+import android.view.Window;
 import android.view.WindowInsets;
+import android.view.WindowInsetsController;
 import android.widget.FrameLayout;
 import java.io.InputStream;
 import java.io.ByteArrayOutputStream;
@@ -23,10 +28,12 @@ public final class MainActivity extends Activity {
     static void scheduleDiagnostics(long application) { Diagnostics.schedule(application); }
     static native long open(long application, android.view.Surface surface, int width, int height);
     static native int frame(long session, long displayTimeNanos);
+    static native int systemBarIcons(long session);
     static native void pointer(long session, int kind, float x, float y);
     static native void text(long session, String text, boolean composing);
     static native void key(long session, int scancode, int modifiers);
     static native void scroll(long session, float x, float y, float deltaX, float deltaY);
+    static native void surface(long session, float density, int idiom, float top, float leading, float bottom, float trailing, float keyboard, float[] textSizes);
     static native void keyState(long session, int scancode, boolean down);
     static native void edit(long session, int kind, int start, int end);
     static native String snapshot(long session);
@@ -66,25 +73,78 @@ public final class MainActivity extends Activity {
         } catch (Exception error) { throw new IllegalStateException("Invalid Android launch configuration", error); }
         surface = new ContentSurfaceView(this, savedState == null ? "" : savedState.getString("checkpoint", ""), launch.toString(),
                 new RuntimeOptions(this, getIntent()), getLastNonConfigurationInstance() instanceof Long ? (Long)getLastNonConfigurationInstance() : 0);
+        boolean gameMode = "game".equals(launch.optString("mode"));
+        // Modern platforms draw apps edge to edge: the surface owns the whole
+        // window, the app paints behind transparent bars and insets its chrome.
+        // The game control strip is a Java overlay, so it keeps window padding.
         FrameLayout root = new FrameLayout(this);
         root.addView(surface);
-        if ("game".equals(launch.optString("mode"))) root.addView(new GameControls(this, surface), GameControls.layout());
+        if (gameMode) root.addView(new GameControls(this, surface), GameControls.layout());
         root.setOnApplyWindowInsetsListener((view, insets) -> {
-            if (Build.VERSION.SDK_INT >= 30) {
-                android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
-                view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+            if (gameMode) {
+                if (Build.VERSION.SDK_INT >= 30) {
+                    android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
+                    view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+                } else {
+                    view.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(),
+                                    insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
+                }
             } else {
-                view.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(),
-                                insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
+                surface.setWindowInsets(insets);
             }
             return insets;
         });
         setContentView(root);
+        // The insets controller only exists once the decor view is attached.
+        if (!gameMode) configureSystemBars();
+        root.requestApplyInsets();
         IntentFilter filter = new IntentFilter("com.guava.probe.DEMO_INPUT");
         if (debugBuild()) {
             if (Build.VERSION.SDK_INT >= 33) registerReceiver(commands, filter, Context.RECEIVER_EXPORTED);
             else registerReceiver(commands, filter);
             commandsRegistered = true;
+        }
+    }
+
+    /** Edge-to-edge window with transparent bars; the app paints behind them. */
+    private void configureSystemBars() {
+        Window window = getWindow();
+        window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        if (Build.VERSION.SDK_INT >= 30) window.setDecorFitsSystemWindows(false);
+        else window.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
+        android.view.WindowManager.LayoutParams attributes = window.getAttributes();
+        attributes.layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+        window.setAttributes(attributes);
+        window.setStatusBarColor(Color.TRANSPARENT);
+        window.setNavigationBarColor(Color.TRANSPARENT);
+        if (Build.VERSION.SDK_INT >= 29) window.setNavigationBarContrastEnforced(false);
+        boolean night = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
+                == Configuration.UI_MODE_NIGHT_YES;
+        setSystemBarIcons(!night);
+    }
+
+    /**
+     * Bar icon contrast follows the surface background, not the system theme:
+     * the app decides how bright the pixels behind the bars are.
+     */
+    void setSystemBarIcons(boolean darkIcons) {
+        Window window = getWindow();
+        if (Build.VERSION.SDK_INT >= 30) {
+            WindowInsetsController controller = window.getInsetsController();
+            if (controller == null) return;
+            int mask = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                    | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
+            controller.setSystemBarsAppearance(darkIcons ? mask : 0, mask);
+        } else {
+            int flags = window.getDecorView().getSystemUiVisibility()
+                    | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION;
+            flags = darkIcons
+                    ? flags | View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+                    : flags & ~(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+            window.getDecorView().setSystemUiVisibility(flags);
         }
     }
 

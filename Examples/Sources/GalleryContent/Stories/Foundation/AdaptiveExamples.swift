@@ -14,11 +14,11 @@ struct AdaptiveControlExamples: View {
         }
     }
     var body: some View {
-        StorySection("Adaptive previews", "Each frame is a fixed surface width and input mode. Touch reserves 44pt targets; pointer surfaces keep hover.") {
+        StorySection("Adaptive previews", "Container widths for pointer layouts.") {
             Box(direction: .column, alignItems: .flexStart, spacing: 16) {
-                preview("390 pt · Pointer", width: 390, input: [.pointer, .keyboard])
-                preview("720 pt · Pointer", width: 720, input: [.pointer, .keyboard])
-                preview("390 pt · Touch", width: 390, input: [.touch])
+                preview("390 pt · Pointer", width: 390)
+                preview("720 pt · Pointer", width: 720)
+
             }
         }
     }
@@ -44,17 +44,16 @@ struct AdaptiveControlExamples: View {
         }
     }
 
-    /// A labeled device frame: the sample sits top-leading at the frame's exact
-    /// width, and scrolls horizontally when the page is narrower.
-    private func preview(_ title: String, width: Float, input: UIEnvironment.Input) -> some View {
-        var surface = UIEnvironment(); surface.viewport.width = width; surface.input = input
+    /// Fixed container proposals exercise desktop layout independently of the host width.
+    private func preview(_ title: String, width: Float) -> some View {
+        var surface = UIEnvironment(); surface.viewport.width = width; surface.input = [.pointer, .keyboard]
         let frameHeight = sampleHeight.map { $0 + 32 }
         return Column(alignment: .leading, spacing: 6) {
             Text(title).font(.caption).foregroundColor(.onSurfaceMuted)
             ScrollView(.horizontal) {
                 AdaptiveControlSample(page: page, options: options)
                     .frame(width: .points(width), height: frameHeight.map { .points($0) } ?? .auto).surfaceEnvironment(surface)
-                    .debugName("adaptive-\(page.rawValue)-\(input.contains(.touch) ? "touch" : width < 600 ? "narrow" : "wide")")
+                    .debugName("adaptive-\(page.rawValue)-\(width < 600 ? "narrow" : "wide")")
             }
             .frame(maxWidth: width + 2)
             .frame(height: frameHeight.map { .points($0) } ?? .auto)
@@ -534,92 +533,6 @@ private struct AdaptiveControlSample: View {
          SelectOption(value: 2, label: "Unavailable", isEnabled: false)]
     }
 }
-
-struct ViewportTraitsStory: View {
-    var body: some View {
-        SurfaceReader { surface in
-            StorySection("Viewport traits", "Width and height classes use independent 600/1000pt thresholds. Orientation is portrait below square and landscape at or above it; readers recompose when the surface changes without remounting their content.") {
-                WidthClassReader { width in
-                    HeightClassReader { height in
-                        OrientationReader { orientation in
-                            Column(alignment: .leading, spacing: 10) {
-                                Text("Viewport: \(Int(surface.viewport.width)) × \(Int(surface.viewport.height))")
-                                    .font(.caption).foregroundColor(.onSurfaceMuted)
-                                    .debugName("viewport-size")
-                                Text("Width class: \(Self.name(width))")
-                                    .font(.body).debugName("viewport-width-class")
-                                Text("Height class: \(Self.name(height))")
-                                    .font(.body).debugName("viewport-height-class")
-                                Text("Orientation: \(Self.name(orientation))")
-                                    .font(.body).debugName("viewport-orientation")
-                                Text("Compact < 600 · Medium 600–999 · Expanded ≥ 1000")
-                                    .font(.caption).foregroundColor(.onSurfaceMuted)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private static func name(_ width: UIEnvironment.WidthClass) -> String {
-        switch width {
-        case .compact: "compact"
-        case .medium: "medium"
-        case .expanded: "expanded"
-        }
-    }
-
-    private static func name(_ height: UIEnvironment.HeightClass) -> String {
-        switch height {
-        case .compact: "compact"
-        case .medium: "medium"
-        case .expanded: "expanded"
-        }
-    }
-
-    private static func name(_ orientation: UIEnvironment.Orientation) -> String {
-        switch orientation {
-        case .portrait: "portrait"
-        case .landscape: "landscape"
-        }
-    }
-}
-
-struct ViewThatFitsStory: View {
-    @State private var narrow = false
-
-    var body: some View {
-        StorySection("Intrinsic fitting", "The wide branch is measured at an unspecified width. It stays selected while its natural width and height fit; otherwise the compact branch replaces it while both subtrees retain their state.") {
-            Button(narrow ? "Use wide proposal" : "Use narrow proposal") { narrow.toggle() }
-                .buttonStyle(.secondary)
-            ViewThatFits(fitting: .intrinsic) {
-                Row(spacing: 8) {
-                    Text("Intrinsic wide").font(.caption)
-                    chip("Files")
-                    chip("Preview")
-                    chip("Settings")
-                }
-            } compact: {
-                Column(spacing: 8) {
-                    Text("Intrinsic compact").font(.caption)
-                    chip("Files")
-                    chip("Preview")
-                    chip("Settings")
-                }
-            }
-            .frame(width: narrow ? 180 : 520)
-            .debugName("intrinsic-fit")
-        }
-    }
-
-    private func chip(_ title: String) -> some View {
-        Text(title).font(.caption)
-            .padding(horizontal: 10, vertical: 6)
-            .background(.surfaceVariant).cornerRadius(6)
-    }
-}
-
 
 private struct ViewportTraitLabels: View {
     var body: some View {

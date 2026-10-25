@@ -6,6 +6,9 @@ import GuavaUIDevTools
 import GuavaLogging
 import NativeRHI
 import PlatformShell
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// 高层应用宿主。隐藏窗口、设备、DrawList 绘制器、
 /// `TextEnvironment`、`ViewGraph` 等装配细节。
@@ -607,8 +610,17 @@ public final class Application {
         environment.safeArea.bottom = insets.bottom
         environment.safeArea.leading = insets.leading
         environment.safeArea.trailing = insets.trailing
-        #if os(iOS) || os(Android)
+        #if os(iOS)
         environment.input = [.touch, .keyboard]
+        environment.idiom = UIDevice.current.userInterfaceIdiom == .pad ? .tablet : .phone
+        // UIFontMetrics is the platform's own accessibility ramp; one sample
+        // keeps the whole point-based typography scale in proportion.
+        let reference: CGFloat = 17
+        environment.textScale = .init(Float(UIFontMetrics.default.scaledValue(for: reference) / reference))
+        #elseif os(Android)
+        environment.input = [.touch, .keyboard]
+        #else
+        environment.idiom = .desktop
         #endif
         if environment != composition.environment.wrappedValue { composition.environment.wrappedValue = environment }
     }

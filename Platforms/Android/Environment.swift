@@ -1,21 +1,23 @@
 import Foundation
-import GuavaUICompose
-import GuavaUIRuntime
+internal import GuavaUICompose
+internal import GuavaUIRuntime
 
 /// Per-scene font/image services and a queue drained only on Android's UI thread.
 final class SceneEnvironment {
     let images = ImageAssetRegistry()
-    let surface = State<UIEnvironment>(wrappedValue: UIEnvironment())
     private(set) var text: TextEnvironment?
+    private var rasterScale: Float?
     private let lock = NSLock()
     private var work: [() -> Void] = []
 
     var hasWork: Bool { lock.withLock { !work.isEmpty } }
 
     func configure(scale: Float) {
-        guard text == nil else { return }
+        let rasterScale = min(4, max(1, scale))
+        guard self.rasterScale != rasterScale else { return }
+        self.rasterScale = rasterScale
         text = TextEnvironment.bootstrapped(atlasTextureID: 1, primaryFontName: SystemFontDefaults.primaryFontName,
-            defaultFont: .system(size: 16), defaultLineHeight: 22, rasterScale: scale, atlasEdge: 2048)
+            defaultFont: .system(size: 16), defaultLineHeight: 22, rasterScale: rasterScale, atlasEdge: 2048)
     }
 
     func withCurrent<R>(scale: Float, _ body: () throws -> R) rethrows -> R {

@@ -46,7 +46,9 @@ private struct ConsumerView: View {
     surface.safeArea.leading = 12
     let graph = ViewGraph(tree: NodeTree(), recomposer: Recomposer())
     graph.install(root: AdaptiveApplicationContent(content:
-        Box { Spacer().frame(width: 10, height: 10).debugName("adaptive-marker") }.padding(24),
+        SafeArea {
+            Box { Spacer().frame(width: 10, height: 10).debugName("adaptive-marker") }.padding(24)
+        },
         environment: State(wrappedValue: surface)))
     graph.computeLayout(width: 400, height: 800)
     func marker(_ node: Node) -> Node? {
@@ -65,10 +67,12 @@ private struct ConsumerView: View {
     let environment = State(wrappedValue: surface)
     let graph = ViewGraph(tree: NodeTree(), recomposer: Recomposer())
     graph.install(root: AdaptiveApplicationContent(content:
-        Box(direction: .column, alignItems: .stretch) {
-            Box {}.frame(height: 40).flex(0, shrink: 0).debugName("root-header")
-            Box {}.flex(1, shrink: 1, basis: 0).debugName("root-content")
-        }.flex(1, shrink: 1, basis: 0).frame(minWidth: 0, minHeight: 0).debugName("root-shell"),
+        SafeArea {
+            Box(direction: .column, alignItems: .stretch) {
+                Box {}.frame(height: 40).flex(0, shrink: 0).debugName("root-header")
+                Box {}.flex(1, shrink: 1, basis: 0).debugName("root-content")
+            }.flex(1, shrink: 1, basis: 0).frame(minWidth: 0, minHeight: 0).debugName("root-shell")
+        },
         environment: environment))
     func frame(_ name: String) throws -> CGRect {
         try #require(graph.layoutSnapshot().first { $0.debugName == name }?.absoluteFrame)

@@ -20,6 +20,7 @@ extern void* guava_android_create_application(float scale, const uint16_t* check
                                                const uint16_t* options, int options_count);
 extern void guava_android_destroy_application(void* application);
 extern void* guava_android_open(void* application, void* window, int width, int height);
+extern int guava_android_system_bar_icons(void* session);
 extern int guava_android_frame(void* session, uint64_t timestamp);
 extern void guava_android_close(void* session);
 
@@ -76,6 +77,12 @@ JNIEXPORT jint JNICALL Java_com_guava_probe_MainActivity_frame(JNIEnv* env, jcla
     (void)env; (void)type;
     GuavaSurface* host = (GuavaSurface*)(uintptr_t)value;
     return host && timestamp >= 0 ? guava_android_frame(host->session, (uint64_t)timestamp) : 0;
+}
+
+JNIEXPORT jint JNICALL Java_com_guava_probe_MainActivity_systemBarIcons(JNIEnv* env, jclass type, jlong value) {
+    (void)env; (void)type;
+    GuavaSurface* host = (GuavaSurface*)(uintptr_t)value;
+    return host ? (jint)guava_android_system_bar_icons(host->session) : -1;
 }
 
 JNIEXPORT void JNICALL Java_com_guava_probe_MainActivity_close(JNIEnv* env, jclass type, jlong value) {

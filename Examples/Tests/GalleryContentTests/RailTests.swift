@@ -67,7 +67,7 @@ struct RailTests {
                 let retained = try named("gallery-retained-rail", in: graph.tree.root)
                 #expect(try named("sidebar-item-1", in: retained).accessibility?.state.isSelected == true)
                 #expect(AdaptiveControlExamples.supports(.navigationRail))
-                for suffix in ["narrow", "wide", "touch"] {
+                for suffix in ["narrow", "wide"] {
                     #expect(
                         nodes(graph.tree.root).contains {
                             $0.attachments[LayoutDebugAttachmentKey.debugName] as? String

@@ -42,7 +42,7 @@ struct AppBarTests {
             #expect(nodes(bar).contains { $0.layoutNode?.textInputs?.text == "Save workspace" })
             let safeHost = try named("appbar-safe-host", graph), safeBar = try named("appbar-safe-content", graph)
             #expect(safeBar.absoluteFrame.minY - safeHost.absoluteFrame.minY == 24)
-            for suffix in ["narrow", "wide", "touch"] { _ = try named("adaptive-appBar-\(suffix)", graph) }
+            for suffix in ["narrow", "wide"] { _ = try named("adaptive-appBar-\(suffix)", graph) }
         } }
     }
 }

@@ -137,6 +137,7 @@ let runtimeTargets: [Target] = [
                     .linkedLibrary("dxgi", .when(platforms: [.windows])),
                     .linkedLibrary("d3d12", .when(platforms: [.windows])),
                     .linkedLibrary("android", .when(platforms: [.android])),
+                    .linkedLibrary("GLESv2", .when(platforms: [.android])),
                     .linkedLibrary("OpenSLES", .when(platforms: [.android]))]),
     .target(name: "PlatformShell", dependencies: ["CSDL3",
             .target(name: "GuavaPlatformCore"),

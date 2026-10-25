@@ -1,5 +1,5 @@
 import Foundation
-import GuavaUIRuntime
+internal import GuavaUIRuntime
 
 /// Classifies a primary touch as a control drag or a scroll gesture.
 final class TouchInput {

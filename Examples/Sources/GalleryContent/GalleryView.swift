@@ -24,43 +24,52 @@ public struct GalleryView: View {
   public func selectPage(_ page: GalleryPage) { self.page = page }
 
   public var body: some View {
-    LayerRoot {
-      AdaptiveSidebar(
-        "GuavaUI navigation", isPresented: $navigationOpen,
-        selection: Binding(get: { page }, set: { if let selected = $0 { page = selected } }),
-        width: $navigationWidth,
-        sections: navigationSections,
-        configure: {
-          $0.allowsEdgeSwipe = true
-          $0.layout.showsRailLabels = false
-        },
-        header: {
-          navigationHeader
-        },
-        footer: {
-          navigationFooter
-        }
-      ) {
-        Box(direction: .column, alignItems: .stretch, spacing: 0) {
-          header
-          Divider()
-          toolbar
-          ScrollView(.vertical, scrollbarGutter: .stable) {
-            page.makeStory(options: options)
-              .id("\(page.rawValue)-\(resetGeneration)")
-              .controlSize(options.size)
-              .textScaler(TextScaler(Float(textScale ?? 1)))
-              .padding(24)
-              .flex(0, shrink: 0)
-              .frame(minWidth: 0)
-          }.flex(1, shrink: 1, basis: 0).frame(minHeight: 0).debugName("gallery-content")
-          Divider()
-          Text("\(GalleryCatalog.entries.count) stories   ·   GuavaUI component showcase")
-            .font(.caption).foregroundColor(.onSurfaceMuted).padding(horizontal: 24, vertical: 8)
-        }.flex(1, shrink: 1, basis: 0).frame(minWidth: 0)
-      }.flex(1, shrink: 1, basis: 0).frame(minHeight: 0).background(.background)
-        .debugName("gallery-shell")
-    }.appearance(appearance, transition: .circular())
+    SafeArea {
+      LayerRoot {
+        AdaptiveSidebar(
+          "GuavaUI navigation", isPresented: $navigationOpen,
+          selection: Binding(get: { page }, set: { if let selected = $0 { page = selected } }),
+          width: $navigationWidth,
+          sections: navigationSections,
+          configure: {
+            $0.allowsEdgeSwipe = true
+            $0.layout.showsRailLabels = false
+          },
+          header: {
+            navigationHeader
+          },
+          footer: {
+            navigationFooter
+          }
+        ) {
+          Box(direction: .column, alignItems: .stretch, spacing: 0) {
+            header
+            Divider()
+            toolbar
+            ScrollView(.vertical, scrollbarGutter: .stable) {
+              TextScalerReader { inherited in
+                page.makeStory(options: options)
+                  .id("\(page.rawValue)-\(resetGeneration)")
+                  .controlSize(options.size)
+                  .textScaler(inherited.multiplied(by: Float(textScale ?? 1)))
+                  .padding(24)
+                  .flex(0, shrink: 0)
+                  .frame(minWidth: 0)
+              }
+            }.flex(1, shrink: 1, basis: 0).frame(minHeight: 0).debugName("gallery-content")
+            Divider()
+            Text("\(GalleryCatalog.entries.count) stories   ·   GuavaUI component showcase")
+              .font(.caption).foregroundColor(.onSurfaceMuted).padding(horizontal: 24, vertical: 8)
+          }.flex(1, shrink: 1, basis: 0).frame(minWidth: 0)
+        }.flex(1, shrink: 1, basis: 0).frame(minHeight: 0).debugName("gallery-shell")
+      }
+    }
+    .flex(1, shrink: 1, basis: 0)
+    .frame(minWidth: 0, minHeight: 0)
+    // The app background paints behind the system bars; only the interactive
+    // chrome is inset, so the surface never shows opaque bars or a letterbox.
+    .background(.background)
+    .appearance(appearance, transition: .circular())
   }
 
   private var navigationSections: [SidebarSection<GalleryPage>] {

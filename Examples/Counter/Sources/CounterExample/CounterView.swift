@@ -35,6 +35,8 @@ public struct CounterView: View {
     public var body: some View {
         let foreground = dark ? Color(red: 241, green: 245, blue: 249) : Color(red: 22, green: 35, blue: 56)
         let background = dark ? Color(red: 20, green: 29, blue: 45) : Color(red: 244, green: 247, blue: 252)
+        SurfaceReader { surface in
+        Box {
         Box(direction: .column, alignItems: .stretch, spacing: 12) {
             DemoLabel("GuavaUI · Shared Counter", size: 22, color: foreground, height: 36)
             DemoLabel("Shared Compose · ViewGraph · Yoga", size: 14, color: foreground, height: 24)
@@ -49,8 +51,11 @@ public struct CounterView: View {
             }
             DemoButton(dark ? "Light theme" : "Dark theme", name: "counter.theme") { dark.toggle() }
             DemoNote(value: $note, color: foreground)
-        }.modifier(DemoStyle(padding: 24, background: background, grow: 1))
+        }.modifier(DemoStyle(grow: 1))
+         .modifier(DemoInsets(insets: surface.safeArea, padding: 24))
          .debugName("counter.root")
+        }.modifier(DemoStyle(background: background, grow: 1))
+        }
     }
 }
 
@@ -178,5 +183,18 @@ private struct DemoNote: _PrimitiveView {
             if !value.wrappedValue.isEmpty { value.wrappedValue.removeLast() }
             return .handled
         }
+    }
+}
+
+/// Pads content by the host safe area plus authored padding while the
+/// background still paints behind the system bars.
+private struct DemoInsets: ViewModifier {
+    let insets: UIEnvironment.Insets
+    let padding: Float
+    func apply(layout: LayoutNode) {
+        layout.setPadding(padding + max(0, insets.top), edge: .top)
+        layout.setPadding(padding + max(0, insets.leading), edge: .start)
+        layout.setPadding(padding + max(0, insets.bottom), edge: .bottom)
+        layout.setPadding(padding + max(0, insets.trailing), edge: .end)
     }
 }

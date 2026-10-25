@@ -8,17 +8,19 @@ private struct RootView: View {
     @State private var name: TextBuffer = "GuavaUI"
 
     var body: some View {
-        Box(direction: .column, alignItems: .stretch, spacing: 20) {
-            Text(AppResources.welcome).font(.headline)
-            Text("Count: \(count)").font(.body)
-            Row(alignment: .center, spacing: 12) {
-                Button("Add one") { count += 1 }
-                Button("Reset") { count = 0 }.buttonStyle(.secondary)
+        SafeArea {
+            Box(direction: .column, alignItems: .stretch, spacing: 20) {
+                Text(AppResources.welcome).font(.headline)
+                Text("Count: \(count)").font(.body)
+                Row(alignment: .center, spacing: 12) {
+                    Button("Add one") { count += 1 }
+                    Button("Reset") { count = 0 }.buttonStyle(.secondary)
+                }
+                TextField("Your name", text: $name) { $0.behavior.clearable = true }
+                Text("Hello, \(name.stringValue)").foregroundColor(.onSurfaceMuted)
             }
-            TextField("Your name", text: $name) { $0.behavior.clearable = true }
-            Text("Hello, \(name.stringValue)").foregroundColor(.onSurfaceMuted)
+            .padding(24)
         }
-        .padding(24)
         .background(.surface)
     }
 }

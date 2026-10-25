@@ -1,6 +1,6 @@
 import Foundation
-import GuavaUICompose
-import GuavaUIRuntime
+public import GuavaUICompose
+internal import GuavaUIRuntime
 
 extension AndroidContentSession {
     public struct Inspection {

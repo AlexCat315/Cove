@@ -1,7 +1,7 @@
 import Foundation
 import GuavaUIDevTools
-import GuavaUIRuntime
-import GuavaUICompose
+internal import GuavaUIRuntime
+internal import GuavaUICompose
 
 /// The socket queue only enqueues work; it never reads the scene or renderer.
 private final class DiagnosticsInbox: @unchecked Sendable {

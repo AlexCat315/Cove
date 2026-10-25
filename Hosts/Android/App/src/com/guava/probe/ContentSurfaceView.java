@@ -9,6 +9,7 @@ import android.view.KeyCharacterMap;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.WindowInsets;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
@@ -34,10 +35,13 @@ final class ContentSurfaceView extends SurfaceView implements SurfaceHolder.Call
     private float touchX, touchY;
     private boolean touchMoved;
     private long touchStarted;
+    private final SurfaceMetrics metrics;
+    private int lastSystemBarIcons = -1;
 
     ContentSurfaceView(Context context, String checkpoint, String configuration, RuntimeOptions options, long application) {
         super(context);
         Diagnostics.attach(this);
+        metrics = new SurfaceMetrics(this, () -> session);
         this.checkpoint = checkpoint;
         this.configuration = configuration;
         this.application = application;
@@ -86,6 +90,7 @@ final class ContentSurfaceView extends SurfaceView implements SurfaceHolder.Call
         if (!running || session == 0) return;
         long started = options.timings ? System.nanoTime() : 0;
         int result = MainActivity.frame(session, timestamp);
+        applySystemBarIcons();
         if (result < 0) { stopFrames(); return; }
         if (result > 0 && debugBuild && options.snapshots && !options.benchmark && (timestamp - lastSnapshotTime > 200000000L || !gameMode)) {
             saveSnapshot(); lastSnapshotTime = timestamp;
@@ -105,6 +110,26 @@ final class ContentSurfaceView extends SurfaceView implements SurfaceHolder.Call
         if (application == 0) application = MainActivity.createApplication(getResources().getDisplayMetrics().density,
                 AssetInstaller.root(getContext()).getAbsolutePath(), checkpoint, configuration, options.json());
         if (application != 0) session = MainActivity.open(application, getHolder().getSurface(), getWidth(), getHeight());
+        metrics.refresh();
+    }
+
+    void setWindowInsets(WindowInsets insets) { metrics.update(insets); }
+
+    @Override protected void onConfigurationChanged(android.content.res.Configuration configuration) {
+        super.onConfigurationChanged(configuration);
+        metrics.refresh();
+        requestApplyInsets();
+    }
+
+    /** The app's background decides bar icon contrast; poll after each frame. */
+    private void applySystemBarIcons() {
+        if (session == 0) return;
+        int icons = MainActivity.systemBarIcons(session);
+        if (icons == lastSystemBarIcons) return;
+        lastSystemBarIcons = icons;
+        if (icons >= 0 && getContext() instanceof MainActivity) {
+            ((MainActivity) getContext()).setSystemBarIcons(icons == 1);
+        }
     }
     @Override public void surfaceDestroyed(SurfaceHolder holder) { releaseSurface(); }
     void releaseSurface() {

@@ -92,6 +92,37 @@ func scrollEvent(_ pointer: UnsafeMutableRawPointer?, _ x: Float, _ y: Float, _ 
 }
 
 @MainActor
+@_cdecl("guava_android_surface")
+func surfaceMetrics(_ pointer: UnsafeMutableRawPointer?, _ density: Float, _ idiom: Int32,
+                    _ top: Float, _ leading: Float, _ bottom: Float, _ trailing: Float,
+                    _ keyboard: Float, _ textSizes: UnsafePointer<Float>?, _ textCount: Int32) {
+    guard let pointer else { return }
+    guard let textSizes, textCount >= 0, textCount <= 128, textCount.isMultiple(of: 2) else { return }
+    let sizes = UnsafeBufferPointer(start: textSizes, count: Int(textCount))
+    let textScale = UIEnvironment.TextScale(samples: stride(from: 0, to: sizes.count, by: 2).map {
+        .init(size: sizes[$0], scaledSize: sizes[$0 + 1])
+    })
+    session(pointer).application.updateScale(density)
+    var safeArea = UIEnvironment.Insets()
+    safeArea.top = top
+    safeArea.leading = leading
+    safeArea.bottom = bottom
+    safeArea.trailing = trailing
+    session(pointer).scene.content.updateSurface(
+        idiom: idiom == 0 ? .phone : idiom == 1 ? .tablet : .desktop,
+        safeArea: safeArea,
+        keyboard: .init(height: keyboard),
+        textScale: textScale)
+}
+
+@MainActor
+@_cdecl("guava_android_system_bar_icons")
+func systemBarIconStyle(_ pointer: UnsafeMutableRawPointer?) -> Int32 {
+    guard let pointer else { return -1 }
+    return session(pointer).scene.content.systemBarIconStyle
+}
+
+@MainActor
 @_cdecl("guava_android_key_state")
 func heldKeyEvent(_ pointer: UnsafeMutableRawPointer?, _ scancode: UInt32, _ down: Int32) {
     guard let pointer else { return }

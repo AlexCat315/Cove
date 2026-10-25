@@ -87,9 +87,9 @@ struct GalleryTests {
             #expect(shell?.absoluteFrame.height == 820)
             #expect((content?.frame.height ?? 0) > 500)
             let sections = layout.filter { $0.debugName?.hasPrefix("story-section-") == true }
-            // Five Button stories plus one section holding the three adaptive frames.
+            // Five Button stories plus one section holding the two container previews.
             #expect(sections.count == 6)
-            for preview in ["narrow", "wide", "touch"] {
+            for preview in ["narrow", "wide"] {
                 #expect(layout.contains { $0.debugName == "adaptive-button-\(preview)" })
             }
             let primary = layout.first { $0.debugName == "gallery-primary-button" }

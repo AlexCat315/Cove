@@ -7,6 +7,8 @@ extern void guava_android_text(void* session, const uint16_t* text, int count, i
 extern void guava_android_key(void* session, uint32_t scancode, uint16_t modifiers);
 extern void guava_android_scroll(void* session, float x, float y, float dx, float dy);
 extern void guava_android_key_state(void* session, uint32_t scancode, int down);
+extern void guava_android_surface(void* session, float density, int idiom, float top, float leading,
+                                  float bottom, float trailing, float keyboard, const float* text_sizes, int text_count);
 extern int guava_android_snapshot(void* session, uint16_t* output, int capacity);
 extern int guava_android_input_snapshot(void* session, uint16_t* output, int capacity);
 extern void guava_android_edit(void* session, int kind, int start, int end);
@@ -37,6 +39,19 @@ JNIEXPORT void JNICALL Java_com_guava_probe_MainActivity_scroll(JNIEnv* env, jcl
     (void)env; (void)type;
     GuavaSurface* host = (GuavaSurface*)(uintptr_t)value;
     if (host) guava_android_scroll(host->session, x, y, dx, dy);
+}
+
+JNIEXPORT void JNICALL Java_com_guava_probe_MainActivity_surface(JNIEnv* env, jclass type, jlong value, jfloat density, jint idiom,
+        jfloat top, jfloat leading, jfloat bottom, jfloat trailing, jfloat keyboard, jfloatArray textSizes) {
+    (void)type;
+    GuavaSurface* host = (GuavaSurface*)(uintptr_t)value;
+    if (!host || !textSizes) return;
+    jsize count = (*env)->GetArrayLength(env, textSizes);
+    if (count > 128 || count % 2 != 0) return;
+    jfloat* samples = (*env)->GetFloatArrayElements(env, textSizes, NULL);
+    if (!samples) return;
+    guava_android_surface(host->session, density, idiom, top, leading, bottom, trailing, keyboard, samples, count);
+    (*env)->ReleaseFloatArrayElements(env, textSizes, samples, JNI_ABORT);
 }
 
 static jstring copy_snapshot(JNIEnv* env, GuavaSurface* host, int (*copy)(void*, uint16_t*, int)) {

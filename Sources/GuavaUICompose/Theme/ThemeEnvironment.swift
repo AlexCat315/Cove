@@ -35,4 +35,27 @@ public extension Node {
     var theme: Theme {
         compositionValue(of: ThemeEnvironment.key)
     }
+
+    /// Nearest explicitly provided theme at or below this node.
+    ///
+    /// Platform hosts use it for chrome outside the app's own layout — system
+    /// bar icon contrast, for example — without knowing which component
+    /// applied the appearance. The search is bounded: applications provide
+    /// their theme near the root, so a deep scan would only cost frames.
+    var surfaceTheme: Theme? {
+        var level = [self]
+        var depth = 0
+        var budget = 512
+        while !level.isEmpty, depth < 12, budget > 0 {
+            var next: [Node] = []
+            for node in level {
+                budget -= 1
+                if let theme = node.compositionValues[ThemeEnvironment.key.key] as? Theme { return theme }
+                next.append(contentsOf: node.children)
+            }
+            level = next
+            depth += 1
+        }
+        return nil
+    }
 }

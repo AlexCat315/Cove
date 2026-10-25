@@ -1,6 +1,6 @@
 import Foundation
-import GuavaUICompose
-import GuavaUIRuntime
+public import GuavaUICompose
+public import GuavaUIRuntime
 import GuavaUIDevTools
 
 /// Compose, input and font ownership for a native Android surface host.
@@ -24,14 +24,29 @@ public final class AndroidContentSession {
     private var needsUpdate = true
     private var diagnostics: AndroidDiagnostics?
     private let drawList = DrawList()
-    public private(set) var logicalSize = SIMD2<Float>.zero
-    public private(set) var scale: Float
+    private let surface: SurfaceState
+    public var logicalSize: SIMD2<Float> { surface.logicalSize }
+    public var scale: Float { surface.scale }
+    /// 1 = dark icons over a light surface, 0 = light icons over a dark
+    /// surface, -1 = unknown. The Java host applies it to the system bars.
+    public var systemBarIconStyle: Int32 { surface.systemBarIconStyle }
 
     public init<Root: View>(scale: Float, rendering: Rendering = .layers, @ViewBuilder content: () -> Root) {
-        self.scale = scale.isFinite ? min(4, max(1, scale)) : 1
+        surface = SurfaceState(scale: scale)
         self.rendering = rendering
         environment.configure(scale: self.scale)
-        withCurrent { graph.install(root: AndroidAdaptiveContent(content: content(), environment: environment.surface)) }
+        withCurrent { graph.install(root: AndroidAdaptiveContent(content: content(), environment: surface.value)) }
+    }
+
+    /// Reports device facts the window itself cannot derive: display cutout and
+    /// system-bar insets, the software keyboard height, the accessibility text
+    /// size and whether this is a phone or a tablet.
+    public func updateSurface(idiom: UIEnvironment.Idiom,
+                              safeArea: UIEnvironment.Insets,
+                              keyboard: UIEnvironment.Keyboard,
+                              textScale: UIEnvironment.TextScale) {
+        guard surface.update(idiom: idiom, safeArea: safeArea, keyboard: keyboard, textScale: textScale) else { return }
+        needsUpdate = true
     }
 
     public func configureDiagnostics(_ config: DevToolsConfig, schedule: @escaping @Sendable () -> Void) throws {
@@ -62,12 +77,8 @@ public final class AndroidContentSession {
 
     @discardableResult
     public func prepare(pixels: SIMD2<Int>, scale: Float, deltaTime: Double) -> DrawList {
-        self.scale = scale.isFinite ? min(4, max(1, scale)) : 1
-        logicalSize = SIMD2(Float(pixels.x), Float(pixels.y)) / self.scale
-        var surface = UIEnvironment()
-        surface.input = [.touch, .keyboard]
-        surface.viewport.width = logicalSize.x; surface.viewport.height = logicalSize.y; surface.viewport.scale = self.scale
-        if surface != environment.surface.wrappedValue { environment.surface.wrappedValue = surface }
+        surface.prepare(pixels: pixels, scale: scale)
+        environment.configure(scale: self.scale)
         withCurrent {
             diagnostics?.drain()
             diagnostics?.beginFrame()
@@ -76,6 +87,7 @@ public final class AndroidContentSession {
             animations.tick(deltaTime: deltaTime)
             recomposer.commitAll()
             graph.computeLayoutIfNeeded(width: logicalSize.x, height: logicalSize.y)
+            surface.updateSystemBars(theme: tree.root?.surfaceTheme)
             let layoutEnd = DispatchTime.now().uptimeNanoseconds
             let drawTrace = tree.timeline.begin()
             drawList.reset(); drawList.pixelScale = self.scale
@@ -95,6 +107,7 @@ public final class AndroidContentSession {
 
     public func didPresent() { diagnostics?.presented(tree: tree, list: drawList); needsUpdate = false; tree.flush() }
     public func invalidate() { needsUpdate = true }
+
     public func suspend() {
         withCurrent { context.pointerCapture.release(); context.focusChain.focus(nil) }
     }
@@ -161,5 +174,5 @@ private struct AndroidAdaptiveContent<Root: View>: View {
     let content: Root
     @State var environment: UIEnvironment
     init(content: Root, environment: State<UIEnvironment>) { self.content = content; self._environment = environment }
-    var body: some View { content.surfaceEnvironment(environment) }
+    var body: some View { SurfaceRoot(environment) { content } }
 }

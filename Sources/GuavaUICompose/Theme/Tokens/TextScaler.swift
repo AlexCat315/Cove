@@ -4,10 +4,26 @@ import GuavaUIRuntime
 /// typography ramp. Hosts can supply their accessibility setting once at the
 /// root; pages can override it. No rounding occurs in logical coordinates.
 public struct TextScaler: Hashable, Sendable {
-    public let factor: Float
-    public init(_ factor: Float = 1) { self.factor = factor.isFinite && factor > 0 ? factor : 1 }
+    private var authoredFactor: Float
+    private var systemScale = UIEnvironment.TextScale()
+    public var factor: Float { authoredFactor * systemScale.factor }
+    public init(_ factor: Float = 1) { self.authoredFactor = factor.isFinite && factor > 0 ? factor : 1 }
+
+    /// Apply authored scaling without flattening a native accessibility ramp.
+    public func multiplied(by factor: Float) -> Self {
+        guard factor.isFinite && factor > 0 && (authoredFactor * factor).isFinite else { return self }
+        var result = self
+        result.authoredFactor *= factor
+        return result
+    }
+
+    func applyingSystemScale(_ scale: UIEnvironment.TextScale) -> Self {
+        var result = self
+        result.systemScale = scale
+        return result
+    }
     public static let identity = TextScaler()
-    public func scale(_ value: Float) -> Float { value * factor }
+    public func scale(_ value: Float) -> Float { systemScale.scale(value) * authoredFactor }
     public func scale(_ font: Font) -> Font {
         Font(size: scale(font.size), weight: font.weight, design: font.design, family: font.family, isItalic: font.isItalic)
     }

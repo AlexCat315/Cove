@@ -74,7 +74,7 @@ struct DrawerTests {
             #expect(!context.focusChain.hasModalScope && context.focusChain.focused?.id == opener.id)
             #expect(try named("drawer-selection", graph).layoutNode?.textInputs?.text == "Selected destination: 9")
             #expect(AdaptiveControlExamples.supports(.navigationDrawer))
-            for name in ["narrow", "wide", "touch"] {
+            for name in ["narrow", "wide"] {
                 #expect(
                     nodes(graph.tree.root).contains {
                         $0.attachments[LayoutDebugAttachmentKey.debugName] as? String

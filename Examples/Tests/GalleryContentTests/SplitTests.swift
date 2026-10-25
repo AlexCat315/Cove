@@ -9,7 +9,7 @@ import Testing
 @MainActor
 struct SplitTests {
     @Test(
-        "Narrow, wide and touch previews present the expected panes and retain the edited draft",
+        "Narrow and wide container previews present the expected panes and retain the edited draft",
         arguments: [Float(1), 2])
     func previews(scale: Float) throws {
         let previous = TextEnvironmentHolder.current
@@ -36,7 +36,7 @@ struct SplitTests {
                     }
                 }
                 settle()
-                for name in ["narrow", "wide", "touch"] {
+                for name in ["narrow", "wide"] {
                     let preview = try #require(
                         nodes(graph.tree.root!).first {
                             $0.attachments[LayoutDebugAttachmentKey.debugName] as? String
@@ -54,7 +54,6 @@ struct SplitTests {
                         settle()
                         #expect(field.acceptsSubtreeInput)
                     }
-                    if name == "touch" { #expect(details.frame.height >= 44) }
                     context.focusChain.focus(field)
                     let input = EventDispatcher(
                         tree: graph.tree, interactions: context.interactions,
