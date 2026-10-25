@@ -14,7 +14,7 @@
     ]
   },
   "toolchain" : {
-    "sdkVersion" : "0.1.7"
+    "sdkVersion" : "0.1.8"
   },
   "version" : {
     "build" : 1,
