@@ -23,8 +23,8 @@ public final class ProcessSession: @unchecked Sendable {
               command.environment.allSatisfy({ !$0.key.contains("=") && !$0.key.contains("\0") && !$0.value.contains("\0") }) else {
             throw ProcessError.invalidCommand
         }
-        guard budget.outputBytes > 0, budget.outputBytes <= 33_554_432,
-              budget.pendingInputBytes > 0, budget.pendingInputBytes <= 33_554_432,
+        guard budget.outputBytes > 0, budget.outputBytes <= ProcessBudget.maximumBytes,
+              budget.pendingInputBytes > 0, budget.pendingInputBytes <= ProcessBudget.maximumBytes,
               budget.lifetimeMilliseconds.map({ $0 > 0 && $0 <= 86_400_000 }) ?? true else {
             throw ProcessError.invalidBudget
         }

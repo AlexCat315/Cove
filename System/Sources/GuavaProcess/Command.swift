@@ -15,6 +15,7 @@ public struct ProcessCommand: Sendable, Equatable, Codable {
 }
 
 public struct ProcessBudget: Sendable, Equatable, Codable {
+    static let maximumBytes = 536_870_916
     public var outputBytes = 1_048_576
     public var pendingInputBytes = 4_194_304
     public var lifetimeMilliseconds: Int? = 30_000

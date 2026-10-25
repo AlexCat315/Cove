@@ -19,7 +19,10 @@ struct PathTests {
         #expect(!ancestors.isEmpty && ancestors.count < 100)
         #expect(Set(ancestors.map(\.path)).count == ancestors.count)
         let last = ancestors.last!
+        #expect(PathIdentity.ancestors(of: last) == [last])
+        #if !os(Windows)
         #expect(last.deletingLastPathComponent().standardizedFileURL.path == last.path)
+        #endif
     }
 
     #if os(Windows)
@@ -28,7 +31,7 @@ struct PathTests {
         let extended = URL(fileURLWithPath: "\\\\?\\" + path.path.replacingOccurrences(of: "/", with: "\\"))
         #expect(PathIdentity.sameLocation(path, extended))
         #expect(PathIdentity.ancestors(of: URL(fileURLWithPath: "C:\\" )).count == 1)
-        #expect(PathIdentity.ancestors(of: URL(fileURLWithPath: "\\\\server\\share\\folder")).count < 10)
+        #expect(PathIdentity.ancestors(of: URL(fileURLWithPath: "\\\\server\\share\\folder")).count == 2)
     }
     #else
     @Test func symlinkEscapeAndMissingTargetAreResolved() throws {

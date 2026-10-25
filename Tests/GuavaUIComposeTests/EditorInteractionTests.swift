@@ -278,6 +278,18 @@ struct EditorInteractionTests: GuavaUIComposeSerializedSuite {
         #expect(harness.store.actions == 1)
     } }
 
+    @Test("a context menu preserves an editor's flexible viewport")
+    func contextMenuEditorViewport() throws { try withRig { rig in
+        let graph = rig.graph
+        graph.install(root: Column(spacing: 0) {
+            TextField(text: .constant("source")) { $0.layout.axis = .vertical }
+                .textFieldStyle(.editor).flex(1, shrink: 1, basis: 0)
+                .contextMenu(entries: { [] }).flex(1, shrink: 1, basis: 0)
+        }.frame(width: 600, height: 400))
+        graph.computeLayout(width: 600, height: 400)
+        #expect(try field(rig.tree).absoluteFrame.height == 400)
+    } }
+
     @Test("context menu fits a small window, closes on outside click and cleans up on unmount")
     func contextMenuBounds() throws { try withRig { rig in
         let graph = rig.graph

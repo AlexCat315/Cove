@@ -4,7 +4,7 @@ private import CGuavaSystem
 /// Filesystem comparisons resolve existing ancestors, including paths not created yet.
 public enum PathIdentity {
     public static func canonicalURL(_ url: URL) -> URL {
-        resolvedURL(url) ?? url.standardizedFileURL
+        resolvedURL(url) ?? normalizedURL(url)
     }
 
     public static func sameLocation(_ lhs: URL, _ rhs: URL) -> Bool {
@@ -31,12 +31,15 @@ public enum PathIdentity {
 
     /// Includes the starting directory and terminates at POSIX, drive and UNC roots.
     public static func ancestors(of directory: URL) -> [URL] {
-        var current = directory.standardizedFileURL
+        var current = normalizedURL(directory)
         var visited = Set<String>()
         var result: [URL] = []
         while visited.insert(current.path).inserted {
             result.append(current)
-            let parent = current.deletingLastPathComponent().standardizedFileURL
+            #if os(Windows)
+            guard !isWindowsRoot(current.path) else { break }
+            #endif
+            let parent = normalizedURL(current.deletingLastPathComponent())
             guard !parent.path.isEmpty, parent.path != current.path else { break }
             current = parent
         }
@@ -54,32 +57,58 @@ public enum PathIdentity {
 
     private static func resolvedURL(_ url: URL) -> URL? {
         guard url.isFileURL else { return nil }
-        var ancestor = url.standardizedFileURL
+        var ancestor = normalizedURL(url)
         var suffix: [String] = []
         var visitedLinks = Set<String>()
         while !FileManager.default.fileExists(atPath: ancestor.path) {
             if let destination = try? FileManager.default.destinationOfSymbolicLink(atPath: ancestor.path) {
                 guard visitedLinks.count < 40, visitedLinks.insert(ancestor.path).inserted else { return nil }
-                ancestor = URL(fileURLWithPath: destination, relativeTo: ancestor.deletingLastPathComponent())
-                    .absoluteURL.standardizedFileURL
+                ancestor = normalizedURL(URL(fileURLWithPath: destination, relativeTo: ancestor.deletingLastPathComponent()).absoluteURL)
                 continue
             }
-            let parent = ancestor.deletingLastPathComponent()
+            #if os(Windows)
+            guard !isWindowsRoot(ancestor.path) else { break }
+            #endif
+            let parent = normalizedURL(ancestor.deletingLastPathComponent())
             guard parent.path != ancestor.path, !ancestor.lastPathComponent.isEmpty else { break }
             suffix.append(ancestor.lastPathComponent)
             ancestor = parent
         }
-        let resolved = ancestor.resolvingSymlinksInPath().standardizedFileURL
-        var path = resolved.path
-        #if os(Windows)
-        path = path.replacingOccurrences(of: "\\", with: "/")
-        if path.lowercased().hasPrefix("//?/unc/") { path = "//" + path.dropFirst(8) }
-        else if path.hasPrefix("//?/") { path = String(path.dropFirst(4)) }
-        #endif
-        var result = URL(fileURLWithPath: path, isDirectory: resolved.hasDirectoryPath)
+        var result = normalizedURL(ancestor.resolvingSymlinksInPath())
         for component in suffix.reversed() { result.appendPathComponent(component) }
-        return result.standardizedFileURL
+        return normalizedURL(result)
     }
+
+    private static func normalizedURL(_ url: URL) -> URL {
+        #if os(Windows)
+        // Foundation standardization can collapse //?/ before it reaches the filesystem,
+        // and deleting a drive root can turn C:/ into a relative C:. Normalize first.
+        var path = url.path.replacingOccurrences(of: "\\", with: "/")
+        if let host = url.host, !host.isEmpty, host != "localhost", !path.hasPrefix("//") {
+            path = "//" + host + "/" + path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        }
+        for prefix in ["//?/", "/?/"] where path.hasPrefix(prefix) {
+            path = String(path.dropFirst(prefix.count))
+            if path.lowercased().hasPrefix("unc/") { path = "//" + path.dropFirst(4) }
+            break
+        }
+        if isWindowsRoot(path) {
+            if !path.hasSuffix("/") { path += "/" }
+            return URL(fileURLWithPath: path, isDirectory: true)
+        }
+        return URL(fileURLWithPath: path, isDirectory: url.hasDirectoryPath).standardizedFileURL
+        #else
+        return url.standardizedFileURL
+        #endif
+    }
+
+    #if os(Windows)
+    private static func isWindowsRoot(_ path: String) -> Bool {
+        let parts = path.replacingOccurrences(of: "\\", with: "/").split(separator: "/")
+        if path.hasPrefix("//") { return parts.count <= 2 }
+        return parts.count == 1 && parts[0].count == 2 && parts[0].last == ":"
+    }
+    #endif
 
     public static func components(_ url: URL) -> [String] {
         #if os(Windows)
