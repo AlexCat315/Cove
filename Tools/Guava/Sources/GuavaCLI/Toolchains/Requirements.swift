@@ -37,8 +37,11 @@ enum ToolchainRequirements {
         checks.append(.executable("cc", remedy: common))
         #endif
         if arguments.platform == .ios {
+            // Mobile C dependencies are built from source with CMake/Ninja.
+            checks.append(.executable("cmake", remedy: common))
+            checks.append(.executable("ninja", remedy: common))
             for name in ["xcodebuild", "xcrun"] {
-                checks.append(.executable(name, remedy: "Install full Xcode and Rust; rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios"))
+                checks.append(.executable(name, remedy: "Install the full Xcode IDE (not only Command Line Tools) from the App Store."))
             }
         }
         if arguments.platform == .android { checks += AndroidRequirements.inspect(arguments, root: root, version: version) }

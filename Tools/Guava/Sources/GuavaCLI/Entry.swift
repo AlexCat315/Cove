@@ -67,7 +67,15 @@ enum GuavaCLI {
         case .androidPrepare:
             let project = try AppProject(at: arguments.directory)
             try BuildAndroidApplication.prepare(arguments, root: GuavaSDK.locate(arguments, project: project), project: project)
-        case .sdkInstall: try SDKStore().install(version: arguments.subject!)
+        case .sdkInstall:
+            let version = try SDKStore().install(version: arguments.subject!)
+            let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            // A "latest" pin stays floating; a concrete pin is rewritten to the
+            // resolved version, like npm install pkg@latest.
+            if let project = try? AppProject(at: cwd), project.configuration.toolchain.sdkVersion != SDKRelease.latestTag {
+                try project.pin(sdkVersion: version)
+                print("Pinned \(project.directory.appendingPathComponent("guava.json").path) to SDK \(version)")
+            }
         case .sdkUse: try SDKStore().use(arguments.directory)
         case .sdkList: try SDKStore().list()
         case .setup: try ToolchainSetup.run(arguments, root: GuavaSDK.locate(arguments))
@@ -102,7 +110,7 @@ enum GuavaCLI {
                       [--timeout SECONDS] [--event-output FILE] [--scratch-path DIRECTORY]
           guava clean [directory]
           guava self update [VERSION]
-          guava sdk install VERSION
+          guava sdk install VERSION|latest
           guava sdk use <checkout> | guava sdk list
           guava setup [--mac|--win|--linux|--android|--ios]
           guava doctor [--mac|--win|--linux|--android|--ios]

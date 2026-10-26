@@ -57,7 +57,9 @@ struct ProjectConfiguration: Codable, Equatable {
         try application.validate()
         try targets.validate()
         try version.validate()
-        guard SDKRelease.isVersion(toolchain.sdkVersion) else { throw ToolError.invalid("toolchain.sdkVersion must be an exact SDK version") }
+        guard SDKRelease.isVersionRequirement(toolchain.sdkVersion) else {
+            throw ToolError.invalid("toolchain.sdkVersion must be an exact SDK version or \"latest\"")
+        }
     }
 }
 
@@ -82,6 +84,23 @@ struct AppProject {
         try platform.requireAvailable()
         guard configuration.targets.platforms.contains(platform) else {
             throw ToolError.invalid("This application's targets.platforms does not include \(platform.rawValue)")
+        }
+    }
+
+    /// Re-pins toolchain.sdkVersion in place, preserving the file's formatting.
+    func pin(sdkVersion version: String) throws {
+        guard SDKRelease.isVersion(version) else { throw ToolError.invalid("Pin an exact SDK version, not \(version)") }
+        let manifest = directory.appendingPathComponent("guava.json")
+        let expression = try NSRegularExpression(pattern: #"("sdkVersion"\s*:\s*")[^"]*""#)
+        let rewritten = NSMutableString(string: try String(contentsOf: manifest, encoding: .utf8))
+        let matches = expression.replaceMatches(
+            in: rewritten, range: NSRange(location: 0, length: rewritten.length),
+            withTemplate: "$1" + NSRegularExpression.escapedTemplate(for: version) + "\"")
+        guard matches == 1 else { throw ToolError.invalid("Could not find toolchain.sdkVersion in \(manifest.path)") }
+        try Files.text(rewritten as String, to: manifest)
+        let updated = try JSONDecoder().decode(ProjectConfiguration.self, from: Data((rewritten as String).utf8))
+        guard updated.toolchain.sdkVersion == version else {
+            throw ToolError.invalid("Failed to pin SDK \(version) in \(manifest.path)")
         }
     }
 

@@ -5,9 +5,13 @@ import PackageDescription
 let directory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
 let document = try JSONSerialization.jsonObject(with: Data(contentsOf: directory.appendingPathComponent("guava.json"))) as! [String: Any]
 let toolchain = document["toolchain"] as! [String: String]
-let sdkVersion = Version(toolchain["sdkVersion"]!)!
+let required = toolchain["sdkVersion"]!
+// The CLI always supplies GUAVA_SDK_ROOT; the remote pin is the IDE fallback.
+// "latest" resolves to the highest released tag instead of an exact version.
 let sdk: Package.Dependency = ProcessInfo.processInfo.environment["GUAVA_SDK_ROOT"].map { .package(name: "GuavaUI", path: $0) }
-    ?? .package(url: "https://github.com/AlexCat315/GuavaUI.git", exact: sdkVersion)
+    ?? (required == "latest"
+        ? .package(url: "https://github.com/AlexCat315/GuavaUI.git", from: Version(0, 0, 0))
+        : .package(url: "https://github.com/AlexCat315/GuavaUI.git", exact: Version(required)!))
 
 #if os(macOS)
 let nativeDirectory = "Platforms/macOS/Sources"

@@ -34,11 +34,13 @@ guava self update
 
 ## SDK 版本
 
-应用的 `guava.json` 使用 `toolchain.sdkVersion` 固定版本，SwiftPM 依赖使用同一精确版本：
+应用的 `guava.json` 用 `toolchain.sdkVersion` 固定版本，SwiftPM 依赖使用同一精确版本：
 
 ```swift
 .package(url: "https://github.com/AlexCat315/GuavaUI.git", exact: "0.1.0")
 ```
+
+写 `"sdkVersion": "latest"` 则浮动到本地已安装的最高版本，用 `guava sdk install latest` 拉取新发布（SwiftPM 回退路径按 `from: 0.0.0` 解析最高标签）。
 
 本地联调可使用 `GUAVA_SDK_ROOT` 或项目内被忽略的 `.guava/sdk.json`，其格式为 `{"path":"/absolute/path/GuavaUI"}`。CLI 更新和项目 SDK 版本分别管理。
 

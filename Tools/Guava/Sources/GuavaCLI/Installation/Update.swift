@@ -27,14 +27,11 @@ enum CLIUpdate {
             guard SDKRelease.isVersion(requested) else { throw ToolError.invalid("Supply an exact CLI version") }
             version = requested
         } else {
-            // Follow the /releases/latest pointer on github.com instead of
-            // hitting api.github.com, whose unauthenticated quota is 60 calls/hour.
-            let resolved = try Download.redirectedURL(from: URL(string: repository + "/releases/latest")!)
-            let tag = resolved.lastPathComponent
-            version = String(tag.dropFirst(tag.hasPrefix("v") ? 1 : 0))
-            guard SDKRelease.isVersion(version), version.compare(receipt.version, options: .numeric) != .orderedAscending else {
+            let latest = try SDKRelease.latestVersion(repository: repository)
+            guard latest.compare(receipt.version, options: .numeric) != .orderedAscending else {
                 throw ToolError.invalid("The release channel did not provide a newer supported version")
             }
+            version = latest
         }
         if version == receipt.version { print("guava \(version) is current"); return }
         let name = "guava-\(platform).tar.gz"

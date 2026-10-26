@@ -10,6 +10,9 @@ enum AndroidRequirements {
         // Java writes its version to stderr; javac reports to stdout on supported JDKs.
         let javac = (try? Shell.run(["javac", "-version"], capture: true, quiet: true)) ?? ""
         checks.append(.init(name: "JDK 21", ready: javac.hasPrefix("javac 21."), remedy: "Select JDK 21 using JAVA_HOME and PATH; run javac -version to verify."))
+        // The engine C dependencies are cross-compiled from source with CMake/Ninja.
+        checks.append(.executable("cmake", remedy: "Install CMake and Ninja (Android Studio SDK Manager: cmake; ninja-build), or via brew/scoop/apt."))
+        checks.append(.executable("ninja", remedy: "Install Ninja (ninja-build) and put it on PATH; the NDK does not provide it."))
         for path in ["platform-tools/adb", "platforms/android-36/android.jar", "build-tools/36.1.0/apksigner", "build-tools/36.1.0/zipalign"] {
             #if os(Windows)
             let suffix = path.hasSuffix("adb") || path.hasSuffix("zipalign") ? ".exe" : path.hasSuffix("apksigner") ? ".bat" : ""
