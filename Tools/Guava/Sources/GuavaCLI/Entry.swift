@@ -11,7 +11,7 @@ enum GuavaCLI {
             defer { LogSystem.flush() }
             let raw = Array(CommandLine.arguments.dropFirst())
             if raw == ["--version"] { print("guava \(try SDKRelease.current.version)"); return }
-            if raw.isEmpty || raw.contains("--help") { print(usage); return }
+            if raw.isEmpty || raw.prefix(while: { $0 != "--" }).contains("--help") { print(usage); return }
             let arguments = try Arguments(raw)
             LogContext.withValues(["operation": "\(arguments.operation)", "platform": "\(arguments.platform.rawValue)", "configuration": "\(arguments.configuration.rawValue)"]) {
                 do { try execute(arguments) } catch { fail(error) }
@@ -29,6 +29,9 @@ enum GuavaCLI {
 
     static func execute(_ arguments: Arguments) throws {
         switch arguments.operation {
+        case .task:
+            let root = try GuavaSDK.locate(arguments)
+            try ProjectTaskRunner(arguments: arguments, sdk: root).run()
         case .selfUpdate: try CLIUpdate.run(version: arguments.subject)
         case .installCLI: try CLIInstaller.install(payload: InstallationReceipt.executableDirectory, directory: arguments.directory, commands: URL(fileURLWithPath: try arguments.required(.binDirectory)))
         case .packageCLI: try CLIArchive.create(root: GuavaSDK.locate(arguments), output: arguments.url(.output) ?? arguments.directory.appendingPathComponent("dist"))
@@ -58,6 +61,10 @@ enum GuavaCLI {
             let project = try AppProject(at: arguments.directory)
             let root = try GuavaSDK.locate(arguments, project: project)
             try project.require(arguments.platform)
+            if let workspace = try ProjectWorkspace.find(from: project.directory) {
+                try WorkspaceDependencies.refresh(workspace, sdk: root)
+                try ProjectTaskRunner(arguments: arguments, sdk: root).runBeforeBuild(workspace)
+            }
             if arguments.platform == .android { try BuildAndroidApplication.run(arguments, root: root, project: project) }
             else if arguments.platform == .ios { try IOSBuild(project: project, root: root, arguments: arguments).run() }
             else { try DesktopBuild(project: project, root: root, arguments: arguments).run() }
@@ -109,6 +116,7 @@ enum GuavaCLI {
                       [--build-only|--skip-build] [--testing-library xctest|swift-testing]
                       [--timeout SECONDS] [--event-output FILE] [--scratch-path DIRECTORY]
           guava clean [directory]
+          guava task [NAME] [directory] [--sdk-root PATH] [-- task arguments]
           guava self update [VERSION]
           guava sdk install VERSION|latest
           guava sdk use <checkout> | guava sdk list
