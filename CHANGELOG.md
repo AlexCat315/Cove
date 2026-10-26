@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## 0.2.4 — 2026-10-27
+
 ## Unreleased
 
 - 修复 Windows 安装器读取 GitHub 校验清单的方式：下载后明确按 UTF-8 文本逐行解析，兼容二进制响应类型，并避免覆盖 PowerShell 自动变量。
