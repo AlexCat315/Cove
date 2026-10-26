@@ -4,6 +4,11 @@
 
 ## Unreleased
 
+## Unreleased
+
+- 修复 Windows 安装器读取 GitHub 校验清单的方式：下载后明确按 UTF-8 文本逐行解析，兼容二进制响应类型，并避免覆盖 PowerShell 自动变量。
+- 包含 Cove 0.2 系列的完整改名、子树复用、抗锯齿、mip／LOD、跨平台内存压力和 DevTools 修复。
+
 ## 0.2.3 — 2026-10-27
 
 ## Unreleased

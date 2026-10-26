@@ -20,10 +20,13 @@ try {
         }
         $Archive = Join-Path $temporary $name
         Invoke-WebRequest "$base/$name" -OutFile $Archive
-        $checksums = (Invoke-WebRequest "$base/SHA256SUMS").Content
-        $matches = @($checksums -split "`n" | Where-Object { $_ -match ('^[0-9a-fA-F]{64}\s+' + [Regex]::Escape($name) + '\s*$') })
-        if ($matches.Count -ne 1) { throw 'A unique CLI checksum is required.' }
-        $Checksum = ($matches[0] -split '\s+')[0]
+        $checksumFile = Join-Path $temporary 'SHA256SUMS'
+        Invoke-WebRequest "$base/SHA256SUMS" -OutFile $checksumFile
+        $checksumLines = @(Get-Content -LiteralPath $checksumFile -Encoding utf8 | Where-Object {
+            $_ -match ('^[0-9a-fA-F]{64}\s+' + [Regex]::Escape($name) + '\s*$')
+        })
+        if ($checksumLines.Count -ne 1) { throw 'A unique CLI checksum is required.' }
+        $Checksum = ($checksumLines[0] -split '\s+')[0]
     }
     if (-not $Checksum -or (Get-FileHash -Algorithm SHA256 $Archive).Hash -ne $Checksum) { throw 'CLI checksum mismatch.' }
     & "$env:SystemRoot\System32\tar.exe" -xf $Archive -C $temporary
