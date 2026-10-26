@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Publish the GuavaUI SDK and CLI.
+# Publish the CoveUI SDK and CLI.
 #
 #   Tools/Release/release.sh                  patch bump, e.g. 0.1.5 -> 0.1.6
 #   Tools/Release/release.sh 0.2.0            explicit version
@@ -16,7 +16,7 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 cd "$ROOT"
 
-SDK_MANIFEST=Tools/Guava/Sources/GuavaCLI/SDK.json
+SDK_MANIFEST=Tools/Cove/Sources/CoveCLI/SDK.json
 WORKFLOW=release.yml
 
 BRANCH=main
@@ -156,7 +156,7 @@ step "Preflight"
 
 command -v node >/dev/null || die "node is required"
 command -v git >/dev/null || die "git is required"
-[ -f "$SDK_MANIFEST" ] || die "not a GuavaUI checkout: $SDK_MANIFEST is missing"
+[ -f "$SDK_MANIFEST" ] || die "not a CoveUI checkout: $SDK_MANIFEST is missing"
 
 current_branch=$(git rev-parse --abbrev-ref HEAD)
 [ "$current_branch" = "$BRANCH" ] || die "on '$current_branch'; release from '$BRANCH' or pass --branch"
@@ -211,7 +211,7 @@ fi
 manifests=("$SDK_MANIFEST")
 while IFS= read -r file; do
   manifests+=("$file")
-done < <(git ls-files | grep -E '(^|/)guava\.json$' || true)
+done < <(git ls-files | grep -E '(^|/)cove\.json$' || true)
 
 previous_tag=$(git describe --tags --abbrev=0 2>/dev/null || true)
 if [ -n "$previous_tag" ]; then
@@ -306,9 +306,9 @@ fi
 
 step "Tag"
 if [ -n "$changelog" ]; then
-  git tag -a "$tag" -m "GuavaUI SDK and CLI $version" -m "$changelog"
+  git tag -a "$tag" -m "CoveUI SDK and CLI $version" -m "$changelog"
 else
-  git tag -a "$tag" -m "GuavaUI SDK and CLI $version"
+  git tag -a "$tag" -m "CoveUI SDK and CLI $version"
 fi
 info "tagged $tag"
 

@@ -1,5 +1,5 @@
-import GuavaLogging
+import CoveLogging
 
 extension Logger {
-    static let platform = LogSystem.logger("com.guava.engine.platform")
+    static let platform = LogSystem.logger("com.cove.engine.platform")
 }

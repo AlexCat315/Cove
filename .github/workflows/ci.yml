@@ -33,10 +33,10 @@ jobs:
         id: build-cache
       - name: Identify native inputs
         id: native-inputs
-        run: echo "digest=$(git ls-tree -r HEAD cmake third-party Runtime/third-party Tools/Guava/Sources/GuavaCLI/Toolchains/Native.swift .github/actions/setup-toolchains/action.yml | git hash-object --stdin)" >> "$GITHUB_OUTPUT"
+        run: echo "digest=$(git ls-tree -r HEAD cmake third-party Runtime/third-party Tools/Cove/Sources/CoveCLI/Toolchains/Native.swift .github/actions/setup-toolchains/action.yml | git hash-object --stdin)" >> "$GITHUB_OUTPUT"
       - name: Test system contracts before preparing graphics dependencies
         timeout-minutes: 5
-        run: ./guava test System --no-parallel --timeout 120
+        run: ./cove test System --no-parallel --timeout 120
       - uses: actions/cache/restore@v5
         id: native-cache
         with:
@@ -46,7 +46,7 @@ jobs:
           key: sdk-native-v3-${{ runner.os }}-${{ runner.arch }}-${{ steps.native-inputs.outputs.digest }}
       - name: Prepare native dependencies
         id: native
-        run: ./guava setup
+        run: ./cove setup
       - uses: actions/cache/save@v5
         if: steps.native-cache.outputs.cache-hit != 'true'
         with:
@@ -56,42 +56,42 @@ jobs:
           key: ${{ steps.native-cache.outputs.cache-primary-key }}
       - name: Test standalone CLI
         timeout-minutes: 10
-        run: ./guava test Tools/Guava --timeout 480
+        run: ./cove test Tools/Cove --timeout 480
       - name: Test standalone developer tools
         if: runner.os != 'Windows'
-        run: ./guava test Tools/Developer --timeout 300
+        run: ./cove test Tools/Developer --timeout 300
       - name: Stage native metadata for the SDK package
         shell: bash
         run: |
-          ./guava internal package-native --output "$PWD/dist"
+          ./cove internal package-native --output "$PWD/dist"
           mkdir -p Artifacts
           cp "dist/native-${{ matrix.platform }}.json" Artifacts/native.json
       - name: Package complete SDK
-        run: ./guava internal package-cli --output "$PWD/dist"
+        run: ./cove internal package-cli --output "$PWD/dist"
       - name: Verify CLI without a developer toolchain on PATH
         run: |
           mkdir smoke
-          tar -xf "dist/guava-${{ matrix.platform }}.tar.gz" -C smoke
+          tar -xf "dist/cove-${{ matrix.platform }}.tar.gz" -C smoke
           if [ "$RUNNER_OS" = Windows ]; then
-            env -i SystemRoot="$SYSTEMROOT" WINDIR="$WINDIR" PATH=/c/Windows/System32 smoke/guava/guava.exe --version
+            env -i SystemRoot="$SYSTEMROOT" WINDIR="$WINDIR" PATH=/c/Windows/System32 smoke/cove/cove.exe --version
           else
-            env -i PATH=/usr/bin:/bin smoke/guava/guava --version
+            env -i PATH=/usr/bin:/bin smoke/cove/cove --version
           fi
       - name: Build SDK tests
         if: ${{ !cancelled() && steps.native.conclusion == 'success' }}
-        run: ./guava test . --build-only
+        run: ./cove test . --build-only
       - uses: actions/cache/save@v5
         if: steps.build-cache.outputs.hit != 'true'
         with:
           key: ${{ steps.build-cache.outputs.key }}
           path: |
-            Tools/Guava/.build
+            Tools/Cove/.build
             Tools/Developer/.build
             System/.build
             .build
       - name: Run SDK XCTest
         if: runner.os != 'Windows'
-        run: ./guava test . --skip-build --no-parallel --testing-library xctest --timeout 300
+        run: ./cove test . --skip-build --no-parallel --testing-library xctest --timeout 300
       - name: Run SDK XCTest with hang diagnostics
         if: runner.os == 'Windows'
         shell: pwsh
@@ -100,9 +100,9 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           if [ "$RUNNER_OS" = Linux ]; then
-            xvfb-run -a ./guava test . --skip-build --no-parallel --testing-library swift-testing --timeout 600 --event-output test-results/events.jsonl
+            xvfb-run -a ./cove test . --skip-build --no-parallel --testing-library swift-testing --timeout 600 --event-output test-results/events.jsonl
           else
-            ./guava test . --skip-build --no-parallel --testing-library swift-testing --timeout 600 --event-output test-results/events.jsonl
+            ./cove test . --skip-build --no-parallel --testing-library swift-testing --timeout 600 --event-output test-results/events.jsonl
           fi
       - name: Run SDK Swift Testing with hang diagnostics
         if: runner.os == 'Windows'

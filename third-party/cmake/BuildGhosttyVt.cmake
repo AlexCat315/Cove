@@ -9,19 +9,19 @@
 include(ExternalProject)
 
 set(GHOSTTY_ZIG_VERSION "0.16.0")
-find_program(GUAVA_ZIG zig)
-if(NOT GUAVA_ZIG)
+find_program(COVE_ZIG zig)
+if(NOT COVE_ZIG)
     message(FATAL_ERROR
-        "zig ${GHOSTTY_ZIG_VERSION} is required to build libghostty-vt for GuavaUITerminal.\n"
-        "Install it from https://ziglang.org/download/ or pass -DGUAVA_ZIG=/path/to/zig.")
+        "zig ${GHOSTTY_ZIG_VERSION} is required to build libghostty-vt for CoveUITerminal.\n"
+        "Install it from https://ziglang.org/download/ or pass -DCOVE_ZIG=/path/to/zig.")
 endif()
-execute_process(COMMAND ${GUAVA_ZIG} version OUTPUT_VARIABLE _zig_version OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND ${COVE_ZIG} version OUTPUT_VARIABLE _zig_version OUTPUT_STRIP_TRAILING_WHITESPACE)
 if(NOT _zig_version STREQUAL GHOSTTY_ZIG_VERSION)
-    message(FATAL_ERROR "libghostty-vt needs zig ${GHOSTTY_ZIG_VERSION}; found ${_zig_version} at ${GUAVA_ZIG}.\n"
-        "Point -DGUAVA_ZIG=/path/to/zig at a ${GHOSTTY_ZIG_VERSION} toolchain.")
+    message(FATAL_ERROR "libghostty-vt needs zig ${GHOSTTY_ZIG_VERSION}; found ${_zig_version} at ${COVE_ZIG}.\n"
+        "Point -DCOVE_ZIG=/path/to/zig at a ${GHOSTTY_ZIG_VERSION} toolchain.")
 endif()
 
-# GUAVA_TRIPLE → Zig target. Deployment floors match NativePlatform.cmake.
+# COVE_TRIPLE → Zig target. Deployment floors match NativePlatform.cmake.
 set(_ghostty_targets
     "macos-arm64=aarch64-macos.26.0"
     "macos-x86_64=x86_64-macos.26.0"
@@ -33,17 +33,17 @@ set(GHOSTTY_ZIG_TARGET "")
 foreach(_entry IN LISTS _ghostty_targets)
     string(REPLACE "=" ";" _pair "${_entry}")
     list(GET _pair 0 _triple)
-    if(_triple STREQUAL GUAVA_TRIPLE)
+    if(_triple STREQUAL COVE_TRIPLE)
         list(GET _pair 1 GHOSTTY_ZIG_TARGET)
     endif()
 endforeach()
 if(GHOSTTY_ZIG_TARGET STREQUAL "")
-    message(FATAL_ERROR "No Zig target mapping for ${GUAVA_TRIPLE}")
+    message(FATAL_ERROR "No Zig target mapping for ${COVE_TRIPLE}")
 endif()
 
 set(GHOSTTY_SOURCE_DIR ${CMAKE_SOURCE_DIR}/ghostty)
-set(GHOSTTY_BUNDLE ${GUAVA_VENDOR_DIR}/GhosttyVt.artifactbundle)
-set(GHOSTTY_VARIANT ${GHOSTTY_BUNDLE}/${GUAVA_TRIPLE})
+set(GHOSTTY_BUNDLE ${COVE_VENDOR_DIR}/GhosttyVt.artifactbundle)
+set(GHOSTTY_VARIANT ${GHOSTTY_BUNDLE}/${COVE_TRIPLE})
 set(GHOSTTY_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/ghostty-install)
 if(WIN32)
     set(GHOSTTY_LIB_FILENAME "ghostty-vt-static.lib")
@@ -66,7 +66,7 @@ ExternalProject_Add(ghostty_vt_ep
     INSTALL_DIR ${GHOSTTY_INSTALL_PREFIX}
     CONFIGURE_COMMAND ""
     BUILD_IN_SOURCE TRUE
-    BUILD_COMMAND ${_ghostty_env} ${GUAVA_ZIG} build
+    BUILD_COMMAND ${_ghostty_env} ${COVE_ZIG} build
         -Demit-lib-vt=true
         -Doptimize=ReleaseFast
         -Dtarget=${GHOSTTY_ZIG_TARGET}
@@ -95,23 +95,23 @@ add_custom_target(stage_ghostty_vt ALL
     COMMENT "Staging libghostty-vt into ${GHOSTTY_VARIANT}"
 )
 
-guava_git_revision(GHOSTTY_SOURCE_REVISION "${GHOSTTY_SOURCE_DIR}")
+cove_git_revision(GHOSTTY_SOURCE_REVISION "${GHOSTTY_SOURCE_DIR}")
 string(SUBSTRING "${GHOSTTY_SOURCE_REVISION}" 0 7 _ghostty_short_revision)
 set(GHOSTTY_VERSION "1.3.2-dev+${_ghostty_short_revision}")
 
-write_artifactbundle_info(${GHOSTTY_BUNDLE} "GhosttyVt" "${GUAVA_TRIPLE}/lib/${GHOSTTY_LIB_FILENAME}" "${GHOSTTY_VERSION}")
+write_artifactbundle_info(${GHOSTTY_BUNDLE} "GhosttyVt" "${COVE_TRIPLE}/lib/${GHOSTTY_LIB_FILENAME}" "${GHOSTTY_VERSION}")
 
-guava_add_artifact_build_manifest(
+cove_add_artifact_build_manifest(
     ARTIFACT_NAME "GhosttyVt"
     VERSION "${GHOSTTY_VERSION}"
     BUNDLE_DIR ${GHOSTTY_BUNDLE}
-    LIB_REL_PATH "${GUAVA_TRIPLE}/lib/${GHOSTTY_LIB_FILENAME}"
+    LIB_REL_PATH "${COVE_TRIPLE}/lib/${GHOSTTY_LIB_FILENAME}"
     BUILD_SYSTEM "Zig ${GHOSTTY_ZIG_VERSION} (zig build -Demit-lib-vt=true)"
     SOURCE_KIND "git-submodule"
     SOURCE_URL "third-party/ghostty"
     SOURCE_REF "main"
     SOURCE_REVISION ${GHOSTTY_SOURCE_REVISION}
-    C_COMPILER "${GUAVA_ZIG} (${GHOSTTY_ZIG_TARGET})"
+    C_COMPILER "${COVE_ZIG} (${GHOSTTY_ZIG_TARGET})"
     C_FLAGS_RELEASE "-Doptimize=ReleaseFast"
     NOTES "libghostty-vt static library, zero-dependency C ABI. Pre-1.0 and unstable: pin the submodule revision"
     CXX_COMPILER "none"

@@ -48,7 +48,7 @@ function breakpointSourceURL(source, editor, buildRoot = "", localRoot = "") {
   const encodedPath = uri.slice(`${editor}://file`.length).replace(/:\d+:\d+$/, "");
   let path = decodeURIComponent(encodedPath);
   if (/^\/[A-Za-z]:\//.test(path)) path = path.slice(1);
-  return `${editor}://guava.guavaui-devtools/breakpoint?file=${encodeURIComponent(path)}&line=${source.line}&column=${source.column}`;
+  return `${editor}://cove.coveui-devtools/breakpoint?file=${encodeURIComponent(path)}&line=${source.line}&column=${source.column}`;
 }
 function renderSourceAnalysis(node) {
   const sourceNode = sourceForNode(node), source = sourceNode?.source;
@@ -66,7 +66,7 @@ function renderSourceAnalysis(node) {
     analysisEl("sourceBuildRoot").value.trim(), analysisEl("sourceLocalRoot").value.trim());
   if (breakpointURL) breakpoint.href = breakpointURL; else breakpoint.removeAttribute("href");
   breakpoint.setAttribute("aria-disabled", String(!breakpointURL));
-  breakpoint.title = "Requires the GuavaUI DevTools extension. Adds a source breakpoint to the editor's existing Swift/LLDB debugger.";
+  breakpoint.title = "Requires the CoveUI DevTools extension. Adds a source breakpoint to the editor's existing Swift/LLDB debugger.";
   const owner = node?.ownerScopeID ? context.tree.findNode(context.session.tree.tree, node.ownerScopeID) : null;
   const metrics = owner?.recomposition, button = analysisEl("recompositionOwner");
   button.hidden = !owner;
@@ -117,9 +117,9 @@ function renderRecompositionTable() {
 document.addEventListener("DOMContentLoaded", () => {
   for (const id of ["sourceEditor", "sourceBuildRoot", "sourceLocalRoot"]) {
     const field = analysisEl(id);
-    try { field.value = localStorage.getItem("guava.inspector." + id) ?? field.value; } catch {}
+    try { field.value = localStorage.getItem("cove.inspector." + id) ?? field.value; } catch {}
     field.addEventListener(id === "sourceEditor" ? "change" : "input", () => {
-      try { localStorage.setItem("guava.inspector." + id, field.value); } catch {}
+      try { localStorage.setItem("cove.inspector." + id, field.value); } catch {}
       renderSourceAnalysis(context.tree.findNode(context.session.tree.tree, context.session.tree.selectedId));
     });
   }

@@ -1,2 +1,2 @@
-@_exported import GuavaPlatformCore
-public typealias SystemCursor = GuavaPlatformCore.SystemCursor
+@_exported import CovePlatformCore
+public typealias SystemCursor = CovePlatformCore.SystemCursor

@@ -1,5 +1,5 @@
 public import Foundation
-private import GuavaProcess
+private import CoveProcess
 
 /// Thin, explicit process launching. Arguments are always passed as a vector;
 /// no tool in this public interprets a shell string.

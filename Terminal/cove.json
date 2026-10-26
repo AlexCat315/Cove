@@ -1,0 +1,20 @@
+{
+  "application": {
+    "id": "com.cove.terminaldemo",
+    "name": "CoveUI Terminal"
+  },
+  "version": {
+    "name": "0.1.0",
+    "build": 1
+  },
+  "toolchain": {
+    "sdkVersion": "0.1.14"
+  },
+  "targets": {
+    "platforms": [
+      "mac",
+      "linux"
+    ],
+    "desktopExecutable": "TerminalDemo"
+  }
+}

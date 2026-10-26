@@ -2,11 +2,11 @@
 import PackageDescription
 
 let package = Package(
-    name: "GuavaAndroidContract",
+    name: "CoveAndroidContract",
     platforms: [.macOS(.v26), .iOS(.v26)],
-    products: [.library(name: "GuavaAndroidContract", targets: ["GuavaAndroidContract"])],
+    products: [.library(name: "CoveAndroidContract", targets: ["CoveAndroidContract"])],
     targets: [
-        .target(name: "GuavaAndroidContract"),
-        .testTarget(name: "GuavaAndroidContractTests", dependencies: ["GuavaAndroidContract"]),
+        .target(name: "CoveAndroidContract"),
+        .testTarget(name: "CoveAndroidContractTests", dependencies: ["CoveAndroidContract"]),
     ]
 )

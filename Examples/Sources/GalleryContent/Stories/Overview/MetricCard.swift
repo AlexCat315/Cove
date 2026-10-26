@@ -1,5 +1,5 @@
-import GuavaUI
-import GuavaUIRuntime
+import CoveUI
+import CoveUIRuntime
 
 /// The gallery uses the same public surface and typography APIs as an app.
 struct DashboardCard<Content: View>: View {

@@ -2,18 +2,18 @@
 import PackageDescription
 
 let package = Package(
-    name: "GuavaUIBrowser",
+    name: "CoveUIBrowser",
     platforms: [.macOS(.v26), .iOS(.v26)],
     dependencies: [.package(path: "../Portable"), .package(path: "../Examples/Counter"), .package(path: "../Text"), .package(path: "../Logging")],
     targets: [
-        .executableTarget(name: "GuavaUIBrowserPrototype", dependencies: [
-            .product(name: "GuavaLogging", package: "Logging"),
-            .product(name: "GuavaUIText", package: "Text"),
+        .executableTarget(name: "CoveUIBrowserPrototype", dependencies: [
+            .product(name: "CoveLogging", package: "Logging"),
+            .product(name: "CoveUIText", package: "Text"),
             .product(name: "CounterExample", package: "Counter"),
-            .product(name: "GuavaUICore", package: "Portable"),
-            .product(name: "GuavaUIComposeCore", package: "Portable"),
-            .product(name: "GuavaUIDevToolsScene", package: "Portable"),
-            .product(name: "GuavaUIDevToolsProtocol", package: "Portable"),
+            .product(name: "CoveUICore", package: "Portable"),
+            .product(name: "CoveUIComposeCore", package: "Portable"),
+            .product(name: "CoveUIDevToolsScene", package: "Portable"),
+            .product(name: "CoveUIDevToolsProtocol", package: "Portable"),
         ]),
     ]
 )

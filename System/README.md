@@ -1,9 +1,9 @@
-# GuavaSystem
+# CoveSystem
 
-`GuavaFileSystem` 和 `GuavaProcess` 可独立构建，不依赖 SDL、窗口、字体或 GPU。SDK、CLI 与 Studio 使用同一份实现。
+`CoveFileSystem` 和 `CoveProcess` 可独立构建，不依赖 SDL、窗口、字体或 GPU。SDK、CLI 与 Studio 使用同一份实现。
 
 ```sh
-./guava test System --no-parallel
+./cove test System --no-parallel
 ```
 
 `AtomicFile.write(_:to:access:)` 在目标目录创建暂存文件，再使用同卷替换发布。失败保留旧文件并清理暂存文件。Windows 仅对共享锁和锁冲突进行有限重试；原子可见性不等于断电后的持久性。`.ownerOnly` 在写入内容前设置 POSIX 权限或当前用户 ACL。

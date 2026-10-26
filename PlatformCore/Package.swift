@@ -2,9 +2,9 @@
 import PackageDescription
 
 let package = Package(
-    name: "GuavaPlatformCore",
+    name: "CovePlatformCore",
     platforms: [.macOS(.v26), .iOS(.v26)],
-    products: [.library(name: "GuavaPlatformCore", targets: ["GuavaPlatformCore"])],
-    targets: [.target(name: "GuavaPlatformCore"),
-              .testTarget(name: "GuavaPlatformCoreTests", dependencies: ["GuavaPlatformCore"])]
+    products: [.library(name: "CovePlatformCore", targets: ["CovePlatformCore"])],
+    targets: [.target(name: "CovePlatformCore"),
+              .testTarget(name: "CovePlatformCoreTests", dependencies: ["CovePlatformCore"])]
 )

@@ -1,4 +1,4 @@
-> Historical migration report: the WGPU reference and its commands were retired. Use `swift run --package-path Tools/Developer guava-dev gpu-regression run` and `NativeRHIPassProbe` for current NativeRHI validation. Measurements below describe the original comparison.
+> Historical migration report: the WGPU reference and its commands were retired. Use `swift run --package-path Tools/Developer cove-dev gpu-regression run` and `NativeRHIPassProbe` for current NativeRHI validation. Measurements below describe the original comparison.
 
 # NativeRenderer PBR、阴影与 HDR
 
@@ -20,12 +20,12 @@ CPU 验证还检查未迁移的 UI/TAA packet 会在开始 GPU 帧之前明确�
 
 ```sh
 SLANGC="$PWD/Engine/vendor/slang/bin/slangc" \
-GUAVA_WGPU_BACKEND=metal GUAVA_RUN_GPU_SMOKE_TESTS=1 \
+COVE_WGPU_BACKEND=metal COVE_RUN_GPU_SMOKE_TESTS=1 \
 swift test --package-path Engine --jobs 4 \
   --filter 'NativeRHITests\.|NativeRendererTests\.|RenderThreadTests|MeshSurfaceAndVisibilityTests|MeshAssetCatalogTests|AssetRegistryTests|RenderBackendGPUSmokeTests/(material|directionalShadow|multiDirectionalShadow|directionalCascades|editorGridPaints)|ShaderCatalogTests'
 
 SLANGC="$PWD/Engine/vendor/slang/bin/slangc" swift test --package-path Tools/Developer --filter ShaderToolchainTests
-swift run --package-path Tools/Developer guava-dev maintainability --report
+swift run --package-path Tools/Developer cove-dev maintainability --report
 ```
 
 ## Release 性能探针
@@ -34,9 +34,9 @@ swift run --package-path Tools/Developer guava-dev maintainability --report
 
 ```sh
 swift build -c release --package-path Engine --product NativeRHIPassProbe --jobs 4
-GUAVA_WGPU_BACKEND=metal Engine/.build/release/NativeRHIPassProbe \
+COVE_WGPU_BACKEND=metal Engine/.build/release/NativeRHIPassProbe \
   --scene pbr --width 1920 --height 1080 --frames 180 --warmup 30 --repeats 3 \
-  --output /tmp/guava-native-pbr-1080
+  --output /tmp/cove-native-pbr-1080
 ```
 
 2026-10-08，Apple M1、macOS 27.0.1、Release。每条路径 540 个 CPU 样本，3 个 completed-batch 样本。每三帧等待 GPU 完成，完成批次耗时包含 CPU、驱动提交、GPU 与等待开销，不是 GPU timestamp、窗口 FPS 或整个引擎的性能。
@@ -54,4 +54,4 @@ GUAVA_WGPU_BACKEND=metal Engine/.build/release/NativeRHIPassProbe \
 
 ## 默认切换前剩余范围
 
-默认 EngineHost 仍使用 WGPU。透明网格与蒙皮/变形已在后续阶段迁移，见 [动画与透明验证](NATIVE_ANIMATION_VALIDATION.md)。粒子与 GPU 仿真已在后续阶段迁移，见 [粒子验证](NATIVE_PARTICLE_VALIDATION.md) 和 [GPU 仿真验证](NATIVE_PARTICLE_SIMULATION_VALIDATION.md)；r5 后处理见 [后处理验证](NATIVE_POST_VALIDATION.md)，风格化见 [风格化验证](NATIVE_STYLIZED_VALIDATION.md)；Editor/GuavaUI 的 viewport 与游戏内 HUD 互操作见 [UI 验证](NATIVE_UI_VALIDATION.md)，主／辅助窗口宿主仍在迁移。上述功能覆盖与画面/性能验证完成后再切换默认 renderer，然后移除 WGPU 运行时和参考依赖。Windows/Linux 原生验证按用户要求暂不作为本轮执行任务。
+默认 EngineHost 仍使用 WGPU。透明网格与蒙皮/变形已在后续阶段迁移，见 [动画与透明验证](NATIVE_ANIMATION_VALIDATION.md)。粒子与 GPU 仿真已在后续阶段迁移，见 [粒子验证](NATIVE_PARTICLE_VALIDATION.md) 和 [GPU 仿真验证](NATIVE_PARTICLE_SIMULATION_VALIDATION.md)；r5 后处理见 [后处理验证](NATIVE_POST_VALIDATION.md)，风格化见 [风格化验证](NATIVE_STYLIZED_VALIDATION.md)；Editor/CoveUI 的 viewport 与游戏内 HUD 互操作见 [UI 验证](NATIVE_UI_VALIDATION.md)，主／辅助窗口宿主仍在迁移。上述功能覆盖与画面/性能验证完成后再切换默认 renderer，然后移除 WGPU 运行时和参考依赖。Windows/Linux 原生验证按用户要求暂不作为本轮执行任务。

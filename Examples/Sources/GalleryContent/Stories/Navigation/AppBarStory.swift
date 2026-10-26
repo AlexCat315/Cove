@@ -1,5 +1,5 @@
-import GuavaUI
-import GuavaUIRuntime
+import CoveUI
+import CoveUIRuntime
 
 struct AppBarStory: View {
     let options: GalleryOptions

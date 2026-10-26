@@ -43,13 +43,13 @@ context.input.installMirrorInput();
 // Waiting for that announcement avoids racing a large debug module download.
 if (new URLSearchParams(location.search).get("transport") === "browser") {
   document.body.classList.add("browserHost");
-  context.elements.connection.endpoint.value = "browser://guava";
+  context.elements.connection.endpoint.value = "browser://cove";
   context.elements.connection.endpoint.readOnly = true;
   window.addEventListener("message", (event) => {
     if (event.origin === location.origin && event.source === window.parent &&
-        event.data?.type === "guava.devtools.ready" && !context.session.connection.ws) context.connection.connect();
+        event.data?.type === "cove.devtools.ready" && !context.session.connection.ws) context.connection.connect();
   });
-  window.parent.postMessage({ type: "guava.devtools.probe" }, location.origin);
+  window.parent.postMessage({ type: "cove.devtools.probe" }, location.origin);
 }
 
 // CLI-managed sessions pass their authenticated endpoint without manual port entry.

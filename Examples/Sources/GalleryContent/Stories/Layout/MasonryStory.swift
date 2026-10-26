@@ -1,5 +1,5 @@
-import GuavaUI
-import GuavaUIRuntime
+import CoveUI
+import CoveUIRuntime
 
 struct MasonryStory: View {
     let options: GalleryOptions

@@ -1,5 +1,5 @@
 # Builds SDL3 as a static library and installs into the SDL3.artifactbundle layout.
-# Requires GUAVA_TRIPLE / GUAVA_SPM_TRIPLE / GUAVA_VENDOR_DIR set in parent scope.
+# Requires COVE_TRIPLE / COVE_SPM_TRIPLE / COVE_VENDOR_DIR set in parent scope.
 
 # SDL3 build options — static, minimal
 set(SDL_STATIC ON CACHE BOOL "" FORCE)
@@ -17,8 +17,8 @@ endif()
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/sdl3 sdl3-build EXCLUDE_FROM_ALL)
 
-set(SDL3_BUNDLE ${GUAVA_VENDOR_DIR}/SDL3.artifactbundle)
-set(SDL3_VARIANT ${SDL3_BUNDLE}/${GUAVA_TRIPLE})
+set(SDL3_BUNDLE ${COVE_VENDOR_DIR}/SDL3.artifactbundle)
+set(SDL3_VARIANT ${SDL3_BUNDLE}/${COVE_TRIPLE})
 
 # Install static archive
 install(TARGETS SDL3-static
@@ -80,10 +80,10 @@ install(CODE "
       \\\"version\\\": \\\"3.4.18\\\",
       \\\"variants\\\": [
         {
-          \\\"path\\\": \\\"${GUAVA_TRIPLE}/lib/${SDL3_LIB_FILENAME}\\\",
-          \\\"supportedTriples\\\": [\\\"${GUAVA_SPM_TRIPLE}\\\"],
+          \\\"path\\\": \\\"${COVE_TRIPLE}/lib/${SDL3_LIB_FILENAME}\\\",
+          \\\"supportedTriples\\\": [\\\"${COVE_SPM_TRIPLE}\\\"],
           \\\"staticLibraryMetadata\\\": {
-            \\\"headerPaths\\\": [\\\"${GUAVA_TRIPLE}/include\\\"]
+            \\\"headerPaths\\\": [\\\"${COVE_TRIPLE}/include\\\"]
           }
         }
       ]
@@ -103,7 +103,7 @@ install(CODE "
 if(ANDROID)
     # The final Swift shared library hides symbols from static archives. Its
     # first-party JNI entry point forwards to SDL to register the Java methods.
-    target_compile_definitions(SDL3-static PRIVATE JNI_OnLoad=GuavaSDL_JNI_OnLoad)
+    target_compile_definitions(SDL3-static PRIVATE JNI_OnLoad=CoveSDL_JNI_OnLoad)
 endif()
 add_custom_target(stage_sdl3 ALL
     DEPENDS SDL3-static
@@ -122,12 +122,12 @@ add_custom_target(stage_sdl3 ALL
     VERBATIM
 )
 
-guava_git_revision(SDL3_SOURCE_REVISION "${CMAKE_SOURCE_DIR}/sdl3")
-guava_add_artifact_build_manifest(
+cove_git_revision(SDL3_SOURCE_REVISION "${CMAKE_SOURCE_DIR}/sdl3")
+cove_add_artifact_build_manifest(
     ARTIFACT_NAME "SDL3"
     VERSION "3.4.18"
     BUNDLE_DIR ${SDL3_BUNDLE}
-    LIB_REL_PATH "${GUAVA_TRIPLE}/lib/${SDL3_LIB_FILENAME}"
+    LIB_REL_PATH "${COVE_TRIPLE}/lib/${SDL3_LIB_FILENAME}"
     BUILD_SYSTEM "CMake"
     SOURCE_KIND "git-submodule"
     SOURCE_URL "Runtime/third-party/sdl3"

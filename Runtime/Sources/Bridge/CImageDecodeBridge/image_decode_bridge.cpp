@@ -49,7 +49,7 @@ char* copy_message(const char* message) {
     return copy;
 }
 
-bool fail(GuavaImageDecodeResult* result, const char* message) {
+bool fail(CoveImageDecodeResult* result, const char* message) {
     if (result) {
         result->pixels = nullptr;
         result->width = 0;
@@ -62,7 +62,7 @@ bool fail(GuavaImageDecodeResult* result, const char* message) {
 bool assign_pixels(std::vector<uint8_t>&& pixels,
                    int width,
                    int height,
-                   GuavaImageDecodeResult* result) {
+                   CoveImageDecodeResult* result) {
     const size_t byte_count = static_cast<size_t>(width) * static_cast<size_t>(height) * 4;
     uint8_t* out = static_cast<uint8_t*>(std::malloc(byte_count));
     if (out == nullptr) {
@@ -121,7 +121,7 @@ bool output_rgba(const uint8_t* pixels,
                  int height,
                  int target_width,
                  int target_height,
-                 GuavaImageDecodeResult* result) {
+                 CoveImageDecodeResult* result) {
     if (width <= 0 || height <= 0) {
         return fail(result, "decoded image has invalid dimensions");
     }
@@ -140,7 +140,7 @@ bool decode_stb(const uint8_t* data,
                 size_t data_size,
                 int target_width,
                 int target_height,
-                GuavaImageDecodeResult* result) {
+                CoveImageDecodeResult* result) {
     int width = 0;
     int height = 0;
     int channels = 0;
@@ -162,7 +162,7 @@ bool decode_webp(const uint8_t* data,
                  size_t data_size,
                  int target_width,
                  int target_height,
-                 GuavaImageDecodeResult* result) {
+                 CoveImageDecodeResult* result) {
     int width = 0;
     int height = 0;
     uint8_t* decoded = WebPDecodeRGBA(data, data_size, &width, &height);
@@ -178,7 +178,7 @@ bool decode_svg(const uint8_t* data,
                 size_t data_size,
                 int target_width,
                 int target_height,
-                GuavaImageDecodeResult* result) {
+                CoveImageDecodeResult* result) {
     auto document = lunasvg::Document::loadFromData(reinterpret_cast<const char*>(data), data_size);
     if (document == nullptr) {
         return fail(result, "lunasvg failed to parse SVG");
@@ -203,12 +203,12 @@ bool decode_svg(const uint8_t* data,
 
 } // namespace
 
-extern "C" bool guava_image_decode_memory(const uint8_t* data,
+extern "C" bool cove_image_decode_memory(const uint8_t* data,
                                            size_t data_size,
                                            const char* extension,
                                            int32_t target_width,
                                            int32_t target_height,
-                                           GuavaImageDecodeResult* out_result) {
+                                           CoveImageDecodeResult* out_result) {
     if (out_result == nullptr) {
         return false;
     }
@@ -234,7 +234,7 @@ extern "C" bool guava_image_decode_memory(const uint8_t* data,
     return decode_stb(data, data_size, target_width, target_height, out_result);
 }
 
-extern "C" bool guava_image_dimensions_memory(const uint8_t* data, size_t data_size,
+extern "C" bool cove_image_dimensions_memory(const uint8_t* data, size_t data_size,
                                                 const char* extension, int32_t* width, int32_t* height) {
     if (!data || !data_size || !width || !height || data_size > INT_MAX) return false;
     const std::string ext = lower_extension(extension);
@@ -256,7 +256,7 @@ extern "C" bool guava_image_dimensions_memory(const uint8_t* data, size_t data_s
     return true;
 }
 
-extern "C" void guava_image_decode_free(GuavaImageDecodeResult* result) {
+extern "C" void cove_image_decode_free(CoveImageDecodeResult* result) {
     if (result == nullptr) {
         return;
     }
@@ -280,7 +280,7 @@ struct AnimationFrames {
     int loop_count = 0;
 };
 
-bool fail_animation(GuavaImageAnimationResult* result, const char* message) {
+bool fail_animation(CoveImageAnimationResult* result, const char* message) {
     if (result) {
         result->pixels = nullptr;
         result->durations_ms = nullptr;
@@ -405,15 +405,15 @@ bool decode_webp_frames(const uint8_t* data, size_t data_size, int target_width,
 
 } // namespace
 
-extern "C" bool guava_image_decode_animation_memory(const uint8_t* data,
+extern "C" bool cove_image_decode_animation_memory(const uint8_t* data,
                                                      size_t data_size,
                                                      const char* extension,
                                                      int32_t target_width,
                                                      int32_t target_height,
                                                      int32_t max_frames,
-                                                     GuavaImageAnimationResult* out_result) {
+                                                     CoveImageAnimationResult* out_result) {
     if (out_result == nullptr) return false;
-    *out_result = GuavaImageAnimationResult{};
+    *out_result = CoveImageAnimationResult{};
     if (data == nullptr || data_size == 0 || data_size > INT_MAX) return fail_animation(out_result, "empty image data");
     const int limit = std::max(1, static_cast<int>(max_frames));
     const std::string ext = lower_extension(extension);
@@ -429,7 +429,7 @@ extern "C" bool guava_image_decode_animation_memory(const uint8_t* data,
     out_result->pixels = static_cast<uint8_t*>(std::malloc(frames.pixels.size()));
     out_result->durations_ms = static_cast<int32_t*>(std::malloc(frames.durations.size() * sizeof(int32_t)));
     if (out_result->pixels == nullptr || out_result->durations_ms == nullptr) {
-        guava_image_animation_free(out_result);
+        cove_image_animation_free(out_result);
         return fail_animation(out_result, "out of memory while copying animation frames");
     }
     std::memcpy(out_result->pixels, frames.pixels.data(), frames.pixels.size());
@@ -441,10 +441,10 @@ extern "C" bool guava_image_decode_animation_memory(const uint8_t* data,
     return true;
 }
 
-extern "C" void guava_image_animation_free(GuavaImageAnimationResult* result) {
+extern "C" void cove_image_animation_free(CoveImageAnimationResult* result) {
     if (result == nullptr) return;
     std::free(result->pixels);
     std::free(result->durations_ms);
     std::free(result->error_message);
-    *result = GuavaImageAnimationResult{};
+    *result = CoveImageAnimationResult{};
 }

@@ -3,12 +3,12 @@ import PackageDescription
 import Foundation
 
 // Browser and Android builds stage target-specific artifacts separately from desktop libraries.
-let artifacts = ProcessInfo.processInfo.environment["GUAVA_TEXT_ARTIFACT_ROOT"] ?? "../vendor"
+let artifacts = ProcessInfo.processInfo.environment["COVE_TEXT_ARTIFACT_ROOT"] ?? "../vendor"
 let package = Package(
-    name: "GuavaUIText",
+    name: "CoveUIText",
     platforms: [.macOS(.v26), .iOS(.v26)],
     products: [
-        .library(name: "GuavaUIText", targets: ["GuavaUIText"]),
+        .library(name: "CoveUIText", targets: ["CoveUIText"]),
         .library(name: "CFreeType", targets: ["CFreeType"]),
         .library(name: "CHarfBuzz", targets: ["CHarfBuzz"]),
     ],
@@ -16,9 +16,9 @@ let package = Package(
     targets: [
         .binaryTarget(name: "CFreeType", path: "\(artifacts)/CFreeType.artifactbundle"),
         .binaryTarget(name: "CHarfBuzz", path: "\(artifacts)/CHarfBuzz.artifactbundle"),
-        .target(name: "GuavaUIText", dependencies: [
-            "CFreeType", "CHarfBuzz", .product(name: "GuavaUICore", package: "Portable"),
+        .target(name: "CoveUIText", dependencies: [
+            "CFreeType", "CHarfBuzz", .product(name: "CoveUICore", package: "Portable"),
         ]),
-        .testTarget(name: "GuavaUITextTests", dependencies: ["GuavaUIText"]),
+        .testTarget(name: "CoveUITextTests", dependencies: ["CoveUIText"]),
     ]
 )

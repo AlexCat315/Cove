@@ -36,18 +36,18 @@ enum ShaderFixtures {
         return try JSONDecoder().decode(ShaderArtifact.self, from: Data(contentsOf: output))
     }
 
-    /// Locates the first-party `guava-dev` shader tool, building it on demand.
+    /// Locates the first-party `cove-dev` shader tool, building it on demand.
     private static func developerTool(root: URL) throws -> URL {
         let environment = ProcessInfo.processInfo.environment
-        if let override = environment["GUAVA_DEV"], !override.isEmpty,
+        if let override = environment["COVE_DEV"], !override.isEmpty,
            FileManager.default.isExecutableFile(atPath: override) {
             return URL(fileURLWithPath: override)
         }
-        let swift = try resolveExecutable(environment["GUAVA_SWIFT_EXECUTABLE"] ?? "swift")
+        let swift = try resolveExecutable(environment["COVE_SWIFT_EXECUTABLE"] ?? "swift")
         let package = root.appendingPathComponent("Tools/Developer")
         let process = Process()
         process.executableURL = swift
-        process.arguments = ["build", "--package-path", package.path, "--product", "guava-dev", "--show-bin-path"]
+        process.arguments = ["build", "--package-path", package.path, "--product", "cove-dev", "--show-bin-path"]
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = Pipe()
@@ -55,18 +55,18 @@ enum ShaderFixtures {
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
         guard process.terminationStatus == 0 else {
-            throw RHIError.invalidArgument("Cannot build the guava-dev tool under \(package.path)")
+            throw RHIError.invalidArgument("Cannot build the cove-dev tool under \(package.path)")
         }
         let binPath = String(decoding: data, as: UTF8.self)
             .split(separator: "\n").last.map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
         #if os(Windows)
-        let name = "guava-dev.exe"
+        let name = "cove-dev.exe"
         #else
-        let name = "guava-dev"
+        let name = "cove-dev"
         #endif
         let tool = URL(fileURLWithPath: binPath).appendingPathComponent(name)
         guard FileManager.default.isExecutableFile(atPath: tool.path) else {
-            throw RHIError.invalidArgument("guava-dev was not produced at \(tool.path)")
+            throw RHIError.invalidArgument("cove-dev was not produced at \(tool.path)")
         }
         return tool
     }

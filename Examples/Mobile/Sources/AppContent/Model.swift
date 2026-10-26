@@ -1,4 +1,4 @@
-import GuavaUI
+import CoveUI
 
 struct Project: Identifiable, Hashable {
     let id: String
@@ -14,7 +14,7 @@ struct MobileModel {
         Project(id: "crystal", name: "Crystal Rush", kind: "Game", updated: "2 min ago", progress: 0.72),
         Project(id: "harbor", name: "Harbor Night", kind: "Animation", updated: "1 h ago", progress: 0.4),
         Project(id: "trailer", name: "Launch Trailer", kind: "Video", updated: "Yesterday", progress: 0.9),
-        Project(id: "guavaui", name: "GuavaUI", kind: "Code", updated: "Mon", progress: 0.55),
+        Project(id: "coveui", name: "CoveUI", kind: "Code", updated: "Mon", progress: 0.55),
     ]
     var notifications = true
     var syncOverCellular = false

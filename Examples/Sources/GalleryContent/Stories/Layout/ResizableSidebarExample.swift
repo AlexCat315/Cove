@@ -1,4 +1,4 @@
-import GuavaUI
+import CoveUI
 
 struct ResizableSidebarExample: View {
     let options: GalleryOptions

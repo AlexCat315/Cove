@@ -122,7 +122,7 @@ document.addEventListener("DOMContentLoaded", () => {
   observationEl("timelinePhase").onchange = renderTimeline;
   observationEl("exportTimeline").onclick = () => {
     const url = URL.createObjectURL(new Blob([JSON.stringify(timelineTrace())], {type: "application/json"}));
-    const link = document.createElement("a"); link.href = url; link.download = "guava-timeline.json"; link.click();
+    const link = document.createElement("a"); link.href = url; link.download = "cove-timeline.json"; link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   resetObservations();

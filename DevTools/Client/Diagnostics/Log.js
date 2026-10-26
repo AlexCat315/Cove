@@ -8,7 +8,7 @@ function appendLog(entry) {
   const identity = key(entry);
   if (identity && state.seen.has(identity)) return;
   if (identity) state.seen.add(identity);
-  if (entry.label === "com.guava.logging" && entry.metadata?.total_dropped != null) {
+  if (entry.label === "com.cove.logging" && entry.metadata?.total_dropped != null) {
     state.coreDropped = Math.max(state.coreDropped, Number(entry.metadata.total_dropped) || 0);
   }
   state.logEntries.push(entry);
@@ -73,7 +73,7 @@ function pause() {
 function exportJSONL() {
   const blob = new Blob([filteredEntries().map(entry => JSON.stringify(entry)).join("\n") + "\n"], {type: "application/x-ndjson"});
   const url = URL.createObjectURL(blob), link = document.createElement("a");
-  link.href = url; link.download = "guava-logs.jsonl"; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  link.href = url; link.download = "cove-logs.jsonl"; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 return { appendLog, acceptSnapshot, deliveryGap, renderLog, clear, pause, exportJSONL };
 };

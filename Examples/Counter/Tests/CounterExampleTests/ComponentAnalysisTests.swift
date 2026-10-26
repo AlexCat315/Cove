@@ -1,9 +1,9 @@
 import Foundation
 import Testing
-import GuavaUIComposeCore
+import CoveUIComposeCore
 import CounterExample
-import GuavaUIDevToolsScene
-import GuavaUIDevToolsProtocol
+import CoveUIDevToolsScene
+import CoveUIDevToolsProtocol
 
 private struct DiagnosticLeaf: _PrimitiveView {
     var name = "leaf"

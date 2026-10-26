@@ -1,6 +1,6 @@
 import Foundation
-import GuavaUI
-import GuavaUIRuntime
+import CoveUI
+import CoveUIRuntime
 
 struct AvatarStory: View {
     let options: GalleryOptions
@@ -13,7 +13,7 @@ struct AvatarStory: View {
     private var imageURL: URL? {
         switch source {
         case "remote": URL(string: "https://avatars.githubusercontent.com/u/5518?v=4")
-        case "missing": URL(fileURLWithPath: "/guava-gallery-missing-avatar.png")
+        case "missing": URL(fileURLWithPath: "/cove-gallery-missing-avatar.png")
         case "initials": nil
         default: Self.portrait
         }

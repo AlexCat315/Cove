@@ -1,4 +1,4 @@
-name: Guava SDK toolchains
+name: Cove SDK toolchains
 description: Prepare the Swift and native build tools used by the SDK.
 runs:
   using: composite

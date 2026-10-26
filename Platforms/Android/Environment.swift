@@ -1,6 +1,6 @@
 import Foundation
-internal import GuavaUICompose
-internal import GuavaUIRuntime
+internal import CoveUICompose
+internal import CoveUIRuntime
 
 /// Per-scene font/image services and a queue drained only on Android's UI thread.
 final class SceneEnvironment {

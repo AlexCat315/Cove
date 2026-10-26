@@ -1,4 +1,4 @@
-import GuavaUI
+import CoveUI
 
 struct SettingsScreen: View {
     let model: Binding<MobileModel>

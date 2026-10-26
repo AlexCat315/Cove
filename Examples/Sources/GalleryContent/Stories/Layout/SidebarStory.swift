@@ -1,5 +1,5 @@
-import GuavaUI
-import GuavaUIRuntime
+import CoveUI
+import CoveUIRuntime
 
 struct SidebarStory: View {
     let options: GalleryOptions
@@ -36,7 +36,7 @@ struct SidebarStory: View {
                 Sidebar(selection: $selection, sections: sections, header: {
                     Row(alignment: .center, spacing: 10) {
                         Icon(UIIcons.File.package, size: .large, color: .accent).flex(0, shrink: 0)
-                        Text("Guava workspace").font(.bodyStrong).flex(1, shrink: 1).frame(minWidth: 0)
+                        Text("Cove workspace").font(.bodyStrong).flex(1, shrink: 1).frame(minWidth: 0)
                     }.padding(16)
                     Divider()
                 }, footer: {
@@ -58,7 +58,7 @@ struct SidebarStory: View {
                 }.padding(20).flex(1, shrink: 1, basis: 0).frame(minWidth: 260)
                     .background(.surface).cornerRadius(.panelRadius).border(.border, width: 1)
             }
-            NavigationDrawer("Guava workspace", isPresented: $drawerOpen, selection: $selection, sections: sections)
+            NavigationDrawer("Cove workspace", isPresented: $drawerOpen, selection: $selection, sections: sections)
         }
         ResizableSidebarExample(options: options)
         NestedSidebarExample(options: options)

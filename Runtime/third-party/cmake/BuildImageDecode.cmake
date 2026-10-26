@@ -7,15 +7,15 @@ set(LUNASVG_VERSION "v3.5.0")
 set(PLUTOVG_VERSION "v1.3.3")
 set(LIBWEBP_VERSION "v1.6.0")
 
-set(LUNASVG_BUNDLE ${GUAVA_VENDOR_DIR}/lunasvg.artifactbundle)
-set(PLUTOVG_BUNDLE ${GUAVA_VENDOR_DIR}/plutovg.artifactbundle)
-set(WEBP_BUNDLE ${GUAVA_VENDOR_DIR}/webp.artifactbundle)
-set(SHARPYUV_BUNDLE ${GUAVA_VENDOR_DIR}/sharpyuv.artifactbundle)
+set(LUNASVG_BUNDLE ${COVE_VENDOR_DIR}/lunasvg.artifactbundle)
+set(PLUTOVG_BUNDLE ${COVE_VENDOR_DIR}/plutovg.artifactbundle)
+set(WEBP_BUNDLE ${COVE_VENDOR_DIR}/webp.artifactbundle)
+set(SHARPYUV_BUNDLE ${COVE_VENDOR_DIR}/sharpyuv.artifactbundle)
 
-set(LUNASVG_VARIANT ${LUNASVG_BUNDLE}/${GUAVA_TRIPLE})
-set(PLUTOVG_VARIANT ${PLUTOVG_BUNDLE}/${GUAVA_TRIPLE})
-set(WEBP_VARIANT ${WEBP_BUNDLE}/${GUAVA_TRIPLE})
-set(SHARPYUV_VARIANT ${SHARPYUV_BUNDLE}/${GUAVA_TRIPLE})
+set(LUNASVG_VARIANT ${LUNASVG_BUNDLE}/${COVE_TRIPLE})
+set(PLUTOVG_VARIANT ${PLUTOVG_BUNDLE}/${COVE_TRIPLE})
+set(WEBP_VARIANT ${WEBP_BUNDLE}/${COVE_TRIPLE})
+set(SHARPYUV_VARIANT ${SHARPYUV_BUNDLE}/${COVE_TRIPLE})
 
 set(LUNASVG_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(LUNASVG_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -71,12 +71,12 @@ endif()
 
 # cmake --install installs every archive of these dependencies, so the staging
 # target must build all of them and not only the ones copied into the bundle.
-set(GUAVA_WEBP_STAGE_TARGETS lunasvg plutovg webp webpdecoder webpdemux sharpyuv)
+set(COVE_WEBP_STAGE_TARGETS lunasvg plutovg webp webpdecoder webpdemux sharpyuv)
 if(TARGET cpufeatures-webp)
-    list(APPEND GUAVA_WEBP_STAGE_TARGETS cpufeatures-webp)
+    list(APPEND COVE_WEBP_STAGE_TARGETS cpufeatures-webp)
 endif()
 add_custom_target(stage_image_decode
-    DEPENDS ${GUAVA_WEBP_STAGE_TARGETS}
+    DEPENDS ${COVE_WEBP_STAGE_TARGETS}
     COMMAND ${CMAKE_COMMAND} -E rm -rf ${LUNASVG_VARIANT} ${PLUTOVG_VARIANT} ${WEBP_VARIANT} ${SHARPYUV_VARIANT}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${LUNASVG_VARIANT}/lib ${LUNASVG_VARIANT}/include
     COMMAND ${CMAKE_COMMAND} -E make_directory ${PLUTOVG_VARIANT}/lib ${PLUTOVG_VARIANT}/include
@@ -117,20 +117,20 @@ function(write_static_artifact_bundle bundle artifact version triple spm_triple 
 ")
 endfunction()
 
-write_static_artifact_bundle(${LUNASVG_BUNDLE} "lunasvg" "3.5.0" ${GUAVA_TRIPLE} ${GUAVA_SPM_TRIPLE} ${LUNASVG_LIB_FILENAME})
-write_static_artifact_bundle(${PLUTOVG_BUNDLE} "plutovg" "1.3.3" ${GUAVA_TRIPLE} ${GUAVA_SPM_TRIPLE} ${PLUTOVG_LIB_FILENAME})
-write_static_artifact_bundle(${WEBP_BUNDLE} "webp" "1.6.0" ${GUAVA_TRIPLE} ${GUAVA_SPM_TRIPLE} ${WEBP_LIB_FILENAME})
-write_static_artifact_bundle(${SHARPYUV_BUNDLE} "sharpyuv" "1.6.0" ${GUAVA_TRIPLE} ${GUAVA_SPM_TRIPLE} ${SHARPYUV_LIB_FILENAME})
+write_static_artifact_bundle(${LUNASVG_BUNDLE} "lunasvg" "3.5.0" ${COVE_TRIPLE} ${COVE_SPM_TRIPLE} ${LUNASVG_LIB_FILENAME})
+write_static_artifact_bundle(${PLUTOVG_BUNDLE} "plutovg" "1.3.3" ${COVE_TRIPLE} ${COVE_SPM_TRIPLE} ${PLUTOVG_LIB_FILENAME})
+write_static_artifact_bundle(${WEBP_BUNDLE} "webp" "1.6.0" ${COVE_TRIPLE} ${COVE_SPM_TRIPLE} ${WEBP_LIB_FILENAME})
+write_static_artifact_bundle(${SHARPYUV_BUNDLE} "sharpyuv" "1.6.0" ${COVE_TRIPLE} ${COVE_SPM_TRIPLE} ${SHARPYUV_LIB_FILENAME})
 
-guava_git_revision(LUNASVG_SOURCE_REVISION "${lunasvg_SOURCE_DIR}")
-guava_git_revision(PLUTOVG_SOURCE_REVISION "${lunasvg_SOURCE_DIR}/plutovg")
-guava_git_revision(LIBWEBP_SOURCE_REVISION "${libwebp_SOURCE_DIR}")
+cove_git_revision(LUNASVG_SOURCE_REVISION "${lunasvg_SOURCE_DIR}")
+cove_git_revision(PLUTOVG_SOURCE_REVISION "${lunasvg_SOURCE_DIR}/plutovg")
+cove_git_revision(LIBWEBP_SOURCE_REVISION "${libwebp_SOURCE_DIR}")
 
-guava_add_artifact_build_manifest(
+cove_add_artifact_build_manifest(
     ARTIFACT_NAME "lunasvg"
     VERSION "3.5.0"
     BUNDLE_DIR ${LUNASVG_BUNDLE}
-    LIB_REL_PATH "${GUAVA_TRIPLE}/lib/${LUNASVG_LIB_FILENAME}"
+    LIB_REL_PATH "${COVE_TRIPLE}/lib/${LUNASVG_LIB_FILENAME}"
     BUILD_SYSTEM "CMake FetchContent"
     SOURCE_KIND "git"
     SOURCE_URL "https://github.com/sammycage/lunasvg.git"
@@ -140,11 +140,11 @@ guava_add_artifact_build_manifest(
     DEPENDS stage_image_decode
 )
 
-guava_add_artifact_build_manifest(
+cove_add_artifact_build_manifest(
     ARTIFACT_NAME "plutovg"
     VERSION "1.3.3"
     BUNDLE_DIR ${PLUTOVG_BUNDLE}
-    LIB_REL_PATH "${GUAVA_TRIPLE}/lib/${PLUTOVG_LIB_FILENAME}"
+    LIB_REL_PATH "${COVE_TRIPLE}/lib/${PLUTOVG_LIB_FILENAME}"
     BUILD_SYSTEM "CMake FetchContent"
     SOURCE_KIND "git-subdirectory"
     SOURCE_URL "https://github.com/sammycage/plutovg.git"
@@ -154,11 +154,11 @@ guava_add_artifact_build_manifest(
     DEPENDS stage_image_decode
 )
 
-guava_add_artifact_build_manifest(
+cove_add_artifact_build_manifest(
     ARTIFACT_NAME "webp"
     VERSION "1.6.0"
     BUNDLE_DIR ${WEBP_BUNDLE}
-    LIB_REL_PATH "${GUAVA_TRIPLE}/lib/${WEBP_LIB_FILENAME}"
+    LIB_REL_PATH "${COVE_TRIPLE}/lib/${WEBP_LIB_FILENAME}"
     BUILD_SYSTEM "CMake FetchContent"
     SOURCE_KIND "git"
     SOURCE_URL "https://chromium.googlesource.com/webm/libwebp"
@@ -168,11 +168,11 @@ guava_add_artifact_build_manifest(
     DEPENDS stage_image_decode
 )
 
-guava_add_artifact_build_manifest(
+cove_add_artifact_build_manifest(
     ARTIFACT_NAME "sharpyuv"
     VERSION "1.6.0"
     BUNDLE_DIR ${SHARPYUV_BUNDLE}
-    LIB_REL_PATH "${GUAVA_TRIPLE}/lib/${SHARPYUV_LIB_FILENAME}"
+    LIB_REL_PATH "${COVE_TRIPLE}/lib/${SHARPYUV_LIB_FILENAME}"
     BUILD_SYSTEM "CMake FetchContent"
     SOURCE_KIND "git-subdirectory"
     SOURCE_URL "https://chromium.googlesource.com/webm/libwebp"

@@ -19,7 +19,7 @@ function handleEnvelope(env) {
       context.logs.appendLog({
         level: "info",
         label: "host",
-        message: `Connected to ${env.payload?.host?.appTitle ?? "GuavaUI"} (${env.payload?.protocol ?? "unknown protocol"})`,
+        message: `Connected to ${env.payload?.host?.appTitle ?? "CoveUI"} (${env.payload?.protocol ?? "unknown protocol"})`,
       });
       break;
     case "tree.snapshot":

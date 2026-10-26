@@ -1,5 +1,5 @@
-import GuavaUI
-import GuavaUIRuntime
+import CoveUI
+import CoveUIRuntime
 
 /// Navigation state belongs to the shell; each story owns and resets its own example state.
 public struct GalleryView: View {
@@ -28,7 +28,7 @@ public struct GalleryView: View {
     SafeArea {
       LayerRoot {
         AdaptiveSidebar(
-          "GuavaUI navigation", isPresented: $navigationOpen, isCollapsed: $navigationCollapsed,
+          "CoveUI navigation", isPresented: $navigationOpen, isCollapsed: $navigationCollapsed,
           selection: Binding(get: { page }, set: { if let selected = $0 { page = selected } }),
           width: $navigationWidth,
           sections: navigationSections,
@@ -59,7 +59,7 @@ public struct GalleryView: View {
                   .frame(minWidth: 0)
               }
             }.flex(1, shrink: 1, basis: 0).frame(minHeight: 0).debugName("gallery-content")
-            Text("\(GalleryCatalog.entries.count) stories   ·   GuavaUI component showcase")
+            Text("\(GalleryCatalog.entries.count) stories   ·   CoveUI component showcase")
               .font(.caption).foregroundColor(.onSurfaceMuted).padding(horizontal: 24, vertical: 8)
           }.flex(1, shrink: 1, basis: 0).frame(minWidth: 0, minHeight: 0)
             .background(.surfaceSunken).cornerRadius(14).clipped()
@@ -98,7 +98,7 @@ public struct GalleryView: View {
             Text("G").font(.headline).foregroundColor(.onAccent).padding(9).background(.accent)
               .cornerRadius(9)
             Column(alignment: .leading, spacing: 2) {
-              Text("GuavaUI").font(.bodyStrong).foregroundColor(.onSurface)
+              Text("CoveUI").font(.bodyStrong).foregroundColor(.onSurface)
               Text("Component showcase").font(.caption).foregroundColor(.onSurfaceMuted)
             }
           }.padding(16)

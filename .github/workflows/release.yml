@@ -43,7 +43,7 @@ jobs:
         run: node Tools/Release/check-version.mjs "$GITHUB_REF_NAME" --release
       - name: Identify native inputs
         id: native-inputs
-        run: echo "digest=$(git ls-tree -r HEAD cmake third-party Runtime/third-party Tools/Guava/Sources/GuavaCLI/Toolchains/Native.swift .github/actions/setup-toolchains/action.yml | git hash-object --stdin)" >> "$GITHUB_OUTPUT"
+        run: echo "digest=$(git ls-tree -r HEAD cmake third-party Runtime/third-party Tools/Cove/Sources/CoveCLI/Toolchains/Native.swift .github/actions/setup-toolchains/action.yml | git hash-object --stdin)" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-java@v4
         if: matrix.platform == 'android-arm64'
         with:
@@ -66,28 +66,28 @@ jobs:
             build/android-validation/native
             build/android-validation/fonts-cmake
       - name: Prepare host libraries
-        run: ./guava setup
+        run: ./cove setup
       - name: Package target libraries
-        run: ./guava internal package-native ${{ matrix.options }} --output "$PWD/dist"
+        run: ./cove internal package-native ${{ matrix.options }} --output "$PWD/dist"
       - name: Verify desktop SDK
         if: matrix.desktop
         run: |
           if [ "$RUNNER_OS" = Linux ]; then
-            xvfb-run -a ./guava test . --no-parallel
+            xvfb-run -a ./cove test . --no-parallel
           else
-            ./guava test . --no-parallel
+            ./cove test . --no-parallel
           fi
       - name: Verify Android application packaging
         if: matrix.platform == 'android-arm64'
-        run: ./guava build Examples/Mobile --android --output "$PWD/dist/mobile-smoke.apk"
+        run: ./cove build Examples/Mobile --android --output "$PWD/dist/mobile-smoke.apk"
       - name: Verify iOS Simulator application
         if: matrix.platform == 'ios-arm64-simulator'
-        run: ./guava build Examples/Mobile --ios
+        run: ./cove build Examples/Mobile --ios
       - uses: actions/upload-artifact@v4
         with:
           name: native-${{ matrix.platform }}
           path: |
-            dist/guava-native-*.tar.gz
+            dist/cove-native-*.tar.gz
             dist/native-*.json
           if-no-files-found: error
   sdk:
@@ -120,22 +120,24 @@ jobs:
           node Tools/Release/merge-native.mjs native
           mkdir -p Artifacts
           cp native/native.json Artifacts/native.json
-          tar -xf "native/guava-native-${{ matrix.platform }}.tar.gz"
+          tar -xf "native/cove-native-${{ matrix.platform }}.tar.gz"
       - name: Test SDK management
-        run: ./guava test Tools/Guava --timeout 480
+        run: ./cove test Tools/Cove --timeout 480
       - name: Package complete SDK
-        run: ./guava internal package-cli --output "$PWD/dist"
+        run: ./cove internal package-cli --output "$PWD/dist"
       - name: Verify independent startup
         run: |
           mkdir smoke
-          tar -xf "dist/guava-${{ matrix.platform }}.tar.gz" -C smoke
+          tar -xf "dist/cove-${{ matrix.platform }}.tar.gz" -C smoke
           if [ "$RUNNER_OS" = Windows ]; then
-            env -i SystemRoot="$SYSTEMROOT" WINDIR="$WINDIR" PATH=/c/Windows/System32 smoke/guava/guava.exe --version
+            env -i SystemRoot="$SYSTEMROOT" WINDIR="$WINDIR" PATH=/c/Windows/System32 smoke/cove/cove.exe --version
           else
-            env -i PATH=/usr/bin:/bin smoke/guava/guava --version
+            env -i PATH=/usr/bin:/bin smoke/cove/cove --version
           fi
-          test -f smoke/guava/Package.swift
-          test -f smoke/guava/Runtime/vendor/SDL3.artifactbundle/info.json
+          test -f smoke/cove/Package.swift
+          test -f smoke/cove/DevTools/Client/Performance/Performance.js
+          test -f smoke/cove/Tools/Cove/Sources/CoveCLI/SDK.json
+          test -f smoke/cove/Runtime/vendor/SDL3.artifactbundle/info.json
       - uses: actions/upload-artifact@v4
         with:
           name: sdk-${{ matrix.platform }}
@@ -163,10 +165,10 @@ jobs:
         run: |
           mkdir release
           find sdk -name '*.tar.gz' -exec cp {} release/ \;
-          cp native/guava-native-*.tar.gz release/
+          cp native/cove-native-*.tar.gz release/
           node Tools/Release/merge-native.mjs native
           cp native/native.json release/
           (cd release && sha256sum *.tar.gz | sort > SHA256SUMS)
-          cp Tools/Guava/install.sh Tools/Guava/install.ps1 release/
+          cp Tools/Cove/install.sh Tools/Cove/install.ps1 release/
           node Tools/Release/release-notes.mjs > release-notes.md
-          gh release create "$RELEASE_TAG" release/* --verify-tag --title "Guava SDK $RELEASE_TAG" --notes-file release-notes.md
+          gh release create "$RELEASE_TAG" release/* --verify-tag --title "Cove SDK $RELEASE_TAG" --notes-file release-notes.md

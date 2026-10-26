@@ -6,7 +6,7 @@ function connect() {
 
   let ws;
   try {
-    ws = url === "browser://guava" ? new window.GuavaBrowserConnection() : new WebSocket(url);
+    ws = url === "browser://cove" ? new window.CoveBrowserConnection() : new WebSocket(url);
   } catch (error) {
     context.controls.setStatus("Invalid Endpoint", false);
     context.logs.appendLog({ level: "error", label: "client", message: String(error) });

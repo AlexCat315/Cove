@@ -1,6 +1,6 @@
 # Scene inspection and temporary styles
 
-An additive extension to `guava-devtools/0.1`. Hosts advertise `inspect` for
+An additive extension to `cove-devtools/0.1`. Hosts advertise `inspect` for
 visual picking and `style` for editable styles. Existing messages and optional
 snapshot fields remain compatible with older clients.
 
@@ -83,5 +83,5 @@ connection's scene. Browser `bye`, reconnect and page rebuilds also clear overri
 
 Custom hosts wire `SceneInspector.editor.handle`, `.reset`, `.intercept` and
 `.drawOverlay`, request redisplay on `.onChange`, compute layout before painting,
-and publish a settled snapshot. `DevTools` plus Application/GuavaUIDemo install
+and publish a settled snapshot. `DevTools` plus Application/CoveUIDemo install
 these hooks; `PlatformWindowSession.inputInterceptor` runs before `inputObserver`.

@@ -1,6 +1,6 @@
 // WebSocket-shaped adapter for an Inspector embedded in a Wasm host.
 // MessagePort avoids opening a listener inside the browser sandbox.
-class GuavaBrowserConnection extends EventTarget {
+class CoveBrowserConnection extends EventTarget {
   readyState = 0;
   constructor() {
     super();
@@ -16,7 +16,7 @@ class GuavaBrowserConnection extends EventTarget {
       }
     });
     this.port.start();
-    window.parent.postMessage({ type: "guava.devtools.connect" }, location.origin, [channel.port2]);
+    window.parent.postMessage({ type: "cove.devtools.connect" }, location.origin, [channel.port2]);
   }
   send(data) {
     if (this.readyState !== 1) throw new Error("Browser transport is not connected");
@@ -30,4 +30,4 @@ class GuavaBrowserConnection extends EventTarget {
     this.dispatchEvent(new Event("close"));
   }
 }
-window.GuavaBrowserConnection = GuavaBrowserConnection;
+window.CoveBrowserConnection = CoveBrowserConnection;

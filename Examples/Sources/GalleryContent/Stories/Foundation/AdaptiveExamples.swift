@@ -1,7 +1,7 @@
 import Foundation
-import GuavaUI
-import GuavaUIRuntime
-import GuavaUIWorkspace
+import CoveUI
+import CoveUIRuntime
+import CoveUIWorkspace
 
 /// Deterministic container and input previews, shared by the affected stories.
 struct AdaptiveControlExamples: View {
@@ -103,7 +103,7 @@ private struct AdaptiveControlSample: View {
     @State private var treeSelectedIDs: Set<String> = ["camera"]
     @State private var disclosureOpen = true
     @State private var color = Color(red: 88, green: 126, blue: 231)
-    @State private var json: TextBuffer = "{\"name\": \"Guava\"}"
+    @State private var json: TextBuffer = "{\"name\": \"Cove\"}"
     @State private var asset: AssetRef? = AssetRef(id: "camera", name: "Camera", kind: "image")
     @State private var time: TimeOfDay? = TimeOfDay(hour: 9, minute: 30)
     @State private var popoverOpen = false
@@ -498,7 +498,7 @@ private struct AdaptiveControlSample: View {
             }
         })
         case .introduction: AnyView(Column(alignment: .leading, spacing: 6) {
-            Text("GuavaUI").font(.title)
+            Text("CoveUI").font(.title)
             Text("Component showcase").font(.body).foregroundColor(.onSurfaceMuted)
         }.frame(width: .percent(100)))
         case .image: AnyView(AsyncImage(url: ImageStory.resource.url, width: 180, height: 90,

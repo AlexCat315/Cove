@@ -1,9 +1,9 @@
 import Foundation
 import Testing
-import GuavaUIRuntime
-import GuavaUICompose
+import CoveUIRuntime
+import CoveUICompose
 @testable import GalleryContent
-@testable import GuavaUI
+@testable import CoveUI
 
 @Suite("Component gallery", .serialized)
 @MainActor

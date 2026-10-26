@@ -1,6 +1,6 @@
 import Foundation
-import GuavaUI
-import GuavaUIRuntime
+import CoveUI
+import CoveUIRuntime
 
 /// A general multiline editor. The same `TextField` supports prose (soft wrap,
 /// no chrome) and code (line numbers, diagnostics, completion) without
@@ -178,7 +178,7 @@ struct TextEditorStory: View {
         if let function = foldRegions.first(where: { $0.lines.lowerBound > 0 }) {
             result.append(TextGutterMarker("run", line: function.lines.lowerBound,
                 label: "Preview Greeting.message", icon: UIIcons.Editor.play) {
-                status = "Greeting.message preview: Hello, Guava"
+                status = "Greeting.message preview: Hello, Cove"
             })
         }
         if showsDiagnostic {

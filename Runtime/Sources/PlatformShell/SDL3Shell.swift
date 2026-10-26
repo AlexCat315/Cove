@@ -1,7 +1,7 @@
 private import CSDL3
-import GuavaPlatformCore
+import CovePlatformCore
 import Foundation
-import GuavaLogging
+import CoveLogging
 
 #if os(macOS)
 import AppKit
@@ -44,7 +44,7 @@ public final class SDL3Shell: Shell {
 #if os(macOS)
             return cocoaWindow?.isVisible == true && !NSApp.isHidden
 #else
-            return SDL_GetWindowFlags(window) & SDL_WindowFlags(GUAVA_SDL_WINDOW_HIDDEN) == 0
+            return SDL_GetWindowFlags(window) & SDL_WindowFlags(COVE_SDL_WINDOW_HIDDEN) == 0
 #endif
         }
 
@@ -201,21 +201,21 @@ public final class SDL3Shell: Shell {
 
         func handleWindowEvent(_ eventType: UInt32) {
             switch eventType {
-            case UInt32(GUAVA_SDL_EVENT_WINDOW_RESIZED),
-                 UInt32(GUAVA_SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED),
-                 UInt32(GUAVA_SDL_EVENT_WINDOW_METAL_VIEW_RESIZED):
+            case UInt32(COVE_SDL_EVENT_WINDOW_RESIZED),
+                 UInt32(COVE_SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED),
+                 UInt32(COVE_SDL_EVENT_WINDOW_METAL_VIEW_RESIZED):
                 syncDrawableSize()
-            case UInt32(GUAVA_SDL_EVENT_WINDOW_FOCUS_GAINED):
+            case UInt32(COVE_SDL_EVENT_WINDOW_FOCUS_GAINED):
                 isFocused = true
-            case UInt32(GUAVA_SDL_EVENT_WINDOW_FOCUS_LOST):
+            case UInt32(COVE_SDL_EVENT_WINDOW_FOCUS_LOST):
                 isFocused = false
-            case UInt32(GUAVA_SDL_EVENT_WINDOW_MINIMIZED):
+            case UInt32(COVE_SDL_EVENT_WINDOW_MINIMIZED):
                 isMinimized = true
-            case UInt32(GUAVA_SDL_EVENT_WINDOW_RESTORED):
+            case UInt32(COVE_SDL_EVENT_WINDOW_RESTORED):
                 isMinimized = false
-            case UInt32(GUAVA_SDL_EVENT_WINDOW_OCCLUDED):
+            case UInt32(COVE_SDL_EVENT_WINDOW_OCCLUDED):
                 isOccluded = true
-            case UInt32(GUAVA_SDL_EVENT_WINDOW_EXPOSED):
+            case UInt32(COVE_SDL_EVENT_WINDOW_EXPOSED):
                 isOccluded = false
             default:
                 break
@@ -377,8 +377,8 @@ public final class SDL3Shell: Shell {
 
         func performNativeWindowShortcut(scancode: UInt32, modifiers: UInt16) -> Bool {
             guard let window = cocoaWindow else { return false }
-            let command = modifiers & (UInt16(GUAVA_SDL_KMOD_LGUI) | UInt16(GUAVA_SDL_KMOD_RGUI)) != 0
-            let control = modifiers & (UInt16(GUAVA_SDL_KMOD_LCTRL) | UInt16(GUAVA_SDL_KMOD_RCTRL)) != 0
+            let command = modifiers & (UInt16(COVE_SDL_KMOD_LGUI) | UInt16(COVE_SDL_KMOD_RGUI)) != 0
+            let control = modifiers & (UInt16(COVE_SDL_KMOD_LCTRL) | UInt16(COVE_SDL_KMOD_RCTRL)) != 0
             guard command else { return false }
 
             switch scancode {
@@ -421,18 +421,18 @@ public final class SDL3Shell: Shell {
 
             let id: Int32
             switch cursor {
-            case .arrow:            id = Int32(GUAVA_SDL_SYSTEM_CURSOR_DEFAULT)
-            case .pointer:          id = Int32(GUAVA_SDL_SYSTEM_CURSOR_POINTER)
-            case .ibeam:            id = Int32(GUAVA_SDL_SYSTEM_CURSOR_TEXT)
-            case .crosshair:        id = Int32(GUAVA_SDL_SYSTEM_CURSOR_CROSSHAIR)
-            case .wait:             id = Int32(GUAVA_SDL_SYSTEM_CURSOR_WAIT)
-            case .progress:         id = Int32(GUAVA_SDL_SYSTEM_CURSOR_PROGRESS)
-            case .notAllowed:       id = Int32(GUAVA_SDL_SYSTEM_CURSOR_NOT_ALLOWED)
-            case .move:             id = Int32(GUAVA_SDL_SYSTEM_CURSOR_MOVE)
-            case .resizeHorizontal: id = Int32(GUAVA_SDL_SYSTEM_CURSOR_EW_RESIZE)
-            case .resizeVertical:   id = Int32(GUAVA_SDL_SYSTEM_CURSOR_NS_RESIZE)
-            case .resizeNWSE:       id = Int32(GUAVA_SDL_SYSTEM_CURSOR_NWSE_RESIZE)
-            case .resizeNESW:       id = Int32(GUAVA_SDL_SYSTEM_CURSOR_NESW_RESIZE)
+            case .arrow:            id = Int32(COVE_SDL_SYSTEM_CURSOR_DEFAULT)
+            case .pointer:          id = Int32(COVE_SDL_SYSTEM_CURSOR_POINTER)
+            case .ibeam:            id = Int32(COVE_SDL_SYSTEM_CURSOR_TEXT)
+            case .crosshair:        id = Int32(COVE_SDL_SYSTEM_CURSOR_CROSSHAIR)
+            case .wait:             id = Int32(COVE_SDL_SYSTEM_CURSOR_WAIT)
+            case .progress:         id = Int32(COVE_SDL_SYSTEM_CURSOR_PROGRESS)
+            case .notAllowed:       id = Int32(COVE_SDL_SYSTEM_CURSOR_NOT_ALLOWED)
+            case .move:             id = Int32(COVE_SDL_SYSTEM_CURSOR_MOVE)
+            case .resizeHorizontal: id = Int32(COVE_SDL_SYSTEM_CURSOR_EW_RESIZE)
+            case .resizeVertical:   id = Int32(COVE_SDL_SYSTEM_CURSOR_NS_RESIZE)
+            case .resizeNWSE:       id = Int32(COVE_SDL_SYSTEM_CURSOR_NWSE_RESIZE)
+            case .resizeNESW:       id = Int32(COVE_SDL_SYSTEM_CURSOR_NESW_RESIZE)
             }
 
             guard let created = SDL_CreateSystemCursor(SDL_SystemCursor(rawValue: SDL_SystemCursor.RawValue(id))) else {
@@ -559,16 +559,16 @@ public final class SDL3Shell: Shell {
 
 #if canImport(Metal)
         let windowFlags = SDL_WindowFlags(
-            GUAVA_SDL_WINDOW_RESIZABLE | GUAVA_SDL_WINDOW_HIGH_PIXEL_DENSITY | GUAVA_SDL_WINDOW_METAL)
+            COVE_SDL_WINDOW_RESIZABLE | COVE_SDL_WINDOW_HIGH_PIXEL_DENSITY | COVE_SDL_WINDOW_METAL)
 #else
         // The `.hiddenInset` style is the engine's immersive look: a borderless
         // window whose title bar (with minimize / maximize / close) is drawn by
         // the app via ImmersiveWindowTitleBar. Every screen that wants window
         // controls must include that chrome; otherwise the borderless window has
         // no decorations at all.
-        var rawWindowFlags = GUAVA_SDL_WINDOW_RESIZABLE | GUAVA_SDL_WINDOW_HIGH_PIXEL_DENSITY
+        var rawWindowFlags = COVE_SDL_WINDOW_RESIZABLE | COVE_SDL_WINDOW_HIGH_PIXEL_DENSITY
         if options.titleBarStyle == .hiddenInset {
-            rawWindowFlags |= GUAVA_SDL_WINDOW_BORDERLESS
+            rawWindowFlags |= COVE_SDL_WINDOW_BORDERLESS
         }
         let windowFlags = SDL_WindowFlags(rawWindowFlags)
 #endif
@@ -695,29 +695,29 @@ public final class SDL3Shell: Shell {
             let eventType = event.type
 
             switch eventType {
-            case UInt32(GUAVA_SDL_EVENT_QUIT):
+            case UInt32(COVE_SDL_EVENT_QUIT):
                 if closeInterceptor?(nil) ?? true {
                     isQuitting = true
                 }
 
-            case UInt32(GUAVA_SDL_EVENT_WINDOW_CLOSE_REQUESTED):
+            case UInt32(COVE_SDL_EVENT_WINDOW_CLOSE_REQUESTED):
                 let windowID = WindowID(event.window.windowID)
                 if closeInterceptor?(windowID) ?? true {
                     destroyWindow(windowID)
                 }
 
-            case UInt32(GUAVA_SDL_EVENT_WINDOW_DESTROYED):
+            case UInt32(COVE_SDL_EVENT_WINDOW_DESTROYED):
                 destroyWindow(WindowID(event.window.windowID))
 
-            case UInt32(GUAVA_SDL_EVENT_WINDOW_RESIZED),
-                 UInt32(GUAVA_SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED),
-                 UInt32(GUAVA_SDL_EVENT_WINDOW_METAL_VIEW_RESIZED),
-                 UInt32(GUAVA_SDL_EVENT_WINDOW_FOCUS_GAINED),
-                 UInt32(GUAVA_SDL_EVENT_WINDOW_FOCUS_LOST),
-                 UInt32(GUAVA_SDL_EVENT_WINDOW_MINIMIZED),
-                 UInt32(GUAVA_SDL_EVENT_WINDOW_RESTORED),
-                 UInt32(GUAVA_SDL_EVENT_WINDOW_OCCLUDED),
-                 UInt32(GUAVA_SDL_EVENT_WINDOW_EXPOSED):
+            case UInt32(COVE_SDL_EVENT_WINDOW_RESIZED),
+                 UInt32(COVE_SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED),
+                 UInt32(COVE_SDL_EVENT_WINDOW_METAL_VIEW_RESIZED),
+                 UInt32(COVE_SDL_EVENT_WINDOW_FOCUS_GAINED),
+                 UInt32(COVE_SDL_EVENT_WINDOW_FOCUS_LOST),
+                 UInt32(COVE_SDL_EVENT_WINDOW_MINIMIZED),
+                 UInt32(COVE_SDL_EVENT_WINDOW_RESTORED),
+                 UInt32(COVE_SDL_EVENT_WINDOW_OCCLUDED),
+                 UInt32(COVE_SDL_EVENT_WINDOW_EXPOSED):
                 let windowID = WindowID(event.window.windowID)
                 guard let handle = windows[windowID] else { continue }
                 handle.handleWindowEvent(eventType)
@@ -730,7 +730,7 @@ public final class SDL3Shell: Shell {
                     collected.append(routed)
                 }
 
-            case UInt32(GUAVA_SDL_EVENT_KEY_DOWN):
+            case UInt32(COVE_SDL_EVENT_KEY_DOWN):
                 let windowID = WindowID(event.key.windowID)
                 guard let handle = windows[windowID] else { continue }
 #if os(macOS)
@@ -741,7 +741,7 @@ public final class SDL3Shell: Shell {
 #endif
 #if os(Windows)
                 if event.key.scancode.rawValue == 44,
-                   event.key.mod & (UInt16(GUAVA_SDL_KMOD_LALT) | UInt16(GUAVA_SDL_KMOD_RALT)) != 0 {
+                   event.key.mod & (UInt16(COVE_SDL_KMOD_LALT) | UInt16(COVE_SDL_KMOD_RALT)) != 0 {
                     _ = SDL_ShowWindowSystemMenu(handle.window, 0, 0)
                     continue
                 }
@@ -749,13 +749,13 @@ public final class SDL3Shell: Shell {
                 collected.append(WindowInputEvent(windowID: windowID,
                                                   event: .keyDown(makeKeyEvent(from: event))))
 
-            case UInt32(GUAVA_SDL_EVENT_KEY_UP):
+            case UInt32(COVE_SDL_EVENT_KEY_UP):
                 let windowID = WindowID(event.key.windowID)
                 guard windows[windowID] != nil else { continue }
                 collected.append(WindowInputEvent(windowID: windowID,
                                                   event: .keyUp(makeKeyEvent(from: event))))
 
-            case UInt32(GUAVA_SDL_EVENT_TEXT_EDITING):
+            case UInt32(COVE_SDL_EVENT_TEXT_EDITING):
                 let windowID = WindowID(event.edit.windowID)
                 guard windows[windowID] != nil,
                       let cstr = event.edit.text
@@ -769,7 +769,7 @@ public final class SDL3Shell: Shell {
                     ))
                 ))
 
-            case UInt32(GUAVA_SDL_EVENT_TEXT_INPUT):
+            case UInt32(COVE_SDL_EVENT_TEXT_INPUT):
                 let windowID = WindowID(event.text.windowID)
                 guard windows[windowID] != nil,
                       let cstr = event.text.text
@@ -777,7 +777,7 @@ public final class SDL3Shell: Shell {
                 collected.append(WindowInputEvent(windowID: windowID,
                                                   event: .textInput(String(cString: cstr))))
 
-            case UInt32(GUAVA_SDL_EVENT_MOUSE_MOTION):
+            case UInt32(COVE_SDL_EVENT_MOUSE_MOTION):
                 let windowID = WindowID(event.motion.windowID)
                 guard let handle = windows[windowID] else { continue }
                 let scale = handle.inputCoordinateScale
@@ -791,7 +791,7 @@ public final class SDL3Shell: Shell {
                     ))
                 ))
 
-            case UInt32(GUAVA_SDL_EVENT_MOUSE_BUTTON_DOWN):
+            case UInt32(COVE_SDL_EVENT_MOUSE_BUTTON_DOWN):
                 let windowID = WindowID(event.button.windowID)
                 guard let handle = windows[windowID],
                       let button = makeMouseButtonEvent(from: event,
@@ -800,7 +800,7 @@ public final class SDL3Shell: Shell {
                 collected.append(WindowInputEvent(windowID: windowID,
                                                   event: .mouseButtonDown(button)))
 
-            case UInt32(GUAVA_SDL_EVENT_MOUSE_BUTTON_UP):
+            case UInt32(COVE_SDL_EVENT_MOUSE_BUTTON_UP):
                 let windowID = WindowID(event.button.windowID)
                 guard let handle = windows[windowID],
                       let button = makeMouseButtonEvent(from: event,
@@ -809,7 +809,7 @@ public final class SDL3Shell: Shell {
                 collected.append(WindowInputEvent(windowID: windowID,
                                                   event: .mouseButtonUp(button)))
 
-            case UInt32(GUAVA_SDL_EVENT_MOUSE_WHEEL):
+            case UInt32(COVE_SDL_EVENT_MOUSE_WHEEL):
                 let windowID = WindowID(event.wheel.windowID)
                 guard let handle = windows[windowID] else { continue }
 #if os(macOS)
@@ -835,17 +835,17 @@ public final class SDL3Shell: Shell {
                                                                                      input: .init(unit: .lines,
                                                                                                   timestamp: Double(event.wheel.timestamp) / 1e9)))))
 
-            case UInt32(GUAVA_SDL_EVENT_GAMEPAD_BUTTON_DOWN),
-                 UInt32(GUAVA_SDL_EVENT_GAMEPAD_BUTTON_UP):
+            case UInt32(COVE_SDL_EVENT_GAMEPAD_BUTTON_DOWN),
+                 UInt32(COVE_SDL_EVENT_GAMEPAD_BUTTON_UP):
                 let btn = GamepadButton(rawValue: event.gbutton.button) ?? .south
                 let ev = GamepadButtonEvent(gamepadID: UInt32(event.gbutton.which), button: btn)
                 collected.append(WindowInputEvent(
                     windowID: mainWindowID ?? .main,
-                    event: event.type == GUAVA_SDL_EVENT_GAMEPAD_BUTTON_DOWN
+                    event: event.type == COVE_SDL_EVENT_GAMEPAD_BUTTON_DOWN
                         ? .gamepadButtonDown(ev) : .gamepadButtonUp(ev)
                 ))
 
-            case UInt32(GUAVA_SDL_EVENT_GAMEPAD_AXIS_MOTION):
+            case UInt32(COVE_SDL_EVENT_GAMEPAD_AXIS_MOTION):
                 let axis = GamepadAxis(rawValue: event.gaxis.axis) ?? .leftX
                 let raw = Float(event.gaxis.value)
                 let normalized: Float
@@ -912,7 +912,7 @@ public final class SDL3Shell: Shell {
 
     nonisolated fileprivate static func pushWakeEvent() {
         var event = SDL_Event()
-        event.type = UInt32(GUAVA_SDL_EVENT_WAKE)
+        event.type = UInt32(COVE_SDL_EVENT_WAKE)
         _ = SDL_PushEvent(&event)
     }
 
@@ -1017,7 +1017,7 @@ public final class SDL3Shell: Shell {
 #if os(macOS)
         return handle.isNativeWindowMaximized()
 #else
-        return (SDL_GetWindowFlags(handle.window) & SDL_WindowFlags(GUAVA_SDL_WINDOW_MAXIMIZED)) != 0
+        return (SDL_GetWindowFlags(handle.window) & SDL_WindowFlags(COVE_SDL_WINDOW_MAXIMIZED)) != 0
 #endif
     }
 
@@ -1342,21 +1342,21 @@ public final class SDL3Shell: Shell {
                                         data2: Int32) -> WindowInputEvent? {
         let event: InputEvent?
         switch eventType {
-        case UInt32(GUAVA_SDL_EVENT_WINDOW_RESIZED):
+        case UInt32(COVE_SDL_EVENT_WINDOW_RESIZED):
             event = .windowResized(width: data1, height: data2)
-        case UInt32(GUAVA_SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED):
+        case UInt32(COVE_SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED):
             event = .windowPixelSizeChanged(width: data1, height: data2)
-        case UInt32(GUAVA_SDL_EVENT_WINDOW_FOCUS_GAINED):
+        case UInt32(COVE_SDL_EVENT_WINDOW_FOCUS_GAINED):
             event = .windowFocusGained
-        case UInt32(GUAVA_SDL_EVENT_WINDOW_FOCUS_LOST):
+        case UInt32(COVE_SDL_EVENT_WINDOW_FOCUS_LOST):
             event = .windowFocusLost
-        case UInt32(GUAVA_SDL_EVENT_WINDOW_MINIMIZED):
+        case UInt32(COVE_SDL_EVENT_WINDOW_MINIMIZED):
             event = .windowMinimized
-        case UInt32(GUAVA_SDL_EVENT_WINDOW_RESTORED):
+        case UInt32(COVE_SDL_EVENT_WINDOW_RESTORED):
             event = .windowRestored
-        case UInt32(GUAVA_SDL_EVENT_WINDOW_OCCLUDED):
+        case UInt32(COVE_SDL_EVENT_WINDOW_OCCLUDED):
             event = .windowOccluded
-        case UInt32(GUAVA_SDL_EVENT_WINDOW_EXPOSED):
+        case UInt32(COVE_SDL_EVENT_WINDOW_EXPOSED):
             event = .windowExposed
         default:
             event = nil
@@ -1367,14 +1367,14 @@ public final class SDL3Shell: Shell {
 
     private static func convertModifiers(_ sdlMod: UInt16) -> KeyModifiers {
         var m = KeyModifiers()
-        if sdlMod & UInt16(GUAVA_SDL_KMOD_LSHIFT) != 0 { m.insert(.lshift) }
-        if sdlMod & UInt16(GUAVA_SDL_KMOD_RSHIFT) != 0 { m.insert(.rshift) }
-        if sdlMod & UInt16(GUAVA_SDL_KMOD_LCTRL)  != 0 { m.insert(.lctrl) }
-        if sdlMod & UInt16(GUAVA_SDL_KMOD_RCTRL)  != 0 { m.insert(.rctrl) }
-        if sdlMod & UInt16(GUAVA_SDL_KMOD_LALT)   != 0 { m.insert(.lalt) }
-        if sdlMod & UInt16(GUAVA_SDL_KMOD_RALT)   != 0 { m.insert(.ralt) }
-        if sdlMod & UInt16(GUAVA_SDL_KMOD_LGUI)   != 0 { m.insert(.lgui) }
-        if sdlMod & UInt16(GUAVA_SDL_KMOD_RGUI)   != 0 { m.insert(.rgui) }
+        if sdlMod & UInt16(COVE_SDL_KMOD_LSHIFT) != 0 { m.insert(.lshift) }
+        if sdlMod & UInt16(COVE_SDL_KMOD_RSHIFT) != 0 { m.insert(.rshift) }
+        if sdlMod & UInt16(COVE_SDL_KMOD_LCTRL)  != 0 { m.insert(.lctrl) }
+        if sdlMod & UInt16(COVE_SDL_KMOD_RCTRL)  != 0 { m.insert(.rctrl) }
+        if sdlMod & UInt16(COVE_SDL_KMOD_LALT)   != 0 { m.insert(.lalt) }
+        if sdlMod & UInt16(COVE_SDL_KMOD_RALT)   != 0 { m.insert(.ralt) }
+        if sdlMod & UInt16(COVE_SDL_KMOD_LGUI)   != 0 { m.insert(.lgui) }
+        if sdlMod & UInt16(COVE_SDL_KMOD_RGUI)   != 0 { m.insert(.rgui) }
         return m
     }
 
@@ -1419,7 +1419,7 @@ private let _sdl3ChromeHitTest: @convention(c) (OpaquePointer?, UnsafePointer<SD
         _ = SDL_GetWindowSize(window, &width, &height)
         let w = Float(max(0, width)) / coordinateScale
         let h = Float(max(0, height)) / coordinateScale
-        let isMaximized = (SDL_GetWindowFlags(window) & SDL_WindowFlags(GUAVA_SDL_WINDOW_MAXIMIZED)) != 0
+        let isMaximized = (SDL_GetWindowFlags(window) & SDL_WindowFlags(COVE_SDL_WINDOW_MAXIMIZED)) != 0
         let border = isMaximized ? 0 : config.resizeBorderWidth
 
         if border > 0, w > 0, h > 0 {

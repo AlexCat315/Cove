@@ -1,6 +1,6 @@
 import Foundation
-import GuavaUI
-import GuavaUIRuntime
+import CoveUI
+import CoveUIRuntime
 
 struct ImageStory: View {
     let options: GalleryOptions
@@ -11,7 +11,7 @@ struct ImageStory: View {
     private var url: URL? {
         switch source {
         case "remote": URL(string: remoteURL.stringValue.trimmingCharacters(in: .whitespacesAndNewlines))
-        case "missing": URL(fileURLWithPath: "/guava-gallery-missing.png")
+        case "missing": URL(fileURLWithPath: "/cove-gallery-missing.png")
         case "empty": nil
         default: Self.resource.url
         }

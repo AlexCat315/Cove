@@ -9,12 +9,12 @@ let package = Package(
     dependencies: [.package(path: "../../Portable")],
     targets: [
         .target(name: "CounterExample", dependencies: [
-            .product(name: "GuavaUIComposeCore", package: "Portable"),
+            .product(name: "CoveUIComposeCore", package: "Portable"),
         ]),
         .testTarget(name: "CounterExampleTests", dependencies: [
             "CounterExample",
-            .product(name: "GuavaUIDevToolsScene", package: "Portable"),
-            .product(name: "GuavaUIDevToolsProtocol", package: "Portable"),
+            .product(name: "CoveUIDevToolsScene", package: "Portable"),
+            .product(name: "CoveUIDevToolsProtocol", package: "Portable"),
         ]),
     ]
 )

@@ -1,5 +1,5 @@
-import GuavaUI
-import GuavaUIRuntime
+import CoveUI
+import CoveUIRuntime
 
 struct NavigationDrawerStory: View {
     let options: GalleryOptions
@@ -27,7 +27,7 @@ struct NavigationDrawerStory: View {
             Text("Selected destination: \(selection.map(String.init) ?? "none")")
                 .font(.caption).foregroundColor(.onSurfaceMuted).debugName("drawer-selection")
             NavigationDrawer(
-                "Guava workspace", isPresented: $open, selection: $selection,
+                "Cove workspace", isPresented: $open, selection: $selection,
                 sections: [
                     SidebarSection(
                         "workspace", title: "Workspace",

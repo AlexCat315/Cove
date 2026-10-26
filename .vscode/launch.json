@@ -4,41 +4,41 @@
             "type": "swift",
             "request": "launch",
             "args": [],
-            "cwd": "${workspaceFolder:GuavaUI}",
-            "name": "Debug GuavaUIDevToolsProbe",
-            "target": "GuavaUIDevToolsProbe",
+            "cwd": "${workspaceFolder:CoveUI}",
+            "name": "Debug CoveUIDevToolsProbe",
+            "target": "CoveUIDevToolsProbe",
             "configuration": "debug",
-            "preLaunchTask": "swift: Build Debug GuavaUIDevToolsProbe"
+            "preLaunchTask": "swift: Build Debug CoveUIDevToolsProbe"
         },
         {
             "type": "swift",
             "request": "launch",
             "args": [],
-            "cwd": "${workspaceFolder:GuavaUI}",
-            "name": "Release GuavaUIDevToolsProbe",
-            "target": "GuavaUIDevToolsProbe",
+            "cwd": "${workspaceFolder:CoveUI}",
+            "name": "Release CoveUIDevToolsProbe",
+            "target": "CoveUIDevToolsProbe",
             "configuration": "release",
-            "preLaunchTask": "swift: Build Release GuavaUIDevToolsProbe"
+            "preLaunchTask": "swift: Build Release CoveUIDevToolsProbe"
         },
         {
             "type": "swift",
             "request": "launch",
             "args": [],
-            "cwd": "${workspaceFolder:GuavaUI}",
-            "name": "Debug GuavaProcessFixture",
-            "target": "GuavaProcessFixture",
+            "cwd": "${workspaceFolder:CoveUI}",
+            "name": "Debug CoveProcessFixture",
+            "target": "CoveProcessFixture",
             "configuration": "debug",
-            "preLaunchTask": "swift: Build Debug GuavaProcessFixture"
+            "preLaunchTask": "swift: Build Debug CoveProcessFixture"
         },
         {
             "type": "swift",
             "request": "launch",
             "args": [],
-            "cwd": "${workspaceFolder:GuavaUI}",
-            "name": "Release GuavaProcessFixture",
-            "target": "GuavaProcessFixture",
+            "cwd": "${workspaceFolder:CoveUI}",
+            "name": "Release CoveProcessFixture",
+            "target": "CoveProcessFixture",
             "configuration": "release",
-            "preLaunchTask": "swift: Build Release GuavaProcessFixture"
+            "preLaunchTask": "swift: Build Release CoveProcessFixture"
         }
     ]
 }

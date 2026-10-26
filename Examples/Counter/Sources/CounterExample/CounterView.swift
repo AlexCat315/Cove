@@ -1,5 +1,5 @@
 import Foundation
-import GuavaUIComposeCore
+import CoveUIComposeCore
 
 /// One Compose source used by desktop, browser and Android hosts.
 /// Each host shapes text into the shared font atlas at the painting boundary.
@@ -11,7 +11,7 @@ public struct CounterTextRun: Sendable {
 }
 
 public enum CounterText {
-    public static let attachment = "GuavaUI.sharedDemo.text"
+    public static let attachment = "CoveUI.sharedDemo.text"
     public typealias Painter = (CounterTextRun, DrawList, CGPoint) -> Void
     public static let painter = CompositionLocal<Painter?>(defaultValue: nil)
 }
@@ -38,7 +38,7 @@ public struct CounterView: View {
         SurfaceReader { surface in
         Box {
         Box(direction: .column, alignItems: .stretch, spacing: 12) {
-            DemoLabel("GuavaUI · Shared Counter", size: 22, color: foreground, height: 36)
+            DemoLabel("CoveUI · Shared Counter", size: 22, color: foreground, height: 36)
             DemoLabel("Shared Compose · ViewGraph · Yoga", size: 14, color: foreground, height: 24)
             Box(direction: .column, alignItems: .stretch, spacing: 8) {
                 DemoLabel("Counter", size: 14, color: foreground, height: 24)

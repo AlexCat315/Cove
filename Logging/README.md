@@ -1,13 +1,13 @@
-# Guava 日志
+# Cove 日志
 
-GuavaLogging 是基于 [apple/swift-log](https://github.com/apple/swift-log) 的进程日志后端。业务代码使用标准 `Logger`、等级、metadata 和 source location；Guava 负责初始化、上下文、输出、回放和生命周期。日志不依赖 DevTools 是否启用。
+CoveLogging 是基于 [apple/swift-log](https://github.com/apple/swift-log) 的进程日志后端。业务代码使用标准 `Logger`、等级、metadata 和 source location；Cove 负责初始化、上下文、输出、回放和生命周期。日志不依赖 DevTools 是否启用。
 
 ## 应用里使用
 
-普通 GuavaUI 应用只需现有的 `import GuavaUI`。`Application.run` 会在窗口和 GPU 初始化前安装后端，退出时刷盘。
+普通 CoveUI 应用只需现有的 `import CoveUI`。`Application.run` 会在窗口和 GPU 初始化前安装后端，退出时刷盘。
 
 ```swift
-import GuavaUI
+import CoveUI
 
 let logger = LogSystem.logger("com.example.notes.document")
 logger.info("Document opened", metadata: ["document_id": "notes-42"])
@@ -27,10 +27,10 @@ configuration.logging.storage.filesPerSession = 3
 // 将 configuration 传给现有 Application.run 调用。
 ```
 
-独立工具、嵌入宿主可以直接依赖 `Engine/Logging` 的 `GuavaLogging` product：
+独立工具、嵌入宿主可以直接依赖 `Engine/Logging` 的 `CoveLogging` product：
 
 ```swift
-import GuavaLogging
+import CoveLogging
 
 var configuration = LoggingConfiguration()
 try configuration.applyEnvironment()
@@ -39,7 +39,7 @@ defer { LogSystem.flush() }
 let logger = Logger(label: "com.example.worker")
 ```
 
-同一进程的重复初始化安全；配置相同时不会重开文件，进程后端只安装一次。如果宿主已安装其他 swift-log 后端，应在 Guava 配置中选择 `.installation = .local`：Guava SDK 的 `LogSystem.logger`、原生日志和 Guava 订阅继续工作，宿主自己的标准 Logger 仍由原来的后端处理。不要对 swift-log 再次 bootstrap。
+同一进程的重复初始化安全；配置相同时不会重开文件，进程后端只安装一次。如果宿主已安装其他 swift-log 后端，应在 Cove 配置中选择 `.installation = .local`：Cove SDK 的 `LogSystem.logger`、原生日志和 Cove 订阅继续工作，宿主自己的标准 Logger 仍由原来的后端处理。不要对 swift-log 再次 bootstrap。
 
 ## 上下文与记录
 
@@ -62,15 +62,15 @@ try await LogContext.withValues(["operation_id": "save-42", "document_id": "note
 
 | 输出 | 行为 |
 | --- | --- |
-| 控制台 | 默认可读文本，桌面写 stderr；可选 JSONL。Android 使用 logcat `Guava` tag，保留 severity，并按 UTF-8 边界分块。 |
+| 控制台 | 默认可读文本，桌面写 stderr；可选 JSONL。Android 使用 logcat `Cove` tag，保留 severity，并按 UTF-8 边界分块。 |
 | 文件 | 默认开启，逐行 JSON，独立应用目录和进程会话目录，轮转且限制保留会话数。 |
 | 内存历史 | 默认保留最近 512 条，Inspector 晚连接也可回放。 |
 | Inspector | 桌面/Android WebSocket 和 Wasm MessageChannel 使用同一 LogRecord，支持过滤、详情、暂停显示和导出 JSONL。 |
 | Editor Console | 接收引擎日志；领域错误原有 target/detail/nextStep 保留，避免重复回灌。控制台记录不进入项目持久化。 |
 
-默认目录：macOS `~/Library/Logs/Guava`，Linux `$XDG_STATE_HOME/guava/logs`（默认 `~/.local/state/guava/logs`），Windows `%LOCALAPPDATA%/Guava/Logs`。Android 使用应用私有 `files/logs`，由宿主确定设备路径；Wasm 关闭文件输出，使用浏览器控制台、内存历史和导出。路径结构为 `<root>/<application>/session-<UUID>/events.jsonl`。
+默认目录：macOS `~/Library/Logs/Cove`，Linux `$XDG_STATE_HOME/cove/logs`（默认 `~/.local/state/cove/logs`），Windows `%LOCALAPPDATA%/Cove/Logs`。Android 使用应用私有 `files/logs`，由宿主确定设备路径；Wasm 关闭文件输出，使用浏览器控制台、内存历史和导出。路径结构为 `<root>/<application>/session-<UUID>/events.jsonl`。
 
-单会话默认最多 3 个 8 MiB 文件，保留最近 3 个会话。文件权限默认 0600，目录 0700；Windows 使用宿主的文件权限。清理仅针对带 Guava lease 标记且未被占用的会话，不删除活动进程的日志；因此并发活动会话可以临时超过保留数量。文件写入失败会关闭该文件输出，记录失败计数并保留控制台和历史。
+单会话默认最多 3 个 8 MiB 文件，保留最近 3 个会话。文件权限默认 0600，目录 0700；Windows 使用宿主的文件权限。清理仅针对带 Cove lease 标记且未被占用的会话，不删除活动进程的日志；因此并发活动会话可以临时超过保留数量。文件写入失败会关闭该文件输出，记录失败计数并保留控制台和历史。
 
 原生平台通过串行后台队列处理格式化、文件和订阅，待写队列默认最多 1024 条。饱和时丢弃并计数；error/critical 优先保留最新记录，同时向控制台应急输出。后续汇报 dropped/total_dropped，`LogSystem.status` 可读取写入、丢弃、待写和文件失败数量。error/critical 默认同步刷盘，可通过 `storage.flushOnError` 调整。正常退出、Android onPause 和显式 `LogSystem.flush()` 会排空当前待写批次并同步文件。强制终止或系统断电仍可能损失未刷盘的尾部；这不是崩溃报告采集器。
 
@@ -79,32 +79,32 @@ try await LogContext.withValues(["operation_id": "save-42", "document_id": "note
 ## 环境配置
 
 ```bash
-GUAVA_LOG_LEVEL=debug guava run MyApp --mac
-GUAVA_LOG_MODULES='{"com.guava.engine.rhi":"debug"}' guava run MyApp --android --profile --devtools
-GUAVA_LOG_FORMAT=json GUAVA_LOG_DIRECTORY=/tmp/guava-logs guava doctor
+COVE_LOG_LEVEL=debug cove run MyApp --mac
+COVE_LOG_MODULES='{"com.cove.engine.rhi":"debug"}' cove run MyApp --android --profile --devtools
+COVE_LOG_FORMAT=json COVE_LOG_DIRECTORY=/tmp/cove-logs cove doctor
 ```
 
 | 变量 | 值 |
 | --- | --- |
-| `GUAVA_LOG_LEVEL` | trace/debug/info/notice/warning/error/critical，默认 info |
-| `GUAVA_LOG_MODULES` | JSON 对象，模块前缀到等级；最长路径段前缀匹配 |
-| `GUAVA_LOG_CONSOLE` / `GUAVA_LOG_FILES` | 1/0、true/false、yes/no |
-| `GUAVA_LOG_FORMAT` | text/json |
-| `GUAVA_LOG_DIRECTORY` | 文件根目录；Android 会改为设备私有目录 |
-| `GUAVA_LOG_RUN_ID` | CLI/子进程的关联 ID，通常自动生成 |
+| `COVE_LOG_LEVEL` | trace/debug/info/notice/warning/error/critical，默认 info |
+| `COVE_LOG_MODULES` | JSON 对象，模块前缀到等级；最长路径段前缀匹配 |
+| `COVE_LOG_CONSOLE` / `COVE_LOG_FILES` | 1/0、true/false、yes/no |
+| `COVE_LOG_FORMAT` | text/json |
+| `COVE_LOG_DIRECTORY` | 文件根目录；Android 会改为设备私有目录 |
+| `COVE_LOG_RUN_ID` | CLI/子进程的关联 ID，通常自动生成 |
 
 配置通过验证后才应用。CLI 的结果、帮助和机器可读 stdout 不混入诊断；子进程的人类输出 tee 到原流并记入 JSONL，控制台不会重复打印。命令参数不默认记录，避免把认证参数带入日志。
 
 ## 模块边界和验证
 
-`GuavaLogCore` 只拥有配置、记录、上下文和查询；`GuavaLogging` 拥有后端、输出和订阅；`CGuavaLog` 适配 C/JNI/平台控制台和文件 lease。Portable 协议只依赖 Core，浏览器不引入 NIO，Editor 与 DevTools 都是日志消费者。原生代码使用 `GuavaLog.h` 的 `GUAVA_LOG/GUAVA_LOGF`，SDL 回调和 Android Java RuntimeLog 接入同一后端。
+`CoveLogCore` 只拥有配置、记录、上下文和查询；`CoveLogging` 拥有后端、输出和订阅；`CCoveLog` 适配 C/JNI/平台控制台和文件 lease。Portable 协议只依赖 Core，浏览器不引入 NIO，Editor 与 DevTools 都是日志消费者。原生代码使用 `CoveLog.h` 的 `COVE_LOG/COVE_LOGF`，SDL 回调和 Android Java RuntimeLog 接入同一后端。
 
 ```bash
 swift test --package-path Engine/Logging
-swift test --package-path Tools/Guava
-swift test --package-path GuavaUI/Portable
+swift test --package-path Tools/Cove
+swift test --package-path CoveUI/Portable
 swift test --package-path Editor --filter ConsoleLoggingTests
-swift run --package-path Tools/Developer guava-dev devtools session /path/to/App mac
-swift run --package-path Tools/Developer guava-dev devtools session /path/to/App android
-swift run --package-path Tools/Developer guava-dev android logging /path/to/App
+swift run --package-path Tools/Developer cove-dev devtools session /path/to/App mac
+swift run --package-path Tools/Developer cove-dev devtools session /path/to/App android
+swift run --package-path Tools/Developer cove-dev android logging /path/to/App
 ```

@@ -1,8 +1,10 @@
 # Changelog
 
-每个 Guava SDK 版本对应一个 `vX.Y.Z` 标签，统一包含 CLI、框架源码、模板与各目标平台的原生预编译库。
+每个 Cove SDK 版本对应一个 `vX.Y.Z` 标签，统一包含 CLI、框架源码、模板与各目标平台的原生预编译库。
 
 ## Unreleased
+
+- 项目迁移为 Cove：框架模块采用 `Cove*`，CLI 为 `cove`，清单与本地目录采用 `cove.json`／`.cove`；安装器、发布包、Android 标识与仓库链接同步改名。此版本需要更新旧项目的导入与配置。
 
 - `@State` 父视图更新时自动跳过值输入相等的子 scope，保留原状态和回调；闭包、可变引用及不透明输入保守重组，环境变化仍强制刷新。
 - 补齐描边、路径、圆环与圆角遮罩的覆盖率抗锯齿；`geometryAntialiasing = .analytic` 可按窗口使用 1x 目标，默认仍保留 4x MSAA。离屏 HUD 与 Android 使用解析遮罩。

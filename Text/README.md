@@ -1,24 +1,24 @@
-# GuavaUIText
+# CoveUIText
 
 Desktop and browser hosts share the same FreeType atlas and HarfBuzz shaper.
-This package depends on `Portable/GuavaUICore` and two static C libraries; it
+This package depends on `Portable/CoveUICore` and two static C libraries; it
 does not import SDL, Engine rendering, sockets, or platform font discovery.
 The lightweight Portable package does not depend on this package.
 
 Build desktop dependencies with the existing bootstrap/CMake workflow:
 
 ```bash
-git submodule update --init GuavaUI/third-party/freetype GuavaUI/third-party/harfbuzz
-cmake -S GuavaUI/third-party -B GuavaUI/build/native -DCMAKE_BUILD_TYPE=Release
-cmake --build GuavaUI/build/native --parallel 4
-cmake --install GuavaUI/build/native --prefix /tmp/guava-font-install
-swift test --package-path GuavaUI/Text
+git submodule update --init CoveUI/third-party/freetype CoveUI/third-party/harfbuzz
+cmake -S CoveUI/third-party -B CoveUI/build/native -DCMAKE_BUILD_TYPE=Release
+cmake --build CoveUI/build/native --parallel 4
+cmake --install CoveUI/build/native --prefix /tmp/cove-font-install
+swift test --package-path CoveUI/Text
 ```
 
-The browser's `guava-dev browser build-fonts` operation builds these pinned
+The browser's `cove-dev browser build-fonts` operation builds these pinned
 sources with the installed Swift WASI SDK and stages separate static-library
-artifact bundles. Its build script sets `GUAVA_TEXT_ARTIFACT_ROOT`; desktop
-artifacts remain in `GuavaUI/vendor`.
+artifact bundles. Its build script sets `COVE_TEXT_ARTIFACT_ROOT`; desktop
+artifacts remain in `CoveUI/vendor`.
 Do not export this override globally when switching back to desktop builds.
 
 ```swift

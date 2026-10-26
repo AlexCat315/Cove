@@ -2,8 +2,8 @@
 import PackageDescription
 import Foundation
 
-let runtimeArtifacts = ProcessInfo.processInfo.environment["GUAVA_RUNTIME_ARTIFACT_ROOT"] ?? "Runtime/vendor"
-let textArtifacts = ProcessInfo.processInfo.environment["GUAVA_TEXT_ARTIFACT_ROOT"] ?? "vendor"
+let runtimeArtifacts = ProcessInfo.processInfo.environment["COVE_RUNTIME_ARTIFACT_ROOT"] ?? "Runtime/vendor"
+let textArtifacts = ProcessInfo.processInfo.environment["COVE_TEXT_ARTIFACT_ROOT"] ?? "vendor"
 let windowsCxxRuntime: [LinkerSetting] = ["msvcrt", "msvcprt"].map {
     .linkedLibrary($0, .when(platforms: [.windows]))
 }
@@ -15,61 +15,61 @@ func nativeTarget(_ name: String, directory: String) -> Target {
 }
 
 let platformTargets: [Target] = [
-    .target(name: "GuavaPlatformCore", path: "PlatformCore/Sources/GuavaPlatformCore"),
-    .testTarget(name: "GuavaPlatformCoreTests", dependencies: ["GuavaPlatformCore"], path: "PlatformCore/Tests/GuavaPlatformCoreTests")
+    .target(name: "CovePlatformCore", path: "PlatformCore/Sources/CovePlatformCore"),
+    .testTarget(name: "CovePlatformCoreTests", dependencies: ["CovePlatformCore"], path: "PlatformCore/Tests/CovePlatformCoreTests")
 ]
 
 let systemTargets: [Target] = [
-    .target(name: "CGuavaSystem", path: "System/Sources/CGuavaSystem", linkerSettings: [
+    .target(name: "CCoveSystem", path: "System/Sources/CCoveSystem", linkerSettings: [
         .linkedLibrary("advapi32", .when(platforms: [.windows])),
     ]),
-    .target(name: "GuavaFileSystem", dependencies: ["CGuavaSystem"], path: "System/Sources/GuavaFileSystem"),
-    .target(name: "GuavaProcess", dependencies: ["CGuavaSystem"], path: "System/Sources/GuavaProcess"),
-    .executableTarget(name: "GuavaProcessFixture", dependencies: ["GuavaProcess"], path: "System/Sources/GuavaProcessFixture"),
-    .testTarget(name: "GuavaFileSystemTests", dependencies: ["GuavaFileSystem"], path: "System/Tests/GuavaFileSystemTests"),
-    .testTarget(name: "GuavaProcessTests", dependencies: ["GuavaProcess", "GuavaProcessFixture"], path: "System/Tests/GuavaProcessTests"),
+    .target(name: "CoveFileSystem", dependencies: ["CCoveSystem"], path: "System/Sources/CoveFileSystem"),
+    .target(name: "CoveProcess", dependencies: ["CCoveSystem"], path: "System/Sources/CoveProcess"),
+    .executableTarget(name: "CoveProcessFixture", dependencies: ["CoveProcess"], path: "System/Sources/CoveProcessFixture"),
+    .testTarget(name: "CoveFileSystemTests", dependencies: ["CoveFileSystem"], path: "System/Tests/CoveFileSystemTests"),
+    .testTarget(name: "CoveProcessTests", dependencies: ["CoveProcess", "CoveProcessFixture"], path: "System/Tests/CoveProcessTests"),
 ]
 
 let loggingTargets: [Target] = [
-    .target(name: "CGuavaLog", path: "Logging/Sources/CGuavaLog", publicHeadersPath: "include", linkerSettings: [.linkedLibrary("log", .when(platforms: [.android]))]),
-    .target(name: "GuavaLogCore", dependencies: [.product(name: "Logging", package: "swift-log")], path: "Logging/Sources/GuavaLogCore"),
-    .target(name: "GuavaLogging", dependencies: ["CGuavaLog", "GuavaLogCore"], path: "Logging/Sources/GuavaLogging"),
-    .testTarget(name: "GuavaLoggingTests", dependencies: ["GuavaLogging", "CGuavaLog"], path: "Logging/Tests/GuavaLoggingTests")
+    .target(name: "CCoveLog", path: "Logging/Sources/CCoveLog", publicHeadersPath: "include", linkerSettings: [.linkedLibrary("log", .when(platforms: [.android]))]),
+    .target(name: "CoveLogCore", dependencies: [.product(name: "Logging", package: "swift-log")], path: "Logging/Sources/CoveLogCore"),
+    .target(name: "CoveLogging", dependencies: ["CCoveLog", "CoveLogCore"], path: "Logging/Sources/CoveLogging"),
+    .testTarget(name: "CoveLoggingTests", dependencies: ["CoveLogging", "CCoveLog"], path: "Logging/Tests/CoveLoggingTests")
 ]
 
 let portableTargets: [Target] = [
-    .target(name: "GuavaUIAgentCore", dependencies: ["GuavaFileSystem"], path: "Portable/Sources/GuavaUIAgentCore"),
-    .target(name: "GuavaUIAgentTransport", dependencies: [
-            "GuavaUIAgentCore", .product(name: "NIOCore", package: "swift-nio"),
+    .target(name: "CoveUIAgentCore", dependencies: ["CoveFileSystem"], path: "Portable/Sources/CoveUIAgentCore"),
+    .target(name: "CoveUIAgentTransport", dependencies: [
+            "CoveUIAgentCore", .product(name: "NIOCore", package: "swift-nio"),
             .product(name: "NIOPosix", package: "swift-nio"),
-        ], path: "Portable/Sources/GuavaUIAgentTransport"),
-    .testTarget(name: "GuavaUIAgentTransportTests", dependencies: [
-            "GuavaUIAgentTransport", .product(name: "NIOEmbedded", package: "swift-nio"),
-        ], path: "Portable/Tests/GuavaUIAgentTransportTests"),
-    .testTarget(name: "GuavaUIAgentCoreTests", dependencies: ["GuavaUIAgentCore"], path: "Portable/Tests/GuavaUIAgentCoreTests"),
+        ], path: "Portable/Sources/CoveUIAgentTransport"),
+    .testTarget(name: "CoveUIAgentTransportTests", dependencies: [
+            "CoveUIAgentTransport", .product(name: "NIOEmbedded", package: "swift-nio"),
+        ], path: "Portable/Tests/CoveUIAgentTransportTests"),
+    .testTarget(name: "CoveUIAgentCoreTests", dependencies: ["CoveUIAgentCore"], path: "Portable/Tests/CoveUIAgentCoreTests"),
     .target(name: "CYoga", dependencies: [.product(name: "yoga", package: "yoga")], path: "Portable/Sources/CYoga", publicHeadersPath: "include", linkerSettings: windowsCxxRuntime),
-    .target(name: "GuavaUIScene", dependencies: ["GuavaUICore", "CYoga", .target(name: "GuavaPlatformCore")], path: "Portable/Sources/GuavaUIScene"),
-    .target(name: "GuavaUIComposeCore", dependencies: ["GuavaUIScene"], path: "Portable/Sources/GuavaUIComposeCore"),
-    .target(name: "GuavaUIDevToolsScene", dependencies: ["GuavaUIScene", "GuavaUIDevToolsProtocol", "GuavaUIAgentCore"], path: "Portable/Sources/GuavaUIDevToolsScene"),
-    .target(name: "GuavaUICore", path: "Portable/Sources/GuavaUICore"),
-    .testTarget(name: "GuavaUISceneTests", dependencies: ["GuavaUIComposeCore", "GuavaUIDevToolsScene", "GuavaUIDevToolsProtocol"], path: "Portable/Tests/GuavaUISceneTests"),
-    .testTarget(name: "GuavaUICoreTests", dependencies: ["GuavaUICore"], path: "Portable/Tests/GuavaUICoreTests"),
-    .target(name: "GuavaUIDevToolsProtocol", dependencies: [.target(name: "GuavaLogCore"), .target(name: "GuavaPlatformCore")], path: "Portable/Sources/GuavaUIDevToolsProtocol"),
-    .target(name: "GuavaUIDevToolsServer", dependencies: [
-            "GuavaUIDevToolsProtocol",
+    .target(name: "CoveUIScene", dependencies: ["CoveUICore", "CYoga", .target(name: "CovePlatformCore")], path: "Portable/Sources/CoveUIScene"),
+    .target(name: "CoveUIComposeCore", dependencies: ["CoveUIScene"], path: "Portable/Sources/CoveUIComposeCore"),
+    .target(name: "CoveUIDevToolsScene", dependencies: ["CoveUIScene", "CoveUIDevToolsProtocol", "CoveUIAgentCore"], path: "Portable/Sources/CoveUIDevToolsScene"),
+    .target(name: "CoveUICore", path: "Portable/Sources/CoveUICore"),
+    .testTarget(name: "CoveUISceneTests", dependencies: ["CoveUIComposeCore", "CoveUIDevToolsScene", "CoveUIDevToolsProtocol"], path: "Portable/Tests/CoveUISceneTests"),
+    .testTarget(name: "CoveUICoreTests", dependencies: ["CoveUICore"], path: "Portable/Tests/CoveUICoreTests"),
+    .target(name: "CoveUIDevToolsProtocol", dependencies: [.target(name: "CoveLogCore"), .target(name: "CovePlatformCore")], path: "Portable/Sources/CoveUIDevToolsProtocol"),
+    .target(name: "CoveUIDevToolsServer", dependencies: [
+            "CoveUIDevToolsProtocol",
             .product(name: "NIOCore", package: "swift-nio"),
             .product(name: "NIOPosix", package: "swift-nio"),
             .product(name: "NIOHTTP1", package: "swift-nio"),
             .product(name: "NIOWebSocket", package: "swift-nio"),
-            .target(name: "GuavaLogging"),
-        ], path: "Portable/Sources/GuavaUIDevToolsServer"),
-    .executableTarget(name: "GuavaUIDevToolsProbe", dependencies: [
-            "GuavaUIDevToolsServer", "GuavaUIDevToolsScene", "GuavaUIComposeCore", .target(name: "GuavaLogging"),
-        ], path: "Portable/Sources/GuavaUIDevToolsProbe"),
-    .testTarget(name: "GuavaUIDevToolsServerTests", dependencies: [
-            "GuavaUIDevToolsServer", "GuavaUIDevToolsProtocol", .target(name: "GuavaLogging"),
+            .target(name: "CoveLogging"),
+        ], path: "Portable/Sources/CoveUIDevToolsServer"),
+    .executableTarget(name: "CoveUIDevToolsProbe", dependencies: [
+            "CoveUIDevToolsServer", "CoveUIDevToolsScene", "CoveUIComposeCore", .target(name: "CoveLogging"),
+        ], path: "Portable/Sources/CoveUIDevToolsProbe"),
+    .testTarget(name: "CoveUIDevToolsServerTests", dependencies: [
+            "CoveUIDevToolsServer", "CoveUIDevToolsProtocol", .target(name: "CoveLogging"),
             .product(name: "NIOEmbedded", package: "swift-nio"),
-        ], path: "Portable/Tests/GuavaUIDevToolsServerTests")
+        ], path: "Portable/Tests/CoveUIDevToolsServerTests")
 ]
 
 let runtimeTargets: [Target] = [
@@ -88,7 +88,7 @@ let runtimeTargets: [Target] = [
                                  .linkedLibrary("pthread", .when(platforms: [.linux]))]),
     .target(name: "NativeRHI", dependencies: ["CDX12Bridge",
             .target(name: "CVulkanHeaders", condition: .when(platforms: [.windows, .linux, .android])),
-            .target(name: "GuavaLogging")], path: "Runtime/Sources/NativeRHI", exclude: ["docs"]),
+            .target(name: "CoveLogging")], path: "Runtime/Sources/NativeRHI", exclude: ["docs"]),
     .target(name: "CSDL3", dependencies: ["SDL3"], path: "Runtime/Sources/Bridge/CSDL3", publicHeadersPath: "include",
                 linkerSettings: [
                     .linkedFramework("AVFoundation", .when(platforms: [.macOS, .iOS])),
@@ -128,8 +128,8 @@ let runtimeTargets: [Target] = [
                     .linkedLibrary("GLESv2", .when(platforms: [.android])),
                     .linkedLibrary("OpenSLES", .when(platforms: [.android]))]),
     .target(name: "PlatformShell", dependencies: ["CSDL3",
-            .target(name: "GuavaPlatformCore"),
-            .target(name: "GuavaLogging")], path: "Runtime/Sources/PlatformShell"),
+            .target(name: "CovePlatformCore"),
+            .target(name: "CoveLogging")], path: "Runtime/Sources/PlatformShell"),
     .target(name: "CImageDecodeBridge", dependencies: ["lunasvg", "plutovg", "webp", "sharpyuv"],
                 path: "Runtime/Sources/Bridge/CImageDecodeBridge", publicHeadersPath: "include",
                 cxxSettings: [.define("LUNASVG_BUILD_STATIC")], linkerSettings: windowsCxxRuntime),
@@ -137,40 +137,40 @@ let runtimeTargets: [Target] = [
 
 let textTargets: [Target] = [
     nativeTarget("GhosttyVt", directory: "vendor"),
-    .target(name: "GuavaUITerminal", dependencies: ["GhosttyVt", "GuavaUICompose", "GuavaUIRuntime"], path: "Terminal/Sources/GuavaUITerminal",
+    .target(name: "CoveUITerminal", dependencies: ["GhosttyVt", "CoveUICompose", "CoveUIRuntime"], path: "Terminal/Sources/CoveUITerminal",
                 linkerSettings: [.linkedLibrary("ntdll", .when(platforms: [.windows])),
                                  .linkedLibrary("kernel32", .when(platforms: [.windows]))]),
-    .testTarget(name: "GuavaUITerminalTests", dependencies: ["GuavaUITerminal", "GuavaUICompose", "GuavaUIRuntime"], path: "Terminal/Tests/GuavaUITerminalTests"),
+    .testTarget(name: "CoveUITerminalTests", dependencies: ["CoveUITerminal", "CoveUICompose", "CoveUIRuntime"], path: "Terminal/Tests/CoveUITerminalTests"),
     nativeTarget("CFreeType", directory: textArtifacts),
     nativeTarget("CHarfBuzz", directory: textArtifacts),
-    .target(name: "GuavaUIText", dependencies: [
-            "CFreeType", "CHarfBuzz", .target(name: "GuavaUICore"),
-        ], path: "Text/Sources/GuavaUIText"),
-    .testTarget(name: "GuavaUITextTests", dependencies: ["GuavaUIText"], path: "Text/Tests/GuavaUITextTests")
+    .target(name: "CoveUIText", dependencies: [
+            "CFreeType", "CHarfBuzz", .target(name: "CoveUICore"),
+        ], path: "Text/Sources/CoveUIText"),
+    .testTarget(name: "CoveUITextTests", dependencies: ["CoveUIText"], path: "Text/Tests/CoveUITextTests")
 ]
 
 let uiTargets: [Target] = [
-    .target(name: "GuavaUIAgent", dependencies: [
-            .target(name: "GuavaUIAgentCore"),
-            .target(name: "GuavaUIAgentTransport"),
-            .target(name: "GuavaUIDevToolsScene"),
-        ], path: "Sources/GuavaUIAgent"),
-    .target(name: "GuavaUIAndroid", dependencies: ["GuavaUICompose", "GuavaUIRuntime", "GuavaUIDevTools"], path: "Platforms/Android"),
+    .target(name: "CoveUIAgent", dependencies: [
+            .target(name: "CoveUIAgentCore"),
+            .target(name: "CoveUIAgentTransport"),
+            .target(name: "CoveUIDevToolsScene"),
+        ], path: "Sources/CoveUIAgent"),
+    .target(name: "CoveUIAndroid", dependencies: ["CoveUICompose", "CoveUIRuntime", "CoveUIDevTools"], path: "Platforms/Android"),
     .target(
-            name: "GuavaUIRuntime",
+            name: "CoveUIRuntime",
             dependencies: [
-                .target(name: "GuavaUICore"),
+                .target(name: "CoveUICore"),
                 .target(name: "CYoga"),
-                .target(name: "GuavaUIScene"),
-                .target(name: "GuavaUIText"),
+                .target(name: "CoveUIScene"),
+                .target(name: "CoveUIText"),
                 .target(name: "CFreeType"),
                 .target(name: "CHarfBuzz"),
                 .target(name: "NativeRHI"),
                 .target(name: "PlatformShell"),
-                .target(name: "GuavaPlatformCore"),
+                .target(name: "CovePlatformCore"),
                 .target(name: "CImageDecodeBridge"),
-                .target(name: "GuavaLogging"),
-            ], path: "Sources/GuavaUIRuntime",
+                .target(name: "CoveLogging"),
+            ], path: "Sources/CoveUIRuntime",
             resources: [.copy("Resources/Shaders")],
             linkerSettings: [
                 // winmm provides timeBeginPeriod/timeEndPeriod, used by the run
@@ -180,153 +180,153 @@ let uiTargets: [Target] = [
             ]
         ),
     .target(
-            name: "GuavaUICompose",
-            dependencies: ["GuavaFileSystem", "GuavaUIRuntime", .target(name: "GuavaLogging"),
+            name: "CoveUICompose",
+            dependencies: ["CoveFileSystem", "CoveUIRuntime", .target(name: "CoveLogging"),
                            .product(name: "Markdown", package: "swift-markdown"),
-                           .target(name: "GuavaUIScene"),
-                           .target(name: "GuavaUIComposeCore"),
-                           .target(name: "GuavaPlatformCore")], path: "Sources/GuavaUICompose",
+                           .target(name: "CoveUIScene"),
+                           .target(name: "CoveUIComposeCore"),
+                           .target(name: "CovePlatformCore")], path: "Sources/CoveUICompose",
             resources: [
                 .process("Resources"),
             ]
         ),
     .target(
-            name: "GuavaUIWebView",
-            dependencies: ["GuavaUICompose"], path: "Sources/GuavaUIWebView"
+            name: "CoveUIWebView",
+            dependencies: ["CoveUICompose"], path: "Sources/CoveUIWebView"
         ),
     .target(
-            name: "GuavaUIWorkspace",
+            name: "CoveUIWorkspace",
             dependencies: [
-                "GuavaUICompose",
-                "GuavaUIRuntime",
-                .target(name: "GuavaPlatformCore"),
-            ], path: "Sources/GuavaUIWorkspace",
+                "CoveUICompose",
+                "CoveUIRuntime",
+                .target(name: "CovePlatformCore"),
+            ], path: "Sources/CoveUIWorkspace",
             resources: [
                 .process("Resources"),
             ]
         ),
     .target(
-            name: "GuavaUI",
+            name: "CoveUI",
             dependencies: [
-                "GuavaUIRuntime",
-                "GuavaUICompose",
-                "GuavaUIDevTools",
+                "CoveUIRuntime",
+                "CoveUICompose",
+                "CoveUIDevTools",
                 .target(name: "PlatformShell"),
                 .target(name: "NativeRHI"),
-                .target(name: "GuavaPlatformCore"),
-                .target(name: "GuavaLogging"),
-            ], path: "Sources/GuavaUI",
+                .target(name: "CovePlatformCore"),
+                .target(name: "CoveLogging"),
+            ], path: "Sources/CoveUI",
             resources: [
                 .process("Resources"),
             ]
         ),
     .target(
-            name: "GuavaUIDevTools",
+            name: "CoveUIDevTools",
             dependencies: [
-                "GuavaFileSystem",
-                .target(name: "GuavaUIDevToolsServer"),
-                .target(name: "GuavaUIDevToolsScene"),
-                .target(name: "GuavaUIDevToolsProtocol"),
-                "GuavaUIRuntime",
-                .target(name: "GuavaPlatformCore"),
+                "CoveFileSystem",
+                .target(name: "CoveUIDevToolsServer"),
+                .target(name: "CoveUIDevToolsScene"),
+                .target(name: "CoveUIDevToolsProtocol"),
+                "CoveUIRuntime",
+                .target(name: "CovePlatformCore"),
                 .target(name: "NativeRHI"),
-                .target(name: "GuavaLogging"),
-            ], path: "Sources/GuavaUIDevTools"
+                .target(name: "CoveLogging"),
+            ], path: "Sources/CoveUIDevTools"
         ),
-    .testTarget(name: "GuavaUIAndroidTests", dependencies: ["GuavaUIAndroid", "GuavaUICompose", "GuavaUIRuntime"], path: "Tests/GuavaUIAndroidTests"),
+    .testTarget(name: "CoveUIAndroidTests", dependencies: ["CoveUIAndroid", "CoveUICompose", "CoveUIRuntime"], path: "Tests/CoveUIAndroidTests"),
     .testTarget(
-            name: "GuavaUIRuntimeTests",
+            name: "CoveUIRuntimeTests",
             dependencies: [
-                .target(name: "GuavaUIScene"),
-                "GuavaUIRuntime",
+                .target(name: "CoveUIScene"),
+                "CoveUIRuntime",
                 .target(name: "NativeRHI"),
                 .target(name: "PlatformShell"),
-            ], path: "Tests/GuavaUIRuntimeTests"
+            ], path: "Tests/CoveUIRuntimeTests"
         ),
     .testTarget(
-            name: "GuavaUIComposeTests",
+            name: "CoveUIComposeTests",
             dependencies: [
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "NIOHTTP1", package: "swift-nio"),
-                "GuavaUIAgent",
-                .target(name: "GuavaUIComposeCore"),
-                "GuavaUICompose",
-                "GuavaUIRuntime",
-                .target(name: "GuavaPlatformCore"),
-            ], path: "Tests/GuavaUIComposeTests"
+                "CoveUIAgent",
+                .target(name: "CoveUIComposeCore"),
+                "CoveUICompose",
+                "CoveUIRuntime",
+                .target(name: "CovePlatformCore"),
+            ], path: "Tests/CoveUIComposeTests"
         ),
     .testTarget(
-            name: "GuavaUITests",
+            name: "CoveUITests",
             dependencies: [
-                "GuavaUI",
-                "GuavaUIDevTools",
-                "GuavaUICompose",
-                "GuavaUIWorkspace",
+                "CoveUI",
+                "CoveUIDevTools",
+                "CoveUICompose",
+                "CoveUIWorkspace",
                 .target(name: "NativeRHI"),
-            ], path: "Tests/GuavaUITests"
+            ], path: "Tests/CoveUITests"
         ),
     .testTarget(
-            name: "GuavaUIWebViewTests",
+            name: "CoveUIWebViewTests",
             dependencies: [
-                "GuavaUIWebView",
-                "GuavaUICompose",
-            ], path: "Tests/GuavaUIWebViewTests"
+                "CoveUIWebView",
+                "CoveUICompose",
+            ], path: "Tests/CoveUIWebViewTests"
         ),
     .testTarget(
-            name: "GuavaUIWorkspaceTests",
+            name: "CoveUIWorkspaceTests",
             dependencies: [
-                "GuavaUIWorkspace",
-                "GuavaUICompose",
-                "GuavaUIRuntime",
-            ], path: "Tests/GuavaUIWorkspaceTests"
+                "CoveUIWorkspace",
+                "CoveUICompose",
+                "CoveUIRuntime",
+            ], path: "Tests/CoveUIWorkspaceTests"
         ),
     .testTarget(
-            name: "GuavaUIDevToolsTests",
+            name: "CoveUIDevToolsTests",
             dependencies: [
-                "GuavaUIDevTools",
-                "GuavaUIRuntime",
+                "CoveUIDevTools",
+                "CoveUIRuntime",
                 .target(name: "NativeRHI"),
-            ], path: "Tests/GuavaUIDevToolsTests"
+            ], path: "Tests/CoveUIDevToolsTests"
         )
 ]
 
 let package = Package(
-    name: "GuavaUI",
+    name: "CoveUI",
     platforms: [.macOS(.v26), .iOS(.v26)],
     products: [
-.library(name: "GuavaPlatformCore", targets: ["GuavaPlatformCore"]),
-.library(name: "GuavaFileSystem", targets: ["GuavaFileSystem"]),
-.library(name: "GuavaProcess", targets: ["GuavaProcess"]),
-.library(name: "GuavaLogging", targets: ["GuavaLogging"]),
-    .library(name: "GuavaLogCore", targets: ["GuavaLogCore"]),
-    .library(name: "CGuavaLog", targets: ["CGuavaLog"]),
-.library(name: "GuavaUIAgentCore", targets: ["GuavaUIAgentCore"]),
-        .library(name: "GuavaUIAgentTransport", targets: ["GuavaUIAgentTransport"]),
-        .library(name: "GuavaUIScene", targets: ["GuavaUIScene"]),
-        .library(name: "GuavaUIComposeCore", targets: ["GuavaUIComposeCore"]),
+.library(name: "CovePlatformCore", targets: ["CovePlatformCore"]),
+.library(name: "CoveFileSystem", targets: ["CoveFileSystem"]),
+.library(name: "CoveProcess", targets: ["CoveProcess"]),
+.library(name: "CoveLogging", targets: ["CoveLogging"]),
+    .library(name: "CoveLogCore", targets: ["CoveLogCore"]),
+    .library(name: "CCoveLog", targets: ["CCoveLog"]),
+.library(name: "CoveUIAgentCore", targets: ["CoveUIAgentCore"]),
+        .library(name: "CoveUIAgentTransport", targets: ["CoveUIAgentTransport"]),
+        .library(name: "CoveUIScene", targets: ["CoveUIScene"]),
+        .library(name: "CoveUIComposeCore", targets: ["CoveUIComposeCore"]),
         .library(name: "CYoga", targets: ["CYoga"]),
-        .library(name: "GuavaUIDevToolsScene", targets: ["GuavaUIDevToolsScene"]),
-        .library(name: "GuavaUICore", targets: ["GuavaUICore"]),
-        .library(name: "GuavaUIDevToolsProtocol", targets: ["GuavaUIDevToolsProtocol"]),
-        .library(name: "GuavaUIDevToolsServer", targets: ["GuavaUIDevToolsServer"]),
-        .executable(name: "GuavaUIDevToolsProbe", targets: ["GuavaUIDevToolsProbe"]),
+        .library(name: "CoveUIDevToolsScene", targets: ["CoveUIDevToolsScene"]),
+        .library(name: "CoveUICore", targets: ["CoveUICore"]),
+        .library(name: "CoveUIDevToolsProtocol", targets: ["CoveUIDevToolsProtocol"]),
+        .library(name: "CoveUIDevToolsServer", targets: ["CoveUIDevToolsServer"]),
+        .executable(name: "CoveUIDevToolsProbe", targets: ["CoveUIDevToolsProbe"]),
 .library(name: "CSDL3", targets: ["CSDL3"]),
         .library(name: "NativeRHI", targets: ["NativeRHI"]),
         .library(name: "PlatformShell", targets: ["PlatformShell"]),
         .library(name: "ImageDecodeBridge", targets: ["CImageDecodeBridge"]),
-.library(name: "GuavaUITerminal", targets: ["GuavaUITerminal"]),
-        .library(name: "GuavaUIText", targets: ["GuavaUIText"]),
+.library(name: "CoveUITerminal", targets: ["CoveUITerminal"]),
+        .library(name: "CoveUIText", targets: ["CoveUIText"]),
         .library(name: "CFreeType", targets: ["CFreeType"]),
         .library(name: "CHarfBuzz", targets: ["CHarfBuzz"]),
-.library(name: "GuavaUIAndroid", targets: ["GuavaUIAndroid"]),
-        .library(name: "GuavaUIRuntime", targets: ["GuavaUIRuntime"]),
-        .library(name: "GuavaUICompose", targets: ["GuavaUICompose"]),
-        .library(name: "GuavaUIWebView", targets: ["GuavaUIWebView"]),
-        .library(name: "GuavaUIWorkspace", targets: ["GuavaUIWorkspace"]),
-        .library(name: "GuavaUI", targets: ["GuavaUI"]),
-        .library(name: "GuavaUIDevTools", targets: ["GuavaUIDevTools"]),
-        .library(name: "GuavaUIAgent", targets: ["GuavaUIAgent"]),
+.library(name: "CoveUIAndroid", targets: ["CoveUIAndroid"]),
+        .library(name: "CoveUIRuntime", targets: ["CoveUIRuntime"]),
+        .library(name: "CoveUICompose", targets: ["CoveUICompose"]),
+        .library(name: "CoveUIWebView", targets: ["CoveUIWebView"]),
+        .library(name: "CoveUIWorkspace", targets: ["CoveUIWorkspace"]),
+        .library(name: "CoveUI", targets: ["CoveUI"]),
+        .library(name: "CoveUIDevTools", targets: ["CoveUIDevTools"]),
+        .library(name: "CoveUIAgent", targets: ["CoveUIAgent"]),
     ],
     dependencies: [
         .package(url: "https://github.com/facebook/yoga.git", from: "3.2.1"),
@@ -338,6 +338,6 @@ let package = Package(
     cxxLanguageStandard: .cxx17
 )
 
-for target in systemTargets where target.name != "CGuavaSystem" {
+for target in systemTargets where target.name != "CCoveSystem" {
     target.swiftSettings = [.enableUpcomingFeature("InternalImportsByDefault")]
 }

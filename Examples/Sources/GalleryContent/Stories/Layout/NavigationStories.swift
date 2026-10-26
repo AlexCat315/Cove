@@ -1,12 +1,12 @@
-import GuavaUI
-import GuavaUIRuntime
+import CoveUI
+import CoveUIRuntime
 
 struct AccordionStory: View {
     let options: GalleryOptions
     @State private var expanded: Set<String> = ["project"]
     @State private var multiple = false
     @State private var reduceMotion = false
-    @State private var project: TextBuffer = "Guava Studio"
+    @State private var project: TextBuffer = "Cove Studio"
     @State private var autosave = true
     @State private var diagnostics = false
     var body: some View {
@@ -65,7 +65,7 @@ struct BreadcrumbStory: View {
     var body: some View {
         StorySection("Path navigation", "Long paths collapse intermediate destinations into a menu; the current destination remains a label.") {
             Breadcrumb([BreadcrumbItem("home", "Home"), BreadcrumbItem("team", "Team"), BreadcrumbItem("project", "Project"),
-                        BreadcrumbItem("assets", "Assets"), BreadcrumbItem("textures", "Textures"), BreadcrumbItem("selected", "Guava.png")]) { selected = $0 }
+                        BreadcrumbItem("assets", "Assets"), BreadcrumbItem("textures", "Textures"), BreadcrumbItem("selected", "Cove.png")]) { selected = $0 }
             Text("Opened: \(selected)").font(.caption).foregroundColor(.onSurfaceMuted)
         }
     }
@@ -173,7 +173,7 @@ struct LabelStory: View {
 }
 struct DialogStory: View {
     @State private var open = false
-    @State private var name: TextBuffer = "Guava"
+    @State private var name: TextBuffer = "Cove"
     var body: some View {
         StorySection("Structured dialog", "Header, scrollable content and actions share the modal focus and dismissal policy.") {
             Button("Edit profile") { open = true }.debugName("dialog-open")

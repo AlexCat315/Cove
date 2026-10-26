@@ -1,10 +1,10 @@
-import GuavaUI
+import CoveUI
 
 struct RichTextStory: View {
     @State private var lastOpened = "none"
 
     static let sample: [RichTextRun] = [
-        RichTextRun("GuavaUI lays out "),
+        RichTextRun("CoveUI lays out "),
         RichTextRun("bold", traits: .bold),
         RichTextRun(", "),
         RichTextRun("italic", traits: .italic),
@@ -41,7 +41,7 @@ struct RichTextStory: View {
                 RichText(Self.mixedScript) { lastOpened = $0 }
             }
             StorySection("Right-to-left paragraphs", "Each paragraph takes its direction from its first strong character: Hebrew and Arabic lines align to the trailing edge, embedded Latin words and numbers keep their own order.") {
-                RichText([RichTextRun("שלום "), RichTextRun("GuavaUI", traits: .bold), RichTextRun(" — גרסה 2.0 זמינה עכשיו.")])
+                RichText([RichTextRun("שלום "), RichTextRun("CoveUI", traits: .bold), RichTextRun(" — גרסה 2.0 זמינה עכשיו.")])
                 RichText([RichTextRun("مرحبا بالعالم: "), RichTextRun("RichText", traits: .code), RichTextRun(" يدعم 123 رقمًا.")])
                 RichText([RichTextRun("An English line that mentions "), RichTextRun("עברית", traits: .italic), RichTextRun(" stays left aligned.")])
             }

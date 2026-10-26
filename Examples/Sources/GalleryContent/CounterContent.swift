@@ -1,5 +1,5 @@
-import GuavaUI
-import GuavaUIRuntime
+import CoveUI
+import CoveUIRuntime
 import CounterExample
 
 /// Adapts the portable counter's custom text primitives to the native font service.

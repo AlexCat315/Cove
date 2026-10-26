@@ -1,4 +1,4 @@
-// NativeRHI — cross-platform explicit graphics RHI (Swift port of guava-rhi).
+// NativeRHI — cross-platform explicit graphics RHI (Swift port of cove-rhi).
 //
 // Errors surfaced by the RHI. All failures are explicit: the Swift port never
 // silently truncates input or swallows backend allocation failures.

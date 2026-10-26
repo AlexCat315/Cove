@@ -1,7 +1,7 @@
 import Foundation
-import GuavaUI
-import GuavaUIRuntime
-import GuavaUIWorkspace
+import CoveUI
+import CoveUIRuntime
+import CoveUIWorkspace
 
 struct PanelStory: View {
     var body: some View {
@@ -320,7 +320,7 @@ struct CarouselStory: View {
 
     private static var pages: [CarouselPage<String>] {[
         CarouselPage("welcome", caption: "Welcome — start with the component catalog") {
-            CarouselCard("Welcome", detail: "GuavaUI is declarative, themed and testable.", tint: Color(r: 0.30, g: 0.55, b: 0.95))
+            CarouselCard("Welcome", detail: "CoveUI is declarative, themed and testable.", tint: Color(r: 0.30, g: 0.55, b: 0.95))
         },
         CarouselPage("themes", caption: "Themes — semantic tokens, light and dark") {
             CarouselCard("Themes", detail: "Colours describe roles, never raw values.", tint: Color(r: 0.42, g: 0.36, b: 0.88))

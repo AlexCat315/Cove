@@ -1,6 +1,6 @@
-# GuavaUI 浏览器 Wasm 原型
+# CoveUI 浏览器 Wasm 原型
 
-此目录是浏览器宿主的独立验证工程，尚未成为 `guava build --web` 的完整应用目标。Swift/Wasm 模块通过 JavaScript 适配 Canvas、WebGPU 和 DOM 输入；它不依赖引擎的 Wasmtime 插件运行时。下述已验证工具链配对单独用于原型，不改变 Android 的 Swift 6.4.1 要求。
+此目录是浏览器宿主的独立验证工程，尚未成为 `cove build --web` 的完整应用目标。Swift/Wasm 模块通过 JavaScript 适配 Canvas、WebGPU 和 DOM 输入；它不依赖引擎的 Wasmtime 插件运行时。下述已验证工具链配对单独用于原型，不改变 Android 的 Swift 6.4.1 要求。
 
 浏览器和桌面现在运行同一份 `CounterView` Compose 源码，以及真实的
 ViewGraph、节点树、Yoga 布局、输入分发、State/Binding 和 DrawList。
@@ -19,9 +19,9 @@ macOS 的 Xcode Swift 编译器即使也标记为 6.4，仍可能与官方 SDK �
 
 ```bash
 swift sdk install https://download.swift.org/swift-6.4.1-release/wasm-sdk/swift-6.4.1-RELEASE/swift-6.4.1-RELEASE_wasm.artifactbundle.tar.gz --checksum 783e6128d174d9f975b4eda68be02a5960681b723ef372e6876a7c2543a365d8
-git submodule update --init GuavaUI/third-party/freetype GuavaUI/third-party/harfbuzz
+git submodule update --init CoveUI/third-party/freetype CoveUI/third-party/harfbuzz
 
-cd GuavaUI/Browser
+cd CoveUI/Browser
 npm ci
 npm run build
 npm run serve
@@ -33,9 +33,9 @@ clang/clang++/llvm-ar。`npm run build:fonts` 增量构建现有子模块，不�
 Yoga/HarfBuzz 禁用 C++ 异常；FreeType 字体校验使用 SDK 的 `libsetjmp` 和 Wasm
 异常处理指令，因此浏览器需支持 Wasm exception handling。原生编译设置不受影响。
 
-用 `GUAVA_WASM_CONFIGURATION=release npm run build` 生成优化构建并移除 DWARF；默认 debug
-构建带 DWARF。`GUAVA_WASM_SDK` 可以指定另一对匹配的编译器和 SDK，
-`GUAVA_WASM_OUTPUT` 可以指定独立输出目录。
+用 `COVE_WASM_CONFIGURATION=release npm run build` 生成优化构建并移除 DWARF；默认 debug
+构建带 DWARF。`COVE_WASM_SDK` 可以指定另一对匹配的编译器和 SDK，
+`COVE_WASM_OUTPUT` 可以指定独立输出目录。
 
 WebGPU 需要安全上下文，本地 localhost HTTP 可用。设备不可用或丢失时，Canvas2D
 绘制**同一份 Swift 顶点和索引**。用 `?renderer=canvas2d` 强制回退，或
@@ -46,11 +46,11 @@ WebGPU 需要安全上下文，本地 localhost HTTP 可用。设备不可用或
 从已完成原生依赖构建的仓库根目录运行：
 
 ```bash
-GUAVA_DEVTOOLS=1 swift run --package-path GuavaUI/Examples GuavaUIDemo --shared-counter
+COVE_DEVTOOLS=1 swift run --package-path CoveUI/Examples CoveUIDemo --shared-counter
 ```
 
-桌面入口为 `GuavaUI/Examples/Sources/GuavaUIDemo/main.swift`，浏览器入口为
-`Sources/GuavaUIBrowserPrototype/main.swift`。两者都安装
+桌面入口为 `CoveUI/Examples/Sources/CoveUIDemo/main.swift`，浏览器入口为
+`Sources/CoveUIBrowserPrototype/main.swift`。两者都安装
 `../../examples/Counter/Sources/CounterExample/CounterView.swift`。
 宿主只负责窗口、绘制后端、文字绘制和输入适配。
 
@@ -59,12 +59,12 @@ GUAVA_DEVTOOLS=1 swift run --package-path GuavaUI/Examples GuavaUIDemo --shared-
 | 模块 | 桌面与浏览器共用的实现 |
 | --- | --- |
 | `Engine/PlatformCore` | 输入事件、光标、窗口 ID，输入事件可 Codable |
-| `GuavaUICore` | State/Binding、颜色、DrawList、顶点、WGSL、字体值及字形布局 |
-| `GuavaUIText` | FreeType FontAtlas、HarfBuzz TextShaper、FontCollection 字素回退 |
-| `GuavaUIScene` | Node/RenderTree、Yoga、Recomposer、动画、焦点、捕获和事件分发 |
-| `GuavaUIComposeCore` | View/ViewBuilder、ViewGraph、CompositionLocal、Box/Row/Column |
-| `GuavaUIDevToolsScene` | 从实际节点树生成 Inspector 快照 |
-| `GuavaUIDevToolsProtocol` | 消息结构、会话校验、订阅、状态差异、输入录制格式 |
+| `CoveUICore` | State/Binding、颜色、DrawList、顶点、WGSL、字体值及字形布局 |
+| `CoveUIText` | FreeType FontAtlas、HarfBuzz TextShaper、FontCollection 字素回退 |
+| `CoveUIScene` | Node/RenderTree、Yoga、Recomposer、动画、焦点、捕获和事件分发 |
+| `CoveUIComposeCore` | View/ViewBuilder、ViewGraph、CompositionLocal、Box/Row/Column |
+| `CoveUIDevToolsScene` | 从实际节点树生成 Inspector 快照 |
+| `CoveUIDevToolsProtocol` | 消息结构、会话校验、订阅、状态差异、输入录制格式 |
 
 桌面 Runtime/Compose/DevTools 继续导出这些类型。浏览器不编译 SDL、SwiftNIO
 socket、引擎视口或 GPU 原生依赖。完整的主题控件库仍在桌面 Compose 模块中。
@@ -89,7 +89,7 @@ EventDispatcher。文字输入示例支持追加 Unicode 文本、按字素 Back
 IME 预编辑/提交；它是一个简单的末尾编辑示例，尚未移植桌面完整 TextField 的选择、
 光标导航和撤销。隐藏的 DOM 输入桥为浏览器 IME 提供焦点与候选窗口位置。
 
-现有 Inspector 通过同源 `MessageChannel` 连接 `browser://guava`，无需浏览器监听
+现有 Inspector 通过同源 `MessageChannel` 连接 `browser://cove`，无需浏览器监听
 TCP。桌面 Inspector 连接 `ws://127.0.0.1:9229/`。两者使用同一套消息校验。
 
 - **Pick component**：开启后点击实际画面，选择文字、容器或控件；拾取点击不会触发
@@ -111,8 +111,8 @@ TCP。桌面 Inspector 连接 `ws://127.0.0.1:9229/`。两者使用同一套消�
 - 树快照包含实际布局、渲染和输入清单；状态写入标注真实 Compose scope。
   帧样本分别测量布局和绘制，浏览器 GPU 呈现时间仍为零。
 
-控制台 `guavaDebug.snapshot` 查看当前帧与字形/UTF-8 cluster/字体 ID，
-`guavaDebug.gpuInfo` 查看适配器，`guavaDebug.request(...)` 发送调试请求。
+控制台 `coveDebug.snapshot` 查看当前帧与字形/UTF-8 cluster/字体 ID，
+`coveDebug.gpuInfo` 查看适配器，`coveDebug.request(...)` 发送调试请求。
 C ABI 缓冲区仅在下一次对应更新前有效，JavaScript 会先复制再调用其他 Wasm 导出。
 Swift 源码断点需要支持 Swift 的 DWARF 调试扩展和源码映射；此处未提供完整 Swift
 调试器，可参考 [Swift Wasm 调试说明](https://book.swiftwasm.org/getting-started/debugging.html)。
@@ -140,10 +140,10 @@ npm run dev
 ## 可重复验证
 
 ```bash
-swift test --package-path GuavaUI/Portable
-swift test --package-path GuavaUI/Text # 先构建原生字体依赖，见 ../Text/README.md
-swift build --package-path GuavaUI/Portable
-cd GuavaUI/Browser
+swift test --package-path CoveUI/Portable
+swift test --package-path CoveUI/Text # 先构建原生字体依赖，见 ../Text/README.md
+swift build --package-path CoveUI/Portable
+cd CoveUI/Browser
 npm run build
 npm run verify
 npm run verify:dev
@@ -167,11 +167,11 @@ Inspector 重连、缩放和原生 WebSocket。文字检查包含中文/Emoji �
 Chromium 选择硬件 GPU；默认无头模式会强制软件渲染。
 `--skip-native` 只验证浏览器，`--screenshot` 在严格模式保存 WebGPU 画面。
 `--dist .build/release-preview` 可对指定 release 构建目录执行相同验收。
-`GUAVA_CHROMIUM` 指定 Chromium 路径，`GUAVA_CHROMIUM_ARGS` 是附加启动参数的 JSON 数组。
+`COVE_CHROMIUM` 指定 Chromium 路径，`COVE_CHROMIUM_ARGS` 是附加启动参数的 JSON 数组。
 CI 覆盖共享字体、Linux/Windows Portable 和浏览器流程，并上传构建产物。
 
-仓库还提供手动触发的 `GuavaUI hardware WebGPU acceptance` 工作流。配置带
-`self-hosted, linux, x64, guava-webgpu` 标签、可用物理 GPU/驱动、Chromium 系统依赖及
+仓库还提供手动触发的 `CoveUI hardware WebGPU acceptance` 工作流。配置带
+`self-hosted, linux, x64, cove-webgpu` 标签、可用物理 GPU/驱动、Chromium 系统依赖及
 CMake/Ninja/Node 的 runner 后，从 Actions 手动运行，它会严格检查适配器和
 文字/几何像素，保存日志与 WebGPU 截图。
 
@@ -192,11 +192,11 @@ WebGPU submission remains owned by JavaScript.
 
 `npm run verify -- --native-only` validates the real native WebSocket host and
 Inspector without building Wasm or requiring a GPU. Install Chromium
-and build `GuavaUIDevToolsProbe` first. Full `npm run verify` additionally exercises the
+and build `CoveUIDevToolsProbe` first. Full `npm run verify` additionally exercises the
 Wasm renderer and input pipeline.
 
-For a live macOS GPU/mirror check, run `GUAVA_DEVTOOLS=1 swift run --package-path
-GuavaUI/Examples GuavaUIDemo --shared-counter` from the repository root, then
+For a live macOS GPU/mirror check, run `COVE_DEVTOOLS=1 swift run --package-path
+CoveUI/Examples CoveUIDemo --shared-counter` from the repository root, then
 `npm run verify:native-demo`. This checks live State values,
 actual padding-driven Yoga layout, CPU timeline spans, Metal mirror pixels and
 remote pointer input. The app remains running after the check.

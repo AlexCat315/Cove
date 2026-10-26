@@ -15,7 +15,7 @@ $watchdog = Start-Job -ArgumentList $outputDirectory, ([Math]::Max(1, $Timeout -
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
-public static class GuavaTestDump {
+public static class CoveTestDump {
     [DllImport("kernel32.dll")] static extern IntPtr OpenProcess(uint access, bool inherit, int pid);
     [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
     [DllImport("Dbghelp.dll", SetLastError=true)] static extern bool MiniDumpWriteDump(
@@ -34,7 +34,7 @@ public static class GuavaTestDump {
 }
 '@
     $processes = Get-CimInstance Win32_Process |
-        Where-Object { $_.Name -match 'swift|guava|Tests|GuavaPluginHost' }
+        Where-Object { $_.Name -match 'swift|cove|Tests|DiffusePluginHost' }
     $processes | Select-Object Name, ProcessId, ParentProcessId, CommandLine |
         ConvertTo-Json -Depth 3 | Set-Content -LiteralPath (Join-Path $directory 'processes.json')
     foreach ($process in $processes) {
@@ -43,8 +43,8 @@ public static class GuavaTestDump {
             $events = if ($Matches[1]) { $Matches[1] } else { $Matches[2] }
             if (Test-Path -LiteralPath $events) { Copy-Item -LiteralPath $events -Destination (Join-Path $directory "events-$($process.ProcessId).jsonl") }
         }
-        if ($process.Name -match 'Tests.*\.exe$|GuavaPluginHost\.exe$') {
-            try { [GuavaTestDump]::Write($process.ProcessId, (Join-Path $directory "$($process.ProcessId).dmp")) }
+        if ($process.Name -match 'Tests.*\.exe$|DiffusePluginHost\.exe$') {
+            try { [CoveTestDump]::Write($process.ProcessId, (Join-Path $directory "$($process.ProcessId).dmp")) }
             catch { $_ | Out-String | Add-Content -LiteralPath (Join-Path $directory 'dump-errors.txt') }
         }
     }
@@ -53,7 +53,7 @@ $arguments = @('test', $Package, '--no-parallel', '--testing-library', $Library,
 if ($SkipBuild) { $arguments += '--skip-build' }
 if ($Library -eq 'swift-testing') { $arguments += @('--event-output', (Join-Path $outputDirectory 'events.jsonl')) }
 try {
-    & "$PSScriptRoot/../../guava.cmd" @arguments
+    & "$PSScriptRoot/../../cove.cmd" @arguments
     $result = $LASTEXITCODE
 } finally {
     Stop-Job $watchdog

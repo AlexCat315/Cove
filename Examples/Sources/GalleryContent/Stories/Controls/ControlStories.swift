@@ -1,6 +1,6 @@
 import Foundation
-import GuavaUI
-import GuavaUIRuntime
+import CoveUI
+import CoveUIRuntime
 
 struct ButtonStory: View {
     let options: GalleryOptions
@@ -124,7 +124,7 @@ struct ToggleStory: View {
 
 struct TextFieldStory: View {
     let options: GalleryOptions
-    @State private var name: TextBuffer = "GuavaUI"
+    @State private var name: TextBuffer = "CoveUI"
     @State private var password: TextBuffer = "correct horse"
     @State private var url: TextBuffer = "example.com"
     @State private var limited: TextBuffer = "Hello"
@@ -241,7 +241,7 @@ struct SelectStory: View {
 
 struct JsonStory: View {
     let options: GalleryOptions
-    @State private var json: TextBuffer = "{\"name\":\"Guava\",\"enabled\":true,\"version\":1}"
+    @State private var json: TextBuffer = "{\"name\":\"Cove\",\"enabled\":true,\"version\":1}"
     var body: some View {
         StorySection("Structured input", "Format valid JSON, try a syntax error, then revert to the original value.") {
             JsonField(text: $json, isEnabled: options.isEnabled).frame(maxWidth: 520)

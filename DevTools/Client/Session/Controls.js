@@ -38,7 +38,7 @@ function clearSessionViews() {
   context.session.timing.timingFrames = [];
   context.elements.tree.treeCount.textContent = "";
   context.elements.tree.tree.className = "tree empty";
-  context.elements.tree.tree.textContent = "Connect to a GuavaUI app to inspect the live node tree.";
+  context.elements.tree.tree.textContent = "Connect to a CoveUI app to inspect the live node tree.";
   context.tree.renderDetails(null);
   context.runtime.renderRuntime(null);
   context.elements.timing.timing.className = "details empty";

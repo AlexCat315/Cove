@@ -1,9 +1,9 @@
 import Foundation
 import Testing
-import GuavaUIComposeCore
+import CoveUIComposeCore
 import CounterExample
-import GuavaUIDevToolsScene
-import GuavaUIDevToolsProtocol
+import CoveUIDevToolsScene
+import CoveUIDevToolsProtocol
 
 private func find(_ node: Node, _ name: String) -> Node? {
     if node.attachments[LayoutDebugAttachmentKey.debugName] as? String == name { return node }

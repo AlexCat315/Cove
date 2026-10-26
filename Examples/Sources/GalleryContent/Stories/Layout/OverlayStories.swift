@@ -1,5 +1,5 @@
-import GuavaUI
-import GuavaUIRuntime
+import CoveUI
+import CoveUIRuntime
 
 struct MenuStory: View {
     let options: GalleryOptions
@@ -147,8 +147,8 @@ struct TabsStory: View {
     let options: GalleryOptions
     @State private var selection = "overview"
     @State private var segment = "day"
-    @State private var documents = ["Scene.guava", "Material.guava", "Notes.md"]
-    @State private var documentSelection = "Scene.guava"
+    @State private var documents = ["Scene.cove", "Material.cove", "Notes.md"]
+    @State private var documentSelection = "Scene.cove"
     var body: some View {
         Box(direction: .column, alignItems: .stretch, spacing: 24) {
             StorySection("Content tabs", "The selected tab stays visible. More tabs lists hidden pages. Arrow keys, Home and End reach every enabled tab; long titles retain their full tooltip and name.") {

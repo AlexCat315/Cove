@@ -5,7 +5,7 @@ internal import ToolSupport
 /// launched CLI session and prove the DevTools endpoint rejects unauthenticated
 /// clients while serving one real session per platform.
 enum DevelopmentSession {
-  static let usage = "guava-dev devtools session PROJECT mac|android"
+  static let usage = "cove-dev devtools session PROJECT mac|android"
 
   static func run(_ arguments: [String]) throws {
     if arguments.contains("-h") || arguments.contains("--help") {
@@ -20,7 +20,7 @@ enum DevelopmentSession {
   }
 
   private static func verify(project: URL, platform: String) throws {
-    let folder = project.appendingPathComponent(".guava/build/devtools")
+    let folder = project.appendingPathComponent(".cove/build/devtools")
     let entries: [URL]
     do {
       entries = try FileManager.default.contentsOfDirectory(
@@ -136,7 +136,7 @@ enum DevelopmentSession {
           "Incomplete log record")
       }
       try require(
-        records.contains { $0["label"] as? String == "com.guava.engine.rhi" },
+        records.contains { $0["label"] as? String == "com.cove.engine.rhi" },
         "Engine logs did not join the application journal")
       try require(
         (try await request("log.unsubscribe"))["type"] as? String == "log.unsubscribe.ok",

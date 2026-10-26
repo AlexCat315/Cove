@@ -1,0 +1,23 @@
+{
+  "application" : {
+    "id" : "com.cove.mobile",
+    "name" : "CoveUI Mobile"
+  },
+  "targets" : {
+    "desktopHelpers" : [
+
+    ],
+    "platforms" : [
+      "ios",
+      "android",
+      "mac"
+    ]
+  },
+  "toolchain" : {
+    "sdkVersion" : "0.1.14"
+  },
+  "version" : {
+    "build" : 1,
+    "name" : "0.1.0"
+  }
+}

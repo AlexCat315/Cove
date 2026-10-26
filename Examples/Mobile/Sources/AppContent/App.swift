@@ -1,7 +1,7 @@
-import GuavaUI
+import CoveUI
 
 /// Desktop and mobile hosts install this shared root once per application session.
-/// Preview it as a phone on desktop with `GUAVA_PREVIEW_DEVICE=phone guava run`.
+/// Preview it as a phone on desktop with `COVE_PREVIEW_DEVICE=phone cove run`.
 public func makeApplicationContent() -> some View { RootView() }
 
 enum Tab: Hashable { case today, projects, settings }

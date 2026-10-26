@@ -1,4 +1,4 @@
-> Historical migration report: the WGPU reference and its commands were retired. Use `swift run --package-path Tools/Developer guava-dev gpu-regression run` and `NativeRHIPassProbe` for current NativeRHI validation. Measurements below describe the original comparison.
+> Historical migration report: the WGPU reference and its commands were retired. Use `swift run --package-path Tools/Developer cove-dev gpu-regression run` and `NativeRHIPassProbe` for current NativeRHI validation. Measurements below describe the original comparison.
 
 # NativeRenderer 粒子绘制与 GPU 压缩
 
@@ -20,16 +20,16 @@ Slang 的 SV_InstanceID 在 Metal/SPIR-V/DXIL 为批次内编号，Native shader
 
 `NativeParticleTests` 的实际 GPU 回读检查 131→399→7 个候选的稳定压缩、分块边界、扩容与缩小，并逐批检查 vertexCount、instanceCount、firstVertex、firstInstance 和整个有效 instance 字节。
 
-26 个连续 RGB 对照帧覆盖 alpha/additive 混合、真实 BMP 解码、UV rect、旋转、速度对齐、ribbon 宽度/颜色/alpha/重复 V、fallback、缺失纹理恢复后的重试、深度遮挡、批次重排、400 个新增交错批次、清空/恢复、viewport 扩容/缩小、正交相机、HDR Bloom/TAA/FXAA、opaque cache hit 和错误输入恢复。关键参数必须改变实际像素；此本机测试序列全部 RGB 像素相同。原始图像在 `/tmp/guava-native-particles`。另有实际 Metal 窗口的六帧呈现、缩放与错误恢复检查。
+26 个连续 RGB 对照帧覆盖 alpha/additive 混合、真实 BMP 解码、UV rect、旋转、速度对齐、ribbon 宽度/颜色/alpha/重复 V、fallback、缺失纹理恢复后的重试、深度遮挡、批次重排、400 个新增交错批次、清空/恢复、viewport 扩容/缩小、正交相机、HDR Bloom/TAA/FXAA、opaque cache hit 和错误输入恢复。关键参数必须改变实际像素；此本机测试序列全部 RGB 像素相同。原始图像在 `/tmp/cove-native-particles`。另有实际 Metal 窗口的六帧呈现、缩放与错误恢复检查。
 
 本机相关检查：85 项 NativeRHI XCTest、32 项 NativeRenderer XCTest、44 项 shader catalog/生产 GPU Swift Testing 均通过；纹理恢复和 runtime ABI guard 调整后，3 项 NativeParticleTests 再次通过。Slang 工具链 5 项检查及 Swift maintainability 检查通过，既有 46 项超限指标没有增加。
 
 ```sh
-GUAVA_WGPU_BACKEND=metal GUAVA_RUN_GPU_SMOKE_TESTS=1 \
+COVE_WGPU_BACKEND=metal COVE_RUN_GPU_SMOKE_TESTS=1 \
 SLANGC="$PWD/Engine/vendor/slang/bin/slangc" \
 swift test --package-path Engine --jobs 4 \
   --filter 'NativeRHITests\.|NativeRendererTests\.|ShaderCatalogTests|RenderBackendGPUSmokeTests'
-swift run --package-path Tools/Developer guava-dev maintainability --report
+swift run --package-path Tools/Developer cove-dev maintainability --report
 SLANGC="$PWD/Engine/vendor/slang/bin/slangc" swift test --package-path Tools/Developer --filter ShaderToolchainTests
 ```
 
@@ -39,9 +39,9 @@ SLANGC="$PWD/Engine/vendor/slang/bin/slangc" swift test --package-path Tools/Dev
 
 ```sh
 swift build -c release --package-path Engine --product NativeRHIPassProbe --jobs 4
-GUAVA_WGPU_BACKEND=metal Engine/.build/release/NativeRHIPassProbe \
+COVE_WGPU_BACKEND=metal Engine/.build/release/NativeRHIPassProbe \
   --scene particles --width 1920 --height 1080 --frames 180 --warmup 30 --repeats 3 \
-  --output /tmp/guava-native-particles-1080
+  --output /tmp/cove-native-particles-1080
 ```
 
 Apple M1 本机 Release，验证关闭，30 帧预热、3×180 帧测量：
@@ -61,4 +61,4 @@ Apple M1 本机 Release，验证关闭，30 帧预热、3×180 帧测量：
 
 ## 默认切换前剩余范围
 
-GPU 模拟绘制的 appearance/curves、GPU sorting、texture-sheet playback、trail/instance conversion、resident emitter state、spawn/compact、force/noise/collision、events/readback 和 reset 生命周期已接入，详见 [模拟验证](NATIVE_PARTICLE_SIMULATION_VALIDATION.md)。Editor/GuavaUI 纹理/命令互操作及 DXIL 产物也仍未完成。默认保持 WGPU；完整功能、画面对照与性能验证通过后再切换默认并移除 WGPU。
+GPU 模拟绘制的 appearance/curves、GPU sorting、texture-sheet playback、trail/instance conversion、resident emitter state、spawn/compact、force/noise/collision、events/readback 和 reset 生命周期已接入，详见 [模拟验证](NATIVE_PARTICLE_SIMULATION_VALIDATION.md)。Editor/CoveUI 纹理/命令互操作及 DXIL 产物也仍未完成。默认保持 WGPU；完整功能、画面对照与性能验证通过后再切换默认并移除 WGPU。

@@ -1,4 +1,4 @@
-> Historical migration report: the WGPU reference and its commands were retired. Use `swift run --package-path Tools/Developer guava-dev gpu-regression run` and `NativeRHIPassProbe` for current NativeRHI validation. Measurements below describe the original comparison.
+> Historical migration report: the WGPU reference and its commands were retired. Use `swift run --package-path Tools/Developer cove-dev gpu-regression run` and `NativeRHIPassProbe` for current NativeRHI validation. Measurements below describe the original comparison.
 
 # NativeRHI 编辑器网格 pass
 
@@ -39,7 +39,7 @@ Packet 的 `renderSettings.enableEditorGrid` 决定是否绘制，spacing、相�
 
 ```sh
 SLANGC="$PWD/Engine/vendor/slang/bin/slangc" \
-  swift run --package-path Tools/Developer guava-dev shader rebuild
+  swift run --package-path Tools/Developer cove-dev shader rebuild
 ```
 
 Bundled Metal 产物省略 `#line`，不会嵌入开发机器的绝对路径。DXIL 可在具有 DXC/dxcompiler 的环境中通过 `--targets dxil` 生成；本轮未生成或验证 DX12 renderer shader，缺失时会明确报错。
@@ -50,11 +50,11 @@ Bundled Metal 产物省略 `#line`，不会嵌入开发机器的绝对路径。D
 
 ```sh
 export SLANGC="$PWD/Engine/vendor/slang/bin/slangc"
-export GUAVA_RUN_GPU_SMOKE_TESTS=1
-export GUAVA_WGPU_BACKEND=metal
+export COVE_RUN_GPU_SMOKE_TESTS=1
+export COVE_WGPU_BACKEND=metal
 swift test --package-path Engine --jobs 4 \
   --filter 'NativeRHITests\.|NativeRendererTests\.|RenderThreadTests|RenderCameraMatricesTests|editorGrid'
-swift run --package-path Tools/Developer guava-dev maintainability
+swift run --package-path Tools/Developer cove-dev maintainability
 swift test --package-path Tools/Developer --filter ShaderToolchainTests
 ```
 
@@ -63,10 +63,10 @@ WGPU reference 检查启用 WGPU validation。原生 Windows/Linux Vulkan 与 DX
 ## 性能测量
 
 ```sh
-GUAVA_WGPU_BACKEND=metal \
+COVE_WGPU_BACKEND=metal \
 swift run -c release --package-path Engine --jobs 4 NativeRHIPassProbe \
   --width 1280 --height 720 --frames 180 --warmup 30 --repeats 3 \
-  --output /tmp/guava-native-grid-720
+  --output /tmp/cove-native-grid-720
 ```
 
 1080p 使用 `--width 1920 --height 1080`。工具导出 `report.json` 和三张 PPM 实际读回画面；像素偏差超限会使工具退出失败。WGPU reference 只执行相同的一个网格 pass，不启用原 renderer 的其他 pass 或 opaque cache。

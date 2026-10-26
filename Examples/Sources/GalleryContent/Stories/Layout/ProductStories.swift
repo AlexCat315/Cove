@@ -1,6 +1,6 @@
 import Foundation
-import GuavaUI
-import GuavaUIRuntime
+import CoveUI
+import CoveUIRuntime
 
 struct RadioStory: View {
     let options: GalleryOptions

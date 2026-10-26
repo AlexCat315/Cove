@@ -1,7 +1,7 @@
 import Foundation
 import Testing
-import GuavaUICompose
-import GuavaUIRuntime
+import CoveUICompose
+import CoveUIRuntime
 @testable import GalleryContent
 
 @Suite("Image story layout", .serialized)

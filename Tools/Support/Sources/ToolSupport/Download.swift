@@ -88,7 +88,7 @@ public enum Download {
         return
       }
       let staging = destination.deletingLastPathComponent().appendingPathComponent(
-        ".guava-download-\(UUID().uuidString)")
+        ".cove-download-\(UUID().uuidString)")
       do {
         // URLSession's temporary directory may be on a different volume.
         // Copy while its callback owns the file, then publish the sibling staging file.

@@ -1,0 +1,22 @@
+{
+  "application": {
+    "id": "com.cove.gallery",
+    "name": "CoveUI Gallery"
+  },
+  "version": {
+    "name": "0.1.0",
+    "build": 1
+  },
+  "toolchain": {
+    "sdkVersion": "0.1.14"
+  },
+  "targets": {
+    "platforms": [
+      "mac",
+      "win",
+      "linux",
+      "ios"
+    ],
+    "desktopExecutable": "CoveUIDemo"
+  }
+}

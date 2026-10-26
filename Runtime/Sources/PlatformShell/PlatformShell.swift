@@ -1,6 +1,6 @@
 import Foundation
-import GuavaLogging
-import GuavaPlatformCore
+import CoveLogging
+import CovePlatformCore
 
 #if os(macOS)
 import AppKit

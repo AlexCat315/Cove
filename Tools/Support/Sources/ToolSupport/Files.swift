@@ -1,5 +1,5 @@
 public import Foundation
-private import GuavaFileSystem
+private import CoveFileSystem
 
 public enum Fs {
   public static func directory(_ url: URL) throws {

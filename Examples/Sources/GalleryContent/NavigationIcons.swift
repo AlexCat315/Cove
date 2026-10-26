@@ -1,5 +1,5 @@
-import GuavaUI
-import GuavaUIRuntime
+import CoveUI
+import CoveUIRuntime
 
 extension GalleryPage {
     /// One icon per page, so neighbouring sidebar rows stay distinguishable;

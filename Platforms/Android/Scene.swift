@@ -1,7 +1,7 @@
 import Foundation
-public import GuavaUICompose
-public import GuavaUIRuntime
-import GuavaUIDevTools
+public import CoveUICompose
+public import CoveUIRuntime
+import CoveUIDevTools
 
 /// Compose, input and font ownership for a native Android surface host.
 /// Application content supplies a View; the platform adapter supplies surface frames.

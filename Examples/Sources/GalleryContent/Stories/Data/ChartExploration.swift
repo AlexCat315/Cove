@@ -1,5 +1,5 @@
 import Foundation
-import GuavaUI
+import CoveUI
 
 struct ChartExplorationStory: View {
     @State private var range: ClosedRange<Float>?

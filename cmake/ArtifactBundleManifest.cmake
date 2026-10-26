@@ -1,6 +1,6 @@
-set(GUAVA_MANIFEST_WRITER "${CMAKE_CURRENT_LIST_DIR}/WriteArtifactBuildManifest.cmake")
+set(COVE_MANIFEST_WRITER "${CMAKE_CURRENT_LIST_DIR}/WriteArtifactBuildManifest.cmake")
 
-function(guava_git_revision OUT_VAR SOURCE_DIR)
+function(cove_git_revision OUT_VAR SOURCE_DIR)
     execute_process(
         COMMAND git -C "${SOURCE_DIR}" rev-parse HEAD
         OUTPUT_VARIABLE _revision
@@ -15,7 +15,7 @@ function(guava_git_revision OUT_VAR SOURCE_DIR)
     endif()
 endfunction()
 
-function(guava_add_artifact_build_manifest)
+function(cove_add_artifact_build_manifest)
     set(_one_value_args
         ARTIFACT_NAME
         VERSION
@@ -37,13 +37,13 @@ function(guava_add_artifact_build_manifest)
     cmake_parse_arguments(ARG "" "${_one_value_args}" "${_multi_value_args}" ${ARGN})
 
     if(NOT ARG_ARTIFACT_NAME)
-        message(FATAL_ERROR "guava_add_artifact_build_manifest requires ARTIFACT_NAME")
+        message(FATAL_ERROR "cove_add_artifact_build_manifest requires ARTIFACT_NAME")
     endif()
     if(NOT ARG_BUNDLE_DIR)
-        message(FATAL_ERROR "guava_add_artifact_build_manifest requires BUNDLE_DIR")
+        message(FATAL_ERROR "cove_add_artifact_build_manifest requires BUNDLE_DIR")
     endif()
     if(NOT ARG_LIB_REL_PATH)
-        message(FATAL_ERROR "guava_add_artifact_build_manifest requires LIB_REL_PATH")
+        message(FATAL_ERROR "cove_add_artifact_build_manifest requires LIB_REL_PATH")
     endif()
 
     if(NOT ARG_CONFIGURATION)
@@ -93,7 +93,7 @@ function(guava_add_artifact_build_manifest)
             "-DC_FLAGS_RELEASE=${ARG_C_FLAGS_RELEASE}"
             "-DCXX_FLAGS_RELEASE=${ARG_CXX_FLAGS_RELEASE}"
             "-DNOTES=${ARG_NOTES}"
-            -P "${GUAVA_MANIFEST_WRITER}"
+            -P "${COVE_MANIFEST_WRITER}"
         DEPENDS ${ARG_DEPENDS}
         VERBATIM
         COMMENT "Writing build manifest for ${ARG_ARTIFACT_NAME}"

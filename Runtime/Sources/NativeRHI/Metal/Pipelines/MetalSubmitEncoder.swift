@@ -8,7 +8,7 @@
 #if canImport(Metal)
 import Metal
 import Foundation
-import GuavaLogging
+import CoveLogging
 
 extension MetalDevice {
     public func submit(_ submit: PlannedSubmit, cpuProfile: SubmissionCPUProfile? = nil, completion: @escaping () -> Void) throws {
@@ -50,7 +50,7 @@ extension MetalDevice {
         commandBuffer.addCompletedHandler { buffer in
             if let error = buffer.error {
                 status.record(error.localizedDescription)
-                LogSystem.logger("com.guava.engine.rhi").error("Metal submission failed", metadata: ["detail": "\(error)"])
+                LogSystem.logger("com.cove.engine.rhi").error("Metal submission failed", metadata: ["detail": "\(error)"])
             }
             callback.call()
         }

@@ -1,4 +1,4 @@
-import GuavaUI
+import CoveUI
 
 struct MarkdownStory: View {
     @State private var lastOpened = "none"
@@ -7,7 +7,7 @@ struct MarkdownStory: View {
     static let document = """
     # Release notes
 
-    GuavaUI **0.10** brings *rich text* to every surface. Paragraphs mix `inline code`, \
+    CoveUI **0.10** brings *rich text* to every surface. Paragraphs mix `inline code`, \
     ~~old names~~ and [links](https://github.com/swiftlang/swift-markdown) in one flow, and \
     long lines wrap at the container width.
 
@@ -43,9 +43,9 @@ struct MarkdownStory: View {
 
     static let compact = """
     ### Install
-    Run `guava build` then open the **Gallery**:
+    Run `cove build` then open the **Gallery**:
     ```sh
-    guava run GuavaUI/Examples --mac --devtools -- --component markdown --width 390
+    cove run CoveUI/Examples --mac --devtools -- --component markdown --width 390
     ```
     """
 

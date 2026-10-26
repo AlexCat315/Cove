@@ -1,4 +1,4 @@
-import GuavaUI
+import CoveUI
 
 struct AdaptiveTableSample: View {
     let data: Bool

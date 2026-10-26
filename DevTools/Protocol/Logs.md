@@ -1,6 +1,6 @@
 # Log stream
 
-Capability: `log`. Hosts use `GuavaLogCore.LogRecord` unchanged on native and Wasm transports. Logging works independently of an Inspector connection.
+Capability: `log`. Hosts use `CoveLogCore.LogRecord` unchanged on native and Wasm transports. Logging works independently of an Inspector connection.
 
 `log.subscribe` accepts an optional LogQuery: `{minimum:"warning", labels:["com.example"], text:"save", afterSequence:42}`. Omitted fields use trace/empty/empty/no cursor. Labels match an exact module or a descendant path segment; text searches message, label, metadata and location. The reply is `log.snapshot` with `{records, dropped, firstAvailableSequence}`. Native replay is bounded to the newest 200 matches and 512 KiB. The cursor filters a single process's sequence, and the snapshot's dropped count is the cumulative producer queue loss.
 

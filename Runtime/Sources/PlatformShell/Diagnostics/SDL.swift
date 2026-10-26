@@ -1,5 +1,5 @@
 private import CSDL3
-import GuavaLogging
+import CoveLogging
 
 func installSDLLogging() {
     SDL_SetLogOutputFunction({ _, category, priority, message in
@@ -12,7 +12,7 @@ func installSDLLogging() {
         case SDL_LOG_PRIORITY_CRITICAL: level = .critical
         default: level = .info
         }
-        LogSystem.logger("com.guava.engine.sdl").log(level: level,
+        LogSystem.logger("com.cove.engine.sdl").log(level: level,
             "\(message.map(String.init(cString:)) ?? "")", metadata: ["category": "\(category)"], source: "SDL")
     }, nil)
 }

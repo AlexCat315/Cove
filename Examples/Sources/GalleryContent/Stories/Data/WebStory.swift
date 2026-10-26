@@ -1,8 +1,8 @@
 #if os(macOS) && canImport(WebKit)
 import AppKit
 import Foundation
-import GuavaUI
-import GuavaUIWebView
+import CoveUI
+import CoveUIWebView
 
 /// A real WKWebView hosted above the composed surface. The composed side owns
 /// the frame, clipping and navigation controls; WebKit owns the page.
@@ -14,7 +14,7 @@ struct WebStory: View {
             switch self {
             case .local: "Offline sample"
             case .example: "example.com"
-            case .repository: "GuavaStudio on GitHub"
+            case .repository: "Diffuse on GitHub"
             }
         }
     }
@@ -35,7 +35,7 @@ struct WebStory: View {
         case .example:
             .url(URL(string: "https://example.com")!)
         case .repository:
-            .url(URL(string: "https://github.com/AlexCat315/GuavaStudio")!)
+            .url(URL(string: "https://github.com/AlexCat315/Diffuse")!)
         }
     }
 
@@ -104,7 +104,7 @@ struct WebStory: View {
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1">
-      <title>GuavaUI WebView</title>
+      <title>CoveUI WebView</title>
       <style>
         :root { color-scheme: light dark; }
         * { box-sizing: border-box; }
@@ -142,10 +142,10 @@ struct WebStory: View {
     </head>
     <body>
       <main>
-        <div class="eyebrow">GuavaUI · WKWebView</div>
+        <div class="eyebrow">CoveUI · WKWebView</div>
         <h1>Real HTML, inside a composed window.</h1>
         <p class="muted">
-          This page is rendered by WebKit and clipped to the frame measured by GuavaUI.
+          This page is rendered by WebKit and clipped to the frame measured by CoveUI.
           Scroll the gallery and the native view follows the node.
         </p>
         <div class="card">
@@ -159,7 +159,7 @@ struct WebStory: View {
           Use the sample selector above to load a remote page. Back and Forward
           follow the browser's history between those top-level loads.
         </p>
-        <footer>WKWebView is a native subview; it is deliberately not part of GuavaUI's DrawList.</footer>
+        <footer>WKWebView is a native subview; it is deliberately not part of CoveUI's DrawList.</footer>
       </main>
       <script>
         let taps = 0;
@@ -174,7 +174,7 @@ struct WebStory: View {
     """
 }
 #else
-import GuavaUI
+import CoveUI
 
 struct WebStory: View {
     var body: some View {

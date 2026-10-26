@@ -1,8 +1,8 @@
-> Historical migration report: the WGPU reference and its commands were retired. Use `swift run --package-path Tools/Developer guava-dev gpu-regression run` and `NativeRHIPassProbe` for current NativeRHI validation. Measurements below describe the original comparison.
+> Historical migration report: the WGPU reference and its commands were retired. Use `swift run --package-path Tools/Developer cove-dev gpu-regression run` and `NativeRHIPassProbe` for current NativeRHI validation. Measurements below describe the original comparison.
 
 # NativeRHI UI 迁移验证
 
-默认 UI 和 renderer 当前仍使用 WGPU。GuavaUIRuntime 已新增 `NativeDrawListRenderer`，直接消费现有 DrawList，在调用方管理的 NativeRHI frame / command buffer 内上传和绘制。Metal 的独立 UI、生产场景＋ViewportHost 与游戏内 HUD 对照已通过。NativeRHI 已提供多个窗口的 swapchain 所有权与帧协调，GuavaUI `Application` 现在支持可选的 `.native(Device)` 路径；Editor／Player 默认仍显式选择 WGPU。
+默认 UI 和 renderer 当前仍使用 WGPU。CoveUIRuntime 已新增 `NativeDrawListRenderer`，直接消费现有 DrawList，在调用方管理的 NativeRHI frame / command buffer 内上传和绘制。Metal 的独立 UI、生产场景＋ViewportHost 与游戏内 HUD 对照已通过。NativeRHI 已提供多个窗口的 swapchain 所有权与帧协调，CoveUI `Application` 现在支持可选的 `.native(Device)` 路径；Editor／Player 默认仍显式选择 WGPU。
 
 ## 已实现的基础能力
 
@@ -34,13 +34,13 @@
 - 错误 resolve extent、format、source samples、资源 alias、pipeline samples 以及 MSAA upload/readback/buffer copy 被拒绝。之后同一 frame 提交有效 clear/resolve，结果正确。
 - 平台无关的附件验证与边界溢出检查，以及 resolve 后跨 queue 采样的 release/acquire、timeline 依赖。
 - Recorded buffer upload 覆盖四种格式、非零 buffer offset、padded rows、非零 origin、多个 mip/layer；六个 subresources 的全部字节保持预期。非法 buffer range、row pitch、mip/layer 与 origin 被拒绝，同一 frame 随后有效提交成功。
-- 真实 GuavaUI DrawList 与 WGPU 同时绘制系统字体的 `Hello 中🙂`、color glyph、圆角与描边、半透明重叠、tinted / cropped images、image mask、缺失图片 fallback、初次局部 R8 纹理、连续 color patches、嵌套 fractional scissor、空 scissor，以及非零 firstIndex。
+- 真实 CoveUI DrawList 与 WGPU 同时绘制系统字体的 `Hello 中🙂`、color glyph、圆角与描边、半透明重叠、tinted / cropped images、image mask、缺失图片 fallback、初次局部 R8 纹理、连续 color patches、嵌套 fractional scissor、空 scissor，以及非零 firstIndex。
 - 1.5× 缩放下，两个轴、clip 起点／终点、四种分数坐标、1/4 samples，共 32 组接近整数像素边界的裁剪对照完全一致。正常数值沿用既有 Float 运算舍入；Float 溢出时使用 Double 回退，仍在转 Int 前钳制。
 - RGBA8、BGRA8、两种 sRGB 及 RGBA16Float × 1/4 samples × 160×120、320×240、240×120，共 30 组逐通道 readback。8-bit 最大误差 1，HDR 最大误差 0.00048828125；没有超过容差（3 / 0.002）的通道。实际 BGRA sRGB 4× 画面也经可视检查。
 - 资源生命周期覆盖 no-active-frame、录制放弃、submit 失败、提交期间后续 patch、重复旧 token 确认、resize / unregister / sibling sync、外部图片在 asynchronous submit 期间释放、跨设备拒绝与失败 configure 后继续使用原管线。8 帧不等待 idle 的双 renderer 绘制覆盖不同 logical viewport、超过 4 MiB 的 vertex upload chunk 和 frame-ring 复用。
 - 非有限 vertex / scissor、错误 indices / batch ranges 与溢出 viewport 不留下部分 commands；超大有限 scissor 可安全钳制。失败 font registration 保留 atlas dirty state。
 
-本轮 NativeRHI 101 项 XCTest、NativeRenderer 39 项 XCTest、GuavaUI 全包测试与 shader 工具链 8 项测试通过。Swift maintainability 检查通过，现有 46 项超限指标未增加。
+本轮 NativeRHI 101 项 XCTest、NativeRenderer 39 项 XCTest、CoveUI 全包测试与 shader 工具链 8 项测试通过。Swift maintainability 检查通过，现有 46 项超限指标未增加。
 
 ## 场景 viewport 与快照所有权
 
@@ -58,16 +58,16 @@ ViewportHost 使用 `addClampedImageQuad`，九个相邻区域合并成一个 dr
 - 原生和 WGPU surface 保留 40 次纹理替换后、renderer 销毁后的首张图像；实际 readback 保持原值。scene shrink 保持资源身份，growth 替换，分配成功但 beginFrame 失败时仍发布上一张成功图像。RenderThread report 跨线程保留同一个 image lease。
 - 两张不同 producer、相同 surfaceID 的红／绿图片，在 snapshot restore 后同时绘制；删除源 surface、CPU list 和 registry bindings 后，frame token 仍能提交正确画面。prune 不产生悬空资源。COW / translated layer append、empty geometry、snapshot channel 和 reset / load 都保留并按时释放 lease。
 
-本阶段 NativeRHI 101 项、NativeRenderer 原有 39 项及新增 4 项 XCTest 通过；GuavaUI、Portable 与 Editor 全包测试通过，并运行了 RenderThread 与生产 WGPU GPU smoke。Swift 结构检查仍为 46 项既有超限指标，WGPURenderer 的 stored property allowance 从 124 收紧到 118。集成误差记录见 [viewport Metal 报告](benchmarks/native-viewport-m1.json)。
+本阶段 NativeRHI 101 项、NativeRenderer 原有 39 项及新增 4 项 XCTest 通过；CoveUI、Portable 与 Editor 全包测试通过，并运行了 RenderThread 与生产 WGPU GPU smoke。Swift 结构检查仍为 46 项既有超限指标，WGPURenderer 的 stored property allowance 从 124 收紧到 118。集成误差记录见 [viewport Metal 报告](benchmarks/native-viewport-m1.json)。
 
 Windows/Linux 的 Vulkan 与 Windows 的 DX12 实现及对应测试入口已同步编写，本轮没有在这些平台编译或运行。macOS 不提供 Vulkan／MoltenVK 路径。
 
 ```sh
 SLANGC="$PWD/Engine/vendor/slang/bin/slangc" swift test --package-path Engine --jobs 4 \
   --filter 'NativeRHITests\.|NativeRendererTests\.'
-swift test --package-path GuavaUI --jobs 4
-SLANGC="$PWD/Engine/vendor/slang/bin/slangc" swift run --package-path Tools/Developer guava-dev shader rebuild --ui-only
-swift run --package-path Tools/Developer guava-dev maintainability --report
+swift test --package-path CoveUI --jobs 4
+SLANGC="$PWD/Engine/vendor/slang/bin/slangc" swift run --package-path Tools/Developer cove-dev shader rebuild --ui-only
+swift run --package-path Tools/Developer cove-dev maintainability --report
 ```
 
 ## 同等工作量的 release 性能
@@ -84,10 +84,10 @@ swift run --package-path Tools/Developer guava-dev maintainability --report
 Render pass 的 immutable binding set 在 planner 中只收集一次依赖；后续 pass 的 storage ordering 与跨 queue release/acquire 保持测试覆盖。Metal 绑定使用 visibility bitmask，资源查找／范围校验一次后绑定到所有所需 stages，避免逐 draw 构造 stage arrays。全部场景和 Metal 多 stage／mesh 回归通过。
 
 ```sh
-GUAVA_NATIVE_UI_BENCHMARK=1 swift test --package-path GuavaUI -c release --jobs 4 \
+COVE_NATIVE_UI_BENCHMARK=1 swift test --package-path CoveUI -c release --jobs 4 \
   --filter NativeDrawListBenchmarkTests
-# 产物默认写入 /tmp/guava-native-ui-benchmark。
-# 可用 GUAVA_NATIVE_UI_BENCHMARK_OUTPUT 指定绝对输出目录。
+# 产物默认写入 /tmp/cove-native-ui-benchmark。
+# 可用 COVE_NATIVE_UI_BENCHMARK_OUTPUT 指定绝对输出目录。
 ```
 
 ## 游戏内 UI 接入
@@ -120,13 +120,13 @@ Native HUD encode p50 为 64.6–70.6 μs，WGPU 为 129.7–138.4 μs；scene C
 原始报告：[mesh 720p](benchmarks/native-hud-mesh-m1-720.json)、[mesh 1080p](benchmarks/native-hud-mesh-m1-1080.json)、[post 720p](benchmarks/native-hud-post-m1-720.json)、[post 1080p](benchmarks/native-hud-post-m1-1080.json)。
 
 ```sh
-GUAVA_NATIVE_HUD_BENCHMARK=1 swift test --package-path GuavaUI -c release \
+COVE_NATIVE_HUD_BENCHMARK=1 swift test --package-path CoveUI -c release \
   --filter NativeInGameUIBenchmarkTests
-# 产物写到 /tmp/guava-native-hud-benchmark；可用
-# GUAVA_NATIVE_HUD_BENCHMARK_OUTPUT 指定绝对目录。
+# 产物写到 /tmp/cove-native-hud-benchmark；可用
+# COVE_NATIVE_HUD_BENCHMARK_OUTPUT 指定绝对目录。
 ```
 
-NativeRHI 101 项、NativeRenderer 43 项、GuavaUI 全包及 Editor 受影响测试通过。Swift maintainability 仍为既有 46 项超限指标，没有增加。
+NativeRHI 101 项、NativeRenderer 43 项、CoveUI 全包及 Editor 受影响测试通过。Swift maintainability 仍为既有 46 项超限指标，没有增加。
 
 ## 拥有 CPU 像素的图片资产
 
@@ -144,7 +144,7 @@ GPU residency 弱引用 CPU asset，成功首次注册后复用纹理。clear �
 - 生产 mesh scene + InGameUIHost 的文件 SVG HUD：fit／fill、rounded clip、半透明色块、alpha mask，1× → 2× → 1.5× → 1×，四组 readback 与 WGPU 完全一致。AsyncImage 的实际文件由 main-thread scheduler 发布，再在 worker 线程录制 Native scene，实际红／绿像素正确。原始 [图片 HUD 对照](benchmarks/native-image-hud-parity-m1.json)。
 - SVG cache clear 后，未改变逻辑尺寸的 raster 取得新图，旧 retained geometry 仍保留原像素；评分 mask 的两张 CPU 图片随 draw list 保留。
 
-GuavaUI 和 Portable 全包通过，之后新增的缓存重置／worker-thread／sibling 回归单独通过。Editor 受影响测试及空闲环境下的串行全包通过。并行编译期间的两次全包运行分别出现 workspace preset 和 SourceKit retry fixture 的间歇性失败，相关单独测试与空闲全量复测通过；不据此修改这两处未变更的功能代码。Swift maintainability 仍为 46 项既有超限指标。
+CoveUI 和 Portable 全包通过，之后新增的缓存重置／worker-thread／sibling 回归单独通过。Editor 受影响测试及空闲环境下的串行全包通过。并行编译期间的两次全包运行分别出现 workspace preset 和 SourceKit retry fixture 的间歇性失败，相关单独测试与空闲全量复测通过；不据此修改这两处未变更的功能代码。Swift maintainability 仍为 46 项既有超限指标。
 
 图片 Release 性能使用 96 张独立 64×64 RGBA 图片，共 1,572,864 字节 CPU 像素，8,064 vertices、20,160 indices、96 draws。BGRA sRGB + 4× MSAA，logical 1280×720，物理 720p / 1080p；每条路径预热 30 帧、测量 3×180 帧，每三帧等待 GPU 完成。Native 首次上传 1,572,868 字节（含 white fallback），随后所有稳态帧上传为零。720p 预检逐像素一致，1080p 最大通道误差 1。
 
@@ -160,10 +160,10 @@ GuavaUI 和 Portable 全包通过，之后新增的缓存重置／worker-thread�
 这里仅测 renderer 的 steady-state 工作，不包含解码、首帧图片上传、UI 重组、窗口呈现；completed-batch 不是 GPU timestamp 或显示 FPS，三个批次样本的 p95 为最大批次值。
 
 ```sh
-GUAVA_NATIVE_IMAGE_BENCHMARK=1 swift test --package-path GuavaUI -c release \
+COVE_NATIVE_IMAGE_BENCHMARK=1 swift test --package-path CoveUI -c release \
   --filter NativeDrawListBenchmarkTests
-# 报告写到 /tmp/guava-native-ui-benchmark；可用
-# GUAVA_NATIVE_UI_BENCHMARK_OUTPUT 指定绝对目录。
+# 报告写到 /tmp/cove-native-ui-benchmark；可用
+# COVE_NATIVE_UI_BENCHMARK_OUTPUT 指定绝对目录。
 ```
 
 ## 配对性能采样与提交缓存
@@ -172,7 +172,7 @@ GUAVA_NATIVE_IMAGE_BENCHMARK=1 swift test --package-path GuavaUI -c release \
 
 Metal render encoder 现在缓存各 stage 的 buffer＋offset、texture 和 sampler 原生对象，只在绑定改变时调用 setter。每个绑定仍先解析并校验资源，push constant 覆盖会使相应 buffer slot 失效，新 render pass 使用新缓存。SubmissionPlanner 在单个 render／compute pass 内合并不同 binding set 对同一资源、同一状态的只读依赖；写入以及 vertex／index／indirect 用途切换会清除对应记录。AccessTracker 对已覆盖的读取保留原 RAW 结果，避免重写相同的读取历史；跨帧 RAW／WAR／WAW 结果保持原行为。
 
-2026-10-09 Apple M1：新增实际 Metal 像素测试验证反复绑定、texture／sampler 切换、buffer offset 改变、不同 pipeline 的 fragment push constant 覆盖，以及第二个 load pass 重新绑定。规划器测试验证 96 个不同 set 共享 uniform 的上传依赖、跨队列 release／acquire／timeline、随后写入，以及 buffer 用途切换。NativeRHI 106 项与 NativeRenderer 43 项 XCTest、GuavaUI 全包测试通过；两项 DrawList Release benchmark 在独立测量中运行。Swift maintainability 检查通过，46 项既有超限指标未增加。
+2026-10-09 Apple M1：新增实际 Metal 像素测试验证反复绑定、texture／sampler 切换、buffer offset 改变、不同 pipeline 的 fragment push constant 覆盖，以及第二个 load pass 重新绑定。规划器测试验证 96 个不同 set 共享 uniform 的上传依赖、跨队列 release／acquire／timeline、随后写入，以及 buffer 用途切换。NativeRHI 106 项与 NativeRenderer 43 项 XCTest、CoveUI 全包测试通过；两项 DrawList Release benchmark 在独立测量中运行。Swift maintainability 检查通过，46 项既有超限指标未增加。
 
 优化前的配对基线保留在 [图片 720p](benchmarks/native-ui-image-assets-m1-720-paired-baseline.json)、[图片 1080p](benchmarks/native-ui-image-assets-m1-1080-paired-baseline.json)、[控件 720p](benchmarks/native-ui-m1-720-paired-baseline.json)、[控件 1080p](benchmarks/native-ui-m1-1080-paired-baseline.json)。优化后的空闲测量和第二次确认结果：
 
@@ -201,9 +201,9 @@ Metal 每个窗口按 frame slot 复用有限的 texture ID，并通过 graphics
 
 2026-10-09 Apple M1 Metal 实测：两个真实 NSWindow／CAMetalLayer 连续 40 帧分别绘制红色和绿色，交替 present 顺序。在第 20 帧只 resize 第一个窗口，另一个窗口的尺寸、generation 和像素保持正确；两窗口 readback 全部像素符合预期。两个在途 frame slot 的纹理池最多保留四个 texture。非法格式 resize 保留原窗口；关闭第一个窗口后第二个继续获取／呈现，最后两个窗口的 registry 和图像池均释放。readback 测试单独关闭 framebufferOnly，生产路径仍启用它。
 
-可控 completion 测试覆盖并发帧准备、错误后解锁、延迟 present 阻止 frame slot 复用与资源退休、未呈现图像归还、相同图像 ID 的旧 ticket 拒绝、排队前失败重试，以及 close 的幂等和晚报错误清理。NativeRHI 114 项 XCTest 与 NativeRenderer 43 项 XCTest、GuavaUI 全包测试通过。GuavaUI 25 项 XCTest 中性能 benchmark 按默认设置跳过一项，其余没有失败；Runtime 222 项、Compose 504 项也通过。Editor 的共享 WGPU 生命周期回归和 GameRuntime 的真实 NativeRenderer Metal viewport 回归通过。Swift maintainability 检查通过，45 项既有超限指标未增加。DX12 的 macOS unavailable bridge 编译通过；Windows DX12 和 Windows/Linux Vulkan 的原生编译／运行验证仍暂缓，未引入 MoltenVK。
+可控 completion 测试覆盖并发帧准备、错误后解锁、延迟 present 阻止 frame slot 复用与资源退休、未呈现图像归还、相同图像 ID 的旧 ticket 拒绝、排队前失败重试，以及 close 的幂等和晚报错误清理。NativeRHI 114 项 XCTest 与 NativeRenderer 43 项 XCTest、CoveUI 全包测试通过。CoveUI 25 项 XCTest 中性能 benchmark 按默认设置跳过一项，其余没有失败；Runtime 222 项、Compose 504 项也通过。Editor 的共享 WGPU 生命周期回归和 GameRuntime 的真实 NativeRenderer Metal viewport 回归通过。Swift maintainability 检查通过，45 项既有超限指标未增加。DX12 的 macOS unavailable bridge 编译通过；Windows DX12 和 Windows/Linux Vulkan 的原生编译／运行验证仍暂缓，未引入 MoltenVK。
 
-这一步已把主／辅助窗口宿主和 EngineHost 场景线程接到可选 NativeRHI 路径。`Application.run(backend: .native(device))` 与 `EngineHost(renderDevice: .native(device))` 共用一个 Device，同时各自拥有 swapchain、resize、VSync 和 close 生命周期；WGPU 默认路径仍保留。EditorApp 和 GuavaPlayer 可通过 `--renderer native` 或 `GUAVA_RENDERER=native` 选择当前平台的 NativeRHI；也可显式指定 `metal`、`vulkan` 或 `dx12`，macOS 不启用 MoltenVK。Native 主／辅助窗口、共享设备的场景线程、Native/WGPU DevTools 截图、WGPU 默认多窗口回归和真实 GameApplication NativeRenderer viewport 均已在 Apple M1 通过。整个 Editor 的默认 backend 尚未切换，整个窗口 UI 的画面和呈现性能门槛仍未完成。
+这一步已把主／辅助窗口宿主和 EngineHost 场景线程接到可选 NativeRHI 路径。`Application.run(backend: .native(device))` 与 `EngineHost(renderDevice: .native(device))` 共用一个 Device，同时各自拥有 swapchain、resize、VSync 和 close 生命周期；WGPU 默认路径仍保留。EditorApp 和 CovePlayer 可通过 `--renderer native` 或 `COVE_RENDERER=native` 选择当前平台的 NativeRHI；也可显式指定 `metal`、`vulkan` 或 `dx12`，macOS 不启用 MoltenVK。Native 主／辅助窗口、共享设备的场景线程、Native/WGPU DevTools 截图、WGPU 默认多窗口回归和真实 GameApplication NativeRenderer viewport 均已在 Apple M1 通过。整个 Editor 的默认 backend 尚未切换，整个窗口 UI 的画面和呈现性能门槛仍未完成。
 
 ## 每次录制的常量与图片绑定
 
@@ -232,22 +232,22 @@ UI 的 logical viewport 和 sRGB 标志改用 16 字节顶点 push constants。s
 
 原始基线：[图片 720p](benchmarks/native-ui-image-assets-m1-720-recording-constants-baseline.json)、[图片 1080p](benchmarks/native-ui-image-assets-m1-1080-recording-constants-baseline.json)。首次报告：[图片 720p](benchmarks/native-ui-image-assets-m1-720-recording-constants.json)、[图片 1080p](benchmarks/native-ui-image-assets-m1-1080-recording-constants.json)、[控件 720p](benchmarks/native-ui-m1-720-recording-constants.json)、[控件 1080p](benchmarks/native-ui-m1-1080-recording-constants.json)。确认报告：[图片 720p](benchmarks/native-ui-image-assets-m1-720-recording-constants-confirmation.json)、[图片 1080p](benchmarks/native-ui-image-assets-m1-1080-recording-constants-confirmation.json)、[控件 720p](benchmarks/native-ui-m1-720-recording-constants-confirmation.json)、[控件 1080p](benchmarks/native-ui-m1-1080-recording-constants-confirmation.json)。
 
-GuavaUI 全包回归通过，随后修改的数组计数读取经 Release 的 11 项 draw-list 回归验证，变化几何的绑定复用测试另行通过。Slang 工具链 9 项测试通过，包括两个 UI 阶段在 Metal / SPIR-V 上的反射契约。Swift maintainability 检查通过，未增加既有超限指标。
+CoveUI 全包回归通过，随后修改的数组计数读取经 Release 的 11 项 draw-list 回归验证，变化几何的绑定复用测试另行通过。Slang 工具链 9 项测试通过，包括两个 UI 阶段在 Metal / SPIR-V 上的反射契约。Swift maintainability 检查通过，未增加既有超限指标。
 
 ## 真实 Editor 循环与整窗对照
 
-`swift run --package-path Tools/Developer guava-dev validate editor-loop` 现在默认显式选择 NativeRHI；`--renderer both` 顺序运行 NativeRHI / WGPU 的事件驱动和连续帧循环，并自动比较暂停后的整窗内容。临时 app、项目、布局和脚本信任与日常项目分开。Native 启动须出现 `NativeRenderer ready`，且不能出现 WGPU 初始化或任何渲染失败日志。监听端口可早于首帧布局／字体栅格化开放，脚本先取得非空窗口画面，再检查桥接的交互响应。
+`swift run --package-path Tools/Developer cove-dev validate editor-loop` 现在默认显式选择 NativeRHI；`--renderer both` 顺序运行 NativeRHI / WGPU 的事件驱动和连续帧循环，并自动比较暂停后的整窗内容。临时 app、项目、布局和脚本信任与日常项目分开。Native 启动须出现 `NativeRenderer ready`，且不能出现 WGPU 初始化或任何渲染失败日志。监听端口可早于首帧布局／字体栅格化开放，脚本先取得非空窗口画面，再检查桥接的交互响应。
 
 `get_runtime_state` 增加已提交帧的编号、可见网格数、draw count 和 viewport 有效性。脚本等待新帧、有效 viewport 和非零可见网格后才暂停截图，避免将已经更新的仿真实体数当作渲染完成。该检查发现 NativeRenderer 漏填 `visibleMeshInstanceCount`；现从相机 visibility plan 填写，与 WGPU 使用相同定义。剔除、LOD 和对照场景的统计回归覆盖此修复。
 
-2026-10-09 Apple M1 Debug 实测四个流程全部通过：独立 TCP 客户端、分段／流水线请求和非法 JSON 恢复；实际 Swift 编译、修改源码并热重载；Play → Pause → Stop → Play 的确定性重启；导出后在没有外部工具链的 PATH 下运行 GuavaPlayer，验证一个编译脚本、60 个实体和 120 个仿真帧。两条 renderer 在两种循环下均发布有效场景 viewport，游戏包含 56 个可见网格。
+2026-10-09 Apple M1 Debug 实测四个流程全部通过：独立 TCP 客户端、分段／流水线请求和非法 JSON 恢复；实际 Swift 编译、修改源码并热重载；Play → Pause → Stop → Play 的确定性重启；导出后在没有外部工具链的 PATH 下运行 CovePlayer，验证一个编译脚本、60 个实体和 120 个仿真帧。两条 renderer 在两种循环下均发布有效场景 viewport，游戏包含 56 个可见网格。
 
 两种循环的 1440×870 窗口对照均得到 RGB 平均字节误差 0.003259，超过 3 的像素为 37 / 1,252,800，多数位于文字边缘，最大字节误差 85。自动门槛为平均误差 <0.25、超过 3 的像素 <0.1%。这里是实际窗口 DrawList 通过所选 renderer 重新绘制并 readback 的质量 1 JPEG，包含同一 Device 的场景 viewport 和动态 Editor 文字；它补充组件的无损 readback 测试，不等同于系统 compositor 截图或呈现性能验证。[整窗与运行状态报告](benchmarks/native-editor-window-parity-m1.json)。
 
 ```sh
 swift build --package-path Editor --jobs 4
-swift build --package-path GuavaMcp --product GuavaMCP
-swift run --package-path Tools/Developer guava-dev validate editor-loop --renderer both
+swift build --package-path CoveMcp --product CoveMCP
+swift run --package-path Tools/Developer cove-dev validate editor-loop --renderer both
 # 默认检查两种循环；--mode event-driven / continuous 可单独检查。
 # 临时目录保留每条路径的启动／暂停 JPEG、渲染状态、比较报告和日志。
 ```
@@ -275,7 +275,7 @@ SubmissionPlanner 在注册不可变集合时预解析纹理／缓冲依赖和�
 
 720p 图片 CPU p50 两次略低于或接近 WGPU；1080p 图片仍高约 8%–20%，且第一次 completed-batch p95 高约 3.4%。普通控件 CPU 和所有 completed-batch p50 均更低。绝对 CPU 数值仍有调度波动，不据此宣称前后速度提升，也不宣称整个性能门槛通过。原始数据：[图片 720p](benchmarks/native-ui-image-assets-m1-720-read-dependencies.json)、[图片 1080p](benchmarks/native-ui-image-assets-m1-1080-read-dependencies.json)、[控件 720p](benchmarks/native-ui-m1-720-read-dependencies.json)、[控件 1080p](benchmarks/native-ui-m1-1080-read-dependencies.json)，[图片 720p 确认](benchmarks/native-ui-image-assets-m1-720-read-dependencies-confirmation.json)、[图片 1080p 确认](benchmarks/native-ui-image-assets-m1-1080-read-dependencies-confirmation.json)、[控件 720p 确认](benchmarks/native-ui-m1-720-read-dependencies-confirmation.json)、[控件 1080p 确认](benchmarks/native-ui-m1-1080-read-dependencies-confirmation.json)。这些 completed-batch 数据不包含窗口呈现，也不是 GPU timestamp 或显示 FPS。
 
-NativeRHI 116 项测试在设置 Slang 2026.19 路径后全部通过，无跳过，包含真实 Metal 跨 transfer/compute/graphics 队列的存储读写、绑定状态和 MSAA。NativeRenderer 43 项场景回归、GuavaUI Release 的 11 项 Native draw-list／绑定复用回归通过。新增规划器测试覆盖持续只读、重新上传、队列移交、后续写入和资源销毁；AccessTracker 另检查范围、队列和阶段扩展。Swift maintainability 检查通过，未增加既有超限指标。
+NativeRHI 116 项测试在设置 Slang 2026.19 路径后全部通过，无跳过，包含真实 Metal 跨 transfer/compute/graphics 队列的存储读写、绑定状态和 MSAA。NativeRenderer 43 项场景回归、CoveUI Release 的 11 项 Native draw-list／绑定复用回归通过。新增规划器测试覆盖持续只读、重新上传、队列移交、后续写入和资源销毁；AccessTracker 另检查范围、队列和阶段扩展。Swift maintainability 检查通过，未增加既有超限指标。
 
 ## 后续门槛
 
@@ -301,7 +301,7 @@ CPU 后续工作改为整体命令路径对照与优化：先分开 frontend 校
 | UI widget（equivalent-work） | 0.67 | 0.63 |
 | 96-image（ownedImages） | 0.99 | 1.06 |
 
-图片负载从原先高 WGPU 21%–35% 降到约 ±6% 以内（720p 已达 parity，1080p 受同机调度波动在 1.0–1.06 之间）。UI widget 与 command-count 负载稳定低于 WGPU（0.46–0.83）。绝对 CPU 数值仍随本机调度波动，判定仍以 native/wgpu 同机比值与 ±5% 容差为准。Metal 端的本机功能／画面／性能门槛（除 1080p 图片偶发 ±6%）已满足。应用层默认（GuavaPlayer/EditorApp 的 renderer 名、AppRenderingContext 的 device 兜底）已于 2026-10-10 切到 NativeRHI；WGPU 作为可选 fallback 与对照 harness 保留（仍可由 `--renderer wgpu` / `GUAVA_RENDERER=wgpu` 显式选用）。完整的 WGPU 删除仍取决于 Windows DX12 与 Windows/Linux Vulkan 在各自平台编译／运行验证完成。
+图片负载从原先高 WGPU 21%–35% 降到约 ±6% 以内（720p 已达 parity，1080p 受同机调度波动在 1.0–1.06 之间）。UI widget 与 command-count 负载稳定低于 WGPU（0.46–0.83）。绝对 CPU 数值仍随本机调度波动，判定仍以 native/wgpu 同机比值与 ±5% 容差为准。Metal 端的本机功能／画面／性能门槛（除 1080p 图片偶发 ±6%）已满足。应用层默认（CovePlayer/EditorApp 的 renderer 名、AppRenderingContext 的 device 兜底）已于 2026-10-10 切到 NativeRHI；WGPU 作为可选 fallback 与对照 harness 保留（仍可由 `--renderer wgpu` / `COVE_RENDERER=wgpu` 显式选用）。完整的 WGPU 删除仍取决于 Windows DX12 与 Windows/Linux Vulkan 在各自平台编译／运行验证完成。
 
 ## 2026-10-10：图片资产 atlas 与 draw 合并
 

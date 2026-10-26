@@ -1,9 +1,9 @@
-// A window with a live login shell, for trying GuavaUITerminal by hand:
+// A window with a live login shell, for trying CoveUITerminal by hand:
 //
-//     swift run --package-path GuavaUI/Terminal TerminalDemo
+//     swift run --package-path CoveUI/Terminal TerminalDemo
 
-import GuavaUI
-import GuavaUITerminal
+import CoveUI
+import CoveUITerminal
 
 final class TerminalWindow: View {
     @State var title = ""
@@ -23,7 +23,7 @@ final class TerminalWindow: View {
     }
 }
 
-try Application.run(config: ApplicationConfiguration(title: "GuavaUI · Terminal") {
+try Application.run(config: ApplicationConfiguration(title: "CoveUI · Terminal") {
     $0.window.width = 900
     $0.window.height = 560
 }) {

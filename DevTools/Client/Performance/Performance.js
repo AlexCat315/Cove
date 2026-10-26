@@ -17,7 +17,7 @@ const perf = context.session.performance = {
   frames: [],
   markers: [],
   connectedAt: null,
-  autoTrace: readPref("guava.devtools.autoTrace", true),
+  autoTrace: readPref("cove.devtools.autoTrace", true),
   timer: null,
   memoryToolsId: null,
   memoryRequestId: null,
@@ -476,7 +476,7 @@ function isAutoTraceEnabled() { return perf.autoTrace; }
 
 function setAutoTrace(enabled) {
   perf.autoTrace = enabled;
-  writePref("guava.devtools.autoTrace", enabled);
+  writePref("cove.devtools.autoTrace", enabled);
   if (!context.session.connection.connected) return;
   if (!context.controls.hasCapability("timeline")) return;
   if (enabled && !context.session.observation.recording) context.connection.send("timeline.subscribe");
@@ -534,7 +534,7 @@ function heatSeriesMarkdown(report) {
 
 function markdownReport(report) {
   const lines = [];
-  lines.push("# GuavaUI Performance Report", "");
+  lines.push("# CoveUI Performance Report", "");
   const host = report.host?.appTitle ?? "unknown host";
   lines.push(`- Generated: ${report.generatedAt}`);
   lines.push(`- Host: ${host}`);
@@ -588,7 +588,7 @@ function markdownReport(report) {
 
 function jsonReport(report) {
   return JSON.stringify({
-    schema: "guava-performance-report/1",
+    schema: "cove-performance-report/1",
     generatedAt: report.generatedAt,
     host: report.host,
     window: report.window,
@@ -619,12 +619,12 @@ function jsonReport(report) {
 
 function exportMarkdown() {
   const report = buildReport();
-  download(`guava-performance-${timestampName()}.md`, markdownReport(report), "text/markdown");
+  download(`cove-performance-${timestampName()}.md`, markdownReport(report), "text/markdown");
 }
 
 function exportJSON() {
   const report = buildReport();
-  download(`guava-performance-${timestampName()}.json`, jsonReport(report), "application/json");
+  download(`cove-performance-${timestampName()}.json`, jsonReport(report), "application/json");
 }
 
 function copyReport() {

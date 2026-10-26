@@ -3,8 +3,8 @@
 
 include(ExternalProject)
 
-set(FREETYPE_BUNDLE ${GUAVA_VENDOR_DIR}/CFreeType.artifactbundle)
-set(FREETYPE_VARIANT ${FREETYPE_BUNDLE}/${GUAVA_TRIPLE})
+set(FREETYPE_BUNDLE ${COVE_VENDOR_DIR}/CFreeType.artifactbundle)
+set(FREETYPE_VARIANT ${FREETYPE_BUNDLE}/${COVE_TRIPLE})
 set(FREETYPE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/freetype-install)
 
 ExternalProject_Add(freetype_ep
@@ -15,7 +15,7 @@ ExternalProject_Add(freetype_ep
         -DCMAKE_INSTALL_PREFIX=${FREETYPE_INSTALL_PREFIX}
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON
-        ${GUAVA_PLATFORM_CMAKE_ARGS}
+        ${COVE_PLATFORM_CMAKE_ARGS}
         -DBUILD_SHARED_LIBS=OFF
         -DFT_DISABLE_ZLIB=ON
         -DFT_DISABLE_BZIP2=ON
@@ -49,14 +49,14 @@ add_custom_target(stage_freetype ALL
     COMMENT "Staging FreeType into ${FREETYPE_VARIANT}"
 )
 
-write_artifactbundle_info(${FREETYPE_BUNDLE} "CFreeType" "${GUAVA_TRIPLE}/lib/${FREETYPE_LIB_FILENAME}" "2.14.3")
+write_artifactbundle_info(${FREETYPE_BUNDLE} "CFreeType" "${COVE_TRIPLE}/lib/${FREETYPE_LIB_FILENAME}" "2.14.3")
 
-guava_git_revision(FREETYPE_SOURCE_REVISION "${CMAKE_SOURCE_DIR}/freetype")
-guava_add_artifact_build_manifest(
+cove_git_revision(FREETYPE_SOURCE_REVISION "${CMAKE_SOURCE_DIR}/freetype")
+cove_add_artifact_build_manifest(
     ARTIFACT_NAME "CFreeType"
     VERSION "2.14.3"
     BUNDLE_DIR ${FREETYPE_BUNDLE}
-    LIB_REL_PATH "${GUAVA_TRIPLE}/lib/${FREETYPE_LIB_FILENAME}"
+    LIB_REL_PATH "${COVE_TRIPLE}/lib/${FREETYPE_LIB_FILENAME}"
     BUILD_SYSTEM "CMake ExternalProject"
     SOURCE_KIND "git-submodule"
     SOURCE_URL "third-party/freetype"

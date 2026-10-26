@@ -1,4 +1,4 @@
-import GuavaUI
+import CoveUI
 
 struct TodayScreen: View {
     let model: Binding<MobileModel>

@@ -1,7 +1,7 @@
 import Foundation
 import Testing
-import GuavaUIRuntime
-import GuavaUICompose
+import CoveUIRuntime
+import CoveUICompose
 @testable import GalleryContent
 
 @Suite("Gallery navigation state", .serialized)

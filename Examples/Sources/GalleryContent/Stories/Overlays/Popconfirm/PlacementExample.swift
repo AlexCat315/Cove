@@ -1,4 +1,4 @@
-import GuavaUI
+import CoveUI
 
 struct PopoverPlacementExample: View {
   let options: GalleryOptions

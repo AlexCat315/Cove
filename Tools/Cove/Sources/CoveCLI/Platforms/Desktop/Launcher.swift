@@ -1,0 +1,27 @@
+import Foundation
+
+/// Ordinary UI projects supply AppContent. A custom executable is an explicit opt-in.
+struct DesktopLauncher {
+    let project: AppProject
+    let root: URL
+
+    func prepare() throws -> URL {
+        if project.configuration.targets.desktopExecutable != nil { return project.directory }
+        let directory = project.buildDirectory.appendingPathComponent("desktop/launcher")
+        let package = """
+        // swift-tools-version: 6.4
+        import PackageDescription
+        let package = Package(name: "CoveLauncher", platforms: [.macOS(.v26), .iOS(.v26)],
+            dependencies: [.package(name: "Content", path: \(Files.swiftLiteral(project.directory.path))),
+                           .package(name: "CoveUI", path: \(Files.swiftLiteral(root.path)))],
+            targets: [.executableTarget(name: "Application", dependencies: [
+                .product(name: "AppContent", package: "Content"),
+                .product(name: "CoveUI", package: "CoveUI")])])
+        """
+        try Files.text(package, to: directory.appendingPathComponent("Package.swift"))
+        try Files.text("import CoveUI\nimport AppContent\ntry Application.run { makeApplicationContent() }\n",
+                       to: directory.appendingPathComponent("Sources/Application/main.swift"))
+        return directory
+    }
+
+}

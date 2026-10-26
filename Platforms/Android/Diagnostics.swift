@@ -1,7 +1,7 @@
 import Foundation
-import GuavaUIDevTools
-internal import GuavaUIRuntime
-internal import GuavaUICompose
+import CoveUIDevTools
+internal import CoveUIRuntime
+internal import CoveUICompose
 
 /// The socket queue only enqueues work; it never reads the scene or renderer.
 private final class DiagnosticsInbox: @unchecked Sendable {

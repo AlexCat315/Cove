@@ -1,15 +1,15 @@
 {
-  "name": "guavaui-browser-prototype",
+  "name": "coveui-browser-prototype",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "bash build.sh",
-    "build:fonts": "swift run --package-path ../../Tools/Developer guava-dev browser build-fonts",
-    "serve": "swift run --package-path ../../Tools/Developer guava-dev browser serve",
-    "verify": "swift run --package-path ../../Tools/Developer guava-dev browser verify",
-    "verify:dev": "swift run --package-path ../../Tools/Developer guava-dev browser verify-dev",
-    "verify:native-demo": "swift run --package-path ../../Tools/Developer guava-dev browser native-demo",
-    "dev": "swift run --package-path ../../Tools/Developer guava-dev browser dev"
+    "build:fonts": "swift run --package-path ../../Tools/Developer cove-dev browser build-fonts",
+    "serve": "swift run --package-path ../../Tools/Developer cove-dev browser serve",
+    "verify": "swift run --package-path ../../Tools/Developer cove-dev browser verify",
+    "verify:dev": "swift run --package-path ../../Tools/Developer cove-dev browser verify-dev",
+    "verify:native-demo": "swift run --package-path ../../Tools/Developer cove-dev browser native-demo",
+    "dev": "swift run --package-path ../../Tools/Developer cove-dev browser dev"
   },
   "dependencies": {
     "@bjorn3/browser_wasi_shim": "0.4.2"

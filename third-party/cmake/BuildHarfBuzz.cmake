@@ -3,8 +3,8 @@
 
 include(ExternalProject)
 
-set(HARFBUZZ_BUNDLE ${GUAVA_VENDOR_DIR}/CHarfBuzz.artifactbundle)
-set(HARFBUZZ_VARIANT ${HARFBUZZ_BUNDLE}/${GUAVA_TRIPLE})
+set(HARFBUZZ_BUNDLE ${COVE_VENDOR_DIR}/CHarfBuzz.artifactbundle)
+set(HARFBUZZ_VARIANT ${HARFBUZZ_BUNDLE}/${COVE_TRIPLE})
 set(HARFBUZZ_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/harfbuzz-install)
 
 ExternalProject_Add(harfbuzz_ep
@@ -20,7 +20,7 @@ ExternalProject_Add(harfbuzz_ep
         -DFREETYPE_INCLUDE_DIR_ft2build=${FREETYPE_INSTALL_PREFIX}/include/freetype2
         -DFREETYPE_INCLUDE_DIR_freetype2=${FREETYPE_INSTALL_PREFIX}/include/freetype2
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON
-        ${GUAVA_PLATFORM_CMAKE_ARGS}
+        ${COVE_PLATFORM_CMAKE_ARGS}
         -DBUILD_SHARED_LIBS=OFF
         -DHB_HAVE_FREETYPE=ON
         -DHB_BUILD_TESTS=OFF
@@ -59,14 +59,14 @@ add_custom_target(stage_harfbuzz ALL
     COMMENT "Staging HarfBuzz into ${HARFBUZZ_VARIANT}"
 )
 
-write_artifactbundle_info(${HARFBUZZ_BUNDLE} "CHarfBuzz" "${GUAVA_TRIPLE}/lib/${HARFBUZZ_LIB_FILENAME}" "14.5.1")
+write_artifactbundle_info(${HARFBUZZ_BUNDLE} "CHarfBuzz" "${COVE_TRIPLE}/lib/${HARFBUZZ_LIB_FILENAME}" "14.5.1")
 
-guava_git_revision(HARFBUZZ_SOURCE_REVISION "${CMAKE_SOURCE_DIR}/harfbuzz")
-guava_add_artifact_build_manifest(
+cove_git_revision(HARFBUZZ_SOURCE_REVISION "${CMAKE_SOURCE_DIR}/harfbuzz")
+cove_add_artifact_build_manifest(
     ARTIFACT_NAME "CHarfBuzz"
     VERSION "14.5.1"
     BUNDLE_DIR ${HARFBUZZ_BUNDLE}
-    LIB_REL_PATH "${GUAVA_TRIPLE}/lib/${HARFBUZZ_LIB_FILENAME}"
+    LIB_REL_PATH "${COVE_TRIPLE}/lib/${HARFBUZZ_LIB_FILENAME}"
     BUILD_SYSTEM "CMake ExternalProject"
     SOURCE_KIND "git-submodule"
     SOURCE_URL "third-party/harfbuzz"

@@ -2,7 +2,7 @@
 ._*
 .build/
 .swiftpm/
-.guava/
+.cove/
 .cache/
 node_modules/
 vendor/
@@ -25,3 +25,6 @@ zig-out/
 /Artifacts/native.json
 /Artifacts/native/
 /Artifacts/locks/
+
+# Build output from checkouts before the Cove migration
+.guava/

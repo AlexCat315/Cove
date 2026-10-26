@@ -1,4 +1,4 @@
-import GuavaUI
+import CoveUI
 
 struct ProjectsScreen: View {
     let model: Binding<MobileModel>
@@ -48,7 +48,7 @@ private struct ProjectDetail: View {
                 }.padding(20).flex(0, shrink: 0).frame(width: .percent(100), minWidth: 0)
             }.flex().frame(minHeight: 0)
             Dialog(isPresented: $sharing, title: "Share \(project.name)") {
-                Text("guava.studio/p/\(project.id)").foregroundColor(.onSurfaceMuted)
+                Text("cove.studio/p/\(project.id)").foregroundColor(.onSurfaceMuted)
             } footer: {
                 Button("Copy link") { sharing = false }.frame(width: .percent(100))
             }

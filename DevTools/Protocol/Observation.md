@@ -1,6 +1,6 @@
 # State observation and CPU timeline
 
-Additive capabilities in `guava-devtools/0.1`: `state.observe` and `timeline`.
+Additive capabilities in `cove-devtools/0.1`: `state.observe` and `timeline`.
 The checkpoint/restore capability `state` remains independent.
 
 ## Explicit state exposure
@@ -30,7 +30,7 @@ tools.stateRegistry = graph.stateRegistry // before tools.start()
 if let token { graph.stateRegistry.unregister(token) }
 ```
 
-Application and GuavaUIDemo attach their graph registry automatically. Other
+Application and CoveUIDemo attach their graph registry automatically. Other
 hosts call `server.broadcastObservations()` on the scene thread after a state
 change or frame; `DevTools.notifyTreeChanged()` / `notifyFrameFinished()` do this.
 
@@ -104,8 +104,8 @@ work; the demo logs transitions instead of every retry.
 
 **Add breakpoint** uses the same validated VS Code/Cursor source path mapping as
 **Open source**, then opens
-`vscode://guava.guavaui-devtools/breakpoint?file=...&line=...&column=...` (or
-`cursor://`). The matching GuavaUI-vscode extension registers an editor URI
+`vscode://cove.coveui-devtools/breakpoint?file=...&line=...&column=...` (or
+`cursor://`). The matching CoveUI-vscode extension registers an editor URI
 handler and adds a `SourceBreakpoint` through `vscode.debug.addBreakpoints`.
 Existing Swift/LLDB debug sessions own resolution, pause, stepping and removal;
 no debugger command or source-file read is sent to the application host.

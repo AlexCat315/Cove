@@ -8,7 +8,7 @@
 //
 
 import Foundation
-import GuavaUI
+import CoveUI
 
 // MARK: - Locate packaged sprite frames
 
@@ -104,7 +104,7 @@ struct PetDemoRoot: View {
 
 // MARK: - Run
 
-try Application.run(config: ApplicationConfiguration(title: "GuavaUI · Software Pet")) {
+try Application.run(config: ApplicationConfiguration(title: "CoveUI · Software Pet")) {
     PetScene(world: world) {
         PetDemoRoot(world: world)
     }

@@ -19,7 +19,7 @@ function updateAtlas(frame) {
   atlas.update = frame.atlasUpdate;
   if (!atlas.update) return;
   const [x, y, width, height] = atlas.update;
-  const pixels = readBytes(wasm.guava_atlas(), wasm.guava_atlas_size());
+  const pixels = readBytes(wasm.cove_atlas(), wasm.cove_atlas_size());
   if (pixels.length !== width * height) throw new Error("Invalid font atlas update");
   for (let row = 0; row < height; row++) {
     atlas.pixels.set(pixels.subarray(row * width, (row + 1) * width), (y + row) * atlas.width + x);
@@ -38,16 +38,16 @@ function readBytes(pointer, size) {
   return new Uint8Array(wasm.memory.buffer, pointer >>> 0, size).slice();
 }
 function readJSON(pointer, size) { return JSON.parse(decoder.decode(readBytes(pointer, size))); }
-function response() { return readJSON(wasm.guava_response(), wasm.guava_response_size()); }
+function response() { return readJSON(wasm.cove_response(), wasm.cove_response_size()); }
 function dispatch(envelope) {
   const bytes = encoder.encode(JSON.stringify(envelope));
-  const pointer = wasm.guava_alloc(bytes.length);
+  const pointer = wasm.cove_alloc(bytes.length);
   if (!pointer) throw new Error("DevTools message exceeds the 1 MiB limit");
   try {
     new Uint8Array(wasm.memory.buffer, pointer >>> 0, bytes.length).set(bytes);
-    wasm.guava_dispatch(pointer, bytes.length);
+    wasm.cove_dispatch(pointer, bytes.length);
     return response();
-  } finally { wasm.guava_free(pointer); }
+  } finally { wasm.cove_free(pointer); }
 }
 function post(envelope) { if (!envelope) return; inspectorPort?.postMessage({ kind: "message", data: JSON.stringify(envelope) }); }
 
@@ -57,14 +57,14 @@ function schedule() {
   requestAnimationFrame(() => {
     scheduled = false;
     const width = surface.clientWidth, height = surface.clientHeight;
-    wasm.guava_set_scale(window.devicePixelRatio || 1);
-    wasm.guava_render(width, height);
-    lastFrame = readJSON(wasm.guava_snapshot(), wasm.guava_snapshot_size());
+    wasm.cove_set_scale(window.devicePixelRatio || 1);
+    wasm.cove_render(width, height);
+    lastFrame = readJSON(wasm.cove_snapshot(), wasm.cove_snapshot_size());
     surface.style.cursor = lastFrame.tree.inspection?.picking ? "crosshair" : "default";
     updateAtlas(lastFrame);
-    const vertices = readBytes(wasm.guava_vertices(), wasm.guava_vertex_bytes());
-    const indexCount = wasm.guava_index_count();
-    const indices = new Uint32Array(readBytes(wasm.guava_indices(), indexCount * 4).buffer);
+    const vertices = readBytes(wasm.cove_vertices(), wasm.cove_vertex_bytes());
+    const indexCount = wasm.cove_index_count();
+    const indices = new Uint32Array(readBytes(wasm.cove_indices(), indexCount * 4).buffer);
     try {
       renderer.draw(lastFrame, vertices, indices);
     } catch (error) {
@@ -84,7 +84,7 @@ function schedule() {
       if (document.activeElement === surface) textInput.focus({preventScroll:true});
     }
     document.querySelector("#stats").textContent = `count=${lastFrame.count} · ${lastFrame.vertices} vertices · ${lastFrame.batches.length} batches · ${lastFrame.fontCount} fonts · FreeType/HarfBuzz`;
-    wasm.guava_events();
+    wasm.cove_events();
     for (const event of response()) post(event);
   });
 }
@@ -277,25 +277,25 @@ function makeCanvasRenderer() {
 
 try {
   const wasi = new WASI([], [], [new OpenFile(new File([])), ConsoleStdout.lineBuffered(console.log), ConsoleStdout.lineBuffered(console.error)]);
-  const module = await WebAssembly.compile(await (await fetch("./guava.wasm")).arrayBuffer());
+  const module = await WebAssembly.compile(await (await fetch("./cove.wasm")).arrayBuffer());
   const instance = await WebAssembly.instantiate(module, { wasi_snapshot_preview1: wasi.wasiImport });
   wasi.initialize(instance); wasm = instance.exports;
   for (const font of ["NotoSans.ttf", "NotoSansCJKsc.otf", "NotoSansArabic.ttf", "NotoSansDevanagari.ttf", "NotoEmoji.ttf"]) {
     const result = await fetch(`./fonts/${font}`);
     if (!result.ok) throw new Error(`Cannot load font ${font}: HTTP ${result.status}`);
     const bytes = new Uint8Array(await result.arrayBuffer());
-    const pointer = wasm.guava_font_alloc(bytes.length);
+    const pointer = wasm.cove_font_alloc(bytes.length);
     if (!pointer) throw new Error(`Font exceeds the 32 MiB limit: ${font}`);
     try {
       new Uint8Array(wasm.memory.buffer, pointer >>> 0, bytes.length).set(bytes);
-      if (!wasm.guava_font_load(pointer, bytes.length)) throw new Error(`Invalid font: ${font}`);
-    } finally { wasm.guava_free(pointer); }
+      if (!wasm.cove_font_load(pointer, bytes.length)) throw new Error(`Invalid font: ${font}`);
+    } finally { wasm.cove_free(pointer); }
   }
   // The first call initializes Swift's lazily-created shared prototype.
-  wasm.guava_render(surface.clientWidth, surface.clientHeight);
+  wasm.cove_render(surface.clientWidth, surface.clientHeight);
   // Preserve the initial full/dirty upload before the next render marks it clean.
-  updateAtlas(readJSON(wasm.guava_snapshot(), wasm.guava_snapshot_size()));
-  renderer = await makeRenderer(decoder.decode(readBytes(wasm.guava_shader(), wasm.guava_shader_size())));
+  updateAtlas(readJSON(wasm.cove_snapshot(), wasm.cove_snapshot_size()));
+  renderer = await makeRenderer(decoder.decode(readBytes(wasm.cove_shader(), wasm.cove_shader_size())));
   if (renderer.lost) {
     if (new URLSearchParams(location.search).get("renderer") === "webgpu") throw new Error("WebGPU device lost during initialization");
     renderer = makeCanvasRenderer();
@@ -303,34 +303,34 @@ try {
   for (const id of ["increment", "reset", "theme"]) {
     document.getElementById(id).addEventListener("click", () => {
       const rect = findNode(lastFrame?.tree.root, `counter.${id}`)?.absoluteFrame;
-      if (rect) wasm.guava_pointer(3, rect.x + rect.w / 2, rect.y + rect.h / 2);
+      if (rect) wasm.cove_pointer(3, rect.x + rect.w / 2, rect.y + rect.h / 2);
       schedule();
     });
   }
   surface.tabIndex = 0;
   const point = event => { const rect = surface.getBoundingClientRect(); return [event.clientX - rect.left, event.clientY - rect.top]; };
-  surface.addEventListener("pointermove", event => { wasm.guava_pointer(0, ...point(event)); schedule(); });
-  surface.addEventListener("pointerleave", () => { wasm.guava_pointer(0, -1, -1); schedule(); });
+  surface.addEventListener("pointermove", event => { wasm.cove_pointer(0, ...point(event)); schedule(); });
+  surface.addEventListener("pointerleave", () => { wasm.cove_pointer(0, -1, -1); schedule(); });
   surface.addEventListener("pointerdown", event => {
     if (event.button !== 0) return;
     surface.focus({preventScroll:true}); surface.setPointerCapture(event.pointerId);
-    wasm.guava_pointer(1, ...point(event)); schedule();
+    wasm.cove_pointer(1, ...point(event)); schedule();
   });
   surface.addEventListener("pointerup", event => {
     if (event.button !== 0) return;
-    wasm.guava_pointer(2, ...point(event));
+    wasm.cove_pointer(2, ...point(event));
     if (surface.hasPointerCapture(event.pointerId)) surface.releasePointerCapture(event.pointerId);
     schedule();
   });
-  surface.addEventListener("pointercancel", () => { wasm.guava_pointer(2, -1, -1); schedule(); });
+  surface.addEventListener("pointercancel", () => { wasm.cove_pointer(2, -1, -1); schedule(); });
   function sendText(string, editing = false) {
     const bytes = encoder.encode(string);
-    const pointer = wasm.guava_alloc(Math.max(1, bytes.length));
+    const pointer = wasm.cove_alloc(Math.max(1, bytes.length));
     if (!pointer) return;
     try {
       new Uint8Array(wasm.memory.buffer, pointer >>> 0, bytes.length).set(bytes);
-      wasm.guava_text(pointer, bytes.length, editing ? 1 : 0); schedule();
-    } finally { wasm.guava_free(pointer); }
+      wasm.cove_text(pointer, bytes.length, editing ? 1 : 0); schedule();
+    } finally { wasm.cove_free(pointer); }
   }
   let composing = false, skipCompositionInput = false;
   textInput.addEventListener("compositionstart", () => { composing = true; });
@@ -351,7 +351,7 @@ try {
     if (!code) return;
     event.preventDefault();
     const modifiers = (event.shiftKey ? 1 : 0) | (event.ctrlKey ? 4 : 0) | (event.altKey ? 16 : 0) | (event.metaKey ? 64 : 0);
-    wasm.guava_key(code, modifiers, name === "keydown" ? 1 : 0, event.repeat ? 1 : 0);
+    wasm.cove_key(code, modifiers, name === "keydown" ? 1 : 0, event.repeat ? 1 : 0);
     if (target === textInput && code === 43) surface.focus({preventScroll:true});
     schedule();
   });
@@ -359,11 +359,11 @@ try {
   window.addEventListener("message", (event) => {
     const iframe = document.querySelector("#inspector");
     if (event.origin !== location.origin || event.source !== iframe.contentWindow) return;
-    if (event.data?.type === "guava.devtools.probe") {
-      iframe.contentWindow.postMessage({ type: "guava.devtools.ready" }, location.origin);
+    if (event.data?.type === "cove.devtools.probe") {
+      iframe.contentWindow.postMessage({ type: "cove.devtools.ready" }, location.origin);
       return;
     }
-    if (event.data?.type !== "guava.devtools.connect" || !event.ports[0]) return;
+    if (event.data?.type !== "cove.devtools.connect" || !event.ports[0]) return;
     if (inspectorPort) { dispatch({ type: "bye" }); inspectorPort.close(); }
     inspectorPort = event.ports[0];
     const port = inspectorPort;
@@ -376,12 +376,12 @@ try {
         catch (error) { post({ type: "request.err", payload: { code: "bad_request", message: String(error) } }); }
       }
     });
-    port.start(); port.postMessage({ kind: "open" }); wasm.guava_hello(); post(response()); schedule();
+    port.start(); port.postMessage({ kind: "open" }); wasm.cove_hello(); post(response()); schedule();
   });
-  const ready = () => document.querySelector("#inspector").contentWindow.postMessage({ type: "guava.devtools.ready" }, location.origin);
+  const ready = () => document.querySelector("#inspector").contentWindow.postMessage({ type: "cove.devtools.ready" }, location.origin);
   document.querySelector("#inspector").addEventListener("load", ready);
   ready();
-  window.guavaDebug = {
+  window.coveDebug = {
     get snapshot() { return lastFrame; }, get backend() { return renderer.backend; },
     get gpuInfo() {
       const info = renderer.adapter?.info;
@@ -391,17 +391,17 @@ try {
     request(envelope) { const result = dispatch(envelope); schedule(); return result; },
   };
   try {
-    const saved = sessionStorage.getItem("guava.dev.checkpoint");
+    const saved = sessionStorage.getItem("cove.dev.checkpoint");
     if (saved) {
       const restored = dispatch({type:"state.restore", id:0, payload:JSON.parse(saved)});
       if (restored.type.endsWith(".err")) console.warn("Previous development state could not be restored", restored.payload);
-      sessionStorage.removeItem("guava.dev.checkpoint");
+      sessionStorage.removeItem("cove.dev.checkpoint");
     }
   } catch (error) { console.warn("Development state restore failed", error); }
   fetch("./dev-mode.json").then(result => result.ok ? result.json() : null).then(mode => {
     if (!mode?.enabled) return;
-    const events = new EventSource("/__guava_events");
-    events.onopen = () => { window.guavaDevConnected = true; };
+    const events = new EventSource("/__cove_events");
+    events.onopen = () => { window.coveDevConnected = true; };
     const overlay = document.createElement("pre");
     overlay.style.cssText = "position:fixed;bottom:0;left:0;right:0;max-height:45vh;overflow:auto;background:#251b22;color:#ffe0e5;padding:16px;z-index:1000;white-space:pre-wrap";
     overlay.hidden = true; document.body.append(overlay);
@@ -411,7 +411,7 @@ try {
       if (message.type === "error") { overlay.textContent=message.message; overlay.hidden=false; }
       if (message.type === "ready") {
         const checkpoint = dispatch({type:"state.checkpoint",id:0}).payload;
-        sessionStorage.setItem("guava.dev.checkpoint", JSON.stringify(checkpoint));
+        sessionStorage.setItem("cove.dev.checkpoint", JSON.stringify(checkpoint));
         location.assign("/" + location.search);
       }
     };

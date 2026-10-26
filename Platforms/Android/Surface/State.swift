@@ -1,5 +1,5 @@
-internal import GuavaUICompose
-internal import GuavaUIRuntime
+internal import CoveUICompose
+internal import CoveUIRuntime
 
 /// Session geometry survives swapchain recreation. Native updates replace
 /// device facts; frame preparation replaces only viewport facts.

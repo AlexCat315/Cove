@@ -11,7 +11,7 @@
 // deferred to the frame's GPU completion instead of freeing live objects.
 
 import Foundation
-import GuavaLogging
+import CoveLogging
 
 /// Monotonic handle allocator. A single counter across all resource kinds
 /// guarantees no two live handles share an ID (ID 0 is reserved/invalid).
@@ -81,11 +81,11 @@ public final class Device {
             do {
                 let backend = try BackendFactory.makeBackend(api, config: config)
                 let device = try Device(backend: backend, config: config)
-                LogSystem.logger("com.guava.engine.rhi").info("Graphics device created", metadata: [
+                LogSystem.logger("com.cove.engine.rhi").info("Graphics device created", metadata: [
                     "backend": "\(api.displayName)", "adapter": "\(device.deviceName)", "frames_in_flight": "\(config.framesInFlight)"])
                 return device
             } catch {
-                LogSystem.logger("com.guava.engine.rhi").warning("Graphics backend initialization failed", metadata: ["backend": "\(api.displayName)", "error": "\(error)"])
+                LogSystem.logger("com.cove.engine.rhi").warning("Graphics backend initialization failed", metadata: ["backend": "\(api.displayName)", "error": "\(error)"])
                 lastError = error
             }
         }
@@ -826,14 +826,14 @@ public final class Device {
     /// failure so a future background compiler can still run while frames
     /// are in flight.
     private func warnPipelineCreationDuringFrame(kind: String, label: String?) {
-        LogSystem.logger("com.guava.engine.rhi").warning(
+        LogSystem.logger("com.cove.engine.rhi").warning(
             "Pipeline created during an active frame",
             metadata: ["kind": "\(kind)", "label": "\(label ?? "<unnamed>")"])
     }
 
     private func logPipelineCreation(kind: String, label: String?, duration: Duration) {
         let milliseconds = Double(duration.rhiNanoseconds) / 1_000_000
-        LogSystem.logger("com.guava.engine.rhi").debug(
+        LogSystem.logger("com.cove.engine.rhi").debug(
             "Pipeline created",
             metadata: ["kind": "\(kind)", "label": "\(label ?? "<unnamed>")",
                        "ms": "\(milliseconds)"])

@@ -1,11 +1,11 @@
 public import Foundation
-private import GuavaFileSystem
+private import CoveFileSystem
 
 /// Locates the SDK checkout every tool operates on, independent of the caller's
 /// working directory, and exposes the small set of well-known roots.
 public enum Repository {
   public static var root: URL {
-    if let override = ProcessInfo.processInfo.environment["GUAVA_ROOT"], !override.isEmpty {
+    if let override = ProcessInfo.processInfo.environment["COVE_ROOT"], !override.isEmpty {
       return URL(fileURLWithPath: override).standardizedFileURL
     }
     let current = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
@@ -14,7 +14,7 @@ public enum Repository {
         return directory
       }
     }
-    Terminal.fail("Run guava-dev from inside a source checkout or set GUAVA_ROOT")
+    Terminal.fail("Run cove-dev from inside a source checkout or set COVE_ROOT")
   }
 
   public static func path(_ relative: String) -> URL {

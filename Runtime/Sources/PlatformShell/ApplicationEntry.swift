@@ -8,7 +8,7 @@ public enum PlatformApplication {
         #if os(iOS)
         let invocation = ApplicationInvocation { try body() }
         let pointer = Unmanaged.passUnretained(invocation).toOpaque()
-        let status = guava_sdl_run_app({ pointer in
+        let status = cove_sdl_run_app({ pointer in
             MainActor.assumeIsolated {
                 let invocation = Unmanaged<ApplicationInvocation>.fromOpaque(pointer!).takeUnretainedValue()
                 do { invocation.runtime = try invocation.body(); return 0 }

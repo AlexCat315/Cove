@@ -1,4 +1,4 @@
-> Historical migration report: the WGPU reference and its commands were retired. Use `swift run --package-path Tools/Developer guava-dev gpu-regression run` and `NativeRHIPassProbe` for current NativeRHI validation. Measurements below describe the original comparison.
+> Historical migration report: the WGPU reference and its commands were retired. Use `swift run --package-path Tools/Developer cove-dev gpu-regression run` and `NativeRHIPassProbe` for current NativeRHI validation. Measurements below describe the original comparison.
 
 # NativeRenderer 场景迁移
 
@@ -6,7 +6,7 @@ NativeRenderer 已从独立网格 consumer 发展为真实场景 consumer，支�
 
 目前支持 r1/r2/r3/r4 和 unlit/baseColor/worldNormal/roughness/metallic 查看模式。材质查看模式沿用现有 WGSL 的 inverse-ACES 输出规则；在这些早期 LDR 阶段，它们还没有经过后续 tonemap。这是画面对照的共同输入约定，不能把它们当作最终 PBR 画面。
 
-完整替换目标仍在推进：PBR 光照、级联/多光源阴影、HDR 天空和 tonemap 已迁移，见 [PBR 验证](NATIVE_PBR_VALIDATION.md)；透明/动画、r5 后处理和风格化见 [动画验证](NATIVE_ANIMATION_VALIDATION.md)、[后处理验证](NATIVE_POST_VALIDATION.md) 和 [风格化验证](NATIVE_STYLIZED_VALIDATION.md)。粒子、编辑器/GuavaUI viewport 互操作与游戏内 HUD 已接入 NativeRHI 并在 Metal 对照验证。主／辅助窗口宿主、整体性能门槛和默认 renderer 切换仍在推进。NativeRenderer 对尚未支持的场景明确报错，避免用缺失的画面冒充完整渲染。默认 EngineHost 仍使用 WGPU。
+完整替换目标仍在推进：PBR 光照、级联/多光源阴影、HDR 天空和 tonemap 已迁移，见 [PBR 验证](NATIVE_PBR_VALIDATION.md)；透明/动画、r5 后处理和风格化见 [动画验证](NATIVE_ANIMATION_VALIDATION.md)、[后处理验证](NATIVE_POST_VALIDATION.md) 和 [风格化验证](NATIVE_STYLIZED_VALIDATION.md)。粒子、编辑器/CoveUI viewport 互操作与游戏内 HUD 已接入 NativeRHI 并在 Metal 对照验证。主／辅助窗口宿主、整体性能门槛和默认 renderer 切换仍在推进。NativeRenderer 对尚未支持的场景明确报错，避免用缺失的画面冒充完整渲染。默认 EngineHost 仍使用 WGPU。
 
 ## 接入与资源
 
@@ -24,17 +24,17 @@ EngineHost/RenderThread 发送原有 RenderPacket，不创建第二套场景模�
 
 材质解析通过 ResolvedMeshMaterial 与 WGPU 共用。导入 baseColorFactor 与运行时覆盖相乘；本轮修正了 WGPU 丢失导入 RGB 因子的行为。MeshInstanceUniforms 的 160 字节布局也由两条路径共用。顶点沿用 MeshAsset 的 96 字节布局。
 
-Slang 仅在离线生成阶段使用。基础几何/深度产物已捆绑 Metal 和 SPIR-V；运行时只加载 ShaderArtifact。DX12 管线使用同一抽象，但本机无 DXC，尚未生成/验证该 pass 的 DXIL。可在支持 DXC 的环境运行 `swift run --package-path Tools/Developer guava-dev shader rebuild --targets dxil`。
+Slang 仅在离线生成阶段使用。基础几何/深度产物已捆绑 Metal 和 SPIR-V；运行时只加载 ShaderArtifact。DX12 管线使用同一抽象，但本机无 DXC，尚未生成/验证该 pass 的 DXIL。可在支持 DXC 的环境运行 `swift run --package-path Tools/Developer cove-dev shader rebuild --targets dxil`。
 
 ## 本机验证
 
 ```sh
 SLANGC="$PWD/Engine/vendor/slang/bin/slangc" \
-GUAVA_WGPU_BACKEND=metal GUAVA_RUN_GPU_SMOKE_TESTS=1 \
+COVE_WGPU_BACKEND=metal COVE_RUN_GPU_SMOKE_TESTS=1 \
 swift test --package-path Engine --jobs 4 \
   --filter 'NativeRHITests\.|NativeRendererTests\.|AssetRegistryTests|MeshAssetCatalogTests|MeshSurfaceAndVisibilityTests|RenderThreadTests'
 
-swift run --package-path Tools/Developer guava-dev maintainability
+swift run --package-path Tools/Developer cove-dev maintainability
 SLANGC="$PWD/Engine/vendor/slang/bin/slangc" swift test --package-path Tools/Developer --filter ShaderToolchainTests
 ```
 
@@ -53,9 +53,9 @@ Vulkan encoder 使用负高度 viewport 并调整 y，与其他后端的 +Y 向�
 
 ```sh
 swift build -c release --package-path Engine --product NativeRHIPassProbe --jobs 4
-GUAVA_WGPU_BACKEND=metal Engine/.build/release/NativeRHIPassProbe \
+COVE_WGPU_BACKEND=metal Engine/.build/release/NativeRHIPassProbe \
   --scene mesh --width 1920 --height 1080 --frames 180 --warmup 30 --repeats 3 \
-  --output /tmp/guava-native-mesh-1080
+  --output /tmp/cove-native-mesh-1080
 ```
 
 `--scene grid` 保留独立网格探针，默认仍为 grid。mesh 使用同一个 RenderPacket、37 个实例、相同材质查看模式与深度/基础几何输出。原生产 WGPU 路径还包含空透明/粒子 pass 与视口发布；Native 深度 pass 不写弃用颜色。两者最终 RGB 进行自动对照，均不使用 HDR opaque snapshot 缓存。

@@ -1,4 +1,4 @@
-import GuavaUI
+import CoveUI
 
 struct ViewportTraitsStory: View {
     var body: some View {

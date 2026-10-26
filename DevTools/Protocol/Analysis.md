@@ -1,6 +1,6 @@
 # Source locations and component recomposition
 
-Additive fields in `guava-devtools/0.1`; hosts advertise `source` and
+Additive fields in `cove-devtools/0.1`; hosts advertise `source` and
 `recomposition`. Older snapshots/clients continue to work.
 
 Each `NodeSummary` may include:

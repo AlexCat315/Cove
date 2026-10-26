@@ -1,7 +1,7 @@
 #if os(macOS)
 import AppKit
 private import CSDL3
-import GuavaPlatformCore
+import CovePlatformCore
 
 /// SDL discards precise units, phase-only packets and momentum phase. Observe
 /// AppKit, then enqueue markers in SDL's ordered queue. The shell skips SDL's

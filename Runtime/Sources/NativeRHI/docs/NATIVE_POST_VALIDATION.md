@@ -1,4 +1,4 @@
-> Historical migration report: the WGPU reference and its commands were retired. Use `swift run --package-path Tools/Developer guava-dev gpu-regression run` and `NativeRHIPassProbe` for current NativeRHI validation. Measurements below describe the original comparison.
+> Historical migration report: the WGPU reference and its commands were retired. Use `swift run --package-path Tools/Developer cove-dev gpu-regression run` and `NativeRHIPassProbe` for current NativeRHI validation. Measurements below describe the original comparison.
 
 # NativeRenderer r5 后处理与历史缓存
 
@@ -20,16 +20,16 @@ NativeRHI 新增 `CopyPassEncoder.copyTexture`：在不同、同格式、单采�
 
 NativePostTests 比较生产 WGPURenderer 的实际 viewport：24 帧覆盖逐项启用效果、SSR 运动/静止、TAA 连续历史、网格开关、缩小/增长 viewport、关闭/重启 TAA、缓存命中、透明更新、分配后的失败 resize 恢复、r4/r5 切换与正交相机。另有 9 帧单独检查 SSAO、SSR、Bloom、FXAA 都实际改变像素，避免把空 pass 当作功能实现。
 
-所有对照帧检查 RGB 平均通道误差 <0.5、差值 >3 的像素 <1%。实际 Native/WGPU PPM 保存于 `/tmp/guava-native-post`；本机还查看了组合效果和正交场景的读回图像。alpha 不参与 RGB 比较。
+所有对照帧检查 RGB 平均通道误差 <0.5、差值 >3 的像素 <1%。实际 Native/WGPU PPM 保存于 `/tmp/cove-native-post`；本机还查看了组合效果和正交场景的读回图像。alpha 不参与 RGB 比较。
 
 受影响范围执行 85 项 NativeRHI XCTest、23 项 NativeRenderer XCTest、32 项渲染线程/相机/生产 GPU/shader Swift Testing。包含实际 Metal 窗口的 r5 后处理呈现、缩放与错误输入恢复。旧测试中的“r5 尚未支持”和“稳定帧必须重画不透明通道”断言随功能更新并复测通过；容量策略更新后再次通过全部 NativeRenderer 测试和纹理复制测试。Slang 工具链 5 项测试及 Swift 结构检查通过；既有 46 项超限指标未增加。
 
 ```sh
-GUAVA_WGPU_BACKEND=metal GUAVA_RUN_GPU_SMOKE_TESTS=1 \
+COVE_WGPU_BACKEND=metal COVE_RUN_GPU_SMOKE_TESTS=1 \
 SLANGC="$PWD/Engine/vendor/slang/bin/slangc" \
 swift test --package-path Engine --jobs 4 \
   --filter 'NativeRHITests\.|NativeRendererTests\.|RenderThreadTests|MeshSurfaceAndVisibilityTests|RenderCameraMatricesTests|RenderBackendGPUSmokeTests/(orthographic|opaqueCache|editorGrid|transparent|material)|ShaderCatalogTests'
-swift run --package-path Tools/Developer guava-dev maintainability --report
+swift run --package-path Tools/Developer cove-dev maintainability --report
 SLANGC="$PWD/Engine/vendor/slang/bin/slangc" swift test --package-path Tools/Developer --filter ShaderToolchainTests
 ```
 
@@ -39,9 +39,9 @@ SLANGC="$PWD/Engine/vendor/slang/bin/slangc" swift test --package-path Tools/Dev
 
 ```sh
 swift build -c release --package-path Engine --product NativeRHIPassProbe --jobs 4
-GUAVA_WGPU_BACKEND=metal Engine/.build/release/NativeRHIPassProbe \
+COVE_WGPU_BACKEND=metal Engine/.build/release/NativeRHIPassProbe \
   --scene post --width 1920 --height 1080 --frames 180 --warmup 30 --repeats 3 \
-  --output /tmp/guava-native-post-1080
+  --output /tmp/cove-native-post-1080
 ```
 
 Apple M1 本机 Release，Metal 验证关闭，30 帧预热，3×180 帧测量：
@@ -61,4 +61,4 @@ Apple M1 本机 Release，Metal 验证关闭，30 帧预热，3×180 帧测量�
 
 ## 默认切换前剩余范围
 
-EngineHost 默认仍使用 WGPU。风格化已在后续阶段迁移，见 [风格化验证](NATIVE_STYLIZED_VALIDATION.md)。粒子 GPU 模拟、Editor/GuavaUI 纹理/命令互操作和 DXIL 产物仍须完成。全部功能、画面对照与性能门限完成后再切换默认 renderer，然后移除 WGPU 运行时与参考依赖。
+EngineHost 默认仍使用 WGPU。风格化已在后续阶段迁移，见 [风格化验证](NATIVE_STYLIZED_VALIDATION.md)。粒子 GPU 模拟、Editor/CoveUI 纹理/命令互操作和 DXIL 产物仍须完成。全部功能、画面对照与性能门限完成后再切换默认 renderer，然后移除 WGPU 运行时与参考依赖。

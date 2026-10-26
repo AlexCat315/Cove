@@ -17,23 +17,23 @@ function select(tab, { persist = true, expand = false } = {}) {
   tabs.forEach(button => button.classList.toggle("active", button.dataset.tab === tab));
   panels.forEach(panel => panel.classList.toggle("active", panel.dataset.tab === tab));
   if (expand) dock.classList.remove("collapsed");
-  if (persist) writePref("guava.devtools.tab", tab);
+  if (persist) writePref("cove.devtools.tab", tab);
   if (tab === "performance") context.performance?.refreshNow();
 }
 
 function setCollapsed(collapsed) {
   dock.classList.toggle("collapsed", collapsed);
-  writePref("guava.devtools.dockCollapsed", collapsed ? "1" : "0");
+  writePref("cove.devtools.dockCollapsed", collapsed ? "1" : "0");
 }
 
 function init() {
-  const savedHeight = Number(readPref("guava.devtools.dockHeight", ""));
+  const savedHeight = Number(readPref("cove.devtools.dockHeight", ""));
   if (Number.isFinite(savedHeight) && savedHeight >= MIN_HEIGHT) {
     dock.style.setProperty("--dock-height", `${savedHeight}px`);
   }
-  const savedTab = readPref("guava.devtools.tab", "tree");
+  const savedTab = readPref("cove.devtools.tab", "tree");
   if (tabs.some(tab => tab.dataset.tab === savedTab)) select(savedTab, { persist: false });
-  if (readPref("guava.devtools.dockCollapsed", "0") === "1") setCollapsed(true);
+  if (readPref("cove.devtools.dockCollapsed", "0") === "1") setCollapsed(true);
 }
 
 tabs.forEach(button => button.addEventListener("click", () => {
@@ -66,7 +66,7 @@ splitter.addEventListener("pointermove", event => {
 function finishDrag() {
   if (!dragging) return;
   dragging = false;
-  writePref("guava.devtools.dockHeight", String(Math.round(dock.getBoundingClientRect().height)));
+  writePref("cove.devtools.dockHeight", String(Math.round(dock.getBoundingClientRect().height)));
 }
 splitter.addEventListener("pointerup", finishDrag);
 splitter.addEventListener("pointercancel", finishDrag);

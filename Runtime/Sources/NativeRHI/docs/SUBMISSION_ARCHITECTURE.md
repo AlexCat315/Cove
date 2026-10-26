@@ -25,7 +25,7 @@ wgpu-core 源码 revision 为 `4cbe6232b2d7c289b6e1a38416a6ae1461a22e81`。
 | NVRHI VK | open 创建/复用原生命令缓冲；setGraphicsState 等路径跟踪资源并提交屏障；close 恢复要求的初始状态并结束原生命令缓冲 | 整理 timeline、命令缓冲寿命、staging 引用，调用原生队列 |
 | slang-rhi Metal | API 记录抽象命令；finish 解析 pipeline，并由 CommandRecorder 回放成 Metal encoder 命令 | 提交已有 Metal 命令缓冲，处理 fence、residency 与资源回收 |
 | WGPU 29.0.3 Metal | pass.end 保存抽象 pass；CommandEncoder.finish 校验并 encode_commands，建立命令缓冲内资源使用跟踪，调用 HAL / Metal | 校验命令缓冲寿命，衔接设备全局资源状态，处理初始化与 pending writes，再提交 HAL 队列 |
-| Guava NativeRHI Metal | UI 准备资源、上传几何、生成 Swift 抽象命令数组 | frontend 校验 → checkpoint / 状态与队列依赖规划 → 再次检查附件 → 回放 Metal encoder → commit |
+| Cove NativeRHI Metal | UI 准备资源、上传几何、生成 Swift 抽象命令数组 | frontend 校验 → checkpoint / 状态与队列依赖规划 → 再次检查附件 → 回放 Metal encoder → commit |
 
 因此已有 benchmark 的 `cpuRecord`、`cpuSubmit` **不能跨实现按列直接排名**。
 WGPU 的主要原生编码已经包含在 `cpuRecord` 内；NativeRHI 的编码包含在
@@ -115,17 +115,17 @@ CPU 数值用于定位，不作为最终性能验收或改动前后加速比例�
 复现（先以同一工具链完成 Release 构建）：
 
 ```sh
-GUAVA_NATIVE_COMMAND_BENCHMARK=1 GUAVA_NATIVE_UI_BENCHMARK=1 \
-GUAVA_NATIVE_SUBMISSION_PROFILE=1 GUAVA_NATIVE_UI_BENCHMARK_OUTPUT=/tmp/guava-submission-profile \
-swift test --package-path GuavaUI -c release --skip-build --filter NativeDrawListBenchmarkTests
+COVE_NATIVE_COMMAND_BENCHMARK=1 COVE_NATIVE_UI_BENCHMARK=1 \
+COVE_NATIVE_SUBMISSION_PROFILE=1 COVE_NATIVE_UI_BENCHMARK_OUTPUT=/tmp/cove-submission-profile \
+swift test --package-path CoveUI -c release --skip-build --filter NativeDrawListBenchmarkTests
 ```
 
-去掉 `GUAVA_NATIVE_SUBMISSION_PROFILE` 后不插入分段时钟；对比优化收益时应使用这个模式，
+去掉 `COVE_NATIVE_SUBMISSION_PROFILE` 后不插入分段时钟；对比优化收益时应使用这个模式，
 保持交替首发顺序、完整工作量与完成时间口径。
 
 验证在隔离的 `fb92b738` 工作树加本次渲染改动上完成，以避开主目录同时进行的组件注册表
 改造；15 个渲染/测试源文件逐字节一致。NativeRHI 117 项测试全部通过、无跳过（设置
-Slang 路径，含真实 Metal 队列与存储读写）；GuavaUI Release 14 项相关测试中 11 项执行
+Slang 路径，含真实 Metal 队列与存储读写）；CoveUI Release 14 项相关测试中 11 项执行
 通过，3 项 opt-in benchmark 在普通回归运行中跳过。上述诊断单独启用其中 2 项（命令
 数量与普通控件），10 份报告与所有画面预检通过。Swift maintainability 检查通过，
 未增加现有超限指标。

@@ -1,4 +1,4 @@
-import GuavaUI
+import CoveUI
 
 struct ViewThatFitsStory: View {
     @State private var narrow = false

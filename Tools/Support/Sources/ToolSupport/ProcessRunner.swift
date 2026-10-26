@@ -1,5 +1,5 @@
 public import Foundation
-public import GuavaProcess
+public import CoveProcess
 
 /// Tool boundary: resolves PATH and chooses capture or live output; process IO is shared with applications.
 public enum ProcessRunner {

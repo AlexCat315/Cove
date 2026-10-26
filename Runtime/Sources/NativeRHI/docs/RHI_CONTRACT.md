@@ -1,10 +1,10 @@
 # NativeRHI 内部契约
 
-`NativeRHI` 是 Guava 自有的显式 GPU 接口。前端负责句柄、布局、命令记录、帧生命周期和提交规划；后端负责原生对象与执行。资源和布局的组织可参考 WebGPU，但高级能力独立设计，不承诺符合 WebGPU 标准。
+`NativeRHI` 是 Cove 自有的显式 GPU 接口。前端负责句柄、布局、命令记录、帧生命周期和提交规划；后端负责原生对象与执行。资源和布局的组织可参考 WebGPU，但高级能力独立设计，不承诺符合 WebGPU 标准。
 
 这一轮参考了本地 NRI、NVRHI 和 slang-rhi 源码中的布局、原生管线和资源生命周期组织，保持自有接口与实现，不引入这些项目的运行时依赖。Slang 只承担离线编译；RHI 接收目标产物，其他编译器也可以生成相同的 `ShaderArtifact`。
 
-NativeRHI 是唯一的图形后端。EngineHost、编辑器、播放器、GuavaUI 主/辅助窗口和 HUD 共享 NativeRHI Device；无设备的 EngineHost 用于无 GPU 仿真。macOS 默认使用 Metal，Windows 优先使用 DX12、设备创建失败时尝试 Vulkan，Linux / Android 默认使用原生 Vulkan。Android 的原生窗口与 GuavaUI 绘制验证见 [Android 入口](../../../../Platforms/Android/README.md)。DX12 打包 shader 仍待 Windows 工具链生成。旧后端已移除；下列迁移报告及 benchmarks 保留当时的历史测量，不能作为当前可运行的对照命令。当前迁移结果见 [独立运行验证](validation/Standalone.md)。
+NativeRHI 是唯一的图形后端。EngineHost、编辑器、播放器、CoveUI 主/辅助窗口和 HUD 共享 NativeRHI Device；无设备的 EngineHost 用于无 GPU 仿真。macOS 默认使用 Metal，Windows 优先使用 DX12、设备创建失败时尝试 Vulkan，Linux / Android 默认使用原生 Vulkan。Android 的原生窗口与 CoveUI 绘制验证见 [Android 入口](../../../../Platforms/Android/README.md)。DX12 打包 shader 仍待 Windows 工具链生成。旧后端已移除；下列迁移报告及 benchmarks 保留当时的历史测量，不能作为当前可运行的对照命令。当前迁移结果见 [独立运行验证](validation/Standalone.md)。
 
 Clip space 使用 +Y 向上、深度 0…1；framebuffer / viewport 使用左上原点、+Y 向下。Vulkan backend 通过负高度 viewport 统一这一约定，shader 不再自行翻转 Y。
 
@@ -15,7 +15,7 @@ Clip space 使用 +Y 向上、深度 0…1；framebuffer / viewport 使用左上
 | Buffer / Texture / Sampler、上传与读回 | 本机验证 | Android 核心路径真机验证；Windows/Linux 待验证 | 原生实现，Windows 待验证 |
 | Raster / Compute、绑定、indirect、copy | 本机验证核心路径 | Android 核心路径真机验证；Windows/Linux 待验证 | 原生实现，Windows 待验证 |
 | 纹理局部上传、打包顶点颜色、MSAA color resolve | 本机验证；见 [UI 绘制验证](NATIVE_UI_VALIDATION.md) | Android 核心路径真机验证；Windows/Linux 待验证 | 原生实现，Windows 待验证 |
-| GuavaUI Native DrawList 绘制器 | 已接入主/辅助窗口与 HUD，绘制、MSAA、缩放和资源生命周期本机验证 | Android 颜色、图像、裁剪、1x/4x MSAA 真机验证；Windows/Linux 待验证 | 共用绘制路径；DXIL 产物与 GPU 待验证 |
+| CoveUI Native DrawList 绘制器 | 已接入主/辅助窗口与 HUD，绘制、MSAA、缩放和资源生命周期本机验证 | Android 颜色、图像、裁剪、1x/4x MSAA 真机验证；Windows/Linux 待验证 | 共用绘制路径；DXIL 产物与 GPU 待验证 |
 | 窗口呈现与 resize | 本机验证 | Android 横竖屏与 surface 重建真机验证；Win32 / Xlib / Wayland 待验证 | HWND swapchain 实现，待验证 |
 | 帧上传、延迟销毁、跨队列同步 | 本机验证 | 原生实现，独立 queue family 待验证 | 原生实现，待验证 |
 | Mesh / task | Mesh 已验证；task 关闭 | EXT 管线与直接 dispatch 实现，设备功能链控制，GPU 待验证 | MS / AS 管线与直接 dispatch 实现，GPU 待验证 |
@@ -69,7 +69,7 @@ try device.waitUntilIdle() // 调试、测试或停机
 
 MSAA texture 当前要求一个 2D layer、一个 mip，并具备 color/depth attachment usage；不支持 multisampled shader binding，须先 resolve 再采样。sample count 接受 1/2/4/8/16/32/64；硬件与格式不支持的组合明确报错，不降级。`GraphicsPipelineDescriptor.sampleCount` 默认 1，必须与所有 source attachments 一致；extent 和格式也在录制时检查。`RenderColorTarget.resolveTexture` 默认 nil；非 nil 时要求匹配 extent/format 的单采样 color target，附件与 resolve destination 必须各不相同。`store` 控制保留 source attachment，resolve destination 总会保存结果。Resolve target 纳入 planner 的 attachment writes，后续采样、copy 和跨 queue 使用均建立依赖。Vulkan 为多 mip render target 单独创建 mip0 attachment view，采样 view 保留完整 mip 链。立即上传、读回及普通 texture copy 拒绝 MSAA source，须读 resolved image。Depth resolve 尚未实现。
 
-`VertexFormat.unorm8x4` 对应四个紧密排列的 UInt8，顶点取值归一化到 0…1；Metal 使用 uchar4Normalized，Vulkan 使用 R8G8B8A8_UNORM，DX12 使用 R8G8B8A8_UNORM。可直接读取 GuavaUI 的 RGBA 打包颜色，无须展开成四个 Float。
+`VertexFormat.unorm8x4` 对应四个紧密排列的 UInt8，顶点取值归一化到 0…1；Metal 使用 uchar4Normalized，Vulkan 使用 R8G8B8A8_UNORM，DX12 使用 R8G8B8A8_UNORM。可直接读取 CoveUI 的 RGBA 打包颜色，无须展开成四个 Float。
 
 正常帧的 `CopyPassEncoder.uploadBufferToTexture` 接收 `TextureBufferUpload`，指定源 buffer、bytesPerRow、texture、矩形 region，以及默认零的 buffer offset / mip / layer。调用方的 source storage 必须保留到 submit；`uploadTransient` 由 frame ring 保留到 GPU 完成。上传可以在同一 command buffer 随后供 UI 采样，planner 记录 transfer write 依赖。`TextureResource` 为跨 renderer / viewport 的纹理提供强引用所有权；它不会让一个设备创建的 texture 可供其他设备使用。
 
@@ -106,20 +106,20 @@ Metal 光追仍使用原生 MSL；Slang Metal RT 和 Metal Shader Converter 不�
 macOS arm64：
 
 ```sh
-swift run --package-path Tools/Developer guava-dev shader bootstrap-slang
+swift run --package-path Tools/Developer cove-dev shader bootstrap-slang
 export SLANGC="$PWD/Engine/vendor/slang/bin/slangc"
 swift test --package-path Engine --filter 'NativeRHITests\.' --jobs 4
 swift test --package-path Tools/Developer --filter ShaderToolchainTests
-swift run --package-path Tools/Developer guava-dev shader rebuild --check
-swift run --package-path Tools/Developer guava-dev gpu-regression run
-swift run --package-path Tools/Developer guava-dev maintainability
+swift run --package-path Tools/Developer cove-dev shader rebuild --check
+swift run --package-path Tools/Developer cove-dev gpu-regression run
+swift run --package-path Tools/Developer cove-dev maintainability
 ```
 
 macOS 只使用 Metal，不链接 Vulkan loader，不加载 Vulkan ICD，也不执行 Vulkan GPU 测试。Slang 是离线工具，产物无需运行时编译器。
 
 Android 使用 Swift 6.4.0 Android SDK、NDK r30 与系统 libvulkan，默认 RGBA8 surface；工具链和真机复现见 `Platforms/Android/README.md`。
 
-Windows / Linux 使用安装的 Vulkan SDK，非系统位置设置 `VULKAN_SDK`。可在对应宿主上运行 `swift run --package-path Tools/Developer guava-dev vulkan bootstrap`，校验固定 Vulkan-Headers / Loader **1.4.328** 的 SHA-256 并安装到忽略的 `Engine/vendor/vulkan-sdk`；脚本在 macOS 明确拒绝运行。Windows 还需 Windows SDK 的 D3D12 / DXGI；DXIL shader 编译需 DXC。
+Windows / Linux 使用安装的 Vulkan SDK，非系统位置设置 `VULKAN_SDK`。可在对应宿主上运行 `swift run --package-path Tools/Developer cove-dev vulkan bootstrap`，校验固定 Vulkan-Headers / Loader **1.4.328** 的 SHA-256 并安装到忽略的 `Engine/vendor/vulkan-sdk`；脚本在 macOS 明确拒绝运行。Windows 还需 Windows SDK 的 D3D12 / DXGI；DXIL shader 编译需 DXC。
 
 `SurfaceDescriptor.kind` 区分 CAMetalLayer、HWND、Xlib Window 和 Wayland wl_surface。Xlib/Wayland 使用 `display`；Xlib 的 `nativeHandle` 保存 Window 的 pointer bit pattern。Vulkan 仅启用宿主实际提供的 WSI 扩展，并从已创建的 instance 解析 instance dispatch 命令。Surface 创建失败会释放对象；swapchain 检查 graphics queue 的呈现支持、请求的颜色格式和原生 drawable extent。仅有其他 queue family 支持呈现时，当前会明确拒绝该 surface。
 

@@ -3,19 +3,19 @@
   "platforms": {
     "android-arm64": {
       "sha256": "073c5bcbe776abab6a5b505b7fe78002537172e4002f49bee3414371da97434e",
-      "url": "https://github.com/AlexCat315/GuavaUI/releases/download/v0.1.12/guava-native-android-arm64.tar.gz"
+      "url": "https://github.com/AlexCat315/Cove/releases/download/v0.1.12/cove-native-android-arm64.tar.gz"
     },
     "ios-arm64-simulator": {
       "sha256": "82943d6698de972ae028d8f8c6497da58e5a813706a900fab468225280e42bf5",
-      "url": "https://github.com/AlexCat315/GuavaUI/releases/download/v0.1.12/guava-native-ios-arm64-simulator.tar.gz"
+      "url": "https://github.com/AlexCat315/Cove/releases/download/v0.1.12/cove-native-ios-arm64-simulator.tar.gz"
     },
     "ios-arm64": {
       "sha256": "3e32453060b9246db3a6ea78e0f3f94c9c1a462dce7b93268dd7d4f323205e9a",
-      "url": "https://github.com/AlexCat315/GuavaUI/releases/download/v0.1.12/guava-native-ios-arm64.tar.gz"
+      "url": "https://github.com/AlexCat315/Cove/releases/download/v0.1.12/cove-native-ios-arm64.tar.gz"
     },
     "macos-arm64": {
       "sha256": "4596b2d25f7c9b99053a44f26f1cf774fcc5147a4eebc287d445be22cf1a8ce4",
-      "url": "https://github.com/AlexCat315/GuavaUI/releases/download/v0.1.12/guava-native-macos-arm64.tar.gz"
+      "url": "https://github.com/AlexCat315/Cove/releases/download/v0.1.12/cove-native-macos-arm64.tar.gz"
     }
   }
 }

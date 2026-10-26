@@ -1,4 +1,4 @@
-> Historical migration report: the WGPU reference and its commands were retired. Use `swift run --package-path Tools/Developer guava-dev gpu-regression run` and `NativeRHIPassProbe` for current NativeRHI validation. Measurements below describe the original comparison.
+> Historical migration report: the WGPU reference and its commands were retired. Use `swift run --package-path Tools/Developer cove-dev gpu-regression run` and `NativeRHIPassProbe` for current NativeRHI validation. Measurements below describe the original comparison.
 
 # NativeRenderer resident GPU 粒子模拟
 
@@ -49,11 +49,11 @@ Apple M1 的实际 Metal GPU 对照覆盖 1/37/64/255/256 个 physical threads�
 验证命令：
 
 ```sh
-GUAVA_WGPU_BACKEND=metal GUAVA_RUN_GPU_SMOKE_TESTS=1 \
+COVE_WGPU_BACKEND=metal COVE_RUN_GPU_SMOKE_TESTS=1 \
 SLANGC="$PWD/Engine/vendor/slang/bin/slangc" \
 swift test --package-path Engine --jobs 4 \
   --filter 'NativeRHITests\.|NativeRendererTests\.|ShaderCatalogTests|RenderBackendGPUSmokeTests'
-swift run --package-path Tools/Developer guava-dev maintainability --report
+swift run --package-path Tools/Developer cove-dev maintainability --report
 SLANGC="$PWD/Engine/vendor/slang/bin/slangc" swift test --package-path Tools/Developer --filter ShaderToolchainTests
 ```
 
@@ -63,9 +63,9 @@ SLANGC="$PWD/Engine/vendor/slang/bin/slangc" swift test --package-path Tools/Dev
 
 ```sh
 swift build -c release --package-path Engine --product NativeRHIPassProbe --jobs 4
-GUAVA_WGPU_BACKEND=metal Engine/.build/release/NativeRHIPassProbe \
+COVE_WGPU_BACKEND=metal Engine/.build/release/NativeRHIPassProbe \
   --scene simulation --width 1920 --height 1080 --frames 180 --warmup 30 --repeats 3 \
-  --backends metal --output /tmp/guava-native-simulation-1080
+  --backends metal --output /tmp/cove-native-simulation-1080
 ```
 
 Apple M1，Release，validation 关闭，30 帧预热和 3×180 帧测量：
@@ -81,6 +81,6 @@ Apple M1，Release，validation 关闭，30 帧预热和 3×180 帧测量：
 
 两条路径逐项要求并通过工作量相等检查：1,080 个 simulation batch、1,105,920 个实际 simulation/sort 粒子、17,820 个 physics workgroup、60,480 次 sort pass / 997,920 个 sort workgroup、52,380 个 instance workgroup、3,317,760 个 GPU render instance、3,335,040 个含 CPU 粒子的 cull candidate、1,620 个 cull workgroup / indirect draw。事件分配容量和回读字节、全图 pass frames/draws 也相等；opaque pass 各 315 帧，SSR 270 帧，粒子/Bloom/tonemap/FXAA 各 540 帧。
 
-最终 RGB 图像通过平均通道误差 <0.5 / >3 像素 <1% 门限：720p 为 0.042205、最大 76、4,676/921,600（0.507378%）；1080p 为 0.042701、最大 86、10,260/2,073,600（0.494792%）。完整 post 场景不能由独立 22 帧测试推断逐像素相同。原始环境、分位数和工作量见 [720p 报告](benchmarks/native-simulation-m1-720.json) / [1080p 报告](benchmarks/native-simulation-m1-1080.json)；本机 PPM 保存在对应的 `/tmp/guava-native-simulation-*` 输出目录。
+最终 RGB 图像通过平均通道误差 <0.5 / >3 像素 <1% 门限：720p 为 0.042205、最大 76、4,676/921,600（0.507378%）；1080p 为 0.042701、最大 86、10,260/2,073,600（0.494792%）。完整 post 场景不能由独立 22 帧测试推断逐像素相同。原始环境、分位数和工作量见 [720p 报告](benchmarks/native-simulation-m1-720.json) / [1080p 报告](benchmarks/native-simulation-m1-1080.json)；本机 PPM 保存在对应的 `/tmp/cove-native-simulation-*` 输出目录。
 
-此前 CPU 粒子绘制/稳定压缩的图像与 Release 数据见 [粒子绘制验证](NATIVE_PARTICLE_VALIDATION.md)。Editor/GuavaUI 互操作与 DXIL 产物仍待完成，完整覆盖及性能 gate 通过之前不切换默认、不移除 WGPU。
+此前 CPU 粒子绘制/稳定压缩的图像与 Release 数据见 [粒子绘制验证](NATIVE_PARTICLE_VALIDATION.md)。Editor/CoveUI 互操作与 DXIL 产物仍待完成，完整覆盖及性能 gate 通过之前不切换默认、不移除 WGPU。

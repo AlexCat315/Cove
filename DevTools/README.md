@@ -1,20 +1,20 @@
-# GuavaUI DevTools
+# CoveUI DevTools
 
-Minimal standalone client for the in-process `GuavaUIDevTools` WebSocket server.
+Minimal standalone client for the in-process `CoveUIDevTools` WebSocket server.
 
 The server uses SwiftNIO on macOS, Linux and Windows. Protocol dispatch and
 socket transport live in the independent [Portable package](../Portable/README.md).
 The previous Network.framework-only server and non-Apple no-op were removed.
 
-1. Start a GuavaUI app with DevTools enabled:
+1. Start a CoveUI app with DevTools enabled:
 
    ```bash
-   ./guava run GuavaUI/Examples --devtools
+   ./cove run CoveUI/Examples --devtools
    # Application project:
-   ./guava run /path/to/MyApp --devtools
-   ./guava run /path/to/MyApp --android --devtools --device DEVICE_SERIAL
+   ./cove run /path/to/MyApp --devtools
+   ./cove run /path/to/MyApp --android --devtools --device DEVICE_SERIAL
    # Connect to an existing CLI-managed session:
-   ./guava devtools /path/to/MyApp
+   ./cove devtools /path/to/MyApp
    ```
 
 The CLI opens this Inspector with the runtime's authenticated endpoint. Dynamic
@@ -27,8 +27,8 @@ directly: the OS URL handlers (`open`, `xdg-open`, `rundll32`) drop the query
 string from `file://` URLs, so the endpoint would never reach the client. The
 bootstrap forwards in-browser, where the query is preserved.
 
-For direct framework development, `GUAVA_DEVTOOLS=1 swift run --package-path
-GuavaUI/Examples GuavaUIDemo` still enables the loopback service at the default
+For direct framework development, `COVE_DEVTOOLS=1 swift run --package-path
+CoveUI/Examples CoveUIDemo` still enables the loopback service at the default
 port 9229. Open Client/index.html and connect manually in that workflow. Ordinary apps
 use the same runtime diagnostics service; no demo-specific API is required.
 
@@ -72,7 +72,7 @@ The Performance tab is populated automatically; no manual start is required.
   **Copy report** copies the same text; **Export JSON** writes structured data
   including the Chrome/Perfetto trace and recent log entries. **Clear** resets
   the frame history and restarts the host timeline capture.
-  Report downloads are named `guava-performance-<timestamp>.{md,json}`.
+  Report downloads are named `cove-performance-<timestamp>.{md,json}`.
 
 Layout and dock preferences (active tab, height, collapsed state, auto trace)
 are kept in browser localStorage and never sent to the host.
@@ -98,7 +98,7 @@ hosts advertise tree, selection, log, timing and configured state providers,
 and omit the unavailable mirror capability.
 
 For a headless connection test, run
-`swift run --package-path GuavaUI/Portable GuavaUIDevToolsProbe` from the repository
+`swift run --package-path CoveUI/Portable CoveUIDevToolsProbe` from the repository
 root. It serves a real Node/Yoga diagnostic tree without GPU dependencies.
 
 ## Pick, inspect layout, edit styles
@@ -160,10 +160,10 @@ client-side `vscode://file`/`cursor://file` link; the runtime never reads a sour
 file or executes an editor command.
 
 The [Wasm prototype](../Browser/README.md) embeds the same client and uses
-`browser://guava` over a same-origin MessageChannel. This transport requires the
+`browser://cove` over a same-origin MessageChannel. This transport requires the
 Inspector to be embedded in its browser host.
 
-Application startup installs [GuavaLogging](../../Engine/Logging/README.md), independently of DevTools. The Inspector subscribes to bounded startup history and live records; it does not install or replace swift-log. The Logs panel supports level/module/text filters, structured metadata and source details, pause display, loss counts and JSONL export. See [log protocol](Protocol/Logs.md). Hosts with an existing swift-log backend select local installation in the application's logging configuration.
+Application startup installs [CoveLogging](../../Engine/Logging/README.md), independently of DevTools. The Inspector subscribes to bounded startup history and live records; it does not install or replace swift-log. The Logs panel supports level/module/text filters, structured metadata and source details, pause display, loss counts and JSONL export. See [log protocol](Protocol/Logs.md). Hosts with an existing swift-log backend select local installation in the application's logging configuration.
 
 The default endpoint is loopback-only. Binding to `0.0.0.0` or `::` exposes
 remote input and state restore to the local network; only do this on a trusted
@@ -172,7 +172,7 @@ development network.
 
 ## Shared Compose and reproducible input
 
-The [Wasm host](../Browser/README.md) and desktop `GuavaUIDemo --shared-counter`
+The [Wasm host](../Browser/README.md) and desktop `CoveUIDemo --shared-counter`
 run one Compose source with real ViewGraph, Yoga and input dispatch. Their Inspector
 supports Capture/Restore/Diff and Record/Stop/Replay. `state.diff` accepts the baseline
 string dictionary and returns `{added, removed, changed: {key: {before, after}}}`.
@@ -209,7 +209,7 @@ itself is subscriber-driven and bounded, so unsubscribed hosts capture nothing.
 Parent and child durations overlap. GPU execution is excluded.
 
 **Add breakpoint** forwards the mapped source coordinates to the companion
-GuavaUI-vscode extension's existing VS Code/Cursor debugger API. Build and reload
+CoveUI-vscode extension's existing VS Code/Cursor debugger API. Build and reload
 that extension to enable its URI handler and node-tree context command. See
 [observation protocol](Protocol/Observation.md) for registration APIs, lifecycle,
 wire messages and bounds.
@@ -236,8 +236,8 @@ reallocates its MSAA target when the drawable dimensions change.
 Run the native Inspector acceptance suite without a Wasm SDK or GPU:
 
 ```bash
-swift build --package-path GuavaUI/Portable --product GuavaUIDevToolsProbe
-swift run --package-path Tools/Developer guava-dev browser verify --native-only
+swift build --package-path CoveUI/Portable --product CoveUIDevToolsProbe
+swift run --package-path Tools/Developer cove-dev browser verify --native-only
 ```
 
 The runner needs Chromium. It exercises real WebSocket
@@ -246,7 +246,7 @@ breakpoint URLs and disconnect/reconnect cleanup.
 
 ## Profile and platform adapters
 
-`guava run --profile` uses Swift Release optimization with GUAVA_PROFILE and
+`cove run --profile` uses Swift Release optimization with COVE_PROFILE and
 keeps an opt-in diagnostics service. Streams are still subscription-driven;
 CPU instrumentation and picture mirroring have measurement overhead and should
 be enabled only for the investigation. CLI --release rejects --devtools, and
@@ -262,26 +262,26 @@ including GPU command submission/waiting; it is not GPU execution duration.
 Run against an existing CLI-managed session:
 
 ```sh
-guava-dev devtools session /path/to/MyApp mac
-guava-dev devtools session /path/to/MyApp android
+cove-dev devtools session /path/to/MyApp mac
+cove-dev devtools session /path/to/MyApp android
 ```
 
 ## AI-driven component acceptance
 
-No OS automation is needed. Start the Gallery through the Guava CLI, query its
+No OS automation is needed. Start the Gallery through the Cove CLI, query its
 live AI diagnostics, inject input through DevTools and inspect the renderer mirror.
 Arguments after `--` go to the Gallery, so a page, width and input mode are
-selected at launch. `guava devtools` actions resolve the project's single live
+selected at launch. `cove devtools` actions resolve the project's single live
 session (add `--session ID` when several run):
 
 ```sh
-./guava run GuavaUI/Examples --mac --devtools --no-open -- --component list --width 390 --input touch
-./guava devtools GuavaUI/Examples list                     # available AI tools
-./guava devtools GuavaUI/Examples query '{"text":"Document 5","visible_only":true,"compact":true}'
-./guava devtools GuavaUI/Examples click NODE_ID
-./guava devtools GuavaUI/Examples activate NODE_ID              # accessibility action, no geometry needed
-./guava devtools GuavaUI/Examples input @events.json --capture /tmp/after.jpg
-./guava devtools GuavaUI/Examples capture /tmp/gallery.jpg --settle-ms 400
+./cove run CoveUI/Examples --mac --devtools --no-open -- --component list --width 390 --input touch
+./cove devtools CoveUI/Examples list                     # available AI tools
+./cove devtools CoveUI/Examples query '{"text":"Document 5","visible_only":true,"compact":true}'
+./cove devtools CoveUI/Examples click NODE_ID
+./cove devtools CoveUI/Examples activate NODE_ID              # accessibility action, no geometry needed
+./cove devtools CoveUI/Examples input @events.json --capture /tmp/after.jpg
+./cove devtools CoveUI/Examples capture /tmp/gallery.jpg --settle-ms 400
 ```
 
 A bare JSON object runs `query_ui_nodes`; `query TOOL JSON` runs any other tool.
@@ -291,12 +291,12 @@ a transition in flight); a separate `capture` call starts a new CLI process firs
 `compact: true` returns one short record per node (id, role, label, value,
 non-default state, clipped frame, `File.swift:line`) instead of the full
 layout/style/view-type payload. The same actions are available as
-`guava-dev devtools query-ui|input-ui|capture-ui|record-timings`, which
+`cove-dev devtools query-ui|input-ui|capture-ui|record-timings`, which
 accept a port or an `@session.json` / `@runtime.json` file. Managed sessions retain their authentication
 token and device-forwarded port inside the connection; copying a token into shell
 commands is unnecessary. Select a component through the Gallery search, then
 inspect the narrow/wide/touch previews and change scale or appearance in the UI.
-Build/test changes with `./guava test GuavaUI --no-parallel --filter TEST`.
+Build/test changes with `./cove test CoveUI --no-parallel --filter TEST`.
 
 Gallery flags: `--input touch|mixed|pointer`, `--dark`, `--text-scale 2`,
 `--rtl`, `--reduce-motion`. Width and height still follow the real window after
@@ -335,7 +335,7 @@ After locating the actual `textField` node (rather than a debug-name wrapper),
 explicitly request its current draft/value through the same AI query:
 
 ```sh
-guava-dev devtools query-ui 9231 query_ui_nodes \
+cove-dev devtools query-ui 9231 query_ui_nodes \
   '{"node_id":"177","include_value":true}'
 ```
 
@@ -344,7 +344,7 @@ Output is capped at 4096 Unicode characters; `include_value` requires one
 `node_id`, and unmounted IDs fail. Secure fields return `<redacted>` without
 evaluating their value provider. No private `@State` is exposed by this read.
 
-Touch surfaces use GuavaUI's unified pointer dispatcher, including real touch
+Touch surfaces use CoveUI's unified pointer dispatcher, including real touch
 scroll/refresh/swipe recognition and 44pt hit regions. They test component
 behavior; platform IME and physical device adapters still need device acceptance.
 The mirror replays the application's draw list and excludes OS compositor chrome.

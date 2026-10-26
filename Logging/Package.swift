@@ -1,13 +1,13 @@
 // swift-tools-version: 6.4
 import PackageDescription
 
-let package = Package(name: "GuavaLogging", platforms: [.macOS(.v26), .iOS(.v26)], products: [
-    .library(name: "GuavaLogging", targets: ["GuavaLogging"]),
-    .library(name: "GuavaLogCore", targets: ["GuavaLogCore"]),
-    .library(name: "CGuavaLog", targets: ["CGuavaLog"]),
+let package = Package(name: "CoveLogging", platforms: [.macOS(.v26), .iOS(.v26)], products: [
+    .library(name: "CoveLogging", targets: ["CoveLogging"]),
+    .library(name: "CoveLogCore", targets: ["CoveLogCore"]),
+    .library(name: "CCoveLog", targets: ["CCoveLog"]),
 ], dependencies: [.package(url: "https://github.com/apple/swift-log.git", from: "1.15.1")], targets: [
-    .target(name: "CGuavaLog", publicHeadersPath: "include", linkerSettings: [.linkedLibrary("log", .when(platforms: [.android]))]),
-    .target(name: "GuavaLogCore", dependencies: [.product(name: "Logging", package: "swift-log")]),
-    .target(name: "GuavaLogging", dependencies: ["CGuavaLog", "GuavaLogCore"]),
-    .testTarget(name: "GuavaLoggingTests", dependencies: ["GuavaLogging", "CGuavaLog"]),
+    .target(name: "CCoveLog", publicHeadersPath: "include", linkerSettings: [.linkedLibrary("log", .when(platforms: [.android]))]),
+    .target(name: "CoveLogCore", dependencies: [.product(name: "Logging", package: "swift-log")]),
+    .target(name: "CoveLogging", dependencies: ["CCoveLog", "CoveLogCore"]),
+    .testTarget(name: "CoveLoggingTests", dependencies: ["CoveLogging", "CCoveLog"]),
 ])

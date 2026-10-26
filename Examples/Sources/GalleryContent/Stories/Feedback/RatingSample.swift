@@ -1,6 +1,6 @@
-import GuavaUI
-import GuavaUIRuntime
-@_spi(CustomLayout) import GuavaUIScene
+import CoveUI
+import CoveUIRuntime
+@_spi(CustomLayout) import CoveUIScene
 
 /// Keep a rating's intrinsic hit lanes, with the score and commands below it.
 /// Wide star counts scroll inside the card instead of pushing out other content.

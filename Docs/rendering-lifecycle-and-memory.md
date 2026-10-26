@@ -2,91 +2,81 @@
 
 ## Ownership
 
-`PlatformShell.WindowHandle` reports native visibility, minimization and occlusion.
-`SDL3PlatformHost` resolves these into each session's `isPresentationActive` and
-notifies presentation owners outside GPU frame recording. Programmatic hide is
-synchronous; native changes are reconciled after polling events, before ticking
-clients. Focus alone does not suspend a window.
+The platform host resolves native visibility, minimization and occlusion before
+client ticks. Hidden windows stop presenting, wait for pending GPU work, and drop
+swapchain, MSAA, backdrop and effect targets. Desired size and VSync survive;
+activation requests a frame and recreates targets lazily. Focus alone does not
+suspend a window. Each window owns its presentation history and scratch resources;
+devices, shader pipelines, font/image residency and application state are shared.
 
-`NativeAppWindowRenderer` owns a window's swapchain and derived targets. Its states
-are unconfigured, active, suspended and closed. Suspension waits for pending work
-through `SwapchainResource.close()` and drops target ownership. Pending display
-requests cannot recreate these resources. The native window and latest desired
-size/VSync remain; activation requests a frame and lazily recreates the swapchain.
-Each window has its own presentation renderer, including reveal history and blur
-scratch. The device, shader/pipeline resources, font/image residency and application
-state outlive suspension; per-window transient resources do not.
-
-The host does not initialize/draw suspended windows or spin retries for them.
-An inactive window does not force display-refresh fallback on active siblings.
+Diffuse suppresses hidden viewport/HUD work and restarts temporal convergence on
+exposure. Scene targets grow immediately and shrink after the requested area stays
+at or below one quarter of capacity for one second. Resource leases preserve old
+snapshots through replacement.
 
 ## Update boundaries
 
 Body evaluation, layout invalidation and paint invalidation are separate.
-Recomposition metrics must not dirty rendered content. Nodes invalidate their
-paint when visual identity changes; structure and layout retain their own paths.
+Recomposition metrics do not dirty paint. Cove's keyed registrar and Swift
+Observation track reads in the nearest view scope, around body or primitive
+evaluation rather than recursive reconciliation. Subscriptions are replaced on
+reevaluation and canceled on teardown. Mutation callbacks schedule later work.
 
-Guava's keyed registrar and Swift Observation both use the nearest view scope.
-Swift observation wraps body/primitive evaluation, not recursive reconciliation:
-wrapping the whole tree would accidentally subscribe parents to child reads.
-Subscriptions are replaced on reevaluation and canceled on teardown. Mutation
-callbacks schedule a later recomposition; they do not evaluate a body in `willSet`.
+Plain value-type `@State` invalidates its owning scope. On a parent update,
+structurally equal child value inputs can preserve the existing scope, state,
+bindings and callbacks without reevaluating the child's body. Closures, mutable
+references and opaque values conservatively force recomposition. Changed
+composition locals still invalidate consumers. This comparison does not infer
+which fields of a plain struct a body reads; field-level dependency tracking
+requires observable properties or explicit child inputs.
 
-Plain value-type `@State` remains scope-granular. The framework does not infer
-field reads from reflection or skip arbitrary closures/reference objects by a
-guessed fingerprint. Existing state and binding semantics remain supported.
+## Coverage and sampling
+
+Path strokes, rounded borders and progress rings carry coverage fringes scaled to
+physical pixels. `geometryAntialiasing = .analytic` also feathers rounded masks
+with disjoint geometry cells and selects a 1x target for that window. Geometry
+caches include this mode. Offscreen HUD and Android drawing select analytic masks.
+Desktop defaults remain 4x MSAA: custom triangle meshes do not automatically carry
+boundary coverage, so lowering the global default needs backend visual validation.
+
+Decoded images build alpha-weighted mip pyramids, including odd edge pixels.
+Their full retained pixel payload counts toward the image cache budget. `Image`
+chooses the closest resolution level from the displayed pixel size and visible
+source fraction, with bilinear filtering within that level. `TextureImage` accepts
+producer-owned independent texture levels. This is nearest-level LOD selection;
+it does not implement trilinear filtering or native texture subresource chains.
+
+Diffuse builds GPU levels for fixed-resolution game previews after the scene and
+HUD pass. The first reduction clamps to the used region, excluding unused target
+capacity. Subsequent levels have exact extents. Ordinary viewports do not allocate
+a pyramid. Old snapshots retain the textures they reference.
 
 ## Budgets and diagnostics
 
-`ApplicationConfiguration.memory.text` limits shaping and layout caches separately
-(default 512 entries and 8 MiB each). Cache hits refresh LRU order; oversized
-results are usable without being retained. Trimming also prevents an older
-in-progress build from repopulating the cache.
+`ApplicationConfiguration.memory.text` separately limits shaping and layout caches
+(default 512 entries and 8 MiB each). Hits refresh LRU order; oversized results are
+usable without retention. Trimming prevents older builds from repopulating caches.
+Image-cache eviction drops cache ownership; live views and snapshots retain assets.
 
-`memory.images` configures the existing image cache. Its byte limit is a ceiling,
-not an eager allocation. Cache eviction does not release assets still owned by
-live nodes or in-flight snapshots.
+`AppDisplayHandle.memorySnapshot()` and DevTools `query_ui_memory` report cache
+counts and estimated payload bytes, skipped parent updates, window activity,
+sample count, swapchain ownership and derived target estimates. The Performance
+panel refreshes these while open. These are logical ownership estimates rather
+than process RSS: allocator/driver overhead, drawable pools, font atlases and
+external scene textures are excluded.
 
-`AppDisplayHandle.memorySnapshot()` reports text-cache payload estimates, CPU
-image-cache bytes and each initialized window's state, sample count, swapchain
-ownership and estimated MSAA/backdrop/effect-scratch bytes. These are logical ownership metrics,
-not `phys_footprint`: allocator overhead, driver allocation, drawable pools, font
-atlases and externally owned scene textures are excluded. Do not derive CPU usage
-by subtracting these estimates from an OS process measurement.
+`trimMemory()` drops caches and derived geometry while preserving live state and
+in-flight resources. macOS pressure and iOS warnings invoke it. Windows polls its
+low-memory notification and Linux samples host availability and cgroup v2 limits;
+transitions into pressure enqueue cleanup on the UI loop. Android forwards
+`onTrimMemory` and `onLowMemory`, excluding the visibility-only UI-hidden event.
+Offscreen hosts expose their own trim hook.
 
-`trimMemory()` drops text/image cache ownership and derived layer/frame geometry.
-macOS warning/critical pressure and iOS memory warnings enqueue the same operation
-on the UI loop. Other hosts can invoke the explicit hook. Live view/state and
-in-flight resources remain valid. Offscreen hosts expose their own `trimMemory()`.
+## Migration
 
-## Quality and integration
-
-Application rendering remains the default. `config.window.rendering` and
-`display.openWindow(rendering:)` optionally override samples/clear color per window.
-The default remains 4x MSAA. No new geometry-AA mode, shader ABI or texture-mipmap
-contract is introduced by this repair. Those require separate image/clip/path
-coverage and cross-backend pixel validation, especially for cropped engine textures
-and glyph atlases; a global sampler change cannot supply missing mip contents.
-
-Studio consumes visibility before ticking, suppresses hidden viewport/HUD work,
-and restarts temporal convergence on exposure. Scene targets grow immediately and
-shrink when their quantized requested area stays at or below one quarter of the
-allocation for one second. Old surface leases remain readable after replacement.
-
-## Regression coverage
-
-- Root updates with unchanged paint reuse geometry with metrics enabled; changed
-  output and theme updates still repaint.
-- Swift-observed sibling properties only invalidate their readers; repeated writes,
-  conditional dependencies, reader closures and scope teardown are covered.
-- Dynamic text/width streams stay bounded, LRU hits survive, oversize results bypass
-  retention and trimming wins over an older build.
-- Hidden multi-window sessions cannot render pending frames; siblings continue.
-  A Metal test exercises 100 suspend/resize/resume cycles with owned-target snapshots.
-- Offscreen snapshots preserve geometry and atlas update delivery across reuse/trim.
-- Studio's viewport gate suppresses forced hidden frames and restores TAA convergence;
-  target sizing tests cover settled shrink, resize changes and immediate growth.
-
-Run package checks through `guava test`, selecting this checkout with `--sdk-root`.
-Changes to Swift sources do not by themselves validate Windows/Linux/Android/iOS
-runtime behavior; record host-specific results separately.
+Cove 0.2 uses `Cove*` modules, `cove`, `cove.json`, `.cove`, and `COVE_*` environment
+variables. Update these together when migrating an existing project. Explicit
+`--sdk-root` or `COVE_SDK_ROOT` overrides may select a source checkout with a
+version different from the project's fixed SDK; normal project selection still
+enforces its pin. Source checkouts bootstrap native dependencies from source,
+while installed SDKs require complete matching prebuilt libraries.

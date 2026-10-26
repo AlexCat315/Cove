@@ -1,5 +1,5 @@
 import Foundation
-import GuavaUI
+import CoveUI
 
 struct LayoutFoundationExamples: View {
     let options: GalleryOptions

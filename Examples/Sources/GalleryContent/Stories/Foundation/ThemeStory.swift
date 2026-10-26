@@ -1,5 +1,5 @@
-import GuavaUI
-import GuavaUIRuntime
+import CoveUI
+import CoveUIRuntime
 
 private struct EditorialTokens: ThemeExtension {
     var figure = TextStyleToken(font: .system(size: 30, weight: .bold), lineHeight: 38, letterSpacing: -0.5)
@@ -12,7 +12,7 @@ struct ThemeStory: View {
     @State private var radius: Double = 12
     @State private var family: String? = "system"
     @State private var largerIcons = false
-    @State private var name: TextBuffer = "Guava Studio"
+    @State private var name: TextBuffer = "Cove Studio"
     @State private var saved = 0
 
     var body: some View {
@@ -74,7 +74,7 @@ struct ThemeStory: View {
                     Spacer()
                     Badge("Local theme", tone: .info)
                 }
-                Text("A body role belongs to your application. GuavaUI supplies a default, and your design system sets the family, size and line height.")
+                Text("A body role belongs to your application. CoveUI supplies a default, and your design system sets the family, size and line height.")
                 TextField("Project name", text: $name).debugName("theme-preview-input")
                 Row(alignment: .center, spacing: 12) {
                     Text("\(saved)").font(SemanticFontRef { $0.extensions[EditorialTokens.self].figure })

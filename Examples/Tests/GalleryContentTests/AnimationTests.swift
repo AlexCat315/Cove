@@ -1,7 +1,7 @@
 import Foundation
 import Testing
-import GuavaUI
-import GuavaUIRuntime
+import CoveUI
+import CoveUIRuntime
 @testable import GalleryContent
 
 @Suite("Gallery timing curves", .serialized)

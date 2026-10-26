@@ -1,4 +1,4 @@
-import GuavaUI
+import CoveUI
 
 struct GridColumnExamples: View {
     let options: GalleryOptions
