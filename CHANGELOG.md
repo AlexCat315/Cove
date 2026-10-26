@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## 0.2.3 — 2026-10-27
+
 ## Unreleased
 
 - 完整发布 Cove 0.2 系列 SDK：包含改名、子树复用、覆盖率抗锯齿、mip／LOD、内存压力与 DevTools 接线修复。
