@@ -6,29 +6,21 @@
 
 ## 0.2.4 — 2026-10-27
 
-## Unreleased
-
 - 修复 Windows 安装器读取 GitHub 校验清单的方式：下载后明确按 UTF-8 文本逐行解析，兼容二进制响应类型，并避免覆盖 PowerShell 自动变量。
 - 包含 Cove 0.2 系列的完整改名、子树复用、抗锯齿、mip／LOD、跨平台内存压力和 DevTools 修复。
 
 ## 0.2.3 — 2026-10-27
-
-## Unreleased
 
 - 完整发布 Cove 0.2 系列 SDK：包含改名、子树复用、覆盖率抗锯齿、mip／LOD、内存压力与 DevTools 接线修复。
 - 修复解析抗锯齿在 Android 上的浮点数学重载与类型推导，采用 Swift 原生开方和取整，并在整数转换前限制细分数量。
 
 ## 0.2.2 — 2026-10-27
 
-## Unreleased
-
 - 完整发布 Cove 改名后的 SDK，包含 0.2 系列的子树复用、抗锯齿、mip／LOD、内存压力和 DevTools 修复。
 - Android 发布明确选择已安装的 NDK r30，避免 runner 继承的旧 NDK 环境变量使原生库打包失败。
 - 发行脚本等待真实的 GitHub workflow ID，不再把空列表显示为 `null`。
 
 ## 0.2.1 — 2026-10-27
-
-## Unreleased
 
 - 首次发布完整 Cove SDK：同步模块、CLI、清单、安装目录与发布包名称，包含值状态子树复用、覆盖率抗锯齿、mip／LOD 和跨平台内存压力修复。
 - 修复 Linux／Android 原生构建中 SVG、WebP 静态依赖的链接顺序，CLI 自动配置所需选项。
