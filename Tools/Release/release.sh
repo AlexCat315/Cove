@@ -337,7 +337,7 @@ step "Release workflow"
 # The build and publish result is deliberately not awaited.
 find_run() {
   gh run list --workflow "$WORKFLOW" --branch "$tag" --limit 1 \
-    --json databaseId,url --jq '.[0] | "\(.databaseId) \(.url)"' 2>/dev/null || true
+    --json databaseId,url --jq '.[] | "\(.databaseId) \(.url)"' 2>/dev/null || true
 }
 
 run_info=

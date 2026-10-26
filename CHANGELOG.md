@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+## Unreleased
+
+- 完整发布 Cove 改名后的 SDK，包含 0.2 系列的子树复用、抗锯齿、mip／LOD、内存压力和 DevTools 修复。
+- Android 发布明确选择已安装的 NDK r30，避免 runner 继承的旧 NDK 环境变量使原生库打包失败。
+- 发行脚本等待真实的 GitHub workflow ID，不再把空列表显示为 `null`。
+
 ## 0.2.1 — 2026-10-27
 
 ## Unreleased
