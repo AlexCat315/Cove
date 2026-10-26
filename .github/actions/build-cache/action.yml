@@ -14,6 +14,7 @@ runs:
         key: sdk-swift-v1-${{ runner.os }}-${{ runner.arch }}-6.4.1-${{ hashFiles('**/Package.swift', '**/Package.resolved', '.github/actions/setup-toolchains/action.yml') }}-${{ github.sha }}
         restore-keys: |
           sdk-swift-v1-${{ runner.os }}-${{ runner.arch }}-6.4.1-${{ hashFiles('**/Package.swift', '**/Package.resolved', '.github/actions/setup-toolchains/action.yml') }}-
+          sdk-swift-v1-${{ runner.os }}-${{ runner.arch }}-6.4.1-
     # Save after successful compilation, even if a later test reports a failure.
     # The workflow calls cache/save explicitly after the build gate.
 outputs:
