@@ -12,6 +12,8 @@ jobs:
   verify:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 40
+    env:
+      SWIFT_BACKTRACE: 'enable=yes,interactive=no'
     strategy:
       fail-fast: false
       matrix:
@@ -108,6 +110,11 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: ./Tools/Testing/Windows.ps1 -Package . -SkipBuild -Output test-results
+      - name: Collect macOS crash reports
+        if: failure() && runner.os == 'macOS'
+        run: |
+          mkdir -p test-results/crashes
+          find "$HOME/Library/Logs/DiagnosticReports" -type f -mmin -60 \( -name '*Cove*' -o -name '*swift*' \) -exec cp {} test-results/crashes/ \;
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

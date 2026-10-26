@@ -34,6 +34,9 @@ enum SwiftPackage {
     static func environment(root: URL) throws -> [String: String] {
         var environment = ProcessInfo.processInfo.environment
         environment["COVE_SDK_ROOT"] = root.path
+        #if os(Linux)
+        environment["COVE_NATIVE_LINK_ORDER"] = "1"
+        #endif
         #if os(Windows)
         try WindowsBuildEnvironment.activate(&environment)
         #endif

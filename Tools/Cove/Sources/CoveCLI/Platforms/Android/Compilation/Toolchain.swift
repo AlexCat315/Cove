@@ -61,6 +61,7 @@ struct AndroidToolchain {
         let artifacts = try NativeDependencies(toolchain: self).prepare()
         var environment = ProcessInfo.processInfo.environment
         environment["COVE_SDK_ROOT"] = root.path
+        environment["COVE_NATIVE_LINK_ORDER"] = "1"
         environment["ANDROID_NDK_HOME"] = ndk.path
         // SwiftPM resolves binary target paths against the consuming package root, so the
         // shared cache locations are passed relative to the package that reads them.

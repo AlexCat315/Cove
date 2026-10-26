@@ -49,7 +49,7 @@ struct RenderingFeatureTests {
         #expect(first?.url.absoluteString == "https://example.com/a_(b)")
         #expect(first?.columns == 4...28)
         #expect(URLDetector.match(in: frame, row: 0, column: 29) == nil)
-        #expect(URLDetector.match(in: frame, row: 0, column: 33)?.url.absoluteString == "https://www.guava.dev")
+        #expect(URLDetector.match(in: frame, row: 0, column: 33)?.url.absoluteString == "https://www.cove.dev")
         #expect(URLDetector.match(in: frame, row: 0, column: 1) == nil)
     }
 

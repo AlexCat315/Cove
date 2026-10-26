@@ -7,7 +7,12 @@ let textArtifacts = ProcessInfo.processInfo.environment["COVE_TEXT_ARTIFACT_ROOT
 let windowsCxxRuntime: [LinkerSetting] = ["msvcrt", "msvcprt"].map {
     .linkedLibrary($0, .when(platforms: [.windows]))
 }
-
+// SwiftPM's native build system does not order binary archives by dependency.
+// Repeat leaf libraries after their consumers for GNU ld's single-pass scan.
+// Swift Build resolves artifact paths itself and must not receive these flags.
+let nativeImageLinkOrder: [LinkerSetting] = ProcessInfo.processInfo.environment["COVE_NATIVE_LINK_ORDER"] == "1"
+    ? ["plutovg", "sharpyuv"].map { .linkedLibrary($0, .when(platforms: [.linux, .android])) }
+    : []
 
 func nativeTarget(_ name: String, directory: String) -> Target {
     let local = "\(directory)/\(name).artifactbundle"
@@ -132,7 +137,7 @@ let runtimeTargets: [Target] = [
             .target(name: "CoveLogging")], path: "Runtime/Sources/PlatformShell"),
     .target(name: "CImageDecodeBridge", dependencies: ["lunasvg", "plutovg", "webp", "sharpyuv"],
                 path: "Runtime/Sources/Bridge/CImageDecodeBridge", publicHeadersPath: "include",
-                cxxSettings: [.define("LUNASVG_BUILD_STATIC")], linkerSettings: windowsCxxRuntime),
+                cxxSettings: [.define("LUNASVG_BUILD_STATIC")], linkerSettings: windowsCxxRuntime + nativeImageLinkOrder),
 ]
 
 let textTargets: [Target] = [
