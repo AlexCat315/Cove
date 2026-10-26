@@ -4,6 +4,8 @@ GuavaUI SDK 与 `guava` CLI 的发布记录。每个版本对应 git 标签 `vX.
 
 ## Unreleased
 
+## 0.1.11 — 2026-10-26
+
 - `guava.json` 的 `toolchain.sdkVersion` 支持写 `latest`：构建时浮动到本地已安装的最高版本 SDK（离线可用，不触发网络），用 `guava sdk install latest` 拉取新发布并刷新；`guava sdk install latest` 在精确钉版项目里仍会把解析后的具体版本写回清单（npm 语义），无 `GUAVA_SDK_ROOT` 的 SwiftPM 回退路径改用 `from: 0.0.0` 解析最高发布标签，Android Gradle 回退同样支持 latest。
 - `guava sdk install latest` 解析 GitHub Latest 指针时去掉仓库地址末尾的 `.git`，此前拼接出 `.git/releases/latest` 会 404。
 - `guava self update` 不再调用 `api.github.com`（未认证每小时 60 次配额，超限即失败），改为跟随 `github.com/repos/latest` 的重定向解析最新版本；下载类错误现在打印完整的 HTTP 状态而不是通用的 `ToolError` 提示。
