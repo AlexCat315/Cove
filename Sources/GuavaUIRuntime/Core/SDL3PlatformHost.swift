@@ -32,6 +32,18 @@ public final class PlatformWindowSession {
     }
     fileprivate var nextRenderAttemptTime: Double = 0
 
+    public private(set) var isPresentationActive = true
+    public var onPresentationChanged: (@MainActor (Bool) -> Void)?
+
+    fileprivate func updatePresentation(active: Bool) -> Bool {
+        guard isPresentationActive != active else { return false }
+        isPresentationActive = active
+        nextRenderAttemptTime = 0
+        if active { needsDisplay = true }
+        onPresentationChanged?(active)
+        return true
+    }
+
     public private(set) var drawableSize: (width: UInt32, height: UInt32)
     public private(set) var logicalSize: (width: UInt32, height: UInt32)
     public private(set) var contentScaleFactor: Float
@@ -220,6 +232,8 @@ public final class SDL3PlatformHost: PlatformHost {
     /// own per-window GPU surfaces must release the matching surface here so it
     /// does not outlive the SDL/Wayland window it was created from.
     public var onWindowTeardown: (@MainActor (_ windowID: WindowID) -> Void)?
+    /// Delivered outside a frame, including programmatic hide/minimize.
+    public var onWindowPresentationChanged: (@MainActor (WindowID, Bool) -> Void)?
     /// Fires once when the run loop has exited, *before* the shell tears down its
     /// windows and quits SDL. The symmetric counterpart to `onInit`: consumers
     /// must release any GPU surfaces created from a window handle here, while the
@@ -306,6 +320,7 @@ public final class SDL3PlatformHost: PlatformHost {
 
     public func minimizeWindow(_ windowID: WindowID) {
         shell?.minimizeWindow(windowID)
+        synchronizePresentation(windowID)
     }
 
     public func maximizeWindow(_ windowID: WindowID) {
@@ -318,10 +333,21 @@ public final class SDL3PlatformHost: PlatformHost {
 
     public func hideWindow(_ windowID: WindowID) {
         shell?.hideWindow(windowID)
+        synchronizePresentation(windowID)
     }
 
     public func showWindow(_ windowID: WindowID) {
         shell?.showWindow(windowID)
+        synchronizePresentation(windowID)
+    }
+
+    private func synchronizePresentation(_ id: WindowID) {
+        guard let handle = shell?.window(for: id), let session = sessions[id] else { return }
+        let active = handle.isVisible && !handle.isMinimized && !handle.isOccluded
+            && handle.drawableSize.width > 0 && handle.drawableSize.height > 0
+        if session.updatePresentation(active: active) {
+            onWindowPresentationChanged?(id, active)
+        }
     }
 
     public func isWindowMaximized(_ windowID: WindowID) -> Bool {
@@ -513,6 +539,8 @@ public final class SDL3PlatformHost: PlatformHost {
             }
         }
 
+        for id in sessionOrder { synchronizePresentation(id) }
+
         // Run work handed back from native callbacks (e.g. file dialogs) on
         // the main thread, then force a frame so any resulting UI change
         // (such as a freshly loaded project) is shown promptly.
@@ -537,18 +565,20 @@ public final class SDL3PlatformHost: PlatformHost {
         var nativeWindows = Set<WindowID>()
         var refreshTicks: [WindowID: DisplayRefreshTick] = [:]
         for id in sessionOrder {
-            if shell.setDisplayRefreshEnabled(wantsNativeRefresh, windowID: id), wantsNativeRefresh {
+            let enabled = wantsNativeRefresh && sessions[id]?.isPresentationActive == true
+            if shell.setDisplayRefreshEnabled(enabled, windowID: id), enabled {
                 nativeWindows.insert(id)
                 if let tick = shell.takeDisplayRefresh(windowID: id) { refreshTicks[id] = tick }
             }
         }
-        let needsRefreshFallback = wantsNativeRefresh && nativeWindows.count < sessions.count
+        let activeWindowCount = sessions.values.filter(\.isPresentationActive).count
+        let needsRefreshFallback = wantsNativeRefresh && nativeWindows.count < activeWindowCount
         if needsRefreshFallback, !state.reportedFallback {
             Logger.runtime.warning("native display refresh unavailable; using fixed-rate deadline fallback")
             state.reportedFallback = true
         }
         let fallbackInterval: Double? = {
-            if case let .fixed(fps) = frameDrive.mode { return 1.0 / fps }
+            if case let .fixed(fps) = frameDrive.mode, activeWindowCount > 0 { return 1.0 / fps }
             guard needsRefreshFallback else { return nil }
             return 1.0 / Self.sanitizedDisplayRefreshRate(shell.displayRefreshRate(windowID: mainWindowID))
         }()
@@ -602,7 +632,7 @@ public final class SDL3PlatformHost: PlatformHost {
                 session.recomposer.commitAll()
             }
             WindowRevealContext.clearActivation(in: session.tree.root)
-            if didCommit {
+            if didCommit && session.tree.hasRenderUpdates {
                 session.needsDisplay = true
             }
         }
@@ -632,7 +662,7 @@ public final class SDL3PlatformHost: PlatformHost {
                 }
             }
 
-            if !session.didCallOnInit, let surface = handle.renderSurface {
+            if !session.didCallOnInit, session.isPresentationActive, let surface = handle.renderSurface {
                 session.didCallOnInit = true
                 session.needsDisplay = true
                 session.onInit?(surface, session.drawableSize.width, session.drawableSize.height)
@@ -645,7 +675,7 @@ public final class SDL3PlatformHost: PlatformHost {
             if nativeWindows.contains(id), refreshTicks[id] != nil {
                 session.nextRenderAttemptTime = 0
             }
-            let shouldRender = (session.needsDisplay || hasRenderInvalidation)
+            let shouldRender = session.isPresentationActive && (session.needsDisplay || hasRenderInvalidation)
                 && frameStart >= session.nextRenderAttemptTime
                 && (!isCadenceDriven || refreshTicks[id] != nil || (!nativeWindows.contains(id) && fallbackDue))
                 && (isCadenceDriven || !nativeWindows.contains(id) || refreshTicks[id] != nil || session.needsDisplay)
@@ -727,7 +757,7 @@ public final class SDL3PlatformHost: PlatformHost {
                 && !animationsWereActive && AnimatorScheduler.current.hasActiveAnimations
             let hasImmediateWork = startsAnimation || sessions.values.contains { session in
                 !isCadenceDriven && (session.recomposer.hasPending ||
-                    ((session.needsDisplay || (session.tree.hasRenderUpdates && !nativeWindows.contains(session.id)))
+                    (session.isPresentationActive && (session.needsDisplay || (session.tree.hasRenderUpdates && !nativeWindows.contains(session.id)))
                         && now >= session.nextRenderAttemptTime)
                 )
             }
@@ -735,7 +765,7 @@ public final class SDL3PlatformHost: PlatformHost {
                 ? 0
                 : eventWaitTimeout(now: now)
             if let remaining = state.fallbackDeadline.remaining(now: now) { timeout = min(timeout, remaining) }
-            for session in sessions.values where !isCadenceDriven && !nativeWindows.contains(session.id)
+            for session in sessions.values where session.isPresentationActive && !isCadenceDriven && !nativeWindows.contains(session.id)
                 && (session.needsDisplay || session.tree.hasRenderUpdates) {
                 timeout = min(timeout, max(0.001, session.nextRenderAttemptTime - now))
             }

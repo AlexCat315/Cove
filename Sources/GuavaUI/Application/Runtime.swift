@@ -80,6 +80,7 @@ public final class Application {
     private let performanceHUD = PerformanceHUD()
     private var runLoopError: Error?
     private let diagnostics = ApplicationDiagnostics()
+    private var memoryPressure: ApplicationMemoryPressure?
 
     private static let forceVSyncOff = ["off", "0", "false", "no"].contains(
         ProcessInfo.processInfo.environment["GUAVA_VSYNC"]?.lowercased() ?? "")
@@ -107,6 +108,7 @@ public final class Application {
                                             height: Self.previewsPhone ? 844 : max(1, config.window.height), titleBarStyle: config.window.titleBarStyle.platformStyle,
                                             showsDockIcon: config.window.showsDockIcon), inputContext: input)
         composition = MainComposition(recomposer: host.recomposer, portalStore: portalStore)
+        composition.imageAssets.limits = config.memory.images
         configureHostFrameDrive()
     }
 
@@ -233,7 +235,22 @@ public final class Application {
         host.onWindowTeardown = { [weak self] windowID in
             self?.releaseGPUSurface(for: windowID)
         }
+        host.onWindowPresentationChanged = { [weak self] windowID, active in
+            guard let self else { return }
+            do {
+                if self.host.mainSession?.id == windowID {
+                    try self.windowRenderer?.setPresentationActive(active)
+                    self.callbacks.events.publish(active ? .windowExposed : .windowOccluded)
+                } else {
+                    try self.auxiliaryWindows[windowID]?.setPresentationActive(active)
+                }
+            } catch {
+                self.failRunLoop(error, context: "window presentation transition")
+            }
+        }
         host.onTeardown = { [weak self] in
+            self?.memoryPressure?.stop()
+            self?.memoryPressure = nil
             self?.callbacks.diagnosticsReady?(nil)
             self?.diagnostics.queries?.resetCaptures()
             self?.diagnostics.queries = nil
@@ -249,6 +266,9 @@ public final class Application {
             host?.wakeEventLoop()
         }
         AppDisplayHandleHolder.current = displayHandle
+        displayHandle.installMemoryControls(snapshot: { [weak self] in self?.memorySnapshot() },
+            trim: { [weak self] in self?.trimMemory() })
+        memoryPressure = ApplicationMemoryPressure(host: host) { [weak self] in self?.trimMemory() }
         host.externalDisplayRequestDrain = {
             displayHandle.drainDisplayRequest()
         }
@@ -377,6 +397,22 @@ public final class Application {
     /// `SDL_Quit` has disconnected Wayland dereferences freed proxies and crashes
     /// in libwayland-client. Wired to `host.onTeardown`, which fires after the run
     /// loop exits but before `shell.shutdown()`.
+    private func memorySnapshot() -> AppMemorySnapshot {
+        var windows = auxiliaryWindows.compactMapValues { $0.memorySnapshot }
+        if let id = host.mainSession?.id, let renderer = windowRenderer { windows[id] = renderer.memorySnapshot }
+        let text = TextEnvironmentHolder.current
+        return AppMemorySnapshot(shaping: text?.shapingCacheSnapshot, textLayout: text?.layoutCacheSnapshot,
+            cachedImageBytes: composition.imageAssets.cachedBytes, windows: windows)
+    }
+
+    private func trimMemory() {
+        TextEnvironmentHolder.current?.trimTextCaches()
+        composition.imageAssets.clear()
+        composition.graph.renderTree.trimCaches()
+        composition.drawList.reset()
+        for window in auxiliaryWindows.values { window.trimMemory() }
+    }
+
     private func releaseGPUSurfaces() {
         releaseMainWindowRenderer()
         for window in auxiliaryWindows.values { window.releaseGPUSurface() }
@@ -405,7 +441,7 @@ public final class Application {
         mainWindow.logicalW = host.logicalSize.width
         mainWindow.logicalH = host.logicalSize.height
 
-        let renderer = try rendering.makeWindow(settings: AppWindowRenderSettings(config: config))
+        let renderer = try rendering.makeWindow(settings: AppWindowRenderSettings(config: config, window: config.window.rendering))
         try renderer.configure(native: native, size: SIMD2(widthPx, heightPx), vsync: mainWindow.isVSyncEnabled)
         windowRenderer = renderer
 
@@ -650,7 +686,8 @@ public final class Application {
             defaultLineHeight: config.typography.lineHeight,
             defaultColor: .white,
             rasterScale: scale,
-            atlasEdge: atlasEdge
+            atlasEdge: atlasEdge,
+            cacheLimits: config.memory.text
         )
         typography.atlas = env.atlas
         TextEnvironmentHolder.current = env
@@ -685,6 +722,7 @@ public final class Application {
                                             portalStore: portalStore,
                                             rendering: rendering,
                                             config: config,
+                                            windowRendering: request.rendering,
                                             isVSyncEnabled: mainWindow.isVSyncEnabled,
                                             useLegacyRenderer: composition.useLegacyRenderer,
                                             setWindowChromeHitTest: { [weak self] id, hitTest in

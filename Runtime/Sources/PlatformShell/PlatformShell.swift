@@ -138,11 +138,13 @@ public protocol WindowHandle: AnyObject {
     var logicalSize: (width: UInt32, height: UInt32) { get }
     var contentScaleFactor: Float { get }
     var isFocused: Bool { get }
+    var isVisible: Bool { get }
     var isMinimized: Bool { get }
     var isOccluded: Bool { get }
 }
 
 public extension WindowHandle {
+    var isVisible: Bool { true }
     var safeArea: WindowSafeArea { WindowSafeArea() }
     var nativeWindowReference: NativeWindowReference? { nil }
     var contentScaleFactor: Float {
@@ -385,6 +387,7 @@ public final class AppKitShell: Shell {
         var drawableSize: (width: UInt32, height: UInt32) { shell?.drawableSize ?? (1, 1) }
         var logicalSize: (width: UInt32, height: UInt32) { shell?.logicalSize ?? (1, 1) }
         var isFocused: Bool { shell?.isRunning ?? false }
+        var isVisible: Bool { shell?.window?.isVisible == true && !NSApp.isHidden }
         var isMinimized: Bool { shell?.window?.isMiniaturized ?? false }
         var isOccluded: Bool { false }
     }

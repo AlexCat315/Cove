@@ -17,6 +17,16 @@ public enum AppFrameDrivePolicy: Sendable, Equatable {
     case continuous
 }
 
+/// Nil values inherit application rendering defaults.
+public struct AppWindowRendering: Sendable, Equatable {
+    public var sampleCount: UInt32?
+    public var clearColor: SIMD4<Float>?
+    public init(sampleCount: UInt32? = nil, clearColor: SIMD4<Float>? = nil) {
+        self.sampleCount = sampleCount
+        self.clearColor = clearColor
+    }
+}
+
 /// Application defaults are owned by the subsystem that consumes them.
 /// Configure only the groups your application needs; native GPU setup is optional.
 public struct ApplicationConfiguration: Sendable {
@@ -27,6 +37,7 @@ public struct ApplicationConfiguration: Sendable {
         public var height: Int32 = 720
         public var titleBarStyle = AppWindowTitleBarStyle.standard
         public var showsDockIcon = true
+        public var rendering = AppWindowRendering()
         public init() {}
     }
 
@@ -63,12 +74,19 @@ public struct ApplicationConfiguration: Sendable {
         public init() {}
     }
 
+    public struct Memory: Sendable {
+        public var text = TextCacheLimits()
+        public var images = ImageAssetRegistry.Limits()
+        public init() {}
+    }
+
     public var logging = LoggingConfiguration()
     public var window = Window()
     public var typography = Typography()
     public var rendering = Rendering()
     public var frames = Frames()
     public var diagnostics = Diagnostics()
+    public var memory = Memory()
 
     public init(title: String? = nil, configure: (inout Self) -> Void = { _ in }) {
         if let title { window.title = title }

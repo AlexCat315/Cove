@@ -86,6 +86,10 @@ public final class ViewGraph {
         self.renderTree = RenderTree()
     }
 
+    deinit {
+        for scope in scopes.values { scope.uninstall() }
+    }
+
     // MARK: - Install
 
     /// Install a root, releasing the previous tree's scopes, layout and resources.
@@ -93,13 +97,24 @@ public final class ViewGraph {
         filePath: StaticString = #filePath, line: UInt = #line, column: UInt = #column) {
         if let previous = tree.root {
             for child in previous.children { tearDown(node: child, parentLayout: layoutRoot) }
+            scopes.removeValue(forKey: ObjectIdentifier(previous))?.uninstall()
             layoutOf.removeValue(forKey: ObjectIdentifier(previous))
             renderTree.tearDown(node: previous)
         }
         let rootNode = Node()
         tree.root = rootNode
         layoutOf[ObjectIdentifier(rootNode)] = layoutRoot
-        let nodes = materialise(root, into: rootNode, layoutParent: layoutRoot)
+        let nodes: [Node]
+        if ViewScope.isMaterialisedDirectly(root), !(root is EmptyView) {
+            // Primitive/structural roots have no user-view anchor. Their reader
+            // closures still need an owner, without adding a layout container.
+            let scope = ViewScope(graph: self, anchor: rootNode, view: root, layoutParent: layoutRoot)
+            scopes[ObjectIdentifier(rootNode)] = scope
+            scope.install()
+            nodes = rootNode.children
+        } else {
+            nodes = materialise(root, into: rootNode, layoutParent: layoutRoot)
+        }
         for node in nodes where node.sourceLocation == nil {
             node.sourceLocation = .init(fileID: String(describing: fileID), filePath: String(describing: filePath), line: line, column: column)
         }
@@ -504,12 +519,12 @@ public final class ViewGraph {
 
         if let prim = view as? any _PrimitiveView {
             ModifierReplay.reset(on: node)
-            prim._updateNode(node)
+            ObservableStateTracking.observeReads { prim._updateNode(node) }
             let myLayout = layoutOf[ObjectIdentifier(node)]
-            if let ln = myLayout { prim._updateLayout(ln) }
+            if let ln = myLayout { ObservableStateTracking.observeReads { prim._updateLayout(ln) } }
             reconcileChildren(parent: node,
                               layoutParent: myLayout ?? layoutParent,
-                              newViews: prim._children(for: node))
+                              newViews: ObservableStateTracking.observeReads { prim._children(for: node) })
             return
         }
 
@@ -644,15 +659,15 @@ public final class ViewGraph {
             layoutParent?.addChild(ln)
         }
         parent.addChild(node)
-        view._updateNode(node)
+        ObservableStateTracking.observeReads { view._updateNode(node) }
 
         var childLayoutParent = layoutParent
         if let ln {
-            view._updateLayout(ln)
+            ObservableStateTracking.observeReads { view._updateLayout(ln) }
             childLayoutParent = ln
         }
 
-        for child in view._children(for: node) {
+        for child in ObservableStateTracking.observeReads({ view._children(for: node) }) {
             _ = materialise(child, into: node, layoutParent: childLayoutParent)
         }
         return [node]
@@ -861,11 +876,6 @@ final class ViewScope {
         var metrics = anchor.recompositionMetrics ?? ComponentRecompositionMetrics()
         metrics.record(milliseconds: ms, initial: initial, reasons: reasons)
         anchor.recompositionMetrics = metrics
-        // Publish diagnostics even when evaluating body produces identical nodes.
-        if !initial {
-            let causedByWrite = reasons.contains { ["state", "observable", "dynamicProperty"].contains($0.kind) }
-            anchor.markRenderDirty(reason: causedByWrite ? .stateWrite(scope: anchor.id.rawValue) : .unknown)
-        }
     }
 
     /// Tracks observable reads for the body and for the primitives it
@@ -880,7 +890,7 @@ final class ViewScope {
     }
 
     private func body() -> any View {
-        isMaterialisedDirectly(view) ? view : anyBody(of: view)
+        ObservableStateTracking.observeReads { Self.isMaterialisedDirectly(view) ? view : anyBody(of: view) }
     }
 
     /// Defensive guard for bodyless view forms. These should normally be
@@ -888,7 +898,7 @@ final class ViewScope {
     /// but shutdown/reconcile paths can still hand a scoped slot a bodyless
     /// wrapper. Returning it directly lets the materialiser expand it instead
     /// of reading its `Never` body.
-    private func isMaterialisedDirectly(_ view: any View) -> Bool {
+    fileprivate static func isMaterialisedDirectly(_ view: any View) -> Bool {
         view is EmptyView
             || view is AnyView
             || view is any _PrimitiveView

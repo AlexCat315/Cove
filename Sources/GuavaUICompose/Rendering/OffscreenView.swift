@@ -16,6 +16,8 @@ public final class OffscreenView {
     private var textEnv: TextEnvironment?
     private var lastScale: Float = 0
     private var didInstallRoot = false
+    private var cachedSnapshot: DrawListSnapshot?
+    private var recordedScale: Float = 0
 
     public init() {
         self.graph = ViewGraph(tree: tree, recomposer: recomposer)
@@ -46,14 +48,23 @@ public final class OffscreenView {
         if !didInstallRoot { setRootView(EmptyView()) }
         ensureTextEnvironment(scale: contentScale)
 
+        var didRecord = false
         withTextEnvInstalled {
             _ = recomposer.commitAll()
             WindowRevealContext.clearActivation(in: graph.tree.root)
             _ = graph.computeLayoutIfNeeded(width: Float(width), height: Float(height))
+            let logicalSize = SIMD2(Float(width), Float(height))
+            guard cachedSnapshot?.logicalSize != logicalSize || recordedScale != contentScale
+                || tree.hasRenderUpdates || textEnv?.atlas.isDirty == true else { return }
             drawList.reset()
             drawList.pixelScale = Float(contentScale)
             layerRenderer.render(tree: graph.renderTree, into: drawList)
+            tree.flush()
+            recordedScale = contentScale
+            didRecord = true
         }
+
+        if !didRecord { return cachedSnapshot }
 
         var atlasUpdates: [DrawListAtlasDirty] = []
         if let env = textEnv, env.atlas.isDirty {
@@ -80,7 +91,7 @@ public final class OffscreenView {
             env.atlas.markClean()
         }
 
-        return DrawListSnapshot(
+        let snapshot = DrawListSnapshot(
             vertices: drawList.vertices,
             indices: drawList.indices,
             batches: drawList.batches,
@@ -88,6 +99,19 @@ public final class OffscreenView {
             atlasUpdates: atlasUpdates,
             resources: drawList.resources
         )
+        // Atlas patches are one-shot work. Reusing geometry must never replay
+        // a patch over a newer atlas upload on the recording thread.
+        cachedSnapshot = DrawListSnapshot(vertices: snapshot.vertices, indices: snapshot.indices,
+            batches: snapshot.batches, logicalSize: snapshot.logicalSize, resources: snapshot.resources)
+        return snapshot
+    }
+
+    public func trimMemory() {
+        textEnv?.trimTextCaches()
+        imageAssets.clear()
+        graph.renderTree.trimCaches()
+        cachedSnapshot = nil
+        drawList.reset()
     }
 
     // MARK: - Private

@@ -9,6 +9,73 @@ import Testing
 
 @Suite("Multi-window smoke")
 struct MultiWindowSmokeTests {
+    @MainActor
+    @Test("Committing unchanged composition does not submit another frame")
+    func unchangedCommitDoesNotRequestFrame() throws {
+        let shell = MockShell(eventBatches: [[], [], [], []])
+        let host = SDL3PlatformHost(shellFactory: { shell })
+        let tree = NodeTree(), root = Node()
+        tree.root = root
+        let session = try host.openWindow(title: "A", tree: tree)
+        (shell.window(for: session.id) as? MockWindowHandle)?.renderSurface =
+            .metalLayer(UnsafeMutableRawPointer(bitPattern: 1)!)
+        var iteration = 0, frames = 0
+        session.onFrame = { _ in frames += 1; return true }
+        shell.onPoll = {
+            iteration += 1
+            if iteration == 2 { session.recomposer.invalidate(scopeID: ObjectIdentifier(root)) {} }
+            if iteration == 3 {
+                session.recomposer.invalidate(scopeID: ObjectIdentifier(root)) { root.opacity = 0.5 }
+            }
+        }
+        host.run()
+        #expect(frames == 2)
+    }
+    @MainActor
+    @Test("An entirely hidden fixed-rate host waits for events instead of spinning a frame deadline")
+    func hiddenFixedRateHostSleeps() throws {
+        let shell = MockShell(eventBatches: [[], [], [], []])
+        let host = SDL3PlatformHost(shellFactory: { shell })
+        let session = try host.openWindow(title: "A", tree: NodeTree())
+        host.setFrameRateMode(.fixed(60))
+        var iteration = 0
+        shell.onPoll = {
+            iteration += 1
+            if iteration == 2 { host.hideWindow(session.id) }
+        }
+        host.run()
+        #expect(shell.waitTimeouts.last == 0.25)
+    }
+    @MainActor
+    @Test("Hidden windows suspend synchronously and pending frames cannot reactivate them")
+    func presentationLifecycleIsPerWindow() throws {
+        let shell = MockShell(eventBatches: [[], [], [], []])
+        let host = SDL3PlatformHost(shellFactory: { shell })
+        let first = try host.openWindow(title: "A", tree: NodeTree())
+        let second = try host.openWindow(title: "B", tree: NodeTree())
+        let surface = NativeRenderSurface.metalLayer(UnsafeMutableRawPointer(bitPattern: 1)!)
+        (shell.window(for: first.id) as? MockWindowHandle)?.renderSurface = surface
+        (shell.window(for: second.id) as? MockWindowHandle)?.renderSurface = surface
+        var transitions: [Bool] = [], frames = 0, siblingFrames = 0, iteration = 0
+        first.onPresentationChanged = { transitions.append($0) }
+        first.onFrame = { _ in frames += 1; return true }
+        second.onFrame = { _ in siblingFrames += 1; return true }
+        shell.onPoll = {
+            iteration += 1
+            if iteration == 2 {
+                host.hideWindow(first.id)
+                #expect(!first.isPresentationActive)
+                #expect(transitions == [false])
+            }
+            if iteration == 4 { host.showWindow(first.id) }
+            first.requestDisplay()
+            second.requestDisplay()
+        }
+        host.run()
+        #expect(transitions == [false, true])
+        #expect(frames == 2)
+        #expect(siblingFrames == 4)
+    }
     #if os(macOS)
     @MainActor
     @Test("Temporary native objects are released before the next event-loop iteration")
@@ -845,6 +912,7 @@ private final class MockWindowHandle: WindowHandle {
     var drawableSize: (width: UInt32, height: UInt32)
     var logicalSize: (width: UInt32, height: UInt32)
     var isFocused: Bool = true
+    var isVisible: Bool = true
     var isMinimized: Bool = false
     var isOccluded: Bool = false
 
@@ -859,6 +927,8 @@ private final class MockWindowHandle: WindowHandle {
 
 @MainActor
 private final class MockShell: Shell {
+    func hideWindow(_ id: WindowID) { handles[id]?.isVisible = false }
+    func showWindow(_ id: WindowID) { handles[id]?.isVisible = true }
     var closeInterceptor: ((WindowID?) -> Bool)?
     struct CursorRequest: Equatable {
         let windowID: WindowID

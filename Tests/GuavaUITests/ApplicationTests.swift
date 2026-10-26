@@ -40,6 +40,16 @@ private struct ConsumerView: View {
     #expect(ApplicationConfiguration { $0.frames.targetRate = 1000 }.frames.validatedTargetRate == 240)
 }
 
+@Test func windowRenderingOverridesInheritApplicationDefaults() {
+    let config = ApplicationConfiguration { $0.rendering.sampleCount = 4 }
+    let inherited = AppWindowRenderSettings(config: config)
+    let overridden = AppWindowRenderSettings(config: config, window: .init(sampleCount: 2))
+    #expect(inherited.samples == 4)
+    #expect(overridden.samples == 2)
+    #expect(overridden.clearColor == inherited.clearColor)
+    #expect(AppWindowRenderSettings(config: config, window: .init(sampleCount: 0)).samples == 1)
+}
+
 @Test @MainActor func safeAreaKeepsAuthoredPadding() throws {
     var surface = UIEnvironment()
     surface.safeArea.top = 60

@@ -9,6 +9,30 @@ import Testing
 /// everywhere else, including when the renderer has nothing to sample.
 @Suite("Native frosted backdrops", .serialized)
 struct NativeUIBackdropTests {
+    @Test("Window renderers share texture residency but own and trim their own effect scratch")
+    func presentationOwnershipIsIndependent() throws {
+        let context = try NativeUIDrawTestContext()
+        let format = NativeUITestFormat.cases[0]
+        let first = try context.native.makePresentationRenderer(format: format.native)
+        let second = try context.native.makePresentationRenderer(format: format.native)
+        #expect(first.textureStore === second.textureStore)
+        #expect(first.textureStore === context.native.textureStore)
+        let list = stripedList(frosted: true)
+        let firstImage = try context.nativeImage(list: list, format: format, samples: 1,
+            viewport: viewport, renderer: first, backdropSource: true).0
+        let secondImage = try context.nativeImage(list: list, format: format, samples: 1,
+            viewport: viewport, renderer: second, backdropSource: true).0
+        #expect(firstImage == secondImage)
+        let secondBytes = second.estimatedPresentationTextureBytes
+        #expect(first.estimatedPresentationTextureBytes > 0)
+        #expect(secondBytes > 0)
+        first.trimPresentationResources()
+        #expect(first.estimatedPresentationTextureBytes == 0)
+        #expect(second.estimatedPresentationTextureBytes == secondBytes)
+        let restored = try context.nativeImage(list: list, format: format, samples: 1,
+            viewport: viewport, renderer: first, backdropSource: true).0
+        #expect(restored == firstImage)
+    }
     private let viewport = NativeUIViewport(pixels: SIMD2(64, 64), logical: SIMD2(64, 64))
     private let panel = UIRect(x: 16, y: 16, width: 32, height: 32)
 

@@ -5,9 +5,9 @@ import NativeRHI
 struct AppWindowRenderSettings {
     let samples: UInt32
     let clearColor: SIMD4<Float>
-    init(config: ApplicationConfiguration) {
-        samples = max(1, config.rendering.sampleCount)
-        clearColor = config.rendering.clearColor
+    init(config: ApplicationConfiguration, window: AppWindowRendering = AppWindowRendering()) {
+        samples = max(1, window.sampleCount ?? config.rendering.sampleCount)
+        clearColor = window.clearColor ?? config.rendering.clearColor
     }
 }
 
@@ -24,8 +24,10 @@ final class AppRenderingContext {
     }
 
     func makeWindow(settings: AppWindowRenderSettings) throws -> any AppWindowRenderer {
-        try device.withFrameSession { try renderer.configure(format: .bgra8UnormSRGB, sampleCount: Int(settings.samples)) }
-        return NativeAppWindowRenderer(device: device, renderer: renderer, settings: settings)
+        try device.withFrameSession {
+            let presentation = try renderer.makePresentationRenderer(format: .bgra8UnormSRGB, sampleCount: Int(settings.samples))
+            return NativeAppWindowRenderer(device: device, renderer: presentation, settings: settings)
+        }
     }
 
     func uploadFontAtlas(_ atlas: FontAtlas, textureID: TextureID) throws {

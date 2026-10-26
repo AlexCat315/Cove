@@ -1,7 +1,26 @@
 import GuavaUICore
 import Foundation
+#if canImport(Observation)
+private import Observation
+#endif
+
+private final class ObservationReadTracking: @unchecked Sendable {
+    private let lock = NSLock()
+    private var onChange: (() -> Void)?
+    init(onChange: @escaping () -> Void) { self.onChange = onChange }
+    func cancel() { lock.withLock { onChange = nil } }
+    func changed() {
+        let callback = lock.withLock {
+            let callback = onChange
+            onChange = nil
+            return callback
+        }
+        callback?()
+    }
+}
 
 public struct ObservableStateScope {
+    fileprivate let observation: ObservationReadTracking
     public let id: ObjectIdentifier
     public let invalidate: () -> Void
     public let invalidateTracked: ((RecompositionReason) -> Void)?
@@ -12,6 +31,7 @@ public struct ObservableStateScope {
         self.id = id
         self.invalidate = invalidate
         self.invalidateTracked = invalidateTracked
+        observation = ObservationReadTracking(onChange: invalidate)
     }
 }
 
@@ -60,9 +80,22 @@ public enum ObservableStateTracking {
                                     _ body: () throws -> R) rethrows -> R {
         clearDependencies(for: id)
         let stack = stackBox
-        stack.stack.append(ObservableStateScope(id: id, invalidate: invalidate, invalidateTracked: invalidateTracked))
+        let scope = ObservableStateScope(id: id, invalidate: invalidate, invalidateTracked: invalidateTracked)
+        registerDependencyCleaner(for: id, ownerID: ObjectIdentifier(scope.observation)) { _ in scope.observation.cancel() }
+        stack.stack.append(scope)
         defer { _ = stack.stack.popLast() }
         return try body()
+    }
+
+    /// Track a single evaluation boundary. Do not wrap recursive reconciliation:
+    /// otherwise parents would also observe every property read by their children.
+    public static func observeReads<R>(_ body: () -> R) -> R {
+        #if canImport(Observation)
+        guard let observation = current?.observation else { return body() }
+        return withObservationTracking(body, onChange: { [weak observation] in observation?.changed() })
+        #else
+        return body()
+        #endif
     }
 
     public static func removeScope(id: ObjectIdentifier) {

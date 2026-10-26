@@ -40,6 +40,14 @@ public final class SDL3Shell: Shell {
         var isMinimized: Bool = false
         var isOccluded: Bool = false
 
+        var isVisible: Bool {
+#if os(macOS)
+            return cocoaWindow?.isVisible == true && !NSApp.isHidden
+#else
+            return SDL_GetWindowFlags(window) & SDL_WindowFlags(GUAVA_SDL_WINDOW_HIDDEN) == 0
+#endif
+        }
+
         init(id: WindowID,
              window: OpaquePointer,
              metalView: UnsafeMutableRawPointer?) throws {

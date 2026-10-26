@@ -102,9 +102,9 @@ public final class NativeDrawListRenderer {
         textureStore = try NativeUITextureStore(device: device, shaders: shaders)
     }
     private init(device: Device, shaders: NativeUIShaderResources,
-                 backdropShaders: NativeUIBackdropShaders?) throws {
+                 backdropShaders: NativeUIBackdropShaders?, sharedTextures: NativeUITextureStore? = nil) throws {
         self.device = device; self.shaders = shaders; self.backdropShaders = backdropShaders
-        textureStore = try NativeUITextureStore(device: device, shaders: shaders)
+        textureStore = try sharedTextures ?? NativeUITextureStore(device: device, shaders: shaders)
     }
 
     public func configure(format: TextureFormat, sampleCount: Int = 1) throws {
@@ -137,6 +137,28 @@ public final class NativeDrawListRenderer {
         try sibling.configure(format: format, sampleCount: sampleCount)
         try sibling.synchronizeTextures(from: self)
         return sibling
+    }
+
+    /// Independent presentation/history with shared font and image residency.
+    /// Serialize these renderers on their device, as with a single renderer.
+    public func makePresentationRenderer(format: TextureFormat, sampleCount: Int = 1) throws -> NativeDrawListRenderer {
+        let result = try NativeDrawListRenderer(device: device, shaders: shaders,
+            backdropShaders: backdropShaders, sharedTextures: textureStore)
+        try result.configure(format: format, sampleCount: sampleCount)
+        return result
+    }
+
+    public var estimatedPresentationTextureBytes: Int {
+        backdropPasses.values.reduce(0) { $0 + $1.estimatedScratchBytes }
+    }
+
+    /// Drops derived per-presentation resources, keeping shared texture uploads
+    /// and warmed pipelines. A resumed reveal needs a fresh previous frame.
+    public func trimPresentationResources() {
+        geometry = nil
+        retainedReveal = nil
+        lastFrameExtent = nil
+        for pass in backdropPasses.values { pass.trimScratch() }
     }
 
     /// Whether frosted panels can be drawn: false on a backend whose offline

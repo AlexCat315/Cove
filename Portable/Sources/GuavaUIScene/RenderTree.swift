@@ -211,6 +211,15 @@ public final class RenderTree {
 
     // MARK: - Diagnostics
 
+    /// Discard derived geometry without destroying live scene/state ownership.
+    public func trimCaches() {
+        for object in byNode.values {
+            object.cachedLayerList = nil
+            object.cachedPaintBounds = nil
+            object.cacheInvalid = true
+        }
+    }
+
     /// Snapshot of every layer-root RenderObject in pre-order.
     public func layerRoots() -> [RenderObject] {
         guard let root else { return [] }

@@ -13,8 +13,19 @@ final class NativeAppWindowRenderer: AppWindowRenderer {
     private var multisample: TextureResource?
     /// Owned copy of the presented frame, so a panel can blur it.
     private var framebuffer: TextureResource?
+    private var presentationActive = true
+    private var vsync = true
+    private var state = AppWindowRendererState.unconfigured
 
-    var isConfigured: Bool { swapchain != nil }
+    var isConfigured: Bool { native != nil }
+
+    var memorySnapshot: AppWindowMemorySnapshot {
+        let bytes = [multisample, framebuffer].compactMap { $0 }.reduce(0) {
+            $0 + $1.descriptor.width * $1.descriptor.height * 4 * $1.descriptor.sampleCount
+        }
+        return AppWindowMemorySnapshot(state: state, samples: settings.samples,
+            hasSwapchain: swapchain != nil, estimatedTargetBytes: bytes + renderer.estimatedPresentationTextureBytes)
+    }
 
     init(device: Device, renderer: NativeDrawListRenderer, settings: AppWindowRenderSettings) {
         self.device = device; self.renderer = renderer; self.settings = settings
@@ -22,29 +33,37 @@ final class NativeAppWindowRenderer: AppWindowRenderer {
 
     func configure(native: NativeRenderSurface, size: SIMD2<UInt32>, vsync: Bool) throws {
         try device.withFrameSession {
-            guard swapchain == nil else { throw RHIError.invalidArgument("window is already configured") }
+            guard self.native == nil else { throw RHIError.invalidArgument("window is already configured") }
             let resource = try SwapchainResource(device: device,
                 descriptor: SurfaceFactory.nativeDescriptor(native: native, size: size, vsync: vsync))
             self.native = native; self.swapchain = resource; self.size = size
+            self.vsync = vsync
+            presentationActive = true
+            state = .active
         }
     }
 
     func resize(size: SIMD2<UInt32>, vsync: Bool) throws {
         try device.withFrameSession {
+            self.size = size
+            self.vsync = vsync
             guard let native, let swapchain else { return }
-            // Minimized windows may have no drawable extent; keep the last pool
-            // alive and resume configuration when a positive size returns.
-            guard size.x > 0 && size.y > 0 else { self.size = size; return }
+            // Native swapchains require a positive extent. The host suspends
+            // zero-sized windows; keep their desired size for the next activation.
+            guard size.x > 0 && size.y > 0 else { return }
             try device.configureSwapchain(swapchain.swapchain,
                 descriptor: SurfaceFactory.nativeDescriptor(native: native, size: size, vsync: vsync))
-            self.size = size
         }
     }
 
     func draw(list: DrawList, logical: SIMD2<Float>) throws -> Bool {
         try device.withFrameSession {
-            guard let swapchain, size.x > 0 && size.y > 0 else { return false }
-            // Each window reapplies its own pipeline state to the shared UI renderer.
+            guard presentationActive, let native, size.x > 0 && size.y > 0 else { return false }
+            if swapchain == nil {
+                swapchain = try SwapchainResource(device: device,
+                    descriptor: SurfaceFactory.nativeDescriptor(native: native, size: size, vsync: vsync))
+            }
+            guard let swapchain else { return false }
             try renderer.configure(format: .bgra8UnormSRGB, sampleCount: Int(settings.samples))
             try device.beginFrame()
             defer { device.endFrame() }
@@ -90,9 +109,25 @@ final class NativeAppWindowRenderer: AppWindowRenderer {
         }
     }
 
+    func setPresentationActive(_ active: Bool) throws {
+        try device.withFrameSession {
+            guard presentationActive != active else { return }
+            presentationActive = active
+            if native != nil { state = active ? .active : .suspended }
+            if !active {
+                // close waits for in-flight work before dropping attachment ownership.
+                defer { swapchain = nil; multisample = nil; framebuffer = nil; renderer.trimPresentationResources() }
+                try swapchain?.close()
+            }
+        }
+    }
+
     func close() throws {
         try device.withFrameSession {
-            defer { swapchain = nil; native = nil; multisample = nil; framebuffer = nil; size = .zero }
+            defer {
+                swapchain = nil; native = nil; multisample = nil; framebuffer = nil; size = .zero; state = .closed
+                renderer.trimPresentationResources()
+            }
             try swapchain?.close()
         }
     }

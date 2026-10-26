@@ -178,6 +178,20 @@ final class NativeUIBackdropPass {
     private var revealCapture: Scratch?
     private var frameBinding: BindingSet?
 
+    var estimatedScratchBytes: Int {
+        [scratchA, scratchB, revealCapture].compactMap { $0 }.reduce(0) {
+            $0 + $1.width * $1.height * ($1.resource.descriptor.format == .rgba16Float ? 8 : 4)
+        }
+    }
+
+    func trimScratch() {
+        scratchA = nil
+        scratchB = nil
+        revealCapture = nil
+        frameBinding = nil
+        frameTexture = nil
+    }
+
     init(device: Device, shaders: NativeUIBackdropShaders, format: TextureFormat, samples: Int) throws {
         self.device = device
         self.shaders = shaders

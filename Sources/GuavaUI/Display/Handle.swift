@@ -9,9 +9,21 @@ struct AppAuxiliaryWindowRequest {
     let width: Int32
     let height: Int32
     let rootView: AnyView
+    let rendering: AppWindowRendering
 }
 
 public final class AppDisplayHandle: @unchecked Sendable {
+    private var memoryQuery: (@MainActor () -> AppMemorySnapshot?)?
+    private var trimMemoryAction: (@MainActor () -> Void)?
+
+    @MainActor public func memorySnapshot() -> AppMemorySnapshot? { memoryQuery?() }
+    @MainActor public func trimMemory() { trimMemoryAction?() }
+
+    @MainActor func installMemoryControls(snapshot: @escaping @MainActor () -> AppMemorySnapshot?,
+                                          trim: @escaping @MainActor () -> Void) {
+        memoryQuery = snapshot
+        trimMemoryAction = trim
+    }
     private final class Signal: @unchecked Sendable {
         private let lock = NSLock()
         private var pending = false
@@ -202,11 +214,13 @@ public final class AppDisplayHandle: @unchecked Sendable {
     public func openWindow<Root: View>(title: String,
                                        width: Int32 = 480,
                                        height: Int32 = 360,
+                                       rendering: AppWindowRendering = AppWindowRendering(),
                                        @ViewBuilder rootView: () -> Root) -> WindowID? {
         openAuxiliaryWindow?(AppAuxiliaryWindowRequest(title: title,
                                                        width: width,
                                                        height: height,
-                                                       rootView: AnyView(rootView())))
+                                                       rootView: AnyView(rootView()),
+                                                       rendering: rendering))
     }
 
     @MainActor

@@ -25,7 +25,8 @@ public struct TextEnvironment {
                 defaultLineHeight: Float,
                 defaultColor: Color = .white,
                 defaultFont: Font? = nil,
-                fontResolver: TextFontResolver? = nil) {
+                fontResolver: TextFontResolver? = nil,
+                cacheLimits: TextCacheLimits = TextCacheLimits()) {
         self.atlas = atlas
         self.shaper = shaper
         self.atlasTextureID = atlasTextureID
@@ -34,8 +35,17 @@ public struct TextEnvironment {
         let fallbackSize = atlas.fontSize > 0 ? atlas.fontSize : max(1, defaultLineHeight)
         self.defaultFont = defaultFont ?? Font.system(size: fallbackSize)
         self.fontResolver = fontResolver
-        self.shapeCache = SharedTextShapeCache()
-        self.layoutCache = SharedTextLayoutCache()
+        self.shapeCache = SharedTextShapeCache(limits: cacheLimits)
+        self.layoutCache = SharedTextLayoutCache(limits: cacheLimits)
+    }
+
+    public var shapingCacheSnapshot: TextCacheSnapshot { shapeCache.cache.snapshot }
+    public var layoutCacheSnapshot: TextCacheSnapshot { layoutCache.cache.snapshot }
+
+    /// Drops reusable results. Visible nodes keep their own layout snapshots.
+    public func trimTextCaches() {
+        shapeCache.cache.clear()
+        layoutCache.cache.clear()
     }
 
     public static func bootstrapped(atlasTextureID: TextureID,
@@ -44,7 +54,8 @@ public struct TextEnvironment {
                                     defaultLineHeight: Float = 22,
                                     defaultColor: Color = .white,
                                     rasterScale: Float = 1,
-                                    atlasEdge: Int? = nil) -> TextEnvironment {
+                                    atlasEdge: Int? = nil,
+                                    cacheLimits: TextCacheLimits = TextCacheLimits()) -> TextEnvironment {
         let scale = max(1, rasterScale)
         let resolvedAtlasEdge = atlasEdge ?? max(1024, Int((1024 * scale).rounded(.up)))
         let atlas = FontAtlas(width: resolvedAtlasEdge, height: resolvedAtlasEdge)
@@ -66,7 +77,8 @@ public struct TextEnvironment {
             defaultLineHeight: defaultLineHeight,
             defaultColor: defaultColor,
             defaultFont: defaultFont,
-            fontResolver: resolver
+            fontResolver: resolver,
+            cacheLimits: cacheLimits
         )
     }
 
@@ -147,22 +159,15 @@ final class SharedTextShapeCache {
         let font: Font
     }
 
-    private let lock = NSLock()
-    private var table: [Key: [ShapedGlyph]] = [:]
+    let cache: TextCache<Key, [ShapedGlyph]>
+
+    init(limits: TextCacheLimits = TextCacheLimits()) { cache = TextCache(limits: limits) }
 
     func value(text: String, font: Font, build: () -> [ShapedGlyph]) -> [ShapedGlyph] {
         let key = Key(text: text, font: font)
-        if let cached = lock.withLock({ table[key] }) {
-            return cached
-        }
-        let result = build()
-        return lock.withLock {
-            if let cached = table[key] {
-                return cached
-            }
-            table[key] = result
-            return result
-        }
+        return cache.value(for: key, cost: {
+            text.utf8.count + MemoryLayout<Key>.stride + $0.count * MemoryLayout<ShapedGlyph>.stride
+        }, build: build)
     }
 }
 
@@ -176,21 +181,16 @@ final class SharedTextLayoutCache {
         let letterSpacing: Float
     }
 
-    private let lock = NSLock()
-    private var table: [Key: TextLayoutResult] = [:]
+    let cache: TextCache<Key, TextLayoutResult>
+
+    init(limits: TextCacheLimits = TextCacheLimits()) { cache = TextCache(limits: limits) }
 
     func value(for key: Key, build: () -> TextLayoutResult) -> TextLayoutResult {
-        if let cached = lock.withLock({ table[key] }) {
-            return cached
-        }
-        let result = build()
-        return lock.withLock {
-            if let cached = table[key] {
-                return cached
-            }
-            table[key] = result
-            return result
-        }
+        cache.value(for: key, cost: { result in
+            key.text.utf8.count + MemoryLayout<Key>.stride
+                + result.lines.count * MemoryLayout<TextLine>.stride
+                + result.lines.reduce(0) { $0 + $1.glyphs.count * MemoryLayout<PositionedGlyph>.stride }
+        }, build: build)
     }
 }
 

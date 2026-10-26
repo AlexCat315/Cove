@@ -39,6 +39,7 @@ final class AuxiliaryAppWindow {
     private let rendering: AppRenderingContext
     private var windowRenderer: (any AppWindowRenderer)?
     private let config: ApplicationConfiguration
+    private let windowRendering: AppWindowRendering
     private let useLegacyRenderer: Bool
     private let drawList = DrawList()
     private let layerRenderer = LayerAwareNodeRenderer()
@@ -57,6 +58,7 @@ final class AuxiliaryAppWindow {
          portalStore: PortalStore,
          rendering: AppRenderingContext,
          config: ApplicationConfiguration,
+         windowRendering: AppWindowRendering,
          isVSyncEnabled: Bool,
          useLegacyRenderer: Bool,
          setWindowChromeHitTest: @escaping (WindowID, WindowChromeHitTest?) -> Void) {
@@ -65,6 +67,7 @@ final class AuxiliaryAppWindow {
         self.portalStore = portalStore
         self.rendering = rendering
         self.config = config
+        self.windowRendering = windowRendering
         self.isVSyncEnabled = isVSyncEnabled
         self.useLegacyRenderer = useLegacyRenderer
         self.setWindowChromeHitTest = setWindowChromeHitTest
@@ -79,7 +82,7 @@ final class AuxiliaryAppWindow {
         logicalW = session.logicalSize.width
         logicalH = session.logicalSize.height
 
-        let renderer = try rendering.makeWindow(settings: AppWindowRenderSettings(config: config))
+        let renderer = try rendering.makeWindow(settings: AppWindowRenderSettings(config: config, window: windowRendering))
         try renderer.configure(native: native, size: SIMD2(widthPx, heightPx), vsync: isVSyncEnabled)
         windowRenderer = renderer
 
@@ -108,6 +111,17 @@ final class AuxiliaryAppWindow {
         do { try windowRenderer?.close() }
         catch { LogSystem.logger("com.guava.ui.app").error("Auxiliary window GPU cleanup failed: \(error)") }
         windowRenderer = nil
+    }
+
+    func setPresentationActive(_ active: Bool) throws {
+        try windowRenderer?.setPresentationActive(active)
+    }
+
+    var memorySnapshot: AppWindowMemorySnapshot? { windowRenderer?.memorySnapshot }
+
+    func trimMemory() {
+        graph.renderTree.trimCaches()
+        drawList.reset()
     }
 
     func handleResize(widthPx: UInt32,
