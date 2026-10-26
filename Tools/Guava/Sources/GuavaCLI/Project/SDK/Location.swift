@@ -9,9 +9,9 @@ enum GuavaSDK {
         let selected = store.selected.flatMap { root in
             required == nil || (try? SDKRelease.read(at: root).version) == required ? root : nil
         }
-        let explicit = arguments.url(.sdkRoot)
+        let override = arguments.url(.sdkRoot)
             ?? environment["GUAVA_SDK_ROOT"].map { URL(fileURLWithPath: $0).standardizedFileURL }
-            ?? local
+        let explicit = override ?? local
         let bundled = isSDK(InstallationReceipt.executableDirectory) ? InstallationReceipt.executableDirectory : nil
         let development = checkout(containing: URL(fileURLWithPath: #filePath))
         var root: URL?
@@ -34,7 +34,7 @@ enum GuavaSDK {
             throw ToolError.invalid("Install the SDK with guava sdk install \(required ?? "VERSION"), or select a checkout with --sdk-root")
         }
         let release = try SDKRelease.read(at: root)
-        if let required, required != SDKRelease.latestTag, release.version != required {
+        if override == nil, let required, required != SDKRelease.latestTag, release.version != required {
             throw ToolError.invalid("Project requires SDK \(required); selected checkout provides \(release.version)")
         }
         return root

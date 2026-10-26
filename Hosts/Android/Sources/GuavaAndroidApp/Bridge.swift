@@ -171,3 +171,15 @@ func pumpDiagnostics(_ pointer: UnsafeMutableRawPointer?) {
     guard let pointer else { return }
     Unmanaged<AndroidApplication>.fromOpaque(pointer).takeUnretainedValue().scene.content.pumpDiagnostics()
 }
+
+@MainActor
+@_cdecl("guava_android_memory_pressure")
+func trimApplicationMemory(_ pointer: UnsafeMutableRawPointer?) {
+    guard let pointer else { return }
+    let application = Unmanaged<AndroidApplication>.fromOpaque(pointer).takeUnretainedValue()
+    application.scene.content.trimMemory()
+    try? application.device.withFrameSession {
+        try application.device.waitUntilIdle()
+        application.renderer.trimPresentationResources()
+    }
+}

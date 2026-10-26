@@ -142,6 +142,7 @@ final class ContentSurfaceView extends SurfaceView implements SurfaceHolder.Call
     }
     void pumpDiagnostics(long value) { if (application != 0 && application == value) MainActivity.pumpDiagnostics(application); }
     void closeApplication() { if (application != 0) { MainActivity.destroyApplication(application); application = 0; } }
+    void trimMemory() { if (application != 0) MainActivity.memoryPressure(application); schedule(); }
     long detachApplication() { releaseSurface(); long retained = application; application = 0; return retained; }
     private JSONObject state() {
         try { return new JSONObject(session == 0 ? "{}" : MainActivity.snapshot(session)); }

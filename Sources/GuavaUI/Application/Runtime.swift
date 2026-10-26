@@ -109,6 +109,7 @@ public final class Application {
                                             showsDockIcon: config.window.showsDockIcon), inputContext: input)
         composition = MainComposition(recomposer: host.recomposer, portalStore: portalStore)
         composition.imageAssets.limits = config.memory.images
+        composition.drawList.geometryAntialiasing = config.window.rendering.geometryAntialiasing ?? config.rendering.geometryAntialiasing
         configureHostFrameDrive()
     }
 
@@ -181,6 +182,23 @@ public final class Application {
 
         if callbacks.diagnosticsReady != nil {
             diagnostics.queries = UIDiagnostics(tree: composition.tree, state: composition.graph.stateRegistry)
+            diagnostics.queries?.memory = { [weak self] in
+                guard let self else { return UIDiagnosticMemorySnapshot(counters: [:], windows: [:]) }
+                let value = self.memorySnapshot()
+                return UIDiagnosticMemorySnapshot(counters: [
+                    "shapingEntries": value.shaping?.entries ?? 0,
+                    "shapingBytes": value.shaping?.estimatedBytes ?? 0,
+                    "layoutEntries": value.textLayout?.entries ?? 0,
+                    "layoutBytes": value.textLayout?.estimatedBytes ?? 0,
+                    "imageBytes": value.cachedImageBytes,
+                    "skippedParentUpdates": self.composition.graph.skippedParentUpdates
+                ], windows: Dictionary(uniqueKeysWithValues: value.windows.map { id, window in
+                    (String(describing: id), ["samples": Int(window.samples),
+                        "hasSwapchain": window.hasSwapchain ? 1 : 0,
+                        "suspended": window.state == .suspended ? 1 : 0,
+                        "targetBytes": window.estimatedTargetBytes])
+                }))
+            }
             callbacks.diagnosticsReady?(diagnostics.queries)
         }
 

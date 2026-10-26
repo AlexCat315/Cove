@@ -68,6 +68,7 @@ final class AuxiliaryAppWindow {
         self.rendering = rendering
         self.config = config
         self.windowRendering = windowRendering
+        drawList.geometryAntialiasing = windowRendering.geometryAntialiasing ?? config.rendering.geometryAntialiasing
         self.isVSyncEnabled = isVSyncEnabled
         self.useLegacyRenderer = useLegacyRenderer
         self.setWindowChromeHitTest = setWindowChromeHitTest

@@ -51,6 +51,8 @@ jobs:
           java-version: '21'
       - uses: android-actions/setup-android@v3
         if: matrix.platform == 'android-arm64'
+        with:
+          packages: 'platform-tools'
       - name: Prepare Android platform tools
         if: matrix.platform == 'android-arm64'
         run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.1.0" "ndk;30.0.16248370"

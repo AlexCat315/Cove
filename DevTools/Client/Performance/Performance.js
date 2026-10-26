@@ -19,6 +19,9 @@ const perf = context.session.performance = {
   connectedAt: null,
   autoTrace: readPref("guava.devtools.autoTrace", true),
   timer: null,
+  memoryToolsId: null,
+  memoryRequestId: null,
+  memoryAvailable: false,
 };
 
 function el(id) { return document.getElementById(id); }
@@ -37,12 +40,45 @@ function isPerformanceTab() {
 function setConnected(connected) {
   if (connected) {
     perf.connectedAt = Date.now();
-    if (perf.timer == null) perf.timer = setInterval(() => { if (isPerformanceTab()) render(); }, 1000);
+    perf.memoryAvailable = false;
+    perf.memoryToolsId = context.connection.send("diagnostics.tools");
+    if (perf.timer == null) perf.timer = setInterval(() => {
+      if (isPerformanceTab()) { requestMemory(); render(); }
+    }, 1000);
   } else if (perf.timer != null) {
     clearInterval(perf.timer);
     perf.timer = null;
+    perf.memoryToolsId = null;
+    perf.memoryRequestId = null;
+    perf.memoryAvailable = false;
   }
   updateControls();
+}
+
+function requestMemory() {
+  if (perf.memoryAvailable && perf.memoryRequestId == null) {
+    perf.memoryRequestId = context.connection.send("diagnostics.call", { name: "query_ui_memory", arguments: {} });
+  }
+}
+
+function acceptMemory(env) {
+  if (env.id === perf.memoryToolsId && perf.memoryToolsId != null) {
+    perf.memoryToolsId = null;
+    perf.memoryAvailable = env.payload?.tools?.some(tool => tool.name === "query_ui_memory") === true;
+    requestMemory();
+    return true;
+  }
+  if (env.id !== perf.memoryRequestId || perf.memoryRequestId == null) return false;
+  perf.memoryRequestId = null;
+  const value = env.payload?.data;
+  if (!value) { perf.memoryAvailable = false; return true; }
+  perf.memory = value;
+  const counters = value.counters ?? {};
+  const mib = bytes => `${(Number(bytes || 0) / 1048576).toFixed(2)} MiB`;
+  const targets = Object.values(value.windows ?? {}).reduce((sum, window) => sum + Number(window.targetBytes || 0), 0);
+  const container = el("perfMemory");
+  if (container) container.textContent = `Owned estimates · Text ${mib((counters.shapingBytes || 0) + (counters.layoutBytes || 0))} · Images ${mib(counters.imageBytes)} · Window targets ${mib(targets)} · Skipped updates ${counters.skippedParentUpdates || 0}`;
+  return true;
 }
 
 function reset() {
@@ -627,6 +663,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 return {
+  acceptMemory,
   recordFrame, reset, setConnected, refreshNow, render,
   isAutoTraceEnabled, setAutoTrace,
   buildReport, markdownReport,

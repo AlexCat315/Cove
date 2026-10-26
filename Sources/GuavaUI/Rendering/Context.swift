@@ -6,7 +6,8 @@ struct AppWindowRenderSettings {
     let samples: UInt32
     let clearColor: SIMD4<Float>
     init(config: ApplicationConfiguration, window: AppWindowRendering = AppWindowRendering()) {
-        samples = max(1, window.sampleCount ?? config.rendering.sampleCount)
+        let analytic = (window.geometryAntialiasing ?? config.rendering.geometryAntialiasing) == .analytic
+        samples = analytic ? 1 : max(1, window.sampleCount ?? config.rendering.sampleCount)
         clearColor = window.clearColor ?? config.rendering.clearColor
     }
 }

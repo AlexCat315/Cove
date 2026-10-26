@@ -52,6 +52,14 @@ public struct Image: _PrimitiveView {
             case .texture: break
             }
         }
+        func resolution(for target: SIMD2<Float>, fraction: SIMD2<Float>) -> Source {
+            switch self {
+            case .asset(let asset): .asset(asset.resolution(for: target, fraction: fraction))
+            case .rendered(let image): .rendered(image.resolution(for: target,
+                source: SIMD2(Float(image.pixelSize.x), Float(image.pixelSize.y)) * fraction))
+            case .texture: self
+            }
+        }
     }
     public let source: Source
     public let width: Float
@@ -121,10 +129,12 @@ public struct Image: _PrimitiveView {
                                    width: drawWidth,
                                    height: drawHeight)
             let resolved = vectorRaster?.resolve(width: drawWidth, height: drawHeight) ?? snap.source
-            resolved.retain(in: list)
-            let texture = resolved.textureID
             let geometry = ImageGeometry(container: container, source: resolved.sourcePixelSize, mode: snap.contentMode)
             var rect = geometry.rect
+            let selected = resolved.resolution(for: SIMD2(rect.width, rect.height) * max(1, list.pixelScale),
+                fraction: SIMD2(geometry.uvMax.x - geometry.uvMin.x, geometry.uvMax.y - geometry.uvMin.y))
+            selected.retain(in: list)
+            let texture = selected.textureID
             if snap.renderingMode == .alphaMask {
                 let scale = ContentScaleHolder.current
                 if vectorRaster != nil, scale.isFinite, scale > 0 {

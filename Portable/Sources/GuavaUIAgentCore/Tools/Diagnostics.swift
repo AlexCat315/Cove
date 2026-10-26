@@ -8,6 +8,7 @@ public enum UIDiagnosticTool: String, CaseIterable, Sendable {
     case queryUINodes = "query_ui_nodes"
     case queryUIRecomposition = "query_ui_recomposition"
     case queryUIState = "query_ui_state"
+    case queryUIMemory = "query_ui_memory"
     case captureUITrace = "capture_ui_trace"
     case getUITrace = "get_ui_trace"
     case compareUITraces = "compare_ui_traces"
@@ -30,6 +31,8 @@ public enum UIDiagnosticTool: String, CaseIterable, Sendable {
         case .getDiagnostics:
             AgentTool(name: rawValue, description: "Read bounded diagnostic issues with evidence and data availability. Recommendations are hypotheses to verify.",
                 schema: Self.object(["limit": .integer(minimum: 1, maximum: 100)]))
+        case .queryUIMemory:
+            AgentTool(name: rawValue, description: "Read logical text/image cache and per-window target memory estimates. Excludes driver pools and external scene textures; this is not process physical footprint. Null means the host has no provider.", schema: Self.object())
         case .queryUINodes:
             AgentTool(name: rawValue, description: "Query live UI nodes by accessible label, value, help, role or source. Text searches also match debug names and view tags; secure values are redacted before matching. Lazy input values are omitted by default: use node_id with include_value=true to read one field, capped at 4096 characters with valueTruncated reported. Secure providers are never read. Returns flat paged results, clipped visible bounds and effective input availability, including modal scopes. Use compact=true for one short record per node (id, role, label, value, state, frame, source). Use visible_only to exclude hidden/offscreen nodes; input_enabled_only also excludes disabled or modal-blocked controls. IDs expire on unmount.",
                 schema: Self.object(Self.paging.merging(["node_id": Self.text, "include_value": .boolean(), "compact": .boolean(), "text": Self.text, "role": Self.text, "source": Self.text, "visible_only": .boolean(), "input_enabled_only": .boolean()]) { _, new in new }))
@@ -62,7 +65,7 @@ public enum UIDiagnosticTool: String, CaseIterable, Sendable {
     public var isImmediateRead: Bool {
         switch self {
         case .captureUITrace, .getUITrace, .compareUITraces: return false
-        case .getDiagnostics, .queryUINodes, .queryUIRecomposition, .queryUIState,
+        case .getDiagnostics, .queryUINodes, .queryUIRecomposition, .queryUIState, .queryUIMemory,
              .listSkills, .readSkill: return true
         }
     }

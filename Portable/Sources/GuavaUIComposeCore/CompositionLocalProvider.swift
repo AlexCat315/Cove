@@ -28,14 +28,8 @@ public struct _ProvideCompositionLocalModifier<Value>: ViewModifier, _ScopeApply
     }
 
     public func _applyScope(node: Node) -> Bool {
-        let cacheKey = "__compLocal_\(ObjectIdentifier(local))"
-        if let hashable = value as? any Hashable {
-            let hash = AnyHashable(hashable)
-            if let cached = node.attachments[cacheKey] as? AnyHashable, cached == hash {
-                return false
-            }
-            node.attachments[cacheKey] = hash
-        }
+        if let previous = node.compositionValues[local.key],
+           ViewInputComparison.equal(previous, value, environment: true) { return false }
         node.setCompositionValue(local, value)
         return true
     }

@@ -1,5 +1,6 @@
 InspectorModules.messages = function(context) {
 function handleEnvelope(env) {
+  if (context.performance?.acceptMemory(env)) return;
   if (context.observation.handleObservationEnvelope(env)) return;
   switch (env.type) {
     case "hello":

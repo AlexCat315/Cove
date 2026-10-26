@@ -37,6 +37,7 @@ public struct UIDiagnosticPage<Item: Codable & Sendable>: Codable, Sendable {
 /// Applications pass this facade to an agent adapter; live Nodes stay internal.
 @MainActor
 public final class UIDiagnostics {
+    public var memory: (@MainActor () -> UIDiagnosticMemorySnapshot)?
     private let inspector: SceneInspector
     private let tree: NodeTree
     private let state: StateRegistry?

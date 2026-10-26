@@ -25,6 +25,7 @@ public final class MainActivity extends Activity {
     static native long createApplication(float scale, String resources, String checkpoint, String configuration, String options);
     static native void destroyApplication(long application);
     static native void pumpDiagnostics(long application);
+    static native void memoryPressure(long application);
     static void scheduleDiagnostics(long application) { Diagnostics.schedule(application); }
     static native long open(long application, android.view.Surface surface, int width, int height);
     static native int frame(long session, long displayTimeNanos);
@@ -40,6 +41,15 @@ public final class MainActivity extends Activity {
     static native String inputSnapshot(long session);
     static native void close(long session);
     private ContentSurfaceView surface;
+    @Override public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        if (surface != null && (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW
+                && level != android.content.ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN)) surface.trimMemory();
+    }
+    @Override public void onLowMemory() {
+        super.onLowMemory();
+        if (surface != null) surface.trimMemory();
+    }
     private JSONObject launch;
     private boolean commandsRegistered;
     private boolean debugBuild() { return (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0; }

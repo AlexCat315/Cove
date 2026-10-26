@@ -7,6 +7,14 @@ public final class ImageAssetRegistry: @unchecked Sendable {
     public final class Asset: UITextureAsset, Equatable {
         public let textureID: TextureID
         public let image: DecodedImage
+        public let mipmaps: [Asset]
+        public var retainedPixelBytes: Int { image.pixels.count + mipmaps.reduce(0) { $0 + $1.image.pixels.count } }
+
+        public func resolution(for target: SIMD2<Float>, fraction: SIMD2<Float> = SIMD2(repeating: 1)) -> Asset {
+            let level = ImageLOD.level(source: SIMD2(Float(image.width), Float(image.height)) * fraction,
+                target: target, count: mipmaps.count)
+            return level == 0 ? self : mipmaps[level - 1]
+        }
 
         public init(image: DecodedImage) throws {
             guard image.width > 0, image.height > 0, image.width <= 16_384, image.height <= 16_384 else {
@@ -18,6 +26,10 @@ public final class ImageAssetRegistry: @unchecked Sendable {
             }
             self.image = image
             textureID = try ImageAssetIDs.shared.allocate()
+            if let reduced = image.reducedMip() {
+                let next = try Asset(image: reduced)
+                mipmaps = [next] + next.mipmaps
+            } else { mipmaps = [] }
         }
         public static func == (lhs: Asset, rhs: Asset) -> Bool { lhs === rhs }
     }
@@ -35,7 +47,7 @@ public final class ImageAssetRegistry: @unchecked Sendable {
     private struct Entry {
         let asset: Asset
         var lastUse: UInt64
-        var bytes: Int { asset.image.pixels.count }
+        var bytes: Int { asset.retainedPixelBytes }
     }
 
     private let lock = NSLock()
@@ -98,7 +110,7 @@ public final class ImageAssetRegistry: @unchecked Sendable {
             if var hit = cache[key] { hit.lastUse = clock; cache[key] = hit; return hit.asset }
             let asset = try Asset(image: decoded)
             cache[key] = Entry(asset: asset, lastUse: clock)
-            totalBytes += asset.image.pixels.count
+            totalBytes += asset.retainedPixelBytes
             evictIfNeeded(keeping: key)
             return asset
         }

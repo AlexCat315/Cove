@@ -78,6 +78,7 @@ public final class DrawList {
     /// a centred layout puts nearly every edge on a half pixel. Zero (the
     /// default, and what an offscreen test sees) leaves coordinates alone.
     public var pixelScale: Float = 0
+    public var geometryAntialiasing = GeometryAntialiasing.multisample
 
     /// Stack of clip rectangles applied via `pushClip` / `popClip`.
     private var clipStack: [UIRect] = []
@@ -98,6 +99,13 @@ public final class DrawList {
     public private(set) var reveal: UIReveal?
 
     public init() {}
+
+    func appendCoverageGeometry(_ points: [UIVertex], _ triangles: [UInt32]) {
+        let baseVertex = UInt32(vertices.count), baseIndex = UInt32(indices.count)
+        vertices.append(contentsOf: points)
+        indices.append(contentsOf: triangles.map { $0 + baseVertex })
+        recordIndices(at: baseIndex, count: UInt32(triangles.count), textureID: .none)
+    }
 
     /// Reset all CPU buffers. Called at the start of each frame.
     public func reset() {
@@ -414,37 +422,11 @@ public final class DrawList {
             addRoundedRect(rect, radius: outerRadius, color: color)
             return
         }
-        let innerRadius = max(0, outerRadius - stroke)
-        let segments = outerRadius > 0 ? cornerSegmentCount(for: outerRadius) : 1
-        let packed = color.rgba8
-        let baseVertex = UInt32(vertices.count)
-        let baseIndex = UInt32(indices.count)
-        // Clockwise corners, each with matching outer/inner arc samples.
-        for corner in 0..<4 {
-            let right = corner == 1 || corner == 2
-            let bottom = corner >= 2
-            let outerX = right ? rect.maxX - outerRadius : rect.minX + outerRadius
-            let outerY = bottom ? rect.maxY - outerRadius : rect.minY + outerRadius
-            let innerX = right ? inner.maxX - innerRadius : inner.minX + innerRadius
-            let innerY = bottom ? inner.maxY - innerRadius : inner.minY + innerRadius
-            let start = Float(corner) * .pi / 2 + .pi
-            for step in 0...segments {
-                let angle = start + Float(step) / Float(segments) * .pi / 2
-                vertices.append(UIVertex(posX: outerX + cos(angle) * outerRadius,
-                                         posY: outerY + sin(angle) * outerRadius,
-                                         u: -1, v: 0, color: packed))
-                vertices.append(UIVertex(posX: innerX + cos(angle) * innerRadius,
-                                         posY: innerY + sin(angle) * innerRadius,
-                                         u: -1, v: 0, color: packed))
-            }
-        }
-        let pairs = UInt32(4 * (segments + 1))
-        for pair in 0..<pairs {
-            let a = baseVertex + pair * 2
-            let b = baseVertex + ((pair + 1) % pairs) * 2
-            indices.append(contentsOf: [a, b, a + 1, a + 1, b, b + 1])
-        }
-        recordIndices(at: baseIndex, count: pairs * 6, textureID: .none)
+        let centerRect = UIRect(x: rect.minX + stroke / 2, y: rect.minY + stroke / 2,
+            width: rect.width - stroke, height: rect.height - stroke)
+        let radius = max(0, outerRadius - stroke / 2)
+        let points = UIRoundedRect(centerRect, radius: radius).outline(segments: cornerSegmentCount(for: max(radius, 1)))
+        addPathStroke(points.map { SIMD2($0.x, $0.y) }, width: stroke, color: color, closed: true)
     }
 
     /// Append a single textured quad from a font atlas glyph.
@@ -719,6 +701,11 @@ public final class DrawList {
     private func applyMasks(from baseIndex: UInt32, count: UInt32) -> UInt32 {
         let start = Int(baseIndex), end = start + Int(count)
         let active = masks.indices.filter { masks[$0].radius > 0 }
+        let analytic = geometryAntialiasing == .analytic
+        let halfPixel = analytic ? 0.5 / max(1, pixelScale) : 0
+        func contains(_ index: Int, _ bounds: UIRect) -> Bool {
+            AnalyticClipper.inset(masks[index], by: halfPixel).contains(bounds)
+        }
         var minX = Float.infinity, minY = Float.infinity
         var maxX = -Float.infinity, maxY = -Float.infinity
         for index in indices[start..<end] {
@@ -729,12 +716,12 @@ public final class DrawList {
             maxY = max(maxY, vertex.posY)
         }
         let bounds = UIRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
-        if active.allSatisfy({ masks[$0].contains(bounds) }) { return count }
+        if active.allSatisfy({ contains($0, bounds) }) { return count }
         func outsideMask(_ bounds: UIRect) -> Bool {
             active.contains { index in
                 let rect = masks[index].rect
-                return bounds.maxX < rect.minX || bounds.minX > rect.maxX
-                    || bounds.maxY < rect.minY || bounds.minY > rect.maxY
+                return bounds.maxX < rect.minX - halfPixel || bounds.minX > rect.maxX + halfPixel
+                    || bounds.maxY < rect.minY - halfPixel || bounds.minY > rect.maxY + halfPixel
             }
         }
         // Keep vertices for cached paint bounds, but discard invisible indices
@@ -755,12 +742,22 @@ public final class DrawList {
             let maxX = max(a.posX, max(b.posX, c.posX)), maxY = max(a.posY, max(b.posY, c.posY))
             let bounds = UIRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
             if outsideMask(bounds) { changed = true; continue }
-            let intersecting = active.filter { !masks[$0].contains(bounds) }
+            let intersecting = active.filter { !contains($0, bounds) }
             if intersecting.isEmpty {
                 kept.append(contentsOf: emitted[triangle..<(triangle + 3)])
                 continue
             }
             changed = true
+            if analytic {
+                for polygon in AnalyticClipper.clip([a, b, c], masks: intersecting.map { masks[$0] }, scale: pixelScale) {
+                    let first = UInt32(vertices.count)
+                    vertices.append(contentsOf: polygon)
+                    for fan in 1..<(polygon.count - 1) {
+                        kept.append(contentsOf: [first, first + UInt32(fan), first + UInt32(fan + 1)])
+                    }
+                }
+                continue
+            }
             let outlines = intersecting.map { index -> [(x: Float, y: Float)] in
                 let mask = masks[index], rect = mask.rect
                 // In the horizontal or vertical straight strip, rounded

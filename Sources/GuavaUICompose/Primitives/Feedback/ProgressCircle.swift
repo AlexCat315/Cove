@@ -154,22 +154,8 @@ public struct ProgressCircle: _PrimitiveView {
                            inner: Float, outer: Float,
                            from: Float, sweep: Float,
                            color: Color) {
-        guard sweep > 0.001 else { return }
-        let segments = max(8, min(120, Int(outer * sweep / 2)))
-        let step = sweep / Float(segments)
-        var a0 = from
-        for _ in 0..<segments {
-            let a1 = a0 + step
-            let c0 = cos(a0), s0 = sin(a0)
-            let c1 = cos(a1), s1 = sin(a1)
-            let ix0 = cx + c0 * inner, iy0 = cy + s0 * inner
-            let ox0 = cx + c0 * outer, oy0 = cy + s0 * outer
-            let ix1 = cx + c1 * inner, iy1 = cy + s1 * inner
-            let ox1 = cx + c1 * outer, oy1 = cy + s1 * outer
-            list.addTriangle(ix0, iy0, ox0, oy0, ox1, oy1, color: color)
-            list.addTriangle(ix0, iy0, ox1, oy1, ix1, iy1, color: color)
-            a0 = a1
-        }
+        list.addArcStroke(center: SIMD2(cx, cy), radius: (inner + outer) / 2,
+            start: from, sweep: sweep, width: outer - inner, color: color)
     }
 
     private struct DrawIdentity: Equatable {

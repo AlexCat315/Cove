@@ -158,6 +158,9 @@ extension UIDiagnostics {
 
     private func readResponse(tool: UIDiagnosticTool, input: Data) throws -> AgentToolResult {
         switch tool {
+        case .queryUIMemory:
+            _ = try decode(EmptyInput.self, from: input)
+            return try AgentToolResult.encode(QueryResponse(data: memory?()))
         case .getDiagnostics:
             let args = try decode(GetDiagnosticsInput.self, from: input)
             let nodes = try queryNodes(limit: 1)

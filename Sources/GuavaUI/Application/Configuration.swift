@@ -19,11 +19,14 @@ public enum AppFrameDrivePolicy: Sendable, Equatable {
 
 /// Nil values inherit application rendering defaults.
 public struct AppWindowRendering: Sendable, Equatable {
+    public var geometryAntialiasing: GeometryAntialiasing?
     public var sampleCount: UInt32?
     public var clearColor: SIMD4<Float>?
-    public init(sampleCount: UInt32? = nil, clearColor: SIMD4<Float>? = nil) {
+    public init(sampleCount: UInt32? = nil, clearColor: SIMD4<Float>? = nil,
+                geometryAntialiasing: GeometryAntialiasing? = nil) {
         self.sampleCount = sampleCount
         self.clearColor = clearColor
+        self.geometryAntialiasing = geometryAntialiasing
     }
 }
 
@@ -53,6 +56,7 @@ public struct ApplicationConfiguration: Sendable {
         public var clearColor = SIMD4<Float>(0.05, 0.06, 0.08, 1)
         public var device = DeviceConfig()
         public var sampleCount: UInt32 = 4
+        public var geometryAntialiasing = GeometryAntialiasing.multisample
         public var vsync = true
         public init() {}
     }

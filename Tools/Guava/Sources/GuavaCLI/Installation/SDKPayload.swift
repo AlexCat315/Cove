@@ -4,7 +4,7 @@ enum SDKPayload {
     static func stageSources(from root: URL, into payload: URL) throws {
         let paths = ["Package.swift", "LICENSE", "NOTICE", "README.md", "CHANGELOG.md",
                      "Sources", "Tests", "Runtime/Sources", "Runtime/Tests", "Text", "PlatformCore",
-                     "Portable", "System", "Logging", "Hosts", "Tools", "Platforms", "Terminal", "Examples"]
+                     "Portable", "System", "Logging", "Hosts", "Tools", "Platforms", "Terminal", "Examples", "DevTools", "Docs"]
         let excluded: Set<String> = [".git", ".build", ".guava", "build", "vendor", "node_modules", "dist"]
         for path in paths {
             let source = root.appendingPathComponent(path)

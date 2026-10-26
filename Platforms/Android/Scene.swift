@@ -34,6 +34,7 @@ public final class AndroidContentSession {
     public init<Root: View>(scale: Float, rendering: Rendering = .layers, @ViewBuilder content: () -> Root) {
         surface = SurfaceState(scale: scale)
         self.rendering = rendering
+        drawList.geometryAntialiasing = .analytic
         environment.configure(scale: self.scale)
         withCurrent { graph.install(root: AndroidAdaptiveContent(content: content(), environment: surface.value)) }
     }
@@ -56,6 +57,13 @@ public final class AndroidContentSession {
     }
 
     public func pumpDiagnostics() { withCurrent { diagnostics?.drain() } }
+    public func trimMemory() {
+        environment.text?.trimTextCaches()
+        environment.images.clear()
+        graph.renderTree.trimCaches()
+        drawList.reset()
+        needsUpdate = true
+    }
     isolated deinit { diagnostics?.stop() }
 
     public var needsFrame: Bool {

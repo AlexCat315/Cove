@@ -19,8 +19,9 @@ public final class OffscreenView {
     private var cachedSnapshot: DrawListSnapshot?
     private var recordedScale: Float = 0
 
-    public init() {
+    public init(geometryAntialiasing: GeometryAntialiasing = .analytic) {
         self.graph = ViewGraph(tree: tree, recomposer: recomposer)
+        drawList.geometryAntialiasing = geometryAntialiasing
     }
 
     // MARK: - Main-thread API

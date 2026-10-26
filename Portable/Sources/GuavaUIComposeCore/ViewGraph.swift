@@ -73,6 +73,7 @@ public final class ViewGraph {
     internal var scopes: [ObjectIdentifier: ViewScope] = [:]
     /// Lightweight diagnostics; hosts may disable timing/count collection.
     public var tracksRecomposition = true
+    public private(set) var skippedParentUpdates = 0
     internal var activeRecompositionScope: UInt64?
     internal var environmentReasons: [RecompositionReason] = []
 
@@ -537,6 +538,10 @@ public final class ViewGraph {
         // Note: any `@State` storage in the new view value is discarded; the
         // existing scope keeps its previously-wired storage so state survives.
         if let scope = scopes[ObjectIdentifier(node)] {
+            if environmentReasons.isEmpty, ViewInputComparison.equal(scope.view, view) {
+                skippedParentUpdates += 1
+                return
+            }
             ModifierReplay.reset(on: node)
             scope.replaceView(with: view)
             scope.recompose(reasons: [.init(kind: "parent", originScope: activeRecompositionScope)] + environmentReasons)

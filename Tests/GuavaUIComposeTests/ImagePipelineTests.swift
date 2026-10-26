@@ -11,11 +11,11 @@ struct ImagePipelineTests {
 
     @Test("The registry evicts least recently used assets past its byte and count budgets")
     func eviction() throws {
-        let registry = ImageAssetRegistry(limits: .init(maximumBytes: 64 * 3, maximumCount: 10))
+        let registry = ImageAssetRegistry(limits: .init(maximumBytes: 84 * 3, maximumCount: 10))
         try registry.register(key: "a", decoded: image(1))
         try registry.register(key: "b", decoded: image(2))
         try registry.register(key: "c", decoded: image(3))
-        #expect(registry.cachedBytes == 192)
+        #expect(registry.cachedBytes == 252, "Three 4×4 assets include their 2×2 and 1×1 levels")
         _ = registry.cached("a") // a becomes most recent
         try registry.register(key: "d", decoded: image(4))
         #expect(registry.cached("b") == nil)

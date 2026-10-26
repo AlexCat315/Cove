@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+- `@State` 父视图更新时自动跳过值输入相等的子 scope，保留原状态和回调；闭包、可变引用及不透明输入保守重组，环境变化仍强制刷新。
+- 补齐描边、路径、圆环与圆角遮罩的覆盖率抗锯齿；`geometryAntialiasing = .analytic` 可按窗口使用 1x 目标，默认仍保留 4x MSAA。离屏 HUD 与 Android 使用解析遮罩。
+- 图像生成带 alpha 权重的 mip 金字塔，计入图片缓存预算，并按实际显示像素选择 LOD；GPU 图像可携带由生产者生成的独立分辨率层。
+- 增加 Windows 低内存通知、Linux 主机／cgroup 压力监听和 Android `onTrimMemory` 清理；DevTools 提供 `query_ui_memory` 与性能页内存估算。
+- 显式本地 SDK 覆盖可跨版本调试；SDK 包补齐 Inspector 客户端及资源文档。Android 发布不再请求已下架的 `tools` 包。
+
 ## 0.1.14 — 2026-10-26
 
 - 修复发布引导：源码仓库的旧原生库清单不再阻止新版本从源码构建；已安装 SDK 缺少库时明确报错，避免回退到不存在的依赖源码。

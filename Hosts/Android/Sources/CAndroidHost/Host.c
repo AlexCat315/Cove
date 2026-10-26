@@ -95,6 +95,11 @@ JNIEXPORT void JNICALL Java_com_guava_probe_MainActivity_close(JNIEnv* env, jcla
 }
 
 extern void guava_android_pump_diagnostics(void* application);
+extern void guava_android_memory_pressure(void* application);
+JNIEXPORT void JNICALL Java_com_guava_probe_MainActivity_memoryPressure(JNIEnv* env, jclass type, jlong application) {
+    (void)env; (void)type;
+    guava_android_memory_pressure((void*)(uintptr_t)application);
+}
 JNIEXPORT void JNICALL Java_com_guava_probe_MainActivity_pumpDiagnostics(JNIEnv* env, jclass type, jlong application) {
     (void)env; (void)type;
     guava_android_pump_diagnostics((void*)(uintptr_t)application);

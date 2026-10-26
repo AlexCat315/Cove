@@ -2,7 +2,7 @@ import GuavaUICompose
 import GuavaUIRuntime
 import GuavaPlatformCore
 import Foundation
-#if os(macOS)
+#if os(macOS) || os(Windows) || os(Linux)
 private import Dispatch
 #elseif os(iOS)
 import UIKit
@@ -33,6 +33,9 @@ final class ApplicationMemoryPressure {
     private var source: (any DispatchSourceMemoryPressure)?
     #elseif os(iOS)
     private var observer: (any NSObjectProtocol)?
+    #elseif os(Windows) || os(Linux)
+    private var source: (any DispatchSourceTimer)?
+    private let probe = MemoryPressureProbe()
     #endif
 
     init(host: SDL3PlatformHost, trim: @escaping @MainActor () -> Void) {
@@ -48,6 +51,17 @@ final class ApplicationMemoryPressure {
             object: nil, queue: nil) { [weak host] _ in
                 host?.enqueueMainThreadWork { MainActor.assumeIsolated { trim() } }
             }
+        #elseif os(Windows) || os(Linux)
+        let source = DispatchSource.makeTimerSource(queue: .global())
+        source.schedule(deadline: .now(), repeating: .seconds(2))
+        let probe = probe
+        source.setEventHandler { [weak host] in
+            if probe.changedToLowMemory() {
+                host?.enqueueMainThreadWork { MainActor.assumeIsolated { trim() } }
+            }
+        }
+        source.resume()
+        self.source = source
         #endif
     }
 
@@ -58,6 +72,10 @@ final class ApplicationMemoryPressure {
         #elseif os(iOS)
         if let observer { NotificationCenter.default.removeObserver(observer) }
         observer = nil
+        #elseif os(Windows) || os(Linux)
+        source?.cancel()
+        source = nil
+        probe.close()
         #endif
     }
 }

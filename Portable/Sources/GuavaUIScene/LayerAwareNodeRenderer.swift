@@ -73,7 +73,7 @@ public final class LayerAwareNodeRenderer {
             if !obj.cacheInvalid,
                clipUnchanged,
                let cached = obj.cachedLayerList,
-               cached.pixelScale == frame.pixelScale {
+               cached.pixelScale == frame.pixelScale, cached.geometryAntialiasing == frame.geometryAntialiasing {
                 if obj.children.isEmpty, let bounds = obj.cachedPaintBounds,
                    let cachedPlacement = obj.lastPlacement,
                    own.a == cachedPlacement.a, own.shadowScale == cachedPlacement.shadowScale {
@@ -134,6 +134,7 @@ public final class LayerAwareNodeRenderer {
             // independent of the frame DrawList and reusable next time.
             let layerList = DrawList()
             layerList.pixelScale = frame.pixelScale
+            layerList.geometryAntialiasing = frame.geometryAntialiasing
             layerList.setViewportBounds(frame.viewportBounds)
             // Push the parent clip stack so nested clips intersect properly.
             for clip in parentClipStack { layerList.pushClip(clip) }
