@@ -1,21 +1,49 @@
 import Foundation
+private import GuavaFileSystem
 
 /// Frontend discovery is independent of application compilation and platform hosting.
 enum Inspector {
-    static func present(_ session: ManagedSession, root: URL, open: Bool) throws {
+    static func present(_ session: ManagedSession, root: URL, sessionDirectory: URL, open: Bool) throws {
         let page = root.appendingPathComponent("DevTools/Client/index.html")
-        var url = URLComponents(url: page, resolvingAgainstBaseURL: false)!
-        url.queryItems = [URLQueryItem(name: "endpoint", value: session.endpoint)]
+        var components = URLComponents(url: page, resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "endpoint", value: session.endpoint)]
+        let target = components.url!.absoluteString
+        // open(1)/xdg-open/rundll32 drop the query string when launching a file://
+        // URL, so the endpoint never reaches the client. Land first on a session-local
+        // page that forwards from inside the browser, where the query is preserved.
+        let bootstrap = sessionDirectory.appendingPathComponent("inspector.html")
+        try Files.text(bootstrapHTML(target: target), to: bootstrap)
+        try FilePermissions.restrictToCurrentUser(bootstrap)
         print("DevTools session: \(session.runtime.id) (\(session.application.name), \(session.configuration.rawValue))")
-        print("Inspector: \(url.url!.absoluteString)")
+        print("Inspector: \(bootstrap.absoluteString)")
         guard open else { return }
         #if os(macOS)
-        try Shell.run(["open", url.url!.absoluteString])
+        try Shell.run(["open", bootstrap.absoluteString])
         #elseif os(Windows)
-        try Shell.run(["rundll32.exe", "url.dll,FileProtocolHandler", url.url!.absoluteString])
+        try Shell.run(["rundll32.exe", "url.dll,FileProtocolHandler", bootstrap.absoluteString])
         #else
-        try Shell.run(["xdg-open", url.url!.absoluteString])
+        try Shell.run(["xdg-open", bootstrap.absoluteString])
         #endif
+    }
+
+    /// The bootstrap embeds the endpoint as a JSON string literal; the token
+    /// stays in the 0700 session directory and the file is removed with it.
+    private static func bootstrapHTML(target: String) throws -> String {
+        let literal = String(data: try JSONEncoder().encode(target), encoding: .utf8)!
+        return """
+        <!doctype html>
+        <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <title>GuavaUI DevTools</title>
+        </head>
+        <body>
+          <p>Opening GuavaUI DevTools… <a href="\(target)">Open manually</a></p>
+          <noscript><p>Enable JavaScript or open the GuavaUI DevTools Inspector directly.</p></noscript>
+          <script>location.replace(\(literal));</script>
+        </body>
+        </html>
+        """
     }
 
     /// Opens the Inspector, or runs one client action (query, click, input,
@@ -23,7 +51,8 @@ enum Inspector {
     static func attach(_ arguments: Arguments, project: AppProject, root: URL) throws {
         let (session, file) = try live(arguments, project: project)
         guard let client = arguments.client else {
-            try present(session, root: root, open: !arguments.flags.contains(.noOpen))
+            try present(session, root: root, sessionDirectory: file.deletingLastPathComponent(),
+                        open: !arguments.flags.contains(.noOpen))
             return
         }
         try DeveloperTool.run(["devtools", client.operation, "@" + file.path] + client.arguments, root: root)

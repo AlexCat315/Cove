@@ -4,6 +4,8 @@ GuavaUI SDK 与 `guava` CLI 的发布记录。每个版本对应 git 标签 `vX.
 
 ## Unreleased
 
+- DevTools Inspector 自动打开时先打开会话目录内的 `inspector.html` 跳转页：`open`、`xdg-open` 与 `rundll32` 会丢弃 `file://` URL 的查询参数，客户端此前只能回退到默认 9229 端口并停留在 Disconnected；跳转页在浏览器内完成导航，动态端口与一次性 token 完整保留，打开即自动连接。`guava devtools` 附加到现存会话时同样生成该跳转页。
+
 ## 0.1.8 — 2026-10-26
 
 - Windows 子进程以反斜杠路径启动，参数只在需要时加引号：`cmd.exe` 会扫描整条命令行，曾把 `C:/…/cmd.exe` 里的 `/cmd.exe` 当作 `/c` 开关，现在能执行命令并返回真实退出码。

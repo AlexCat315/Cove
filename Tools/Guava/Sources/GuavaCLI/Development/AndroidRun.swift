@@ -31,7 +31,7 @@ enum AndroidRun {
         guard let hostPort = Int(forwarded) else { throw ToolError.invalid("ADB did not return a forwarded port") }
         defer { _ = try? Shell.run(command + ["forward", "--remove", "tcp:\(hostPort)"], quiet: true) }
         let session = try development.publish(runtime, device: .init(adb: adb, serial: device, forwardedPort: hostPort))
-        try Inspector.present(session, root: toolchain.root,
+        try Inspector.present(session, root: toolchain.root, sessionDirectory: development.directory,
             open: arguments.flags.contains(.devtools) && !arguments.flags.contains(.noOpen))
         while !cancellation.isCancelled {
             if (try? Inspector.isAlive(session)) != true { break }

@@ -22,6 +22,11 @@ ports and per-session tokens allow multiple apps/devices without a shared fixed 
 Use `--no-open` for headless runs and `--session ID` to select an existing session.
 Android uses a CLI-owned ADB forwarding lifetime; Ctrl+C removes the forwarding.
 
+The CLI opens a session-local `inspector.html` bootstrap rather than the client
+directly: the OS URL handlers (`open`, `xdg-open`, `rundll32`) drop the query
+string from `file://` URLs, so the endpoint would never reach the client. The
+bootstrap forwards in-browser, where the query is preserved.
+
 For direct framework development, `GUAVA_DEVTOOLS=1 swift run --package-path
 GuavaUI/Examples GuavaUIDemo` still enables the loopback service at the default
 port 9229. Open Client/index.html and connect manually in that workflow. Ordinary apps

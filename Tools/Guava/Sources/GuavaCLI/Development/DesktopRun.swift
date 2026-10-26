@@ -27,7 +27,8 @@ enum DesktopRun {
             throw ToolError.invalid("Application did not publish its DevTools endpoint; check its startup log and diagnostics configuration")
         }
         let session = try development.publish(runtime)
-        try Inspector.present(session, root: root, open: arguments.flags.contains(.devtools) && !arguments.flags.contains(.noOpen))
+        try Inspector.present(session, root: root, sessionDirectory: development.directory,
+                              open: arguments.flags.contains(.devtools) && !arguments.flags.contains(.noOpen))
         while process.isRunning, !cancellation.isCancelled { Thread.sleep(forTimeInterval: 0.1) }
         if !process.isRunning { process.waitUntilExit() }
         if !cancellation.isCancelled, process.terminationStatus != 0 { throw ToolError.failed(executable.path, process.terminationStatus) }
