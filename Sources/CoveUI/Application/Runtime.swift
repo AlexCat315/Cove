@@ -140,6 +140,9 @@ public final class Application {
             #endif
         }
 
+        let queryMemory: @MainActor @Sendable () -> UIDiagnosticMemorySnapshot = { [weak self] in
+            self?.diagnosticMemorySnapshot() ?? UIDiagnosticMemorySnapshot(counters: [:], windows: [:])
+        }
         if let devConfig = config.diagnostics.devTools {
             let dev = DevTools(config: devConfig,
                                tree: composition.tree,
@@ -147,6 +150,7 @@ public final class Application {
                                renderTree: composition.graph.renderTree)
             try rendering.attachFrameTap(to: dev)
             dev.stateRegistry = composition.graph.stateRegistry
+            dev.memorySnapshot = queryMemory
             configureCheckpoint(dev)
             dev.server.host.execute = { [weak self] operation in
                 self?.host.enqueueMainThreadWork {
@@ -182,23 +186,7 @@ public final class Application {
 
         if callbacks.diagnosticsReady != nil {
             diagnostics.queries = UIDiagnostics(tree: composition.tree, state: composition.graph.stateRegistry)
-            diagnostics.queries?.memory = { [weak self] in
-                guard let self else { return UIDiagnosticMemorySnapshot(counters: [:], windows: [:]) }
-                let value = self.memorySnapshot()
-                return UIDiagnosticMemorySnapshot(counters: [
-                    "shapingEntries": value.shaping?.entries ?? 0,
-                    "shapingBytes": value.shaping?.estimatedBytes ?? 0,
-                    "layoutEntries": value.textLayout?.entries ?? 0,
-                    "layoutBytes": value.textLayout?.estimatedBytes ?? 0,
-                    "imageBytes": value.cachedImageBytes,
-                    "skippedParentUpdates": self.composition.graph.skippedParentUpdates
-                ], windows: Dictionary(uniqueKeysWithValues: value.windows.map { id, window in
-                    (String(describing: id), ["samples": Int(window.samples),
-                        "hasSwapchain": window.hasSwapchain ? 1 : 0,
-                        "suspended": window.state == .suspended ? 1 : 0,
-                        "targetBytes": window.estimatedTargetBytes])
-                }))
-            }
+            diagnostics.queries?.memory = queryMemory
             callbacks.diagnosticsReady?(diagnostics.queries)
         }
 
@@ -421,6 +409,24 @@ public final class Application {
         let text = TextEnvironmentHolder.current
         return AppMemorySnapshot(shaping: text?.shapingCacheSnapshot, textLayout: text?.layoutCacheSnapshot,
             cachedImageBytes: composition.imageAssets.cachedBytes, windows: windows)
+    }
+
+    private func diagnosticMemorySnapshot() -> UIDiagnosticMemorySnapshot {
+        let value = memorySnapshot()
+        return UIDiagnosticMemorySnapshot(counters: [
+            "shapingEntries": value.shaping?.entries ?? 0,
+            "shapingBytes": value.shaping?.estimatedBytes ?? 0,
+            "layoutEntries": value.textLayout?.entries ?? 0,
+            "layoutBytes": value.textLayout?.estimatedBytes ?? 0,
+            "imageEntries": composition.imageAssets.cachedCount,
+            "imageBytes": value.cachedImageBytes,
+            "skippedParentUpdates": composition.graph.skippedParentUpdates
+        ], windows: Dictionary(uniqueKeysWithValues: value.windows.map { id, window in
+            (String(describing: id), ["samples": Int(window.samples),
+                "hasSwapchain": window.hasSwapchain ? 1 : 0,
+                "suspended": window.state == .suspended ? 1 : 0,
+                "targetBytes": window.estimatedTargetBytes])
+        }))
     }
 
     private func trimMemory() {

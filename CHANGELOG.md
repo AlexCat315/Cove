@@ -4,6 +4,13 @@
 
 ## Unreleased
 
+## Unreleased
+
+- 首次发布完整 Cove SDK：同步模块、CLI、清单、安装目录与发布包名称，包含值状态子树复用、覆盖率抗锯齿、mip／LOD 和跨平台内存压力修复。
+- 修复 Linux／Android 原生构建中 SVG、WebP 静态依赖的链接顺序，CLI 自动配置所需选项。
+- 浏览器 DevTools 与内置 Agent 共用内存数据源，Android 提供文本／图片缓存统计；断开连接后清除旧快照。
+- 深层 UI 交互回归在应用主 Actor 上执行，避免 macOS CI 后台工作线程栈溢出；改名后的 CLI 使用物理路径，防止旧路径链接产生重复编译缓存。
+
 ## 0.2.0 — 2026-10-27
 
 - 项目迁移为 Cove：框架模块采用 `Cove*`，CLI 为 `cove`，清单与本地目录采用 `cove.json`／`.cove`；安装器、发布包、Android 标识与仓库链接同步改名。此版本需要更新旧项目的导入与配置。

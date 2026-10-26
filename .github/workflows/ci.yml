@@ -104,24 +104,6 @@ jobs:
           if [ "$RUNNER_OS" = Linux ]; then
             xvfb-run -a ./cove test . --skip-build --no-parallel --testing-library swift-testing --timeout 600 --event-output test-results/events.jsonl
           else
-            mkdir -p test-results
-            # Attach to the existing SwiftPM test process rather than replaying
-            # a failing test. Runner images do not always retain crash reports.
-            (
-              for attempt in $(seq 1 3000); do
-                pid=$(pgrep -f 'swiftpm-testing-helper.*--test-bundle-path.*CoveUIComposeTests.*--testing-library swift-testing' | head -n 1 || true)
-                if [ -n "$pid" ]; then
-                  sudo lldb --batch --attach-pid "$pid" \
-                    -o 'process handle -s true -n true -p true SIGBUS SIGILL SIGSEGV SIGABRT' \
-                    -o continue -o 'thread backtrace -c 100' -o 'process kill' \
-                    >> test-results/compose-backtrace.txt 2>&1 || true
-                  if grep -Eq 'stop reason = (EXC_BAD|signal SIG(BUS|ILL|SEGV|ABRT))' test-results/compose-backtrace.txt; then exit; fi
-                fi
-                sleep 0.2
-              done
-            ) &
-            debugger=$!
-            trap 'kill "$debugger" 2>/dev/null || true' EXIT
             ./cove test . --skip-build --no-parallel --testing-library swift-testing --timeout 600 --event-output test-results/events.jsonl
           fi
       - name: Run SDK Swift Testing with hang diagnostics

@@ -38,6 +38,9 @@ function isPerformanceTab() {
 }
 
 function setConnected(connected) {
+  perf.memory = null;
+  const memory = el("perfMemory");
+  if (memory) memory.textContent = "";
   if (connected) {
     perf.connectedAt = Date.now();
     perf.memoryAvailable = false;
@@ -71,7 +74,13 @@ function acceptMemory(env) {
   if (env.id !== perf.memoryRequestId || perf.memoryRequestId == null) return false;
   perf.memoryRequestId = null;
   const value = env.payload?.data;
-  if (!value) { perf.memoryAvailable = false; return true; }
+  if (!value) {
+    perf.memoryAvailable = false;
+    perf.memory = null;
+    const memory = el("perfMemory");
+    if (memory) memory.textContent = "";
+    return true;
+  }
   perf.memory = value;
   const counters = value.counters ?? {};
   const mib = bytes => `${(Number(bytes || 0) / 1048576).toFixed(2)} MiB`;

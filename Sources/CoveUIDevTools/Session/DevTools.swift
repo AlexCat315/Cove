@@ -21,8 +21,13 @@ public final class DevTools {
     public var stateRegistry: StateRegistry? {
         didSet {
             diagnostics = UIDiagnostics(tree: diagnosticTree, state: stateRegistry)
+            diagnostics.memory = memorySnapshot
             server.host.observation.state = stateRegistry.map { registry in { @MainActor ids in registry.observation(ids: ids) } }
         }
+    }
+    /// Read on the host's UI loop through the same wire tool as embedded agents.
+    public var memorySnapshot: (@MainActor @Sendable () -> UIDiagnosticMemorySnapshot)? {
+        didSet { diagnostics.memory = memorySnapshot }
     }
 
     private let timeline: PerformanceTimeline

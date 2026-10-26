@@ -68,7 +68,7 @@ struct ContextMenuStory: View {
                                    detail: "Creates a copy next to the original"), action: { status = "Duplicated" })),
                     .item(MenuItem(title: "Documentation", isEnabled: options.isEnabled,
                                    content: MenuItemContent(richTitle: [RichTextRun("Read the "), RichTextRun("guide", traits: .bold)],
-                                                            link: "https://guava.example/docs"),
+                                                            link: "https://cove.example/docs"),
                                    action: { status = "Opened documentation" })),
                     .separator("nested"),
                     .submenu(MenuSubmenu(id: "organize", title: "Organize", entries: [

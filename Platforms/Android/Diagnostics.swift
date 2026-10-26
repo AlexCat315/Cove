@@ -27,11 +27,13 @@ final class AndroidDiagnostics {
     private var drawMs = 0.0
 
     init(config: DevToolsConfig, tree: NodeTree, graph: ViewGraph,
-         schedule: @escaping @Sendable () -> Void, invalidate: @escaping @MainActor () -> Void) throws {
+         schedule: @escaping @Sendable () -> Void, invalidate: @escaping @MainActor () -> Void,
+         memory: @escaping @MainActor @Sendable () -> UIDiagnosticMemorySnapshot) throws {
         let inbox = DiagnosticsInbox(schedule: schedule)
         self.inbox = inbox
         tools = DevTools(config: config, tree: tree, renderTree: graph.renderTree)
         tools.stateRegistry = graph.stateRegistry
+        tools.memorySnapshot = memory
         tools.server.host.execute = { operation in inbox.enqueue(operation) }
         tools.onSelectionChanged = invalidate
         try tools.start()

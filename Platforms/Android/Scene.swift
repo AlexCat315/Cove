@@ -53,7 +53,17 @@ public final class AndroidContentSession {
     public func configureDiagnostics(_ config: DevToolsConfig, schedule: @escaping @Sendable () -> Void) throws {
         diagnostics?.stop()
         diagnostics = try AndroidDiagnostics(config: config, tree: tree, graph: graph, schedule: schedule,
-            invalidate: { [weak self] in self?.needsUpdate = true })
+            invalidate: { [weak self] in self?.needsUpdate = true }, memory: { [weak self] in
+                guard let self else { return UIDiagnosticMemorySnapshot(counters: [:], windows: [:]) }
+                let shaping = self.environment.text?.shapingCacheSnapshot
+                let layout = self.environment.text?.layoutCacheSnapshot
+                return UIDiagnosticMemorySnapshot(counters: [
+                    "shapingEntries": shaping?.entries ?? 0, "shapingBytes": shaping?.estimatedBytes ?? 0,
+                    "layoutEntries": layout?.entries ?? 0, "layoutBytes": layout?.estimatedBytes ?? 0,
+                    "imageEntries": self.environment.images.cachedCount, "imageBytes": self.environment.images.cachedBytes,
+                    "skippedParentUpdates": self.graph.skippedParentUpdates
+                ], windows: [:])
+            })
     }
 
     public func pumpDiagnostics() { withCurrent { diagnostics?.drain() } }
