@@ -9,6 +9,9 @@ struct NativeDependencies {
             let base = NativeArtifacts.directory(at: toolchain.root, target: "android-arm64")
             return Artifacts(engine: base.appendingPathComponent("Runtime/vendor"), text: base.appendingPathComponent("vendor"))
         }
+        guard NativeArtifacts.hasSourceInputs(at: toolchain.root) else {
+            throw ToolError.invalid("Missing Android native libraries; reinstall a complete SDK release. Native compilation requires a source checkout.")
+        }
         let engine = toolchain.cache.appendingPathComponent("native")
         let fonts = toolchain.cache.appendingPathComponent("fonts-cmake")
         try configure(source: toolchain.root.appendingPathComponent("Runtime/third-party"), directory: engine,

@@ -11,6 +11,9 @@ enum NativeSDK {
     static func prepare(root: URL, apple: AppleTarget? = nil, fromSource: Bool = false) throws {
         let target = apple?.variant ?? CLIUpdate.platform
         if !fromSource, try NativeArtifacts.install(at: root, target: target) { return }
+        guard NativeArtifacts.hasSourceInputs(at: root) else {
+            throw ToolError.invalid("Missing native libraries for \(target); reinstall a complete SDK release. Building native libraries requires a source checkout.")
+        }
         var environment = ProcessInfo.processInfo.environment
         #if os(Windows)
         try WindowsBuildEnvironment.activate(&environment)

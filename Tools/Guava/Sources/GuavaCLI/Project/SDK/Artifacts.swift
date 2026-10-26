@@ -27,6 +27,14 @@ struct NativeArtifacts: Codable {
         }
     }
 
+    /// Packaged SDKs deliberately omit native sources. A checkout must bootstrap
+    /// itself without downloading the release it is in the process of building.
+    static func hasSourceInputs(at root: URL) -> Bool {
+        ["Runtime/third-party/CMakeLists.txt", "third-party/CMakeLists.txt"].allSatisfy {
+            FileManager.default.fileExists(atPath: root.appendingPathComponent($0).path)
+        }
+    }
+
     @discardableResult
     static func install(at root: URL, target: String = CLIUpdate.platform, cacheDirectory: URL = Installation.directory) throws -> Bool {
         try FileLock.withLock(at: root.appendingPathComponent("Artifacts/locks/\(target).lock")) {
@@ -36,6 +44,7 @@ struct NativeArtifacts: Codable {
 
     private static func installLocked(at root: URL, target: String, cacheDirectory: URL) throws -> Bool {
         if isPrepared(at: root, target: target) { return true }
+        if hasSourceInputs(at: root) { return false }
         let file = root.appendingPathComponent("Artifacts/native.json")
         guard FileManager.default.fileExists(atPath: file.path) else { return false }
         let manifest = try JSONDecoder().decode(Self.self, from: Data(contentsOf: file))

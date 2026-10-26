@@ -3,6 +3,18 @@ private import Testing
 private import ToolSupport
 @testable import GuavaCLI
 
+@Test func checkoutBootstrapsWithoutItsOwnPublishedNativeArchive() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? Files.remove(root) }
+    try makeSDK(at: root)
+    try Files.text("# native source", to: root.appendingPathComponent("Runtime/third-party/CMakeLists.txt"))
+    try Files.text("# fonts", to: root.appendingPathComponent("third-party/CMakeLists.txt"))
+    try Files.json(NativeArtifacts(version: "0.0.1", platforms: [:]), to: root.appendingPathComponent("Artifacts/native.json"))
+    #expect(try !NativeArtifacts.install(at: root))
+    try Files.remove(root.appendingPathComponent("Runtime/third-party/CMakeLists.txt"))
+    #expect(throws: (any Error).self) { try NativeArtifacts.install(at: root) }
+}
+
 @Test func sourcePayloadExcludesBuildCachesAndNativeSourceTrees() throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? Files.remove(root) }
