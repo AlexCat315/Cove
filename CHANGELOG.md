@@ -4,6 +4,9 @@ GuavaUI SDK 与 `guava` CLI 的发布记录。每个版本对应 git 标签 `vX.
 
 ## Unreleased
 
+- SDK CLI 增加 `guava task` 和 `guava.workspace.json`：项目提供 Swift 任务库，SDK 负责依赖排序、按需构建、参数传递及构建前钩子，不需要项目包装脚本或独立 CLI。
+- 工作区可声明 `dependencyUpdates: "branches"`，本地 build/run 自动检查并刷新分支依赖；CI 保持锁文件，离线检查保留已解析版本。
+
 ## 0.1.11 — 2026-10-26
 
 - `guava.json` 的 `toolchain.sdkVersion` 支持写 `latest`：构建时浮动到本地已安装的最高版本 SDK（离线可用，不触发网络），用 `guava sdk install latest` 拉取新发布并刷新；`guava sdk install latest` 在精确钉版项目里仍会把解析后的具体版本写回清单（npm 语义），无 `GUAVA_SDK_ROOT` 的 SwiftPM 回退路径改用 `from: 0.0.0` 解析最高发布标签，Android Gradle 回退同样支持 latest。

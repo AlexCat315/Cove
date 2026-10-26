@@ -3,7 +3,7 @@ import Foundation
 enum Operation: Equatable {
     case androidExport
     case selfUpdate, installCLI, packageCLI, packageNative, packageBuild
-    case setup, sdkInstall, sdkUse, sdkList, create, build, run, clean, test, doctor, devices, showcase, androidCompile, androidPrepare, devtools
+    case setup, sdkInstall, sdkUse, sdkList, create, build, run, clean, test, task, doctor, devices, showcase, androidCompile, androidPrepare, devtools
 }
 
 enum Option: String, CaseIterable {
@@ -22,6 +22,7 @@ enum Option: String, CaseIterable {
 /// Parses one command grammar. Platform backends consume the same request.
 struct Arguments {
     let operation: Operation
+    let taskName: String?
     let subject: String?
     let platform: AppPlatform
     let requestedPlatform: AppPlatform?
@@ -37,6 +38,7 @@ struct Arguments {
         var tokens = raw[...]
         guard let verb = tokens.popFirst() else { throw ToolError.invalid("Supply a command; use guava --help") }
         let operation: Operation
+        var taskName: String?
         switch verb {
         case "self":
             guard tokens.popFirst() == "update" else { throw ToolError.invalid("Use guava self update [VERSION]") }
@@ -48,6 +50,9 @@ struct Arguments {
         case "run": operation = .run
         case "clean": operation = .clean
         case "test": operation = .test
+        case "task":
+            operation = .task
+            if let name = tokens.first, !name.hasPrefix("--") { taskName = tokens.popFirst() }
         case "doctor": operation = .doctor
         case "setup": operation = .setup
         case "sdk":
@@ -78,7 +83,7 @@ struct Arguments {
         var platform: AppPlatform?, configuration: BuildConfiguration?
         var applicationArguments: [String] = [], client: DevToolsClient?
         while let token = tokens.popFirst() {
-            if token == "--", operation == .run {
+            if token == "--", operation == .run || operation == .task {
                 applicationArguments = Array(tokens)
                 break
             } else if operation == .devtools, let action = try DevToolsClient(action: token, arguments: Array(tokens)) {
@@ -110,10 +115,10 @@ struct Arguments {
         if [.doctor, .setup, .sdkList, .devices, .androidCompile].contains(operation), subject != nil {
             throw ToolError.invalid("This command does not take a project directory")
         }
-        if [.create, .clean, .test].contains(operation), platform != nil {
+        if [.create, .clean, .test, .task].contains(operation), platform != nil {
             throw ToolError.invalid("\(verb) is project-wide and does not take a platform flag")
         }
-        if configuration != nil, ![.build, .run, .test, .showcase, .androidCompile, .androidExport, .androidPrepare, .packageBuild].contains(operation) {
+        if configuration != nil, ![.build, .run, .test, .task, .showcase, .androidCompile, .androidExport, .androidPrepare, .packageBuild].contains(operation) {
             throw ToolError.invalid("\(verb) does not take a build configuration")
         }
         let selectedPlatform = platform ?? ([.androidCompile, .androidExport, .androidPrepare, .showcase].contains(operation) ? .android : .host)
@@ -152,6 +157,7 @@ struct Arguments {
         self.client = client
         self.flags = flags
         self.operation = operation
+        self.taskName = taskName
         self.subject = subject
         self.platform = selectedPlatform
         self.requestedPlatform = platform
@@ -182,6 +188,7 @@ struct Arguments {
         let android: Set<Option> = [.androidSDK, .ndk, .keystore, .keyAlias, .storePassword, .keyPassword]
         switch operation {
         case .create: return common.union([.id, .name, .platforms])
+        case .task: return common
         case .build: return common.union(android).union([.output, .device, .simulator, .team])
         case .run: return common.union(android).union([.output, .device, .simulator, .team])
         case .test: return common.union([.filter, .scratchPath, .testingLibrary, .timeout, .eventOutput])
