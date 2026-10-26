@@ -4,6 +4,9 @@ import CoveUIRuntime
 @testable import CoveUICompose
 
 @Suite("Product interaction regressions", .serialized)
+// Application composition runs on the UI actor. Swift Testing's cooperative
+// worker stack can overflow while deeply nested controls decode their SVGs.
+@MainActor
 struct ProductInteractionRegressionTests: CoveUIComposeSerializedSuite {
     private func nodes(_ root: Node) -> [Node] { [root] + root.children.flatMap(nodes) }
     private func key(_ code: UInt32, modifiers: KeyModifiers = []) -> KeyEvent {
