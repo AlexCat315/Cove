@@ -7,9 +7,9 @@ val configuration = JsonSlurper().parse(projectRoot.resolve("guava.json")) as Ma
 val application = configuration["application"] as Map<*, *>
 val version = configuration["version"] as Map<*, *>
 val sdk = extensions.extraProperties["guavaSDK"] as File
-val generated = projectRoot.resolve(".guava/build/android/generated")
-layout.buildDirectory.set(projectRoot.resolve(".guava/build/android/gradle/app"))
-rootProject.layout.buildDirectory.set(projectRoot.resolve(".guava/build/android/gradle/root"))
+val generated = projectRoot.resolve(".build/android/generated")
+layout.buildDirectory.set(projectRoot.resolve(".build/android/gradle/app"))
+rootProject.layout.buildDirectory.set(projectRoot.resolve(".build/android/gradle/root"))
 
 android {
     namespace = "com.guava.probe"

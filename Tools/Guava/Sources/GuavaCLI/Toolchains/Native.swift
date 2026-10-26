@@ -9,7 +9,8 @@ enum NativeSDK {
     }
 
     static func prepare(root: URL, apple: AppleTarget? = nil, fromSource: Bool = false) throws {
-        if apple == nil, !fromSource, try NativeArtifacts.install(at: root) { return }
+        let target = apple?.variant ?? CLIUpdate.platform
+        if !fromSource, try NativeArtifacts.install(at: root, target: target) { return }
         var environment = ProcessInfo.processInfo.environment
         #if os(Windows)
         try WindowsBuildEnvironment.activate(&environment)
@@ -18,7 +19,8 @@ enum NativeSDK {
             let source = root.appendingPathComponent(domain == "Runtime" ? "Runtime/third-party" : "third-party")
             let base = domain == "Runtime" ? root.appendingPathComponent("Runtime") : root
             let build = base.appendingPathComponent("build/\(apple?.variant ?? "native")")
-            let vendor = apple == nil ? base.appendingPathComponent("vendor") : build.appendingPathComponent("vendor")
+            let artifacts = NativeArtifacts.directory(at: root, target: target)
+            let vendor = artifacts.appendingPathComponent(domain == "Runtime" ? "Runtime/vendor" : "vendor")
             let names = domain == "Runtime" ? ["SDL3", "lunasvg", "plutovg", "webp", "sharpyuv"]
                 : ["CFreeType", "CHarfBuzz"] + (apple == nil ? ["GhosttyVt"] : [])
             if names.allSatisfy({ FileManager.default.fileExists(atPath: vendor.appendingPathComponent("\($0).artifactbundle/info.json").path) }) { continue }

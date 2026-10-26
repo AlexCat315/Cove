@@ -33,15 +33,22 @@ val semver = Comparator<File> { a, b ->
     pa.zip(pb).firstNotNullOfOrNull { (x, y) -> x.compareTo(y).takeIf { it != 0 } }
         ?: pa.size.compareTo(pb.size)
 }
-val newestInstalled = installation.resolve("sdks").listFiles()
-    ?.filter { it.resolve("Package.swift").isFile }
-    ?.maxWithOrNull(semver)
-val sdk = environment["GUAVA_SDK_ROOT"]?.let(::File)
+fun sdkVersion(root: File): String? = runCatching {
+    (JsonSlurper().parse(root.resolve("Tools/Guava/Sources/GuavaCLI/SDK.json")) as Map<*, *>)["version"] as String
+}.getOrNull()
+val globalSelection = installation.resolve("sdk.json")
+val selectedSDK = if (globalSelection.isFile) File((JsonSlurper().parse(globalSelection) as Map<*, *>)["path"] as String) else null
+val candidates = listOfNotNull(selectedSDK) + (installation.resolve("versions").listFiles()?.filter { !it.name.startsWith(".") } ?: emptyList())
+val sdkCandidate = environment["GUAVA_SDK_ROOT"]?.let(::File)
     ?: if (selection.isFile) File((JsonSlurper().parse(selection) as Map<*, *>)["path"] as String)
-       else if (version == "latest") newestInstalled
-       else installation.resolve("sdks/$version")
-check(sdk?.resolve("Package.swift")?.isFile == true) { "Install the SDK with guava sdk install $version" }
-requireNotNull(sdk)
+       else if (version == "latest") candidates.filter { sdkVersion(it) != null }.maxWithOrNull { a, b ->
+           semver.compare(File(sdkVersion(a)!!), File(sdkVersion(b)!!))
+       }
+       else candidates.firstOrNull { sdkVersion(it) == version }
+
+val sdk = requireNotNull(sdkCandidate) { "Install the SDK with guava sdk install $version" }
+check(sdk.resolve("Package.swift").isFile) { "Install the SDK with guava sdk install $version" }
+check(version == "latest" || sdkVersion(sdk) == version) { "Selected SDK does not match $version" }
 gradle.beforeProject { extensions.extraProperties.set("guavaSDK", sdk) }
 include(":app", ":guavaRuntime")
 project(":guavaRuntime").projectDir = sdk.resolve("Hosts/Android/Runtime")

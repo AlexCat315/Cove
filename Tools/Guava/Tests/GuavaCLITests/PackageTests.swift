@@ -25,14 +25,13 @@ import Testing
                                              toolchain: .init(sdkVersion: try SDKRelease.read(at: root).version))
     try Files.json(configuration, to: directory.appendingPathComponent("guava.json"))
     let plan = try PackageTests(Arguments(["test", directory.path]))
-    #expect(plan.command.suffix(2) == ["--scratch-path", directory.appendingPathComponent(".guava/build/swift").path])
+    #expect(!plan.command.contains("--scratch-path"))
     #expect(plan.helpers.isEmpty)
     var withHelper = configuration
     withHelper.targets.desktopHelpers = ["GuavaPluginHost"]
     try Files.json(withHelper, to: directory.appendingPathComponent("guava.json"))
     let helpers = try PackageTests(Arguments(["test", directory.path])).helpers
-    #expect(helpers.count == 1 && helpers[0].suffix(4) == ["--scratch-path", directory.appendingPathComponent(".guava/build/swift").path,
-                                                         "--product", "GuavaPluginHost"])
+    #expect(helpers.count == 1 && helpers[0].suffix(2) == ["--product", "GuavaPluginHost"])
     try Files.text("{}", to: directory.appendingPathComponent("guava.json"))
     #expect(throws: (any Error).self) { try PackageTests(Arguments(["test", directory.path])) }
 }

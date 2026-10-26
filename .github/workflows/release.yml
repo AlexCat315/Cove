@@ -1,11 +1,95 @@
-name: CLI release
+name: SDK release
 on:
   push:
     tags: ['v[0-9]*']
 permissions:
   contents: write
 jobs:
-  build:
+  native:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: xcode-27
+            platform: macos-arm64
+            options: ''
+            desktop: true
+          - runner: windows-2025-vs2026
+            platform: windows-x86_64
+            options: ''
+            desktop: true
+          - runner: ubuntu-24.04
+            platform: linux-x86_64
+            options: ''
+            desktop: true
+          - runner: ubuntu-24.04
+            platform: android-arm64
+            options: '--android'
+          - runner: xcode-27
+            platform: ios-arm64
+            options: '--ios --sdk iphoneos --arch arm64'
+          - runner: xcode-27
+            platform: ios-arm64-simulator
+            options: '--ios --sdk iphonesimulator --arch arm64'
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: ./.github/actions/fetch-submodules
+      - uses: ./.github/actions/setup-toolchains
+      - name: Verify release metadata
+        run: node Tools/Release/check-version.mjs "$GITHUB_REF_NAME" --release
+      - name: Identify native inputs
+        id: native-inputs
+        run: echo "digest=$(git ls-tree -r HEAD cmake third-party Runtime/third-party Tools/Guava/Sources/GuavaCLI/Toolchains/Native.swift .github/actions/setup-toolchains/action.yml | git hash-object --stdin)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-java@v4
+        if: matrix.platform == 'android-arm64'
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        if: matrix.platform == 'android-arm64'
+      - name: Prepare Android platform tools
+        if: matrix.platform == 'android-arm64'
+        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.1.0" "ndk;30.0.16248370"
+      - uses: actions/cache@v5
+        with:
+          key: sdk-native-v3-${{ matrix.platform }}-${{ steps.native-inputs.outputs.digest }}
+          path: |
+            vendor
+            Runtime/vendor
+            Artifacts/native
+            build/android-validation/native
+            build/android-validation/fonts-cmake
+      - name: Prepare host libraries
+        run: ./guava setup
+      - name: Package target libraries
+        run: ./guava internal package-native ${{ matrix.options }} --output "$PWD/dist"
+      - name: Verify desktop SDK
+        if: matrix.desktop
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a ./guava test . --no-parallel
+          else
+            ./guava test . --no-parallel
+          fi
+      - name: Verify Android application packaging
+        if: matrix.platform == 'android-arm64'
+        run: ./guava build Examples/Mobile --android --output "$PWD/dist/mobile-smoke.apk"
+      - name: Verify iOS Simulator application
+        if: matrix.platform == 'ios-arm64-simulator'
+        run: ./guava build Examples/Mobile --ios
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.platform }}
+          path: |
+            dist/guava-native-*.tar.gz
+            dist/native-*.json
+          if-no-files-found: error
+  sdk:
+    needs: native
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -24,12 +108,20 @@ jobs:
       - uses: actions/checkout@v7.0.1
       - uses: ./.github/actions/fetch-submodules
       - uses: ./.github/actions/setup-toolchains
-      - name: Verify tag and SDK metadata
-        run: node Tools/Release/check-version.mjs "$GITHUB_REF_NAME"
-      - name: Test CLI
-        timeout-minutes: 10
-        run: ./guava test Tools/Guava
-      - name: Package CLI and runtime libraries
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: native
+          merge-multiple: true
+      - name: Assemble shared SDK libraries and metadata
+        run: |
+          node Tools/Release/merge-native.mjs native
+          mkdir -p Artifacts
+          cp native/native.json Artifacts/native.json
+          tar -xf "native/guava-native-${{ matrix.platform }}.tar.gz"
+      - name: Test SDK management
+        run: ./guava test Tools/Guava --timeout 480
+      - name: Package complete SDK
         run: ./guava internal package-cli --output "$PWD/dist"
       - name: Verify independent startup
         run: |
@@ -40,28 +132,39 @@ jobs:
           else
             env -i PATH=/usr/bin:/bin smoke/guava/guava --version
           fi
+          test -f smoke/guava/Package.swift
+          test -f smoke/guava/Runtime/vendor/SDL3.artifactbundle/info.json
       - uses: actions/upload-artifact@v4
         with:
-          name: cli-${{ matrix.platform }}
+          name: sdk-${{ matrix.platform }}
           path: dist/*
           if-no-files-found: error
   publish:
-    needs: build
+    needs: sdk
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/download-artifact@v4
         with:
-          pattern: cli-*
-          path: dist
-      - name: Publish after every platform passes
+          pattern: sdk-*
+          path: sdk
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: native
+          merge-multiple: true
+      - name: Publish one SDK release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           mkdir release
-          find dist -name '*.tar.gz' -exec cp {} release/ \;
-          find dist -name SHA256SUMS -exec cat {} \; | sort > release/SHA256SUMS
+          find sdk -name '*.tar.gz' -exec cp {} release/ \;
+          cp native/guava-native-*.tar.gz release/
+          node Tools/Release/merge-native.mjs native
+          cp native/native.json release/
+          (cd release && sha256sum *.tar.gz | sort > SHA256SUMS)
           cp Tools/Guava/install.sh Tools/Guava/install.ps1 release/
-          gh release create "$RELEASE_TAG" release/* --verify-tag --title "$RELEASE_TAG" --generate-notes
+          node Tools/Release/release-notes.mjs > release-notes.md
+          gh release create "$RELEASE_TAG" release/* --verify-tag --title "Guava SDK $RELEASE_TAG" --notes-file release-notes.md

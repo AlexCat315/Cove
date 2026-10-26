@@ -18,9 +18,6 @@ enum CLIUpdate {
                 ? "Update this installation with brew upgrade guava"
                 : "Use the package manager that installed guava, or install with the official standalone installer")
         }
-        let temporary = FileManager.default.temporaryDirectory.appendingPathComponent("guava-update-" + UUID().uuidString)
-        try Files.directory(temporary)
-        defer { try? Files.remove(temporary) }
         let repository = try SDKRelease.current.repository.replacingOccurrences(of: ".git", with: "")
         let version: String
         if let requested {
@@ -34,24 +31,9 @@ enum CLIUpdate {
             version = latest
         }
         if version == receipt.version { print("guava \(version) is current"); return }
-        let name = "guava-\(platform).tar.gz"
-        let base = repository + "/releases/download/v\(version)/"
-        let checksums = temporary.appendingPathComponent("SHA256SUMS")
-        try Download.metadata(from: URL(string: base + "SHA256SUMS")!, to: checksums)
-        let digest = try checksum(for: name, in: String(contentsOf: checksums, encoding: .utf8))
-        let archive = temporary.appendingPathComponent(name)
-        try Download.file(from: URL(string: base + name)!, to: archive, sha256: digest)
-        let expanded = temporary.appendingPathComponent("payload")
-        try Files.directory(expanded)
-        #if os(Windows)
-        let tar = URL(fileURLWithPath: ProcessInfo.processInfo.environment["SystemRoot"] ?? "C:\\Windows").appendingPathComponent("System32/tar.exe").path
-        #else
-        let tar = "tar"
-        #endif
-        try Shell.run([tar, "-xf", archive.path, "-C", expanded.path])
-        let payload = expanded.appendingPathComponent("guava")
-        let packaged = try String(contentsOf: payload.appendingPathComponent("VERSION"), encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard packaged == version else { throw ToolError.invalid("CLI archive and requested version disagree") }
+        let store = SDKStore(directory: receipt.directory)
+        try store.install(version: version)
+        let payload = store.installed(version)
         #if os(Windows)
         let binary = payload.appendingPathComponent("guava.exe")
         #else

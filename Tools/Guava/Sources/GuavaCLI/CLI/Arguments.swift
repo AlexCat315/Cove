@@ -16,7 +16,7 @@ enum Option: String, CaseIterable {
     case component, product, contentPackage = "content-package", gameplayPackage = "gameplay-package"
     case scratchPath = "scratch-path", resultFile = "result-file"
     case testingLibrary = "testing-library", timeout, eventOutput = "event-output"
-    case triple, sdk, target
+    case triple, sdk, target, architecture = "arch"
 }
 
 /// Parses one command grammar. Platform backends consume the same request.
@@ -122,6 +122,14 @@ struct Arguments {
             throw ToolError.invalid("\(verb) does not take a build configuration")
         }
         let selectedPlatform = platform ?? ([.androidCompile, .androidExport, .androidPrepare, .showcase].contains(operation) ? .android : .host)
+        if [.setup, .packageNative].contains(operation), values[.sdk] != nil || values[.architecture] != nil {
+            guard selectedPlatform == .ios,
+                  values[.sdk].map({ ["iphoneos", "iphonesimulator"].contains($0) }) ?? true,
+                  values[.architecture].map({ ["arm64", "x86_64"].contains($0) }) ?? true,
+                  values[.sdk] != "iphoneos" || values[.architecture] != "x86_64" else {
+                throw ToolError.invalid("Select a valid iOS SDK and architecture")
+            }
+        }
         if [.androidCompile, .androidExport, .androidPrepare, .showcase].contains(operation), selectedPlatform != .android {
             throw ToolError.invalid("This operation currently requires --android")
         }
@@ -195,10 +203,12 @@ struct Arguments {
         case .clean: return []
         case .sdkInstall, .selfUpdate: return []
         case .installCLI: return [.binDirectory]
-        case .packageCLI, .packageNative: return common.union([.output])
+        case .packageCLI: return common.union([.output])
+        case .packageNative: return common.union([.output, .sdk, .architecture, .ndk, .androidSDK])
         case .packageBuild: return common.union([.product, .target, .triple, .sdk, .scratchPath, .resultFile])
         case .sdkUse, .sdkList: return []
-        case .setup, .doctor: return common.union([.androidSDK, .ndk])
+        case .setup: return common.union([.androidSDK, .ndk, .sdk, .architecture])
+        case .doctor: return common.union([.androidSDK, .ndk])
         case .devices: return [.androidSDK]
         case .showcase: return common.union(android).union([.output, .component, .device])
         case .devtools: return common.union([.session])

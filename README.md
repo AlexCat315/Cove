@@ -2,9 +2,9 @@
 
 Swift 跨平台 UI 框架与 `guava` CLI。应用共享声明式视图、布局、文本和图像管线，通过 NativeRHI 使用 Metal、DirectX 12 或 Vulkan。
 
-预编译 CLI 首批提供 macOS arm64、Windows x86_64、Linux x86_64。构建应用需要 Swift 6.4.1 和对应平台的编译工具。Apple 平台最低版本为 macOS 26 和 iOS 26。
+SDK 安装包提供 macOS arm64、Windows x86_64、Linux x86_64。构建应用需要 Swift 6.4.1 和对应平台的编译工具。Apple 平台最低版本为 macOS 26 和 iOS 26。
 
-## 安装 CLI
+## 安装 SDK
 
 macOS / Linux：
 
@@ -20,10 +20,9 @@ Invoke-WebRequest https://github.com/AlexCat315/GuavaUI/releases/latest/download
 ./install-guava.ps1
 ```
 
-安装器配置用户 PATH；安装后打开新终端。CLI 自带运行库，执行 `guava --version` 无需先安装 Swift。
+安装器配置用户 PATH；安装后打开新终端。SDK 包含 CLI、框架源码和主机原生库，CLI 自带运行库，执行 `guava --version` 无需先安装 Swift。
 
 ```sh
-guava sdk install 0.1.0
 guava setup
 guava create app MyApp
 guava run MyApp
@@ -34,15 +33,11 @@ guava self update
 
 ## SDK 版本
 
-应用的 `guava.json` 用 `toolchain.sdkVersion` 固定版本，SwiftPM 依赖使用同一精确版本：
+应用的 `guava.json` 用 `toolchain.sdkVersion` 固定完整 SDK 版本。所有项目及 IDE 通过本地路径引用全局 `versions/VERSION` 中的同一份 SDK，不再单独下载 GuavaUI 与原生库。
 
-```swift
-.package(url: "https://github.com/AlexCat315/GuavaUI.git", exact: "0.1.0")
-```
+`guava sdk install VERSION|latest` 安装 SDK；`guava sdk use VERSION|PATH` 选择版本或本地开发源码。`latest` 使用本地最新版本，精确版本缺失时由 CLI 自动安装。项目使用对应 SDK 自带的 CLI。
 
-写 `"sdkVersion": "latest"` 则浮动到本地已安装的最高版本，用 `guava sdk install latest` 拉取新发布（SwiftPM 回退路径按 `from: 0.0.0` 解析最高标签）。
-
-本地联调可使用 `GUAVA_SDK_ROOT` 或项目内被忽略的 `.guava/sdk.json`，其格式为 `{"path":"/absolute/path/GuavaUI"}`。CLI 更新和项目 SDK 版本分别管理。
+主机原生库随安装包提供；Android 与 iOS 产物按目标下载到同一共享 SDK。构建与测试共用 SwiftPM 标准 `.build`。详见 [SDK 工具](Tools/Guava/README.md)。
 
 ## 源码开发
 
@@ -60,8 +55,6 @@ cd GuavaUI
 
 ## 发布
 
-1. 更新 `Tools/Guava/Sources/GuavaCLI/SDK.json` 的版本，运行 **Native SDK release**。
-2. 将成功构建的 `native.json` 写入 `Artifacts/native.json` 并提交，等待三平台 CI 通过。
-3. 推送对应的 `vVERSION` 标签。CLI 发布流程测试并打包三个平台，全部成功后发布安装器、程序与校验和。
-
-原生依赖单独使用 `native-vVERSION-rREVISION` 预发布标签，SDK 与 CLI 使用 `vVERSION` 正式标签。已发布标签与资源保持不可变。
+1. 更新 SDK 版本、示例钉版并写入 CHANGELOG.md，或运行 `Tools/Release/release.sh`。
+2. 推送 `vVERSION` 标签。SDK release 自动构建桌面、Android 和 iOS 原生库，测试并打包各主机完整 SDK。
+3. 所有构建通过后，在同一个 Release 发布安装包、目标平台原生库、清单与校验和。无需单独的 Native Release 或手工提交原生库清单。

@@ -4,7 +4,11 @@ struct NativeDependencies {
     struct Artifacts { let engine: URL; let text: URL }
     let toolchain: AndroidToolchain
 
-    func prepare() throws -> Artifacts {
+    func prepare(fromSource: Bool = false) throws -> Artifacts {
+        if !fromSource, try NativeArtifacts.install(at: toolchain.root, target: "android-arm64") {
+            let base = NativeArtifacts.directory(at: toolchain.root, target: "android-arm64")
+            return Artifacts(engine: base.appendingPathComponent("Runtime/vendor"), text: base.appendingPathComponent("vendor"))
+        }
         let engine = toolchain.cache.appendingPathComponent("native")
         let fonts = toolchain.cache.appendingPathComponent("fonts-cmake")
         try configure(source: toolchain.root.appendingPathComponent("Runtime/third-party"), directory: engine,

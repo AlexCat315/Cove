@@ -25,9 +25,9 @@ guava clean
 - Linux：Application.desktop 配置平台集成；Name / Exec 由构建提供。
 - 桌面平台可添加 Sources 目录，其 Swift 代码编译为 PlatformSupport；需要时由 AppContent 按平台条件导入。
 
-构建不会覆盖平台源文件。`.guava/build` 保存生成文件、缓存、产物及开发会话；clean 保留平台工程、其他作者数据和 Package.resolved。项目外 --output 与 SDK 共享缓存不由应用 clean 删除。
+构建不会覆盖平台源文件。`.build` 保存生成文件、缓存、产物及开发会话；clean 保留平台工程、其他作者数据和 Package.resolved。项目外 --output 与 SDK 共享缓存不由应用 clean 删除。
 
-Android 需要 Swift 6.4.1 release、匹配 Swift SDK、NDK r30、Android SDK 36 / build-tools 36.1.0、JDK 21、CMake 和 Ninja；Gradle wrapper 负责固定 Gradle / AGP。桌面需要对应主机及 SDK 原生依赖。iOS / Web 完整应用宿主尚未实现。
+Android 需要 Swift 6.4.1 release、匹配 Swift SDK、NDK r30、Android SDK 36 / build-tools 36.1.0、JDK 21；Gradle wrapper 负责固定 Gradle / AGP。桌面需要对应主机及 SDK 原生依赖。iOS 需要 macOS 和完整 Xcode；Web 完整应用宿主尚未实现。
 
 DevTools 使用动态端口和临时会话令牌。`--no-open` 保留服务但不打开浏览器。Android 使用 ADB 转发，CLI 保持会话，Ctrl+C 后停止应用并清理转发。Profile 使用优化后的 Swift 构建并保留诊断；Release 不启用 CLI 诊断入口。时间线记录 CPU spans，GPU / 实际呈现分析需相应后端测量；Android 目前不提供画面镜像。
 

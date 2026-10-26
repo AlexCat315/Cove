@@ -4,6 +4,8 @@
 // Return zero on success, otherwise an errno or Win32 error code.
 uint32_t guava_restrict_path(const char *path, int directory);
 int guava_same_file(const char *lhs, const char *rhs);
+intptr_t guava_file_lock(const char *path, uint32_t *error);
+void guava_file_unlock(intptr_t handle);
 
 #if defined(_WIN32)
 void *guava_process_start(const uint16_t *executable, const uint16_t *command,

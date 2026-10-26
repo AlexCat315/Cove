@@ -30,6 +30,8 @@ import Testing
     ["create", "app"], ["create", "android", "App"], ["create", "app", "App", "--android"],
     ["run", "--android", "--mac"], ["build", "--debug", "--release"], ["run", "--output"],
     ["build", "App", "Other"], ["clean", "--release"], ["test", "--android"],
+    ["setup", "--sdk", "iphoneos"], ["setup", "--ios", "--arch", "../../escape"],
+    ["setup", "--ios", "--sdk", "iphoneos", "--arch", "x86_64"],
     ["build", "--mac", "--ndk", "/ndk"], ["run", "--install"],
     ["create", "app", "App", "--id", "a.b", "--id", "c.d"],
     ["doctor", "App"], ["unknown"], ["build", "--configuration", "release"],

@@ -1,4 +1,5 @@
 internal import Foundation
+private import GuavaFileSystem
 #if canImport(Darwin)
 private import Darwin
 #elseif canImport(Glibc)
@@ -10,6 +11,13 @@ enum CLIInstaller {
         let version = try String(contentsOf: payload.appendingPathComponent("VERSION"), encoding: .utf8)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard SDKRelease.isVersion(version) else { throw ToolError.invalid("Invalid CLI version in installation payload") }
+        try SDKPayload.validate(payload, version: version)
+        try FileLock.withLock(at: directory.appendingPathComponent("locks/sdk-\(version).lock")) {
+            try installLocked(payload: payload, directory: directory, commands: commands, version: version)
+        }
+    }
+
+    private static func installLocked(payload: URL, directory: URL, commands: URL, version: String) throws {
         #if os(Windows)
         let binary = payload.appendingPathComponent("guava.exe")
         #else
@@ -21,9 +29,10 @@ enum CLIInstaller {
         try Files.directory(destination.deletingLastPathComponent())
         if FileManager.default.fileExists(atPath: destination.path) {
             let existing = try InstallationReceipt.read(at: destination)
-            guard existing.version == version, existing.directory == directory, existing.commands == commands else {
+            guard existing.version == version, samePath(existing.directory, directory), samePath(existing.commands, commands) else {
                 throw ToolError.invalid("Installation directory already contains an unmanaged version")
             }
+            try SDKPayload.validate(destination, version: version)
         } else {
             let staging = directory.appendingPathComponent("versions/." + UUID().uuidString)
             defer { try? Files.remove(staging) }
@@ -33,7 +42,8 @@ enum CLIInstaller {
         }
         try activate(version: destination, commands: commands, directory: directory)
         try Files.json(receipt, to: directory.appendingPathComponent(InstallationReceipt.filename))
-        print("Installed guava \(version): \(commands.path)")
+        try SDKStore(directory: directory).use(destination)
+        print("Installed Guava SDK \(version): \(commands.path)")
     }
 
     private static func activate(version: URL, commands: URL, directory: URL) throws {
@@ -41,7 +51,7 @@ enum CLIInstaller {
         #if os(Windows)
         if FileManager.default.fileExists(atPath: commands.appendingPathComponent("guava.cmd").path) {
             let existing = try InstallationReceipt.read(at: directory)
-            guard existing.directory == directory, existing.commands == commands else {
+            guard samePath(existing.directory, directory), samePath(existing.commands, commands) else {
                 throw ToolError.invalid("The guava command is managed by another installation")
             }
         }
@@ -51,12 +61,16 @@ enum CLIInstaller {
         let entry = commands.appendingPathComponent("guava")
         if FileManager.default.fileExists(atPath: entry.path) {
             let existing = try InstallationReceipt.read(at: entry.resolvingSymlinksInPath().deletingLastPathComponent())
-            guard existing.directory == directory else { throw ToolError.invalid("The guava command is managed by another installation") }
+            guard samePath(existing.directory, directory) else { throw ToolError.invalid("The guava command is managed by another installation") }
         }
         let temporary = commands.appendingPathComponent(".guava-" + UUID().uuidString)
         defer { try? Files.remove(temporary) }
         try FileManager.default.createSymbolicLink(at: temporary, withDestinationURL: version.appendingPathComponent("guava"))
         guard rename(temporary.path, entry.path) == 0 else { throw ToolError.invalid("Could not activate the new guava command") }
         #endif
+    }
+
+    private static func samePath(_ lhs: URL, _ rhs: URL) -> Bool {
+        lhs.resolvingSymlinksInPath().path == rhs.resolvingSymlinksInPath().path
     }
 }

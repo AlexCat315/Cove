@@ -17,7 +17,6 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 cd "$ROOT"
 
 SDK_MANIFEST=Tools/Guava/Sources/GuavaCLI/SDK.json
-NATIVE_MANIFEST=Artifacts/native.json
 WORKFLOW=release.yml
 
 BRANCH=main
@@ -209,7 +208,7 @@ else
   info "local only: nothing will be pushed"
 fi
 
-manifests=("$SDK_MANIFEST" "$NATIVE_MANIFEST")
+manifests=("$SDK_MANIFEST")
 while IFS= read -r file; do
   manifests+=("$file")
 done < <(git ls-files | grep -E '(^|/)guava\.json$' || true)
@@ -253,10 +252,9 @@ fi
 if [ "$version" != "$current_version" ]; then
   step "Bump manifests to $version"
   set_json_version "$SDK_MANIFEST" version "$version"
-  set_json_version "$NATIVE_MANIFEST" version "$version"
   for file in "${manifests[@]}"; do
     case "$file" in
-      "$SDK_MANIFEST"|"$NATIVE_MANIFEST") continue ;;
+      "$SDK_MANIFEST") continue ;;
     esac
     set_json_version "$file" sdkVersion "$version"
   done

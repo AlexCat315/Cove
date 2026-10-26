@@ -20,8 +20,11 @@ enum ToolchainRequirements {
         let common = "Install Git, CMake and Ninja. macOS: brew install git cmake ninja; "
             + "Ubuntu/Debian: sudo apt-get install git cmake ninja-build build-essential pkg-config. "
             + "Windows: winget install Git.Git Kitware.CMake Ninja-build.Ninja; reopen the terminal."
-        let prebuilt = (try? JSONDecoder().decode(NativeArtifacts.self, from: Data(contentsOf: root.appendingPathComponent("Artifacts/native.json"))))?.platforms[CLIUpdate.platform]?.isEmpty == false
-        let commands = prebuilt ? ["git"] : ["git", "cmake", "ninja", "zig"]
+        let apple = NativeSDK.AppleTarget(sdk: arguments.value(.sdk) ?? "iphonesimulator", architecture: arguments.value(.architecture) ?? "arm64")
+        let target = arguments.platform == .android ? "android-arm64" : arguments.platform == .ios ? apple.variant : CLIUpdate.platform
+        let prebuilt = NativeArtifacts.isPrepared(at: root, target: target)
+            || (try? JSONDecoder().decode(NativeArtifacts.self, from: Data(contentsOf: root.appendingPathComponent("Artifacts/native.json"))))?.platforms[target] != nil
+        let commands = prebuilt ? ["git"] : ["git", "cmake", "ninja"] + ([AppPlatform.ios, .android].contains(arguments.platform) ? [] : ["zig"])
         var checks = commands.map { ToolchainCheck.executable($0, remedy: common) }
         let version = (try? Shell.run([GuavaSDK.swift, "--version"], capture: true, quiet: true)) ?? ""
         checks.append(.init(name: "Swift 6.4", ready: supportsCompiler(version),
@@ -37,9 +40,6 @@ enum ToolchainRequirements {
         checks.append(.executable("cc", remedy: common))
         #endif
         if arguments.platform == .ios {
-            // Mobile C dependencies are built from source with CMake/Ninja.
-            checks.append(.executable("cmake", remedy: common))
-            checks.append(.executable("ninja", remedy: common))
             for name in ["xcodebuild", "xcrun"] {
                 checks.append(.executable(name, remedy: "Install the full Xcode IDE (not only Command Line Tools) from the App Store."))
             }

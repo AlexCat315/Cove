@@ -56,6 +56,7 @@ struct AndroidToolchain {
 
     func compile(product: String, configuration: BuildConfiguration, content: URL? = nil,
                  gameplay: URL? = nil, scratch: URL? = nil) throws -> URL {
+        try Self.ensureSwiftSDK()
         try Files.directory(cache)
         let artifacts = try NativeDependencies(toolchain: self).prepare()
         var environment = ProcessInfo.processInfo.environment
@@ -77,6 +78,14 @@ struct AndroidToolchain {
         if let scratch { command += ["--scratch-path", scratch.path] }
         try Shell.run(command + ["--product", product], environment: environment)
         return URL(fileURLWithPath: try Shell.run(command + ["--show-bin-path"], environment: environment, capture: true))
+    }
+
+    static func ensureSwiftSDK() throws {
+        let installed = try Shell.run([GuavaSDK.swift, "sdk", "list"], capture: true, quiet: true)
+        guard !installed.contains(sdkID) else { return }
+        try Shell.run([GuavaSDK.swift, "sdk", "install",
+            "https://download.swift.org/swift-6.4.1-release/android-sdk/swift-6.4.1-RELEASE/swift-6.4.1-RELEASE_android.artifactbundle.tar.gz",
+            "--checksum", "a356b79f8f1daa6ae3a66f4c556966ca20c0208b3659805cf30a83a0a31d6772"])
     }
 }
 

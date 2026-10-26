@@ -1,7 +1,8 @@
 internal import Foundation
 
 enum GuavaSDK {
-    static func locate(_ arguments: Arguments, project: AppProject? = nil, store: SDKStore = SDKStore()) throws -> URL {
+    static func locate(_ arguments: Arguments, project: AppProject? = nil, store: SDKStore = SDKStore(), installMissing: Bool = true) throws -> URL {
+        let project = try project ?? projectIfPresent(at: arguments.directory)
         let environment = ProcessInfo.processInfo.environment
         let local = project.flatMap { SDKStore.selection(at: $0.directory.appendingPathComponent(".guava/sdk.json")) }
         let required = project?.configuration.toolchain.sdkVersion
@@ -11,15 +12,23 @@ enum GuavaSDK {
         let explicit = arguments.url(.sdkRoot)
             ?? environment["GUAVA_SDK_ROOT"].map { URL(fileURLWithPath: $0).standardizedFileURL }
             ?? local
-        let root: URL?
+        let bundled = isSDK(InstallationReceipt.executableDirectory) ? InstallationReceipt.executableDirectory : nil
+        let development = checkout(containing: URL(fileURLWithPath: #filePath))
+        var root: URL?
         if required == SDKRelease.latestTag {
             // "latest" floats to the newest installed SDK; the explicit override
             // always wins. Refresh what "latest" means with `sdk install latest`.
-            root = explicit ?? newestInstalled(store: store)
+            root = explicit ?? newestInstalled(store: store) ?? bundled
         } else {
             let pinned = required.map { store.installed($0) }.flatMap { isSDK($0) ? $0 : nil }
-            root = explicit ?? selected ?? pinned
-                ?? checkout(containing: URL(fileURLWithPath: #filePath))
+            let own = [bundled, development].compactMap { $0 }.first {
+                required == nil || (try? SDKRelease.read(at: $0).version) == required
+            }
+            root = explicit ?? selected ?? pinned ?? own
+        }
+        if root == nil, installMissing, let required {
+            let version = try store.install(version: required)
+            root = store.installed(version)
         }
         guard let root, isSDK(root) else {
             throw ToolError.invalid("Install the SDK with guava sdk install \(required ?? "VERSION"), or select a checkout with --sdk-root")
@@ -31,10 +40,15 @@ enum GuavaSDK {
         return root
     }
 
+    private static func projectIfPresent(at directory: URL) throws -> AppProject? {
+        guard FileManager.default.fileExists(atPath: directory.appendingPathComponent("guava.json").path) else { return nil }
+        return try AppProject(at: directory)
+    }
+
     /// Highest-version SDK among the installed copies and the current selection;
     /// ties keep the explicit selection.
     private static func newestInstalled(store: SDKStore) -> URL? {
-        let candidates = Set(store.installedURLs() + [store.selected].compactMap { $0 }).filter(isSDK)
+        let candidates = ([store.selected].compactMap { $0 } + store.installedURLs()).filter(isSDK)
         return candidates.max { lhs, rhs in
             let lhsVersion = (try? SDKRelease.read(at: lhs))?.version ?? "0.0.0"
             let rhsVersion = (try? SDKRelease.read(at: rhs))?.version ?? "0.0.0"

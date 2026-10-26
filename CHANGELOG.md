@@ -1,11 +1,20 @@
 # Changelog
 
-GuavaUI SDK 与 `guava` CLI 的发布记录。每个版本对应 git 标签 `vX.Y.Z`；版本号写在 `Tools/Guava/Sources/GuavaCLI/SDK.json`，并与 `Artifacts/native.json`、各应用的 `toolchain.sdkVersion` 保持一致。
+每个 Guava SDK 版本对应一个 `vX.Y.Z` 标签，统一包含 CLI、框架源码、模板与各目标平台的原生预编译库。
 
 ## Unreleased
 
 - SDK CLI 增加 `guava task` 和 `guava.workspace.json`：项目提供 Swift 任务库，SDK 负责依赖排序、按需构建、参数传递及构建前钩子，不需要项目包装脚本或独立 CLI。
 - 工作区可声明 `dependencyUpdates: "branches"`，本地 build/run 自动检查并刷新分支依赖；CI 保持锁文件，离线检查保留已解析版本。
+
+## 0.1.12 — 2026-10-26
+
+- 安装包包含完整 SDK 与主机原生库，按版本安装到全局 `versions/VERSION`；项目、示例和 IDE 引用同一份源码与库，不再回退到各项目单独检出 GuavaUI。
+- CLI 自动调用项目对应 SDK 的工具；安装 SDK 不再改写项目版本，`sdk use` 负责选择版本。
+- Guava 构建、测试与清理使用 SwiftPM 标准 `.build`，移除 `.guava/build/swift` 这套独立编译缓存。
+- 将原生构建与 SDK 发布收拢为一个工作流、一个 Release；原生库按目标拆包并由 SDK 自动准备，覆盖桌面、Android ARM64、iOS 真机和 ARM64 模拟器。
+- Android 构建自动安装匹配且校验过的 Swift Android SDK；平台工具由 setup/doctor 检查。
+- 并发项目通过系统文件锁复用同一份 SDK 安装与原生库准备；修复旧安装记录路径末尾斜杠导致升级被误判为其他安装的问题。
 
 ## 0.1.11 — 2026-10-26
 

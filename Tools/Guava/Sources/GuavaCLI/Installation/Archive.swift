@@ -12,6 +12,17 @@ enum CLIArchive {
         defer { try? Files.remove(staging) }
         let payload = staging.appendingPathComponent("guava")
         try Files.directory(payload)
+        try SDKPayload.stageSources(from: root, into: payload)
+        try NativeSDK.prepare(root: root)
+        for path in NativeArtifacts.bundles(for: CLIUpdate.platform) {
+            let relative = path + ".artifactbundle"
+            try Files.copy(root.appendingPathComponent(relative), to: payload.appendingPathComponent(relative))
+        }
+        let manifest = root.appendingPathComponent("Artifacts/native.json")
+        guard FileManager.default.fileExists(atPath: manifest.path) else {
+            throw ToolError.invalid("Merge native release metadata into Artifacts/native.json before packaging the SDK")
+        }
+        try Files.copy(manifest, to: payload.appendingPathComponent("Artifacts/native.json"))
         #if os(Windows)
         let executable = binaries.appendingPathComponent("guava.exe")
         #else
@@ -23,6 +34,7 @@ enum CLIArchive {
         }
         try CLIRuntimeLibraries.stage(executable: executable, into: payload)
         try Files.text(try SDKRelease.current.version + "\n", to: payload.appendingPathComponent("VERSION"))
+        try SDKPayload.validate(payload, version: SDKRelease.read(at: root).version)
         try Shell.run([payload.appendingPathComponent(executable.lastPathComponent).path, "--version"])
         try Files.directory(output)
         let archive = output.appendingPathComponent("guava-\(CLIUpdate.platform).tar.gz")

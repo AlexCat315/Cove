@@ -1,5 +1,6 @@
 @echo off
 setlocal
+if not defined GUAVA_SDK_ROOT set "GUAVA_SDK_ROOT=%~dp0"
 if not defined GUAVA_SWIFT_EXECUTABLE set "GUAVA_SWIFT_EXECUTABLE=swift"
 "%GUAVA_SWIFT_EXECUTABLE%" build --package-path "%~dp0Tools\Guava" --product guava --jobs 4
 if errorlevel 1 exit /b %errorlevel%

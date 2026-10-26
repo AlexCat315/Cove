@@ -22,3 +22,6 @@ zig-out/
 *.swp
 .idea/
 .workbuddy-ai/
+/Artifacts/native.json
+/Artifacts/native/
+/Artifacts/locks/

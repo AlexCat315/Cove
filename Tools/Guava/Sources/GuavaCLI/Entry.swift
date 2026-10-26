@@ -11,8 +11,10 @@ enum GuavaCLI {
             defer { LogSystem.flush() }
             let raw = Array(CommandLine.arguments.dropFirst())
             if raw == ["--version"] { print("guava \(try SDKRelease.current.version)"); return }
+            try SDKCommand.bootstrap(raw)
             if raw.isEmpty || raw.prefix(while: { $0 != "--" }).contains("--help") { print(usage); return }
             let arguments = try Arguments(raw)
+            try SDKCommand.forward(arguments, raw: raw)
             LogContext.withValues(["operation": "\(arguments.operation)", "platform": "\(arguments.platform.rawValue)", "configuration": "\(arguments.configuration.rawValue)"]) {
                 do { try execute(arguments) } catch { fail(error) }
             }
@@ -35,7 +37,7 @@ enum GuavaCLI {
         case .selfUpdate: try CLIUpdate.run(version: arguments.subject)
         case .installCLI: try CLIInstaller.install(payload: InstallationReceipt.executableDirectory, directory: arguments.directory, commands: URL(fileURLWithPath: try arguments.required(.binDirectory)))
         case .packageCLI: try CLIArchive.create(root: GuavaSDK.locate(arguments), output: arguments.url(.output) ?? arguments.directory.appendingPathComponent("dist"))
-        case .packageNative: try NativeArchive.create(root: GuavaSDK.locate(arguments), output: arguments.url(.output) ?? arguments.directory.appendingPathComponent("dist"))
+        case .packageNative: try NativeArchive.create(root: GuavaSDK.locate(arguments), output: arguments.url(.output) ?? arguments.directory.appendingPathComponent("dist"), arguments: arguments)
         case .packageBuild:
             let root = try GuavaSDK.locate(arguments)
             var command = SwiftPackage.command(directory: arguments.directory, configuration: arguments.configuration,
@@ -75,15 +77,19 @@ enum GuavaCLI {
             let project = try AppProject(at: arguments.directory)
             try BuildAndroidApplication.prepare(arguments, root: GuavaSDK.locate(arguments, project: project), project: project)
         case .sdkInstall:
-            let version = try SDKStore().install(version: arguments.subject!)
+            try SDKStore().install(version: arguments.subject!)
+        case .sdkUse:
+            let store = SDKStore()
+            let subject = arguments.subject!
+            let root = SDKRelease.isVersion(subject) ? store.installed(subject) : arguments.directory
+            if SDKRelease.isVersion(subject) {
+                let commands = (try? InstallationReceipt.read(at: store.directory))?.commands ?? Installation.commands
+                try CLIInstaller.install(payload: root, directory: store.directory, commands: commands)
+            } else { try store.use(root) }
             let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-            // A "latest" pin stays floating; a concrete pin is rewritten to the
-            // resolved version, like npm install pkg@latest.
-            if let project = try? AppProject(at: cwd), project.configuration.toolchain.sdkVersion != SDKRelease.latestTag {
-                try project.pin(sdkVersion: version)
-                print("Pinned \(project.directory.appendingPathComponent("guava.json").path) to SDK \(version)")
+            if let project = try? AppProject(at: cwd) {
+                try project.pin(sdkVersion: SDKRelease.read(at: root).version)
             }
-        case .sdkUse: try SDKStore().use(arguments.directory)
         case .sdkList: try SDKStore().list()
         case .setup: try ToolchainSetup.run(arguments, root: GuavaSDK.locate(arguments))
         case .doctor: try Diagnostics.doctor(arguments, root: GuavaSDK.locate(arguments))
@@ -119,7 +125,7 @@ enum GuavaCLI {
           guava task [NAME] [directory] [--sdk-root PATH] [-- task arguments]
           guava self update [VERSION]
           guava sdk install VERSION|latest
-          guava sdk use <checkout> | guava sdk list
+          guava sdk use VERSION|PATH | guava sdk list
           guava setup [--mac|--win|--linux|--android|--ios]
           guava doctor [--mac|--win|--linux|--android|--ios]
           guava devices [--android|--ios]

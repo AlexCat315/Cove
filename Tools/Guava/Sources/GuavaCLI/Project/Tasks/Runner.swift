@@ -25,7 +25,7 @@ struct ProjectTaskRunner {
     }
 
     func prepare(_ workspace: ProjectWorkspace) throws -> URL {
-        let cache = workspace.directory.appendingPathComponent(".guava/build/tasks")
+        let cache = workspace.directory.appendingPathComponent(".build/tasks")
         guard cache.resolvingSymlinksInPath().path.hasPrefix(workspace.directory.path + "/") else {
             throw ToolError.invalid("Project task cache must remain inside the workspace")
         }

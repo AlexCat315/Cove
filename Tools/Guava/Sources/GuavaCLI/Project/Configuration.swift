@@ -67,7 +67,7 @@ struct AppProject {
     let directory: URL
     let configuration: ProjectConfiguration
     var desktopProduct: String { configuration.targets.desktopExecutable ?? "Application" }
-    var buildDirectory: URL { directory.appendingPathComponent(".guava/build") }
+    var buildDirectory: URL { directory.appendingPathComponent(".build") }
 
     init(at directory: URL) throws {
         self.directory = directory.standardizedFileURL
@@ -105,22 +105,27 @@ struct AppProject {
     }
 
     func clean() throws {
-        let sessions = buildDirectory.appendingPathComponent("devtools")
-        if FileManager.default.fileExists(atPath: sessions.path) {
-            for directory in try Files.children(sessions) {
-                guard let data = try? Data(contentsOf: directory.appendingPathComponent("session.json")),
-                      let session = try? JSONDecoder().decode(ManagedSession.self, from: data) else { continue }
-                if (try? Inspector.isAlive(session)) == true {
-                    throw ToolError.invalid("Stop development session \(session.runtime.id) before cleaning this application's build cache")
+        var builds = [buildDirectory]
+        let legacy = directory.appendingPathComponent(".guava/build")
+        let legacyIsLink = (try? legacy.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true
+            || (try? legacy.deletingLastPathComponent().resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true
+        if !legacyIsLink { builds.append(legacy) }
+        for build in builds {
+            guard (try? build.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) != true,
+                  (try? build.deletingLastPathComponent().resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) != true else {
+                throw ToolError.invalid("Refusing to clean a symlink at \(build.path)")
+            }
+            let sessions = build.appendingPathComponent("devtools")
+            if FileManager.default.fileExists(atPath: sessions.path) {
+                for directory in try Files.children(sessions) {
+                    guard let data = try? Data(contentsOf: directory.appendingPathComponent("session.json")),
+                          let session = try? JSONDecoder().decode(ManagedSession.self, from: data) else { continue }
+                    if (try? Inspector.isAlive(session)) == true {
+                        throw ToolError.invalid("Stop development session \(session.runtime.id) before cleaning this application's build cache")
+                    }
                 }
             }
         }
-        // Only this generated subtree is owned by the CLI. Other .guava data may be authored.
-        let build = buildDirectory
-        guard (try? build.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) != true,
-              (try? build.deletingLastPathComponent().resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) != true else {
-            throw ToolError.invalid("Refusing to clean a symlink at \(build.path)")
-        }
-        try Files.remove(build)
+        for build in builds { try Files.remove(build) }
     }
 }

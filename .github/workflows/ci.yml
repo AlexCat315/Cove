@@ -31,6 +31,9 @@ jobs:
       - uses: ./.github/actions/setup-toolchains
       - uses: ./.github/actions/build-cache
         id: build-cache
+      - name: Identify native inputs
+        id: native-inputs
+        run: echo "digest=$(git ls-tree -r HEAD cmake third-party Runtime/third-party Tools/Guava/Sources/GuavaCLI/Toolchains/Native.swift .github/actions/setup-toolchains/action.yml | git hash-object --stdin)" >> "$GITHUB_OUTPUT"
       - name: Test system contracts before preparing graphics dependencies
         timeout-minutes: 5
         run: ./guava test System --no-parallel --timeout 120
@@ -40,7 +43,7 @@ jobs:
           path: |
             vendor
             Runtime/vendor
-          key: sdk-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Artifacts/native.json') }}
+          key: sdk-native-v3-${{ runner.os }}-${{ runner.arch }}-${{ steps.native-inputs.outputs.digest }}
       - name: Prepare native dependencies
         id: native
         run: ./guava setup
@@ -57,7 +60,13 @@ jobs:
       - name: Test standalone developer tools
         if: runner.os != 'Windows'
         run: ./guava test Tools/Developer --timeout 300
-      - name: Package standalone CLI
+      - name: Stage native metadata for the SDK package
+        shell: bash
+        run: |
+          ./guava internal package-native --output "$PWD/dist"
+          mkdir -p Artifacts
+          cp "dist/native-${{ matrix.platform }}.json" Artifacts/native.json
+      - name: Package complete SDK
         run: ./guava internal package-cli --output "$PWD/dist"
       - name: Verify CLI without a developer toolchain on PATH
         run: |

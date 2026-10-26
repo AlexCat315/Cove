@@ -18,9 +18,10 @@ struct DesktopBuild {
     }
 
     private func compile() throws -> URL {
+        try NativeSDK.prepare(root: root)
         let package = try DesktopLauncher(project: project, root: root).prepare()
         let command = SwiftPackage.command(directory: package, configuration: arguments.configuration,
-            scratchPath: project.buildDirectory.appendingPathComponent("swift"))
+            scratchPath: project.buildDirectory)
         try Shell.run(command + ["--product", project.desktopProduct], environment: SwiftPackage.environment(root: root))
         for helper in project.configuration.targets.desktopHelpers {
             try Shell.run(command + ["--product", helper], environment: SwiftPackage.environment(root: root))

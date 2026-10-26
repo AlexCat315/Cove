@@ -35,8 +35,10 @@ func invalidApplicationIdentifiersFail(id: String) {
     let project = try AppProject(at: directory)
     try Files.text("authored", to: directory.appendingPathComponent(".guava/scene.json"))
     try Files.text("cache", to: project.buildDirectory.appendingPathComponent("swift/object.o"))
+    try Files.text("old cache", to: directory.appendingPathComponent(".guava/build/swift/object.o"))
     try project.clean()
     #expect(!FileManager.default.fileExists(atPath: project.buildDirectory.path))
+    #expect(!FileManager.default.fileExists(atPath: directory.appendingPathComponent(".guava/build").path))
     #expect(try String(contentsOf: directory.appendingPathComponent(".guava/scene.json"), encoding: .utf8) == "authored")
     try project.clean()
 }
@@ -46,7 +48,7 @@ func invalidApplicationIdentifiersFail(id: String) {
     let other = try temporaryProject()
     defer { try? Files.remove(directory); try? Files.remove(other) }
     try Files.directory(directory.appendingPathComponent(".guava"))
-    try FileManager.default.createSymbolicLink(at: directory.appendingPathComponent(".guava/build"), withDestinationURL: other)
+    try FileManager.default.createSymbolicLink(at: directory.appendingPathComponent(".build"), withDestinationURL: other)
     let project = try AppProject(at: directory)
     #expect(throws: (any Error).self) { try project.clean() }
     #expect(FileManager.default.fileExists(atPath: other.appendingPathComponent("guava.json").path))
@@ -59,12 +61,12 @@ func invalidApplicationIdentifiersFail(id: String) {
     #expect(throws: (any Error).self) { try CreateApplication.run(arguments, root: directory) }
 }
 
-@Test func cleanRejectsSymlinkedGuavaDirectory() throws {
+@Test func cleanLeavesAuthoredGuavaDirectoryUntouched() throws {
     let directory = try temporaryProject()
     let other = try temporaryProject()
     defer { try? Files.remove(directory); try? Files.remove(other) }
     try Files.text("authored", to: other.appendingPathComponent("build/scene.json"))
     try FileManager.default.createSymbolicLink(at: directory.appendingPathComponent(".guava"), withDestinationURL: other)
-    #expect(throws: (any Error).self) { try AppProject(at: directory).clean() }
+    try AppProject(at: directory).clean()
     #expect(FileManager.default.fileExists(atPath: other.appendingPathComponent("build/scene.json").path))
 }

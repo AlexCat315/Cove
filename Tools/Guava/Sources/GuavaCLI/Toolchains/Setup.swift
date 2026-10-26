@@ -12,10 +12,16 @@ enum ToolchainSetup {
     }
 
     static func run(_ arguments: Arguments, root: URL) throws {
+        if arguments.platform == .android {
+            _ = try AndroidToolchain(root: root, arguments: arguments)
+            try AndroidToolchain.ensureSwiftSDK()
+        }
         try report(arguments, root: root)
         if arguments.platform == .ios {
-            try NativeSDK.prepare(root: root, apple: .init(sdk: "iphonesimulator", architecture: "arm64"))
-        } else if arguments.platform != .android {
+            try NativeSDK.prepare(root: root, apple: .init(sdk: arguments.value(.sdk) ?? "iphonesimulator", architecture: arguments.value(.architecture) ?? "arm64"))
+        } else if arguments.platform == .android {
+            _ = try NativeDependencies(toolchain: AndroidToolchain(root: root, arguments: arguments)).prepare()
+        } else {
             // SDK native archives are built once, shared by all application projects.
             try NativeSDK.prepare(root: root)
         }

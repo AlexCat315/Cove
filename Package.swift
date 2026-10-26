@@ -9,31 +9,8 @@ let windowsCxxRuntime: [LinkerSetting] = ["msvcrt", "msvcprt"].map {
 }
 
 
-let packageDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-#if os(macOS)
-let nativeSystem = "macos"
-#elseif os(Windows)
-let nativeSystem = "windows"
-#else
-let nativeSystem = "linux"
-#endif
-#if arch(arm64)
-let nativeArchitecture = "arm64"
-#else
-let nativeArchitecture = "x86_64"
-#endif
-let nativeDocument = (try? Data(contentsOf: packageDirectory.appendingPathComponent("Artifacts/native.json")))
-    .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
-let nativePlatforms = nativeDocument?["platforms"] as? [String: [String: [String: String]]] ?? [:]
-let nativeArchives = nativePlatforms["\(nativeSystem)-\(nativeArchitecture)"] ?? [:]
 func nativeTarget(_ name: String, directory: String) -> Target {
     let local = "\(directory)/\(name).artifactbundle"
-    if FileManager.default.fileExists(atPath: packageDirectory.appendingPathComponent(local).path) {
-        return .binaryTarget(name: name, path: local)
-    }
-    if let artifact = nativeArchives[name], let url = artifact["url"], let checksum = artifact["sha256"] {
-        return .binaryTarget(name: name, url: url, checksum: checksum)
-    }
     return .binaryTarget(name: name, path: local)
 }
 

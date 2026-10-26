@@ -1,4 +1,5 @@
 internal import Foundation
+private import GuavaFileSystem
 
 struct SDKStore {
     struct Selection: Codable { let path: String }
@@ -6,12 +7,12 @@ struct SDKStore {
 
     init(directory: URL? = nil) { self.directory = directory ?? Installation.directory }
     var selected: URL? { Self.selection(at: directory.appendingPathComponent("sdk.json")) }
-    func installed(_ version: String) -> URL { directory.appendingPathComponent("sdks/\(version)") }
+    func installed(_ version: String) -> URL { directory.appendingPathComponent("versions/\(version)") }
 
-    /// All valid SDK checkouts under sdks/, unordered.
+    /// Each version contains its CLI, framework sources and host native libraries.
     func installedURLs() -> [URL] {
-        let parent = directory.appendingPathComponent("sdks")
-        guard let children = try? FileManager.default.contentsOfDirectory(at: parent, includingPropertiesForKeys: nil) else { return [] }
+        let parent = directory.appendingPathComponent("versions")
+        guard let children = try? FileManager.default.contentsOfDirectory(at: parent, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]) else { return [] }
         return children.filter(GuavaSDK.isSDK)
     }
 
@@ -28,7 +29,7 @@ struct SDKStore {
     }
 
     func list() throws {
-        let installed = directory.appendingPathComponent("sdks")
+        let installed = directory.appendingPathComponent("versions")
         if FileManager.default.fileExists(atPath: installed.path) {
             for sdk in try Files.children(installed).filter({ GuavaSDK.isSDK($0) }) { print(sdk.path) }
         }
@@ -46,17 +47,24 @@ struct SDKStore {
         guard SDKRelease.isVersion(version) else {
             throw ToolError.invalid("Use guava sdk install VERSION or latest")
         }
-        let target = installed(version)
-        if GuavaSDK.isSDK(target) { try use(target); return version }
-        let staging = directory.appendingPathComponent("downloads/" + UUID().uuidString)
-        try Files.directory(staging.deletingLastPathComponent())
-        defer { try? Files.remove(staging) }
-        try Shell.run(["git", "clone", "--depth", "1", "--branch", "v" + version,
-                       "--recurse-submodules", "--shallow-submodules", "--", repository, staging.path])
-        guard try SDKRelease.read(at: staging).version == version else { throw ToolError.invalid("SDK tag and manifest version disagree") }
-        try Files.directory(target.deletingLastPathComponent())
-        try FileManager.default.moveItem(at: staging, to: target)
-        try use(target)
-        return version
+        return try FileLock.withLock(at: directory.appendingPathComponent("locks/sdk-\(version).lock")) {
+            let target = installed(version)
+            if GuavaSDK.isSDK(target) { return version }
+            let staging = directory.appendingPathComponent("downloads/" + UUID().uuidString)
+            try Files.directory(staging.deletingLastPathComponent())
+            defer { try? Files.remove(staging) }
+            let payload = try SDKDownload.fetch(version: version, into: staging)
+            try Files.directory(target.deletingLastPathComponent())
+            let commands = (try? InstallationReceipt.read(at: directory))?.commands ?? Installation.commands
+            let receipt = InstallationReceipt(version: version, directory: directory, commands: commands)
+            try Files.json(receipt, to: payload.appendingPathComponent(InstallationReceipt.filename))
+            do { try FileManager.default.moveItem(at: payload, to: target) }
+            catch {
+                guard GuavaSDK.isSDK(target) else { throw error }
+            }
+            if selected == nil { try use(target) }
+            print("Installed Guava SDK \(version): \(target.path)")
+            return version
+        }
     }
 }

@@ -64,6 +64,39 @@ private func withoutSDKRoot(_ body: () throws -> Void) throws {
 
 @Suite(.serialized)
 struct SDKLocationTests {
+    @Test func sdkSelectionPrecedesParsingNewSDKCommandsAndFlags() throws {
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? Files.remove(base) }
+        let store = SDKStore(directory: base.appendingPathComponent("home"))
+        let sdk = store.installed("0.2.0")
+        try makeSDK(at: sdk, version: "0.2.0")
+        let project = base.appendingPathComponent("Application")
+        try makeProject(at: project, sdkVersion: "0.2.0")
+        let raw = ["future-command", project.path, "--future-flag", "value"]
+        #expect(throws: (any Error).self) { try Arguments(raw) }
+        let selected = try SDKCommand.selectedSDK(raw, store: store, environment: [:])
+        #expect(selected?.resolvingSymlinksInPath().path == sdk.resolvingSymlinksInPath().path)
+    }
+
+    @Test func projectsWithTheSameVersionShareOneSDKWithoutProjectCheckouts() throws {
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? Files.remove(base) }
+        let store = SDKStore(directory: base.appendingPathComponent("home"))
+        let sdk = store.installed("0.1.12")
+        try makeSDK(at: sdk, version: "0.1.12")
+        try store.use(sdk)
+        for name in ["Examples", "Studio", "Muing"] {
+            let directory = base.appendingPathComponent(name)
+            try makeProject(at: directory, sdkVersion: "0.1.12")
+            try withoutSDKRoot {
+                let project = try AppProject(at: directory)
+                #expect(try GuavaSDK.locate(Arguments(["build", directory.path]), project: project, store: store, installMissing: false).path == sdk.path)
+                #expect(project.buildDirectory.path == directory.appendingPathComponent(".build").path)
+                #expect(!FileManager.default.fileExists(atPath: directory.appendingPathComponent("GuavaUI").path))
+            }
+        }
+    }
+
     @Test func latestPinFloatsToNewestInstalledSDK() throws {
         let base = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? Files.remove(base) }
@@ -77,7 +110,7 @@ struct SDKLocationTests {
 
         try withoutSDKRoot {
             let located = try GuavaSDK.locate(Arguments(["build"]),
-                                              project: try AppProject(at: project), store: store)
+                                              project: try AppProject(at: project), store: store, installMissing: false)
             #expect(try SDKRelease.read(at: located).version == "0.1.10")
         }
     }
@@ -93,7 +126,7 @@ struct SDKLocationTests {
         try withoutSDKRoot {
             #expect(throws: (any Error).self) {
                 _ = try GuavaSDK.locate(Arguments(["build"]),
-                                        project: try AppProject(at: project), store: store)
+                                        project: try AppProject(at: project), store: store, installMissing: false)
             }
         }
     }
@@ -110,7 +143,7 @@ struct SDKLocationTests {
         try withoutSDKRoot {
             #expect(throws: (any Error).self) {
                 _ = try GuavaSDK.locate(Arguments(["build"]),
-                                        project: try AppProject(at: project), store: store)
+                                        project: try AppProject(at: project), store: store, installMissing: false)
             }
         }
     }

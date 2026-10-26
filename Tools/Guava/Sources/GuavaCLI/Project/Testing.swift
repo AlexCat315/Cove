@@ -2,7 +2,7 @@ import Foundation
 private import ToolSupport
 
 /// Testing needs a package, not application identity or native launch targets.
-/// An authored guava.json still owns SDK selection and the app's isolated cache.
+/// Applications and ordinary packages use SwiftPM's standard .build directory.
 struct PackageTests {
     let command: [String]
     /// Desktop helper builds, so tests that launch a helper never run a stale one.
@@ -21,7 +21,7 @@ struct PackageTests {
         guard !arguments.flags.isSuperset(of: [.skipBuild, .buildOnly]) else {
             throw ToolError.invalid("Select either --build-only or --skip-build")
         }
-        let scratchPath = arguments.url(.scratchPath) ?? project?.buildDirectory.appendingPathComponent("swift")
+        let scratchPath = arguments.url(.scratchPath)
         var command = SwiftPackage.command(directory: directory, configuration: arguments.configuration, verb: "test",
             scratchPath: scratchPath)
         if let filter = arguments.value(.filter) { command += ["--filter", filter] }
