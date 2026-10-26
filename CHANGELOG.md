@@ -4,6 +4,11 @@
 
 ## Unreleased
 
+## Unreleased
+
+- 完整发布 Cove 0.2 系列 SDK：包含改名、子树复用、覆盖率抗锯齿、mip／LOD、内存压力与 DevTools 接线修复。
+- 修复解析抗锯齿在 Android 上的浮点数学重载与类型推导，采用 Swift 原生开方和取整，并在整数转换前限制细分数量。
+
 ## 0.2.2 — 2026-10-27
 
 ## Unreleased

@@ -17,7 +17,7 @@ public extension DrawList {
         let opaque = color.multipliedAlpha(peak).rgba8, clear = opaque & 0x00ff_ffff
         var output: [UIVertex] = [], triangles: [UInt32] = []
         func unit(_ value: SIMD2<Float>) -> SIMD2<Float> {
-            value / max(0.00001, sqrt(value.x * value.x + value.y * value.y))
+            value / max(0.00001, (value.x * value.x + value.y * value.y).squareRoot())
         }
         func normal(_ direction: SIMD2<Float>) -> SIMD2<Float> { SIMD2(-direction.y, direction.x) }
         for index in path.indices {
@@ -68,11 +68,12 @@ public extension DrawList {
                       width: Float, color: Color) {
         guard radius.isFinite, radius > 0, start.isFinite, sweep.isFinite, abs(sweep) > 0.0001 else { return }
         let sweep = max(-2 * Float.pi, min(2 * Float.pi, sweep))
-        let count = max(12, min(512, Int(ceil(abs(sweep) * radius * max(1, pixelScale)))))
+        let estimate = (abs(sweep) * radius * max(1, pixelScale)).rounded(.up)
+        let count = Int(max(12, min(512, estimate)))
         let closed = abs(sweep) >= 2 * .pi - 0.0001
         let points = (0..<(closed ? count : count + 1)).map { index in
-            let angle = start + Float(index) / Float(count) * sweep
-            return center + SIMD2(cos(angle), sin(angle)) * radius
+            let angle = Double(start + Float(index) / Float(count) * sweep)
+            return center + SIMD2(Float(cos(angle)), Float(sin(angle))) * radius
         }
         addPathStroke(points, width: width, color: color, closed: closed)
     }

@@ -16,7 +16,8 @@ enum AnalyticClipper {
         let scale = max(1, scale), half = 0.5 / max(1, scale)
         var pieces = [triangle]
         for mask in masks {
-            let segments = max(4, min(64, Int(ceil(mask.radius * scale * .pi / 4))))
+            let estimate = (mask.radius * scale * .pi / 4).rounded(.up)
+            let segments = Int(max(4, min(64, estimate)))
             let inside = inset(mask, by: half).outline(segments: segments)
             let outside = inset(mask, by: -half).outline(segments: segments)
             var result: [[UIVertex]] = []
@@ -28,8 +29,10 @@ enum AnalyticClipper {
                     let next = (index + 1) % inside.count
                     // This strip is disjoint from the core and other strips.
                     let outline = [inside[index], outside[index], outside[next], inside[next]]
-                    let area = zip(outline, Array(outline.dropFirst()) + [outline[0]]).reduce(Float(0)) {
-                        $0 + $1.0.x * $1.1.y - $1.1.x * $1.0.y
+                    var area: Float = 0
+                    for edge in outline.indices {
+                        let a = outline[edge], b = outline[(edge + 1) % outline.count]
+                        area += a.x * b.y - b.x * a.y
                     }
                     guard abs(area) > 0.000001 else { continue }
                     let clockwise = area > 0 ? outline : Array(outline.reversed())
@@ -53,6 +56,7 @@ enum AnalyticClipper {
         let rect = mask.rect, radius = mask.radius
         let x = abs(vertex.posX - rect.x - rect.width / 2) - rect.width / 2 + radius
         let y = abs(vertex.posY - rect.y - rect.height / 2) - rect.height / 2 + radius
-        return sqrt(max(x, 0) * max(x, 0) + max(y, 0) * max(y, 0)) + min(max(x, y), 0) - radius
+        let squared = max(x, 0) * max(x, 0) + max(y, 0) * max(y, 0)
+        return squared.squareRoot() + min(max(x, y), 0) - radius
     }
 }
