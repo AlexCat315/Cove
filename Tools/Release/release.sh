@@ -8,8 +8,8 @@
 #   Tools/Release/release.sh --no-bump        tag the version the manifests already declare
 #
 # Every manifest that pins the SDK version is bumped, then committed, tagged
-# vX.Y.Z, pushed, and the CLI release workflow is awaited. Network steps retry
-# with backoff, and a failed workflow is rerun before the script gives up.
+# vX.Y.Z, pushed, and the triggered release workflow run is reported. The
+# workflow result is not awaited; check the run link if the release fails.
 
 set -euo pipefail
 
@@ -26,12 +26,9 @@ TARGET_VERSION=
 NO_BUMP=0
 DRY_RUN=0
 PUSH=1
-WAIT_CI=1
 ASSUME_YES=0
 ALLOW_DIRTY=0
 RETRIES=5
-CI_RERUNS=2
-CI_TIMEOUT_MIN=45
 CHANGELOG=1
 
 usage() {
@@ -44,11 +41,8 @@ Options:
   -y, --yes                       Do not ask for confirmation
   -d, --dry-run                   Print the plan, change nothing
       --no-push                   Commit and tag locally, publish nothing
-      --no-ci                     Do not wait for the release workflow
       --no-changelog              Leave CHANGELOG.md alone
   -r, --retries <n>               Retries per network step (default: 5)
-      --ci-reruns <n>             Workflow reruns before giving up (default: 2)
-      --ci-timeout <minutes>      How long to wait for the workflow (default: 45)
       --branch <name>             Branch to release from (default: main)
       --allow-dirty               Allow unrelated uncommitted changes
   -h, --help                      Show this help
@@ -141,12 +135,9 @@ while [ $# -gt 0 ]; do
     -n|--no-bump) NO_BUMP=1; shift ;;
     -y|--yes) ASSUME_YES=1; shift ;;
     -d|--dry-run) DRY_RUN=1; shift ;;
-    --no-push) PUSH=0; WAIT_CI=0; shift ;;
-    --no-ci) WAIT_CI=0; shift ;;
+    --no-push) PUSH=0; shift ;;
     --no-changelog) CHANGELOG=0; shift ;;
     -r|--retries) RETRIES=${2:?--retries needs a value}; shift 2 ;;
-    --ci-reruns) CI_RERUNS=${2:?--ci-reruns needs a value}; shift 2 ;;
-    --ci-timeout) CI_TIMEOUT_MIN=${2:?--ci-timeout needs a value}; shift 2 ;;
     --branch) BRANCH=${2:?--branch needs a value}; shift 2 ;;
     --allow-dirty) ALLOW_DIRTY=1; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -239,10 +230,10 @@ for file in "${manifests[@]}"; do info "  $file"; done
 if [ "$CHANGELOG" -eq 1 ] && [ -f CHANGELOG.md ]; then
   info "changelog CHANGELOG.md: Unreleased -> $version"
 fi
-if [ "$WAIT_CI" -eq 1 ]; then
-  info "then push and wait for the $WORKFLOW workflow"
+if [ "$PUSH" -eq 1 ]; then
+  info "then push and confirm the $WORKFLOW run is triggered (result not awaited)"
 else
-  info "then stop (no workflow wait)"
+  info "then stop (nothing pushed)"
 fi
 
 if [ "$DRY_RUN" -eq 1 ]; then
@@ -343,64 +334,26 @@ step "Push"
 retry "$RETRIES" "git push" publish || die "cannot publish $tag after $RETRIES attempts"
 info "origin has $BRANCH and $tag"
 
-if [ "$WAIT_CI" -eq 0 ]; then
-  step "Done"
-  info "the $WORKFLOW workflow builds and publishes $tag"
-  exit 0
-fi
-
 step "Release workflow"
+# Confirms the tag push actually started a run, then reports it and exits.
+# The build and publish result is deliberately not awaited.
 find_run() {
   gh run list --workflow "$WORKFLOW" --branch "$tag" --limit 1 \
-    --json databaseId --jq '.[0].databaseId // empty' 2>/dev/null || true
+    --json databaseId,url --jq '.[0] | "\(.databaseId) \(.url)"' 2>/dev/null || true
 }
 
-run_id=
+run_info=
 for ((attempt = 1; attempt <= 12; attempt++)); do
-  run_id=$(find_run)
-  [ -n "$run_id" ] && break
+  run_info=$(find_run)
+  [ -n "$run_info" ] && break
   sleep 5
 done
-[ -n "$run_id" ] || die "no $WORKFLOW run appeared for $tag; check: gh run list --workflow $WORKFLOW"
-info "run $run_id"
+[ -n "$run_info" ] || die "no $WORKFLOW run appeared for $tag; check: gh run list --workflow $WORKFLOW"
+run_id=${run_info%% *}
+run_url=${run_info#* }
+info "run $run_id triggered"
+info "result not awaited; watch: $run_url"
+info "if it fails: gh run view $run_id --log-failed, then gh run rerun $run_id --failed"
 
-# Waits for the run. 0 succeeded, 1 failed, 2 still running at the deadline.
-watch_run() {
-  local deadline=$((SECONDS + CI_TIMEOUT_MIN * 60)) state
-  while [ "$SECONDS" -lt "$deadline" ]; do
-    state=$(gh run view "$run_id" --json status,conclusion \
-      --jq '"\(.status) \(.conclusion)"' 2>/dev/null || true)
-    case "$state" in
-      "completed success") return 0 ;;
-      "completed "*) return 1 ;;
-    esac
-    sleep 15
-  done
-  return 2
-}
-
-status=0
-watch_run || status=$?
-attempt=0
-while [ "$status" -eq 1 ] && [ "$attempt" -lt "$CI_RERUNS" ]; do
-  attempt=$((attempt + 1))
-  warn "run $run_id failed; rerunning failed jobs ($attempt/$CI_RERUNS)"
-  gh run rerun "$run_id" --failed >/dev/null 2>&1 || break
-  sleep 10
-  status=0
-  watch_run || status=$?
-done
-
-case "$status" in
-  0) ;;
-  2) die "run $run_id is still going after ${CI_TIMEOUT_MIN}m; check: gh run view $run_id" ;;
-  *)
-    printf '\n' >&2
-    gh run view "$run_id" --log-failed 2>/dev/null | tail -40 >&2 || true
-    die "run $run_id failed; the tag is published, fix and rerun: gh run rerun $run_id --failed"
-    ;;
-esac
-
-step "Published"
-url=$(gh release view "$tag" --json url --jq .url 2>/dev/null || true)
-info "$tag released${url:+: $url}"
+step "Done"
+info "tag $tag is on origin; $WORKFLOW builds and publishes the GitHub Release"

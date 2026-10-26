@@ -2,8 +2,6 @@ internal import Foundation
 internal import ToolSupport
 
 enum CLIUpdate {
-    private struct Release: Decodable { let tag_name: String }
-
     static var platform: String {
         #if arch(arm64)
         let architecture = "arm64"
@@ -29,11 +27,11 @@ enum CLIUpdate {
             guard SDKRelease.isVersion(requested) else { throw ToolError.invalid("Supply an exact CLI version") }
             version = requested
         } else {
-            let latest = temporary.appendingPathComponent("latest.json")
-            let api = repository.replacingOccurrences(of: "https://github.com/", with: "https://api.github.com/repos/")
-            try Download.metadata(from: URL(string: api + "/releases/latest")!, to: latest)
-            let release = try JSONDecoder().decode(Release.self, from: Data(contentsOf: latest))
-            version = String(release.tag_name.dropFirst(release.tag_name.hasPrefix("v") ? 1 : 0))
+            // Follow the /releases/latest pointer on github.com instead of
+            // hitting api.github.com, whose unauthenticated quota is 60 calls/hour.
+            let resolved = try Download.redirectedURL(from: URL(string: repository + "/releases/latest")!)
+            let tag = resolved.lastPathComponent
+            version = String(tag.dropFirst(tag.hasPrefix("v") ? 1 : 0))
             guard SDKRelease.isVersion(version), version.compare(receipt.version, options: .numeric) != .orderedAscending else {
                 throw ToolError.invalid("The release channel did not provide a newer supported version")
             }

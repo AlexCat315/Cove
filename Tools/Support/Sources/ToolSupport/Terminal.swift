@@ -1,8 +1,8 @@
-internal import Foundation
+public import Foundation
 
 /// One error type for every repository tool, so the CLI can print a single
 /// actionable line and return a non-zero status without leaking internals.
-public enum ToolError: Error, CustomStringConvertible {
+public enum ToolError: Error, CustomStringConvertible, LocalizedError {
   case message(String)
   case command(String, Int32)
 
@@ -12,6 +12,8 @@ public enum ToolError: Error, CustomStringConvertible {
     case .command(let command, let status): return "\(command) exited with status \(status)"
     }
   }
+
+  public var errorDescription: String? { description }
 }
 
 public enum Terminal {

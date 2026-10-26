@@ -7,6 +7,36 @@ public import Foundation
 /// Downloads a pinned artifact and verifies its SHA-256 before use. A cached
 /// file that already matches the digest is reused without network access.
 public enum Download {
+  /// Resolves `remote` after redirects using a HEAD request, without a body.
+  /// Used to read GitHub's `/releases/latest` pointer without the API rate
+  /// limit that applies to api.github.com.
+  public static func redirectedURL(from remote: URL) throws -> URL {
+    guard remote.scheme == "https" else { throw ToolError.message("Metadata requires HTTPS") }
+    var request = URLRequest(url: remote)
+    request.httpMethod = "HEAD"
+    let semaphore = DispatchSemaphore(value: 0)
+    let result = UncheckedBox<Result<URL, Error>>()
+    let task = URLSession.shared.dataTask(with: request) { _, response, error in
+      defer { semaphore.signal() }
+      if let error {
+        result.set(.failure(error))
+        return
+      }
+      guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+        result.set(.failure(ToolError.message("HTTP \(response.map { String(describing: $0) } ?? "?") for \(remote.absoluteString)")))
+        return
+      }
+      result.set(.success(http.url ?? remote))
+    }
+    task.resume()
+    semaphore.wait()
+    switch result.get() {
+    case .success(let url): return url
+    case .failure(let error): throw error
+    case nil: throw ToolError.message("Redirect did not complete: \(remote.absoluteString)")
+    }
+  }
+
   public static func metadata(from remote: URL, to destination: URL) throws {
     guard remote.scheme == "https" else { throw ToolError.message("Metadata requires HTTPS") }
     try Fs.directory(destination.deletingLastPathComponent())
