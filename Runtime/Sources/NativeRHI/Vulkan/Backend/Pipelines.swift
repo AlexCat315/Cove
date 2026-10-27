@@ -4,6 +4,9 @@ import Foundation
 
 extension VulkanBackend {
     func createComputePipeline(_ handle: ComputePipeline, descriptor: ComputePipelineDescriptor) throws {
+        try prepareComputeCompilation(handle, descriptor: descriptor).runAndInstall()
+    }
+    func prepareComputeCompilation(_ handle: ComputePipeline, descriptor: ComputePipelineDescriptor) throws -> RHICompilationWork {
         guard let module = registries.shaderModules[descriptor.shader.id], module.stage == .compute,
               let layout = registries.pipelineLayouts[descriptor.layout.id] else {
             throw RHIError.invalidArgument("unknown compute shader or pipeline layout")
@@ -14,12 +17,16 @@ extension VulkanBackend {
         info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO
         info.stage = stage
         info.layout = layout.native
-        var pipeline: VkPipeline = vkNull()
-        let result = withExtendedLifetime(arena) {
-            context.resources.createComputePipelines(context.device, vkNull(), 1, &info, nil, &pipeline)
+        return RHICompilationWork { [self, arena] in
+            var pipeline: VkPipeline = vkNull()
+            let result = withExtendedLifetime(arena) {
+                context.resources.createComputePipelines(context.device, vkNull(), 1, &info, nil, &pipeline)
+            }
+            guard result == VK_SUCCESS else { throw RHIError.invalidArgument("Vulkan compute pipeline failed: \(result)") }
+            return RHICompiledObject(publish: { [self] in
+                registries.computePipelines[handle.id] = VulkanComputePipelineRecord(pipeline: pipeline, descriptor: descriptor)
+            }, discard: { [context] in context.resources.destroyPipeline(context.device, pipeline, nil) })
         }
-        guard result == VK_SUCCESS else { throw RHIError.invalidArgument("Vulkan compute pipeline failed: \(result)") }
-        registries.computePipelines[handle.id] = VulkanComputePipelineRecord(pipeline: pipeline, descriptor: descriptor)
     }
 
     func destroyComputePipeline(_ handle: ComputePipeline) {
@@ -28,6 +35,9 @@ extension VulkanBackend {
     }
 
     func createGraphicsPipeline(_ handle: GraphicsPipeline, descriptor: GraphicsPipelineDescriptor) throws {
+        try prepareGraphicsCompilation(handle, descriptor: descriptor).runAndInstall()
+    }
+    func prepareGraphicsCompilation(_ handle: GraphicsPipeline, descriptor: GraphicsPipelineDescriptor) throws -> RHICompilationWork {
         guard let layout = registries.pipelineLayouts[descriptor.layout.id],
               let vertex = registries.shaderModules[descriptor.vertex.id], vertex.stage == .vertex else {
             throw RHIError.invalidArgument("unknown graphics shader or pipeline layout")
@@ -44,8 +54,12 @@ extension VulkanBackend {
             }
             stages.append(try shaderStage(shader, arena: arena))
         }
-        let pipeline = try graphicsPipeline(descriptor, nativeLayout: layout.native, stages: stages, arena: arena)
-        registries.graphicsPipelines[handle.id] = VulkanGraphicsPipelineRecord(pipeline: pipeline, descriptor: descriptor)
+        return RHICompilationWork { [self, arena] in
+            let pipeline = try graphicsPipeline(descriptor, nativeLayout: layout.native, stages: stages, arena: arena)
+            return RHICompiledObject(publish: { [self] in
+                registries.graphicsPipelines[handle.id] = VulkanGraphicsPipelineRecord(pipeline: pipeline, descriptor: descriptor)
+            }, discard: { [context] in context.resources.destroyPipeline(context.device, pipeline, nil) })
+        }
     }
 
     func destroyGraphicsPipeline(_ handle: GraphicsPipeline) {

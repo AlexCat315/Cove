@@ -10,7 +10,7 @@ private final class PipelineTestUploader: FrameUploader {
 
 /// Records backend calls without a GPU so interning and refcounting are
 /// observable independently of native pipeline compilation.
-private final class PipelineTestBackend: RHIBackend, @unchecked Sendable {
+class PipelineTestBackend: RHIBackend, @unchecked Sendable {
     let api: GraphicsAPI = .metal
     let deviceName = "pipeline cache test"
 
@@ -218,7 +218,8 @@ final class PipelineCacheTests: XCTestCase {
 
         try device.beginFrame()
         let pipeline = try device.makeGraphicsPipeline(descriptor)
-        let module = try shader(device, stage: .vertex)
+        let module = try device.makeShaderModule(ShaderModuleDescriptor(
+            stage: .vertex, format: .mslSource, code: Data([5, 6]), entryPoint: "newVertex"))
         device.endFrame()
 
         XCTAssertEqual(device.pipelineStatistics.graphics.cold.duringFrame, 1)
@@ -226,6 +227,22 @@ final class PipelineCacheTests: XCTestCase {
         XCTAssertEqual(device.pipelineStatistics.creationsDuringFrame, 2)
         device.destroy(pipeline)
         device.destroy(module)
+    }
+
+    func testShaderModulesShareContentAndReleaseTheirOwnLeases() throws {
+        let (device, backend) = try makeDevice()
+        let first = try shader(device, stage: .vertex)
+        let second = try shader(device, stage: .vertex)
+        XCTAssertEqual(first, second)
+        XCTAssertEqual(backend.createdShaderModules.count, 1)
+        XCTAssertEqual(device.pipelineStatistics.shaderModuleCacheHits, 1)
+        device.destroy(first)
+        XCTAssertEqual(device.pipelineStatistics.liveShaderModules, 1)
+        device.destroy(second)
+        XCTAssertEqual(device.pipelineStatistics.liveShaderModules, 0)
+        let recreated = try shader(device, stage: .vertex)
+        XCTAssertNotEqual(first, recreated)
+        device.destroy(recreated)
     }
 
     func testResetClearsCountersButKeepsInternedPipelines() throws {

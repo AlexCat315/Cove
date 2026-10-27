@@ -8,6 +8,9 @@ struct VulkanMeshPipelineRecord {
 
 extension VulkanBackend {
     func createMeshPipeline(_ handle: MeshPipeline, descriptor: MeshPipelineDescriptor) throws {
+        try prepareMeshCompilation(handle, descriptor: descriptor).runAndInstall()
+    }
+    func prepareMeshCompilation(_ handle: MeshPipeline, descriptor: MeshPipelineDescriptor) throws -> RHICompilationWork {
         guard context.features.mesh, let module = registries.shaderModules[descriptor.mesh.id], module.stage == .mesh,
               let layout = registries.pipelineLayouts[descriptor.layout.id] else { throw RHIError.unsupportedFeature("Vulkan mesh shader unavailable or invalid layout") }
         let arena = VulkanScratch()
@@ -21,8 +24,12 @@ extension VulkanBackend {
             stages.append(try shaderStage(module, arena: arena))
         }
         let graphics = meshGraphicsDescriptor(descriptor)
-        let pipeline = try graphicsPipeline(graphics, nativeLayout: layout.native, stages: stages, arena: arena)
-        registries.meshPipelines[handle.id] = VulkanMeshPipelineRecord(pipeline: pipeline, descriptor: descriptor)
+        return RHICompilationWork { [self, arena] in
+            let pipeline = try graphicsPipeline(graphics, nativeLayout: layout.native, stages: stages, arena: arena)
+            return RHICompiledObject(publish: { [self] in
+                registries.meshPipelines[handle.id] = VulkanMeshPipelineRecord(pipeline: pipeline, descriptor: descriptor)
+            }, discard: { [context] in context.resources.destroyPipeline(context.device, pipeline, nil) })
+        }
     }
     func meshGraphicsDescriptor(_ descriptor: MeshPipelineDescriptor) -> GraphicsPipelineDescriptor {
         GraphicsPipelineDescriptor(layout: descriptor.layout, vertex: ShaderModule(id: 0), fragment: descriptor.fragment,

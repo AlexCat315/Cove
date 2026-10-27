@@ -11,6 +11,9 @@ struct MetalMeshPipeline {
 
 extension MetalDevice {
     public func createMeshPipeline(_ handle: MeshPipeline, descriptor: MeshPipelineDescriptor) throws {
+        try prepareMeshCompilation(handle, descriptor: descriptor).runAndInstall()
+    }
+    func prepareMeshCompilation(_ handle: MeshPipeline, descriptor: MeshPipelineDescriptor) throws -> RHICompilationWork {
         guard queryAdapterCapabilities().meshShading else {
             throw RHIError.unsupportedFeature("adapter has no mesh shader support")
         }
@@ -55,17 +58,21 @@ extension MetalDevice {
         guard descriptor.depthStencil == nil else {
             throw RHIError.unsupportedFeature("mesh depth/stencil state is not implemented")
         }
-        let state = try device.makeRenderPipelineState(descriptor: pd, options: []).0
         let meshSize = registries.shaderThreadgroupSizes[descriptor.mesh.id] ?? ThreadgroupSize()
         let taskSize = descriptor.task.flatMap { registries.shaderThreadgroupSizes[$0.id] } ?? ThreadgroupSize()
+        return RHICompilationWork { [self] in
+            let state = try device.makeRenderPipelineState(descriptor: pd, options: []).0
         try rhiRequire(meshSize.x * meshSize.y * meshSize.z <= state.maxTotalThreadsPerMeshThreadgroup,
                        "mesh workgroup exceeds pipeline limit")
         if descriptor.task != nil {
             try rhiRequire(taskSize.x * taskSize.y * taskSize.z <= state.maxTotalThreadsPerObjectThreadgroup,
                            "task workgroup exceeds pipeline limit")
         }
-        registries.meshPipelines[handle.id] = MetalMeshPipeline(
-            descriptor: descriptor, state: state, meshSize: meshSize, taskSize: taskSize, rasterization: descriptor.rasterization)
+        return RHICompiledObject(publish: { [self] in
+            registries.meshPipelines[handle.id] = MetalMeshPipeline(
+                descriptor: descriptor, state: state, meshSize: meshSize, taskSize: taskSize, rasterization: descriptor.rasterization)
+        })
+        }
     }
 
     public func destroyMeshPipeline(_ handle: MeshPipeline) {

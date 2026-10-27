@@ -21,8 +21,18 @@ struct MeshStream {
     Subobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SAMPLE_DESC,DXGI_SAMPLE_DESC> sample;
     Subobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SAMPLE_MASK,UINT> mask;
 };
+// Inputs must be local values/COM references before releasing this registry lock.
+// Restore run()'s lock ownership before publishing a result or propagating errors.
+template<typename F> static HRESULT compileOutsideRegistryLock(State& s, F compile) {
+    s.mutex.unlock();
+    HRESULT result;
+    try { result = compile(); }
+    catch (...) { s.mutex.lock(); throw; }
+    s.mutex.lock();
+    return result;
+}
 void grhi::graphicsPipeline(State& s, uint32_t id, const GRHI_GraphicsDesc& d) {
-    require(d.color_count <= 8, "too many render targets"); auto& layout = s.layouts.at(d.layout);
+    require(d.color_count <= 8, "too many render targets"); auto layout = s.layouts.at(d.layout); auto device = s.device; Shader vertex{}, fragment{}, task{};
     require(d.sample_count && d.sample_count <= 64 && !(d.sample_count & (d.sample_count - 1)), "invalid pipeline sample count");
     Pipeline result; result.layout = d.layout; result.raster = d.raster; result.mesh = d.mesh != 0; result.samples = d.sample_count;
     D3D12_GRAPHICS_PIPELINE_STATE_DESC native{}; native.pRootSignature = layout.native.Get(); native.SampleMask = UINT_MAX; native.SampleDesc.Count = d.sample_count;
@@ -39,26 +49,26 @@ void grhi::graphicsPipeline(State& s, uint32_t id, const GRHI_GraphicsDesc& d) {
     for (UINT i = 0; i < d.color_count; ++i) { auto c = d.colors[i]; native.RTVFormats[i] = format(c.format); validateSamples(s, native.RTVFormats[i], d.sample_count); result.colors.push_back(native.RTVFormats[i]); auto& b = native.BlendState.RenderTarget[i];
         b.BlendEnable = c.enabled; b.SrcBlend = blend(c.source_rgb); b.DestBlend = blend(c.destination_rgb); b.BlendOp = D3D12_BLEND_OP(c.operation_rgb + 1);
         b.SrcBlendAlpha = blend(c.source_alpha); b.DestBlendAlpha = blend(c.destination_alpha); b.BlendOpAlpha = D3D12_BLEND_OP(c.operation_alpha + 1); b.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL; }
-    if (d.fragment) { auto& shader = s.shaders.at(d.fragment); require(shader.stage == GRHI_STAGE_FRAGMENT, "fragment stage mismatch"); native.PS = shader.code(); }
+    if (d.fragment) { fragment = s.shaders.at(d.fragment); require(fragment.stage == GRHI_STAGE_FRAGMENT, "fragment stage mismatch"); native.PS = fragment.code(); }
     if (d.mesh) {
-        require(s.capabilities.mesh, "mesh shaders unsupported"); auto& shader = s.shaders.at(d.mesh); require(shader.stage == GRHI_STAGE_MESH, "mesh stage mismatch");
+        require(s.capabilities.mesh, "mesh shaders unsupported"); auto shader = s.shaders.at(d.mesh); require(shader.stage == GRHI_STAGE_MESH, "mesh stage mismatch");
         MeshStream stream; stream.root.value = native.pRootSignature; stream.mesh.value = shader.code(); stream.fragment.value = native.PS;
-        if (d.task) { auto& task = s.shaders.at(d.task); require(task.stage == GRHI_STAGE_TASK, "task stage mismatch"); stream.task.value = task.code(); }
+        if (d.task) { task = s.shaders.at(d.task); require(task.stage == GRHI_STAGE_TASK, "task stage mismatch"); stream.task.value = task.code(); }
         stream.blend.value = native.BlendState; stream.raster.value = native.RasterizerState; stream.depth.value = native.DepthStencilState; stream.topology.value = native.PrimitiveTopologyType;
         stream.formats.value.NumRenderTargets = native.NumRenderTargets; memcpy(stream.formats.value.RTFormats, native.RTVFormats, sizeof(native.RTVFormats)); stream.depthFormat.value = native.DSVFormat; stream.sample.value = native.SampleDesc; stream.mask.value = UINT_MAX;
-        D3D12_PIPELINE_STATE_STREAM_DESC info{sizeof(stream), &stream}; check(s.device->CreatePipelineState(&info, IID_PPV_ARGS(&result.native)), "CreatePipelineState mesh"); s.mesh.emplace(id, std::move(result)); return;
+        D3D12_PIPELINE_STATE_STREAM_DESC info{sizeof(stream), &stream}; check(compileOutsideRegistryLock(s, [&] { return device->CreatePipelineState(&info, IID_PPV_ARGS(&result.native)); }), "CreatePipelineState mesh"); s.mesh.emplace(id, std::move(result)); return;
     }
-    auto& shader = s.shaders.at(d.vertex); require(shader.stage == GRHI_STAGE_VERTEX, "vertex stage mismatch"); native.VS = shader.code();
+    vertex = s.shaders.at(d.vertex); require(vertex.stage == GRHI_STAGE_VERTEX, "vertex stage mismatch"); native.VS = vertex.code();
     std::vector<D3D12_INPUT_ELEMENT_DESC> attributes;
     for (UINT i = 0; i < d.vertex_buffer_count; ++i) result.strides.push_back(d.vertex_buffers[i].stride);
     for (UINT i = 0; i < d.attribute_count; ++i) { auto a = d.attributes[i]; require(a.buffer < d.vertex_buffer_count && a.format < 5 && a.semantic, "invalid vertex attribute");
         static const DXGI_FORMAT formats[] = {DXGI_FORMAT_R32G32_FLOAT,DXGI_FORMAT_R32G32B32_FLOAT,DXGI_FORMAT_R32G32B32A32_FLOAT,DXGI_FORMAT_R32_FLOAT,DXGI_FORMAT_R8G8B8A8_UNORM}; bool instance = d.vertex_buffers[a.buffer].per_instance;
         attributes.push_back({a.semantic,a.semantic_index,formats[a.format],a.buffer,a.offset,instance ? D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA : D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,instance ? 1u : 0u}); }
-    native.InputLayout = {attributes.data(), UINT(attributes.size())}; check(s.device->CreateGraphicsPipelineState(&native, IID_PPV_ARGS(&result.native)), "CreateGraphicsPipelineState"); s.graphics.emplace(id, std::move(result));
+    native.InputLayout = {attributes.data(), UINT(attributes.size())}; check(compileOutsideRegistryLock(s, [&] { return device->CreateGraphicsPipelineState(&native, IID_PPV_ARGS(&result.native)); }), "CreateGraphicsPipelineState"); s.graphics.emplace(id, std::move(result));
 }
 int32_t grhi_dx12_graphics_pipeline(GRHI_DX12Device* d, uint32_t id, const GRHI_GraphicsDesc* desc) { return run(d, [&](State& s) { graphicsPipeline(s, id, *desc); }); }
 int32_t grhi_dx12_compute_pipeline(GRHI_DX12Device* d, uint32_t id, uint32_t layout, uint32_t shaderID) { return run(d, [&](State& s) {
-    auto& shader = s.shaders.at(shaderID); require(shader.stage == GRHI_STAGE_COMPUTE, "compute stage mismatch"); Pipeline pipeline; pipeline.layout = layout; pipeline.compute = true;
-    D3D12_COMPUTE_PIPELINE_STATE_DESC desc{}; desc.pRootSignature = s.layouts.at(layout).native.Get(); desc.CS = shader.code();
-    check(s.device->CreateComputePipelineState(&desc, IID_PPV_ARGS(&pipeline.native)), "CreateComputePipelineState"); s.compute.emplace(id, std::move(pipeline)); }); }
+    auto shader = s.shaders.at(shaderID); auto root = s.layouts.at(layout).native; auto device = s.device; require(shader.stage == GRHI_STAGE_COMPUTE, "compute stage mismatch"); Pipeline pipeline; pipeline.layout = layout; pipeline.compute = true;
+    D3D12_COMPUTE_PIPELINE_STATE_DESC desc{}; desc.pRootSignature = root.Get(); desc.CS = shader.code();
+    check(compileOutsideRegistryLock(s, [&] { return device->CreateComputePipelineState(&desc, IID_PPV_ARGS(&pipeline.native)); }), "CreateComputePipelineState"); s.compute.emplace(id, std::move(pipeline)); }); }
 #endif

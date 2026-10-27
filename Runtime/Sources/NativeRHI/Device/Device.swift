@@ -26,7 +26,13 @@ final class IdentifierPool {
     }
 }
 
-public final class Device {
+public final class Device: @unchecked Sendable {
+    let preparationQueue = DispatchQueue(label: "com.cove.rhi.preparation", qos: .userInitiated)
+    // Mutable frontend/registry state remains serialized. Only prepared native
+    // compiler work executes outside the lock, with its inputs pinned below.
+    private var activeCompilations = 0
+    private var compilationRetirements: [() -> Void] = []
+    public var supportsBackgroundCompilation: Bool { backend is any RHIBackgroundCompilation }
     /// The graphics API of the selected backend.
     public let backendAPI: GraphicsAPI
     /// Features implemented by this backend and supported by the selected device.
@@ -182,6 +188,7 @@ public final class Device {
             try rhiRequire(descriptor.size > 0, "buffer size must be positive")
             let handle = Buffer(id: identifiers.next())
             try backend.createBuffer(handle, descriptor: descriptor)
+            ResourcePreparationContext.current?.acquired(self, id: handle.id) { [self] in destroy(handle) }
             return handle
         }
     }
@@ -202,6 +209,7 @@ public final class Device {
             try rhiValidateTextureSamples(descriptor)
             let handle = Texture(id: identifiers.next())
             try backend.createTexture(handle, descriptor: descriptor)
+            ResourcePreparationContext.current?.acquired(self, id: handle.id) { [self] in destroy(handle) }
             return handle
         }
     }
@@ -215,6 +223,7 @@ public final class Device {
         try locked {
             let handle = Sampler(id: identifiers.next())
             try backend.createSampler(handle, descriptor: descriptor)
+            ResourcePreparationContext.current?.acquired(self, id: handle.id) { [self] in destroy(handle) }
             return handle
         }
     }
@@ -234,18 +243,22 @@ public final class Device {
                     throw RHIError.unsupportedFeature("mesh shading is not implemented by this backend")
                 }
             }
-            let clock = ContinuousClock()
-            let started = clock.now
-            let handle = ShaderModule(id: identifiers.next())
-            try backend.createShaderModule(handle, descriptor: descriptor)
-            let duration = started.duration(to: clock.now)
-            let duringFrame = currentSlot != nil
-            pipelineStore.recordShaderModule(duration, duringFrame: duringFrame)
-            logPipelineCreation(kind: "shader module", label: nil, duration: duration)
-            if duringFrame {
-                warnPipelineCreationDuringFrame(kind: "shader module", label: nil)
+            let clock = ContinuousClock(), started = clock.now
+            let lease = try pipelineStore.shaders.acquire(ShaderModuleKey(descriptor)) {
+                let handle = ShaderModule(id: identifiers.next())
+                try compileResource(.shader(handle, descriptor), label: descriptor.entryPoint)
+                return handle
             }
-            return handle
+            let duringFrame = currentSlot != nil && ResourcePreparationContext.current == nil
+            let duration = started.duration(to: clock.now)
+            if let duplicate = lease.discarded { backend.destroyShaderModule(duplicate) }
+            if lease.created || lease.discarded != nil {
+                pipelineStore.recordShaderModule(duration, duringFrame: duringFrame)
+                logPipelineCreation(kind: "shader module", label: descriptor.entryPoint, duration: duration)
+                if duringFrame { warnPipelineCreationDuringFrame(kind: "shader module", label: descriptor.entryPoint) }
+            } else { pipelineStore.recordShaderCacheHit() }
+            ResourcePreparationContext.current?.acquired(self, id: lease.handle.id) { [self] in destroy(lease.handle) }
+            return lease.handle
         }
     }
 
@@ -274,6 +287,7 @@ public final class Device {
             case .topLevel(let instances):
                 accelerationBuildInputs[handle.id] = instances.map { ResourceRef(kind: .accelerationStructure, id: $0.structure.id) }
             }
+            ResourcePreparationContext.current?.acquired(self, id: handle.id) { [self] in destroy(handle) }
             return handle
         }
     }
@@ -288,6 +302,7 @@ public final class Device {
     }
 
     public func destroy(_ structure: AccelerationStructure) {
+        ResourcePreparationContext.current?.released(self, id: structure.id)
         locked {
             accelerationBuildInputs[structure.id] = nil
             planner.forgetResource(ResourceRef(kind: .accelerationStructure, id: structure.id))
@@ -298,6 +313,7 @@ public final class Device {
     // MARK: Resource destruction (deferred)
 
     public func destroy(_ buffer: Buffer) {
+        ResourcePreparationContext.current?.released(self, id: buffer.id)
         locked {
             planner.forgetResource(ResourceRef(kind: .buffer, id: buffer.id))
             frameRing.retireCurrent { [backend] in backend.destroyBuffer(buffer) }
@@ -305,6 +321,7 @@ public final class Device {
     }
 
     public func destroy(_ texture: Texture) {
+        ResourcePreparationContext.current?.released(self, id: texture.id)
         locked {
             planner.forgetResource(ResourceRef(kind: .texture, id: texture.id))
             frameRing.retireCurrent { [backend] in backend.destroyTexture(texture) }
@@ -312,11 +329,18 @@ public final class Device {
     }
 
     public func destroy(_ sampler: Sampler) {
+        ResourcePreparationContext.current?.released(self, id: sampler.id)
         locked { frameRing.retireCurrent { [backend] in backend.destroySampler(sampler) } }
     }
 
     public func destroy(_ shader: ShaderModule) {
-        locked { frameRing.retireCurrent { [backend] in backend.destroyShaderModule(shader) } }
+        ResourcePreparationContext.current?.released(self, id: shader.id)
+        locked {
+            guard pipelineStore.shaders.release(shader) else { return }
+            frameRing.retireCurrent { [weak self, backend] in
+                if let self { self.retireCompilerResource { backend.destroyShaderModule(shader) } }
+                else { backend.destroyShaderModule(shader) }
+            } }
     }
 
     // MARK: Pipelines
@@ -333,12 +357,13 @@ public final class Device {
             let started = clock.now
             let lease = try pipelineStore.graphics.acquire(GraphicsPipelineKey(descriptor)) {
                 let handle = GraphicsPipeline(id: identifiers.next())
-                try backend.createGraphicsPipeline(handle, descriptor: descriptor)
+                try compileResource(.graphics(handle, descriptor), label: descriptor.label ?? "graphics pipeline")
                 return handle
             }
-            let duringFrame = currentSlot != nil
+            let duringFrame = currentSlot != nil && ResourcePreparationContext.current == nil
             let duration = started.duration(to: clock.now)
-            pipelineStore.recordGraphics(duration, created: lease.created, duringFrame: duringFrame)
+            if let duplicate = lease.discarded { backend.destroyGraphicsPipeline(duplicate) }
+            pipelineStore.recordGraphics(duration, created: lease.created || lease.discarded != nil, duringFrame: duringFrame)
             if lease.created {
                 interfaces.uses[lease.handle.id] = PipelineUse(layout: descriptor.layout, kind: .graphics)
                 logPipelineCreation(kind: "graphics", label: descriptor.label, duration: duration)
@@ -346,6 +371,7 @@ public final class Device {
                     warnPipelineCreationDuringFrame(kind: "graphics", label: descriptor.label)
                 }
             }
+            ResourcePreparationContext.current?.acquired(self, id: lease.handle.id) { [self] in destroy(lease.handle) }
             return lease.handle
         }
     }
@@ -360,12 +386,13 @@ public final class Device {
             let started = clock.now
             let lease = try pipelineStore.mesh.acquire(MeshPipelineKey(descriptor)) {
                 let handle = MeshPipeline(id: identifiers.next())
-                try backend.createMeshPipeline(handle, descriptor: descriptor)
+                try compileResource(.mesh(handle, descriptor), label: descriptor.label ?? "mesh pipeline")
                 return handle
             }
-            let duringFrame = currentSlot != nil
+            let duringFrame = currentSlot != nil && ResourcePreparationContext.current == nil
             let duration = started.duration(to: clock.now)
-            pipelineStore.recordMesh(duration, created: lease.created, duringFrame: duringFrame)
+            if let duplicate = lease.discarded { backend.destroyMeshPipeline(duplicate) }
+            pipelineStore.recordMesh(duration, created: lease.created || lease.discarded != nil, duringFrame: duringFrame)
             if lease.created {
                 interfaces.uses[lease.handle.id] = PipelineUse(layout: descriptor.layout, kind: .mesh)
                 logPipelineCreation(kind: "mesh", label: descriptor.label, duration: duration)
@@ -373,15 +400,20 @@ public final class Device {
                     warnPipelineCreationDuringFrame(kind: "mesh", label: descriptor.label)
                 }
             }
+            ResourcePreparationContext.current?.acquired(self, id: lease.handle.id) { [self] in destroy(lease.handle) }
             return lease.handle
         }
     }
 
     public func destroy(_ pipeline: MeshPipeline) {
+        ResourcePreparationContext.current?.released(self, id: pipeline.id)
         locked {
             guard pipelineStore.mesh.release(pipeline) else { return }
             interfaces.uses[pipeline.id] = nil
-            frameRing.retireCurrent { [backend] in backend.destroyMeshPipeline(pipeline) }
+            frameRing.retireCurrent { [weak self, backend] in
+                if let self { self.retireCompilerResource { backend.destroyMeshPipeline(pipeline) } }
+                else { backend.destroyMeshPipeline(pipeline) }
+            }
         }
     }
 
@@ -395,12 +427,13 @@ public final class Device {
             let started = clock.now
             let lease = try pipelineStore.compute.acquire(ComputePipelineKey(descriptor)) {
                 let handle = ComputePipeline(id: identifiers.next())
-                try backend.createComputePipeline(handle, descriptor: descriptor)
+                try compileResource(.compute(handle, descriptor), label: descriptor.label ?? "compute pipeline")
                 return handle
             }
-            let duringFrame = currentSlot != nil
+            let duringFrame = currentSlot != nil && ResourcePreparationContext.current == nil
             let duration = started.duration(to: clock.now)
-            pipelineStore.recordCompute(duration, created: lease.created, duringFrame: duringFrame)
+            if let duplicate = lease.discarded { backend.destroyComputePipeline(duplicate) }
+            pipelineStore.recordCompute(duration, created: lease.created || lease.discarded != nil, duringFrame: duringFrame)
             if lease.created {
                 interfaces.uses[lease.handle.id] = PipelineUse(layout: descriptor.layout, kind: .compute)
                 logPipelineCreation(kind: "compute", label: descriptor.label, duration: duration)
@@ -408,23 +441,32 @@ public final class Device {
                     warnPipelineCreationDuringFrame(kind: "compute", label: descriptor.label)
                 }
             }
+            ResourcePreparationContext.current?.acquired(self, id: lease.handle.id) { [self] in destroy(lease.handle) }
             return lease.handle
         }
     }
 
     public func destroy(_ pipeline: GraphicsPipeline) {
+        ResourcePreparationContext.current?.released(self, id: pipeline.id)
         locked {
             guard pipelineStore.graphics.release(pipeline) else { return }
             interfaces.uses[pipeline.id] = nil
-            frameRing.retireCurrent { [backend] in backend.destroyGraphicsPipeline(pipeline) }
+            frameRing.retireCurrent { [weak self, backend] in
+                if let self { self.retireCompilerResource { backend.destroyGraphicsPipeline(pipeline) } }
+                else { backend.destroyGraphicsPipeline(pipeline) }
+            }
         }
     }
 
     public func destroy(_ pipeline: ComputePipeline) {
+        ResourcePreparationContext.current?.released(self, id: pipeline.id)
         locked {
             guard pipelineStore.compute.release(pipeline) else { return }
             interfaces.uses[pipeline.id] = nil
-            frameRing.retireCurrent { [backend] in backend.destroyComputePipeline(pipeline) }
+            frameRing.retireCurrent { [weak self, backend] in
+                if let self { self.retireCompilerResource { backend.destroyComputePipeline(pipeline) } }
+                else { backend.destroyComputePipeline(pipeline) }
+            }
         }
     }
 
@@ -822,6 +864,49 @@ public final class Device {
             frameRing.waitUntilIdle()
             try backend.waitUntilIdle()
         }
+    }
+
+    /// Called with the frontend lock held. Backend snapshots never retain a
+    /// mutable registry reference that the compiler will access off-thread.
+    private func compileResource(_ request: RHICompilationRequest, label: String) throws {
+        guard let compiler = backend as? any RHIBackgroundCompilation else {
+            switch request {
+            case let .shader(handle, descriptor): try backend.createShaderModule(handle, descriptor: descriptor)
+            case let .graphics(handle, descriptor): try backend.createGraphicsPipeline(handle, descriptor: descriptor)
+            case let .compute(handle, descriptor): try backend.createComputePipeline(handle, descriptor: descriptor)
+            case let .mesh(handle, descriptor): try backend.createMeshPipeline(handle, descriptor: descriptor)
+            }
+            return
+        }
+        let progress = ResourcePreparationContext.current
+        try progress?.checkCancellation()
+        let work = try compiler.prepareCompilation(request)
+        activeCompilations += 1
+        lock.unlock()
+        let result = Result {
+            try progress?.compilationStarted(label)
+            let object = try work.compile()
+            try progress?.checkCancellation()
+            progress?.compilationFinished()
+            return object
+        }
+        lock.lock()
+        defer {
+            activeCompilations -= 1
+            if activeCompilations == 0 {
+                let actions = compilationRetirements
+                compilationRetirements.removeAll()
+                actions.forEach { $0() }
+            }
+        }
+        let object = try result.get()
+        try progress?.checkCancellation()
+        object.install()
+    }
+
+    private func retireCompilerResource(_ action: @escaping () -> Void) {
+        if activeCompilations > 0 { compilationRetirements.append(action) }
+        else { action() }
     }
 
     // MARK: Lock helper

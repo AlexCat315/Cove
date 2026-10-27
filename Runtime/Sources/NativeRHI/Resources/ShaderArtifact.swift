@@ -52,6 +52,8 @@ public struct ShaderArtifact: Codable, Sendable {
     public var code: Data
     public var interface = ShaderInterface()
     public var compiler: String
+    /// Source artifact code hash for an optional platform-precompiled library.
+    public var sourceFingerprint: String?
 
     public init(stage: ShaderStage, format: ShaderFormat, entryPoint: String,
                 code: Data, compiler: String) {

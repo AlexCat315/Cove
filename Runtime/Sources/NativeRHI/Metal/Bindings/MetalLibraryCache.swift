@@ -7,9 +7,11 @@
 
 #if canImport(Metal)
 import Metal
+import Foundation
 
 final class MetalLibraryCache {
     private let device: MTLDevice
+    private let lock = NSLock()
     /// MSL-source libraries keyed by the raw source bytes.
     private var sourceLibraries: [Data: MTLLibrary] = [:]
     /// metallib blobs keyed by the raw library data.
@@ -22,6 +24,9 @@ final class MetalLibraryCache {
     /// Returns the compiled/loaded library for a shader module descriptor,
     /// compiling MSL source only on first sight of that source.
     func library(for descriptor: ShaderModuleDescriptor) throws -> MTLLibrary {
+        // All callers perform this work outside Device's render lock.
+        lock.lock()
+        defer { lock.unlock() }
         switch descriptor.format {
         case .mslSource:
             if let cached = sourceLibraries[descriptor.code] { return cached }

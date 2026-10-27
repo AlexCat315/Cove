@@ -8,7 +8,25 @@
 // Creation is measured separately from cache hits. A miss is the cold path
 // that may compile native GPU code; a hit is only a dictionary lookup.
 
+import Foundation
+
 // MARK: - Keys
+
+struct ShaderModuleKey: Hashable {
+    let stage: ShaderStage
+    let format: ShaderFormat
+    let code: Data
+    let entryPoint: String
+    let workgroup: [Int]
+    let constants: [String]
+    init(_ descriptor: ShaderModuleDescriptor) {
+        stage = descriptor.stage; format = descriptor.format; code = descriptor.code; entryPoint = descriptor.entryPoint
+        workgroup = [descriptor.threadgroupSize.x, descriptor.threadgroupSize.y, descriptor.threadgroupSize.z]
+        constants = descriptor.specializationConstants.sorted { $0.id < $1.id }.map {
+            "\($0.id):\($0.value.type):\($0.value.bits)"
+        }
+    }
+}
 
 /// Immutable graphics pipeline state. Every field that changes the native
 /// pipeline object is present; the label is not.
@@ -78,6 +96,10 @@ struct PipelineLease<Handle: RHIHandle> {
     let handle: Handle
     /// True when this call created the backend object.
     let created: Bool
+    let discarded: Handle?
+    init(handle: Handle, created: Bool, discarded: Handle? = nil) {
+        self.handle = handle; self.created = created; self.discarded = discarded
+    }
 }
 
 /// Reference-counted value-keyed pipeline cache.
@@ -98,6 +120,12 @@ final class PipelineCache<Key: Hashable, Handle: RHIHandle> {
             return PipelineLease(handle: existing, created: false)
         }
         let handle = try create()
+        // A backend compile may release Device's lock. Another caller can
+        // publish this key first; keep its lease and retire our duplicate.
+        if let existing = entries[key] {
+            references[existing.id, default: 0] += 1
+            return PipelineLease(handle: existing, created: false, discarded: handle)
+        }
         entries[key] = handle
         keysByHandle[handle.id] = key
         references[handle.id] = 1
@@ -181,8 +209,10 @@ public struct PipelineKindStatistics: Sendable, Equatable {
 
 /// Snapshot of pipeline creation and cache behavior for one `Device`.
 public struct PipelineStatistics: Sendable, Equatable {
-    /// Shader module creations. Shader modules are not interned.
+    /// Cold shader module creations; identical modules share a leased handle.
     public var shaderModules = PipelineCompileTiming()
+    public var shaderModuleCacheHits: UInt64 = 0
+    public var liveShaderModules: Int = 0
     public var graphics = PipelineKindStatistics()
     public var compute = PipelineKindStatistics()
     public var mesh = PipelineKindStatistics()
@@ -211,6 +241,7 @@ public struct PipelineStatistics: Sendable, Equatable {
 
 /// Groups the three pipeline caches and their counters, keeping `Device` small.
 final class PipelineStore {
+    let shaders = PipelineCache<ShaderModuleKey, ShaderModule>()
     let graphics = PipelineCache<GraphicsPipelineKey, GraphicsPipeline>()
     let compute = PipelineCache<ComputePipelineKey, ComputePipeline>()
     let mesh = PipelineCache<MeshPipelineKey, MeshPipeline>()
@@ -219,6 +250,7 @@ final class PipelineStore {
 
     var snapshot: PipelineStatistics {
         var result = statistics
+        result.liveShaderModules = shaders.count
         result.graphics.live = graphics.count
         result.compute.live = compute.count
         result.mesh.live = mesh.count
@@ -228,6 +260,7 @@ final class PipelineStore {
     func recordShaderModule(_ duration: Duration, duringFrame: Bool) {
         statistics.shaderModules.record(duration, duringFrame: duringFrame)
     }
+    func recordShaderCacheHit() { statistics.shaderModuleCacheHits += 1 }
 
     func recordGraphics(_ duration: Duration, created: Bool, duringFrame: Bool) {
         statistics.graphics.record(duration, created: created, duringFrame: duringFrame)

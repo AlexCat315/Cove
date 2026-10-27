@@ -70,33 +70,45 @@ extension MetalDevice {
     // MARK: Shader modules
 
     public func createShaderModule(_ handle: ShaderModule, descriptor: ShaderModuleDescriptor) throws {
-        let library = try libraryCache.library(for: descriptor)
-        let function: MTLFunction?
-        if descriptor.specializationConstants.isEmpty { function = library.makeFunction(name: descriptor.entryPoint) }
-        else {
-            let constants = MTLFunctionConstantValues()
-            for constant in descriptor.specializationConstants {
-                let type: MTLDataType
-                switch constant.value.type { case .uint32: type = .uint; case .int32: type = .int; case .float32: type = .float; case .bool: type = .bool }
-                var bits = constant.value.bits
-                withUnsafePointer(to: &bits) { constants.setConstantValue($0,type: type,index: Int(constant.id)) }
+        try prepareShaderCompilation(handle, descriptor: descriptor).runAndInstall()
+    }
+    func prepareShaderCompilation(_ handle: ShaderModule, descriptor: ShaderModuleDescriptor) throws -> RHICompilationWork {
+        RHICompilationWork { [self] in
+            let library = try libraryCache.library(for: descriptor)
+            let function: MTLFunction?
+            if descriptor.specializationConstants.isEmpty { function = library.makeFunction(name: descriptor.entryPoint) }
+            else {
+                let constants = MTLFunctionConstantValues()
+                for constant in descriptor.specializationConstants {
+                    let type: MTLDataType
+                    switch constant.value.type { case .uint32: type = .uint; case .int32: type = .int; case .float32: type = .float; case .bool: type = .bool }
+                    var bits = constant.value.bits
+                    withUnsafePointer(to: &bits) { constants.setConstantValue($0,type: type,index: Int(constant.id)) }
+                }
+                function = try library.makeFunction(name: descriptor.entryPoint,constantValues: constants)
             }
-            function = try library.makeFunction(name: descriptor.entryPoint,constantValues: constants)
+            guard let function else {
+                throw RHIError.invalidArgument(
+                    "entry point '\(descriptor.entryPoint)' not found in the compiled library"
+                )
+            }
+
+            return RHICompiledObject(publish: { [self] in
+                registries.shaderStages[handle.id] = descriptor.stage
+                registries.shaderThreadgroupSizes[handle.id] = descriptor.threadgroupSize
+                registries.shaderFunctions[handle.id] = function
+                registries.shaderLibraries[handle.id] = library
+            })
         }
-        guard let function else {
-            throw RHIError.invalidArgument(
-                "entry point '\(descriptor.entryPoint)' not found in the compiled library"
-            )
-        }
-        registries.shaderStages[handle.id] = descriptor.stage
-        registries.shaderThreadgroupSizes[handle.id] = descriptor.threadgroupSize
-        registries.shaderFunctions[handle.id] = function
-        registries.shaderLibraries[handle.id] = library
     }
 
     // MARK: Graphics pipelines
 
     public func createGraphicsPipeline(_ handle: GraphicsPipeline, descriptor: GraphicsPipelineDescriptor) throws {
+        try prepareGraphicsCompilation(handle, descriptor: descriptor).runAndInstall()
+    }
+    func prepareGraphicsCompilation(_ handle: GraphicsPipeline, descriptor: GraphicsPipelineDescriptor) throws -> RHICompilationWork {
+
         guard let vertexFunction = registries.shaderFunctions[descriptor.vertex.id] else {
             throw RHIError.invalidArgument("graphics pipeline: vertex shader module not found")
         }
@@ -142,7 +154,6 @@ extension MetalDevice {
 
         // Rasterization itself (cull/winding/fill) is encoder state in Metal;
         // stash the descriptor so the render encoder can apply it on bind.
-        registries.pipelineRasterStates[handle.id] = descriptor.rasterization
 
         // Vertex layout. Throw on capacity overflow (never silently truncate).
         if let layout = descriptor.vertexLayout {
@@ -159,24 +170,23 @@ extension MetalDevice {
             pd.vertexDescriptor = makeVertexDescriptor(layout)
         }
 
-        do {
-            let state = try device.makeRenderPipelineState(descriptor: pd)
-            registries.renderPipelines[handle.id] = MetalGraphicsPipeline(state: state, descriptor: descriptor)
-        } catch {
-            throw RHIError.invalidArgument(
-                "graphics pipeline failed: \(error.localizedDescription)"
-            )
-        }
-        registries.pipelinePrimitives[handle.id] = mtlPrimitiveType(descriptor.primitive)
-
-        // Depth/stencil state paired with this pipeline.
-        if let depthStencil = descriptor.depthStencil {
-            let dsd = MTLDepthStencilDescriptor()
-            dsd.depthCompareFunction = mtlCompareFunction(depthStencil.depthCompare)
-            dsd.isDepthWriteEnabled = depthStencil.depthWriteEnabled
-            if let state = device.makeDepthStencilState(descriptor: dsd) {
-                registries.depthStates[handle.id] = state
+        return RHICompilationWork { [self] in
+            let state: MTLRenderPipelineState
+            do { state = try device.makeRenderPipelineState(descriptor: pd) }
+            catch { throw RHIError.invalidArgument("graphics pipeline failed: \(error.localizedDescription)") }
+            var depthState: MTLDepthStencilState?
+            if let depthStencil = descriptor.depthStencil {
+                let dsd = MTLDepthStencilDescriptor()
+                dsd.depthCompareFunction = mtlCompareFunction(depthStencil.depthCompare)
+                dsd.isDepthWriteEnabled = depthStencil.depthWriteEnabled
+                depthState = device.makeDepthStencilState(descriptor: dsd)
             }
+            return RHICompiledObject(publish: { [self] in
+                registries.renderPipelines[handle.id] = MetalGraphicsPipeline(state: state, descriptor: descriptor)
+                registries.pipelineRasterStates[handle.id] = descriptor.rasterization
+                registries.pipelinePrimitives[handle.id] = mtlPrimitiveType(descriptor.primitive)
+                if let depthState { registries.depthStates[handle.id] = depthState }
+            })
         }
     }
 
@@ -200,21 +210,22 @@ extension MetalDevice {
     // MARK: Compute pipelines
 
     public func createComputePipeline(_ handle: ComputePipeline, descriptor: ComputePipelineDescriptor) throws {
+        try prepareComputeCompilation(handle, descriptor: descriptor).runAndInstall()
+    }
+    func prepareComputeCompilation(_ handle: ComputePipeline, descriptor: ComputePipelineDescriptor) throws -> RHICompilationWork {
         guard registries.shaderStages[descriptor.shader.id] == .compute,
               let function = registries.shaderFunctions[descriptor.shader.id] else {
             throw RHIError.invalidArgument("compute pipeline: shader module not found")
         }
-        do {
+        let size = registries.shaderThreadgroupSizes[descriptor.shader.id] ?? ThreadgroupSize()
+        return RHICompilationWork { [self] in
             let state = try device.makeComputePipelineState(function: function)
-            let size = registries.shaderThreadgroupSizes[descriptor.shader.id] ?? ThreadgroupSize()
             try rhiRequire(size.x * size.y * size.z <= state.maxTotalThreadsPerThreadgroup,
-                           "compute workgroup exceeds pipeline limit")
-            registries.computeThreadgroupSizes[handle.id] = size
-            registries.computePipelines[handle.id] = state
-        } catch {
-            throw RHIError.invalidArgument(
-                "compute pipeline failed: \(error.localizedDescription)"
-            )
+                "compute workgroup exceeds pipeline limit")
+            return RHICompiledObject(publish: { [self] in
+                registries.computeThreadgroupSizes[handle.id] = size
+                registries.computePipelines[handle.id] = state
+            })
         }
     }
 

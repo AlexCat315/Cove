@@ -40,15 +40,7 @@ final class NativeUIShaderResources {
     deinit { device.destroy(vertex); device.destroy(fragment); device.destroy(sampler) }
 
     private static func artifact(api: GraphicsAPI, stage: ShaderStage) throws -> ShaderArtifact {
-        let target: String
-        switch api { case .metal: target = "metal"; case .vulkan: target = "spirv"; case .dx12: target = "dxil" }
-        guard let url = ShaderResourcesBundle.bundle.url(forResource: "ui.\(stage.rawValue)", withExtension: "json",
-            subdirectory: "Shaders/Native/\(target)") else {
-            throw RHIError.unsupportedFeature("missing offline \(target) UI shader; rebuild native renderer shaders")
-        }
-        let artifact = try JSONDecoder().decode(ShaderArtifact.self, from: Data(contentsOf: url))
-        guard artifact.stage == stage else { throw RHIError.layoutMismatch("UI artifact stage mismatch") }
-        return artifact
+        try ShaderArtifact.load(from: ShaderResourcesBundle.bundle, name: "ui", stage: stage, api: api)
     }
 }
 

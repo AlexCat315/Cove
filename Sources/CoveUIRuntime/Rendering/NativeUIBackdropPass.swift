@@ -96,15 +96,7 @@ final class NativeUIBackdropShaders {
     }
 
     private static func artifact(api: GraphicsAPI, stage: ShaderStage) throws -> ShaderArtifact {
-        let target: String
-        switch api { case .metal: target = "metal"; case .vulkan: target = "spirv"; case .dx12: target = "dxil" }
-        guard let url = ShaderResourcesBundle.bundle.url(forResource: "ui_backdrop.\(stage.rawValue)", withExtension: "json",
-            subdirectory: "Shaders/Native/\(target)") else {
-            throw RHIError.unsupportedFeature("missing offline \(target) backdrop shader; rebuild native renderer shaders")
-        }
-        let artifact = try JSONDecoder().decode(ShaderArtifact.self, from: Data(contentsOf: url))
-        guard artifact.stage == stage else { throw RHIError.layoutMismatch("backdrop artifact stage mismatch") }
-        return artifact
+        try ShaderArtifact.load(from: ShaderResourcesBundle.bundle, name: "ui_backdrop", stage: stage, api: api)
     }
 }
 

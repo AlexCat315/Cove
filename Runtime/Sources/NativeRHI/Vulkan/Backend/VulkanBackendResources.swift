@@ -253,6 +253,10 @@ extension VulkanBackend {
     }
 
     func createShaderModule(_ handle: ShaderModule, descriptor: ShaderModuleDescriptor) throws {
+        try prepareShaderCompilation(handle, descriptor: descriptor).runAndInstall()
+    }
+    func prepareShaderCompilation(_ handle: ShaderModule, descriptor: ShaderModuleDescriptor) throws -> RHICompilationWork {
+        RHICompilationWork { [self] in
         guard descriptor.format == .spirv else {
             throw RHIError.unsupportedFeature("Vulkan backend requires SPIR-V shader modules")
         }
@@ -281,8 +285,11 @@ extension VulkanBackend {
         guard let module: VkShaderModule = withExtendedLifetime(arena, {
             vkWithOutHandle { _ = context.core.createShaderModule(context.device, &info, nil, $0) }
         }) else { throw RHIError.outOfMemory }
-        registries.shaderModules[handle.id] = VulkanShaderModuleRecord(module: module, stage: descriptor.stage,
-            entryPoint: descriptor.entryPoint,specializationConstants: descriptor.specializationConstants)
+        return RHICompiledObject(publish: { [self] in
+            registries.shaderModules[handle.id] = VulkanShaderModuleRecord(module: module, stage: descriptor.stage,
+                entryPoint: descriptor.entryPoint,specializationConstants: descriptor.specializationConstants)
+        }, discard: { [context] in context.core.destroyShaderModule(context.device, module, nil) })
+        }
     }
 
     func destroyShaderModule(_ handle: ShaderModule) {
