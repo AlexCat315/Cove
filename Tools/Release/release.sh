@@ -219,6 +219,7 @@ if [ -n "$previous_tag" ]; then
 else
   changelog=$(git log --no-merges --pretty=format:'- %s' -20 2>/dev/null || true)
 fi
+changelog=$(printf '%s\n' "$changelog" | node Tools/Release/sanitize-commit-notes.mjs)
 
 step "Plan"
 info "version  $current_version -> $version"
@@ -346,7 +347,7 @@ for ((attempt = 1; attempt <= 12; attempt++)); do
   [ -n "$run_info" ] && break
   sleep 5
 done
-[ -n "$run_info" ] || die "no $WORKFLOW run appeared for $tag; check: gh run list --workflow $WORKFLOW"
+[ -n "$run_info" ] || die "no $WORKFLOW run appeared for $tag; recover without moving it: gh workflow run $WORKFLOW --ref $BRANCH -f tag=$tag"
 run_id=${run_info%% *}
 run_url=${run_info#* }
 info "run $run_id triggered"

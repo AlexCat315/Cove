@@ -2,8 +2,20 @@ name: SDK release
 on:
   push:
     tags: ['v[0-9]*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing SDK version tag to build and publish
+        required: true
+        type: string
+run-name: Release ${{ inputs.tag || github.ref_name }}
 permissions:
   contents: write
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+concurrency:
+  group: sdk-release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
 jobs:
   native:
     runs-on: ${{ matrix.runner }}
@@ -37,10 +49,12 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - uses: ./.github/actions/fetch-submodules
       - uses: ./.github/actions/setup-toolchains
       - name: Verify release metadata
-        run: node Tools/Release/check-version.mjs "$GITHUB_REF_NAME" --release
+        run: node Tools/Release/check-version.mjs "$RELEASE_TAG" --release
       - name: Identify native inputs
         id: native-inputs
         run: echo "digest=$(git ls-tree -r HEAD cmake third-party Runtime/third-party Tools/Cove/Sources/CoveCLI/Toolchains/Native.swift .github/actions/setup-toolchains/action.yml | git hash-object --stdin)" >> "$GITHUB_OUTPUT"
@@ -110,6 +124,8 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - uses: ./.github/actions/fetch-submodules
       - uses: ./.github/actions/setup-toolchains
       - uses: actions/download-artifact@v4
@@ -150,6 +166,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - uses: actions/download-artifact@v4
         with:
           pattern: sdk-*
@@ -163,7 +181,6 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
         run: |
           mkdir release
           find sdk -name '*.tar.gz' -exec cp {} release/ \;
