@@ -8,6 +8,7 @@ extension DX12Device {
         resources.buffers[handle.id] = descriptor
     }
     public func createTexture(_ handle: Texture, descriptor: TextureDescriptor) throws {
+        try rhiValidateTextureSamples(descriptor)
         var desc = try GRHI_TextureDesc(width: rhiCount(descriptor.width), height: rhiCount(descriptor.height), depth: rhiCount(descriptor.depth), layers: rhiCount(descriptor.layers), mips: rhiCount(descriptor.mipLevels), samples: rhiCount(descriptor.sampleCount), format: descriptor.format.dx12, usage: descriptor.usage.rawValue, dimension: descriptor.dimension.dx12)
         try check(grhi_dx12_texture(native, handle.id, &desc)); resources.textures[handle.id] = descriptor
     }
@@ -79,5 +80,13 @@ extension DX12Device {
         _ = try rhiTextureUploadBytes(region: region, rowBytes: row, format: descriptor.format,
             textureWidth: extent.width, textureHeight: extent.height, capacity: size)
         try check(grhi_dx12_transfer_texture(native, texture.id, rhiCount(region.origin.x),rhiCount(region.origin.y),rhiCount(region.width), rhiCount(region.height), rhiCount(row), rhiCount(subresource.mipLevel), rhiCount(subresource.layer), pointer, size, upload ? 1 : 0))
+    }
+}
+
+extension DX12Device: TextureMemoryReporting {
+    public func textureAllocation(_ texture: Texture) -> TextureAllocation? {
+        let bytes = grhi_dx12_texture_allocation(native, texture.id)
+        guard bytes > 0, bytes <= UInt64(Int.max) else { return nil }
+        return TextureAllocation(allocatedBytes: Int(bytes), isMemoryless: false)
     }
 }

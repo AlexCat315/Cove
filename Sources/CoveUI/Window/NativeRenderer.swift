@@ -10,7 +10,6 @@ final class NativeAppWindowRenderer: AppWindowRenderer {
     private var native: NativeRenderSurface?
     private var swapchain: SwapchainResource?
     private var size = SIMD2<UInt32>(repeating: 0)
-    private var multisample: TextureResource?
     /// Owned copy of the presented frame, so a panel can blur it.
     private var framebuffer: TextureResource?
     private var presentationActive = true
@@ -20,15 +19,12 @@ final class NativeAppWindowRenderer: AppWindowRenderer {
     var isConfigured: Bool { native != nil }
 
     var memorySnapshot: AppWindowMemorySnapshot {
-        let bytes = [multisample, framebuffer].compactMap { $0 }.reduce(0) {
-            $0 + $1.descriptor.width * $1.descriptor.height * 4 * $1.descriptor.sampleCount
-        }
-        let msaaLogical = multisample.map { $0.descriptor.width * $0.descriptor.height * 4 * $0.descriptor.sampleCount } ?? 0
-        let msaaAllocated: Int? = multisample == nil ? 0 : multisample?.allocation?.allocatedBytes
+        let bytes = framebuffer.map { $0.descriptor.width * $0.descriptor.height * 4 } ?? 0
         return AppWindowMemorySnapshot(state: state, samples: settings.samples,
             hasSwapchain: swapchain != nil, estimatedTargetBytes: bytes + renderer.estimatedPresentationTextureBytes,
-            msaaLogicalBytes: msaaLogical, msaaAllocatedBytes: msaaAllocated,
-            msaaMemoryless: multisample?.allocation?.isMemoryless ?? false)
+            msaaLogicalBytes: renderer.presentationMSAALogicalBytes,
+            msaaAllocatedBytes: renderer.presentationMSAAAllocatedBytes,
+            msaaMemoryless: renderer.presentationMSAAMemoryless)
     }
 
     init(device: Device, renderer: NativeDrawListRenderer, settings: AppWindowRenderSettings) {
@@ -74,43 +70,19 @@ final class NativeAppWindowRenderer: AppWindowRenderer {
             let image = try device.acquireSwapchainImage(swapchain.swapchain)
             let pixels = SIMD2(image.width, image.height)
             let clear = settings.clearColor
-            // A frosted panel or a reveal samples the frame already drawn, so
-            // those frames live in an owned texture and reach the drawable in a
-            // final blit. Ordinary frames draw straight into the drawable: the
-            // blit is a full-screen pass and the owned texture is a full-size
-            // allocation, neither of which pays for itself when no pass needs
-            // to sample the result.
-            let samplesFrame = renderer.supportsBackdrop
-                && (list.reveal != nil || list.batches.contains { $0.backdrop != nil })
-            // Backdrop/reveal split rendering and reload earlier samples.
-            // Ordinary frames resolve once and can keep 4x coverage tile-only.
-            let transient = !samplesFrame
-            if settings.samples > 1 && (multisample?.descriptor.width != pixels.x
-                || multisample?.descriptor.height != pixels.y
-                || multisample?.descriptor.transientAttachment != transient) {
-                multisample = try TextureResource(device: device, descriptor: TextureDescriptor(
-                    width: pixels.x, height: pixels.y, format: .bgra8UnormSRGB, usage: .colorTarget,
-                    sampleCount: Int(settings.samples), label: "ui-multisample",
-                    transientAttachment: transient))
-            }
-            if !samplesFrame { framebuffer = nil }
-            else if framebuffer?.descriptor.width != pixels.x || framebuffer?.descriptor.height != pixels.y {
+            // Resolved history serves every frame. Effects never promote the
+            // raster workspace into a persistent full-frame MSAA allocation.
+            if framebuffer?.descriptor.width != pixels.x || framebuffer?.descriptor.height != pixels.y {
                 framebuffer = try TextureResource(device: device, descriptor: TextureDescriptor(
                     width: pixels.x, height: pixels.y, format: .bgra8UnormSRGB,
                     usage: [.colorTarget, .sampled], label: "ui-framebuffer"))
             }
-            let surface = samplesFrame ? framebuffer?.texture ?? image.texture : image.texture
-            var target = RenderColorTarget(texture: multisample?.texture ?? surface,
-                loadAction: .clear(clear), store: multisample == nil || samplesFrame)
-            target.resolveTexture = multisample == nil ? nil : surface
+            guard let framebuffer else { return false }
             let commands = CommandBuffer()
-            let frame = try renderer.record(list: list, into: commands, target: target,
-                viewport: NativeUIViewport(pixels: pixels, logical: logical),
-                backdropSource: samplesFrame ? framebuffer?.texture : nil)
-            if samplesFrame, let source = framebuffer?.texture {
-                let present = RenderColorTarget(texture: image.texture, loadAction: .dontCare, store: true)
-                try renderer.recordBlit(source: source, into: commands, target: present, size: pixels)
-            }
+            let frame = try renderer.recordPresentation(list: list, into: commands, output: framebuffer.texture,
+                viewport: NativeUIViewport(pixels: pixels, logical: logical), clear: clear)
+            let present = RenderColorTarget(texture: image.texture, loadAction: .dontCare, store: true)
+            try renderer.recordBlit(source: framebuffer.texture, into: commands, target: present, size: pixels)
             try device.submit(commands)
             frame.didSubmit()
             try device.present(image)
@@ -125,7 +97,7 @@ final class NativeAppWindowRenderer: AppWindowRenderer {
             if native != nil { state = active ? .active : .suspended }
             if !active {
                 // close waits for in-flight work before dropping attachment ownership.
-                defer { swapchain = nil; multisample = nil; framebuffer = nil; renderer.trimPresentationResources() }
+                defer { swapchain = nil; framebuffer = nil; renderer.trimPresentationResources() }
                 try swapchain?.close()
             }
         }
@@ -134,7 +106,7 @@ final class NativeAppWindowRenderer: AppWindowRenderer {
     func close() throws {
         try device.withFrameSession {
             defer {
-                swapchain = nil; native = nil; multisample = nil; framebuffer = nil; size = .zero; state = .closed
+                swapchain = nil; native = nil; framebuffer = nil; size = .zero; state = .closed
                 renderer.trimPresentationResources()
             }
             try swapchain?.close()

@@ -38,7 +38,7 @@ final class VulkanMemoryBlock {
 final class VulkanMemoryAllocator {
     private let context: VulkanContext
     private let memoryProperties: VkPhysicalDeviceMemoryProperties
-    private var blocks: [VulkanMemoryBlock] = []
+    private var blocks: [VulkanMemoryBlock?] = []
     private let blockSize: VkDeviceSize = 64 * 1024 * 1024
 
     init(context: VulkanContext,
@@ -67,24 +67,27 @@ final class VulkanMemoryAllocator {
     func allocate(size: VkDeviceSize,
                   alignment: VkDeviceSize,
                   memoryTypeBits: UInt32,
-                  requiredFlags: VkMemoryPropertyFlags) throws -> VulkanMemoryAllocation {
+                  requiredFlags: VkMemoryPropertyFlags,
+                  preferredFlags: VkMemoryPropertyFlags = 0,
+                  dedicated: Bool = false) throws -> VulkanMemoryAllocation {
         // Buffer/image granularity is an allocation boundary invariant when
         // linear buffers and optimal images share one VkDeviceMemory block.
         let granularity = max(1, context.limits.bufferImageGranularity)
         let alignment = max(alignment, granularity)
         let size = align(offset: size, alignment: granularity)
-        guard let typeIndex = findMemoryType(memoryTypeBits: memoryTypeBits,
-                                             requiredFlags: requiredFlags) else {
+        guard let typeIndex = findMemoryType(memoryTypeBits: memoryTypeBits, requiredFlags: requiredFlags | preferredFlags)
+            ?? findMemoryType(memoryTypeBits: memoryTypeBits, requiredFlags: requiredFlags) else {
             throw RHIError.outOfMemory
         }
         // Best-fit over existing blocks of this type.
-        for (blockIndex, block) in blocks.enumerated() where block.memoryTypeIndex == typeIndex {
+        for (blockIndex, candidate) in blocks.enumerated() {
+            guard let block = candidate, block.memoryTypeIndex == typeIndex else { continue }
             if let region = findFreeRegion(block: block, size: size, alignment: alignment) {
                 return commit(blockIndex: blockIndex, block: block, region: region, size: size)
             }
         }
         // Otherwise grow a fresh block.
-        let blockSize = max(self.blockSize, align(offset: size, alignment: alignment))
+        let blockSize = max(dedicated ? 0 : self.blockSize, align(offset: size, alignment: alignment))
         var properties = memoryProperties
         let coherent = withUnsafePointer(to: &properties.memoryTypes) { raw in
             let flags = UnsafeRawPointer(raw).assumingMemoryBound(to: VkMemoryType.self)[Int(typeIndex)].propertyFlags
@@ -92,8 +95,8 @@ final class VulkanMemoryAllocator {
             return flags & required == required
         }
         let block = try createBlock(size: blockSize, typeIndex: typeIndex, hostVisible: coherent)
-        blocks.append(block)
-        let blockIndex = blocks.count - 1
+        let blockIndex = blocks.firstIndex(where: { $0 == nil }) ?? blocks.count
+        if blockIndex == blocks.count { blocks.append(block) } else { blocks[blockIndex] = block }
         guard let region = findFreeRegion(block: block, size: size, alignment: alignment) else {
             throw RHIError.outOfMemory
         }
@@ -102,7 +105,7 @@ final class VulkanMemoryAllocator {
 
     func free(_ allocation: VulkanMemoryAllocation) {
         guard allocation.blockIndex < blocks.count else { return }
-        let block = blocks[allocation.blockIndex]
+        guard let block = blocks[allocation.blockIndex] else { return }
         block.freeRegions.append((allocation.offset, allocation.size))
         block.freeRegions.sort { $0.offset < $1.offset }
         var merged: [(offset: VkDeviceSize, size: VkDeviceSize)] = []
@@ -111,11 +114,18 @@ final class VulkanMemoryAllocator {
             else { merged.append(region) }
         }
         block.freeRegions = merged
+        // Retired presentation images must actually return empty allocations;
+        // retaining every grown block defeats window suspension and resizing.
+        if merged.count == 1, merged[0].offset == 0, merged[0].size == block.size {
+            if block.mappedBase != nil { context.core.unmapMemory(context.device, block.memory) }
+            context.core.freeMemory(context.device, block.memory, nil)
+            blocks[allocation.blockIndex] = nil
+        }
     }
 
     /// Unmaps and frees every block. Call only after the device is idle.
     func destroyAll() {
-        for block in blocks {
+        for block in blocks.compactMap({ $0 }) {
             if block.mappedBase != nil {
                 context.core.unmapMemory(context.device, block.memory)
             }

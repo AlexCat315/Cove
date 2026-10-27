@@ -8,8 +8,8 @@ retain 4x coverage using transient tile storage. This setting does not change Di
 
 ## Measurement
 
-Apple M1 (MacBookAir10,1), macOS 27.0.1, Metal; debug host build, precompiled UI
-shaders, GPU validation disabled. The logical scene is 512 × 320, with 1x and 2x
+Apple M1 (MacBookAir10,1), macOS 27.0.1, Metal; debug host build, bundled Slang-generated MSL
+shaders (compiled and warmed before sampling), GPU validation disabled. The logical scene is 512 × 320, with 1x and 2x
 physical scale. Each configuration warms up four frames, then records thirty
 frames with a GPU idle between submissions. GPU time is the completed Metal
 command buffer's `gpuEndTime - gpuStartTime`, excluding CPU encoding and queue
@@ -57,12 +57,45 @@ image and drawable pools still need memory. The probe's resolved triangle images
 were identical. [Raw allocation result](evaluations/msaa-metal-m1-2026-10-27/allocation-4k.json).
 Apple documents [memoryless attachment storage](https://developer.apple.com/documentation/metal/choosing-a-resource-storage-mode-for-apple-gpus).
 
-Cove selects this path for ordinary single-pass windows on supported Apple GPUs.
-Frosted backdrops and reveals reload earlier samples across render passes, so
-those frames retain private attachments and switch back when the frame simplifies.
-The sample count, resolution, geometry and shaders stay unchanged. Other backends
-fall back to their existing device-local allocation until they implement transient
-backing; they must not report unknown allocation as zero.
+Window presentation now keeps **resolved single-sample history** for every frame.
+Before each frosted panel, the renderer replays the required prefix, including
+previous frosted composites, and resolves it. Only each panel's small blurred
+capture survives until the final raster pass. The reveal overlay is drawn inside
+that final pass. No window effect loads or preserves MSAA samples between passes.
+Replay adds geometry work for each backdrop dependency; the earlier timing table
+measures the simple scene and does not measure this additional work.
+
+The reusable MSAA workspace has a **16 MiB logical backing budget** when the
+backend needs device memory. Large windows render integer-aligned horizontal
+strips with the original full-frame viewport and sample positions; each strip
+resolves before being copied to its single-sample destination. A 4K BGRA8 4x
+window uses 3840 × 273 samples (**15.996 MiB**) plus a 3.999 MiB strip resolve,
+instead of a 126.6 MiB full-frame sample image. Backend alignment can add padding.
+This policy is shared by Metal, Vulkan and DX12 and applies equally to ordinary
+content, frost and reveals. Hardware reporting actual memoryless storage may
+rasterize the whole frame without persistent sample backing.
+
+Vulkan transient images use TRANSIENT_ATTACHMENT without transfer flags and
+prefer LAZILY_ALLOCATED memory when available. Other adapters use device-local
+memory within the same bounded workspace. Empty Vulkan memory blocks are freed
+after their resources retire, instead of remaining resident after suspension.
+DX12 uses the bounded workspace and reports resource allocation size; it has no
+portable zero-backing MSAA guarantee. Unknown allocation stays unknown.
+
+A 4K resolved BGRA8 image still costs about **31.6 MiB**. An active reveal needs
+one additional retained image; exact prior-frame transitions cannot work without
+retaining or reconstructing that information. Drawable pools, in-flight resources
+and scene textures remain additional costs. This removes the large per-window
+MSAA allocation, not all memory used by the application.
+
+The overlapping-frost check compares complete 4x and private-storage strips at
+both scales: their output is byte-identical. The old path differed only inside
+the second, smaller panel because it reused oversized blur scratch with a
+smaller UV footprint; capture-sized textures correct that mismatch. Initial
+reveal, progress, reversal, finish and clearing also pass for single-sample,
+full memoryless 4x and private strip 4x paths. The checks ran on Metal; private
+strips exercise the storage policy needed by other backends, without claiming
+physical Vulkan/DX12 GPU validation. [Effect results](evaluations/msaa-metal-m1-2026-10-27/effect-replay.json).
 
 Window snapshots and DevTools distinguish logical target capacity from
 `msaaAllocatedBytes` and `msaaMemoryless`. Allocation describes the current texture,

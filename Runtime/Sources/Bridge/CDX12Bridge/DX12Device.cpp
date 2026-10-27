@@ -100,11 +100,21 @@ int32_t grhi_dx12_texture(GRHI_DX12Device* d, uint32_t id, const GRHI_TextureDes
     if (desc->usage & (1 << 1)) native.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
     if (desc->usage & (1 << 2)) { native.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL; native.Format = desc->format == GRHI_FORMAT_DEPTH32 ? DXGI_FORMAT_R32_TYPELESS : DXGI_FORMAT_R24G8_TYPELESS; }
     if (desc->usage & (1 << 4)) native.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+    if (desc->samples > 1) native.Flags |= D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE;
     D3D12_HEAP_PROPERTIES props{}; props.Type = D3D12_HEAP_TYPE_DEFAULT;
     check(s.device->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &native, r.state, nullptr, IID_PPV_ARGS(&r.native)), "CreateCommittedResource texture");
     if (desc->usage & (1 << 1)) { r.view = s.rtvs.allocate(); s.device->CreateRenderTargetView(r.native.Get(), nullptr, s.rtvs.cpu(r.view)); }
     else if (desc->usage & (1 << 2)) { r.view = s.dsvs.allocate(); D3D12_DEPTH_STENCIL_VIEW_DESC view{}; view.Format = format(desc->format); view.ViewDimension = desc->samples > 1 ? D3D12_DSV_DIMENSION_TEXTURE2DMS : D3D12_DSV_DIMENSION_TEXTURE2D; s.device->CreateDepthStencilView(r.native.Get(), &view, s.dsvs.cpu(r.view)); }
     s.textures.emplace(id, std::move(r)); }); }
+uint64_t grhi_dx12_texture_allocation(GRHI_DX12Device* d, uint32_t id) {
+    if (!d) return 0;
+    std::lock_guard<std::mutex> lock(d->state->mutex);
+    auto& s = *d->state;
+    auto found = s.textures.find(id);
+    if (found == s.textures.end()) return 0;
+    auto desc = found->second.native->GetDesc();
+    return s.device->GetResourceAllocationInfo(0, 1, &desc).SizeInBytes;
+}
 int32_t grhi_dx12_sampler(GRHI_DX12Device* d, uint32_t id, const GRHI_SamplerDesc* desc) { return run(d, [&](State& s) {
     D3D12_SAMPLER_DESC result{};
     result.Filter = D3D12_ENCODE_BASIC_FILTER(desc->min_filter ? D3D12_FILTER_TYPE_LINEAR : D3D12_FILTER_TYPE_POINT, desc->mag_filter ? D3D12_FILTER_TYPE_LINEAR : D3D12_FILTER_TYPE_POINT, desc->mip_filter ? D3D12_FILTER_TYPE_LINEAR : D3D12_FILTER_TYPE_POINT, desc->compare_enabled ? D3D12_FILTER_REDUCTION_TYPE_COMPARISON : D3D12_FILTER_REDUCTION_TYPE_STANDARD);

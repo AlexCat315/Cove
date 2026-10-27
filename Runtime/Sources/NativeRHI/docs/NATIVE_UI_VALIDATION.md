@@ -246,7 +246,7 @@ CoveUI 全包回归通过，随后修改的数组计数读取经 Release 的 11 
 
 ```sh
 swift build --package-path Editor --jobs 4
-swift build --package-path CoveMcp --product CoveMCP
+./cove internal build-package DiffuseMCP --product DiffuseMCP
 swift run --package-path Tools/Developer cove-dev validate editor-loop --renderer both
 # 默认检查两种循环；--mode event-driven / continuous 可单独检查。
 # 临时目录保留每条路径的启动／暂停 JPEG、渲染状态、比较报告和日志。

@@ -14,6 +14,7 @@ struct VulkanBufferRecord {
 }
 
 struct VulkanTextureRecord {
+    var transientAttachment = false
     var sampleCount: Int = 1
     var attachmentView: VkImageView? = nil
     let image: VkImage

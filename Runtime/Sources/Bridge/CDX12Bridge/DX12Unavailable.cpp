@@ -8,6 +8,7 @@ const char* grhi_dx12_name(GRHI_DX12Device*) { return "DirectX 12 requires Windo
 GRHI_DX12Capabilities grhi_dx12_capabilities(GRHI_DX12Device*) { return {}; }
 int32_t grhi_dx12_buffer(GRHI_DX12Device*, uint32_t id, uint64_t size, uint32_t usage, uint32_t upload) { return 0; }
 int32_t grhi_dx12_texture(GRHI_DX12Device*, uint32_t id, const GRHI_TextureDesc*) { return 0; }
+uint64_t grhi_dx12_texture_allocation(GRHI_DX12Device*, uint32_t) { return 0; }
 int32_t grhi_dx12_sampler(GRHI_DX12Device*, uint32_t id, const GRHI_SamplerDesc*) { return 0; }
 int32_t grhi_dx12_shader(GRHI_DX12Device*, uint32_t id, uint32_t stage, const void* bytes, size_t count) { return 0; }
 int32_t grhi_dx12_binding_layout(GRHI_DX12Device*, uint32_t id, const GRHI_BindingDecl*, size_t count) { return 0; }

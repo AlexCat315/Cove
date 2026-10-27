@@ -236,7 +236,15 @@ extension VulkanBackend {
     }
 
     private func renderPassSignature(_ pass: RenderPassDescriptor) throws -> RenderPassSignature<VkFormat> {
-        try rhiRenderPassSignature(pass) { handle in
+        for target in pass.colorTargets where registries.textures[target.texture.id]?.transientAttachment == true {
+            if case .load = target.loadAction { throw RHIError.invalidArgument("transient color attachments cannot load prior contents") }
+            try rhiRequire(!target.store, "transient color attachments cannot preserve samples")
+        }
+        if let target = pass.depthTarget, registries.textures[target.texture.id]?.transientAttachment == true {
+            if case .load = target.loadAction { throw RHIError.invalidArgument("transient depth attachments cannot load prior contents") }
+            try rhiRequire(!target.store, "transient depth attachments cannot preserve contents")
+        }
+        return try rhiRenderPassSignature(pass) { handle in
             guard let texture = registries.textures[handle.id] else { throw RHIError.invalidArgument("unknown render attachment") }
             var info = RenderTextureInfo(extent: SIMD2(texture.width, texture.height), sampleCount: texture.sampleCount,
                 format: VulkanFormats.vkFormat(texture.format), usage: texture.usage,

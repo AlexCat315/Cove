@@ -65,9 +65,10 @@ caches include this mode. Offscreen HUD and Android drawing select analytic mask
 Desktop defaults remain 4x MSAA: custom triangle meshes do not automatically carry
 boundary coverage. The [Metal evaluation](msaa-evaluation.md) measures GPU time,
 attachment storage and edge error; its custom-triangle result supports retaining
-4x globally until those boundaries and other backends are covered. Ordinary
-Apple-GPU window frames use transient 4x attachments; backdrop/reveal frames
-preserve samples across passes. DevTools reports logical capacity and backend
+4x globally until those boundaries and other backends are covered. All window frames retain resolved history and discard MSAA samples after each
+pass. Frost replays resolved prefixes and reveals composite inside the final
+raster pass. A shared 16 MiB workspace budget bounds MSAA backing on Metal,
+Vulkan and DX12; true memoryless hardware can keep full-frame samples on chip. DevTools reports logical capacity and backend
 MSAA allocation separately.
 
 Decoded images build alpha-weighted mip pyramids, including odd edge pixels.

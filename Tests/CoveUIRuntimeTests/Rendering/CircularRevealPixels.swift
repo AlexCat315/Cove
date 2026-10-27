@@ -6,11 +6,14 @@ import Testing
 
 @Suite("Circular reveal pixels", .serialized)
 struct CircularRevealPixelTests {
-    @Test("The first frame holds the old theme, the new theme grows from the origin, and a reversal retains the mixed frame", arguments: [1, 2])
-    func revealAndReverse(scale: Int) throws {
+    @Test("The first frame holds the old theme, the new theme grows from the origin, and a reversal retains the mixed frame", arguments: [1, 2], [1, 4, 0])
+    func revealAndReverse(scale: Int, mode: Int) throws {
         let context = try NativeUIDrawTestContext()
         let viewport = NativeUIViewport(pixels: SIMD2(64 * scale, 64 * scale), logical: SIMD2(64, 64))
         let output = try context.nativeOutput(format: .bgra8Unorm, size: viewport.pixels)
+        try context.native.configure(format: .bgra8Unorm, sampleCount: mode == 1 ? 1 : 4)
+        let raster = mode == 0 ? try NativeUIRasterWorkspace(device: context.device, pixels: viewport.pixels,
+            format: .bgra8Unorm, samples: 4, budget: viewport.pixels.x * 4 * 4 * 13, preferMemoryless: false) : nil
         func render(_ color: Color, reveal: UIReveal? = nil) throws -> Data {
             let list = DrawList()
             list.addRect(UIRect(x: 0, y: 0, width: 64, height: 64), color: color)
@@ -18,9 +21,19 @@ struct CircularRevealPixelTests {
             try context.device.beginFrame()
             do {
                 let commands = CommandBuffer()
-                let frame = try context.native.record(list: list, into: commands,
-                    target: RenderColorTarget(texture: output.texture, loadAction: .clear(.zero), store: true),
-                    viewport: viewport, backdropSource: output.texture)
+                let frame: NativeUIDrawFrame
+                if mode == 4 {
+                    frame = try context.native.recordPresentation(list: list, into: commands, output: output.texture,
+                        viewport: viewport, clear: .zero)
+                    #if arch(arm64)
+                    #expect(context.native.presentationMSAAMemoryless)
+                    #expect(context.native.presentationMSAAAllocatedBytes == 0)
+                    #endif
+                } else {
+                    frame = try context.native.record(list: list, into: commands,
+                        target: RenderColorTarget(texture: output.texture, loadAction: .clear(.zero), store: true),
+                        viewport: viewport, backdropSource: output.texture, raster: raster)
+                }
                 try context.device.submit(commands); frame.didSubmit()
                 context.device.endFrame()
                 try context.device.waitUntilIdle()

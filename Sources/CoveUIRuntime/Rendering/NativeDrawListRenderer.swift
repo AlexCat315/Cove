@@ -64,13 +64,13 @@ private struct NativeUIBatch {
 public final class NativeDrawListRenderer {
     private let device: Device
     private let shaders: NativeUIShaderResources
-    /// Optional: a backend without the offline backdrop artifact (DXIL is not
-    /// generated here yet) keeps every panel, they just lose the frost.
+    /// Shared program for resolved-frame copies, frost and reveal compositing.
     private let backdropShaders: NativeUIBackdropShaders?
     let textureStore: NativeUITextureStore
     private var geometry: NativeUIGeometry?
     private var pipeline: NativeUIPipeline?
     private var backdropPass: NativeUIBackdropPass?
+    private var rasterWorkspace: NativeUIRasterWorkspace?
     /// Pipelines are retained per attachment state. Switching windows or
     /// reconfiguring must not destroy and recompile a state that was already
     /// warmed; the device also interns identical descriptors across renderers.
@@ -98,7 +98,7 @@ public final class NativeDrawListRenderer {
     public init(device: Device) throws {
         self.device = device
         shaders = try NativeUIShaderResources(device: device)
-        backdropShaders = try? NativeUIBackdropShaders(device: device)
+        backdropShaders = try NativeUIBackdropShaders(device: device)
         textureStore = try NativeUITextureStore(device: device, shaders: shaders)
     }
     private init(device: Device, shaders: NativeUIShaderResources,
@@ -127,6 +127,8 @@ public final class NativeDrawListRenderer {
         pipeline = selectedPipeline
         backdropPass = selectedBackdrop
         configuredState = key
+        rasterWorkspace = nil
+        for (otherKey, pass) in backdropPasses where otherKey != key { pass.trimScratch() }
         retainedReveal = nil
         lastFrameExtent = nil
     }
@@ -149,8 +151,15 @@ public final class NativeDrawListRenderer {
     }
 
     public var estimatedPresentationTextureBytes: Int {
-        backdropPasses.values.reduce(0) { $0 + $1.estimatedScratchBytes }
+        backdropPasses.values.reduce(0) { $0 + $1.estimatedScratchBytes } + (rasterWorkspace?.estimatedBytes ?? 0)
     }
+
+    public var presentationMSAALogicalBytes: Int { rasterWorkspace?.logicalBytes ?? 0 }
+    public var presentationMSAAAllocatedBytes: Int? {
+        guard let rasterWorkspace else { return 0 }
+        return rasterWorkspace.allocatedBytes
+    }
+    public var presentationMSAAMemoryless: Bool { rasterWorkspace?.memoryless ?? false }
 
     /// Drops derived per-presentation resources, keeping shared texture uploads
     /// and warmed pipelines. A resumed reveal needs a fresh previous frame.
@@ -158,19 +167,19 @@ public final class NativeDrawListRenderer {
         geometry = nil
         retainedReveal = nil
         lastFrameExtent = nil
+        rasterWorkspace = nil
         for pass in backdropPasses.values { pass.trimScratch() }
     }
 
-    /// Whether frosted panels can be drawn: false on a backend whose offline
-    /// backdrop artifact is missing. Panels still render, without the frost.
+    /// Whether the renderer has configured its backdrop/compositing pipeline.
     public var supportsBackdrop: Bool { backdropPass != nil }
 
     /// Hands an owned frame to the swapchain, which is a render target only and
-    /// must never be sampled by a backdrop. No-op without `supportsBackdrop`;
-    /// a caller that switched its frame into an owned texture must branch on it.
+    /// must never be sampled by a backdrop.
     public func recordBlit(source: Texture, into commands: CommandBuffer,
                            target: RenderColorTarget, size: SIMD2<Int>) throws {
-        try backdropPass?.recordBlit(source: source, into: commands, target: target, size: size)
+        guard let backdropPass else { throw RHIError.invalidArgument("configure the renderer before recording a blit") }
+        try backdropPass.recordBlit(source: source, into: commands, target: target, size: size)
     }
 
     public func synchronizeTextures(from source: NativeDrawListRenderer) throws {
@@ -194,6 +203,33 @@ public final class NativeDrawListRenderer {
     ///   blur needs to sample the frame, and a swapchain image cannot be.
     public func record(list: DrawList, into commands: CommandBuffer, target: RenderColorTarget,
         viewport: NativeUIViewport, backdropSource: Texture? = nil) throws -> NativeUIDrawFrame {
+        try record(list: list, into: commands, target: target, viewport: viewport,
+            backdropSource: backdropSource, raster: nil)
+    }
+
+    /// Complete window frame, retaining only resolved history between passes.
+    /// The same memory budget applies to ordinary content, frost and reveals.
+    public func recordPresentation(list: DrawList, into commands: CommandBuffer, output: Texture,
+        viewport: NativeUIViewport, clear: SIMD4<Float>, msaaBudgetBytes: Int = 16 * 1024 * 1024) throws -> NativeUIDrawFrame {
+        guard let pipeline, backdropPass != nil else {
+            throw RHIError.unsupportedFeature("presentation requires the UI and backdrop shader artifacts")
+        }
+        try viewport.validate()
+        guard msaaBudgetBytes >= viewport.pixels.x * (pipeline.format == .rgba16Float ? 8 : 4) * pipeline.samples else {
+            throw RHIError.invalidArgument("MSAA budget must fit at least one pixel row")
+        }
+        if rasterWorkspace?.pixels != viewport.pixels || rasterWorkspace?.format != pipeline.format
+            || rasterWorkspace?.samples != pipeline.samples || rasterWorkspace?.budget != msaaBudgetBytes {
+            rasterWorkspace = try NativeUIRasterWorkspace(device: device, pixels: viewport.pixels,
+                format: pipeline.format, samples: pipeline.samples, budget: msaaBudgetBytes)
+        }
+        return try record(list: list, into: commands,
+            target: RenderColorTarget(texture: output, loadAction: .clear(clear), store: true),
+            viewport: viewport, backdropSource: output, raster: rasterWorkspace)
+    }
+
+    func record(list: DrawList, into commands: CommandBuffer, target: RenderColorTarget,
+        viewport: NativeUIViewport, backdropSource: Texture?, raster: NativeUIRasterWorkspace?) throws -> NativeUIDrawFrame {
         guard let pipeline else { throw RHIError.invalidArgument("configure the native UI renderer before recording") }
         try viewport.validate()
         if geometry?.matches(list) != true { geometry = try NativeUIGeometry(validating: list) }
@@ -273,47 +309,40 @@ public final class NativeDrawListRenderer {
         let coalesced = coalesceDraws(draws)
         // Append only after all validation, allocations and bindings succeed.
         if !uploads.isEmpty { commands.copyPass { pass in uploads.forEach { pass.uploadBufferToTexture($0) } } }
-        // A frosted panel cannot be drawn in the same pass that captures its
-        // backdrop, so the frame is recorded as segments split around them.
-        var segmentTarget = target
-        if backdropPass != nil, backdropSource != nil,
-           list.reveal != nil || coalesced.contains(where: { $0.backdrop != nil }) {
-            segmentTarget.store = true
-        }
-        var segmentStart = 0
-        var pending: NativeUIBackdropComposite?
-        var frosted = 0
+        // Build dependencies from resolved prefixes. Every raster pass starts
+        // from the same clear and discards its samples after resolve; no effect
+        // requires loading or retaining a full multisample image between passes.
+        backdropPass?.beginCaptures()
+        var composites: [Int: NativeUIBackdropComposite] = [:]
+        var drawCalls = 0
         for (index, draw) in coalesced.enumerated() {
-            guard let backdrop = draw.backdrop, let backdropPass, let backdropSource else { continue }
-            try recordSegment(coalesced[segmentStart..<index], composite: pending,
-                loadAction: segmentStart == 0 ? target.loadAction : .load, isFirst: segmentStart == 0,
-                into: commands, target: segmentTarget, viewport: viewport, pipeline: pipeline,
-                vertices: vertices, indices: indices, backdropPass: backdropPass)
-            segmentStart = index
-            pending = try backdropPass.record(backdrop, source: backdropSource,
-                frame: viewport.pixels, logical: viewport.logical, into: commands)
-            if pending != nil { frosted += 1 }
-        }
-        try recordSegment(coalesced[segmentStart...], composite: pending,
-            loadAction: segmentStart == 0 ? target.loadAction : .load, isFirst: segmentStart == 0,
-            into: commands, target: segmentTarget, viewport: viewport, pipeline: pipeline,
-            vertices: vertices, indices: indices, backdropPass: backdropPass)
-        // Last, so the reveal covers everything the new frame drew — including
-        // any frosted panel that opened in the same frame.
-        if let backdropPass, let retained, let reveal = list.reveal {
-            var compositeTarget = target
-            compositeTarget.loadAction = .load
-            compositeTarget.store = true
-            try commands.renderPass(
-                descriptor: RenderPassDescriptor(colorTargets: [compositeTarget], label: "ui-reveal")) { pass in
-                try backdropPass.drawReveal(reveal, source: retained, viewport: viewport, in: &pass)
+            guard let backdrop = draw.backdrop, backdrop.opacity > 0, let backdropPass, let backdropSource else { continue }
+            if case .load = target.loadAction {
+                throw RHIError.invalidArgument("backdrop replay requires a complete frame with clear or dontCare load")
+            }
+            var captureTarget = target
+            captureTarget.store = pipeline.samples == 1 || raster != nil
+            if pipeline.samples > 1 && raster == nil { captureTarget.resolveTexture = backdropSource }
+            else { captureTarget.texture = backdropSource }
+            drawCalls += try recordContent(coalesced.prefix(index), composites: composites,
+                into: commands, target: captureTarget, viewport: viewport, pipeline: pipeline,
+                vertices: vertices, indices: indices, backdropPass: backdropPass, raster: raster)
+            if let composite = try backdropPass.record(backdrop, source: backdropSource,
+                frame: viewport.pixels, logical: viewport.logical, into: commands) {
+                composites[index] = composite
+                drawCalls += 3
             }
         }
-        statistics.drawCalls = coalesced.count + frosted + (retained == nil ? 0 : 1)
+        drawCalls += try recordContent(coalesced[...], composites: composites,
+            into: commands, target: target, viewport: viewport, pipeline: pipeline,
+            vertices: vertices, indices: indices, backdropPass: backdropPass, raster: raster,
+            reveal: retained.flatMap { texture in list.reveal.map { ($0, texture) } })
+        statistics.drawCalls = drawCalls
         var frame = NativeUIDrawFrame(statistics: statistics, pipeline: pipeline, textures: slots, commits: commits,
             atlasCommit: atlasUploads.sequence == 0 ? nil
                 : NativeUIAtlasCommit(store: textureStore, sequence: atlasUploads.sequence))
         frame.presentationCommit = { [weak self] in
+            self?.backdropPass?.finishCaptures()
             self?.retainedReveal = nextReveal
             self?.lastFrameExtent = extent
             if nextReveal == nil { self?.backdropPass?.clearRevealCapture() }
@@ -321,45 +350,86 @@ public final class NativeDrawListRenderer {
         return frame
     }
 
-    /// One slice of the frame between two backdrop captures.
-    private func recordSegment(_ draws: ArraySlice<NativeUIBatch>,
-        composite: NativeUIBackdropComposite?, loadAction: ColorLoadAction, isFirst: Bool,
+    /// A complete frame/prefix is one raster pass, including its composites.
+    private func recordContent(_ draws: ArraySlice<NativeUIBatch>,
+        composites: [Int: NativeUIBackdropComposite],
         into commands: CommandBuffer, target: RenderColorTarget, viewport: NativeUIViewport,
         pipeline: NativeUIPipeline, vertices: UploadLocation?, indices: UploadLocation?,
-        backdropPass: NativeUIBackdropPass?) throws {
-        // The first segment runs even with nothing to draw: it carries the
-        // clear, and an empty frame still has to show the clear colour.
-        guard composite != nil || !draws.isEmpty || isFirst else { return }
-        var colorTarget = target
-        colorTarget.loadAction = loadAction
-        // The caller preserves samples only when a later segment reloads them.
-        // A single-pass frame may resolve directly from transient tile storage.
-        try commands.renderPass(descriptor: RenderPassDescriptor(colorTargets: [colorTarget], label: "ui-segment")) { pass in
-            pass.setViewport(Viewport(width: Double(viewport.pixels.x), height: Double(viewport.pixels.y)))
-            if let composite, let backdropPass {
-                try backdropPass.draw(composite, in: &pass)
+        backdropPass: NativeUIBackdropPass?, raster: NativeUIRasterWorkspace?,
+        reveal: (UIReveal, Texture)? = nil) throws -> Int {
+        guard let raster else {
+            return try recordRasterPass(draws, composites: composites, into: commands, target: target,
+                viewport: viewport, pipeline: pipeline, vertices: vertices, indices: indices,
+                backdropPass: backdropPass, reveal: reveal)
+        }
+        var drawCalls = 0
+        for y in stride(from: 0, to: viewport.pixels.y, by: raster.stripHeight) {
+            let height = min(raster.stripHeight, viewport.pixels.y - y)
+            drawCalls += try recordRasterPass(draws, composites: composites, into: commands,
+                target: raster.target(output: target.texture, load: target.loadAction),
+                viewport: viewport, pipeline: pipeline, vertices: vertices, indices: indices,
+                backdropPass: backdropPass, reveal: reveal, stripY: y, stripHeight: height)
+            if let strip = raster.strip, let backdropPass {
+                let destination = RenderColorTarget(texture: target.texture,
+                    loadAction: y == 0 ? target.loadAction : .load, store: true)
+                try backdropPass.recordStrip(source: strip.texture, target: destination, frame: viewport.pixels,
+                    y: y, height: height, sourceHeight: raster.stripHeight, into: commands)
+                drawCalls += 1
             }
-            guard let vertices, let indices, !draws.isEmpty else { return }
-            pass.setPipeline(pipeline.handle)
-            pass.setVertexBuffer(vertices.buffer, offset: vertices.offset)
-            pass.setIndexBuffer(indices.buffer, offset: indices.offset, type: .uint32)
-            // Constants belong to this recording. Image bindings have no
-            // frame-dependent buffers and can hit the Device's cache even
-            // as upload chunks, viewports and target formats change.
-            pass.pushConstant(stage: .vertex, slot: shaders.constants.slot,
-                value: SIMD4(viewport.logical.x, viewport.logical.y, pipeline.srgb, Float(0)))
+        }
+        return drawCalls
+    }
+
+    private func recordRasterPass(_ draws: ArraySlice<NativeUIBatch>,
+        composites: [Int: NativeUIBackdropComposite],
+        into commands: CommandBuffer, target: RenderColorTarget, viewport: NativeUIViewport,
+        pipeline: NativeUIPipeline, vertices: UploadLocation?, indices: UploadLocation?,
+        backdropPass: NativeUIBackdropPass?, reveal: (UIReveal, Texture)? = nil,
+        stripY: Int = 0, stripHeight: Int? = nil) throws -> Int {
+        try commands.renderPass(descriptor: RenderPassDescriptor(colorTargets: [target], label: "ui-frame")) { pass in
+            let height = stripHeight ?? viewport.pixels.y
+            let renderViewport = Viewport(y: -Double(stripY), width: Double(viewport.pixels.x), height: Double(viewport.pixels.y))
+            pass.setViewport(renderViewport)
+            let fullScissor = ScissorRect(width: viewport.pixels.x, height: height)
+            func bindGeometry(_ pass: inout RenderPassEncoder) {
+                pass.setPipeline(pipeline.handle)
+                if let vertices { pass.setVertexBuffer(vertices.buffer, offset: vertices.offset) }
+                if let indices { pass.setIndexBuffer(indices.buffer, offset: indices.offset, type: .uint32) }
+                pass.pushConstant(stage: .vertex, slot: shaders.constants.slot,
+                    value: SIMD4(viewport.logical.x, viewport.logical.y, pipeline.srgb, Float(0)))
+            }
+            bindGeometry(&pass)
             var boundSet: BindingSet?
             var scissor: ScissorRect?
-            for draw in draws {
+            for index in draws.indices {
+                let draw = draws[index]
+                if let composite = composites[index], let backdropPass {
+                    pass.setScissor(fullScissor)
+                    try backdropPass.draw(composite, in: &pass)
+                    bindGeometry(&pass)
+                    boundSet = nil; scissor = nil
+                }
+                guard vertices != nil, indices != nil else { continue }
+                let minY = max(draw.scissor.y, stripY)
+                let maxY = min(draw.scissor.y + draw.scissor.height, stripY + height)
+                guard maxY > minY else { continue }
+                let drawScissor = ScissorRect(x: draw.scissor.x, y: minY - stripY,
+                    width: draw.scissor.width, height: maxY - minY)
                 if boundSet != draw.bindings {
                     pass.setBindingSet(draw.bindings); boundSet = draw.bindings
                 }
-                if scissor != draw.scissor {
-                    pass.setScissor(draw.scissor); scissor = draw.scissor
+                if scissor != drawScissor {
+                    pass.setScissor(drawScissor); scissor = drawScissor
                 }
                 pass.drawIndexed(DrawIndexedArguments(indexCount: Int(draw.indices.indexCount), firstIndex: Int(draw.indices.indexOffset)))
             }
+            if let (request, texture) = reveal, let backdropPass {
+                pass.setScissor(fullScissor)
+                try backdropPass.drawReveal(request, source: texture, viewport: viewport,
+                    renderViewport: renderViewport, in: &pass)
+            }
         }
+        return draws.count + draws.indices.filter { composites[$0] != nil }.count + (reveal == nil ? 0 : 1)
     }
 
     /// Merge consecutive draws that bind the same set into one draw covering

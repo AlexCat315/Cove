@@ -57,6 +57,14 @@ extension DX12Device {
         consumed = true
     }
     private func beginRender(_ encoder: OpaquePointer, descriptor: RenderPassDescriptor) throws {
+        for target in descriptor.colorTargets where resources.textures[target.texture.id]?.transientAttachment == true {
+            if case .load = target.loadAction { throw RHIError.invalidArgument("transient color attachments cannot load prior contents") }
+            try rhiRequire(!target.store, "transient color attachments cannot preserve samples")
+        }
+        if let target = descriptor.depthTarget, resources.textures[target.texture.id]?.transientAttachment == true {
+            if case .load = target.loadAction { throw RHIError.invalidArgument("transient depth attachments cannot load prior contents") }
+            try rhiRequire(!target.store, "transient depth attachments cannot preserve contents")
+        }
         let colors = descriptor.colorTargets.map { c -> GRHI_RenderColor in
             var result = GRHI_RenderColor(); result.texture = c.texture.id; result.store = c.store ? 1 : 0
             result.resolve = c.resolveTexture?.id ?? 0

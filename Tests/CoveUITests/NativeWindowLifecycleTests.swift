@@ -42,8 +42,10 @@ struct NativeWindowLifecycleTests {
                 frosted.beginBackdrop(UIBackdrop(rect: UIRect(x: 8, y: 8, width: 48, height: 48), blurRadius: 3))
                 frosted.addRect(UIRect(x: 8, y: 8, width: 48, height: 48), color: Color(r: 0.2, g: 0.3, b: 0.4, a: 0.5))
                 #expect(try windowRenderer.draw(list: frosted, logical: SIMD2(64, 64)))
-                #expect(!windowRenderer.memorySnapshot.msaaMemoryless)
-                #expect((windowRenderer.memorySnapshot.msaaAllocatedBytes ?? 0) > 0)
+                #if arch(arm64)
+                #expect(windowRenderer.memorySnapshot.msaaMemoryless)
+                #expect(windowRenderer.memorySnapshot.msaaAllocatedBytes == 0)
+                #endif
                 #expect(try windowRenderer.draw(list: list, logical: SIMD2(64, 64)))
                 #if arch(arm64)
                 #expect(windowRenderer.memorySnapshot.msaaMemoryless)
@@ -60,7 +62,7 @@ struct NativeWindowLifecycleTests {
             try windowRenderer.setPresentationActive(true)
             #expect(!windowRenderer.memorySnapshot.hasSwapchain)
             #expect(try windowRenderer.draw(list: list, logical: SIMD2(64, 64)))
-            #expect(windowRenderer.memorySnapshot.estimatedTargetBytes == Int(side * side * 4 * 4))
+            #expect(windowRenderer.memorySnapshot.estimatedTargetBytes == Int(side * side * 4 * 5))
         }
         try windowRenderer.close()
         #expect(windowRenderer.memorySnapshot.state == .closed)

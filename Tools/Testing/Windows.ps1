@@ -53,7 +53,10 @@ $arguments = @('test', $Package, '--no-parallel', '--testing-library', $Library,
 if ($SkipBuild) { $arguments += '--skip-build' }
 if ($Library -eq 'swift-testing') { $arguments += @('--event-output', (Join-Path $outputDirectory 'events.jsonl')) }
 try {
-    & "$PSScriptRoot/../../cove.cmd" @arguments
+    $sdkRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+    $cli = Join-Path $sdkRoot 'cove.exe'
+    if (-not (Test-Path -LiteralPath $cli)) { $cli = Join-Path $sdkRoot 'cove.cmd' }
+    & $cli @arguments
     $result = $LASTEXITCODE
 } finally {
     Stop-Job $watchdog

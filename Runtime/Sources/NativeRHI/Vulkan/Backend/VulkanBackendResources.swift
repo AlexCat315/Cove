@@ -133,6 +133,12 @@ extension VulkanBackend {
         info.samples = try VulkanFormats.vkSampleCount(descriptor.sampleCount)
         info.tiling = VK_IMAGE_TILING_OPTIMAL
         info.usage = Self.textureUsageFlags(descriptor.usage)
+        if descriptor.transientAttachment {
+            // TRANSIENT images may only have attachment/input-attachment usage.
+            // The general helper also enables transfer operations; remove them.
+            info.usage &= ~(UInt32(VK_IMAGE_USAGE_TRANSFER_SRC_BIT.rawValue) | UInt32(VK_IMAGE_USAGE_TRANSFER_DST_BIT.rawValue))
+            info.usage |= UInt32(VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT.rawValue)
+        }
         let arena = VulkanScratch()
         let families = Array(Set([context.queues.graphics.family, context.queues.compute.family, context.queues.transfer.family]))
         info.sharingMode = families.count > 1 ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE
@@ -162,7 +168,9 @@ extension VulkanBackend {
         let allocation = try allocator.allocate(
             size: req.size, alignment: req.alignment,
             memoryTypeBits: req.memoryTypeBits,
-            requiredFlags: UInt32(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT.rawValue))
+            requiredFlags: UInt32(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT.rawValue),
+            preferredFlags: descriptor.transientAttachment ? UInt32(VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT.rawValue) : 0,
+            dedicated: descriptor.transientAttachment)
         defer { if !stored { allocator.free(allocation) } }
         if context.core.bindImageMemory(context.device, image, allocation.memory, allocation.offset) != VK_SUCCESS {
             throw RHIError.outOfMemory
@@ -202,6 +210,7 @@ extension VulkanBackend {
             usage: descriptor.usage, isSwapchain: false, layout: VK_IMAGE_LAYOUT_UNDEFINED)
         record.layers = info.arrayLayers
         record.sampleCount = descriptor.sampleCount
+        record.transientAttachment = descriptor.transientAttachment
         record.attachmentView = attachmentView
         registries.textures[handle.id] = record
         stored = true
@@ -308,6 +317,15 @@ extension VulkanBackend {
         if usage.contains(.transferSource) { flags |= UInt32(VK_IMAGE_USAGE_TRANSFER_SRC_BIT.rawValue) }
         if usage.contains(.transferDestination) { flags |= UInt32(VK_IMAGE_USAGE_TRANSFER_DST_BIT.rawValue) }
         return flags
+    }
+}
+
+extension VulkanBackend: TextureMemoryReporting {
+    func textureAllocation(_ texture: Texture) -> TextureAllocation? {
+        guard let allocation = registries.textures[texture.id]?.allocation else { return nil }
+        // Reserved resource bytes, including lazy allocations. Lazy memory may
+        // commit zero bytes on a tile GPU, but that is not a portable guarantee.
+        return TextureAllocation(allocatedBytes: Int(allocation.size), isMemoryless: false)
     }
 }
 

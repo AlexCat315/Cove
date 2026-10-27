@@ -173,23 +173,30 @@ final class NativeUIBackdropPass {
     private let offscreen: GraphicsPipeline   // scratch passes: no blending
     private let composite: GraphicsPipeline   // into the frame: alpha blended
     private let blit: GraphicsPipeline        // frame -> swapchain: no blending
-    private var scratchA: Scratch?
     private var scratchB: Scratch?
+    private var captures: [Scratch] = []
+    private var captureIndex = 0
     private var revealCapture: Scratch?
     private var frameBinding: BindingSet?
 
     var estimatedScratchBytes: Int {
-        [scratchA, scratchB, revealCapture].compactMap { $0 }.reduce(0) {
+        (captures + [scratchB, revealCapture].compactMap { $0 }).reduce(0) {
             $0 + $1.width * $1.height * ($1.resource.descriptor.format == .rgba16Float ? 8 : 4)
         }
     }
 
     func trimScratch() {
-        scratchA = nil
+        captures.removeAll()
         scratchB = nil
         revealCapture = nil
         frameBinding = nil
         frameTexture = nil
+    }
+
+    func beginCaptures() { captureIndex = 0 }
+
+    func finishCaptures() {
+        if captures.count > captureIndex { captures.removeLast(captures.count - captureIndex) }
     }
 
     init(device: Device, shaders: NativeUIBackdropShaders, format: TextureFormat, samples: Int) throws {
@@ -247,7 +254,12 @@ final class NativeUIBackdropPass {
         let factor = downsampleFactor(for: capture)
         let width = max(1, Int(ceil(Float(capture.width) / Float(factor))))
         let height = max(1, Int(ceil(Float(capture.height) / Float(factor))))
-        let a = try scratch(&scratchA, width: width, height: height)
+        // Each dependency keeps its small resolved blur until the final pass.
+        // Reusing it for the next panel would overwrite an earlier backdrop.
+        var slot = captureIndex < captures.count ? captures[captureIndex] : nil
+        let a = try scratch(&slot, width: width, height: height)
+        if captureIndex < captures.count { captures[captureIndex] = a } else { captures.append(a) }
+        captureIndex += 1
         let b = try scratch(&scratchB, width: width, height: height)
         // `blurRadius` is a CSS-style gaussian radius: one standard deviation
         // in points, so a tap has to reach about two of them.
@@ -357,6 +369,7 @@ final class NativeUIBackdropPass {
     /// quad and coverage keeps the retained frame outside the growing disc,
     /// leaving the new frame visible inside it.
     func drawReveal(_ reveal: UIReveal, source: Texture, viewport: NativeUIViewport,
+                    renderViewport: Viewport? = nil,
                     in pass: inout RenderPassEncoder) throws {
         let size = viewport.pixels
         let quad = try uploadQuad(x0: -1, y0: 1, x1: 1, y1: -1)
@@ -367,7 +380,7 @@ final class NativeUIBackdropPass {
         let scale = SIMD2<Float>(Float(size.x) / max(viewport.logical.x, 0.0001),
                                  Float(size.y) / max(viewport.logical.y, 0.0001))
         pass.setPipeline(composite)
-        pass.setViewport(Viewport(width: Double(size.x), height: Double(size.y)))
+        pass.setViewport(renderViewport ?? Viewport(width: Double(size.x), height: Double(size.y)))
         pass.setVertexBuffer(quad.buffer, offset: quad.offset)
         pass.setBindingSet(try revealBinding(for: source))
         pass.pushConstant(stage: .fragment, slot: shaders.constants.slot,
@@ -403,6 +416,24 @@ final class NativeUIBackdropPass {
                               value: NativeUIBackdropParams(uvTransform: SIMD4(1, 1, 0, 0),
                                             blur: SIMD4(Mode.blit.rawValue, 0, 0, 0),
                                             shape: .zero))
+            pass.draw(vertexCount: 6)
+        }
+    }
+
+    /// Copy resolved strip pixels to their original integer-aligned position.
+    func recordStrip(source: Texture, target: RenderColorTarget, frame: SIMD2<Int>,
+                     y: Int, height: Int, sourceHeight: Int, into commands: CommandBuffer) throws {
+        let quad = try uploadQuad(x0: -1, y0: clipY(y, frame: frame.y),
+            x1: 1, y1: clipY(y + height, frame: frame.y))
+        let binding = try bindingSet(for: source)
+        commands.renderPass(descriptor: RenderPassDescriptor(colorTargets: [target], label: "ui-strip-copy")) { pass in
+            pass.setPipeline(blit)
+            pass.setViewport(Viewport(width: Double(frame.x), height: Double(frame.y)))
+            pass.setVertexBuffer(quad.buffer, offset: quad.offset)
+            pass.setBindingSet(binding)
+            pass.pushConstant(stage: .fragment, slot: shaders.constants.slot,
+                value: NativeUIBackdropParams(uvTransform: SIMD4(1, Float(height) / Float(sourceHeight), 0, 0),
+                    blur: SIMD4(Mode.blit.rawValue, 0, 0, 0)))
             pass.draw(vertexCount: 6)
         }
     }
@@ -466,7 +497,7 @@ final class NativeUIBackdropPass {
     }
 
     private func scratch(_ slot: inout Scratch?, width: Int, height: Int) throws -> Scratch {
-        if let existing = slot, existing.width >= width, existing.height >= height { return existing }
+        if let existing = slot, existing.width == width, existing.height == height { return existing }
         // Scratch targets share the frame's format so every sRGB encode and
         // decode stays the hardware's job and the frost matches its panel.
         var descriptor = TextureDescriptor(width: width, height: height,
@@ -479,9 +510,9 @@ final class NativeUIBackdropPass {
     }
 
     private func bindingSet(for texture: Texture) throws -> BindingSet {
-        if scratchA?.resource.texture == texture {
-            if let set = scratchA?.bindingSet { return set }
-            let set = try makeBindingSet(texture: texture); scratchA?.bindingSet = set; return set
+        if let index = captures.firstIndex(where: { $0.resource.texture == texture }) {
+            if let set = captures[index].bindingSet { return set }
+            let set = try makeBindingSet(texture: texture); captures[index].bindingSet = set; return set
         }
         if scratchB?.resource.texture == texture {
             if let set = scratchB?.bindingSet { return set }

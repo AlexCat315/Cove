@@ -64,6 +64,7 @@ const char* grhi_dx12_name(GRHI_DX12Device*);
 GRHI_DX12Capabilities grhi_dx12_capabilities(GRHI_DX12Device*);
 int32_t grhi_dx12_buffer(GRHI_DX12Device*, uint32_t id, uint64_t size, uint32_t usage, uint32_t upload);
 int32_t grhi_dx12_texture(GRHI_DX12Device*, uint32_t id, const GRHI_TextureDesc*);
+uint64_t grhi_dx12_texture_allocation(GRHI_DX12Device*, uint32_t id);
 int32_t grhi_dx12_sampler(GRHI_DX12Device*, uint32_t id, const GRHI_SamplerDesc*);
 int32_t grhi_dx12_shader(GRHI_DX12Device*, uint32_t id, uint32_t stage, const void* bytes, size_t count);
 int32_t grhi_dx12_binding_layout(GRHI_DX12Device*, uint32_t id, const GRHI_BindingDecl*, size_t count);
