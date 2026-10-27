@@ -1,10 +1,21 @@
 name: Native UI shader artifacts
 on:
   workflow_dispatch:
+    inputs:
+      target:
+        description: Artifact family to generate
+        type: choice
+        options: [all, dxil, metal]
+        default: all
+      diffuseRef:
+        description: Diffuse shader source revision
+        type: string
+        default: main
 permissions:
   contents: read
 jobs:
   dxil:
+    if: inputs.target != 'metal'
     runs-on: windows-2025-vs2026
     timeout-minutes: 10
     steps:
@@ -35,4 +46,31 @@ jobs:
         with:
           name: native-ui-dxil
           path: dist/shaders/dxil
+          if-no-files-found: error
+  metal:
+    if: inputs.target != 'dxil'
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7.0.1
+        with:
+          repository: AlexCat315/Diffuse
+          ref: ${{ inputs.diffuseRef }}
+          path: diffuse
+      - name: Prepare Metal compiler
+        run: |
+          sudo xcode-select -s /Applications/Xcode_27.0.app
+          xcodebuild -downloadComponent MetalToolchain
+      - name: Compile platform libraries
+        run: |
+          node Tools/Shaders/build-metal-libraries.mjs
+          node Tools/Shaders/build-metal-libraries.mjs diffuse/Engine/Sources/RenderBackend/Resources/Shaders
+          mkdir -p dist/metal/ui dist/metal/engine
+          cp -R Sources/CoveUIRuntime/Resources/Shaders/Native/metal-* dist/metal/ui/
+          cp -R diffuse/Engine/Sources/RenderBackend/Resources/Shaders/Native/metal-* dist/metal/engine/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-metal-libraries
+          path: dist/metal
           if-no-files-found: error
