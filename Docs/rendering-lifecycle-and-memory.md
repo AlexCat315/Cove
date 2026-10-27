@@ -26,9 +26,33 @@ Plain value-type `@State` invalidates its owning scope. On a parent update,
 structurally equal child value inputs can preserve the existing scope, state,
 bindings and callbacks without reevaluating the child's body. Closures, mutable
 references and opaque values conservatively force recomposition. Changed
-composition locals still invalidate consumers. This comparison does not infer
-which fields of a plain struct a body reads; field-level dependency tracking
-requires observable properties or explicit child inputs.
+composition locals still invalidate consumers.
+
+Add `@TrackStateReads` to a view struct to infer plain value-type state field
+reads in its body. The compiler rewrites `model.name` and
+`self.model.details.title` into typed key-path reads; the model can remain an
+ordinary struct. Only changed, actually read Equatable value fields invalidate
+that scope. Conditional reads are replaced on reevaluation, teardown removes
+subscriptions, and DevTools reasons include the inferred field name. Normal
+views retain their existing state-write behavior.
+
+```swift
+@TrackStateReads
+struct ProfileView: View {
+    @State var model = Profile()
+    var body: some View { Text(model.name) }
+}
+```
+
+Whole-value reads, helper methods and opaque/reference-bearing fields fall back
+to conservative invalidation. A read such as `let snapshot = model` subscribes
+to the whole value. Name shadowing disables unqualified rewriting for that name;
+`self.model.field` remains explicit. Calls keep their method receiver semantics,
+including writable field operations such as `model.name.append("x")`. For a
+method reference, first bind the whole value in a local variable, then reference
+its method; Swift key paths cannot represent methods. This is compile-time
+instrumentation enabled by the view macro, not runtime inference for unannotated
+Swift property access.
 
 ## Coverage and sampling
 
@@ -37,7 +61,9 @@ physical pixels. `geometryAntialiasing = .analytic` also feathers rounded masks
 with disjoint geometry cells and selects a 1x target for that window. Geometry
 caches include this mode. Offscreen HUD and Android drawing select analytic masks.
 Desktop defaults remain 4x MSAA: custom triangle meshes do not automatically carry
-boundary coverage, so lowering the global default needs backend visual validation.
+boundary coverage. The [Metal evaluation](msaa-evaluation.md) measures GPU time,
+attachment storage and edge error; its custom-triangle result supports retaining
+4x globally until those boundaries and other backends are covered.
 
 Decoded images build alpha-weighted mip pyramids, including odd edge pixels.
 Their full retained pixel payload counts toward the image cache budget. `Image`

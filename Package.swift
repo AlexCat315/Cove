@@ -1,5 +1,6 @@
 // swift-tools-version: 6.4
 import PackageDescription
+import CompilerPluginSupport
 import Foundation
 
 let runtimeArtifacts = ProcessInfo.processInfo.environment["COVE_RUNTIME_ARTIFACT_ROOT"] ?? "Runtime/vendor"
@@ -54,7 +55,11 @@ let portableTargets: [Target] = [
     .testTarget(name: "CoveUIAgentCoreTests", dependencies: ["CoveUIAgentCore"], path: "Portable/Tests/CoveUIAgentCoreTests"),
     .target(name: "CYoga", dependencies: [.product(name: "yoga", package: "yoga")], path: "Portable/Sources/CYoga", publicHeadersPath: "include", linkerSettings: windowsCxxRuntime),
     .target(name: "CoveUIScene", dependencies: ["CoveUICore", "CYoga", .target(name: "CovePlatformCore")], path: "Portable/Sources/CoveUIScene"),
-    .target(name: "CoveUIComposeCore", dependencies: ["CoveUIScene"], path: "Portable/Sources/CoveUIComposeCore"),
+    .macro(name: "CoveUIReadMacros", dependencies: [
+        .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
+        .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
+    ], path: "Portable/Sources/CoveUIReadMacros"),
+    .target(name: "CoveUIComposeCore", dependencies: ["CoveUIScene", "CoveUIReadMacros"], path: "Portable/Sources/CoveUIComposeCore"),
     .target(name: "CoveUIDevToolsScene", dependencies: ["CoveUIScene", "CoveUIDevToolsProtocol", "CoveUIAgentCore"], path: "Portable/Sources/CoveUIDevToolsScene"),
     .target(name: "CoveUICore", path: "Portable/Sources/CoveUICore"),
     .testTarget(name: "CoveUISceneTests", dependencies: ["CoveUIComposeCore", "CoveUIDevToolsScene", "CoveUIDevToolsProtocol"], path: "Portable/Tests/CoveUISceneTests"),
@@ -334,6 +339,7 @@ let package = Package(
         .library(name: "CoveUIAgent", targets: ["CoveUIAgent"]),
     ],
     dependencies: [
+        .package(url: "https://github.com/swiftlang/swift-syntax.git", exact: "604.0.0"),
         .package(url: "https://github.com/facebook/yoga.git", from: "3.2.1"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.103.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.15.1"),

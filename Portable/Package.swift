@@ -1,5 +1,6 @@
 // swift-tools-version: 6.4
 import PackageDescription
+import CompilerPluginSupport
 
 // Shared UI and DevTools build without SDL, GPU drivers or native font libraries.
 // Browser targets depend only on the protocol, never on the socket transport.
@@ -19,6 +20,7 @@ let package = Package(
         .executable(name: "CoveUIDevToolsProbe", targets: ["CoveUIDevToolsProbe"]),
     ],
     dependencies: [
+        .package(url: "https://github.com/swiftlang/swift-syntax.git", exact: "604.0.0"),
         .package(path: "../System"),
         .package(path: "../PlatformCore"),
         .package(url: "https://github.com/facebook/yoga.git", from: "3.2.1"),
@@ -39,7 +41,11 @@ let package = Package(
                 linkerSettings: [.linkedLibrary("msvcrt", .when(platforms: [.windows])),
                                  .linkedLibrary("msvcprt", .when(platforms: [.windows]))]),
         .target(name: "CoveUIScene", dependencies: ["CoveUICore", "CYoga", .product(name: "CovePlatformCore", package: "PlatformCore")]),
-        .target(name: "CoveUIComposeCore", dependencies: ["CoveUIScene"]),
+        .macro(name: "CoveUIReadMacros", dependencies: [
+            .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
+            .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
+        ]),
+        .target(name: "CoveUIComposeCore", dependencies: ["CoveUIScene", "CoveUIReadMacros"]),
         .target(name: "CoveUIDevToolsScene", dependencies: ["CoveUIScene", "CoveUIDevToolsProtocol", "CoveUIAgentCore"]),
         .target(name: "CoveUICore"),
         .testTarget(name: "CoveUISceneTests", dependencies: ["CoveUIComposeCore", "CoveUIDevToolsScene", "CoveUIDevToolsProtocol"]),

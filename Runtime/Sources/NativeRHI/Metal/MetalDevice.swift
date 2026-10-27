@@ -24,7 +24,8 @@ final class MetalWindowSwapchain {
     init(layer: CAMetalLayer, generation: UInt64) { self.layer = layer; self.generation = generation }
 }
 
-public final class MetalDevice: RHIBackend {
+public final class MetalDevice: RHIBackend, GPUTimestampRecording {
+    public var gpuTimestampProfile: GPUTimestampProfile?
     public let api: GraphicsAPI = .metal
 
     let device: MTLDevice

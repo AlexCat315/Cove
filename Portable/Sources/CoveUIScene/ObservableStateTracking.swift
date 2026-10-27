@@ -84,7 +84,10 @@ public enum ObservableStateTracking {
         registerDependencyCleaner(for: id, ownerID: ObjectIdentifier(scope.observation)) { _ in scope.observation.cancel() }
         stack.stack.append(scope)
         defer { _ = stack.stack.popLast() }
-        return try body()
+        return try StateReadTracking.withScope(.init(id: id, invalidate: { field in
+            if let invalidateTracked { invalidateTracked(.init(kind: "state", detail: field)) }
+            else { invalidate() }
+        }), body)
     }
 
     /// Track a single evaluation boundary. Do not wrap recursive reconciliation:
@@ -99,6 +102,7 @@ public enum ObservableStateTracking {
     }
 
     public static func removeScope(id: ObjectIdentifier) {
+        StateReadTracking.removeScope(id)
         clearDependencies(for: id)
     }
 

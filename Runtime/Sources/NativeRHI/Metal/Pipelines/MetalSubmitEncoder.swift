@@ -45,12 +45,26 @@ extension MetalDevice {
             commandBuffer.encodeSignalEvent(event, value: semaphore.value)
         }
 
+        // Capture the selected profile for this submission. Later frames may
+        // detach it before this buffer reaches its GPU completion handler.
+        let gpuProfile = gpuTimestampProfile
+        let gpuLabel = submit.queue == .compute ? "compute submission" : "graphics submission"
         let status = submissionStatus
         let callback = MetalCompletionCallback(completion)
         commandBuffer.addCompletedHandler { buffer in
             if let error = buffer.error {
                 status.record(error.localizedDescription)
                 LogSystem.logger("com.cove.engine.rhi").error("Metal submission failed", metadata: ["detail": "\(error)"])
+            }
+            if let gpuProfile {
+                let seconds = buffer.gpuEndTime - buffer.gpuStartTime
+                if buffer.status == .completed, buffer.gpuStartTime > 0, seconds.isFinite, seconds > 0,
+                   seconds < Double(UInt64.max) / 1e9 {
+                    gpuProfile.note("ok")
+                    gpuProfile.append(.init(label: gpuLabel, nanoseconds: UInt64(seconds * 1e9)))
+                } else {
+                    gpuProfile.note("Metal command buffer did not expose completed GPU timestamps")
+                }
             }
             callback.call()
         }

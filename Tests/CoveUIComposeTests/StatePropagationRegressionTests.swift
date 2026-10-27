@@ -22,6 +22,7 @@ struct StatePropagationRegressionTests: CoveUIComposeSerializedSuite {
         return nil
     }
 
+    @TrackStateReads
     struct ButtonHarness: View {
         @State var flag: Bool = false
         @State var count: Int = 0
@@ -100,6 +101,7 @@ struct StatePropagationRegressionTests: CoveUIComposeSerializedSuite {
         #expect(maxMarker(in: tree.root) == 7)
     } }
 
+    @TrackStateReads
     struct TextFieldHarness: View {
         @State var flag: Bool = false
         @State var text: TextBuffer = ""

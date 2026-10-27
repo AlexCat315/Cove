@@ -776,6 +776,7 @@ final class ViewScope {
         for child in Mirror(reflecting: view).children {
             guard let stateBox = child.value as? _StateErased else { continue }
             let field = child.label.map { $0.hasPrefix("_") ? String($0.dropFirst()) : $0 }
+            stateBox._wireReadTracking(scopeID: scopeID, precise: view is any _StateReadTrackedView)
             let kind = stateBox._diagnosticKind
             if let read = stateBox._devToolsRead,
                let id = graph.stateRegistry.register(id: "\(anchor.id.rawValue):\(field ?? "State")", name: field ?? "State", valueType: stateBox._devToolsValueType,
@@ -939,6 +940,10 @@ final class ViewScope {
     /// Read `view.body` through an existential boundary. We don't care about
     /// the concrete `Body` type — only that it's a `View`.
     private func anyBody(of view: any View) -> any View {
+        if let tracked = view as? any _StateReadTrackedView {
+            func extractTracked<V: _StateReadTrackedView>(_ v: V) -> any View { v._coveTrackedBody }
+            return extractTracked(tracked)
+        }
         func extract<V: View>(_ v: V) -> any View { v.body }
         return extract(view)
     }
@@ -986,6 +991,7 @@ public protocol _StateErased {
     var _devToolsValueType: String { get }
     var _diagnosticKind: String { get }
     func _wire(invalidate: @escaping () -> Void)
+    func _wireReadTracking(scopeID: ObjectIdentifier, precise: Bool)
     func _unwire()
     /// Copy the runtime value out of `other` into self's backing storage.
     /// No-op if the concrete value types do not match.
@@ -997,10 +1003,14 @@ public extension _StateErased {
     var _devToolsValueType: String { String(reflecting: type(of: self)) }
     var _diagnosticKind: String { "dynamicProperty" }
     func _unwire() {}
+    func _wireReadTracking(scopeID: ObjectIdentifier, precise: Bool) {}
 }
 
 extension State: _StateErased {
     public var _diagnosticKind: String { "state" }
+    public func _wireReadTracking(scopeID: ObjectIdentifier, precise: Bool) {
+        _setReadTrackingOwner(scopeID, precise: precise)
+    }
     public func _wire(invalidate: @escaping () -> Void) {
         _setOnChange(invalidate)
     }
