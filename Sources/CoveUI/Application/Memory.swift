@@ -18,6 +18,19 @@ public struct AppWindowMemorySnapshot: Sendable {
     public let hasSwapchain: Bool
     /// Owned MSAA, backdrop and effect scratch. Drawable pool/driver memory is excluded.
     public let estimatedTargetBytes: Int
+    public let msaaLogicalBytes: Int
+    /// Backend allocation of the current MSAA target; nil means unavailable.
+    public let msaaAllocatedBytes: Int?
+    public let msaaMemoryless: Bool
+
+    public init(state: AppWindowRendererState, samples: UInt32, hasSwapchain: Bool,
+                estimatedTargetBytes: Int, msaaLogicalBytes: Int = 0,
+                msaaAllocatedBytes: Int? = nil, msaaMemoryless: Bool = false) {
+        self.state = state; self.samples = samples; self.hasSwapchain = hasSwapchain
+        self.estimatedTargetBytes = estimatedTargetBytes
+        self.msaaLogicalBytes = msaaLogicalBytes; self.msaaAllocatedBytes = msaaAllocatedBytes
+        self.msaaMemoryless = msaaMemoryless
+    }
 }
 
 public struct AppMemorySnapshot: Sendable {

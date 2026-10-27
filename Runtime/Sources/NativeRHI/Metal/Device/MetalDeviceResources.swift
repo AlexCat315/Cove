@@ -38,8 +38,9 @@ extension MetalDevice {
         td.mipmapLevelCount = max(1, descriptor.mipLevels)
         td.sampleCount = max(1, descriptor.sampleCount)
         td.usage = mtlTextureUsage(descriptor.usage)
-        // Device-local storage; immediate uploads blit from shared staging.
-        td.storageMode = .private
+        // Ordinary textures use device-local storage; transient samples may
+        // remain tile-only on Apple GPUs without changing their sample count.
+        td.storageMode = descriptor.transientAttachment && device.supportsFamily(.apple1) ? .memoryless : .private
         guard let texture = device.makeTexture(descriptor: td) else {
             throw RHIError.outOfMemory
         }
@@ -254,4 +255,10 @@ extension MetalDevice {
     }
 }
 
+extension MetalDevice: TextureMemoryReporting {
+    public func textureAllocation(_ texture: Texture) -> TextureAllocation? {
+        guard let native = registries.textures[texture.id] else { return nil }
+        return .init(allocatedBytes: native.allocatedSize, isMemoryless: native.storageMode == .memoryless)
+    }
+}
 #endif

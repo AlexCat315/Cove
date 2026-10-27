@@ -422,10 +422,14 @@ public final class Application {
             "imageBytes": value.cachedImageBytes,
             "skippedParentUpdates": composition.graph.skippedParentUpdates
         ], windows: Dictionary(uniqueKeysWithValues: value.windows.map { id, window in
-            (String(describing: id), ["samples": Int(window.samples),
+            var counters = ["samples": Int(window.samples),
                 "hasSwapchain": window.hasSwapchain ? 1 : 0,
                 "suspended": window.state == .suspended ? 1 : 0,
-                "targetBytes": window.estimatedTargetBytes])
+                "targetBytes": window.estimatedTargetBytes,
+                "msaaLogicalBytes": window.msaaLogicalBytes,
+                "msaaMemoryless": window.msaaMemoryless ? 1 : 0]
+            if let allocated = window.msaaAllocatedBytes { counters["msaaAllocatedBytes"] = allocated }
+            return (String(describing: id), counters)
         }))
     }
 

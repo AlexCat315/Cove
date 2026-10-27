@@ -12,6 +12,8 @@ struct MSAAEvaluationTests {
     struct Measurement: Codable {
         let scale: Int
         let samples: Int
+        let transientAttachment: Bool
+        let allocatedMSAABytes: Int?
         let vertices: Int
         let indices: Int
         let drawCalls: Int
@@ -40,16 +42,17 @@ struct MSAAEvaluationTests {
             try render(context, list: referenceList, output: referenceOutput, multisample: nil, viewport: referenceViewport)
             let reference = downsample(try context.read(referenceOutput), width: pixels.x, height: pixels.y, factor: 4)
             try writePNG(reference, width: pixels.x, height: pixels.y, to: directory.appendingPathComponent("reference-\(scale)x.png"))
-            for samples in [1, 4] {
+            var persistentPixels: Data?
+            for (samples, transient) in [(1, false), (4, false), (4, true)] {
                 let list = scene(scale: Float(scale), analytic: samples == 1)
                 let viewport = NativeUIViewport(pixels: pixels, logical: logical)
                 let output = try context.nativeOutput(format: .bgra8Unorm, size: pixels)
                 let multisample = samples == 1 ? nil : try TextureResource(device: context.device,
                     descriptor: TextureDescriptor(width: pixels.x, height: pixels.y, format: .bgra8Unorm,
-                        usage: .colorTarget, sampleCount: samples))
+                        usage: .colorTarget, sampleCount: samples, transientAttachment: transient))
                 try context.native.configure(format: .bgra8Unorm, sampleCount: samples)
                 // Warm shader/pipeline and upload buffers before sampling.
-                for _ in 0..<4 { try render(context, list: list, output: output, multisample: multisample, viewport: viewport) }
+                for _ in 0..<4 { try render(context, list: list, output: output, multisample: multisample, viewport: viewport, storeSamples: !transient) }
                 let profile = GPUTimestampProfile(markerLimit: 100)
                 context.device.setGPUTimestampProfile(profile)
                 defer { context.device.setGPUTimestampProfile(nil) }
@@ -58,18 +61,21 @@ struct MSAAEvaluationTests {
                 for _ in 0..<30 {
                     let start = ContinuousClock.now
                     statistics = try render(context, list: list, output: output, multisample: multisample,
-                        viewport: viewport, wait: false)
+                        viewport: viewport, wait: false, storeSamples: !transient)
                     let duration = start.duration(to: .now).components
                     cpu.append(Double(duration.seconds) * 1000 + Double(duration.attoseconds) / 1e15)
                     try context.device.waitUntilIdle()
                 }
                 context.device.setGPUTimestampProfile(nil)
                 let image = try context.read(output)
+                if transient, let baseline = persistentPixels { #expect(image == baseline) }
+                else if samples == 4 { persistentPixels = image }
                 try writePNG(image, width: pixels.x, height: pixels.y,
-                    to: directory.appendingPathComponent("\(samples)sample-\(scale)x.png"))
+                    to: directory.appendingPathComponent("\(samples)sample\(transient ? "-transient" : "")-\(scale)x.png"))
                 let errors = error(image, reference, width: pixels.x, height: pixels.y, scale: scale)
                 let gpu = profile.recordedMarkers.map { Double($0.nanoseconds) / 1e6 }
-                let measurement = Measurement(scale: scale, samples: samples, vertices: statistics.vertices,
+                let measurement = Measurement(scale: scale, samples: samples, transientAttachment: transient,
+                    allocatedMSAABytes: multisample == nil ? 0 : multisample?.allocation?.allocatedBytes, vertices: statistics.vertices,
                     indices: statistics.indices, drawCalls: statistics.drawCalls,
                     msaaTargetBytes: samples == 1 ? 0 : pixels.x * pixels.y * 4 * samples,
                     cpuMedianMilliseconds: median(cpu), gpuMedianMilliseconds: gpu.isEmpty ? nil : median(gpu),
@@ -77,7 +83,7 @@ struct MSAAEvaluationTests {
                     triangleRGBError: errors.2)
                 report.append(measurement)
                 #expect(statistics.vertices > 0 && image.count == reference.count)
-                print("msaa-evaluation scale=\(scale) samples=\(samples) edgeMAE=\(errors.1) triangleMAE=\(errors.2) gpuMs=\(measurement.gpuMedianMilliseconds ?? -1)")
+                print("msaa-evaluation scale=\(scale) samples=\(samples) transient=\(transient) edgeMAE=\(errors.1) triangleMAE=\(errors.2) gpuMs=\(measurement.gpuMedianMilliseconds ?? -1)")
             }
             let one = try #require(report.first { $0.scale == scale && $0.samples == 1 })
             let four = try #require(report.first { $0.scale == scale && $0.samples == 4 })
@@ -92,11 +98,11 @@ struct MSAAEvaluationTests {
 
     @discardableResult
     private func render(_ context: NativeUIDrawTestContext, list: DrawList, output: TextureResource,
-                        multisample: TextureResource?, viewport: NativeUIViewport, wait: Bool = true) throws -> NativeUIDrawStatistics {
+                        multisample: TextureResource?, viewport: NativeUIViewport, wait: Bool = true, storeSamples: Bool = false) throws -> NativeUIDrawStatistics {
         try context.device.beginFrame()
         do {
             var target = RenderColorTarget(texture: (multisample ?? output).texture,
-                loadAction: .clear(SIMD4(0.07, 0.09, 0.12, 1)), store: multisample == nil)
+                loadAction: .clear(SIMD4(0.07, 0.09, 0.12, 1)), store: multisample == nil || storeSamples)
             target.resolveTexture = multisample == nil ? nil : output.texture
             let commands = CommandBuffer()
             let frame = try context.native.record(list: list, into: commands, target: target, viewport: viewport)

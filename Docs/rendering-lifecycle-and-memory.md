@@ -33,7 +33,9 @@ reads in its body. The compiler rewrites `model.name` and
 `self.model.details.title` into typed key-path reads; the model can remain an
 ordinary struct. Only changed, actually read Equatable value fields invalidate
 that scope. Conditional reads are replaced on reevaluation, teardown removes
-subscriptions, and DevTools reasons include the inferred field name. Normal
+subscriptions, and DevTools reasons include the inferred field name. Deferred
+custom painting and layout callbacks subscribe to the retained owner. Unread
+state can still serve as an explicit invalidation signal. Normal
 views retain their existing state-write behavior.
 
 ```swift
@@ -63,7 +65,10 @@ caches include this mode. Offscreen HUD and Android drawing select analytic mask
 Desktop defaults remain 4x MSAA: custom triangle meshes do not automatically carry
 boundary coverage. The [Metal evaluation](msaa-evaluation.md) measures GPU time,
 attachment storage and edge error; its custom-triangle result supports retaining
-4x globally until those boundaries and other backends are covered.
+4x globally until those boundaries and other backends are covered. Ordinary
+Apple-GPU window frames use transient 4x attachments; backdrop/reveal frames
+preserve samples across passes. DevTools reports logical capacity and backend
+MSAA allocation separately.
 
 Decoded images build alpha-weighted mip pyramids, including odd edge pixels.
 Their full retained pixel payload counts toward the image cache budget. `Image`

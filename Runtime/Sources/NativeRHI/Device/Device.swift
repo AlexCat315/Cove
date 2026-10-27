@@ -206,6 +206,11 @@ public final class Device {
         }
     }
 
+    /// Allocation of this resource, when the backend can report it.
+    public func textureAllocation(of texture: Texture) -> TextureAllocation? {
+        locked { (backend as? any TextureMemoryReporting)?.textureAllocation(texture) }
+    }
+
     public func makeSampler(_ descriptor: SamplerDescriptor = SamplerDescriptor()) throws -> Sampler {
         try locked {
             let handle = Sampler(id: identifiers.next())

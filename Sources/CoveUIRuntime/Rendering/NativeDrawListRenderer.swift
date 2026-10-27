@@ -275,6 +275,11 @@ public final class NativeDrawListRenderer {
         if !uploads.isEmpty { commands.copyPass { pass in uploads.forEach { pass.uploadBufferToTexture($0) } } }
         // A frosted panel cannot be drawn in the same pass that captures its
         // backdrop, so the frame is recorded as segments split around them.
+        var segmentTarget = target
+        if backdropPass != nil, backdropSource != nil,
+           list.reveal != nil || coalesced.contains(where: { $0.backdrop != nil }) {
+            segmentTarget.store = true
+        }
         var segmentStart = 0
         var pending: NativeUIBackdropComposite?
         var frosted = 0
@@ -282,7 +287,7 @@ public final class NativeDrawListRenderer {
             guard let backdrop = draw.backdrop, let backdropPass, let backdropSource else { continue }
             try recordSegment(coalesced[segmentStart..<index], composite: pending,
                 loadAction: segmentStart == 0 ? target.loadAction : .load, isFirst: segmentStart == 0,
-                into: commands, target: target, viewport: viewport, pipeline: pipeline,
+                into: commands, target: segmentTarget, viewport: viewport, pipeline: pipeline,
                 vertices: vertices, indices: indices, backdropPass: backdropPass)
             segmentStart = index
             pending = try backdropPass.record(backdrop, source: backdropSource,
@@ -291,7 +296,7 @@ public final class NativeDrawListRenderer {
         }
         try recordSegment(coalesced[segmentStart...], composite: pending,
             loadAction: segmentStart == 0 ? target.loadAction : .load, isFirst: segmentStart == 0,
-            into: commands, target: target, viewport: viewport, pipeline: pipeline,
+            into: commands, target: segmentTarget, viewport: viewport, pipeline: pipeline,
             vertices: vertices, indices: indices, backdropPass: backdropPass)
         // Last, so the reveal covers everything the new frame drew — including
         // any frosted panel that opened in the same frame.
@@ -327,10 +332,8 @@ public final class NativeDrawListRenderer {
         guard composite != nil || !draws.isEmpty || isFirst else { return }
         var colorTarget = target
         colorTarget.loadAction = loadAction
-        // Keep the multisampled attachment: every segment after the first
-        // resumes it with `.load`, and discarding it would drop the geometry
-        // those segments are meant to draw over.
-        colorTarget.store = true
+        // The caller preserves samples only when a later segment reloads them.
+        // A single-pass frame may resolve directly from transient tile storage.
         try commands.renderPass(descriptor: RenderPassDescriptor(colorTargets: [colorTarget], label: "ui-segment")) { pass in
             pass.setViewport(Viewport(width: Double(viewport.pixels.x), height: Double(viewport.pixels.y)))
             if let composite, let backdropPass {

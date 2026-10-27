@@ -23,8 +23,10 @@ struct IOSBuild {
         environment["COVE_TEXT_ARTIFACT_ROOT"] = "Artifacts/native/\(variant)/vendor"
         let derived = project.buildDirectory.appendingPathComponent("\(variant)/xcode")
         let configuration = arguments.configuration == .debug ? "Debug" : "Release"
+        // The destination selects the app SDK. A global -sdk override also
+        // forces host compiler plug-ins onto iOS, making Swift macros unloadable.
         var command = ["xcodebuild", "-jobs", "4", "-project", project.directory.appendingPathComponent("Platforms/iOS/Application.xcodeproj").path,
-            "-scheme", "Application", "-configuration", configuration, "-sdk", sdk,
+            "-scheme", "Application", "-configuration", configuration,
             "-destination", "generic/platform=" + (device == nil ? "iOS Simulator" : "iOS"),
             "-derivedDataPath", derived.path, "ARCHS=\(arch)",
             "PRODUCT_BUNDLE_IDENTIFIER=\(project.configuration.application.id)",

@@ -78,6 +78,9 @@ public struct TextureDescriptor: Sendable {
     public var format: TextureFormat
     public var usage: TextureUsage
     public var dimension: TextureDimension
+    /// Multisample attachment contents are discarded at the end of each pass. Supporting
+    /// backends may use tile-only storage; other devices retain device-local storage.
+    public var transientAttachment: Bool
     public var label: String?
 
     public init(
@@ -90,7 +93,8 @@ public struct TextureDescriptor: Sendable {
         layers: Int = 1,
         mipLevels: Int = 1,
         sampleCount: Int = 1,
-        label: String? = nil
+        label: String? = nil,
+        transientAttachment: Bool = false
     ) {
         self.width = width
         self.height = height
@@ -101,6 +105,7 @@ public struct TextureDescriptor: Sendable {
         self.format = format
         self.usage = usage
         self.dimension = dimension
+        self.transientAttachment = transientAttachment
         self.label = label
     }
 }

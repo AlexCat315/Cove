@@ -4,6 +4,10 @@ func rhiValidateSampleCount(_ count: Int) throws {
 
 func rhiValidateTextureSamples(_ descriptor: TextureDescriptor) throws {
     try rhiValidateSampleCount(descriptor.sampleCount)
+    if descriptor.transientAttachment {
+        try rhiRequire(descriptor.sampleCount > 1 && descriptor.usage.subtracting([.colorTarget, .depthStencilTarget]).isEmpty,
+            "transient textures require multisample attachment-only usage")
+    }
     guard descriptor.sampleCount > 1 else { return }
     try rhiRequire(descriptor.dimension == .texture2D && descriptor.depth == 1
         && descriptor.layers == 1 && descriptor.mipLevels == 1,

@@ -23,8 +23,12 @@ final class NativeAppWindowRenderer: AppWindowRenderer {
         let bytes = [multisample, framebuffer].compactMap { $0 }.reduce(0) {
             $0 + $1.descriptor.width * $1.descriptor.height * 4 * $1.descriptor.sampleCount
         }
+        let msaaLogical = multisample.map { $0.descriptor.width * $0.descriptor.height * 4 * $0.descriptor.sampleCount } ?? 0
+        let msaaAllocated: Int? = multisample == nil ? 0 : multisample?.allocation?.allocatedBytes
         return AppWindowMemorySnapshot(state: state, samples: settings.samples,
-            hasSwapchain: swapchain != nil, estimatedTargetBytes: bytes + renderer.estimatedPresentationTextureBytes)
+            hasSwapchain: swapchain != nil, estimatedTargetBytes: bytes + renderer.estimatedPresentationTextureBytes,
+            msaaLogicalBytes: msaaLogical, msaaAllocatedBytes: msaaAllocated,
+            msaaMemoryless: multisample?.allocation?.isMemoryless ?? false)
     }
 
     init(device: Device, renderer: NativeDrawListRenderer, settings: AppWindowRenderSettings) {
@@ -69,12 +73,6 @@ final class NativeAppWindowRenderer: AppWindowRenderer {
             defer { device.endFrame() }
             let image = try device.acquireSwapchainImage(swapchain.swapchain)
             let pixels = SIMD2(image.width, image.height)
-            if settings.samples > 1 && (multisample?.descriptor.width != pixels.x || multisample?.descriptor.height != pixels.y) {
-                var descriptor = TextureDescriptor(width: pixels.x, height: pixels.y,
-                    format: .bgra8UnormSRGB, usage: [.colorTarget])
-                descriptor.sampleCount = Int(settings.samples)
-                multisample = try TextureResource(device: device, descriptor: descriptor)
-            }
             let clear = settings.clearColor
             // A frosted panel or a reveal samples the frame already drawn, so
             // those frames live in an owned texture and reach the drawable in a
@@ -84,6 +82,17 @@ final class NativeAppWindowRenderer: AppWindowRenderer {
             // to sample the result.
             let samplesFrame = renderer.supportsBackdrop
                 && (list.reveal != nil || list.batches.contains { $0.backdrop != nil })
+            // Backdrop/reveal split rendering and reload earlier samples.
+            // Ordinary frames resolve once and can keep 4x coverage tile-only.
+            let transient = !samplesFrame
+            if settings.samples > 1 && (multisample?.descriptor.width != pixels.x
+                || multisample?.descriptor.height != pixels.y
+                || multisample?.descriptor.transientAttachment != transient) {
+                multisample = try TextureResource(device: device, descriptor: TextureDescriptor(
+                    width: pixels.x, height: pixels.y, format: .bgra8UnormSRGB, usage: .colorTarget,
+                    sampleCount: Int(settings.samples), label: "ui-multisample",
+                    transientAttachment: transient))
+            }
             if !samplesFrame { framebuffer = nil }
             else if framebuffer?.descriptor.width != pixels.x || framebuffer?.descriptor.height != pixels.y {
                 framebuffer = try TextureResource(device: device, descriptor: TextureDescriptor(
@@ -92,7 +101,7 @@ final class NativeAppWindowRenderer: AppWindowRenderer {
             }
             let surface = samplesFrame ? framebuffer?.texture ?? image.texture : image.texture
             var target = RenderColorTarget(texture: multisample?.texture ?? surface,
-                loadAction: .clear(clear))
+                loadAction: .clear(clear), store: multisample == nil || samplesFrame)
             target.resolveTexture = multisample == nil ? nil : surface
             let commands = CommandBuffer()
             let frame = try renderer.record(list: list, into: commands, target: target,

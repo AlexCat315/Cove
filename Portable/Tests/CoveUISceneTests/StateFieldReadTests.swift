@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 import CoveUIComposeCore
 
@@ -27,6 +28,36 @@ struct StateFieldReadTests {
             let _ = counter.bump()
             EmptyView()
         }
+    }
+
+    private struct DeferredProbe: _PrimitiveView {
+        let read: () -> Void
+        var layout = false
+        func _makeNode() -> Node { Node() }
+        func _updateNode(_ node: Node) {
+            node.frame = CGRect(x: 0, y: 0, width: 64, height: 64)
+            if layout { node.layoutDidUpdate = { _ in read() } }
+            else { node.draw = { _, _ in read() } }
+        }
+    }
+
+    @TrackStateReads
+    struct Deferred: View {
+        @State var model = Model()
+        let bodyCounter: Counter
+        let readCounter: Counter
+        var layout = false
+        var body: some View {
+            let _ = bodyCounter.bump()
+            DeferredProbe(read: { let _ = model.name; readCounter.bump() }, layout: layout)
+        }
+    }
+
+    @TrackStateReads
+    struct Signal: View {
+        @State var revision = 0
+        let counter: Counter
+        var body: some View { let _ = counter.bump(); EmptyView() }
     }
 
     @TrackStateReads
@@ -124,6 +155,51 @@ struct StateFieldReadTests {
         replacement.field.box.text = "b"
         harness.model = replacement
         #expect(recomposer.hasPending)
+        recomposer.commitAll()
+        #expect(counter.count == 2)
+    }
+
+    @Test("Deferred custom painting tracks fields without subscribing event reads")
+    func deferredPaint() throws {
+        let body = Counter(), paint = Counter(), harness = Deferred(bodyCounter: body, readCounter: paint)
+        let recomposer = Recomposer(), graph = ViewGraph(tree: NodeTree(), recomposer: recomposer)
+        graph.install(root: harness)
+        defer { graph.install(root: EmptyView()) }
+        NodeRenderer().render(root: try #require(graph.tree.root), into: DrawList())
+        #expect(body.count == 1 && paint.count == 1)
+        harness.model.age += 1
+        #expect(!recomposer.hasPending)
+        harness.model.name = "b"
+        #expect(recomposer.hasPending)
+        recomposer.commitAll()
+        #expect(body.count == 2)
+        NodeRenderer().render(root: try #require(graph.tree.root), into: DrawList())
+        #expect(paint.count == 2)
+    }
+
+    @Test("Deferred layout callbacks retain their state owner")
+    func deferredLayout() {
+        let body = Counter(), layout = Counter(), harness = Deferred(bodyCounter: body, readCounter: layout, layout: true)
+        let recomposer = Recomposer(), graph = ViewGraph(tree: NodeTree(), recomposer: recomposer)
+        graph.install(root: harness)
+        defer { graph.install(root: EmptyView()) }
+        graph.computeLayout(width: 64, height: 64)
+        #expect(layout.count == 1)
+        harness.model.age += 1
+        #expect(!recomposer.hasPending)
+        harness.model.name = "b"
+        #expect(recomposer.hasPending)
+        recomposer.commitAll()
+        #expect(body.count == 2)
+    }
+
+    @Test("Unread state can still serve as an explicit invalidation signal")
+    func unreadSignal() {
+        let counter = Counter(), harness = Signal(counter: counter)
+        let recomposer = Recomposer(), graph = ViewGraph(tree: NodeTree(), recomposer: recomposer)
+        graph.install(root: harness)
+        defer { graph.install(root: EmptyView()) }
+        harness.revision += 1
         recomposer.commitAll()
         #expect(counter.count == 2)
     }

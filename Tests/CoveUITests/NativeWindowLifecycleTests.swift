@@ -32,6 +32,24 @@ struct NativeWindowLifecycleTests {
         for index in 0..<100 {
             #expect(try windowRenderer.draw(list: list, logical: SIMD2(64, 64)))
             #expect(windowRenderer.memorySnapshot.estimatedTargetBytes > 0)
+            #if arch(arm64)
+            #expect(windowRenderer.memorySnapshot.msaaMemoryless)
+            #expect(windowRenderer.memorySnapshot.msaaAllocatedBytes == 0)
+            #endif
+            if index == 0, renderer.supportsBackdrop {
+                let frosted = DrawList()
+                frosted.addRect(UIRect(x: 0, y: 0, width: 64, height: 64), color: .white)
+                frosted.beginBackdrop(UIBackdrop(rect: UIRect(x: 8, y: 8, width: 48, height: 48), blurRadius: 3))
+                frosted.addRect(UIRect(x: 8, y: 8, width: 48, height: 48), color: Color(r: 0.2, g: 0.3, b: 0.4, a: 0.5))
+                #expect(try windowRenderer.draw(list: frosted, logical: SIMD2(64, 64)))
+                #expect(!windowRenderer.memorySnapshot.msaaMemoryless)
+                #expect((windowRenderer.memorySnapshot.msaaAllocatedBytes ?? 0) > 0)
+                #expect(try windowRenderer.draw(list: list, logical: SIMD2(64, 64)))
+                #if arch(arm64)
+                #expect(windowRenderer.memorySnapshot.msaaMemoryless)
+                #expect(windowRenderer.memorySnapshot.msaaAllocatedBytes == 0)
+                #endif
+            }
             try windowRenderer.setPresentationActive(false)
             #expect(windowRenderer.memorySnapshot.state == .suspended)
             #expect(!windowRenderer.memorySnapshot.hasSwapchain)

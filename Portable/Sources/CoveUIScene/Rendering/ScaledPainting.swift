@@ -4,7 +4,7 @@ public import CoveUICore
 /// Custom painters use layout lengths. Resolve their geometry and local clips
 /// into the same scaled space as the node's surface, without changing layout.
 func paintScaled(_ painter: (DrawList, CGPoint) -> Void, into list: DrawList, origin: CGPoint, scale: Float) {
-    guard scale != 1 else { painter(list, origin); return }
+    guard scale != 1 else { StateReadTracking.withDeferredEvaluation { painter(list, origin) }; return }
     guard scale > 0, scale.isFinite else { return }
     let x = Float(origin.x), y = Float(origin.y)
     func resolve(_ rect: UIRect, factor: Float) -> UIRect {
@@ -15,7 +15,7 @@ func paintScaled(_ painter: (DrawList, CGPoint) -> Void, into list: DrawList, or
     local.pixelScale = list.pixelScale * scale
     local.setViewportBounds(list.viewportBounds.map { resolve($0, factor: 1 / scale) })
     if let clip = list.currentClip { local.pushClip(resolve(clip, factor: 1 / scale)) }
-    painter(local, origin)
+    StateReadTracking.withDeferredEvaluation { painter(local, origin) }
     let vertices = local.vertices.map { vertex in
         var result = vertex
         result.posX = x + (vertex.posX - x) * scale

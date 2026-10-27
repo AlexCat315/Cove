@@ -132,9 +132,11 @@ public final class ViewGraph {
         let trace = tree.timeline.begin()
         defer { tree.timeline.end(trace, phase: "layout", name: "Yoga layout") }
         lastLayoutSize = (width, height)
-        layoutRoot.calculateLayout(availableWidth: width, availableHeight: height)
-        guard let root = tree.root else { return }
-        writeLayoutBack(node: root)
+        StateReadTracking.withDeferredEvaluation {
+            layoutRoot.calculateLayout(availableWidth: width, availableHeight: height)
+            guard let root = tree.root else { return }
+            writeLayoutBack(node: root)
+        }
     }
 
     /// Run layout only when Yoga says some layout node is dirty or the root

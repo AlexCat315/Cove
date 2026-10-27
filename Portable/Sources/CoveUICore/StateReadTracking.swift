@@ -11,7 +11,10 @@ public enum StateReadTracking {
         }
     }
 
-    private final class StackBox { var stack: [Scope] = [] }
+    private final class StackBox {
+        var stack: [Scope] = []
+        var deferredDepth = 0
+    }
     private static let storageKey = "cove.ui.StateReadTracking.stack"
     private static let lock = NSLock()
     nonisolated(unsafe) private static var cleaners: [ObjectIdentifier: [ObjectIdentifier: (ObjectIdentifier) -> Void]] = [:]
@@ -28,6 +31,16 @@ public enum StateReadTracking {
     #endif
 
     static var current: Scope? { stack.stack.last }
+    static var isDeferredEvaluation: Bool { stack.deferredDepth > 0 }
+
+    /// Layout callbacks and painters run after body evaluation. Reads there
+    /// still subscribe to their state's retained owner; input actions do not.
+    public static func withDeferredEvaluation<R>(_ body: () throws -> R) rethrows -> R {
+        let box = stack
+        box.deferredDepth += 1
+        defer { box.deferredDepth -= 1 }
+        return try body()
+    }
     static func contains(_ id: ObjectIdentifier) -> Bool { lock.withLock { installed.contains(id) } }
 
     public static func withScope<R>(_ scope: Scope, _ body: () throws -> R) rethrows -> R {
@@ -66,8 +79,15 @@ extension StateStorage {
         var fields: [AnyKeyPath: FieldRead] = [:]
     }
 
+    private var readScope: StateReadTracking.Scope? {
+        if let current = StateReadTracking.current { return current }
+        guard preciseOwner, StateReadTracking.isDeferredEvaluation,
+              let ownerScope, let onChange else { return nil }
+        return .init(id: ownerScope, invalidate: { _ in onChange() })
+    }
+
     func readWhole() {
-        guard preciseOwner, let scope = StateReadTracking.current else { return }
+        guard preciseOwner, let scope = readScope else { return }
         register(scope)
         readersLock.withLock {
             var reader = readers[scope.id] ?? Reader(invalidate: scope.invalidate)
@@ -78,7 +98,7 @@ extension StateStorage {
 
     func read<Field>(_ keyPath: KeyPath<Value, Field>, name: String) -> Field {
         let observed = value[keyPath: keyPath]
-        if let scope = StateReadTracking.current {
+        if let scope = readScope {
             register(scope)
             readersLock.withLock {
                 var reader = readers[scope.id] ?? Reader(invalidate: scope.invalidate)
@@ -109,7 +129,7 @@ extension StateStorage {
         }
         // Existing views keep their explicit state-write invalidation contract.
         // A tracked view is invalidated by exactly the values its body read.
-        if !preciseOwner || ownerScope.map({ !StateReadTracking.contains($0) }) != false {
+        if !preciseOwner || snapshot.isEmpty || ownerScope.map({ !StateReadTracking.contains($0) }) != false {
             onChange?()
         }
     }

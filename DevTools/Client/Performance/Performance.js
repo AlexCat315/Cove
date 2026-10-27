@@ -84,9 +84,12 @@ function acceptMemory(env) {
   perf.memory = value;
   const counters = value.counters ?? {};
   const mib = bytes => `${(Number(bytes || 0) / 1048576).toFixed(2)} MiB`;
-  const targets = Object.values(value.windows ?? {}).reduce((sum, window) => sum + Number(window.targetBytes || 0), 0);
+  const windows = Object.values(value.windows ?? {});
+  const targets = windows.reduce((sum, window) => sum + Number(window.targetBytes || 0), 0);
+  const hasAllocation = windows.every(window => Number.isFinite(window.msaaAllocatedBytes));
+  const msaaBacking = hasAllocation ? mib(windows.reduce((sum, window) => sum + window.msaaAllocatedBytes, 0)) : "n/a";
   const container = el("perfMemory");
-  if (container) container.textContent = `Owned estimates · Text ${mib((counters.shapingBytes || 0) + (counters.layoutBytes || 0))} · Images ${mib(counters.imageBytes)} · Window targets ${mib(targets)} · Skipped updates ${counters.skippedParentUpdates || 0}`;
+  if (container) container.textContent = `Text ${mib((counters.shapingBytes || 0) + (counters.layoutBytes || 0))} · Images ${mib(counters.imageBytes)} · Targets ${mib(targets)} logical · MSAA backing ${msaaBacking} · Skipped updates ${counters.skippedParentUpdates || 0}`;
   return true;
 }
 

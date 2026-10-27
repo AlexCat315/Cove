@@ -5,10 +5,12 @@ public final class TextureResource {
     public let device: Device
     public let descriptor: TextureDescriptor
     public let texture: Texture
+    public let allocation: TextureAllocation?
 
     public init(device: Device, descriptor: TextureDescriptor) throws {
         self.device = device; self.descriptor = descriptor
         texture = try device.makeTexture(descriptor)
+        allocation = device.textureAllocation(of: texture)
     }
 
     deinit { device.destroy(texture) }

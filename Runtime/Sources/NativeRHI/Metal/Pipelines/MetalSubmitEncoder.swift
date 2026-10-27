@@ -178,6 +178,17 @@ private struct MetalPassEncoder {
             info.supportsColorResolve = texture.pixelFormat != .r32Uint
             return info
         }
+        for target in record.descriptor.colorTargets {
+            if registries.textures[target.texture.id]?.storageMode == .memoryless {
+                if case .load = target.loadAction { throw RHIError.invalidArgument("memoryless color attachments cannot load prior contents") }
+                try rhiRequire(!target.store, "memoryless color attachments cannot store multisample contents")
+            }
+        }
+        if let target = record.descriptor.depthTarget,
+           registries.textures[target.texture.id]?.storageMode == .memoryless {
+            if case .load = target.loadAction { throw RHIError.invalidArgument("memoryless depth attachments cannot load prior contents") }
+            try rhiRequire(!target.store, "memoryless depth attachments cannot store contents")
+        }
         for command in record.body {
             switch command {
             case .setPipeline(let handle):
