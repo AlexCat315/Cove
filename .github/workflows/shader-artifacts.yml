@@ -1,11 +1,11 @@
-name: Native UI shader artifacts
+name: Native shader artifacts
 on:
   workflow_dispatch:
     inputs:
       target:
         description: Artifact family to generate
         type: choice
-        options: [all, dxil, metal]
+        options: [all, dxil, metal, engine-dxil]
         default: all
       diffuseRef:
         description: Diffuse shader source revision
@@ -15,31 +15,12 @@ permissions:
   contents: read
 jobs:
   dxil:
-    if: inputs.target != 'metal'
+    if: inputs.target == 'all' || inputs.target == 'dxil'
     runs-on: windows-2025-vs2026
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7.0.1
-      - name: Install pinned Slang
-        shell: pwsh
-        run: |
-          $archive = Join-Path $env:RUNNER_TEMP 'slang.zip'
-          $root = Join-Path $env:RUNNER_TEMP 'slang'
-          curl.exe --fail --location --retry 3 --output $archive https://github.com/shader-slang/slang/releases/download/v2026.19/slang-2026.19-windows-x86_64.zip
-          if ($LASTEXITCODE -ne 0) { throw 'Slang download failed' }
-          if ((Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant() -ne 'fc922f214b5d115f663932e59e80e0f6b6cc6fae140979cf307da6459b6f8f33') { throw 'Slang checksum mismatch' }
-          Expand-Archive -Path $archive -DestinationPath $root
-          $compiler = Get-ChildItem -Path $root -Recurse -Filter slangc.exe | Select-Object -First 1
-          if (-not $compiler) { throw 'slangc.exe missing' }
-          if (-not (Test-Path (Join-Path $compiler.Directory.FullName 'dxcompiler.dll'))) {
-            $dxc = Get-ChildItem -Path 'C:\Program Files (x86)\Windows Kits\10\bin' -Recurse -Filter dxcompiler.dll |
-              Where-Object { $_.Directory.Name -eq 'x64' } | Sort-Object FullName -Descending | Select-Object -First 1
-            if (-not $dxc) { throw 'Windows SDK dxcompiler.dll missing' }
-            Copy-Item $dxc.FullName $compiler.Directory.FullName
-            $validator = Join-Path $dxc.Directory.FullName 'dxil.dll'
-            if (Test-Path $validator) { Copy-Item $validator $compiler.Directory.FullName }
-          }
-          "SLANGC=$($compiler.FullName)" >> $env:GITHUB_ENV
+      - uses: ./.github/actions/setup-slang
       - name: Compile and validate UI shader ABI
         run: node Tools/Shaders/build-native-ui.mjs dist/shaders/dxil
       - uses: actions/upload-artifact@v4
@@ -48,7 +29,7 @@ jobs:
           path: dist/shaders/dxil
           if-no-files-found: error
   metal:
-    if: inputs.target != 'dxil'
+    if: inputs.target == 'all' || inputs.target == 'metal'
     runs-on: xcode-27
     timeout-minutes: 30
     steps:
@@ -73,4 +54,40 @@ jobs:
         with:
           name: native-metal-libraries
           path: dist/metal
+          if-no-files-found: error
+  engine-dxil:
+    if: inputs.target == 'all' || inputs.target == 'engine-dxil'
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@v7.0.1
+        with:
+          repository: AlexCat315/Diffuse
+          ref: ${{ inputs.diffuseRef }}
+          path: diffuse
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: v0.2.6
+          path: shader-sdk
+      - uses: SwiftyLab/setup-swift@v1.14.1
+        with:
+          swift-version: '6.4.1'
+      - uses: ilammy/msvc-dev-cmd@v1
+      - uses: ./.github/actions/setup-slang
+      - name: Compile engine DXIL and fixed workgroup families
+        shell: pwsh
+        working-directory: diffuse
+        run: |
+          $env:COVE_SDK_ROOT = (Resolve-Path '../shader-sdk').Path
+          $env:COVE_ROOT = (Get-Location).Path
+          & ../shader-sdk/cove.cmd internal build-package Tools/Developer --product cove-dev --result-file ../shader-products.json
+          if ($LASTEXITCODE -ne 0) { throw 'Shader tool build failed' }
+          $products = (Get-Content ../shader-products.json | ConvertFrom-Json).products
+          & (Join-Path $products 'cove-dev.exe') shader rebuild --targets dxil
+          if ($LASTEXITCODE -ne 0) { throw 'Engine shader rebuild failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-engine-dxil
+          path: diffuse/Engine/Sources/RenderBackend/Resources/Shaders/Native/dxil
           if-no-files-found: error
