@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## 0.2.9 — 2026-10-27
+
 ## 0.2.8 — 2026-10-27
 
 - 增加 `Device.prepareResources` 和四类资源的异步创建 API，提供阶段/步骤/编译进度、Task 取消和失败清理；Metal、Vulkan、DX12 在昂贵编译期间释放设备资源锁，已预热的 UI 可继续渲染。
