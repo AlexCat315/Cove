@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -9,7 +9,9 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const compiler = process.env.SLANGC;
 if (!compiler) throw new Error('Set SLANGC to the pinned Slang 2026.19 executable');
-const version = execFileSync(compiler, ['-version'], { encoding: 'utf8' }).trim();
+const versionResult = spawnSync(compiler, ['-version'], { encoding: 'utf8' });
+if (versionResult.status !== 0) throw new Error('Failed to query Slang version');
+const version = (versionResult.stdout + versionResult.stderr).trim();
 if (version !== '2026.19') throw new Error(`Expected Slang 2026.19, got ${version}`);
 const shaders = join(root, 'Sources/CoveUIRuntime/Resources/Shaders');
 const output = resolve(process.argv[2] ?? join(shaders, 'Native/dxil'));
