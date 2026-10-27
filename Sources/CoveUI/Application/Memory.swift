@@ -54,21 +54,21 @@ final class ApplicationMemoryPressure {
     init(host: SDL3PlatformHost, trim: @escaping @MainActor () -> Void) {
         #if os(macOS)
         let source = DispatchSource.makeMemoryPressureSource(eventMask: [.warning, .critical], queue: .global())
-        source.setEventHandler { [weak host] in
+        source.setEventHandler { @Sendable [weak host] in
             host?.enqueueMainThreadWork { MainActor.assumeIsolated { trim() } }
         }
         source.resume()
         self.source = source
         #elseif os(iOS)
         observer = NotificationCenter.default.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification,
-            object: nil, queue: nil) { [weak host] _ in
+            object: nil, queue: nil) { @Sendable [weak host] _ in
                 host?.enqueueMainThreadWork { MainActor.assumeIsolated { trim() } }
             }
         #elseif os(Windows) || os(Linux)
         let source = DispatchSource.makeTimerSource(queue: .global())
         source.schedule(deadline: .now(), repeating: .seconds(2))
         let probe = probe
-        source.setEventHandler { [weak host] in
+        source.setEventHandler { @Sendable [weak host] in
             if probe.changedToLowMemory() {
                 host?.enqueueMainThreadWork { MainActor.assumeIsolated { trim() } }
             }
