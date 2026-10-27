@@ -1,0 +1,38 @@
+name: Native UI shader artifacts
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dxil:
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Install pinned Slang
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'slang.zip'
+          $root = Join-Path $env:RUNNER_TEMP 'slang'
+          curl.exe --fail --location --retry 3 --output $archive https://github.com/shader-slang/slang/releases/download/v2026.19/slang-2026.19-windows-x86_64.zip
+          if ($LASTEXITCODE -ne 0) { throw 'Slang download failed' }
+          if ((Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant() -ne 'fc922f214b5d115f663932e59e80e0f6b6cc6fae140979cf307da6459b6f8f33') { throw 'Slang checksum mismatch' }
+          Expand-Archive -Path $archive -DestinationPath $root
+          $compiler = Get-ChildItem -Path $root -Recurse -Filter slangc.exe | Select-Object -First 1
+          if (-not $compiler) { throw 'slangc.exe missing' }
+          if (-not (Test-Path (Join-Path $compiler.Directory.FullName 'dxcompiler.dll'))) {
+            $dxc = Get-ChildItem -Path 'C:\Program Files (x86)\Windows Kits\10\bin' -Recurse -Filter dxcompiler.dll |
+              Where-Object { $_.Directory.Name -eq 'x64' } | Sort-Object FullName -Descending | Select-Object -First 1
+            if (-not $dxc) { throw 'Windows SDK dxcompiler.dll missing' }
+            Copy-Item $dxc.FullName $compiler.Directory.FullName
+            $validator = Join-Path $dxc.Directory.FullName 'dxil.dll'
+            if (Test-Path $validator) { Copy-Item $validator $compiler.Directory.FullName }
+          }
+          "SLANGC=$($compiler.FullName)" >> $env:GITHUB_ENV
+      - name: Compile and validate UI shader ABI
+        run: node Tools/Shaders/build-native-ui.mjs dist/shaders/dxil
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-ui-dxil
+          path: dist/shaders/dxil
+          if-no-files-found: error
