@@ -184,10 +184,13 @@ private func builtinButtonChromeValues(state: BuiltinButtonChromeState,
     let border: Color
     let borderWidth: Float
 
+    var hasBorder = false
     switch state.kind {
     case .primary:
         if !state.isEnabled {
-            background = theme.colors.surfaceVariant
+            // Disabled primary shares the control face and keeps its text
+            // muted, rather than a washed-out accent.
+            background = theme.colors.surface
         } else if pressed {
             background = theme.colors.accentPressed
         } else if hovered {
@@ -195,24 +198,19 @@ private func builtinButtonChromeValues(state: BuiltinButtonChromeState,
         } else {
             background = theme.colors.accent
         }
-        border = focused ? theme.colors.focusRing : clear
-        borderWidth = focused ? 2 : 0
     case .secondary:
-        // A translucent ink wash, so the button stands out from whatever surface
-        // it sits on instead of matching a card of the same tone.
-        let ink = theme.colors.onSurface
+        // A solid control face (surface) with a 1-px border, darkening on
+        // hover and press — matching the reference button treatment.
         if !state.isEnabled {
-            background = ink.multipliedAlpha(0.04)
+            background = theme.colors.surface
         } else if pressed {
-            background = ink.multipliedAlpha(0.16)
+            background = theme.colors.surfacePressed
         } else if hovered {
-            background = ink.multipliedAlpha(0.12)
+            background = theme.colors.surfaceVariant
         } else {
-            background = ink.multipliedAlpha(0.08)
+            background = theme.colors.surface
         }
-        // The tonal fill already reads as a button; an outline only adds noise.
-        border = focused ? theme.colors.focusRing : clear
-        borderWidth = focused ? 2 : 0
+        hasBorder = state.isEnabled
     case .ghost:
         if pressed {
             background = theme.colors.stateLayerPressed
@@ -221,12 +219,10 @@ private func builtinButtonChromeValues(state: BuiltinButtonChromeState,
         } else {
             background = clear
         }
-        border = focused ? theme.colors.focusRing : clear
-        borderWidth = focused ? 2 : 0
     case .destructive:
         let error = theme.colors.error
         if !state.isEnabled {
-            background = theme.colors.surfaceVariant
+            background = theme.colors.surface
         } else if pressed {
             background = error.composited(over: theme.colors.stateLayerPressed)
         } else if hovered {
@@ -234,8 +230,6 @@ private func builtinButtonChromeValues(state: BuiltinButtonChromeState,
         } else {
             background = error
         }
-        border = focused ? theme.colors.focusRing : clear
-        borderWidth = focused ? 2 : 0
     case .toggle:
         // Selection still conveys the current mode when its command cannot
         // be repeated (e.g. Play while already playing). Keep the paired
@@ -255,8 +249,19 @@ private func builtinButtonChromeValues(state: BuiltinButtonChromeState,
         } else {
             background = clear
         }
-        border = focused ? theme.colors.focusRing : clear
-        borderWidth = focused ? 2 : 0
+    }
+
+    // Keyboard focus paints a 2-px accent ring; otherwise the secondary face
+    // carries its 1-px hairline.
+    if focused {
+        border = theme.colors.focusRing
+        borderWidth = 2
+    } else if hasBorder {
+        border = theme.colors.border
+        borderWidth = 1
+    } else {
+        border = clear
+        borderWidth = 0
     }
 
     return BuiltinButtonChromeValues(background: background,

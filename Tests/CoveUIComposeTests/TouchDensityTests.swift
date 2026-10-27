@@ -109,7 +109,7 @@ struct TouchDensityTests: CoveUIComposeSerializedSuite {
         graph.recomposer.commitAll(); graph.computeLayout(width: 400, height: 400)
         let restored = try #require(nodes(graph.tree.root!).first { $0.attachments[LayoutDebugAttachmentKey.debugName] as? String == "authored" })
         #expect(restored === authored && restored.frame.height == 38 && restored.layoutNode?.minHeight == 38)
-        for (name, height): (String, CGFloat) in [("switch", 24), ("slider", 24), ("field", 28)] {
+        for (name, height): (String, CGFloat) in [("switch", 20), ("slider", 24), ("field", 28)] {
             let node = try #require(nodes(graph.tree.root!).first { $0.attachments[LayoutDebugAttachmentKey.debugName] as? String == name })
             #expect(node.frame.height == height)
         }

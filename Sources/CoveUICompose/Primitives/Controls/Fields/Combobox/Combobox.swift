@@ -178,7 +178,7 @@ public struct Combobox<Value: Hashable>: View {
                         }
                     }
                 }
-            }.padding(8).floatingSurface(.controlRadius)
+            }.padding(4).floatingSurface(.groupRadius, elevation: .panel)
         })
         popover.sizing = .anchor
         popover.triggerDescription = .init(label: title, value: selectedLabel ?? "", help: title)

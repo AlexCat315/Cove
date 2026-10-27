@@ -86,7 +86,7 @@ public struct ProgressView: _PrimitiveView {
             let alpha = node.opacity * (isEnabled ? 1 : 0.5)
             let radius = rect.height / 2
             list.addRoundedRect(rect, radius: radius,
-                                color: theme.colors.surfaceVariant.multipliedAlpha(alpha))
+                                color: theme.colors.border.multipliedAlpha(alpha))
             guard rect.width > rect.height else { return }
             if indeterminate {
                 let phase = Float(clock.phase)

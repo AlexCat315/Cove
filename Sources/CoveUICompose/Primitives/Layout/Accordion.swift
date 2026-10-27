@@ -49,7 +49,7 @@ public struct Accordion<ID: Hashable>: View {
                         if index < items.count - 1 { Divider() }
                     }.id(item.id))
                 }
-            }.background(.surfaceRaised).border(.border, width: 1).cornerRadius(.panelRadius).clipped()
+            }.background(.surfaceRaised).border(.border, width: 1).cornerRadius(.controlRadius).clipped()
         }
     }
     public func toggle(_ id: ID) {
@@ -63,7 +63,8 @@ private struct AccordionHeaderStyle: ButtonStyle {
     func makeBody(configuration c: ButtonStyleConfiguration) -> some View {
         Box(direction: .row, alignItems: .center) { AnyView(c.label).flex(1, shrink: 1) }.flex(1, shrink: 1)
             .foregroundColor(c.isEnabled ? .onSurface : .onSurfaceDisabled)
-            .background(c.isPressed ? c.theme.colors.stateLayerPressed : c.isHovered ? c.theme.colors.stateLayerHover : .clear)
+            // A solid hover face, matching the reference accordion header.
+            .background(c.isPressed ? c.theme.colors.surfacePressed : c.isHovered ? c.theme.colors.surfaceVariant : .clear)
             .border(c.isFocused ? c.theme.colors.focusRing : .clear, width: 2)
             .opacity(c.isEnabled ? 1 : 0.55)
             .animation(motion: .fast, value: c.interactionKey)

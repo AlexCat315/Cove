@@ -5,12 +5,12 @@ public struct ModalGeometry {
     public var width: Float = 760
     public var height: Float = 560
     public var inset: Float = 16
-    public var cornerRadius: Float = 8
+    public var cornerRadius: Float = 10
     public var placement: ModalPlacement = .center
     public init() {}
     mutating func validate() {
         width = width.isFinite ? max(64, width) : 760; height = height.isFinite ? max(64, height) : 560
-        inset = inset.isFinite ? max(0, inset) : 16; cornerRadius = cornerRadius.isFinite ? max(0, cornerRadius) : 8
+        inset = inset.isFinite ? max(0, inset) : 16; cornerRadius = cornerRadius.isFinite ? max(0, cornerRadius) : 10
     }
     mutating func fitCompactWindow(_ size: CGSize) {
         guard placement == .center, size.width < CGFloat(UIEnvironment.Viewport.compactMaximumWidth) else { return }

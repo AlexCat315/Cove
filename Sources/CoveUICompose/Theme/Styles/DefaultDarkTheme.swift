@@ -2,53 +2,48 @@ import CoveUIRuntime
 
 /// Default dark theme bundled with CoveUI.
 ///
-/// Modern-IDE palette: a dark canvas
-/// (`background`) with floating panel bodies that sit *darker* than the canvas
-/// (`surfaceSunken`), visible high-contrast borders, a saturated cool blue as
-/// the single interactive accent, and a purple secondary accent for content
-/// classification. Typography separates page headings from controls and supporting text.
+/// Neutral-zinc palette matching the reference design: a zinc-900 window,
+/// zinc-800 control faces, a single blue accent ramp (lighter on hover than
+/// at rest, as the reference), and flat zinc borders.
 public enum DefaultDarkTheme {
     public static let value: Theme = Theme(
         colors: ColorScheme(
-            background:       Color(red: 0x1E, green: 0x1F, blue: 0x22),
-            surface:          Color(red: 0x27, green: 0x29, blue: 0x2E),
-            surfaceVariant:   Color(red: 0x2E, green: 0x31, blue: 0x38),
-            surfaceSunken:    Color(red: 0x18, green: 0x19, blue: 0x1D),
-            surfaceRaised:    Color(red: 0x2E, green: 0x30, blue: 0x36),
-            surfaceFloating:  Color(red: 0x2B, green: 0x2D, blue: 0x33),
-            surfaceOverlay:   Color(red: 0x23, green: 0x25, blue: 0x29),
+            background:       Color(red: 0x18, green: 0x18, blue: 0x1B),
+            surface:          Color(red: 0x27, green: 0x27, blue: 0x2A),
+            surfaceVariant:   Color(red: 0x32, green: 0x32, blue: 0x36),
+            surfacePressed:   Color(red: 0x3C, green: 0x3C, blue: 0x41),
+            surfaceSunken:    Color(red: 0x18, green: 0x18, blue: 0x1B),
+            surfaceRaised:    Color(red: 0x1D, green: 0x1D, blue: 0x20),
+            surfaceFloating:  Color(red: 0x18, green: 0x18, blue: 0x1B),
+            surfaceOverlay:   Color(red: 0x18, green: 0x18, blue: 0x1B),
 
-            onBackground:     Color(red: 0xDF, green: 0xE1, blue: 0xE5),
-            onSurface:        Color(red: 0xDF, green: 0xE1, blue: 0xE5),
-            onSurfaceVariant: Color(red: 0xB4, green: 0xBA, blue: 0xC4),
-            onSurfaceMuted:   Color(red: 0x8B, green: 0x91, blue: 0x9B),
+            onBackground:     Color(red: 0xF4, green: 0xF4, blue: 0xF5),
+            onSurface:        Color(red: 0xF4, green: 0xF4, blue: 0xF5),
+            onSurfaceVariant: Color(red: 0xA1, green: 0xA1, blue: 0xAA),
+            onSurfaceMuted:   Color(red: 0xA1, green: 0xA1, blue: 0xAA),
 
-            accent:           Color(red: 0x35, green: 0x74, blue: 0xF0),
-            accentHover:      Color(red: 0x4D, green: 0x85, blue: 0xF4),
-            accentPressed:    Color(red: 0x2A, green: 0x62, blue: 0xD8),
+            accent:           Color(red: 0x3B, green: 0x82, blue: 0xF6),
+            accentHover:      Color(red: 0x60, green: 0xA5, blue: 0xFA),
+            accentPressed:    Color(red: 0x25, green: 0x63, blue: 0xEB),
             onAccent:         Color(red: 0xFF, green: 0xFF, blue: 0xFF),
-            accentMuted:      Color(red: 0x35, green: 0x74, blue: 0xF0, alpha: 0x29),
-            accentSecondary:  Color(red: 0xB1, green: 0x62, blue: 0xF1),
+            accentMuted:      Color(red: 0x3B, green: 0x82, blue: 0xF6, alpha: 0x33),
+            accentSecondary:  Color(red: 0xA8, green: 0x55, blue: 0xF7),
 
-            stateLayerHover:    Color(red: 0xFF, green: 0xFF, blue: 0xFF, alpha: 0x12),
-            stateLayerPressed:  Color(red: 0xFF, green: 0xFF, blue: 0xFF, alpha: 0x1E),
-            stateLayerSelected: Color(red: 0x35, green: 0x74, blue: 0xF0, alpha: 0x38),
+            stateLayerHover:    Color(red: 0xFF, green: 0xFF, blue: 0xFF, alpha: 0x0F),
+            stateLayerPressed:  Color(red: 0xFF, green: 0xFF, blue: 0xFF, alpha: 0x1A),
+            stateLayerSelected: Color(red: 0x3B, green: 0x82, blue: 0xF6, alpha: 0x38),
 
-            success:          Color(red: 0x6E, green: 0xCD, blue: 0x7E),
-            warning:          Color(red: 0xEA, green: 0xC0, blue: 0x66),
-            error:            Color(red: 0xF5, green: 0x6E, blue: 0x6E),
-            info:             Color(red: 0x72, green: 0xB4, blue: 0xFF),
+            success:          Color(red: 0x22, green: 0xC5, blue: 0x5E),
+            warning:          Color(red: 0xF5, green: 0x9E, blue: 0x0B),
+            error:            Color(red: 0xEF, green: 0x44, blue: 0x44),
+            info:             Color(red: 0x3B, green: 0x82, blue: 0xF6),
 
-            // Translucent white keeps edges soft on every surface: surfaces separate
-            // regions, and an edge only confirms a boundary already seen.
-            border:           Color(red: 0xFF, green: 0xFF, blue: 0xFF, alpha: 0x1C),
-            borderStrong:     Color(red: 0xFF, green: 0xFF, blue: 0xFF, alpha: 0x30),
-            divider:          Color(red: 0xFF, green: 0xFF, blue: 0xFF, alpha: 0x10),
-            // Matches the light theme: a ring that can be told apart from the
-            // fill it crosses, instead of a translucent wash.
-            focusRing:        Color(red: 0x35, green: 0x74, blue: 0xF0, alpha: 0xE6),
-            selection:        Color(red: 0x35, green: 0x74, blue: 0xF0, alpha: 0x38),
-            overlay:          Color(red: 0x00, green: 0x00, blue: 0x00, alpha: 0xB8)
+            border:           Color(red: 0x3F, green: 0x3F, blue: 0x46),
+            borderStrong:     Color(red: 0x6C, green: 0x6C, blue: 0x72), // border mixed 25% toward text
+            divider:          Color(red: 0x27, green: 0x27, blue: 0x2A),
+            focusRing:        Color(red: 0x60, green: 0xA5, blue: 0xFA, alpha: 0x99),
+            selection:        Color(red: 0x3B, green: 0x82, blue: 0xF6, alpha: 0x66),
+            overlay:          Color(red: 0x00, green: 0x00, blue: 0x00, alpha: 0x66)
         ),
         typography: Typography(
             display:    TextStyleToken(font: .system(size: 32, weight: .bold), lineHeight: 38, letterSpacing: -0.6),
@@ -61,24 +56,23 @@ public enum DefaultDarkTheme {
             mono:       TextStyleToken(font: .monospaced(size: 13), lineHeight: 20)
         ),
         spacing:   SpacingScale(xs: 4, sm: 6, md: 8, lg: 12, xl: 16, xxl: 24),
-        // Radii: chips / rows 6, controls 10, grouped chrome 14, panels 18.
-        // Apple-leaning continuous-corner feel: each step runs slightly rounder
-        // than the previous scale without turning small controls into pills.
-        radius:    RadiusScale(none: 0, sm: 6, md: 10, lg: 14, xl: 18, pill: 9999),
+        // Radii follow the reference design's 4px spacing unit: check boxes 4,
+        // controls 6, popups and menus 8, modal dialogs 10.
+        radius:    RadiusScale(none: 0, sm: 4, md: 6, lg: 8, xl: 10, pill: 9999),
         elevation: ElevationScale(
             none:   .none,
-            low:    SurfaceShadow(color: Color(red: 0, green: 0, blue: 0, alpha: 0x50), offsetX: 0, offsetY: 1, blur: 2),
-            medium: SurfaceShadow(color: Color(red: 0, green: 0, blue: 0, alpha: 0x72), offsetX: 0, offsetY: 4, blur: 12),
-            high:   SurfaceShadow(color: Color(red: 0, green: 0, blue: 0, alpha: 0x96), offsetX: 0, offsetY: 12, blur: 32),
-            // A floating panel reads as lifted only when a wide, faint halo
-            // separates the whole shape before a tighter shadow under it says
-            // how high it is. One layer has to choose, and either choice alone
-            // looks wrong: broad-only is fog, tight-only is a sticker.
+            // Selected segments, small chips: a tight 1px key shadow.
+            low:    SurfaceShadow(color: Color(red: 0, green: 0, blue: 0, alpha: 0x4D), offsetX: 0, offsetY: 1, blur: 2),
+            // Cards: a hairline key shadow.
+            medium: SurfaceShadow(color: Color(red: 0, green: 0, blue: 0, alpha: 0x33), offsetX: 0, offsetY: 1, blur: 3),
+            // Popups, menus, tooltips: a soft 20px lift.
+            high:   SurfaceShadow(color: Color(red: 0, green: 0, blue: 0, alpha: 0x72), offsetX: 0, offsetY: 6, blur: 20),
+            // Modals: a wide, faint ambient halo over a tighter directional key.
             floating: LayeredShadow(
-                ambient: SurfaceShadow(color: Color(red: 0, green: 0, blue: 0, alpha: 0x4D),
-                                       offsetX: 0, offsetY: 3, blur: 24),
-                key:     SurfaceShadow(color: Color(red: 0, green: 0, blue: 0, alpha: 0x99),
-                                       offsetX: 0, offsetY: 6, blur: 8)
+                ambient: SurfaceShadow(color: Color(red: 0, green: 0, blue: 0, alpha: 0x66),
+                                       offsetX: 0, offsetY: 0, blur: 40),
+                key:     SurfaceShadow(color: Color(red: 0, green: 0, blue: 0, alpha: 0x8C),
+                                       offsetX: 0, offsetY: 10, blur: 16)
             )
         ),
         motion: MotionScale(

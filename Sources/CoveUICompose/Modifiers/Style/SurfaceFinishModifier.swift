@@ -28,22 +28,38 @@ public struct SurfaceFinishModifier: ViewModifier {
 /// anything, and a live backdrop blur samples whatever happens to be behind
 /// the panel, which reads as noise on fine content; the edge and the shadow
 /// carry the depth instead.
+/// The depth of a floating panel.
+public enum FloatingSurfaceElevation: Sendable {
+    /// Menus and popovers: a 20-pt lift (`elevation.high`).
+    case panel
+    /// Modals and sheets: the widest, deepest shadow (`elevation.floating`).
+    case modal
+}
+
 public struct FloatingSurfaceModifier: ViewModifier {
     public let cornerRadius: Float
+    public let elevation: FloatingSurfaceElevation
 
-    public init(cornerRadius: Float) {
+    public init(cornerRadius: Float, elevation: FloatingSurfaceElevation = .modal) {
         self.cornerRadius = max(0, cornerRadius)
+        self.elevation = elevation
     }
 
     public func apply(node: Node) {
         let colors = node.theme.colors
         node.animatableSet(\.backgroundColor, to: colors.surfaceFloating)
         node.animatableSet(\.cornerRadius, to: cornerRadius)
-        node.animatableSet(\.borderColor, to: colors.floatingOutline)
+        node.animatableSet(\.borderColor, to: colors.border)
         node.animatableSet(\.borderWidth, to: 1)
-        let floating = node.theme.elevation.floating
-        node.ambientShadow = floating.ambient
-        node.shadow = floating.key
+        switch elevation {
+        case .modal:
+            let floating = node.theme.elevation.floating
+            node.ambientShadow = floating.ambient
+            node.shadow = floating.key
+        case .panel:
+            node.ambientShadow = SurfaceShadow()
+            node.shadow = node.theme.elevation.high
+        }
     }
 }
 
@@ -51,12 +67,14 @@ public extension View {
     func surfaceFinish() -> some View { modifier(SurfaceFinishModifier()) }
 
     /// Raise this surface above the chrome as a floating panel.
-    func floatingSurface(_ cornerRadius: Float) -> some View {
-        modifier(FloatingSurfaceModifier(cornerRadius: cornerRadius))
+    func floatingSurface(_ cornerRadius: Float,
+                         elevation: FloatingSurfaceElevation = .modal) -> some View {
+        modifier(FloatingSurfaceModifier(cornerRadius: cornerRadius, elevation: elevation))
     }
 
     /// The theme-driven radius, the same way `.cornerRadius(_ token:)` takes one.
-    func floatingSurface(_ cornerRadius: ThemeMetric) -> some View {
-        ThemeReader { theme in self.floatingSurface(cornerRadius.resolve(theme)) }
+    func floatingSurface(_ cornerRadius: ThemeMetric,
+                         elevation: FloatingSurfaceElevation = .modal) -> some View {
+        ThemeReader { theme in self.floatingSurface(cornerRadius.resolve(theme), elevation: elevation) }
     }
 }

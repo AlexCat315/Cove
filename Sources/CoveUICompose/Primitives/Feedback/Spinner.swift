@@ -34,13 +34,14 @@ public struct Spinner: _PrimitiveView {
 
     public func _updateNode(_ node: Node) {
         let clock = node.firstResource(LoadingAnimationClock.self)!
-        clock.configure(duration: 1, isActive: isAnimating && !node.prefersReducedMotion)
+        clock.configure(duration: 0.75, isActive: isAnimating && !node.prefersReducedMotion)
         node.draw = { [weak node] list, origin in
             guard let node else { return }
             let phase = Float(clock.phase) * Float.pi * 2
             let cx = Float(origin.x + node.frame.width / 2), cy = Float(origin.y + node.frame.height / 2)
             let diameter = min(Float(node.frame.width), Float(node.frame.height))
-            let thickness = max(1, diameter / 8)
+            // A 1.5-pt arc at 16 pt, matching the reference loader.
+            let thickness = max(1, diameter * 0.09375)
             let radius = max(2, diameter / 2 - thickness)
             let color = (node.inheritedForegroundColor ?? node.theme.colors.onSurface).multipliedAlpha(node.opacity)
             // Tapered tail: each facet fades in turn so the ring reads as

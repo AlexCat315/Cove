@@ -79,9 +79,9 @@ struct ButtonStyleTests: CoveUIComposeSerializedSuite {
         )
 
         let filled = findFilled(tree.root!)
-        // A translucent ink wash, and no outline at rest.
-        #expect(filled?.backgroundColor == Theme.defaultDark.colors.onSurface.multipliedAlpha(0.08))
-        #expect(filled?.borderWidth == 0)
+        // A solid control face (surface) with a 1-px hairline border at rest.
+        #expect(filled?.backgroundColor == Theme.defaultDark.colors.surface)
+        #expect(filled?.borderWidth == 1)
     } }
 
     @Test(".buttonStyle(.destructive) uses the error color slot")
@@ -125,7 +125,7 @@ struct ButtonStyleTests: CoveUIComposeSerializedSuite {
         graph.install(root: Button("Save", isEnabled: false) { })
 
         let filled = findFilled(tree.root!)
-        #expect(filled?.backgroundColor == Theme.defaultDark.colors.surfaceVariant)
+        #expect(filled?.backgroundColor == Theme.defaultDark.colors.surface)
     } }
 
     @Test(".theme(_:) override flows into the button style")

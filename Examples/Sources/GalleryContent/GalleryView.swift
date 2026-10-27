@@ -62,17 +62,17 @@ public struct GalleryView: View {
             Text("\(GalleryCatalog.entries.count) stories   ·   CoveUI component showcase")
               .font(.caption).foregroundColor(.onSurfaceMuted).padding(horizontal: 24, vertical: 8)
           }.flex(1, shrink: 1, basis: 0).frame(minWidth: 0, minHeight: 0)
-            .background(.surfaceSunken).cornerRadius(14).clipped()
-          }.padding(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 8))
+            .background(.background)
+          }.padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
             .flex(1, shrink: 1, basis: 0).frame(minWidth: 0, minHeight: 0)
         }.flex(1, shrink: 1, basis: 0).frame(minHeight: 0).debugName("gallery-shell")
       }
     }
     .flex(1, shrink: 1, basis: 0)
     .frame(minWidth: 0, minHeight: 0)
-    // The app background paints behind the system bars; only the interactive
-    // chrome is inset, so the surface never shows opaque bars or a letterbox.
-    .background(.surface)
+    // The app background paints behind the system bars; the window is white,
+    // the sidebar carries the surface fill, and the cards carry their own edge.
+    .background(.background)
     .appearance(appearance, transition: .circular())
   }
 
@@ -191,8 +191,10 @@ struct StorySection<Content: View>: View {
     Box(direction: .column, alignItems: .stretch, spacing: 8) {
       Text(title).font(.headline).foregroundColor(.onSurface)
       Text(detail).font(.body).foregroundColor(.onSurfaceMuted)
+      // A white card with a 1-px hairline, 10-pt radius and 18-pt padding.
       Box(direction: .column, alignItems: .stretch, spacing: 12) { content }
-        .padding(22).background(.surface).cornerRadius(12)
+        .padding(18).background(.background).cornerRadius(.panelRadius)
+        .border(.border, width: 1)
     }.flex(0, shrink: 0).frame(minWidth: 0).debugName("story-section-\(title)")
   }
 }

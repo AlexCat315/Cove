@@ -28,3 +28,6 @@ zig-out/
 
 # Build output from checkouts before the Cove migration
 .guava/
+
+# Local visual comparison assets (reference screenshots and capture scripts)
+.compare/

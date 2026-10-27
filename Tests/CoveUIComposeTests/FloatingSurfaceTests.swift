@@ -100,14 +100,14 @@ struct FloatingSurfaceTests: CoveUIComposeSerializedSuite {
                 let panel = try #require(flatten(tree.root).first {
                     $0.backgroundColor != nil && $0.frame.width > 100
                 })
-                // Every floating panel is the same material; a menu that skipped
-                // part of it would render as a plain card among floating ones.
+                // A menu is the panel material: an 8-pt corner, a hairline
+                // border, and the single high (20-pt) lift with no ambient halo.
                 let theme = panel.theme
                 #expect(panel.backgroundColor == theme.colors.surfaceFloating)
-                #expect(panel.cornerRadius == theme.radius.md)
-                #expect(panel.borderColor == theme.colors.floatingOutline)
-                #expect(panel.ambientShadow == theme.elevation.floating.ambient)
-                #expect(panel.shadow == theme.elevation.floating.key)
+                #expect(panel.cornerRadius == theme.radius.lg)
+                #expect(panel.borderColor == theme.colors.border)
+                #expect(panel.ambientShadow == SurfaceShadow())
+                #expect(panel.shadow == theme.elevation.high)
                 // Nothing above the panel clips it: a portal clip cut the shadow
                 // to the panel's box and left square shadow corners.
                 var ancestor = panel.parent

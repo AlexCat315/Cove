@@ -106,7 +106,7 @@ public struct ButtonGroup<ID: Hashable>: View {
                     AnyView(Button(item.title, isEnabled: isEnabled && item.isEnabled, isSelected: selection.wrappedValue == item.id) { selection.wrappedValue = item.id }
                         .buttonStyle(SegmentButtonStyle()).modifier(RovingItemModifier(id: AnyHashable(item.id), isTabStop: tabStop == item.id)))
                 }
-            }.padding(3).background(.surfaceVariant).cornerRadius(.controlRadius)
+            }.padding(3).background(.surface).cornerRadius(.controlRadius)
         }
     }
 }

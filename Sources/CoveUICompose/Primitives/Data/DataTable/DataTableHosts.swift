@@ -71,7 +71,11 @@ struct DataTableRowHost<Content: View>: _PrimitiveView {
         guard node.attachments[rowHostUpdateKey] as? RowHostUpdate != update else { return }
         node.attachments[rowHostUpdateKey] = update
         node.attachments["dataTable.rowIndex"] = index
-        node.backgroundColor = isSelected ? node.theme.colors.selection : isStriped && index % 2 == 1 ? node.theme.colors.surfaceVariant : node.theme.colors.surface
+        // Rows are white with hairline separators; a selected row is solid
+        // accent, matching the reference table.
+        node.backgroundColor = isSelected
+            ? node.theme.colors.accent
+            : (isStriped && index % 2 == 1 ? node.theme.colors.surface.multipliedAlpha(0.6) : node.theme.colors.background)
         node.accessibility = AccessibilitySemantics(isFrozenLane ? .group : .row) {
             $0.label = "Row \(index + 1)"; $0.state.isSelected = isSelected; $0.state.isEnabled = isEnabled
         }

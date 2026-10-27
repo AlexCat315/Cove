@@ -94,8 +94,8 @@ struct ThemeCrossFadeComponentTests: CoveUIComposeSerializedSuite {
             let h = ListHarness()
             graph.install(root: h)
 
-            let darkSelection = Theme.defaultDark.colors.selection
-            let lightSelection = Theme.defaultLight.colors.selection
+            let darkSelection = Theme.defaultDark.colors.accent
+            let lightSelection = Theme.defaultLight.colors.accent
             let node = findFirst(tree.root!) { $0.backgroundColor == darkSelection }
             #expect(node != nil)
 
@@ -125,8 +125,8 @@ struct ThemeCrossFadeComponentTests: CoveUIComposeSerializedSuite {
             let h = TreeHarness()
             graph.install(root: h)
 
-            let darkSelection = Theme.defaultDark.colors.selection
-            let lightSelection = Theme.defaultLight.colors.selection
+            let darkSelection = Theme.defaultDark.colors.accent
+            let lightSelection = Theme.defaultLight.colors.accent
             let node = findFirst(tree.root!) { $0.backgroundColor == darkSelection }
             #expect(node != nil)
 

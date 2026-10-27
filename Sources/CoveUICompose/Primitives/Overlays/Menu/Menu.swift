@@ -69,7 +69,7 @@ public enum MenuEntry {
 }
 
 enum MenuRowMetrics {
-    static let minimumHeight = CompositionLocal<Float>(defaultValue: 32)
+    static let minimumHeight = CompositionLocal<Float>(defaultValue: 30)
 }
 
 public struct Menu: View {
@@ -143,7 +143,7 @@ struct MenuLevel: View {
             }
             // Every panel that floats over content gets the same material: a solid
             // body, a crisp edge and the chrome's shadow under it.
-            .floatingSurface(.controlRadius)
+            .floatingSurface(.groupRadius, elevation: .panel)
             .frame(width: configuration.width)
         }
     }

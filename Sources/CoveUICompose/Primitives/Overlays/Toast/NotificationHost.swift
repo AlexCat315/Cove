@@ -105,11 +105,13 @@ private struct ToastCard: View {
     let controller: ToastController
     var body: some View {
         ThemeReader { theme in
+        let onChip = theme.colors.background
+        let onChipSoft = theme.colors.background.multipliedAlpha(0.82)
         Box(direction: .row, alignItems: .flexStart, spacing: 10) {
             Box(direction: .column, alignItems: .stretch, spacing: 5) {
                 Text(notification.title).truncatingTail().tooltip(notification.title)
-                    .font(.bodyStrong).foregroundColor(notification.tone.color)
-                if !notification.message.isEmpty { Text(notification.message).font(.body).foregroundColor(.onSurfaceVariant) }
+                    .font(.bodyStrong).foregroundColor(onChip)
+                if !notification.message.isEmpty { Text(notification.message).font(.body).foregroundColor(onChipSoft) }
                 if !notification.actions.isEmpty {
                     Box(direction: .row, alignItems: .center, wrap: .wrap, spacing: 8) {
                         actionButton(notification.actions[0])
@@ -122,11 +124,14 @@ private struct ToastCard: View {
             if notification.isDismissible {
                 Button(icon: .resource(UIIcons.Action.x), size: 12, tooltip: "Dismiss notification") { controller.dismiss(notification.id) }
                     .buttonStyle(.ghost).controlSize(.small)
+                    .foregroundColor(onChipSoft)
                     .debugName("toast-dismiss-\(notification.id)")
             }
-        // Opaque on purpose: a toast must stay readable over whatever it covers.
-        }.padding(14).background(.surfaceFloating).cornerRadius(.groupRadius).border(.border, width: 1)
-            .shadow(color: theme.elevation.low.color ?? .clear, offsetY: 2, blur: 10)
+        // Inverted toast: the primary text colour fills the chip, the window
+        // background colour carries the label, and a wide lift shadow floats it.
+        }.foregroundColor(onChip)
+         .padding(horizontal: 14, vertical: 10).background(theme.colors.onSurface).cornerRadius(.groupRadius)
+            .shadow(color: Color(r: 0, g: 0, b: 0, a: 0.25), offsetY: 6, blur: 20)
             .onHover { controller.setPaused($0, id: notification.id) }
         }
     }

@@ -15,12 +15,16 @@ public struct DefaultTreeRowStyle: TreeRowStyle {
 
     public func makeBody(configuration: TreeRowStyleConfiguration) -> some View {
         let t = configuration.theme
-        let selection = SelectionAppearance.resolve(.navigation, theme: t)
-        let bg: Color = configuration.isSearchHit && !configuration.isSelected
-            ? t.colors.stateLayerSelected
-            : selection.fill(isSelected: configuration.isSelected,
-                             isHovered: false,
-                             isPressed: false)
+        let colors = t.colors
+        // A selected row is a solid accent band with a light label, matching
+        // the reference; an unselected hover is a neutral surface face.
+        let bg: Color = {
+            if configuration.isSelected {
+                return configuration.isHovered ? colors.accentHover : colors.accent
+            }
+            if configuration.isSearchHit { return colors.stateLayerSelected }
+            return configuration.isHovered ? colors.surfaceVariant : .clear
+        }()
         let alpha: Float = configuration.isEnabled ? 1 : 0.55
         let visualKey = _TreeRowVisualKey(background: bg, alpha: alpha)
 
@@ -32,9 +36,25 @@ public struct DefaultTreeRowStyle: TreeRowStyle {
             .flex()
             .padding(horizontal: t.spacing.sm + 1, vertical: t.spacing.xs + 1)
         }
+        // Only the selected band re-inks its label; unselected rows keep the
+        // default ink, so a theme cross-fade doesn't animate a redundant color.
+        .modifier(SelectedTreeRowInk(isSelected: configuration.isSelected, onAccent: colors.onAccent))
         .background(bg)
-        .cornerRadius(selection.cornerRadius)
+        .cornerRadius(t.radius.md)
         .opacity(alpha)
         .animation(.semantic(.fast, in: t), value: visualKey)
+    }
+}
+
+private struct SelectedTreeRowInk: ViewModifier {
+    let isSelected: Bool
+    let onAccent: Color
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isSelected {
+            content.foregroundColor(onAccent)
+        } else {
+            content
+        }
     }
 }

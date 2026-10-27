@@ -326,7 +326,9 @@ private struct RangeSliderHost: _PrimitiveView {
                                 color: appearance.fillColor)
         }
 
-        let half = appearance.thumbDiameter * 0.5
+        let knobLen = appearance.thumbLength
+        let knobBreadth = appearance.thumbDiameter
+        let half = knobLen * 0.5
         let focusedNode = FocusChainHolder.current?.focused
         let focusVisible = FocusChainHolder.current?.isFocusVisible == true
         let lowerHandle = handleNode(.lower, in: node)
@@ -334,24 +336,29 @@ private struct RangeSliderHost: _PrimitiveView {
         for (thumb, centreX) in [(RangeThumb.lower, lowerX), (.upper, upperX)] {
             let clamped = min(max(originX + half, centreX), originX + width - half)
             let rect = UIRect(x: clamped - half,
-                              y: originY + (height - appearance.thumbDiameter) * 0.5,
-                              width: appearance.thumbDiameter,
-                              height: appearance.thumbDiameter)
+                              y: originY + (height - knobBreadth) * 0.5,
+                              width: knobLen,
+                              height: knobBreadth)
+            let corner = min(rect.width, rect.height) * 0.5
             let focused = focusVisible
                 && (thumb == .lower ? focusedNode === lowerHandle : focusedNode === upperHandle)
+            if let shadow = appearance.thumbShadow {
+                list.addShadow(shadow, rect: rect, cornerRadius: corner)
+            }
             if focused {
-                list.addRoundedRect(UIRect(x: rect.minX - 2, y: rect.minY - 2,
-                                           width: rect.width + 4, height: rect.height + 4),
-                                    radius: (rect.height + 4) * 0.5,
+                list.addRoundedRectStroke(UIRect(x: rect.minX - 3, y: rect.minY - 3,
+                                           width: rect.width + 6, height: rect.height + 6),
+                                    radius: corner + 3,
+                                    width: 2,
                                     color: node.theme.colors.focusRing)
             } else if let border = appearance.thumbBorderColor, appearance.thumbBorderWidth > 0 {
                 let bw = appearance.thumbBorderWidth
                 list.addRoundedRect(UIRect(x: rect.minX - bw, y: rect.minY - bw,
                                            width: rect.width + 2 * bw, height: rect.height + 2 * bw),
-                                    radius: (rect.height + 2 * bw) * 0.5,
+                                    radius: corner + bw,
                                     color: border)
             }
-            list.addRoundedRect(rect, radius: appearance.thumbDiameter * 0.5,
+            list.addRoundedRect(rect, radius: corner,
                                 color: appearance.thumbColor)
         }
     }

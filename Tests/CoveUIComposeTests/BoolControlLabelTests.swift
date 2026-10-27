@@ -26,7 +26,7 @@ struct BoolControlLabelTests: CoveUIComposeSerializedSuite {
             let checkbox = try #require(nodes.first {
                 $0.accessibility?.role == .checkbox && $0.accessibility?.label == "Accept the terms"
             })
-            #expect(toggle.frame.width == 38 && checkbox.frame.width == 18)
+            #expect(toggle.frame.width == 36 && checkbox.frame.width == 16)
             #expect(nodes.contains { $0.layoutNode?.textInputs?.text == "Notifications" })
             #expect(nodes.contains { $0.layoutNode?.textInputs?.text == "Accept the terms" })
             #expect(nodes.filter { $0.accessibility?.role == .toggle && $0.accessibility?.label == "Notifications" }.count == 1)

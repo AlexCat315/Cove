@@ -21,10 +21,11 @@ struct PopoverSurfaceHost<Content: View>: _PrimitiveView {
       guard let node, node.frame.width > 20, node.frame.height > 20 else { return }
       let inset = Float(PopoverGeometry.inset), x = Float(origin.x), y = Float(origin.y)
       let body = UIRect(x: x + inset, y: y + inset, width: Float(node.frame.width) - inset * 2, height: Float(node.frame.height) - inset * 2)
-      let radius = min(node.theme.radius.md, min(body.width, body.height) / 2)
+      // Panels use the reference's 8-pt radius with a 20-pt lift shadow.
+      let radius = min(node.theme.radius.lg, min(body.width, body.height) / 2)
       let fill = node.theme.colors.surfaceFloating.multipliedAlpha(node.opacity)
       let border = node.theme.colors.border.multipliedAlpha(node.opacity)
-      list.addShadow(node.theme.elevation.low, rect: body, cornerRadius: radius, opacity: node.opacity)
+      list.addShadow(node.theme.elevation.high, rect: body, cornerRadius: radius, opacity: node.opacity)
       list.addRoundedRect(body, radius: radius, color: fill)
       list.addRoundedRectStroke(body, radius: radius, width: 1, color: border)
       let geometry = anchor.geometry(size: node.frame.size, placement: placement)

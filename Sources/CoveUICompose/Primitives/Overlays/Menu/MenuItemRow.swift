@@ -140,9 +140,9 @@ struct MenuItemRowHost: _PrimitiveView {
         }
     }
 
-    func _makeLayoutNode() -> LayoutNode? { .rowSlot(minHeight: 32) }
+    func _makeLayoutNode() -> LayoutNode? { .rowSlot(minHeight: 28) }
 
-    func _updateLayout(_ layout: LayoutNode) { layout.updateRowSlot(minHeight: 32) }
+    func _updateLayout(_ layout: LayoutNode) { layout.updateRowSlot(minHeight: 28) }
 
     func _children(for node: Node) -> [any View] {
         let theme = node.theme
@@ -200,7 +200,7 @@ struct MenuItemRowHost: _PrimitiveView {
                 Icon(UIIcons.Action.externalLink, size: .small, color: theme.colors.onSurfaceMuted).accessibilityHidden()
             }
         }
-        .padding(horizontal: 16, vertical: 6)
+        .padding(horizontal: 12, vertical: 4)
         .frame(minHeight: minimumHeight)
 
         return [row]
@@ -236,8 +236,10 @@ private func updateMenuItemFill(_ node: Node) {
     let hovered = node.attachments["__menu_item_hovered"] as? Bool == true
     let highlighted = node.attachments["__menu_highlighted"] as? Bool == true
     let colors = node.theme.colors
-    let fill = !enabled ? Color.clear : pressed ? colors.stateLayerPressed
-        : hovered ? colors.stateLayerHover : highlighted ? colors.stateLayerSelected : .clear
+    // A solid hover face (matching the reference), the same for the pointer
+    // and for keyboard navigation; pressed darkens it one step further.
+    let fill = !enabled ? Color.clear : pressed ? colors.surfacePressed
+        : (hovered || highlighted) ? colors.surfaceVariant : .clear
     let previous = node.attachments["__menu_visual_fill"] as? Color
     let apply = { [node] in
         node.animatableSet(propertyKey: "menu.fill", current: previous ?? fill, to: fill) { [weak node] color in

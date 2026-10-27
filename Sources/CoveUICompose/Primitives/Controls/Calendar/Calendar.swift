@@ -138,7 +138,7 @@ public struct CalendarView: View {
                 }
             }
         }.padding(10).frame(minWidth: Self.panelWidth(cellSize: cellSize, granularity: options.granularity) + 20)
-            .background(.surface).cornerRadius(.controlRadius).border(.border, width: 1)
+            .background(.background).cornerRadius(.controlRadius)
     }
 
     /// The focused cell when it is in this month, else the first available one.
@@ -243,7 +243,7 @@ public struct CalendarView: View {
                 })
             }
         }.padding(10).frame(minWidth: width + 20)
-            .background(.surface).cornerRadius(.controlRadius).border(.border, width: 1)
+            .background(.background).cornerRadius(.controlRadius)
     }
 
     private func periodCell(_ date: Date, text: String, label: String, isAvailable: Bool, isTabStop: Bool,
@@ -381,10 +381,16 @@ struct CalendarCellStyle: ButtonStyle {
     let isCurrentMonth: Bool
     let isToday: Bool
     func makeBody(configuration c: ButtonStyleConfiguration) -> some View {
-        Box(direction: .row, alignItems: .center, justifyContent: .center) { AnyView(c.label).font(.label) }
-            .frame(width: width, height: height).background(c.isSelected ? c.theme.colors.accent : c.isHovered ? c.theme.colors.stateLayerHover : .clear)
+        // Day cells use a 6-pt radius (not a full circle) and a solid hover
+        // face, matching the reference calendar.
+        let cellRadius = c.theme.radius.md
+        let fill: Color = c.isSelected ? c.theme.colors.accent
+            : c.isHovered ? c.theme.colors.surfaceVariant
+            : .clear
+        return Box(direction: .row, alignItems: .center, justifyContent: .center) { AnyView(c.label).font(.label) }
+            .frame(width: width, height: height).background(fill)
             .foregroundColor(c.isSelected ? c.theme.colors.onAccent : c.isEnabled ? c.theme.colors.onSurface : c.theme.colors.onSurfaceMuted)
-            .opacity(isCurrentMonth ? 1 : 0.35).cornerRadius(height / 2)
+            .opacity(isCurrentMonth ? 1 : 0.35).cornerRadius(cellRadius)
             .border(c.isFocused ? c.theme.colors.focusRing : isToday ? c.theme.colors.accent : .clear, width: c.isFocused ? 2 : isToday ? 1 : 0)
             .animation(motion: .fast, value: c.interactionKey)
     }

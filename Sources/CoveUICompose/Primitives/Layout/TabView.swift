@@ -185,7 +185,15 @@ struct TabStripItem<ID: Hashable>: View {
                 Box(direction: .row, spacing: 0) {
                     if let icon = tab.icon { Icon(icon, size: .medium).accessibilityHidden() }
                 }
-                Text(tab.label).truncatingTail().font(.label).accessibilityHidden()
+                ThemeReader { tabTheme in
+                    // The active underline tab is bold, matching the reference.
+                    let isActiveBar = variant == .bar && tab.id == selection.wrappedValue
+                    Text(tab.label).truncatingTail()
+                        .font(isActiveBar
+                              ? Font(size: tabTheme.typography.label.font.size, weight: .bold)
+                              : tabTheme.typography.label.font)
+                        .accessibilityHidden()
+                }
                 Row(alignment: .center, spacing: 6) {
                     if let badge = tab.badge {
                         Badge(badge) { $0.variant = .solid; $0.isEnabled = enabled }

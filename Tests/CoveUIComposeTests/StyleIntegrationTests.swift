@@ -84,7 +84,7 @@ struct StyleIntegrationTests {
 
     // MARK: - List row
 
-    @Test("Selected List row paints theme.colors.selection")
+    @Test("Selected List row paints theme.colors.accent")
     func listRowSelectionFollowsTheme() { GlobalTestLock.locked {
         struct Row: Identifiable { let id: Int; let title: String }
         struct Harness: View {
@@ -102,7 +102,7 @@ struct StyleIntegrationTests {
         graph.install(root: Harness())
         graph.computeLayout(width: 200, height: 120)
 
-        let selectedFill = Theme.defaultLight.colors.selection
+        let selectedFill = Theme.defaultLight.colors.accent
         let hits = allNodes(in: tree).filter { $0.backgroundColor == selectedFill }
         // Exactly one row should carry the selected fill.
         #expect(hits.count == 1)
@@ -110,7 +110,7 @@ struct StyleIntegrationTests {
 
     // MARK: - TextField
 
-    @Test("TextField default chrome resolves to theme.colors.surfaceSunken")
+    @Test("TextField default chrome resolves to the input surface token")
     func textFieldUsesThemeChrome() { GlobalTestLock.locked {
         struct H: View {
             @State var s: TextBuffer = ""
@@ -124,7 +124,8 @@ struct StyleIntegrationTests {
         graph.computeLayout(width: 200, height: 36)
 
         let nodes = allNodes(in: tree)
-        let hit = nodes.first { $0.backgroundColor == Theme.defaultDark.colors.surfaceSunken }
+        let inputFill = Theme.defaultDark.inputs.background
+        let hit = nodes.first { $0.backgroundColor == inputFill }
         #expect(hit != nil)
         #expect(hit?.cornerRadius == Theme.defaultDark.radius.md)
     } }

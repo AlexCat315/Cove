@@ -101,7 +101,9 @@ private struct _ModalBackdrop<Content: View>: _PrimitiveView {
                           height: min(CGFloat(options.geometry.height), max(0, bounds.height - CGFloat(options.geometry.inset * 2))))
         return [AnimatedVisibility(isVisible: isVisible, transition: options.geometry.transition(size: size), animateOnMount: true) {
             content.frame(width: .percent(100), height: options.fitsContentHeight ? nil : .percent(100)).accessibility { $0.role = .dialog }
-                .background(options.surface).cornerRadius(options.geometry.cornerRadius).border(.border, width: 1).surfaceFinish()
+                .background(options.surface).cornerRadius(options.geometry.cornerRadius)
+                // The modal lift: a wide, deep shadow.
+                .shadow(color: Color(r: 0, g: 0, b: 0, a: 0.3), offsetY: 10, blur: 30)
         }
         // Fixed dialogs need a definite animation-host height for flexible
         // content. Action sheets instead measure their bounded intrinsic height.

@@ -56,27 +56,37 @@ public struct SliderAppearance: Equatable, Sendable {
     public var trackHeight: Float
     public var trackColor: Color
     public var fillColor: Color
+    /// Cross-axis knob size (16 in the reference).
     public var thumbDiameter: Float
+    /// Along-axis knob size; a capsule knob is longer than it is tall (20×16).
+    /// Defaults to `thumbDiameter` for a circular knob.
+    public var thumbLength: Float
     public var thumbColor: Color
     public var thumbBorderColor: Color?
     public var thumbBorderWidth: Float
+    /// Drop shadow under the knob; `nil` for a flat knob.
+    public var thumbShadow: SurfaceShadow?
     public var trackCornerRadius: Float
 
     public init(trackHeight: Float,
                 trackColor: Color,
                 fillColor: Color,
                 thumbDiameter: Float,
+                thumbLength: Float? = nil,
                 thumbColor: Color,
                 thumbBorderColor: Color? = nil,
                 thumbBorderWidth: Float = 0,
+                thumbShadow: SurfaceShadow? = nil,
                 trackCornerRadius: Float) {
         self.trackHeight = trackHeight
         self.trackColor = trackColor
         self.fillColor = fillColor
         self.thumbDiameter = thumbDiameter
+        self.thumbLength = thumbLength ?? thumbDiameter
         self.thumbColor = thumbColor
         self.thumbBorderColor = thumbBorderColor
         self.thumbBorderWidth = thumbBorderWidth
+        self.thumbShadow = thumbShadow
         self.trackCornerRadius = trackCornerRadius
     }
 }
@@ -116,33 +126,34 @@ public extension SliderStyle where Self == DefaultSliderStyle {
 
 // MARK: - DefaultSliderStyle
 
-/// Built-in style. Horizontal track with a filled accent segment and a circular
-/// thumb. Hover / press tweak the thumb fill via `Color.lighter` / `darker`.
+/// Built-in style, matching the reference control: a 6-pt track with a
+/// neutral empty half and an accent filled half, and a white 20×16 capsule
+/// knob with a small key shadow. The knob stays white; the fill carries the
+/// accent, and the track reacts to hover / press.
 public struct DefaultSliderStyle: SliderStyle {
     public init() {}
 
     public func resolve(configuration c: SliderStyleConfiguration) -> SliderAppearance {
         let theme = c.theme
-        let track = theme.colors.surfaceVariant
+        let track = c.isEnabled ? theme.colors.border : theme.colors.border.multipliedAlpha(0.6)
         let fill: Color = c.isEnabled ? theme.colors.accent
-                                      : theme.colors.surfaceVariant
-        let thumbBase: Color = c.isEnabled ? theme.colors.accent
-                                           : theme.colors.surfaceVariant
-        let thumb: Color = {
-            if !c.isEnabled { return thumbBase }
-            if c.isPressed  { return theme.colors.accentPressed }
-            if c.isHovered  { return theme.colors.accentHover }
-            return thumbBase
-        }()
+                                      : theme.colors.borderStrong.multipliedAlpha(0.6)
+        let knob: Color = c.isEnabled ? .white : Color.white.multipliedAlpha(0.7)
+        // The empty track darkens slightly while the knob is held.
+        let trackColor = c.isPressed ? theme.colors.borderStrong : track
         return SliderAppearance(
-            trackHeight: 4,
-            trackColor: track,
+            trackHeight: 6,
+            trackColor: trackColor,
             fillColor: fill,
-            thumbDiameter: 18,
-            thumbColor: thumb,
+            thumbDiameter: 16,
+            thumbLength: 20,
+            thumbColor: knob,
+            // Keyboard focus draws a 2-px ring around the white capsule knob.
             thumbBorderColor: c.isFocused ? theme.colors.focusRing : nil,
             thumbBorderWidth: c.isFocused ? 2 : 0,
-            trackCornerRadius: theme.radius.sm
+            thumbShadow: SurfaceShadow(color: Color(r: 0, g: 0, b: 0, a: 0.25),
+                                      offsetX: 0, offsetY: 1, blur: 3),
+            trackCornerRadius: 3
         )
     }
 }

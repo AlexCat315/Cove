@@ -30,7 +30,7 @@ public struct RadioGroup<Value: Hashable>: View {
                 for option in options {
                     AnyView(Button(isEnabled: isEnabled && option.isEnabled, isSelected: selection.wrappedValue == option.value,
                                    action: { selection.wrappedValue = option.value }) {
-                        Row(alignment: .center, spacing: 9) {
+                        Row(alignment: .center, spacing: 8) {
                             RadioMark(isSelected: selection.wrappedValue == option.value, isEnabled: isEnabled && option.isEnabled)
                             Column(alignment: .leading, spacing: 3) {
                                 Text(option.title).font(.label)
@@ -58,16 +58,45 @@ private struct RadioItemStyle: ButtonStyle {
 private struct RadioMark: _PrimitiveView {
     let isSelected: Bool
     let isEnabled: Bool
+    var isHovered: Bool = false
+    var isPressed: Bool = false
+    private static let edge: Float = 16
     func _makeNode() -> Node { let node = Node(); node.isHitTestable = false; return node }
-    func _makeLayoutNode() -> LayoutNode? { let layout = LayoutNode(); layout.width = 18; layout.height = 18; return layout }
+    func _makeLayoutNode() -> LayoutNode? { let layout = LayoutNode(); layout.width = Self.edge; layout.height = Self.edge; return layout }
     func _updateNode(_ node: Node) {
         node.draw = { [weak node] list, origin in
             guard let node else { return }
-            let color = (isEnabled ? isSelected ? node.theme.colors.accent : node.theme.colors.onSurfaceMuted : SemanticColorRef.onSurfaceDisabled.resolve(node.theme)).multipliedAlpha(node.opacity)
+            let colors = node.theme.colors
+            let edge = Self.edge
             let x = Float(origin.x), y = Float(origin.y)
-            list.addRoundedRect(UIRect(x: x, y: y, width: 18, height: 18), radius: 9, color: color)
-            list.addRoundedRect(UIRect(x: x + 1.5, y: y + 1.5, width: 15, height: 15), radius: 7.5, color: node.theme.colors.surface)
-            if isSelected { list.addRoundedRect(UIRect(x: x + 5, y: y + 5, width: 8, height: 8), radius: 4, color: color) }
+            let rect = UIRect(x: x, y: y, width: edge, height: edge)
+            // White face with a thin border, like the check box.
+            let fill = isEnabled ? colors.background : colors.surface
+            let border: Color
+            if !isEnabled {
+                border = colors.onSurface.multipliedAlpha(0.3)
+            } else if isSelected {
+                border = colors.accent
+            } else if isPressed {
+                border = colors.accentPressed
+            } else if isHovered {
+                border = colors.borderStrong
+            } else {
+                border = colors.border
+            }
+            list.addRoundedRect(rect, radius: edge * 0.5, color: fill.multipliedAlpha(node.opacity))
+            // The selected ring is 2 px; the empty ring is 1 px.
+            list.addRoundedRectStroke(rect, radius: edge * 0.5,
+                                      width: isSelected ? 2 : 1,
+                                      color: border.multipliedAlpha(node.opacity))
+            if isSelected {
+                let dot = isEnabled ? colors.accent : colors.onSurfaceMuted
+                let d: Float = 6
+                list.addRoundedRect(UIRect(x: x + (edge - d) * 0.5, y: y + (edge - d) * 0.5,
+                                           width: d, height: d),
+                                    radius: d * 0.5,
+                                    color: dot.multipliedAlpha(node.opacity))
+            }
         }
     }
 }

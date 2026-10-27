@@ -109,9 +109,10 @@ enum _BoolControlVariant: Sendable, Equatable {
     var layoutSize: (width: Float, height: Float) {
         switch self {
         case .toggle:
-            return (38, 24)
+            // 36×20 track with a 16-point knob (reference metrics).
+            return (36, 20)
         case .checkbox, .mixedCheckbox:
-            return (18, 18)
+            return (16, 16)
         }
     }
 }
@@ -302,21 +303,15 @@ struct BoolControlHost: _PrimitiveView {
                                width: thumbDiameter,
                                height: thumbDiameter)
 
-        // The thumb keeps a static hairline rim so it reads as a disc sitting on
-        // the track. Focus used to widen this rim into the focus colour, which
-        // flushed a translucent blue plate against the fill — the two merge and
-        // it looks like the control is glowing.
-        let thumbBorderWidth: Float = 1
-        let outerRect = UIRect(x: thumbRect.minX - thumbBorderWidth,
-                               y: thumbRect.minY - thumbBorderWidth,
-                               width: thumbRect.width + 2 * thumbBorderWidth,
-                               height: thumbRect.height + 2 * thumbBorderWidth)
-        list.addRoundedRect(outerRect,
-                            radius: outerRect.height * 0.5,
-                            color: colors.border)
+        // The knob is a white disc with a small key shadow, as in the
+        // reference — a raised disc rather than an outlined one.
+        let thumbFill = resolvedToggleThumbColor(colors: colors)
+        list.addShadow(SurfaceShadow(color: Color(r: 0, g: 0, b: 0, a: 0.22),
+                                     offsetX: 0, offsetY: 1, blur: 2),
+                       rect: thumbRect, cornerRadius: thumbRect.height * 0.5)
         list.addRoundedRect(thumbRect,
                             radius: thumbRect.height * 0.5,
-                            color: resolvedToggleThumbColor(colors: colors))
+                            color: thumbFill)
 
         // The ring belongs outside the whole control, drawn as a ring and with a
         // gap: flush against the fill it cannot be told apart from it.
@@ -351,19 +346,22 @@ struct BoolControlHost: _PrimitiveView {
                              height: edge)
         let isFocused = (FocusChainHolder.current?.focused === node
             && FocusChainHolder.current?.isFocusVisible == true)
-        // Static hairline for the box itself; the focus ring is drawn outside
-        // it with a gap rather than replacing this rim — see `renderToggle`.
-        let boxBorderWidth: Float = 1
-        let outerRect = UIRect(x: boxRect.minX - boxBorderWidth,
-                               y: boxRect.minY - boxBorderWidth,
-                               width: boxRect.width + 2 * boxBorderWidth,
-                               height: boxRect.height + 2 * boxBorderWidth)
-        list.addRoundedRect(outerRect,
-                            radius: 5,
-                            color: colors.border)
+        // A 16×16 box: white fill (background) with a 1-px inset border,
+        // matching the reference control.
+        let fill = resolvedCheckboxFillColor(node: node, colors: colors)
+        let borderColor: Color = {
+            if !isEnabled { return colors.onSurface.multipliedAlpha(0.3) }
+            if isOn.wrappedValue { return fill }
+            let hovered = node.attachments[Self.hoveredKey] as? Bool ?? false
+            return hovered ? colors.borderStrong : colors.border
+        }()
         list.addRoundedRect(boxRect,
                             radius: 4,
-                            color: resolvedFillColor(node: node, colors: colors))
+                            color: fill)
+        list.addRoundedRectStroke(boxRect,
+                                  radius: 4,
+                                  width: 1,
+                                  color: borderColor)
         if isFocused {
             let gap: Float = 1
             let ring: Float = 2
@@ -407,7 +405,8 @@ struct BoolControlHost: _PrimitiveView {
     private func resolvedFillColor(node: Node, colors: ColorScheme) -> Color {
         if let fill = node.attachments["__bool_visual_fill"] as? Color { return fill.multipliedAlpha(node.opacity) }
         if !isEnabled {
-            return colors.onSurface.multipliedAlpha(0.08)
+            // Disabled track shares the same dimmed border fill.
+            return colors.border.multipliedAlpha(0.8)
         }
         let isPressed = node.attachments[Self.pressedKey] as? Bool ?? false
         let isHovered = node.attachments[Self.hoveredKey] as? Bool ?? false
@@ -417,10 +416,11 @@ struct BoolControlHost: _PrimitiveView {
             return colors.accent
         }
 
-        // Off is a translucent ink track, so it stays visible on any surface.
-        let base = colors.onSurface.multipliedAlpha(0.18)
-        if isPressed { return base.composited(over: colors.stateLayerPressed) }
-        if isHovered { return base.composited(over: colors.stateLayerHover) }
+        // Off is a solid neutral track (border darkened toward text),
+        // matching the reference: a grey track rather than a translucent wash.
+        let base = colors.borderStrong
+        if isPressed { return colors.borderStrong.mixed(with: colors.onSurface, amount: 0.08) }
+        if isHovered { return colors.borderStrong.mixed(with: colors.onSurface, amount: 0.04) }
         return base
     }
 
@@ -428,6 +428,24 @@ struct BoolControlHost: _PrimitiveView {
     /// coloured thumb vanishes into the card.
     private func resolvedToggleThumbColor(colors: ColorScheme) -> Color {
         isEnabled ? .white : Color.white.multipliedAlpha(0.6)
+    }
+
+    /// The fill of a check box. Unchecked it is the window background (white),
+    /// disabled it is the control face (surface); checked it is the accent
+    /// ramp. This differs from the switch, whose off track is a solid neutral.
+    private func resolvedCheckboxFillColor(node: Node, colors: ColorScheme) -> Color {
+        if let fill = node.attachments["__bool_visual_fill"] as? Color {
+            return fill.multipliedAlpha(node.opacity)
+        }
+        if !isEnabled { return colors.surface }
+        let isPressed = node.attachments[Self.pressedKey] as? Bool ?? false
+        let isHovered = node.attachments[Self.hoveredKey] as? Bool ?? false
+        if isOn.wrappedValue {
+            if isPressed { return colors.accentPressed }
+            if isHovered { return colors.accentHover }
+            return colors.accent
+        }
+        return colors.background
     }
 }
 
@@ -444,9 +462,19 @@ private func updateBoolControlAppearance(_ node: Node, isOn: Bool, isEnabled: Bo
     let colors = node.theme.colors
     let pressed = node.attachments[BoolControlHost.pressedKey] as? Bool == true
     let hovered = node.attachments[BoolControlHost.hoveredKey] as? Bool == true
-    let base = !isEnabled ? colors.onSurface.multipliedAlpha(0.08) : isOn ? colors.accent : colors.onSurface.multipliedAlpha(0.18)
-    let fill = !isEnabled ? base : pressed ? (isOn ? colors.accentPressed : base.composited(over: colors.stateLayerPressed))
-        : hovered ? (isOn ? colors.accentHover : base.composited(over: colors.stateLayerHover)) : base
+    let isSwitch = node.attachments[BoolControlHost.variantKey] as? _BoolControlVariant == .toggle
+    // Off fill differs by control: the switch has a solid neutral track, the
+    // check box shows the window background (white) inside its border.
+    let offBase = isSwitch ? colors.borderStrong : colors.background
+    let base = !isEnabled ? (isSwitch ? colors.border.multipliedAlpha(0.8) : colors.surface)
+        : isOn ? colors.accent : offBase
+    // An unchecked box keeps its fill; only the border reacts to hover.
+    let offHover = isSwitch ? colors.borderStrong.mixed(with: colors.onSurface, amount: 0.04) : colors.background
+    let offPress = isSwitch ? colors.borderStrong.mixed(with: colors.onSurface, amount: 0.08) : colors.background
+    let fill = !isEnabled ? base
+        : pressed ? (isOn ? colors.accentPressed : offPress)
+        : hovered ? (isOn ? colors.accentHover : offHover)
+        : base
     let previous = node.attachments["__bool_visual_progress"] as? Float
     let applyProgress = { [node] in
         node.animatableSet(propertyKey: "bool.progress", current: previous ?? (isOn ? 1 : 0), to: Float(isOn ? 1 : 0)) { [weak node] value in
@@ -461,7 +489,6 @@ private func updateBoolControlAppearance(_ node: Node, isOn: Bool, isEnabled: Bo
         }
     }
     if previous != nil {
-        let isSwitch = node.attachments[BoolControlHost.variantKey] as? _BoolControlVariant == .toggle
         let motion: Animation = isSwitch
             ? .spring(response: node.theme.motion.fast.seconds, dampingFraction: 0.9, allowsOvershoot: true)
             : .semantic(.fast, in: node.theme)

@@ -95,11 +95,16 @@ public extension View {
 }
 
 func tooltipDescription(_ description: String) -> AnyView {
-    AnyView(Text(description).font(.caption).foregroundColor(.onSurface)
-        // Frosted, not opaque: a tooltip sits over whatever the pointer is
-        // near, and the blur is what keeps a busy backdrop from reading as
-        // noise behind the text. Menus and popovers float the same way.
-        .padding(9).floatingSurface(.rowRadius))
+    // Inverted: the primary text colour becomes the fill and the window
+    // background colour becomes the label, so it reads the same on both
+    // themes — a dark chip in light mode, a light chip in dark mode.
+    AnyView(Text(description)
+        .font(Font.system(size: 11))
+        .foregroundColor(.background)
+        .padding(horizontal: 8, vertical: 5)
+        .background(.onSurface)
+        .cornerRadius(5)
+        .shadow(color: Color(r: 0, g: 0, b: 0, a: 0.2), offsetX: 0, offsetY: 2, blur: 8))
 }
 
 private struct TooltipHost<Target: View>: _PrimitiveView {

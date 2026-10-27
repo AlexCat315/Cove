@@ -305,13 +305,16 @@ struct DesignSystemTests: CoveUIComposeSerializedSuite {
             #expect(first.layoutNode?.textMeasure?.key.font.size == 28)
             func all(_ node: Node) -> [Node] { [node] + node.children.flatMap(all) }
             let nodes = all(graph.tree.root!)
-            // The floating material, like every other floating panel.
+            // The floating panel material: a white face, rounded corners and a
+            // hairline border.
             let panel = try #require(nodes.first {
                 $0.backgroundColor == Theme.defaultLight.colors.surfaceFloating && $0.cornerRadius > 0
-                    && $0.borderColor == Theme.defaultLight.colors.floatingOutline
+                    && $0.borderColor == Theme.defaultLight.colors.border
             })
-            #expect(panel.frame.height >= 104)
-            #expect(nodes.filter { $0.attachments["__menu_item_id"] != nil }.allSatisfy { $0.frame.height >= 52 })
+            // At 2× the body line is 40pt; rows grow with the text, bounded by
+            // the 30pt desktop floor and 4pt vertical padding: 40 + 2×4 = 48.
+            #expect(panel.frame.height >= 96)
+            #expect(nodes.filter { $0.attachments["__menu_item_id"] != nil }.allSatisfy { $0.frame.height >= 48 })
         }
     }
 

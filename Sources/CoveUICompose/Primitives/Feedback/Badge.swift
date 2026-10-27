@@ -73,7 +73,8 @@ public struct Badge: _PrimitiveView {
         switch variant {
         case .soft:
             ink = isEnabled ? base : disabledInk
-            fill = base.multipliedAlpha(0.14)
+            // Neutral soft badges are the reference "Text at 10 %" pill.
+            fill = tone == .neutral ? base.multipliedAlpha(0.1) : base.multipliedAlpha(0.14)
             stroke = .clear
             strokeWidth = 0
         case .solid:
@@ -109,7 +110,7 @@ public struct Badge: _PrimitiveView {
             }
             .padding(horizontal: metrics.paddingX, vertical: metrics.paddingY)
             .background(fill)
-            .cornerRadius(theme.radius.sm)
+            .cornerRadius(999)
             .border(stroke, width: strokeWidth)
             .opacity(isEnabled ? 1 : 0.6)
         ]

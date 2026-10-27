@@ -37,6 +37,9 @@ public struct ColorScheme: Sendable {
     public var background: Color
     public var surface: Color
     public var surfaceVariant: Color
+    /// Solid fill for a pressed surface control (secondary button, menu
+    /// item). One step below `surfaceVariant` (the hover fill).
+    public var surfacePressed: Color
     public var surfaceSunken: Color
     public var surfaceRaised: Color
     public var surfaceFloating: Color
@@ -81,6 +84,7 @@ public struct ColorScheme: Sendable {
     public init(background: Color,
                 surface: Color,
                 surfaceVariant: Color,
+                surfacePressed: Color? = nil,
                 surfaceSunken: Color,
                 surfaceRaised: Color,
                 surfaceFloating: Color,
@@ -111,6 +115,8 @@ public struct ColorScheme: Sendable {
         self.background = background
         self.surface = surface
         self.surfaceVariant = surfaceVariant
+        self.surfacePressed = surfacePressed
+            ?? surfaceVariant.mixed(with: onSurface, amount: 0.12)
         self.surfaceSunken = surfaceSunken
         self.surfaceRaised = surfaceRaised
         self.surfaceFloating = surfaceFloating

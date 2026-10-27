@@ -178,8 +178,8 @@ struct RowDensityTests: CoveUIComposeSerializedSuite {
             harness.input = [.pointer, .keyboard]
             settle(graph, width: 390)
             #expect(treeRows.allSatisfy { $0.frame.height == CGFloat(30 * scale) })
-            #expect(row.frame.height >= 32)
-            if scale == 1 { #expect(row.frame.height == 32) }
+            #expect(row.frame.height >= 30)
+            if scale == 1 { #expect(row.frame.height == 30) }
         }
     }
 
@@ -217,7 +217,7 @@ struct RowDensityTests: CoveUIComposeSerializedSuite {
             harness.input = [.pointer, .keyboard]
             settle(graph, width: 390)
             let anchored = try #require(menuRow(AnyHashable("branch"), in: graph.tree.root!))
-            #expect(anchored.frame.height == 32)
+            #expect(anchored.frame.height == 30)
             #expect(!nodes(graph.tree.root!).contains { $0.attachments[LayoutDebugAttachmentKey.debugName] as? String == "touch-overlay-sheet" })
             #expect(!graph.recomposer.hasPending)
         }

@@ -36,15 +36,17 @@ public struct Theme: Sendable {
         // call sites that omit `inputs:` get a sensible derived appearance
         // rather than having to reconstruct one by hand.
         self.inputs = inputs ?? InputAppearance(
-            background:         colors.surfaceSunken,
+            // Inputs share the control face: a surface fill with a border,
+            // like buttons and selects.
+            background:         colors.surface,
             backgroundDisabled: colors.surfaceVariant,
             borderColor:        colors.border,
             borderHover:        colors.borderStrong,
-            borderFocused:      colors.focusRing,
+            borderFocused:      colors.accent,
             borderError:        colors.error,
             borderDisabled:     colors.border,
             borderWidth:        1,
-            focusRingWidth:     2,
+            focusRingWidth:     1,
             addonBackground:    colors.surfaceVariant,
             addonForeground:    colors.onSurfaceMuted,
             dividerColor:       colors.border,

@@ -130,7 +130,8 @@ struct MenuHierarchyTests: CoveUIComposeSerializedSuite {
         let last = try row("item-99", graph: graph)
         #expect(context.focusChain.focused === last)
         let scroll = try #require(nodes(graph.tree.root).first { $0.attachments[MenuScrollMarker.key] as? Bool == true })
-        #expect(scroll.contentOffset.y > 3000)
+        // 100 rows at the 30-pt reference row metric, minus the ~8-row viewport.
+        #expect(scroll.contentOffset.y > 2700)
         #expect(last.absoluteFrame.minY >= scroll.absoluteFrame.minY - 1)
         #expect(last.absoluteFrame.maxY <= scroll.absoluteFrame.maxY + 1)
         key(Scancode.home, graph: graph, dispatcher: dispatcher)
@@ -277,7 +278,7 @@ struct MenuHierarchyTests: CoveUIComposeSerializedSuite {
         // origins use pixel-grid rounding, allowing one point of gap variance.
         #expect(abs(titleShortcutGap - 8) <= 1)
         #expect(target.absoluteFrame.contains(shortcut.absoluteFrame))
-        #expect(title.absoluteFrame.minX - target.absoluteFrame.minX == 16)
+        #expect(title.absoluteFrame.minX - target.absoluteFrame.minX == 12)
         let short = try row("short", graph: graph)
         #expect(short.absoluteFrame.minY >= target.absoluteFrame.maxY)
         let lines = nodes(graph.tree.root).filter { $0.backgroundColor == $0.theme.colors.divider && $0.frame.height > 0 }

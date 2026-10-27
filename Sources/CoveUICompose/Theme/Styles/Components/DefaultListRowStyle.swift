@@ -14,18 +14,43 @@ public struct DefaultListRowStyle: ListRowStyle {
     public func makeBody(configuration: ListRowStyleConfiguration) -> some View {
         let theme = configuration.theme
         let touch = configuration.input.contains(.touch)
-        let appearance = SelectionAppearance.resolve(touch ? .dataRow : .navigation, theme: theme)
-        let fill = appearance.fill(isSelected: configuration.isSelected, isHovered: configuration.isHovered, isPressed: false)
+        let colors = theme.colors
+        // A selected row is a solid accent band with a light label, like the
+        // reference; an unselected hover is a neutral surface face.
+        let fill: Color = {
+            if configuration.isSelected {
+                return configuration.isHovered ? colors.accentHover : colors.accent
+            }
+            return configuration.isHovered ? colors.surfaceVariant : .clear
+        }()
+        let radius: Float = touch ? 0 : theme.radius.md
         let alpha: Float = configuration.isEnabled ? 1 : 0.55
         return Row(alignment: .center, spacing: theme.spacing.sm) {
             configuration.content.frame(minWidth: 0).flex(1, shrink: 1, basis: 0)
         }
-        .frame(height: max(0, configuration.rowHeight - 2 * appearance.verticalInset))
-        .selectionHighlight(touch ? .dataRow : .navigation, isSelected: configuration.isSelected, isHovered: configuration.isHovered)
-        .padding(horizontal: touch ? 16 : appearance.horizontalInset, vertical: 0)
+        .frame(height: max(0, configuration.rowHeight - 2 * (touch ? 0 : theme.spacing.xs)))
+        // Only the selected band re-inks its label; unselected rows keep the
+        // default ink, so a theme cross-fade doesn't animate a redundant color.
+        .modifier(SelectedRowInk(isSelected: configuration.isSelected, onAccent: colors.onAccent))
+        .background(fill)
+        .cornerRadius(radius)
+        .padding(horizontal: touch ? 16 : theme.spacing.sm, vertical: 0)
         .modifier(ListRowSeparator(color: theme.colors.divider, isEnabled: touch))
         .opacity(alpha)
         .animation(.semantic(.fast, in: theme), value: _ListRowVisualKey(fill: fill, alpha: alpha))
+    }
+}
+
+private struct SelectedRowInk: ViewModifier {
+    let isSelected: Bool
+    let onAccent: Color
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isSelected {
+            content.foregroundColor(onAccent)
+        } else {
+            content
+        }
     }
 }
 

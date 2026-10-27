@@ -25,7 +25,8 @@ struct ListStory: View {
         StorySection("Selectable list", "Click a row or focus the list and use arrows, Home and End. Return activates the selected row.") {
             List(Array(0..<30), id: \.self, selection: $selected, onActivate: { activated = "Activated row \($0)" }) { row, isSelected in
                 ListRow(galleryDocumentTitle(row), leading: {
-                    Icon(UIIcons.File.fileText, size: .medium, color: .onSurfaceMuted).accessibilityHidden()
+                    Icon(UIIcons.File.fileText, size: .medium,
+                         color: isSelected ? .onAccent : .onSurfaceMuted).accessibilityHidden()
                 }, trailing: {
                     if isSelected { Badge("Selected", tone: .info) }
                 }).font(.body)
@@ -438,7 +439,8 @@ private struct MultipleSelectionListStory: View {
             List(Array(0..<12), id: \.self, selection: $selection,
                             onActivate: { activated = "Activated \(galleryDocumentTitle($0))" }) { row, isSelected in
                 ListRow(galleryDocumentTitle(row), leading: {
-                    Icon(UIIcons.File.fileText, size: .medium, color: .onSurfaceMuted).accessibilityHidden()
+                    Icon(UIIcons.File.fileText, size: .medium,
+                         color: isSelected ? .onAccent : .onSurfaceMuted).accessibilityHidden()
                 }, trailing: {
                     if isSelected { Badge("Selected", tone: .info) }
                 }).font(.body)

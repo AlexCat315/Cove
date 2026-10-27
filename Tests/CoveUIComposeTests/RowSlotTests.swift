@@ -49,7 +49,7 @@ struct RowSlotTests: CoveUIComposeSerializedSuite {
             let nodes = all(graph.tree.root!)
             let item = try #require(nodes.first { $0.accessibility?.role == .button && $0.accessibility?.label == "Open" }?.absoluteFrame)
             let title = try #require(nodes.first { $0.accessibility?.role == .staticText && $0.accessibility?.label == "Open" }?.absoluteFrame)
-            #expect(item.height >= 32)
+            #expect(item.height >= 30)
             #expect(abs(title.midY - item.midY) <= 0.5)
         }
     }

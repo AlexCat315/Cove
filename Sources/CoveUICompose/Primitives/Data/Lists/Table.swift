@@ -52,7 +52,7 @@ public struct TableLayout {
     public var rowHeight: Float = 36
     /// Authored logical height, before text scaling and the touch density floor.
     public var headerHeight: Float = 38
-    public var isStriped = true
+    public var isStriped = false
     public var emptyTitle = "No records"
     public init() {}
     func resolved(in surface: UIEnvironment, textScaler: TextScaler) -> Self {
@@ -173,7 +173,7 @@ public struct Table<Record, ID: Hashable>: View {
                 }.frame(width: columnWidth(column), height: options.layout.headerHeight).flex(0, shrink: 0)
                     .modifier(TableColumnIdentity(id: column.id)).id(column.id))
             }
-        }.background(.surfaceVariant)
+        }.background(.background)
     }
     private var selectionBinding: Binding<ID?> {
         options.selection ?? Binding(get: { session.selection }, set: { session.selection = $0 })
@@ -291,12 +291,17 @@ struct TableHeaderStyle: ButtonStyle {
 }
 
 /// Table rows are a grid: the highlight has to stay edge to edge so the column
-/// boundaries keep reading straight across every row.
+/// boundaries keep reading straight across every row. A selected row is a
+/// solid accent band with a light label.
 private struct TableRowStyle: ListRowStyle {
     func makeBody(configuration c: ListRowStyleConfiguration) -> some View {
-        Box(direction: .column, alignItems: .stretch) { c.content }
+        let colors = c.theme.colors
+        let fill: Color = c.isSelected ? (c.isHovered ? colors.accentHover : colors.accent)
+            : c.isHovered ? colors.surfaceVariant : .clear
+        return Box(direction: .column, alignItems: .stretch) { c.content }
             .flex(1, shrink: 1)
-            .selectionHighlight(.dataRow, isSelected: c.isSelected)
+            .foregroundColor(c.isSelected ? colors.onAccent : colors.onSurface)
+            .background(fill)
             .animation(motion: .fast, value: c.isSelected)
     }
 }

@@ -28,34 +28,48 @@ extension SliderHost {
 
         if showsTicks, let step, span.isFinite, span > 0 {
             let count = (span / step).rounded(.down)
-            // Small dots inside the track: light over the fill, muted beyond it,
-            // hidden under the thumb, and omitted when they would crowd together.
+            // Small 1-px hairlines just outside the track (below it on a
+            // horizontal axis, beside it on a vertical one), muted, hidden
+            // under the knob, and omitted when they would crowd together.
             let spacing = count > 0 ? geometry.length / Float(count) : 0
             if count.isFinite, count >= 1, count <= 40, spacing >= 10 {
-                let dot = max(2, min(3, appearance.trackHeight - 1))
-                let thumbHalf = appearance.thumbDiameter / 2 + 1
+                let tickColor = node.theme.colors.onSurfaceMuted.multipliedAlpha(0.6)
+                let thumbHalf = appearance.thumbLength / 2 + 2
+                let trackRect = geometry.rect(at: 0, length: geometry.length,
+                    thickness: appearance.trackHeight, origin: origin)
                 for index in 0...Int(count) {
                     let tick = geometry.position(for: Float(Double(index) * step / span))
                     guard abs(tick - position) > thumbHalf else { continue }
-                    let filled = tick >= fillStart && tick <= fillStart + fillLength
-                    let color = filled ? node.theme.colors.onAccent.multipliedAlpha(0.7) : node.theme.colors.onSurfaceMuted.multipliedAlpha(0.55)
-                    list.addRoundedRect(geometry.rect(
-                        at: min(max(0, tick - dot / 2), max(0, geometry.length - dot)), length: dot,
-                        thickness: dot, origin: origin), radius: dot / 2, color: color)
+                    if geometry.axis == .horizontal {
+                        let x = Float(origin.x) + tick - 0.5
+                        list.addRect(UIRect(x: x, y: trackRect.maxY + 2, width: 1, height: 2),
+                                     color: tickColor)
+                    } else {
+                        let y = Float(origin.y) + tick - 0.5
+                        list.addRect(UIRect(x: trackRect.maxX + 2, y: y, width: 2, height: 1),
+                                     color: tickColor)
+                    }
                 }
             }
         }
 
-        let diameter = min(appearance.thumbDiameter, geometry.length, geometry.breadth)
-        let half = diameter / 2
+        // The knob is a capsule: longer along the drag axis than across it.
+        let breadth = min(appearance.thumbDiameter, geometry.breadth)
+        let length = min(appearance.thumbLength, geometry.length)
+        let half = length / 2
         let centre = min(max(half, position), geometry.length - half)
-        let thumb = geometry.rect(at: centre - half, length: diameter, thickness: diameter, origin: origin)
+        let thumb = geometry.rect(at: centre - half, length: length, thickness: breadth, origin: origin)
+        let radius = min(thumb.width, thumb.height) * 0.5
+        // A held knob grows slightly, like a magnifying lens over the track.
+        if let shadow = appearance.thumbShadow {
+            list.addShadow(shadow, rect: thumb, cornerRadius: radius)
+        }
         if let border = appearance.thumbBorderColor, appearance.thumbBorderWidth > 0 {
             let width = appearance.thumbBorderWidth
-            list.addRoundedRect(UIRect(x: thumb.minX - width, y: thumb.minY - width,
-                width: diameter + 2 * width, height: diameter + 2 * width),
-                radius: half + width, color: border)
+            let outer = UIRect(x: thumb.minX - width, y: thumb.minY - width,
+                               width: thumb.width + 2 * width, height: thumb.height + 2 * width)
+            list.addRoundedRect(outer, radius: radius + width, color: border)
         }
-        list.addRoundedRect(thumb, radius: half, color: appearance.thumbColor)
+        list.addRoundedRect(thumb, radius: radius, color: appearance.thumbColor)
     }
 }
