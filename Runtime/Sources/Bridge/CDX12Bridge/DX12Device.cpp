@@ -100,7 +100,6 @@ int32_t grhi_dx12_texture(GRHI_DX12Device* d, uint32_t id, const GRHI_TextureDes
     if (desc->usage & (1 << 1)) native.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
     if (desc->usage & (1 << 2)) { native.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL; native.Format = desc->format == GRHI_FORMAT_DEPTH32 ? DXGI_FORMAT_R32_TYPELESS : DXGI_FORMAT_R24G8_TYPELESS; }
     if (desc->usage & (1 << 4)) native.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-    if (desc->samples > 1) native.Flags |= D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE;
     D3D12_HEAP_PROPERTIES props{}; props.Type = D3D12_HEAP_TYPE_DEFAULT;
     check(s.device->CreateCommittedResource(&props, D3D12_HEAP_FLAG_NONE, &native, r.state, nullptr, IID_PPV_ARGS(&r.native)), "CreateCommittedResource texture");
     if (desc->usage & (1 << 1)) { r.view = s.rtvs.allocate(); s.device->CreateRenderTargetView(r.native.Get(), nullptr, s.rtvs.cpu(r.view)); }
