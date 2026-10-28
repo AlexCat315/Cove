@@ -99,7 +99,12 @@ struct RichTextSurface: _PrimitiveView {
                     return .handled
                 }
                 guard let scope else { return .ignored }
-                guard node.supportsControlHover else {
+                // A precise pointer (mouse/pen) selects; a finger keeps the drag for
+                // scrolling and long-presses to select. On touch PCs both a mouse and a
+                // touchscreen report `supportsHover`, so branch on the event's source,
+                // not just the device capability.
+                let precise = event.kind == .mouse || event.kind == .pen
+                guard node.supportsControlHover, precise else {
                     // Touch keeps drags for scrolling; a long press selects instead.
                     node.attachments[Self.touchPressKey] = (Date(), point(event.x, event.y))
                     return .ignored

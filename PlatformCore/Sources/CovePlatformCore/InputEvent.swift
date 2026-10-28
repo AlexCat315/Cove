@@ -81,14 +81,38 @@ public enum MouseButton: UInt8, Codable, Sendable, Hashable {
     case x2     = 5
 }
 
+/// Where a pointer event originated. Touch PCs report both `.pointer` (mouse) and
+/// `.touch` in `UIEnvironment.Input`, so the *device* can hover, but a single
+/// gesture must still be classified by its source: a finger dragging should
+/// scroll and long-press to select, while a mouse does the opposite. The runtime
+/// carries that classification per event so handlers can branch on the gesture,
+/// not just the device capability.
+public enum PointerKind: UInt8, Codable, Sendable, Hashable {
+    case mouse = 1
+    case touch = 2
+    case pen   = 3
+}
+
 public struct MouseMotionEvent: Codable, Sendable {
     public var x: Float
     public var y: Float
     public var deltaX: Float
     public var deltaY: Float
+    public var kind: PointerKind
 
-    public init(x: Float, y: Float, deltaX: Float, deltaY: Float) {
-        self.x = x; self.y = y; self.deltaX = deltaX; self.deltaY = deltaY
+    public init(x: Float, y: Float, deltaX: Float, deltaY: Float, kind: PointerKind = .mouse) {
+        self.x = x; self.y = y; self.deltaX = deltaX; self.deltaY = deltaY; self.kind = kind
+    }
+
+    private enum CodingKeys: String, CodingKey { case x, y, deltaX, deltaY, kind }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        x = try c.decode(Float.self, forKey: .x)
+        y = try c.decode(Float.self, forKey: .y)
+        deltaX = try c.decode(Float.self, forKey: .deltaX)
+        deltaY = try c.decode(Float.self, forKey: .deltaY)
+        kind = try c.decodeIfPresent(PointerKind.self, forKey: .kind) ?? .mouse
     }
 }
 
@@ -98,17 +122,20 @@ public struct MouseButtonEvent: Codable, Sendable {
     public var y: Float
     public var clicks: UInt8
     public var modifiers: KeyModifiers
+    public var kind: PointerKind
 
     public init(button: MouseButton,
                 x: Float,
                 y: Float,
                 clicks: UInt8,
-                modifiers: KeyModifiers = []) {
+                modifiers: KeyModifiers = [],
+                kind: PointerKind = .mouse) {
         self.button = button
         self.x = x
         self.y = y
         self.clicks = clicks
         self.modifiers = modifiers
+        self.kind = kind
     }
 
     public init(button: MouseButton,
@@ -119,7 +146,20 @@ public struct MouseButtonEvent: Codable, Sendable {
                   x: x,
                   y: y,
                   clicks: clicks,
-                  modifiers: [])
+                  modifiers: [],
+                  kind: .mouse)
+    }
+
+    private enum CodingKeys: String, CodingKey { case button, x, y, clicks, modifiers, kind }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        button = try c.decode(MouseButton.self, forKey: .button)
+        x = try c.decode(Float.self, forKey: .x)
+        y = try c.decode(Float.self, forKey: .y)
+        clicks = try c.decode(UInt8.self, forKey: .clicks)
+        modifiers = try c.decode(KeyModifiers.self, forKey: .modifiers)
+        kind = try c.decodeIfPresent(PointerKind.self, forKey: .kind) ?? .mouse
     }
 }
 

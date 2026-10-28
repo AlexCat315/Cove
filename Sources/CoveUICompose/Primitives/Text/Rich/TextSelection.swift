@@ -4,8 +4,8 @@ import CoveUIRuntime
 /// One selection shared by every paragraph of a document, so a drag can run
 /// from a heading through a list into a code block and copy as one string.
 /// Transient view state: owned by the mounted root, never persisted.
-final class TextSelectionScope {
-    static let key = CompositionLocal<TextSelectionScope?>(defaultValue: nil)
+public final class TextSelectionScope {
+    public static let key = CompositionLocal<TextSelectionScope?>(defaultValue: nil)
 
     struct Position: Equatable {
         var member: ObjectIdentifier
@@ -25,6 +25,12 @@ final class TextSelectionScope {
     private(set) var focus: Position?
     /// Opens the root's context menu at a window-space point.
     var requestMenu: ((CGPoint) -> Void)?
+
+    /// Optional hooks wired by the host so the selection toolbar can offer Look Up
+    /// and Share. On Apple platforms the context menu already surfaces these
+    /// natively; on Android they map to the action-mode bar's items.
+    var lookup: ((String) -> Void)?
+    var share: ((String) -> Void)?
 
     func register(_ node: Node, text: @escaping () -> String, offsetAt: @escaping (CGPoint) -> Int) {
         members[ObjectIdentifier(node)] = Member(node: node, text: text, offsetAt: offsetAt)
@@ -63,6 +69,21 @@ final class TextSelectionScope {
         anchor = nil
         focus = nil
         invalidate()
+    }
+
+    /// Moves the endpoint of the selection that belongs to `node`, keeping the
+    /// other endpoint fixed. Used by the draggable selection handles so a finger or
+    /// pen can refine either edge without starting a fresh selection.
+    func replaceRange(in node: Node, with range: Range<Int>) {
+        guard let anchor, let focus else { return }
+        let nodeID = ObjectIdentifier(node)
+        if anchor.member == nodeID {
+            select(from: Position(member: nodeID, offset: range.lowerBound),
+                   to: Position(member: focus.member, offset: focus.offset))
+        } else if focus.member == nodeID {
+            select(from: Position(member: anchor.member, offset: anchor.offset),
+                   to: Position(member: nodeID, offset: range.upperBound))
+        }
     }
 
     func selectAll() {
@@ -158,14 +179,14 @@ final class TextSelectionScope {
 
 /// Owns the selection for its content and offers Copy / Select All on
 /// secondary click or a touch long press.
-struct TextSelectionRoot<Content: View>: View {
+public struct TextSelectionRoot<Content: View>: View {
     let content: Content
     @State private var scope = TextSelectionScope()
     @State private var menuPoint: CGPoint?
 
     init(@ViewBuilder content: () -> Content) { self.content = content() }
 
-    var body: some View {
+    public var body: some View {
         let scope = scope
         scope.requestMenu = { menuPoint = $0 }
         return _ContextMenuHost(
@@ -173,6 +194,10 @@ struct TextSelectionRoot<Content: View>: View {
             entries: menuPoint == nil ? [] : [
                 .item(MenuItem(id: "copy", title: "Copy", shortcut: Self.shortcut("C"),
                                isEnabled: scope.hasSelection) { scope.copy() }),
+                .item(MenuItem(id: "lookup", title: "Look Up",
+                               isEnabled: scope.hasSelection) { scope.lookup?(scope.selectedText) }),
+                .item(MenuItem(id: "share", title: "Share",
+                               isEnabled: scope.hasSelection) { scope.share?(scope.selectedText) }),
                 .item(MenuItem(id: "selectAll", title: "Select All", shortcut: Self.shortcut("A")) { scope.selectAll() }),
             ],
             width: 200, point: menuPoint,
@@ -231,5 +256,18 @@ enum TextBoundaries {
         }
         let end = max(0, min(offset, text.utf8.count))
         return end..<end
+    }
+}
+
+public extension View {
+    /// Opt a region of the view tree into text selection. Every `Text` and
+    /// `RichText` inside shares one selection, so a drag can run from one
+    /// through another and copy as one string; Copy / Select All are offered on
+    /// secondary click or a touch long press (like SwiftUI's `textSelection`).
+    ///
+    /// Without this, each `RichText` owns its own isolated selection, and
+    /// `Text` never selects at all.
+    func textSelection(_ enabled: Bool = true) -> AnyView {
+        enabled ? AnyView(TextSelectionRoot { self }) : AnyView(self)
     }
 }

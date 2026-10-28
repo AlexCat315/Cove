@@ -52,6 +52,15 @@ enum {
 	COVE_SDL_EVENT_MOUSE_WHEEL       = SDL_EVENT_MOUSE_WHEEL,
 };
 
+// Touch / finger events. SDL3 reports these in window-normalized [0,1] coords,
+// so the shell multiplies by the window's logical size to land in the same
+// coordinate space as mouse events.
+enum {
+	COVE_SDL_EVENT_FINGER_DOWN   = SDL_EVENT_FINGER_DOWN,
+	COVE_SDL_EVENT_FINGER_MOTION = SDL_EVENT_FINGER_MOTION,
+	COVE_SDL_EVENT_FINGER_UP     = SDL_EVENT_FINGER_UP,
+};
+
 // Keyboard modifier masks (SDL_Keymod is typedef Uint16; #defines not imported by Swift)
 enum {
 	COVE_SDL_KMOD_LSHIFT = SDL_KMOD_LSHIFT,

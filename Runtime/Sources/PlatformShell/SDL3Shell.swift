@@ -835,6 +835,28 @@ public final class SDL3Shell: Shell {
                                                                                      input: .init(unit: .lines,
                                                                                                   timestamp: Double(event.wheel.timestamp) / 1e9)))))
 
+            case UInt32(COVE_SDL_EVENT_FINGER_DOWN),
+                 UInt32(COVE_SDL_EVENT_FINGER_MOTION),
+                 UInt32(COVE_SDL_EVENT_FINGER_UP):
+                let windowID = WindowID(event.tfinger.windowID)
+                guard let handle = windows[windowID] else { continue }
+                let size = handle.logicalSize
+                let fx = event.tfinger.x * Float(size.width)
+                let fy = event.tfinger.y * Float(size.height)
+                let fdx = event.tfinger.dx * Float(size.width)
+                let fdy = event.tfinger.dy * Float(size.height)
+                switch eventType {
+                case UInt32(COVE_SDL_EVENT_FINGER_DOWN):
+                    collected.append(WindowInputEvent(windowID: windowID,
+                        event: .mouseButtonDown(MouseButtonEvent(button: .left, x: fx, y: fy, clicks: 1, kind: .touch))))
+                case UInt32(COVE_SDL_EVENT_FINGER_MOTION):
+                    collected.append(WindowInputEvent(windowID: windowID,
+                        event: .mouseMotion(MouseMotionEvent(x: fx, y: fy, deltaX: fdx, deltaY: fdy, kind: .touch))))
+                default:
+                    collected.append(WindowInputEvent(windowID: windowID,
+                        event: .mouseButtonUp(MouseButtonEvent(button: .left, x: fx, y: fy, clicks: 1, kind: .touch))))
+                }
+
             case UInt32(COVE_SDL_EVENT_GAMEPAD_BUTTON_DOWN),
                  UInt32(COVE_SDL_EVENT_GAMEPAD_BUTTON_UP):
                 let btn = GamepadButton(rawValue: event.gbutton.button) ?? .south
@@ -1279,6 +1301,12 @@ public final class SDL3Shell: Shell {
         guard SDL_Init(SDL_INIT_VIDEO) else {
             throw ShellError.initializationFailed(Self.lastSDLError())
         }
+        // Touch becomes its own event stream instead of being rewritten into
+        // synthetic mouse events. The selection handlers branch on the event's
+        // pointer kind, so a touchscreen laptop keeps mouse selection while
+        // fingers scroll and long-press to select — otherwise every finger drag
+        // would be treated as a mouse drag and start a text selection.
+        _ = SDL_SetHint("SDL_TOUCH_MOUSE_EVENTS", "0")
         didInitializeSDL = true
 #if os(macOS)
         scrollInput = AppKitScrollInput()
