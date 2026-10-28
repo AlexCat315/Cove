@@ -35,6 +35,11 @@ public enum UIIcons {
         public static let chevronLeft = asset("chevron-left")
         public static let chevronRight = asset("chevron-right")
         public static let chevronUp = asset("chevron-up")
+        /// The wider, flatter chevron dropdown and menu triggers use. Its
+        /// 8×4pt glyph and 1.5pt stroke at the 12pt icon slot match mygo's
+        /// drawn arrow, which spans 80% of its 2.5-unit box.
+        public static let dropdownChevronDown = asset("dropdown-chevron-down")
+        public static let dropdownChevronUp = asset("dropdown-chevron-up")
         public static let chevronsLeft = asset("chevrons-left")
         public static let chevronsRight = asset("chevrons-right")
         public static let chevronsUpDown = asset("chevrons-up-down")
@@ -316,6 +321,10 @@ public extension UIIcons {
                      resource: Navigation.chevronRight),
         UIIconEntry(id: "chevron-up", name: "chevron-up", category: "Navigation",
                      resource: Navigation.chevronUp),
+        UIIconEntry(id: "dropdown-chevron-down", name: "dropdown-chevron-down", category: "Navigation",
+                     resource: Navigation.dropdownChevronDown),
+        UIIconEntry(id: "dropdown-chevron-up", name: "dropdown-chevron-up", category: "Navigation",
+                     resource: Navigation.dropdownChevronUp),
         UIIconEntry(id: "chevrons-left", name: "chevrons-left", category: "Navigation",
                      resource: Navigation.chevronsLeft),
         UIIconEntry(id: "chevrons-right", name: "chevrons-right", category: "Navigation",

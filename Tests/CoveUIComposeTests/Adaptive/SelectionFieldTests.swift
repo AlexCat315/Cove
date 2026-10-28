@@ -93,7 +93,10 @@ struct SelectionFieldTests: CoveUIComposeSerializedSuite {
                     for dark in [false, true] { for rtl in [false, true] {
                         h.width = width; h.scale = scale; h.input = modality; h.dark = dark; h.rtl = rtl; settle(graph, h)
                         let trigger = try target(Self.title, in: graph)
-                        #expect(trigger === original && trigger.accessibility?.value == Self.title && trigger.accessibility?.help == Self.title)
+                        // The trigger's drawn label is its name and value; help that
+                        // repeats it would be read twice and open a duplicate tooltip.
+                        #expect(trigger === original && trigger.accessibility?.value == Self.title)
+                        #expect(trigger.accessibility?.help == "")
                         #expect(trigger.frame.width <= CGFloat(h.fieldWidth + 1) && trigger.frame.height < 80)
                         if modality.contains(.touch) { #expect(trigger.frame.width >= 44 && trigger.frame.height >= 44) }
                         let text = try #require(nodes(trigger).first { $0.layoutNode?.textInputs?.text == Self.title })
@@ -173,7 +176,10 @@ struct SelectionFieldTests: CoveUIComposeSerializedSuite {
         for kind in Kind.allCases { try scene(kind) { h, graph, _, _, _ in
             h.selection = 99; settle(graph, h)
             let trigger = try target(Self.placeholder, in: graph)
-            #expect(trigger.accessibility?.value.isEmpty == true && trigger.accessibility?.help == Self.placeholder)
+            // The placeholder is the trigger's drawn text, so it is its name,
+            // not help: repeating it would describe the field twice.
+            #expect(trigger.accessibility?.value.isEmpty == true)
+            #expect(trigger.accessibility?.help == "")
             let diagnostic = UIDiagnostics(tree: graph.tree)
             @MainActor func count() throws -> Int {
                 let response = diagnostic.handleReadRequest(.init(type: "diagnostics.call", payload: .object([

@@ -109,7 +109,7 @@ private struct ToastCard: View {
         let onChipSoft = theme.colors.background.multipliedAlpha(0.82)
         Box(direction: .row, alignItems: .flexStart, spacing: 10) {
             Box(direction: .column, alignItems: .stretch, spacing: 5) {
-                Text(notification.title).truncatingTail().tooltip(notification.title)
+                Text(notification.title).truncatingTail().tooltip(notification.title, onlyWhenTruncated: true)
                     .font(.bodyStrong).foregroundColor(onChip)
                 if !notification.message.isEmpty { Text(notification.message).font(.body).foregroundColor(onChipSoft) }
                 if !notification.actions.isEmpty {

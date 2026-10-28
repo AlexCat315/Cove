@@ -323,8 +323,16 @@ struct ButtonHost: _PrimitiveView {
             if node.firstResource(PortalResource.self) == nil { node.addResource(PortalResource()) }
             if node.firstResource(TooltipSession.self) == nil { node.addResource(TooltipSession()) }
             var options = TooltipOptions(); options.isEnabled = isEnabled
-            node.firstResource(TooltipSession.self)?.configure(content: tooltipDescription(resolvedTooltip), options: options,
-                focused: FocusChainHolder.current?.focused === node && FocusChainHolder.current?.isFocusVisible == true)
+            // The description is checked against the drawn label every time the
+            // tip would appear, so hover that starts before the label lays out
+            // cannot leave a duplicate chip behind.
+            node.firstResource(TooltipSession.self)?.configure(
+                content: tooltipDescription(resolvedTooltip), options: options,
+                focused: FocusChainHolder.current?.focused === node && FocusChainHolder.current?.isFocusVisible == true,
+                canShow: { [weak node] in
+                    guard let node else { return false }
+                    return ButtonHost.tooltipAddsText(to: node)
+                })
             node.layoutDidUpdate = { [weak node] _ in node?.firstResource(TooltipSession.self)?.updatePosition() }
         } else {
             node.firstResource(TooltipSession.self)?.dismiss()
@@ -504,7 +512,7 @@ struct ButtonHost: _PrimitiveView {
     static func tooltipAddsText(to node: Node) -> Bool {
         let tooltip = comparable(node.accessibility?.help ?? "")
         guard !tooltip.isEmpty else { return false }
-        let visible = comparable(AccessibilityTree.visibleText(in: node))
+        let visible = comparable(AccessibilityTree.drawnText(in: node))
         return visible.isEmpty || !visible.contains(tooltip)
     }
 

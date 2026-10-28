@@ -65,7 +65,7 @@ struct JsonExpandedEditor: View {
 
     private var header: some View {
         Row(alignment: .center, spacing: 6) {
-            Text(labels.expand).truncatingTail().tooltip(labels.expand).font(.bodyStrong)
+            Text(labels.expand).truncatingTail().tooltip(labels.expand, onlyWhenTruncated: true).font(.bodyStrong)
                 .accessibility { $0.role = .heading; $0.label = labels.expand }
                 .flex(1, shrink: 1, basis: 0).frame(minWidth: 0)
             Button(icon: .resource(UIIcons.Action.format), size: 14,

@@ -249,7 +249,8 @@ public struct Text: _PrimitiveView {
 
     /// A single line with a trailing ellipsis, a full-text tooltip and the
     /// original accessible name. Truncation never splits a grapheme cluster.
-    public func truncated() -> some View { truncatingTail().tooltip(string) }
+    /// The tooltip appears only when the line actually had to clip.
+    public func truncated() -> some View { truncatingTail().tooltip(string, onlyWhenTruncated: true) }
 
     /// Controls with their own tooltip reuse the same painter without nesting descriptions.
     func truncatingTail() -> Text { var copy = self; copy.truncates = true; return copy }
@@ -290,11 +291,17 @@ public struct Text: _PrimitiveView {
                 maxWidth: max(0, Float(node.frame.width) - (padding?.left ?? 0) - (padding?.right ?? 0)),
                 letterSpacing: node.textStyleValue(StyleAttachmentKey.letterSpacing) ?? 0
             )
+            if snapshot.truncates {
+                let marker = TextTruncation.attachmentKey
+                if node.attachments[marker] as? Bool != result.truncated {
+                    node.attachments[marker] = result.truncated
+                }
+            }
             // Composite button labels and other containers supply inherited
             // foregrounds; standalone text falls back to the active theme.
             let baseColor = node.debugForegroundColor ?? snapshot.color ?? node.inheritedForegroundColor ?? node.theme.colors.onSurface
             let drawColor = baseColor.multipliedAlpha(node.opacity)
-            list.addText(result,
+            list.addText(result.layout,
                          origin: (Float(origin.x) + (padding?.left ?? 0), Float(origin.y) + (padding?.top ?? 0)),
                          color: drawColor,
                          textureID: env.atlasTextureID,
@@ -346,8 +353,8 @@ public struct Text: _PrimitiveView {
                 maxWidth: constraint,
                 letterSpacing: layout?.textStyleValue(StyleAttachmentKey.letterSpacing) ?? 0
             )
-            return CGSize(width: CGFloat(result.totalWidth),
-                          height: CGFloat(result.totalHeight))
+            return CGSize(width: CGFloat(result.layout.totalWidth),
+                          height: CGFloat(result.layout.totalHeight))
         }
     }
 
@@ -400,14 +407,30 @@ public struct Text: _PrimitiveView {
     }
 
     private func displayLayout(env: TextEnvironment, layout: LayoutNode?, font: Font,
-                               lineHeight: Float, maxWidth: Float, letterSpacing: Float) -> TextLayoutResult {
+                               lineHeight: Float, maxWidth: Float, letterSpacing: Float)
+        -> (layout: TextLayoutResult, truncated: Bool) {
+        let normalized = string.split(whereSeparator: \.isNewline).joined(separator: " ")
         let text = truncates ? SingleLineText.fitting(string, width: maxWidth) { candidate in
             env.cachedLayout(text: candidate, font: font, lineHeight: lineHeight,
                              letterSpacing: letterSpacing).totalWidth
         } : string
-        return Self.cachedLayout(env: env, layout: layout, text: text, font: font,
-                                 lineHeight: lineHeight, maxWidth: truncates ? maxWidth : resolvedMaxWidth(maxWidth),
-                                 alignment: alignment, letterSpacing: letterSpacing)
+        let result = Self.cachedLayout(env: env, layout: layout, text: text, font: font,
+                                       lineHeight: lineHeight, maxWidth: truncates ? maxWidth : resolvedMaxWidth(maxWidth),
+                                       alignment: alignment, letterSpacing: letterSpacing)
+        return (result, truncates && text != normalized)
+    }
+}
+
+enum TextTruncation {
+    static let attachmentKey = "__text_truncated"
+}
+
+extension Node {
+    /// True when a text descendant had to clip its line. Set while drawing, so
+    /// tooltip presentation reads the same fit the renderer used.
+    var containsTruncatedText: Bool {
+        if attachments[TextTruncation.attachmentKey] as? Bool == true { return true }
+        return children.contains { $0.containsTruncatedText }
     }
 }
 

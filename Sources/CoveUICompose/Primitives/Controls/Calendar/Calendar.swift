@@ -90,7 +90,7 @@ public struct CalendarView: View {
                        action: { drillUp() }) {
                     Row(alignment: .center, spacing: 4) {
                         Text(title).font(.bodyStrong)
-                        Icon(UIIcons.Navigation.chevronDown, size: .small).accessibilityHidden()
+                        Icon(UIIcons.Navigation.dropdownChevronDown, size: .small).accessibilityHidden()
                     }.padding(horizontal: 6)
                 }.buttonStyle(.ghost).accessibilityLabel(label).frame(height: 32).flex(0, shrink: 1)
                 Box {}.flex(1)

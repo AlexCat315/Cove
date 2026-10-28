@@ -52,4 +52,41 @@ struct SingleLineTextTests: CoveUIComposeSerializedSuite {
             }
         }
     }
+
+    @Test("Truncated text marks its node so the full-text tooltip waits for real clipping")
+    func truncationMarker() throws {
+        try GlobalTestLock.locked {
+            let prior = TextEnvironmentHolder.current
+            TextEnvironmentHolder.current = TestTextEnvironmentFactory.make()
+            defer { TextEnvironmentHolder.current = prior }
+            let text = "A label wide enough to clip"
+            struct Sample: View {
+                let text: String
+                let width: Float
+                var body: some View { Text(text).truncated().font(.body).frame(width: width) }
+            }
+            let graph = ViewGraph(tree: NodeTree(), recomposer: Recomposer())
+            defer { graph.install(root: EmptyView()) }
+            func marks(_ width: Float) throws -> Bool {
+                graph.install(root: Sample(text: text, width: width))
+                graph.recomposer.commitAll()
+                graph.computeLayout(width: 1200, height: 100)
+                let root = try #require(graph.tree.root)
+                let list = DrawList()
+                NodeRenderer().render(root: root, into: list)
+                var pending = [root]
+                while let node = pending.popLast() {
+                    if node.layoutNode?.textInputs?.text == text {
+                        return node.containsTruncatedText
+                    }
+                    pending.append(contentsOf: node.children)
+                }
+                return false
+            }
+            let clipped = try marks(40)
+            let fitting = try marks(1000)
+            #expect(clipped)
+            #expect(fitting == false)
+        }
+    }
 }

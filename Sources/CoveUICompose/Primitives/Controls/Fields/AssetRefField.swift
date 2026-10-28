@@ -62,10 +62,10 @@ public struct AssetRefField: View {
                     .flex(0, shrink: 0).accessibilityHidden()
                 Box(direction: .column, alignItems: .stretch, spacing: 1) {
                     Text(value.wrappedValue?.name ?? placeholder)
-                        .truncatingTail().tooltip(value.wrappedValue?.name ?? placeholder)
+                        .truncatingTail().tooltip(value.wrappedValue?.name ?? placeholder, onlyWhenTruncated: true)
                         .font(.caption).foregroundColor(titleColor).flex(0, shrink: 1)
                     if let subtitle = value.wrappedValue?.subtitle, !subtitle.isEmpty {
-                        Text(subtitle).truncatingTail().tooltip(subtitle)
+                        Text(subtitle).truncatingTail().tooltip(subtitle, onlyWhenTruncated: true)
                             .font(.caption).foregroundColor(.onSurfaceMuted).flex(0, shrink: 1)
                     }
                 }.flex(1, shrink: 1, basis: 0).frame(minWidth: 0)
@@ -92,7 +92,7 @@ public struct AssetRefField: View {
             isEnabled: isEnabled && !pickerMenuEntries.isEmpty,
             width: 240, placement: .bottomTrailing, surface: .content, overflow: .flip,
             triggerStyle: AnyButtonStyle(GhostButtonStyle())) {
-                Icon(isPickerPresented ? UIIcons.Navigation.chevronUp : UIIcons.Navigation.chevronDown,
+                Icon(isPickerPresented ? UIIcons.Navigation.dropdownChevronUp : UIIcons.Navigation.dropdownChevronDown,
                      size: 12, color: .onSurfaceMuted)
             } content: {
                 Menu(pickerMenuEntries, width: 240, maxVisibleRows: 9,

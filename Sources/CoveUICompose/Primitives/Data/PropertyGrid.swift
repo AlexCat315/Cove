@@ -329,15 +329,20 @@ private struct _StatefulPropertyGrid: View {
             Box(direction: leading ? .row : .column, alignItems: leading ? .center : .stretch, spacing: leading ? 4 : 6)
             {
                 Box(direction: .row, alignItems: .center, justifyContent: .flexStart) {
-                    Text(row.label)
-                        .lineLimit(leading ? 1 : nil)
-                        .font(.caption)
-                        .foregroundColor(.onSurfaceVariant)
+                    if leading {
+                        Text(row.label).truncatingTail()
+                            .font(.caption)
+                            .foregroundColor(.onSurfaceVariant)
+                    } else {
+                        Text(row.label)
+                            .font(.caption)
+                            .foregroundColor(.onSurfaceVariant)
+                    }
                 }
                 .padding(horizontal: 7)
                 .frame(width: leading ? .points(labelWidth) : .auto, minHeight: leading ? rowHeight : 0)
                 .clipped()
-                .tooltip(row.label)
+                .tooltip(row.label, onlyWhenTruncated: true)
                 .flex(0, shrink: 0)
 
                 Box(direction: .row, alignItems: .center, justifyContent: .flexStart) {

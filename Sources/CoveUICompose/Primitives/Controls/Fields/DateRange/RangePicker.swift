@@ -42,7 +42,7 @@ public struct DateRangePicker: View {
                        width: Float(options.calendar.presentation.numberOfMonths) * (cellSize * 7 + 36),
                        surface: .content, overflow: .flip, label: {
             Row(alignment: .center, spacing: 8) {
-                Text(labelText(formatter)).truncatingTail().font(.label).tooltip(labelText(formatter))
+                Text(labelText(formatter)).truncatingTail().font(.label).tooltip(labelText(formatter), onlyWhenTruncated: true)
                     .flex(1, shrink: 1).frame(minWidth: 0)
                 if options.presentation.isClearable && selection.wrappedValue != nil {
                     Button(icon: .resource(UIIcons.Action.x), size: 12,
@@ -51,7 +51,7 @@ public struct DateRangePicker: View {
                         selection.wrappedValue = nil
                     }.buttonStyle(.ghost).controlSize(.mini)
                 }
-                Icon(UIIcons.Navigation.chevronDown, size: .small)
+                Icon(UIIcons.Navigation.dropdownChevronDown, size: .small)
             }
             .padding(horizontal: 10, vertical: 6)
             .frame(minHeight: 34)

@@ -121,7 +121,6 @@ private struct FormFieldView: View {
                     }
                     .frame(width: leading ? .points(labelWidth) : .auto)
                     .flex(0, shrink: 0)
-                    .tooltip(field.label)
                     Box(direction: .column, alignItems: .stretch, spacing: 5) {
                         field.content.accessibility {
                             $0.label = field.label

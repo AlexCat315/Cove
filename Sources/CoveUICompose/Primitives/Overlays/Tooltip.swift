@@ -6,6 +6,10 @@ public struct TooltipOptions {
     public var maxWidth: Float = 320
     public var gap: Float = 6
     public var isEnabled = true
+    /// Labels that are fully visible repeat what the user already reads. Set
+    /// by `Text.truncated()` so the description appears only when the node
+    /// actually clipped its text.
+    public var onlyWhenTruncated = false
     public init() {}
     mutating func validate() {
         delay = delay.isFinite ? max(0, delay) : 0.45
@@ -88,7 +92,16 @@ private struct CoordinateTooltipHost: _PrimitiveView {
 
 public extension View {
     func tooltip(_ description: String, configure: (inout TooltipOptions) -> Void = { _ in }) -> some View {
-        Tooltip(configure: configure, target: { self }) {
+        tooltip(description, onlyWhenTruncated: false, configure: configure)
+    }
+
+    /// A description that is redundant unless the target had to clip text.
+    func tooltip(_ description: String, onlyWhenTruncated: Bool,
+                 configure: (inout TooltipOptions) -> Void = { _ in }) -> some View {
+        Tooltip(configure: { options in
+            options.onlyWhenTruncated = onlyWhenTruncated
+            configure(&options)
+        }, target: { self }) {
             tooltipDescription(description)
         }
     }
@@ -147,17 +160,26 @@ final class TooltipSession: NodeResource, AnyAnimationController {
     private var elapsed: Double = 0
     private var presented = false
     private var dismissedUntilLeave = false
+    /// Re-evaluated before the tip appears, not just when the pointer enters:
+    /// hover can begin while a control's label is still being laid out, and a
+    /// description that repeats text drawn a frame later must not survive.
+    private var canShow: () -> Bool = { true }
     var isFinished = true
+    /// Whether a tip is on screen; exposed for tooltip regression tests.
+    var isPresented: Bool { presented }
     func mount(node: Node) { self.node = node }
     func unmount(node: Node) { hide(); self.node = nil }
-    func configure(content: AnyView, options: TooltipOptions, focused: Bool) {
+    func configure(content: AnyView, options: TooltipOptions, focused: Bool,
+                   canShow: @escaping () -> Bool = { true }) {
         self.content = content; self.options = options; self.focused = focused
+        self.canShow = canShow
         refresh()
     }
     func setHovered(_ hovered: Bool) { self.hovered = hovered; refresh() }
     func setFocused(_ focused: Bool) { self.focused = focused; refresh() }
     private func refresh() {
-        guard options.isEnabled && (hovered || focused) else { dismissedUntilLeave = false; hide(); return }
+        let showsText = !options.onlyWhenTruncated || showsTruncatedText
+        guard options.isEnabled && (hovered || focused) && showsText, canShow() else { dismissedUntilLeave = false; hide(); return }
         guard !dismissedUntilLeave else { return }
         if presented { show(); return }
         guard isFinished else { return }
@@ -165,13 +187,23 @@ final class TooltipSession: NodeResource, AnyAnimationController {
         if options.delay == 0 { show() }
         else { isFinished = false; AnimatorScheduler.current.register(self) }
     }
+
+    /// A truncated label marks its node while drawing. Text that fits keeps
+    /// the tooltip hidden, so hovering ordinary labels stays quiet.
+    private var showsTruncatedText: Bool {
+        guard let node else { return false }
+        return node.containsTruncatedText
+    }
     func tick(deltaTime: Double) {
         guard !isFinished else { return }
         elapsed += max(0, deltaTime)
-        if elapsed >= options.delay { isFinished = true; show() }
+        if elapsed >= options.delay {
+            isFinished = true
+            if canShow() { show() } else { hide() }
+        }
     }
     private func show() {
-        guard let node, node.acceptsSubtreeInput, let content else { return }
+        guard let node, node.acceptsSubtreeInput, let content, canShow() else { return }
         presented = true
         node.firstResource(PortalResource.self)?.present(in: node.compositionValue(of: PortalStoreEnvironment.key) ?? PortalStoreHolder.current,
             position: position(node), width: nil,

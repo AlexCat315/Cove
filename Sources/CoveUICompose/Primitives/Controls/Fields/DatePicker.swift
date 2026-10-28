@@ -31,13 +31,13 @@ public struct DatePicker: View {
         return Popover(isPresented: $isPresented, isEnabled: options.presentation.isEnabled,
                        width: CalendarView.width(cellSize: cellSize, options: options.calendar), surface: .content, overflow: .flip, label: {
             Row(alignment: .center, spacing: 8) {
-                Text(dateLabel).truncatingTail().font(.label).tooltip(dateLabel)
+                Text(dateLabel).truncatingTail().font(.label).tooltip(dateLabel, onlyWhenTruncated: true)
                     .flex(1, shrink: 1).frame(minWidth: 0)
                 if options.presentation.isClearable && selection.wrappedValue != nil {
                     Button(icon: .resource(UIIcons.Action.x), size: 12, isEnabled: options.presentation.isEnabled,
                            tooltip: "Clear date") { selection.wrappedValue = nil }.buttonStyle(.ghost).controlSize(.mini)
                 }
-                Icon(UIIcons.Navigation.chevronDown, size: .small)
+                Icon(UIIcons.Navigation.dropdownChevronDown, size: .small)
             }.padding(horizontal: 10, vertical: 6).frame(minHeight: 34).background(.surface).cornerRadius(.inputRadius).border(.border, width: 1)
         }, content: {
             CalendarView(selection: Binding(get: { selection.wrappedValue }, set: { selection.wrappedValue = $0; isPresented = false })) {

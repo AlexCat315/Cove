@@ -176,7 +176,7 @@ private struct _StatefulSelect<Value: Hashable>: View {
                     .font(.body)
                     .foregroundColor(select.isEnabled ? .onSurface : .onSurfaceDisabled)
                     .accessibilityHidden()
-                Icon(isPresented ? UIIcons.Navigation.chevronUp : UIIcons.Navigation.chevronDown, size: .small, color: .onSurfaceMuted)
+                Icon(isPresented ? UIIcons.Navigation.dropdownChevronUp : UIIcons.Navigation.dropdownChevronDown, size: .small, color: .onSurfaceMuted)
                     .accessibilityHidden()
             }
             .padding(horizontal: 10, vertical: 6)
@@ -197,8 +197,11 @@ private struct _StatefulSelect<Value: Hashable>: View {
             })
         })
         popover.sizing = .anchor
+        // The selected value is already the trigger's visible text, so it is
+        // the control's name and value, not help: a help string that repeats
+        // them would surface as a duplicate tooltip over the field.
         popover.triggerDescription = .init(label: selectedLabel,
-            value: select.options.first(where: { $0.value == select.selection.wrappedValue })?.label ?? "", help: selectedLabel)
+            value: select.options.first(where: { $0.value == select.selection.wrappedValue })?.label ?? "")
         return popover.frame(minWidth: max(44, chromeWidth + 24 + theme.inputs.borderWidth * 2))
             .compositionLocal(ActionControlAccessibility.role, .comboBox)
         }

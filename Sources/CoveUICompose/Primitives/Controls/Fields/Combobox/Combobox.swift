@@ -142,7 +142,7 @@ public struct Combobox<Value: Hashable>: View {
                            tooltip: "Clear selection") { selection.wrappedValue = nil }
                         .buttonStyle(.ghost).controlSize(.mini).accessibilityLabel("Clear selection")
                 }
-                Icon(UIIcons.Navigation.chevronDown, size: .small).accessibilityHidden()
+                Icon(UIIcons.Navigation.dropdownChevronDown, size: .small).accessibilityHidden()
                 }
             }.padding(horizontal: 10, vertical: 4).frame(minHeight: rows.triggerMinimum).background(.surface).cornerRadius(.inputRadius).border(.border, width: 1)
         }, content: {
@@ -181,7 +181,7 @@ public struct Combobox<Value: Hashable>: View {
             }.padding(4).floatingSurface(.groupRadius, elevation: .panel)
         })
         popover.sizing = .anchor
-        popover.triggerDescription = .init(label: title, value: selectedLabel ?? "", help: title)
+        popover.triggerDescription = .init(label: title, value: selectedLabel ?? "")
         return popover.frame(width: presentation.width, minWidth: max(44, chromeWidth + 26))
             .compositionLocal(ActionControlAccessibility.role, .comboBox)
             .modifier(ComboboxSearchLifetime(session: remote))

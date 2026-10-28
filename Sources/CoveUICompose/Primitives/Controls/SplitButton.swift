@@ -31,7 +31,7 @@ public struct SplitButton<Label: View>: View {
             Box {}.frame(width: 1).background(.border)
             MenuButton(entries: entries, isEnabled: isEnabled, width: menuWidth,
                        accessibilityLabel: "More actions") {
-                Icon(UIIcons.Navigation.chevronDown, size: .small)
+                Icon(UIIcons.Navigation.dropdownChevronDown, size: .small)
                     .padding(horizontal: 10, vertical: 7)
             }
         }

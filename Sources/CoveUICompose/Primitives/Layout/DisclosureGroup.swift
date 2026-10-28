@@ -54,7 +54,7 @@ public extension DisclosureGroup where Label == AnyView {
         self.init(isExpanded: isExpanded, isEnabled: isEnabled, content: content) {
             AnyView(Text(title).truncatingTail().font(.label).foregroundColor(.onSurfaceVariant)
                 .frame(minWidth: 0)
-                .debugName("disclosure-label").tooltip(title))
+                .debugName("disclosure-label").tooltip(title, onlyWhenTruncated: true))
         }
     }
 }

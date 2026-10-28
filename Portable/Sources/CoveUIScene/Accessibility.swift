@@ -231,15 +231,22 @@ public enum AccessibilityTree {
         labelText(in: node).joined(separator: " ")
     }
 
-    private static func labelText(in node: Node) -> [String] {
+    /// The text a control draws, including labels hidden from the accessibility
+    /// tree because the control publishes its own name. Tooltip deduplication
+    /// must compare against what the user can see, not what VoiceOver reads.
+    package static func drawnText(in node: Node) -> String {
+        labelText(in: node, includesHiddenText: true).joined(separator: " ")
+    }
+
+    private static func labelText(in node: Node, includesHiddenText: Bool = false) -> [String] {
         node.children.flatMap { child -> [String] in
             guard child.isLayoutVisible, child.isInteractionEnabled, child.opacity > 0, child.subtreeOpacity > 0 else { return [] }
             if let semantics = child.accessibility {
-                if semantics.isHidden { return [] }
+                if semantics.isHidden && !includesHiddenText { return [] }
                 if semantics.role == .staticText { return [semantics.label] }
                 if semantics.role != .group && !(semantics.role == .scrollArea && semantics.combinesChildren) { return [] }
             }
-            return labelText(in: child)
+            return labelText(in: child, includesHiddenText: includesHiddenText)
         }
     }
 }
