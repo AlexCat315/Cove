@@ -53,7 +53,7 @@ extension TextField {
         guard layout.axis == .vertical, let env = TextEnvironmentHolder.current else { return false }
         let height = resolvedLineHeight(node: node, env: env)
         let visible = max(height, Float(node.frame.height) - verticalInset(for: height) * 2)
-        let rows = max(1, Int(floor(visible / max(1, height))) - 1)
+        let rows = max(1, Int((visible / max(1, height)).rounded(.down)) - 1)
         moveCursorVertically(lineDelta: direction * rows, extendSelection: extendSelection, state: state, node: node)
         return true
     }

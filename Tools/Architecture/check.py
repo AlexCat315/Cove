@@ -26,18 +26,23 @@ BRIDGES = {'CYoga', 'CFreeType', 'CHarfBuzz', 'CSDL3', 'CImageDecodeBridge', 'CD
 # Cross-module names under the same capability remain implementation details.
 DECLARATION = re.compile(r'\.(?:target|binaryTarget|macro|executableTarget|testTarget)\s*\(\s*name:\s*"([^"]+)"')
 IMPORT = re.compile(r'^\s*(?:@_exported\s+|@_spi\([^)]*\)\s+|public\s+|internal\s+|private\s+|@preconcurrency\s+|@testable\s+|@_implementationOnly\s+)*import\s+(?:(?:typealias|struct|class|enum|protocol|let|var|func)\s+)?(\w+)', re.M)
+RESOURCE_BUNDLE = re.compile(r'PackageResourceBundle\.required\(\s*named:\s*"([^"]+)"')
 
 
 def check():
     errors = []
     owners = defaultdict(list)
     modules = {}
+    package_names = {}
     for package in PACKAGES:
         manifest = ROOT / package / 'Package.swift'
         if not manifest.is_file():
             errors.append(f'missing capability manifest: {manifest.relative_to(ROOT)}')
             continue
         source = manifest.read_text()
+        name = re.search(r'Package\(\s*name:\s*"([^"]+)"', source)
+        if name:
+            package_names[package] = name.group(1)
         for match in DECLARATION.finditer(source):
             if source[match.end():].lstrip().startswith(", condition:"):
                 continue
@@ -59,12 +64,21 @@ def check():
     for package in PACKAGES:
         sources = ROOT / package / 'Sources'
         if package == '.':
-            folders = [ROOT / 'Sources', ROOT / 'Hosts/Desktop/Sources/CoveUI', ROOT / 'Hosts/Android/Integration', ROOT / 'Terminal/Sources/CoveUITerminal']
+            folders = [(ROOT / 'Sources', None), (ROOT / 'Hosts/Desktop/Sources/CoveUI', 'CoveUI'),
+                       (ROOT / 'Hosts/Android/Integration', 'CoveUIAndroid'),
+                       (ROOT / 'Terminal/Sources/CoveUITerminal', 'CoveUITerminal')]
         else:
-            folders = [sources]
-        for folder in folders:
+            folders = [(sources, None)]
+        for folder, entry_module in folders:
             for path in folder.rglob('*.swift'):
-                for imported in IMPORT.findall(path.read_text(encoding='utf-8-sig')):
+                source = path.read_text(encoding='utf-8-sig')
+                module = entry_module or path.relative_to(folder).parts[0]
+                if package in package_names:
+                    expected_bundle = f'{package_names[package]}_{module}'
+                    for bundle in RESOURCE_BUNDLE.findall(source):
+                        if bundle != expected_bundle:
+                            errors.append(f'{path.relative_to(ROOT)}: resource bundle {bundle} does not match owner {expected_bundle}')
+                for imported in IMPORT.findall(source):
                     owner = modules.get(imported)
                     if owner is None or owner == package:
                         continue

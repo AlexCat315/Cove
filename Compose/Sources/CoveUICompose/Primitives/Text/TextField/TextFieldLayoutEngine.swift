@@ -115,8 +115,8 @@ extension TextField {
                 state.scroll.needsCaretReveal = false
             }
             updateScroll(state, document: document, lineHeight: lineHeight)
-            let first = max(0, Int(floor(state.scroll.offsetY / max(1, lineHeight))) - 1)
-            let count = Int(ceil(state.scroll.visibleHeight / max(1, lineHeight))) + 3
+            let first = max(0, Int((state.scroll.offsetY / max(1, lineHeight)).rounded(.down)) - 1)
+            let count = Int((state.scroll.visibleHeight / max(1, lineHeight)).rounded(.up)) + 3
             func key() -> RenderCacheKey {
                 RenderCacheKey(root: renderState.buffer.identity, version: renderState.buffer.version, visibleRows: first..<(first + count),
                                totalRows: document.index.rowCount, font: font, lineHeight: lineHeight, letterSpacing: letterSpacing,
@@ -200,7 +200,7 @@ extension TextField {
             let x = Float(point.x - state.pointer.lastDrawOrigin.x) - leading + state.scroll.horizontal.offset
             let y = Float(point.y - state.pointer.lastDrawOrigin.y) - textField.textOriginYOffset(frameHeight: Float(node.frame.height), lineHeight: lineHeight) + state.scroll.offsetY
             let document = interactiveDocument(in: textField.text.wrappedValue, node: node, env: env)
-            return document.character(atRow: Int(floor(max(0, y) / max(1, lineHeight))), x: x, environment: env)
+            return document.character(atRow: Int((max(0, y) / max(1, lineHeight)).rounded(.down)), x: x, environment: env)
         }
         func drawSelection(_ range: Range<Int>, in buffer: TextBuffer, env: TextEnvironment, font: Font, lineHeight: Float,
                            layout: TextLayoutResult, textOriginX: Float, textOriginY: Float, visibleTopY: Float,

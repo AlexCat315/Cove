@@ -117,7 +117,7 @@ struct FixedVirtualStack<Data: RandomAccessCollection, ID: Hashable, Content: Vi
                                     height: Float, overscan: Int) -> Range<Int> {
         let stride = max(1, rowStride)
         let first = max(0, min(count, Int(max(0, offset) / stride) - max(0, overscan)))
-        let last = min(count, max(first, Int(ceil((max(0, offset) + max(stride, height)) / stride)) + max(0, overscan)))
+        let last = min(count, max(first, Int(((max(0, offset) + max(stride, height)) / stride).rounded(.up)) + max(0, overscan)))
         return first..<last
     }
 }

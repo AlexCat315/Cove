@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- 修复 0.2.10 发布验证：Compose 按所属包查找资源，线程局部存储析构回调处理空指针并消除 Windows 的 UUID 名称冲突，Android 的 Float 数学运算使用明确重载，iOS 不再引用 AppKit 菜单适配器。
+
 ## 0.2.10 — 2026-10-29
 
 - 按能力拆分 Core、Text、Imaging、Graphics、Shell、Compose、Runtime、DevTools 与 Hosts，移除 Portable 与根 manifest 对下层 target 的重复声明；根包收拢为应用与扩展产品，内部模块产品改为从所属能力入口消费。

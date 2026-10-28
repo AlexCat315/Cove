@@ -51,8 +51,8 @@ public struct Spinner: _PrimitiveView {
             for i in 0..<24 {
                 let start = phase + Float(i) / 24 * Float.pi * 1.5
                 let end = phase + Float(i + 1) / 24 * Float.pi * 1.5
-                list.addLine(fromX: cx + cos(start) * radius, fromY: cy + sin(start) * radius,
-                             toX: cx + cos(end) * radius, toY: cy + sin(end) * radius,
+                list.addLine(fromX: cx + cosf(start) * radius, fromY: cy + sinf(start) * radius,
+                             toX: cx + cosf(end) * radius, toY: cy + sinf(end) * radius,
                              thickness: thickness, color: color.multipliedAlpha(Float(i + 1) / 24))
             }
         }

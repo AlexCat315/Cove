@@ -49,6 +49,14 @@ class CapabilityBoundaryTests(unittest.TestCase):
         manifest.write_text(manifest.read_text() + '\n.library(name: "NativeRHI", targets: ["NativeRHI"])')
         self.assertTrue(any('implementation module exported' in error for error in architecture.check()[0]))
 
+    def test_resource_bundle_follows_its_declaring_package(self):
+        source = architecture.ROOT / 'Compose/Sources/CoveUICompose/Resources.swift'
+        source.parent.mkdir(parents=True)
+        source.write_text('let bundle = PackageResourceBundle.required(named: "CoveUI_CoveUICompose")\n')
+        self.assertTrue(any('resource bundle' in error for error in architecture.check()[0]))
+        source.write_text('let bundle = PackageResourceBundle.required(named: "CoveUICompose_CoveUICompose")\n')
+        self.assertFalse(architecture.check()[0])
+
 
 if __name__ == '__main__':
     unittest.main()

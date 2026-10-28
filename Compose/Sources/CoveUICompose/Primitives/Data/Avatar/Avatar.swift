@@ -149,14 +149,14 @@ enum AvatarIdentity {
         }
     }
     private static func oklch(_ lightness: Float, _ chroma: Float, _ hue: Float) -> Color {
-        let radians = hue * .pi / 180, a = chroma * cos(radians), b = chroma * sin(radians)
+        let radians = hue * .pi / 180, a = chroma * cosf(radians), b = chroma * sinf(radians)
         let ll = lightness + 0.3963377774 * a + 0.2158037573 * b
         let mm = lightness - 0.1055613458 * a - 0.0638541728 * b
         let ss = lightness - 0.0894841775 * a - 1.2914855480 * b
         let l = ll * ll * ll, m = mm * mm * mm, s = ss * ss * ss
         func channel(_ value: Float) -> Float {
             let value = max(0, min(1, value))
-            return value <= 0.0031308 ? 12.92 * value : 1.055 * pow(value, 1 / 2.4) - 0.055
+            return value <= 0.0031308 ? 12.92 * value : 1.055 * powf(value, 1 / 2.4) - 0.055
         }
         return Color(r: channel(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
                      g: channel(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),

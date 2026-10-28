@@ -47,6 +47,11 @@ public enum StateReadTracking {
     /// thread exits (plain `TlsAlloc` has none). Single-threaded WASI keeps a
     /// single process-wide slot instead.
     private enum StackTLS {
+        private static func releaseStack(_ raw: UnsafeMutableRawPointer?) {
+            guard let raw else { return }
+            Unmanaged<StackBox>.fromOpaque(raw).release()
+        }
+
         #if os(WASI)
         nonisolated(unsafe) private static var slot: StackBox?
         static func load() -> StackBox? { slot }
@@ -55,7 +60,7 @@ public enum StateReadTracking {
         private static let key: pthread_key_t = {
             var key = pthread_key_t()
             pthread_key_create(&key) { raw in
-                Unmanaged<StackBox>.fromOpaque(raw).release()
+                StackTLS.releaseStack(raw)
             }
             return key
         }()
@@ -68,7 +73,7 @@ public enum StateReadTracking {
         }
         #elseif canImport(WinSDK)
         private static let index: DWORD = FlsAlloc { raw in
-            Unmanaged<StackBox>.fromOpaque(raw).release()
+            StackTLS.releaseStack(raw)
         }
         static func load() -> StackBox? {
             guard index != FLS_OUT_OF_INDEXES, let raw = FlsGetValue(index) else { return nil }
@@ -362,7 +367,7 @@ extension StateStorage {
 private enum StateFieldTypes {
     static let scalars = Set([Bool.self, Int.self, Int8.self, Int16.self, Int32.self, Int64.self,
         UInt.self, UInt8.self, UInt16.self, UInt32.self, UInt64.self, Float.self, Double.self,
-        String.self, Character.self, UUID.self, Date.self, CGFloat.self].map(ObjectIdentifier.init))
+        String.self, Character.self, Foundation.UUID.self, Date.self, CGFloat.self].map(ObjectIdentifier.init))
 }
 
 /// A reference hidden inside Equatable can mutate both the retained read and
