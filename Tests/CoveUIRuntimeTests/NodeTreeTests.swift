@@ -117,6 +117,31 @@ struct NodeTreeTests {
         tree.flush()
     }
 
+    @Test("nodeCount tracks membership through the structural-version cache")
+    func nodeCountTracksMembership() {
+        let tree = NodeTree()
+        let root = Node()
+        let mid = Node()
+        let leaf = Node()
+        root.addChild(mid)
+        mid.addChild(leaf)
+        tree.root = root
+        #expect(tree.nodeCount == 3)
+
+        // The next read is served from the cache, so this asserts the deep
+        // insertion still invalidated it through the root's version.
+        leaf.addChild(Node())
+        #expect(tree.nodeCount == 4)
+
+        mid.removeChild(leaf)
+        #expect(tree.nodeCount == 2)
+
+        // A different root of the same version must not reuse the old count.
+        let other = NodeTree()
+        other.root = Node()
+        #expect(other.nodeCount == 1)
+    }
+
     @Test("flush preserves tree structure")
     func flushPreservesStructure() {
         let tree = NodeTree()

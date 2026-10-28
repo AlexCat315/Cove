@@ -563,12 +563,27 @@ public final class Application {
 
         let frameStart = TimingTrace.now()
 
+        // Everything between the layout span and the draw span used to be
+        // unattributed frame time: it landed in `totalMs` but in no timeline
+        // phase, so a slow environment / chrome / accessibility pass looked
+        // like slow rendering. Each gets its own span.
+        let environmentTrace = composition.tree.timeline.begin()
         updateSurfaceEnvironment()
         configureTextEnvironment(scale: host.contentScaleFactor)
+        composition.tree.timeline.end(environmentTrace, phase: "frame", name: "Surface + text environment")
+
         let layoutStart = TimingTrace.now()
         _ = composition.graph.computeLayoutIfNeeded(width: Float(mainWindow.logicalW), height: Float(mainWindow.logicalH))
+
+        let chromeTrace = composition.tree.timeline.begin()
         syncMainWindowChromeHitTest()
-        if let session = host.mainSession { NativeAccessibility.synchronize(host: host, session: session, root: root) }
+        composition.tree.timeline.end(chromeTrace, phase: "frame", name: "Window chrome hit test")
+
+        if let session = host.mainSession {
+            let accessibilityTrace = composition.tree.timeline.begin()
+            NativeAccessibility.synchronize(host: host, session: session, root: root)
+            composition.tree.timeline.end(accessibilityTrace, phase: "frame", name: "Accessibility sync")
+        }
         let layoutEnd = TimingTrace.now()
 
         composition.drawList.reset()
@@ -585,6 +600,12 @@ public final class Application {
         drawDevToolsOverlay(into: composition.drawList)
         let drawEnd = TimingTrace.now()
         composition.tree.timeline.end(drawTrace, phase: "draw", name: "Encode draw list")
+
+        // One walk per frame rather than one per reporting branch, and
+        // memoised on the root's structural version, so a steady frame is O(1).
+        let countTrace = composition.tree.timeline.begin()
+        let frameNodeCount = composition.tree.nodeCount
+        composition.tree.timeline.end(countTrace, phase: "frame", name: "Node count")
 
         do {
             if typography.atlas?.isDirty == true {
@@ -608,7 +629,7 @@ public final class Application {
                 let frameEnd = TimingTrace.now()
                 diagnostics.devTools?.timing.record(layoutMs: (layoutEnd - layoutStart) * 1000,
                     drawMs: (drawEnd - layoutEnd) * 1000, presentMs: 0,
-                    totalMs: (frameEnd - frameStart) * 1000, nodeCount: composition.tree.nodeCount,
+                    totalMs: (frameEnd - frameStart) * 1000, nodeCount: frameNodeCount,
                     batchCount: composition.drawList.batches.count, presented: false)
                 diagnostics.devTools?.notifyFrameFinished()
                 host.requestDisplay()
@@ -647,7 +668,7 @@ public final class Application {
                     drawMs: (drawEnd - layoutEnd) * 1000,
                     presentMs: (presentEnd - drawEnd) * 1000,
                     totalMs: (presentEnd - frameStart) * 1000,
-                    nodeCount: composition.tree.nodeCount,
+                    nodeCount: frameNodeCount,
                     batchCount: composition.drawList.batches.count
                 )
                 dev.notifyFrameFinished()
