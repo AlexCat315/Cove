@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## 0.2.10 — 2026-10-29
+
 - 按能力拆分 Core、Text、Imaging、Graphics、Shell、Compose、Runtime、DevTools 与 Hosts，移除 Portable 与根 manifest 对下层 target 的重复声明；根包收拢为应用与扩展产品，内部模块产品改为从所属能力入口消费。
 - Compose 去除 Runtime/窗口/GPU 依赖；字体、文本环境和缓存统一归 Text，图片解码与资源所有权归 Imaging，GPU 渲染和上传归 Graphics。保留 `import CoveUI` 与 `TextureImage(texture:)` 应用入口；CLI、Browser 使用窄协议/组合/检查依赖。修复字号切换后 HarfBuzz 缓存未同步和映射字体逐字节复制的问题。新增架构边界检查；Core 的 Yoga 布局依赖仍明确保留，尚未达到全量纯 Swift。
 
