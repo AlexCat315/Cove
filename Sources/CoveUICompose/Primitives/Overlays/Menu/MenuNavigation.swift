@@ -158,7 +158,14 @@ struct MenuTypeahead {
 
 struct MenuScrollMarker: ViewModifier {
     static let key = "__menu.scroll"
-    func apply(node: Node) { node.attachments[Self.key] = true }
+    /// The panel's content inset, so revealing a row can keep the same gutter
+    /// instead of pulling the row flush against the viewport edge.
+    static let insetKey = "__menu.scroll.inset"
+    var inset: CGFloat = 0
+    func apply(node: Node) {
+        node.attachments[Self.key] = true
+        node.attachments[Self.insetKey] = inset
+    }
 }
 
 struct MenuWindowBounds: ViewModifier {

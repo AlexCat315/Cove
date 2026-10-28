@@ -24,7 +24,6 @@ public struct Easing: Sendable, Equatable {
     public static let standard   = Easing(0.4, 0.0, 0.2, 1.0)
     public static let emphasized = Easing(0.2, 0.0, 0.0, 1.0)
     public static let decelerate = Easing(0, 0, 0.2, 1)
-    public static let accelerate = Easing(0.4, 0, 1, 1)
 }
 
 /// Floating surfaces share entrance, exit and reveal sizing across components.

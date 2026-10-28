@@ -69,6 +69,9 @@ let package = Package(
         .executableTarget(name: "PetDemo", dependencies: [
             .product(name: "CoveUI", package: "CoveUI"),
         ], resources: [.process("Resources")]),
-        .testTarget(name: "GalleryContentTests", dependencies: ["GalleryContent"]),
+        .testTarget(name: "GalleryContentTests", dependencies: [
+            "GalleryContent",
+            .product(name: "CoveUIDevToolsScene", package: "CoveUI"),
+        ]),
     ]
 )

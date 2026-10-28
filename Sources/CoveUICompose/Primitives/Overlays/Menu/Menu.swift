@@ -117,6 +117,9 @@ struct MenuLevelConfiguration {
 }
 
 struct MenuLevel: View {
+    /// The panel's content gutter: rows sit inside it, so their highlight bands
+    /// keep an even edge on every side. Revealing a row preserves it.
+    static let panelInset: Float = 4
     let configuration: MenuLevelConfiguration
     @State private var session = MenuSession()
     private var enabled: [AnyHashable] {
@@ -139,10 +142,10 @@ struct MenuLevel: View {
                     // mygo insets the panel by 4 and lets each row's accent band
                     // fill the rest, so highlights keep an even gutter on all sides.
                     Box(direction: .column, alignItems: .stretch, spacing: 1) { rows() }
-                        .padding(4)
+                        .padding(Self.panelInset)
                 }
                 .modifier(MenuWindowBounds(maxVisibleRows: configuration.maxVisibleRows))
-                .modifier(MenuScrollMarker())
+                .modifier(MenuScrollMarker(inset: CGFloat(Self.panelInset)))
             }
             // The dropdown shares the chrome's shadow, but its corners match the
             // reference's 8pt popup radius rather than the wider 10pt panel tier,
@@ -254,9 +257,18 @@ struct MenuLevel: View {
         while let node = ancestor {
             if node.attachments[MenuScrollMarker.key] as? Bool == true {
                 let rect = row.absoluteFrame, viewport = node.absoluteFrame
+                // The panel insets its rows by `inset`, and revealing keeps that
+                // same gutter: aligning the row flush to the viewport edge would
+                // hide the padding the highlight is meant to sit inside, and a
+                // "Home" on the first row would land on the padding rather than
+                // the top of the content.
+                let inset = node.attachments[MenuScrollMarker.insetKey] as? CGFloat ?? 0
                 var next = session.scrollOffset
-                if rect.minY < viewport.minY { next.y = max(0, next.y + rect.minY - viewport.minY) }
-                else if rect.maxY > viewport.maxY { next.y += rect.maxY - viewport.maxY }
+                if rect.minY < viewport.minY {
+                    next.y = max(0, next.y + rect.minY - viewport.minY - inset)
+                } else if rect.maxY > viewport.maxY {
+                    next.y += rect.maxY - viewport.maxY + inset
+                }
                 if next != session.scrollOffset { session.scrollOffset = next }
                 return
             }

@@ -68,6 +68,10 @@ public struct AppBar: View {
         }
         Box(direction: .column, alignItems: .stretch, spacing: 2) {
             Text(title).truncated().font(.bodyStrong).foregroundColor(.onSurface)
+                // A compact bar clips the title, and the clipped tail is exactly
+                // the part a reader needs: hover shows the full string. Only
+                // when it had to clip, so an ordinary short title stays quiet.
+                .tooltip(title, onlyWhenTruncated: true)
                 .accessibility { $0.role = .heading; $0.label = title; $0.value = compact ? subtitle ?? "" : ""; $0.combinesChildren = true }
             if !compact, let subtitle, !subtitle.isEmpty {
                 Text(subtitle).truncated().font(.caption).foregroundColor(.onSurfaceMuted)

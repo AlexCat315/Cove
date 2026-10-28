@@ -44,6 +44,7 @@ let package = Package(
         .macro(name: "CoveUIReadMacros", dependencies: [
             .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
             .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
+            .product(name: "SwiftDiagnostics", package: "swift-syntax"),
         ]),
         .target(name: "CoveUIComposeCore", dependencies: ["CoveUIScene", "CoveUIReadMacros"]),
         .target(name: "CoveUIDevToolsScene", dependencies: ["CoveUIScene", "CoveUIDevToolsProtocol", "CoveUIAgentCore"]),

@@ -12,23 +12,35 @@ public struct AnimatedVisibility<Content: View>: View {
     private let content: Content
     private let onVisibilitySettled: ((Bool) -> Void)?
     private var retainsContent = false
+    /// Zero-based position of this view within its entering group. Paired with
+    /// `staggerInterval` to cascade siblings instead of popping in at once.
+    public var staggerIndex: Int = 0
+    /// Delay added per `staggerIndex` step on entrance. Keep short (30–80 ms).
+    public var staggerInterval: Duration = .zero
     @State private var completionRevision = 0
 
     public init(isVisible: Bool, collapses: Bool = true,
-                animation: Animation? = nil, @ViewBuilder content: () -> Content) {
+                animation: Animation? = nil, staggerIndex: Int = 0,
+                staggerInterval: Duration = .zero, @ViewBuilder content: () -> Content) {
         self.isVisible = isVisible
         self.transition = collapses ? .opacity.combined(with: .collapse) : .opacity
         self.animateOnMount = false
         self.onVisibilitySettled = nil
         self.animation = animation
         self.content = content()
+        self.staggerIndex = staggerIndex
+        self.staggerInterval = staggerInterval
     }
 
     public init(isVisible: Bool, transition: Transition, animation: Animation? = nil,
-                animateOnMount: Bool = false, onVisibilitySettled: ((Bool) -> Void)? = nil, @ViewBuilder content: () -> Content) {
+                animateOnMount: Bool = false, staggerIndex: Int = 0,
+                staggerInterval: Duration = .zero,
+                onVisibilitySettled: ((Bool) -> Void)? = nil, @ViewBuilder content: () -> Content) {
         self.isVisible = isVisible; self.transition = transition; self.animation = animation
         self.animateOnMount = animateOnMount; self.content = content()
         self.onVisibilitySettled = onVisibilitySettled
+        self.staggerIndex = staggerIndex
+        self.staggerInterval = staggerInterval
     }
 
     /// Navigation changes presentation without changing the identity of its slots.
@@ -50,6 +62,7 @@ public struct AnimatedVisibility<Content: View>: View {
     public var body: some View {
         _VisibilityHost(isVisible: isVisible, transition: transition, animateOnMount: animateOnMount,
                         animation: animation, revision: completionRevision, retainsContent: retainsContent,
+                        staggerIndex: staggerIndex, staggerInterval: staggerInterval,
                         content: content, onFinished: { completionRevision &+= 1; onVisibilitySettled?(isVisible) })
     }
 }
@@ -87,6 +100,8 @@ private struct _VisibilityHost<Content: View>: _PrimitiveView {
     let animation: Animation?
     let revision: Int
     let retainsContent: Bool
+    let staggerIndex: Int
+    let staggerInterval: Duration
     let content: Content
     let onFinished: () -> Void
 
@@ -146,8 +161,14 @@ private struct _VisibilityHost<Content: View>: _PrimitiveView {
         if isVisible, state.progress == 0 { state.visual = transition.insertion }
         let from = state.visual
         let fromProgress = state.progress
+        let base = animation ?? .semantic(.medium, in: node.theme)
+        // Stagger only on entrance: a deferred exit would make items vanish in
+        // sequence, which reads as broken rather than deliberate.
+        let staged = isVisible
+            ? base.staggered(index: staggerIndex, interval: staggerInterval.seconds)
+            : base
         let controller = AnimationController(from: Float(0), to: Float(1),
-                                              animation: animation ?? .semantic(.medium, in: node.theme)) {
+                                              animation: staged) {
             [weak state, weak node] amount in
             guard let state, let node else { return }
             state.progress = fromProgress + (target - fromProgress) * amount

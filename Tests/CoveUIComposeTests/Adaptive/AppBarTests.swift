@@ -86,6 +86,16 @@ struct AppBarTests: CoveUIComposeSerializedSuite {
         let event = MouseButtonEvent(button: .left, x: Float(frame.midX), y: Float(frame.midY), clicks: 1)
         input.dispatch(.mouseButtonDown(event)); input.dispatch(.mouseButtonUp(event))
     }
+    /// Draws every node once, as a frame would. A few behaviours are recorded
+    /// during paint rather than layout — whether a label had to clip, which is
+    /// what decides if a truncated-title tooltip exists.
+    private func paint(_ graph: ViewGraph) {
+        var pending = graph.tree.root.map { [$0] } ?? []
+        while let node = pending.popLast() {
+            _ = node.draw?(DrawList(), .zero)
+            pending.append(contentsOf: node.children)
+        }
+    }
 
     @Test("Three widths retain commands, fit titles and keep targets across input, theme and text scaling",
           arguments: [Float(390), 720, 1280], [Float(1), 2])
@@ -191,6 +201,9 @@ struct AppBarTests: CoveUIComposeSerializedSuite {
         try scene { harness, graph, _, input, scheduler, portals in
             harness.width = 390; settle(graph, harness)
             let title = try heading(graph), frame = title.absoluteFrame
+            // The bar clips this title, and the clip is only known once the
+            // renderer has drawn it — which is what arms the tooltip.
+            paint(graph)
             input.dispatch(.mouseMotion(.init(x: Float(frame.midX), y: Float(frame.midY), deltaX: 0, deltaY: 0)))
             scheduler.tick(deltaTime: 1); settle(graph, harness)
             #expect(!portals.entries.isEmpty)

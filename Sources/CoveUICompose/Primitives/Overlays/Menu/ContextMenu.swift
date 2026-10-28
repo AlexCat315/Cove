@@ -51,6 +51,16 @@ public struct ContextMenu<Content: View>: View {
 struct _ContextMenuHost<Content: View>: _PrimitiveView {
     let content: Content; let entries: [MenuEntry]; let width: Float; let point: CGPoint?
     let onOpen: (CGPoint) -> Void; let onDismiss: () -> Void
+    /// Whether a press at this window point should open the menu. A host that
+    /// covers a whole document (a selection region, the app root) uses it to stay
+    /// out of the way of everything that is not its own content: an uninterested
+    /// press is ignored instead of handled, so it bubbles to the control under it.
+    var isInterested: (CGPoint) -> Bool = { _ in true }
+    /// Presented beside the content on surfaces without a secondary click. It
+    /// rides as a sibling rather than wrapping the content, because a wrapper
+    /// with no definite height collapses content that sizes itself with
+    /// `flex(1, basis: 0)` — the application root, for one.
+    var sheet: AnyView? = nil
     func _makeNode() -> Node {
         let node = Node(); node.isHitTestable = true; node.addResource(PortalResource())
         node.attachments[LayoutDebugAttachmentKey.debugName] = "context-menu-anchor"
@@ -79,9 +89,14 @@ struct _ContextMenuHost<Content: View>: _PrimitiveView {
         InteractionRegistryHolder.current?.setWheel(node) { _, _ in hold.cancel(); return .ignored }
         let route = InputHandlerRoute(role: .control, priority: .chrome, debugName: "context-menu")
         InteractionRegistryHolder.current?.setPointer(node, route: route) { event, phase, eventPhase in
+            let here = CGPoint(x: CGFloat(event.x), y: CGFloat(event.y))
             if surface.input.contains(.touch), event.button == .left, event.modifiers.isDisjoint(with: .ctrl) {
                 if phase == .down {
-                    hold.begin(CGPoint(x: CGFloat(event.x), y: CGFloat(event.y)))
+                    // Only a press on this host's own content arms the long press,
+                    // so a document-wide region never takes the gesture from a
+                    // control that happens to sit inside it.
+                    guard isInterested(here) else { return .ignored }
+                    hold.begin(here)
                     if eventPhase != .capture, PointerCaptureHolder.current?.target == nil {
                         PointerCaptureHolder.current?.acquire(node, allowsGestureTransfer: true)
                     }
@@ -92,12 +107,16 @@ struct _ContextMenuHost<Content: View>: _PrimitiveView {
                 return .ignored
             }
             guard event.button == .right || (event.button == .left && !event.modifiers.isDisjoint(with: .ctrl)) else { return .ignored }
-            if phase == .down { onOpen(CGPoint(x: CGFloat(event.x), y: CGFloat(event.y))) }
+            guard isInterested(here) else { return .ignored }
+            if phase == .down { onOpen(here) }
             return .handled
         }
         let resource = node.firstResource(PortalResource.self)
         guard !TouchPresentation.usesSheet(surface), let point else { resource?.dismiss(node: node); return }
-        resource?.present(in: node.compositionValue(of: PortalStoreEnvironment.key), position: point, width: width,
+        // Fall back to the ambient store like every other overlay: a host mounted
+        // above the window's composition local (the app root's selection region)
+        // would otherwise never find a store and silently show nothing.
+        resource?.present(in: node.compositionValue(of: PortalStoreEnvironment.key) ?? PortalStoreHolder.current, position: point, width: width,
                           content: AnyView(_PopupMenu(entries: entries, width: width, onDismiss: onDismiss)),
                           // Opens at the pointer and extends right and down, so
                           // the top-left corner is the one nearest the trigger.
@@ -106,7 +125,7 @@ struct _ContextMenuHost<Content: View>: _PrimitiveView {
                               .combined(with: PortalResource.surfaceReveal(anchor: .zero, theme: node.theme)))
         resource?.setDismissal(anchor: { .zero }, dismiss: onDismiss)
     }
-    var _children: [any View] { [content] }
+    var _children: [any View] { sheet.map { [content, $0] } ?? [content] }
 }
 
 struct _PopupMenu: View {

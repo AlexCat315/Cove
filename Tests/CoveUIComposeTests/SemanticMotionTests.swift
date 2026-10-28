@@ -79,7 +79,18 @@ struct SemanticMotionTests {
         let entering = Animation.semantic(.entering, in: theme)
         let exiting = Animation.semantic(.exiting, in: theme)
         #expect(entering.duration == 0.45 && entering.curve == Easing.decelerate.asAnimationCurve)
-        #expect(exiting.duration == 0.12 && exiting.curve == Easing.accelerate.asAnimationCurve)
+        #expect(exiting.duration == 0.12 && exiting.curve == Easing.decelerate.asAnimationCurve)
         #expect(Animation.semantic(.smooth, in: theme).curve == .spring(response: 0.3, dampingFraction: 1))
+    }
+
+    @Test("Animation.staggered defers later siblings without altering the base")
+    func staggered() {
+        let base = Animation(duration: 0.2, curve: .easeOut)
+        let third = base.staggered(index: 3, interval: 0.05)
+        #expect(abs(third.delay - 0.15) < 1e-6)
+        #expect(third.duration == 0.2)
+        #expect(third.curve == .easeOut)
+        // Negative / zero indices stay inert.
+        #expect(base.staggered(index: 0, interval: 0.05).delay == 0)
     }
 }

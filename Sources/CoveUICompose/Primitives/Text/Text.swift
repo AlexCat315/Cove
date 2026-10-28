@@ -224,13 +224,10 @@ public struct Text: _PrimitiveView {
     private var isSelectable = true
     private static let touchPressKey = "__text_touch_press"
     private static let selectingKey = "__text_selecting"
-    /// Set to `DragEnd` while a selection endpoint handle is being dragged.
+    /// Set while a selection endpoint handle is being dragged.
     private static let handleDragKey = "__text_handle_drag"
-    /// Node-local finger point (CGRect) while a handle is dragged, drives the loupe.
+    /// Node-local finger point (CGPoint) while a handle is dragged, drives the loupe.
     private static let loupeKey = "__text_loupe"
-
-    /// Which endpoint a drag started from.
-    private enum DragEnd { case start, end }
 
     private struct PaintIdentity: Equatable {
         let string: String
@@ -294,8 +291,17 @@ public struct Text: _PrimitiveView {
         // labels inside buttons and toolbars keep every click for their control.
         let scope = node.compositionValue(of: TextSelectionScope.key)
         let selectable = isSelectable && scope != nil
+        // A label inside a button, row or cell belongs to that control: it stays
+        // out of the focus order so the control keeps focus and the click.
+        let inControl = selectable && TextSelectionChrome.isInsideControl(node)
         node.isHitTestable = selectable
-        node.isFocusable = selectable
+        // Selectable labels take focus on click for copy shortcuts, but are never
+        // Tab stops: a page of copyable text must not add one stop per label. The
+        // press handler focuses explicitly, so automatic focus stays off and a
+        // label inside a button never pulls focus off its control.
+        node.isFocusable = selectable && !inControl
+        node.isTabStop = false
+        node.automaticallyFocusOnPointerDown = false
         // Bind the draw callback. Captures `string` etc by value.
         let snapshot = self
         node.updateDraw(identity: PaintIdentity(string: string,
@@ -345,26 +351,27 @@ public struct Text: _PrimitiveView {
             // Selection handles and the magnifier are drawn above the glyphs so they
             // stay visible while a finger or pen refines either endpoint.
             if let selection = scope?.range(for: node), !selection.isEmpty {
+                let padL = CGFloat(padding?.left ?? 0), padT = CGFloat(padding?.top ?? 0)
                 let length = snapshot.string.utf8.count
-                if selection.lowerBound != 0 || selection.upperBound != length {
-                    let padL = CGFloat(padding?.left ?? 0), padT = CGFloat(padding?.top ?? 0)
-                    let accent = node.theme.colors.accent
-                    let border = node.theme.colors.surfaceFloating
-                    if selection.lowerBound != 0 {
-                        let c = Self.handleCenter(result.layout, offset: selection.lowerBound, bottom: true, padL: padL, padT: padT)
-                        Self.drawHandle(into: list, at: CGPoint(x: CGFloat(origin.x) + c.x, y: CGFloat(origin.y) + c.y), color: accent, border: border)
-                    }
-                    if selection.upperBound != length {
-                        let c = Self.handleCenter(result.layout, offset: selection.upperBound, bottom: false, padL: padL, padT: padT)
-                        Self.drawHandle(into: list, at: CGPoint(x: CGFloat(origin.x) + c.x, y: CGFloat(origin.y) + c.y), color: accent, border: border)
-                    }
-                }
+                let start = selection.lowerBound > 0
+                    ? result.layout.caretRect(at: selection.lowerBound).offsetBy(dx: padL, dy: padT) : nil
+                let end = selection.upperBound < length
+                    ? result.layout.caretRect(at: selection.upperBound).offsetBy(dx: padL, dy: padT) : nil
+                TextSelectionChrome.drawHandles(into: list, origin: origin, start: start, end: end,
+                                                fill: node.theme.colors.accent,
+                                                border: node.theme.colors.surfaceFloating)
                 if let finger = node.attachments[Self.loupeKey] as? CGPoint {
-                    Self.drawLoupe(into: list, layout: result.layout, env: env, color: drawColor,
-                                   finger: CGPoint(x: finger.x, y: finger.y),
-                                   padL: CGFloat(padding?.left ?? 0), padT: CGFloat(padding?.top ?? 0),
-                                   surface: node.theme.colors.surfaceFloating, border: node.theme.colors.border,
-                                   origin: origin)
+                    TextSelectionChrome.drawLoupe(
+                        into: list,
+                        finger: CGPoint(x: origin.x + finger.x, y: origin.y + finger.y),
+                        surface: node.theme.colors.surfaceFloating,
+                        border: node.theme.colors.border
+                    ) { temp, shift in
+                        temp.addText(result.layout,
+                                     origin: (Float(origin.x) + Float(padL),
+                                              Float(origin.y) + Float(padT) + Float(shift)),
+                                     color: drawColor, textureID: env.atlasTextureID, atlas: env.atlas)
+                    }
                 }
             }
         }
@@ -415,12 +422,13 @@ public struct Text: _PrimitiveView {
         registry.setHover(node) { [weak node] phase in
             guard let node else { return }
             let onHandle = node.attachments[Self.handleDragKey] != nil
-            node.cursor = (phase == .enter && (node.supportsControlHover || onHandle)) ? .ibeam : nil
+            let inert = TextSelectionChrome.isInsideControl(node)
+            node.cursor = (phase == .enter && !inert && (node.supportsControlHover || onHandle)) ? .ibeam : nil
         }
         registry.setPointer(node) { [weak node] event, phase, eventPhase in
             guard let node, eventPhase != .capture, event.button == .left else { return .ignored }
             // Grabbing an endpoint handle refines the selection, even with a finger.
-            if let drag = handleHitTest(node: node, event: event, scope: scope) {
+            if phase == .down, let drag = handleEndpoint(node: node, event: event, scope: scope) {
                 node.attachments[Self.handleDragKey] = drag
                 node.attachments[Self.loupeKey] = CGPoint(x: CGFloat(event.x) - node.absoluteFrame.minX,
                                                           y: CGFloat(event.y) - node.absoluteFrame.minY)
@@ -431,6 +439,9 @@ public struct Text: _PrimitiveView {
             let precise = event.kind == .mouse || event.kind == .pen
             switch phase {
             case .down:
+                // A label inside a button, row or cell leaves the press to that
+                // control: the control owns the gesture, so it keeps every click.
+                guard !TextSelectionChrome.isInsideControl(node) else { return .ignored }
                 guard precise else {
                     // Touch keeps drags for scrolling; a long press selects instead.
                     node.attachments[Self.touchPressKey] = (Date(), point(event.x, event.y))
@@ -448,7 +459,8 @@ public struct Text: _PrimitiveView {
                 FocusChainHolder.current?.focus(node, visible: false)
                 return .handled
             case .up:
-                if let drag = node.attachments.removeValue(forKey: Self.handleDragKey) as? DragEnd {
+                if let drag = node.attachments.removeValue(forKey: Self.handleDragKey)
+                    as? TextSelectionChrome.Endpoint {
                     node.attachments.removeValue(forKey: Self.loupeKey)
                     if PointerCaptureHolder.current?.target === node { PointerCaptureHolder.current?.release() }
                     // Offer the action bar where the handle landed.
@@ -458,6 +470,7 @@ public struct Text: _PrimitiveView {
                         scope.requestMenu?(point(Float(node.absoluteFrame.minX + CGFloat(r.origin.x)),
                                                 Float(node.absoluteFrame.minY + CGFloat(r.origin.y))))
                     }
+                    node.markRenderDirty(reason: .styleSet(field: "textSelectionHandle"))
                     return .handled
                 }
                 if let (start, origin) = node.attachments.removeValue(forKey: Self.touchPressKey) as? (Date, CGPoint) {
@@ -465,6 +478,8 @@ public struct Text: _PrimitiveView {
                     guard Date().timeIntervalSince(start) >= 0.45,
                           hypot(here.x - origin.x, here.y - origin.y) < 10 else { return .ignored }
                     scope.selectWord(at: here)
+                    // Focus without a ring so copy reaches this label's selection.
+                    FocusChainHolder.current?.focus(node, visible: false)
                     scope.requestMenu?(here)
                     return .handled
                 }
@@ -478,7 +493,7 @@ public struct Text: _PrimitiveView {
         registry.setMotion(node) { [weak node] event, phase in
             guard phase != .capture else { return .ignored }
             guard let node else { return .ignored }
-            if let drag = node.attachments[Self.handleDragKey] as? DragEnd,
+            if let drag = node.attachments[Self.handleDragKey] as? TextSelectionChrome.Endpoint,
                let selection = scope.range(for: node) {
                 let local = CGPoint(x: CGFloat(event.x) - node.absoluteFrame.minX,
                                     y: CGFloat(event.y) - node.absoluteFrame.minY)
@@ -514,81 +529,46 @@ public struct Text: _PrimitiveView {
             case Scancode.escape:
                 guard scope.hasSelection else { return .ignored }
                 scope.clear(); return .handled
+            case Scancode.arrowLeft where event.modifiers.contains(.shift):
+                return scope.extendFocus(by: -1) ? .handled : .ignored
+            case Scancode.arrowRight where event.modifiers.contains(.shift):
+                return scope.extendFocus(by: 1) ? .handled : .ignored
+            case Scancode.home where event.modifiers.contains(.shift):
+                return scope.extendFocusToEdge(start: true) ? .handled : .ignored
+            case Scancode.end where event.modifiers.contains(.shift):
+                return scope.extendFocusToEdge(start: false) ? .handled : .ignored
             default:
                 return .ignored
             }
         }
     }
 
-    /// Returns which endpoint handle (if any) sits under a pressed point, so a drag
-    /// can adjust the selection instead of starting a fresh one.
-    private func handleHitTest(node: Node, event: MouseButtonEvent, scope: TextSelectionScope) -> DragEnd? {
-        guard let selection = scope.range(for: node), !selection.isEmpty else { return nil }
-        let length = string.utf8.count
-        guard selection.lowerBound != 0 || selection.upperBound != length else { return nil }
-        guard let layout = layoutResult(node) else { return nil }
-        let local = CGPoint(x: CGFloat(event.x) - node.absoluteFrame.minX, y: CGFloat(event.y) - node.absoluteFrame.minY)
+    /// Caret rectangles for the two draggable endpoints, in node-local space. An
+    /// endpoint sitting on the label's own edge has no handle: there is nothing
+    /// beyond it to drag towards.
+    private func handleCarets(_ node: Node, scope: TextSelectionScope) -> (start: CGRect?, end: CGRect?) {
+        guard let selection = scope.range(for: node), let layout = layoutResult(node) else {
+            return (nil, nil)
+        }
         let padding = node.layoutNode?.resolvedPadding
-        let padL = CGFloat(padding?.left ?? 0)
-        let padT = CGFloat(padding?.top ?? 0)
-        let threshold: CGFloat = 16
-        if selection.lowerBound != 0 {
-            let c = Self.handleCenter(layout, offset: selection.lowerBound, bottom: true, padL: padL, padT: padT)
-            if hypot(local.x - c.x, local.y - c.y) <= threshold { return .start }
+        let dx = CGFloat(padding?.left ?? 0), dy = CGFloat(padding?.top ?? 0)
+        let length = string.utf8.count
+        func caret(_ offset: Int) -> CGRect {
+            layout.caretRect(at: offset).offsetBy(dx: dx, dy: dy)
         }
-        if selection.upperBound != length {
-            let c = Self.handleCenter(layout, offset: selection.upperBound, bottom: false, padL: padL, padT: padT)
-            if hypot(local.x - c.x, local.y - c.y) <= threshold { return .end }
-        }
-        return nil
+        return (selection.lowerBound > 0 ? caret(selection.lowerBound) : nil,
+                selection.upperBound < length ? caret(selection.upperBound) : nil)
     }
 
-    /// Node-local center (in draw-list coordinates) of an endpoint handle.
-    private static func handleCenter(_ layout: TextLayoutResult, offset: Int, bottom: Bool,
-                                     padL: CGFloat, padT: CGFloat) -> CGPoint {
-        let r = layout.caretRect(at: offset)
-        let radius: CGFloat = 6
-        let cx = padL + r.origin.x
-        let cy = padT + (bottom ? r.maxY : r.minY)
-        return CGPoint(x: cx, y: bottom ? cy + radius : cy - radius)
-    }
-
-    private static func drawHandle(into list: DrawList, at center: CGPoint, color: Color, border: Color) {
-        let radius: Float = 6
-        let rect = UIRect(x: Float(center.x) - radius, y: Float(center.y) - radius, width: 2 * radius, height: 2 * radius)
-        list.addRoundedRect(rect, radius: radius, color: color)
-        list.addRoundedRectStroke(rect, radius: radius, width: 1, color: border)
-    }
-
-    /// Circular magnifier that re-renders the text scaled up around the finger.
-    private static func drawLoupe(into list: DrawList, layout: TextLayoutResult, env: TextEnvironment,
-                                  color: Color, finger: CGPoint, padL: CGFloat, padT: CGFloat,
-                                  surface: Color, border: Color, origin: CGPoint) {
-        let fX = Float(origin.x) + Float(finger.x)
-        let fY = Float(origin.y) + Float(finger.y)
-        let lensRadius: Float = 44
-        let lensCX = fX
-        let lensCY = fY - lensRadius - 28
-        let lensRect = UIRect(x: lensCX - lensRadius, y: lensCY - lensRadius, width: 2 * lensRadius, height: 2 * lensRadius)
-        list.addRoundedRect(lensRect, radius: lensRadius, color: surface)
-        let clip = UIClip(lensRect, mask: UIRoundedRect(lensRect, radius: lensRadius))
-        list.pushClip(clip)
-        let scale: Float = 1.8
-        let shiftY = (lensCY - fY) / scale
-        let drawX = Float(origin.x) + Float(padL)
-        let drawY = Float(origin.y) + Float(padT)
-        let originForScale = CGPoint(x: CGFloat(fX), y: CGFloat(fY))
-        paintScaled({ temp, _ in
-            temp.addText(layout, origin: (drawX, drawY + shiftY), color: color,
-                         textureID: env.atlasTextureID, atlas: env.atlas)
-        }, into: list, origin: originForScale, scale: scale)
-        list.popClip(clip)
-        list.addRoundedRectStroke(lensRect, radius: lensRadius, width: 1.5, color: border)
-        // Stem from the lens down to the finger.
-        let stemW: Float = 3
-        let stemTop = lensCY + lensRadius
-        list.addRoundedRect(UIRect(x: lensCX - stemW / 2, y: stemTop, width: stemW,
-                                   height: max(0, fY - stemTop)), radius: stemW / 2, color: border)
+    /// Which endpoint handle (if any) sits under a pressed point, so a drag can
+    /// adjust the selection instead of starting a fresh one.
+    private func handleEndpoint(node: Node, event: MouseButtonEvent,
+                                scope: TextSelectionScope) -> TextSelectionChrome.Endpoint? {
+        let carets = handleCarets(node, scope: scope)
+        guard carets.start != nil || carets.end != nil else { return nil }
+        let local = CGPoint(x: CGFloat(event.x) - node.absoluteFrame.minX,
+                            y: CGFloat(event.y) - node.absoluteFrame.minY)
+        return TextSelectionChrome.endpoint(at: local, start: carets.start, end: carets.end)
     }
 
     /// The laid-out text for offset/rect math, recomputed the same way the painter

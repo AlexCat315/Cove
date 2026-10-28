@@ -141,9 +141,11 @@ struct ButtonIconTests: CoveUIComposeSerializedSuite {
     @Test("Button tooltips share delayed portals and leave with disabled or removed controls")
     @MainActor
     func tooltipPortalLifecycle() throws { try GlobalTestLock.locked {
-        TooltipArbitration.reset()
         let context = PlatformInputContext(), portal = PortalStore(), scheduler = AnimatorScheduler()
         context.addScopedAmbient(PortalStoreAmbient(portal))
+        // Tips are arbitrated per window; a fresh instance keeps this test's
+        // warm window from leaking into the next one.
+        context.addScopedAmbient(TooltipArbitrationAmbient())
         let prior = TextEnvironmentHolder.current; TextEnvironmentHolder.current = TestTextEnvironmentFactory.make()
         defer { TextEnvironmentHolder.current = prior }
         try context.withCurrent { try AnimatorScheduler.$current.withValue(scheduler) {
@@ -173,9 +175,11 @@ struct ButtonIconTests: CoveUIComposeSerializedSuite {
     @Test("A text button has no repeated title tooltip; an explicit explanation still opens")
     @MainActor
     func textButtonTooltipIsExplicit() throws { try GlobalTestLock.locked {
-        TooltipArbitration.reset()
         let context = PlatformInputContext(), portal = PortalStore(), scheduler = AnimatorScheduler()
         context.addScopedAmbient(PortalStoreAmbient(portal))
+        // Tips are arbitrated per window; a fresh instance keeps this test's
+        // warm window from leaking into the next one.
+        context.addScopedAmbient(TooltipArbitrationAmbient())
         let prior = TextEnvironmentHolder.current; TextEnvironmentHolder.current = TestTextEnvironmentFactory.make()
         defer { TextEnvironmentHolder.current = prior }
         try context.withCurrent { try AnimatorScheduler.$current.withValue(scheduler) {
@@ -205,9 +209,11 @@ struct ButtonIconTests: CoveUIComposeSerializedSuite {
           arguments: [UIEnvironment.Input.touch, [.pointer, .keyboard], [.touch, .pointer, .keyboard]])
     @MainActor
     func tooltipKeyboardAndPlacement(input: UIEnvironment.Input) throws { try GlobalTestLock.locked {
-        TooltipArbitration.reset()
         let context = PlatformInputContext(), portal = PortalStore(), scheduler = AnimatorScheduler()
         context.addScopedAmbient(PortalStoreAmbient(portal))
+        // Tips are arbitrated per window; a fresh instance keeps this test's
+        // warm window from leaking into the next one.
+        context.addScopedAmbient(TooltipArbitrationAmbient())
         let prior = TextEnvironmentHolder.current; TextEnvironmentHolder.current = TestTextEnvironmentFactory.make()
         defer { TextEnvironmentHolder.current = prior }
         try context.withCurrent { try AnimatorScheduler.$current.withValue(scheduler) {

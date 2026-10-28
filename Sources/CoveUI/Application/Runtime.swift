@@ -103,6 +103,10 @@ public final class Application {
         let portalStore = PortalStore()
         let input = PlatformInputContext()
         input.addScopedAmbient(PortalStoreAmbient(portalStore))
+        // Tips belong to the window too: one tip at a time is a per-window
+        // rule, and the warm window that skips the rest delay must not carry
+        // over from another window.
+        input.addScopedAmbient(TooltipArbitrationAmbient())
         host = SDL3PlatformHost(title: config.window.title,
             mainWindowOptions: WindowOptions(width: Self.previewsPhone ? 390 : max(1, config.window.width),
                                             height: Self.previewsPhone ? 844 : max(1, config.window.height), titleBarStyle: config.window.titleBarStyle.platformStyle,
@@ -482,10 +486,14 @@ public final class Application {
 
         if !mainWindow.didInstallRoot {
             withWindowChromeContext(host.mainSession?.id) {
-                composition.graph.install(root: AdaptiveApplicationContent(content: rootView, environment: composition.environment).textScaler(config.typography.scaler).compositionLocal(
-                    PortalStoreEnvironment.key,
-                    composition.portalStore
-                ))
+                composition.graph.install(root: AdaptiveApplicationContent(content: rootView, environment: composition.environment)
+                    .textScaler(config.typography.scaler)
+                    // One selection for the whole window: every label is copyable
+                    // without each screen opting in. A subtree that should stay
+                    // inert opts out with `.textSelection(false)`. The local is
+                    // applied outside it so the selection menu can reach the portal.
+                    .textSelection()
+                    .compositionLocal(PortalStoreEnvironment.key, composition.portalStore))
             }
             composition.graph.computeLayout(width: Float(mainWindow.logicalW), height: Float(mainWindow.logicalH))
             syncMainWindowChromeHitTest()
@@ -740,6 +748,7 @@ public final class Application {
             let portalStore = PortalStore()
             let inputContext = PlatformInputContext()
             inputContext.addScopedAmbient(PortalStoreAmbient(portalStore))
+            inputContext.addScopedAmbient(TooltipArbitrationAmbient())
             let session = try host.openWindow(
                 title: request.title,
                 tree: windowTree,

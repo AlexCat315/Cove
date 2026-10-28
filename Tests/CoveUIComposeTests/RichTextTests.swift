@@ -252,4 +252,31 @@ struct RichTextLinkTests: CoveUIComposeSerializedSuite {
             #expect(link.flatMap { registry.handlers(for: $0).key } == nil)
         }
     }
+
+    @Test("caretRect(at:) tracks the line a selection endpoint sits on")
+    func caretRect() {
+        GlobalTestLock.locked {
+            let previous = TextEnvironmentHolder.current
+            let env = TestTextEnvironmentFactory.make()
+            TextEnvironmentHolder.current = env
+            defer { TextEnvironmentHolder.current = previous }
+            let paragraph = RichParagraph(spans: [
+                .init(text: "first line of text", font: .system(size: 16), lineHeight: 20,
+                      traits: [], link: nil),
+            ], wraps: true)
+            let flow = RichTextFlow.layout(paragraph, maxWidth: 60, env: env)
+            #expect(flow.lines.count > 1)
+            // Offset 0 sits on the first line, the end offset on the last one.
+            let start = flow.caretRect(at: 0)
+            let end = flow.caretRect(at: flow.text.utf8.count)
+            #expect(abs(start.origin.y - CGFloat(flow.lines[0].top)) < 0.001)
+            #expect(abs(start.height - CGFloat(flow.lines[0].height)) < 0.001)
+            #expect(abs(end.origin.y - CGFloat(flow.lines[flow.lines.count - 1].top)) < 0.001)
+            // A caret for an offset on a line stays inside that line's width.
+            for line in flow.lines {
+                let rect = flow.caretRect(at: line.startOffset)
+                #expect(rect.origin.x >= -0.001 && rect.origin.x <= CGFloat(line.width) + 0.001)
+            }
+        }
+    }
 }

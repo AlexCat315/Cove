@@ -241,4 +241,105 @@ struct StateFieldReadTests {
         #expect(harness.model.age == 1 && harness.model.name == "ax")
         #expect(counter.count == 2)
     }
+
+    @TrackStateReads
+    struct OptionalUser: View {
+        struct User: Equatable { var name: String; var age: Int }
+        struct Model: Equatable { var user: User?; var other: Int }
+        @State var model = Model(user: nil, other: 0)
+        let counter: Counter
+        var body: some View {
+            let _ = counter.bump()
+            let _ = model.user?.name
+            EmptyView()
+        }
+    }
+
+    @Test("Optional chaining reads track \\.user?.name precisely")
+    func optionalChaining() {
+        let counter = Counter(), harness = OptionalUser(counter: counter)
+        let recomposer = Recomposer(), graph = ViewGraph(tree: NodeTree(), recomposer: recomposer)
+        graph.install(root: harness)
+        defer { graph.install(root: EmptyView()) }
+        #expect(counter.count == 1)
+        harness.model.user = OptionalUser.User(name: "a", age: 1)
+        recomposer.commitAll()
+        #expect(counter.count == 2)
+        harness.model.other += 1
+        #expect(!recomposer.hasPending)
+        harness.model.user?.age = 5
+        #expect(!recomposer.hasPending)
+        harness.model.user?.name = "b"
+        recomposer.commitAll()
+        #expect(counter.count == 3)
+        harness.model.user = nil
+        recomposer.commitAll()
+        #expect(counter.count == 4)
+    }
+
+    @TrackStateReads
+    struct BoundDetails: View {
+        struct Details: Equatable { var title: String; var count: Int }
+        struct Model: Equatable { var details: Details?; var other: Int }
+        @State var model = Model(details: Details(title: "a", count: 0), other: 0)
+        let counter: Counter
+        var body: some View {
+            let _ = counter.bump()
+            if let d = model.details {
+                let _ = d.title
+            }
+            EmptyView()
+        }
+    }
+
+    @Test("if-let binding subscribes to the whole bound field")
+    func bindingAlias() {
+        let counter = Counter(), harness = BoundDetails(counter: counter)
+        let recomposer = Recomposer(), graph = ViewGraph(tree: NodeTree(), recomposer: recomposer)
+        graph.install(root: harness)
+        defer { graph.install(root: EmptyView()) }
+        #expect(counter.count == 1)
+        harness.model.other += 1
+        #expect(!recomposer.hasPending)
+        harness.model.details?.count += 1
+        recomposer.commitAll()
+        #expect(counter.count == 2)
+        harness.model.details?.title = "b"
+        recomposer.commitAll()
+        #expect(counter.count == 3)
+    }
+
+    @TrackStateReads
+    struct SignalField: View {
+        struct Model: Equatable { var name: String; var age: Int }
+        @State var model = Model(name: "a", age: 0)
+        let counter: Counter
+        var body: some View {
+            let _ = counter.bump()
+            let _ = model.name
+            let _ = self._model[signal: \.age, name: "model.age"]
+            EmptyView()
+        }
+    }
+
+    @Test("Unread field still forces invalidation via signal")
+    func signalField() {
+        let counter = Counter(), harness = SignalField(counter: counter)
+        let recomposer = Recomposer(), graph = ViewGraph(tree: NodeTree(), recomposer: recomposer)
+        graph.install(root: harness)
+        defer { graph.install(root: EmptyView()) }
+        #expect(counter.count == 1)
+        harness.model.name = "b"
+        recomposer.commitAll()
+        #expect(counter.count == 2)
+        harness.model.age += 1
+        recomposer.commitAll()
+        #expect(counter.count == 3)
+        harness.model = SignalField.Model(name: "b", age: 9)
+        recomposer.commitAll()
+        #expect(counter.count == 4)
+        harness.model.age += 5
+        recomposer.commitAll()
+        #expect(counter.count == 5)
+    }
 }

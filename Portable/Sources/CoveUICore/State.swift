@@ -82,6 +82,15 @@ public struct State<Value>: DynamicProperty {
         }
     }
 
+    /// Explicitly register an unread field as an invalidation signal: a write that
+    /// changes this field invalidates the owning scope even when the body never
+    /// reads it. Equivalent to a field read for invalidation purposes, but the
+    /// value can be ignored. Useful when a view wants precise tracking of the
+    /// fields it reads yet still react to an unrelated field.
+    public subscript<Field>(signal keyPath: KeyPath<Value, Field>, name name: String) -> Field {
+        _storage.readSignal(keyPath, name: name)
+    }
+
     public func _setReadTrackingOwner(_ scope: ObjectIdentifier, precise: Bool) {
         _storage.ownerScope = scope
         _storage.preciseOwner = precise

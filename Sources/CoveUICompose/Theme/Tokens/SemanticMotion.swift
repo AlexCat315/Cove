@@ -19,7 +19,7 @@ public extension SemanticMotionRef {
         Animation(duration: theme.motion.surface.entrance.seconds, curve: Easing.decelerate.asAnimationCurve)
     }
     static let exiting = SemanticMotionRef { theme in
-        Animation(duration: theme.motion.surface.exit.seconds, curve: Easing.accelerate.asAnimationCurve)
+        Animation(duration: theme.motion.surface.exit.seconds, curve: Easing.decelerate.asAnimationCurve)
     }
     /// 80 ms in the default themes — micro-interactions, hover/press.
     static let fast = SemanticMotionRef { theme in
@@ -85,5 +85,22 @@ extension Easing {
     /// bisection.
     var asAnimationCurve: AnimationCurve {
         .cubicBezier(c1x, c1y, c2x, c2y)
+    }
+}
+
+// MARK: - Stagger
+
+public extension Animation {
+    /// Cascade a group of sibling entrances by deferring each item's start.
+    ///
+    /// `index` is the item's zero-based position within its entering group;
+    /// every step adds `interval` seconds of delay so the group appears in
+    /// sequence rather than popping in all at once. Per the design language keep
+    /// `interval` short (30–80 ms): long delays read as slow, and stagger is
+    /// decorative — it must never block interaction while playing.
+    func staggered(index: Int, interval: Double = 0.05) -> Animation {
+        Animation(duration: duration, curve: curve,
+                  delay: max(0, delay) + Double(max(0, index)) * max(0, interval),
+                  allowsOvershoot: allowsOvershoot, initialVelocity: initialVelocity)
     }
 }

@@ -35,9 +35,15 @@ struct RichTextSurface: _PrimitiveView {
         let source = source
         let scope = node.compositionValue(of: TextSelectionScope.key)
         // Selectable paragraphs take focus on click for copy shortcuts, but are
-        // not Tab stops: links are the keyboard targets inside text.
-        node.isFocusable = scope != nil
+        // not Tab stops: links are the keyboard targets inside text. Focus is
+        // applied explicitly by the press handler, so automatic focus stays off
+        // and a paragraph inside a button never pulls focus off its control.
+        node.isFocusable = scope != nil && !TextSelectionChrome.isInsideControl(node)
         node.isTabStop = false
+        node.automaticallyFocusOnPointerDown = false
+        // Cached for the hover cursor, which resolves on every motion event and
+        // must not walk the ancestor chain each time.
+        node.attachments[Self.inertKey] = TextSelectionChrome.isInsideControl(node)
         scope?.register(node, text: { source.plainText }, offsetAt: { [weak node] point in
             guard let node, let env = TextEnvironmentHolder.current else { return 0 }
             let frame = node.absoluteFrame
@@ -55,6 +61,28 @@ struct RichTextSurface: _PrimitiveView {
                             selection: scope?.range(for: node),
                             opacity: node.opacity)
                 .paint(into: list, x: Float(origin.x), y: Float(origin.y), env: env)
+            // Handles and the magnifier sit above the glyphs so a finger or pen can
+            // keep refining the selection without losing sight of the endpoints.
+            guard let selection = scope?.range(for: node) else { return }
+            let length = source.plainText.utf8.count
+            let start = selection.lowerBound > 0 ? flow.caretRect(at: selection.lowerBound) : nil
+            let end = selection.upperBound < length ? flow.caretRect(at: selection.upperBound) : nil
+            TextSelectionChrome.drawHandles(into: list, origin: origin, start: start, end: end,
+                                            fill: node.theme.colors.accent,
+                                            border: node.theme.colors.surfaceFloating)
+            if let finger = node.attachments[Self.loupeKey] as? CGPoint {
+                TextSelectionChrome.drawLoupe(
+                    into: list,
+                    finger: CGPoint(x: origin.x + finger.x, y: origin.y + finger.y),
+                    surface: node.theme.colors.surfaceFloating,
+                    border: node.theme.colors.border
+                ) { temp, shift in
+                    temp.addText(flow.glyphs,
+                                 origin: (Float(origin.x), Float(origin.y) + Float(shift)),
+                                 color: palette.text.multipliedAlpha(node.opacity),
+                                 textureID: env.atlasTextureID, atlas: env.atlas)
+                }
+            }
         }
         installPointer(on: node, scope: scope)
     }
@@ -74,7 +102,8 @@ struct RichTextSurface: _PrimitiveView {
         }
         let setHovered = { [weak node] (link: Int?) in
             guard let node else { return }
-            node.cursor = link != nil ? .pointer : scope != nil && node.supportsControlHover ? .ibeam : nil
+            let selectable = scope != nil && node.attachments[Self.inertKey] as? Bool != true
+            node.cursor = link != nil ? .pointer : selectable && node.supportsControlHover ? .ibeam : nil
             guard node.attachments[Self.hoveredLinkKey] as? Int != link else { return }
             node.attachments[Self.hoveredLinkKey] = link
             node.markRenderDirty(reason: .styleSet(field: Self.hoveredLinkKey))
@@ -83,8 +112,28 @@ struct RichTextSurface: _PrimitiveView {
         registry.setHover(node) { phase in if phase == .leave { setHovered(nil) } }
         registry.setMotion(node) { [weak node] event, phase in
             guard phase != .capture else { return .ignored }
+            guard let node else { return .ignored }
+            // Dragging an endpoint refines the selection, even with a finger, and
+            // keeps the pointer cursor instead of a link's hand.
+            if let drag = node.attachments[Self.handleDragKey] as? TextSelectionChrome.Endpoint,
+               let scope, let selection = scope.range(for: node), let flow = flowFor(node) {
+                let local = CGPoint(x: CGFloat(event.x) - node.absoluteFrame.minX,
+                                    y: CGFloat(event.y) - node.absoluteFrame.minY)
+                node.attachments[Self.loupeKey] = local
+                let offset = flow.offset(at: Float(local.x), Float(local.y))
+                if drag == .start {
+                    let lower = min(max(0, offset), selection.upperBound)
+                    scope.replaceRange(in: node, with: lower..<selection.upperBound)
+                } else {
+                    let length = source.plainText.utf8.count
+                    let upper = max(min(length, offset), selection.lowerBound)
+                    scope.replaceRange(in: node, with: selection.lowerBound..<upper)
+                }
+                node.markRenderDirty(reason: .styleSet(field: Self.handleDragKey))
+                return .handled
+            }
             setHovered(linkAt(event.x, event.y))
-            guard let node, node.attachments[Self.selectingKey] as? Bool == true, let scope,
+            guard node.attachments[Self.selectingKey] as? Bool == true, let scope,
                   let position = scope.position(at: point(event.x, event.y)) else { return .ignored }
             scope.extend(to: position)
             return .handled
@@ -93,12 +142,23 @@ struct RichTextSurface: _PrimitiveView {
             guard let node, eventPhase != .capture, event.button == .left else { return .ignored }
             switch phase {
             case .down:
+                // A handle wins over a link and over starting a fresh selection.
+                if let scope, let drag = handleEndpoint(node, event: event, scope: scope) {
+                    node.attachments[Self.handleDragKey] = drag
+                    node.attachments[Self.loupeKey] = CGPoint(x: CGFloat(event.x) - node.absoluteFrame.minX,
+                                                              y: CGFloat(event.y) - node.absoluteFrame.minY)
+                    PointerCaptureHolder.current?.acquire(node)
+                    FocusChainHolder.current?.focus(node, visible: false)
+                    return .handled
+                }
                 if let link = linkAt(event.x, event.y) {
                     node.attachments[Self.pressedLinkKey] = link
                     PointerCaptureHolder.current?.acquire(node, allowsGestureTransfer: true)
                     return .handled
                 }
-                guard let scope else { return .ignored }
+                // A paragraph inside a button or row leaves the press to that
+                // control, so the control keeps every click.
+                guard let scope, !TextSelectionChrome.isInsideControl(node) else { return .ignored }
                 // A precise pointer (mouse/pen) selects; a finger keeps the drag for
                 // scrolling and long-presses to select. On touch PCs both a mouse and a
                 // touchscreen report `supportsHover`, so branch on the event's source,
@@ -122,11 +182,27 @@ struct RichTextSurface: _PrimitiveView {
                 FocusChainHolder.current?.focus(node, visible: false)
                 return .handled
             case .up:
+                if let drag = node.attachments.removeValue(forKey: Self.handleDragKey)
+                    as? TextSelectionChrome.Endpoint {
+                    node.attachments.removeValue(forKey: Self.loupeKey)
+                    if PointerCaptureHolder.current?.target === node { PointerCaptureHolder.current?.release() }
+                    // Offer the action bar where the handle landed.
+                    if let scope, let selection = scope.range(for: node), let flow = flowFor(node) {
+                        let caret = flow.caretRect(at: drag == .start ? selection.lowerBound : selection.upperBound)
+                        let frame = node.absoluteFrame
+                        scope.requestMenu?(CGPoint(x: frame.minX + caret.origin.x,
+                                                   y: frame.minY + caret.origin.y))
+                    }
+                    node.markRenderDirty(reason: .styleSet(field: Self.handleDragKey))
+                    return .handled
+                }
                 if let (start, origin) = node.attachments.removeValue(forKey: Self.touchPressKey) as? (Date, CGPoint) {
                     let here = point(event.x, event.y)
                     guard let scope, Date().timeIntervalSince(start) >= 0.45,
                           hypot(here.x - origin.x, here.y - origin.y) < 10 else { return .ignored }
                     scope.selectWord(at: here)
+                    // Focus without a ring so copy reaches this paragraph's selection.
+                    FocusChainHolder.current?.focus(node, visible: false)
                     scope.requestMenu?(here)
                     return .handled
                 }
@@ -152,6 +228,14 @@ struct RichTextSurface: _PrimitiveView {
             case Scancode.a where primary:
                 scope.selectAll()
                 return .handled
+            case Scancode.arrowLeft where event.modifiers.contains(.shift):
+                return scope.extendFocus(by: -1) ? .handled : .ignored
+            case Scancode.arrowRight where event.modifiers.contains(.shift):
+                return scope.extendFocus(by: 1) ? .handled : .ignored
+            case Scancode.home where event.modifiers.contains(.shift):
+                return scope.extendFocusToEdge(start: true) ? .handled : .ignored
+            case Scancode.end where event.modifiers.contains(.shift):
+                return scope.extendFocusToEdge(start: false) ? .handled : .ignored
             case Scancode.escape:
                 guard scope.hasSelection else { return .ignored }
                 scope.clear()
@@ -167,6 +251,35 @@ struct RichTextSurface: _PrimitiveView {
     static let focusedLinkKey = "__rich_text_focused_link"
     static let selectingKey = "__rich_text_selecting"
     static let touchPressKey = "__rich_text_touch_press"
+    /// Set while a selection endpoint handle is being dragged.
+    static let handleDragKey = "__rich_text_handle_drag"
+    /// Node-local finger point (CGPoint) while a handle is dragged, drives the loupe.
+    static let loupeKey = "__rich_text_loupe"
+    /// Cached "this paragraph sits inside a control" flag for the hover cursor.
+    static let inertKey = "__rich_text_inert"
+
+    /// Caret rectangles for the two draggable endpoints, in node-local space. An
+    /// endpoint on the paragraph's own edge has no handle to drag.
+    private func handleCarets(_ node: Node, scope: TextSelectionScope) -> (start: CGRect?, end: CGRect?) {
+        guard let selection = scope.range(for: node), let env = TextEnvironmentHolder.current else {
+            return (nil, nil)
+        }
+        let frame = node.absoluteFrame
+        let flow = RichTextFlow.layout(source.paragraph, maxWidth: Float(frame.width), env: env)
+        let length = source.plainText.utf8.count
+        return (selection.lowerBound > 0 ? flow.caretRect(at: selection.lowerBound) : nil,
+                selection.upperBound < length ? flow.caretRect(at: selection.upperBound) : nil)
+    }
+
+    /// Which endpoint handle sits under a pressed point, if any.
+    private func handleEndpoint(_ node: Node, event: MouseButtonEvent,
+                                scope: TextSelectionScope) -> TextSelectionChrome.Endpoint? {
+        let carets = handleCarets(node, scope: scope)
+        guard carets.start != nil || carets.end != nil else { return nil }
+        let local = CGPoint(x: CGFloat(event.x) - node.absoluteFrame.minX,
+                            y: CGFloat(event.y) - node.absoluteFrame.minY)
+        return TextSelectionChrome.endpoint(at: local, start: carets.start, end: carets.end)
+    }
 }
 
 private extension RichTextRole {

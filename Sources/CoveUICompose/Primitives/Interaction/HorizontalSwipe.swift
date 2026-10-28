@@ -25,7 +25,11 @@ struct HorizontalSwipeHost<Content: View>: _PrimitiveView {
         let session = node.firstResource(HorizontalSwipeSession.self)!
         session.configure(isEnabled: isEnabled, shouldBegin: shouldBegin, onSwipe: onSwipe)
         let registry = InteractionRegistryHolder.current
-        registry?.setPointer(node) { event, phase, eventPhase in
+        // Paging is a scroll gesture, not a control: a control route here would
+        // make every label inside the page read as "inside a control" and stop
+        // being selectable (see `TextSelectionChrome.isInsideControl`).
+        let route = InputHandlerRoute(role: .scroll, priority: .normal, debugName: "horizontal.swipe")
+        registry?.setPointer(node, route: route) { event, phase, eventPhase in
             guard eventPhase != .bubble, event.button == .left else { return .ignored }
             return session.pointer(event, phase: phase)
         }

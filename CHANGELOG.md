@@ -4,6 +4,19 @@
 
 ## Unreleased
 
+- 文本选择补齐跨组件一致性与触摸细节：`RichText`/`Markdown` 与 `Text` 共用同一套端点手柄、放大镜与命中测试（`TextSelectionChrome`），手指或笔可拖动手柄精修选区；`RichTextFlow.caretRect(at:)` 提供手柄定位。
+- 选择区内的 `Text` 不再进入 Tab 焦点序列，点击按钮、列表行或表格单元格中的标签时不再抢走控件焦点与点击；`Text`/`RichText` 在控件内部自动退出选择。
+- 键盘可扩展选区：`Shift+←/→` 按字素步进，`Shift+Home/End` 扩到段首段尾，可跨段落延伸。
+- 触摸长按选词后焦点落到被选中的标签或段落，复制快捷键可直接作用于该选区。
+- 选择菜单的 Look Up / Share 仅在宿主提供动作时出现，新增 `textSelectionActions(lookup:share:)`；`TextSelectionScope` 的 `hasSelection`、`selectedText`、`copy()`、`selectAll()`、`clear()` 与 `TextSelectionRoot` 初始化器公开，供宿主接入。
+- 文本选择改为默认开启：`Runtime` 与辅助窗口安装根视图时统一包一层 `textSelection()`，普通 `Text` 无需在页面里逐个声明即可拖选与复制；子树上用 `.textSelection(false)` 重新关掉。
+- 选择区只接管落在自身文字上的按压（`TextSelectionScope.textUnder`，`_ContextMenuHost.isInterested`），整页或整窗的选择区不再遮挡控件自己的右键菜单与触摸长按。
+- 触摸屏的选择菜单以底部表单呈现（`TouchPresentation.usesSheet`），复制、全选在手指长按后即可用，不再依赖硬件键盘。
+- 选择区对布局完全透明：只挂一个不占布局节点的 `SurfaceReader`，菜单宿主仍是布局根；底部表单作为宿主的兄弟节点而非包裹层。此前用 `Box` 包裹会让 `SurfaceRoot` 的 `flex(1, basis: 0)` 失去确定高度，整个窗口高度塌陷为 0（Gallery 的 `gallery-shell` 由 820 变 0，所有分区叠在一起）。
+- 修复 `Animation.initialVelocity` 的访问级别：`CoveUICompose` 的 `staggered` 需要读取它，否则干净构建失败。
+- `HorizontalSwipe` 的分页手势改用 `.scroll` 角色（原为默认 `.control`）。它包住整页时，页内每个标签都会被判为「控件内的文字」而退出选择，导致整屏文本一个都选不中；分页与滚动一样属于手势容器，不该占用控件角色。
+- 选择能力按整个 Gallery 目录验收，而非抽样单页：`GalleryContentTests` 逐页挂载真实应用根，断言每个叶子标签要么可按下、要么被控件合法拥有（`Badge`/`Tag`/`KeyCap` 这类合并语义的容器不计入），并逐页跑真实的「按下→拖动→松开→Cmd+C」序列校验剪贴板。任一页出现「整页不可选」都会直接指名吞掉手势的祖先节点。
+
 ## 0.2.9 — 2026-10-27
 
 ## 0.2.8 — 2026-10-27

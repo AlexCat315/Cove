@@ -156,9 +156,15 @@ private struct TooltipHost<Target: View>: _PrimitiveView {
 /// innermost target wins, and a tip that follows another within the warm
 /// window skips the rest delay so the pointer can travel along a toolbar.
 ///
-/// Main-thread-only ambient, like the portal store: tooltips are presented
-/// and dismissed on the UI thread.
-enum TooltipArbitration {
+/// Owned by the window's `PlatformInputContext`, like the portal store (规则 3):
+/// two windows must not take tips from each other, and a fresh context starts
+/// with none on screen. The holder is empty until a window registers one, so a
+/// bare tree (previews, tests that do not care) simply has no arbitration and
+/// every tip times out on its own.
+///
+/// Main-thread-only, like the portal store: tooltips are presented and
+/// dismissed on the UI thread.
+public final class TooltipArbitration {
     private final class WeakSession {
         weak var session: TooltipSession?
         init(_ session: TooltipSession) { self.session = session }
@@ -166,43 +172,45 @@ enum TooltipArbitration {
 
     /// A tip that appeared this soon before the next target shows at once.
     static let warmWindow: TimeInterval = 0.4
-    nonisolated(unsafe) private static var sessions: [WeakSession] = []
-    nonisolated(unsafe) private static var lastShown: TimeInterval = -.greatestFiniteMagnitude
-    nonisolated(unsafe) private static var isNotifying = false
+    private var sessions: [WeakSession] = []
+    private var lastShown: TimeInterval = -.greatestFiniteMagnitude
+    private var isNotifying = false
 
-    static func register(_ session: TooltipSession) {
+    public init() {}
+
+    func register(_ session: TooltipSession) {
         prune()
         if !sessions.contains(where: { $0.session === session }) {
             sessions.append(WeakSession(session))
         }
     }
 
-    static func unregister(_ session: TooltipSession) {
+    func unregister(_ session: TooltipSession) {
         sessions.removeAll { $0.session == nil || $0.session === session }
     }
 
     /// A tip went up within the warm window, so the next one needs no rest.
-    static func isWarm() -> Bool {
+    func isWarm() -> Bool {
         prune()
-        return Date.timeIntervalSinceReferenceDate - lastShown <= warmWindow
+        return Date.timeIntervalSinceReferenceDate - lastShown <= Self.warmWindow
     }
 
-    static func noteShown() { lastShown = Date.timeIntervalSinceReferenceDate }
+    func noteShown() { lastShown = Date.timeIntervalSinceReferenceDate }
 
     /// An enabled target inside this session's element is waiting for its own
     /// tip, so this one must stay quiet: over nested targets the inner wins.
-    static func hasInnerActive(than session: TooltipSession) -> Bool {
+    func hasInnerActive(than session: TooltipSession) -> Bool {
         prune()
         guard let node = session.anchorNode else { return false }
         return sessions.contains { entry in
             guard let other = entry.session, other !== session, other.isActive,
                   let otherNode = other.anchorNode else { return false }
-            return isDescendant(otherNode, of: node)
+            return Self.isDescendant(otherNode, of: node)
         }
     }
 
     /// A new tip takes the screen from any other that is still up.
-    static func hideOthers(besides session: TooltipSession) {
+    func hideOthers(besides session: TooltipSession) {
         for entry in sessions {
             guard let other = entry.session, other !== session, other.isPresented else { continue }
             other.hide()
@@ -210,7 +218,7 @@ enum TooltipArbitration {
     }
 
     /// After a tip goes, a target that is still hovered may now own the screen.
-    static func reconsider(besides session: TooltipSession) {
+    func reconsider(besides session: TooltipSession) {
         guard !isNotifying else { return }
         isNotifying = true
         defer { isNotifying = false }
@@ -219,13 +227,13 @@ enum TooltipArbitration {
         }
     }
 
-    static func reset() {
+    func reset() {
         sessions.removeAll()
         lastShown = -.greatestFiniteMagnitude
         isNotifying = false
     }
 
-    private static func prune() {
+    private func prune() {
         sessions.removeAll { $0.session == nil }
     }
 
@@ -236,6 +244,25 @@ enum TooltipArbitration {
             parent = candidate.parent
         }
         return false
+    }
+}
+
+/// The active window's tooltip rules; `nil` until a window registers one.
+public enum TooltipArbitrationHolder {
+    nonisolated(unsafe) public static var current: TooltipArbitration?
+}
+
+/// Registers a window's tooltip rules for as long as its input context is
+/// current, mirroring `PortalStoreAmbient`.
+public final class TooltipArbitrationAmbient: ScopedAmbient {
+    private let arbitration: TooltipArbitration
+    public init(_ arbitration: TooltipArbitration = TooltipArbitration()) {
+        self.arbitration = arbitration
+    }
+    public func activate() -> () -> Void {
+        let previous = TooltipArbitrationHolder.current
+        TooltipArbitrationHolder.current = arbitration
+        return { TooltipArbitrationHolder.current = previous }
     }
 }
 
@@ -251,6 +278,10 @@ final class TooltipSession: NodeResource, AnyAnimationController {
     private var hoverSince: TimeInterval = 0
     private var presented = false
     private var dismissedUntilLeave = false
+    /// The window that mounted this tip. `unmount` must leave *that* window's
+    /// list even if the ambient has already moved on to another one.
+    private weak var owner: TooltipArbitration?
+    private var arbitration: TooltipArbitration? { owner ?? TooltipArbitrationHolder.current }
     /// Re-evaluated before the tip appears, not just when the pointer enters:
     /// hover can begin while a control's label is still being laid out, and a
     /// description that repeats text drawn a frame later must not survive.
@@ -267,11 +298,13 @@ final class TooltipSession: NodeResource, AnyAnimationController {
     }
     func mount(node: Node) {
         self.node = node
-        TooltipArbitration.register(self)
+        owner = TooltipArbitrationHolder.current
+        arbitration?.register(self)
     }
     func unmount(node: Node) {
         hide()
-        TooltipArbitration.unregister(self)
+        arbitration?.unregister(self)
+        owner = nil
         self.node = nil
     }
     func configure(content: AnyView, options: TooltipOptions, focused: Bool,
@@ -291,13 +324,15 @@ final class TooltipSession: NodeResource, AnyAnimationController {
         guard options.isEnabled && (hovered || focused) && showsText, canShow() else { dismissedUntilLeave = false; hide(); return }
         guard !dismissedUntilLeave else { return }
         // Over elements inside one another only the inner tip shows.
-        guard !TooltipArbitration.hasInnerActive(than: self) else { hide(); return }
+        guard arbitration?.hasInnerActive(than: self) != true else { hide(); return }
         if presented { show(); return }
         guard isFinished else { return }
         elapsed = hovered ? max(0, Date.timeIntervalSinceReferenceDate - hoverSince) : 0
-        // Focus shows at once; a tip that follows another in the warm window
-        // does too, so a run along a toolbar does not wait again.
-        if options.delay == 0 || focused || TooltipArbitration.isWarm() || elapsed >= options.delay {
+        // A tip that follows another within the warm window skips the rest, so
+        // a run along a toolbar does not wait again. Keyboard focus does *not*
+        // skip it: focus lands on a trigger the instant a menu closes, and a
+        // chip covering the bar the user just used reads as an accident.
+        if options.delay == 0 || arbitration?.isWarm() == true || elapsed >= options.delay {
             show()
         } else {
             isFinished = false
@@ -328,11 +363,11 @@ final class TooltipSession: NodeResource, AnyAnimationController {
     }
     private func show() {
         guard let node, node.acceptsSubtreeInput, let content, canShow() else { return }
-        guard !TooltipArbitration.hasInnerActive(than: self) else { return }
+        guard arbitration?.hasInnerActive(than: self) != true else { return }
         presented = true
         // One tip at a time: anything already on screen gives way to this one.
-        TooltipArbitration.hideOthers(besides: self)
-        TooltipArbitration.noteShown()
+        arbitration?.hideOthers(besides: self)
+        arbitration?.noteShown()
         let anchor = node.absoluteFrame
         let gap = CGFloat(options.gap)
         let window = portalWindowBounds(node)
@@ -368,7 +403,7 @@ final class TooltipSession: NodeResource, AnyAnimationController {
         if let node { node.firstResource(PortalResource.self)?.unmount(node: node) }
         // A target the tip was covering (a nested one that just closed) may now
         // own the screen without the pointer moving onto it again.
-        if wasPresented { TooltipArbitration.reconsider(besides: self) }
+        if wasPresented { arbitration?.reconsider(besides: self) }
     }
     func cancel() { hide() }
     func finishImmediately() { hide() }

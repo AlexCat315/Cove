@@ -31,3 +31,4 @@ zig-out/
 
 # Local visual comparison assets (reference screenshots and capture scripts)
 .compare/
+skills-lock.json

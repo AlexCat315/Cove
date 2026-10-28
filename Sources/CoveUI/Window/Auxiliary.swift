@@ -91,10 +91,10 @@ final class AuxiliaryAppWindow {
             configureTextEnvironment(session.contentScaleFactor)
             if !didInstallRoot {
                 withWindowChromeContext(session.id) {
-                    graph.install(root: rootView.textScaler(config.typography.scaler).compositionLocal(
-                        PortalStoreEnvironment.key,
-                        portalStore
-                    ))
+                    graph.install(root: rootView
+                        .textScaler(config.typography.scaler)
+                        .textSelection()
+                        .compositionLocal(PortalStoreEnvironment.key, portalStore))
                 }
                 graph.computeLayout(width: Float(logicalW), height: Float(logicalH))
                 syncWindowChromeHitTest()

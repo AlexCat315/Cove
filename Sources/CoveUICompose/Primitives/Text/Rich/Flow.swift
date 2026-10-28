@@ -96,6 +96,16 @@ struct RichTextFlow {
         return carets.last { $0.offset <= offset }?.x ?? carets.first?.x ?? 0
     }
 
+    /// Zero-width caret rectangle at a UTF-8 offset, in paragraph-local space.
+    /// Places the draggable selection handles and the magnifier's target line.
+    func caretRect(at offset: Int) -> CGRect {
+        guard !lines.isEmpty else { return .zero }
+        let index = lines.lastIndex { $0.startOffset <= offset } ?? 0
+        let line = lines[index]
+        return CGRect(x: CGFloat(caretX(offset, line: index)), y: CGFloat(line.top),
+                      width: 0, height: CGFloat(line.height))
+    }
+
     /// Highlight rectangles (x, y, width, height) for a UTF-8 range.
     func selectionRects(_ range: Range<Int>) -> [(Float, Float, Float, Float)] {
         guard !range.isEmpty else { return [] }

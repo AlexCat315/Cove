@@ -179,7 +179,13 @@ struct RowDensityTests: CoveUIComposeSerializedSuite {
             settle(graph, width: 390)
             #expect(treeRows.allSatisfy { $0.frame.height == CGFloat(30 * scale) })
             #expect(row.frame.height >= 30)
-            if scale == 1 { #expect(row.frame.height == 30) }
+            // A menu row is its body line plus the 6-pt vertical padding on
+            // each side; `MenuWindowBounds` uses the same sum for the visible
+            // window, so the floor only binds for shorter type.
+            if scale == 1 {
+                let line = (light ? Theme.defaultLight : Theme.defaultDark).typography.body.lineHeight
+                #expect(row.frame.height == CGFloat(line + 12))
+            }
         }
     }
 
@@ -217,7 +223,9 @@ struct RowDensityTests: CoveUIComposeSerializedSuite {
             harness.input = [.pointer, .keyboard]
             settle(graph, width: 390)
             let anchored = try #require(menuRow(AnyHashable("branch"), in: graph.tree.root!))
-            #expect(anchored.frame.height == 30)
+            // Back on pointer input the 44-pt touch floor drops away and the
+            // row returns to its content height: body line + 12 pt of padding.
+            #expect(anchored.frame.height == CGFloat(Theme.defaultLight.typography.body.lineHeight + 12))
             #expect(!nodes(graph.tree.root!).contains { $0.attachments[LayoutDebugAttachmentKey.debugName] as? String == "touch-overlay-sheet" })
             #expect(!graph.recomposer.hasPending)
         }

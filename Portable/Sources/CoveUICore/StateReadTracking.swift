@@ -71,7 +71,8 @@ public enum StateReadTracking {
 extension StateStorage {
     struct FieldRead {
         let name: String
-        let changed: (Value) -> Bool
+        let keyPath: AnyKeyPath
+        var observed: Any
     }
     struct Reader {
         let invalidate: (String?) -> Void
@@ -102,13 +103,18 @@ extension StateStorage {
             register(scope)
             readersLock.withLock {
                 var reader = readers[scope.id] ?? Reader(invalidate: scope.invalidate)
-                reader.fields[keyPath] = FieldRead(name: name, changed: { new in
-                    !stateFieldEqual(observed, new[keyPath: keyPath])
-                })
+                // Reuse the existing entry rather than allocating a new closure
+                // on every body re-evaluation; only the captured observed value
+                // needs refreshing.
+                reader.fields[keyPath] = FieldRead(name: name, keyPath: keyPath, observed: observed)
                 readers[scope.id] = reader
             }
         }
         return observed
+    }
+
+    func readSignal<Field>(_ keyPath: KeyPath<Value, Field>, name: String) -> Field {
+        read(keyPath, name: name)
     }
 
     private func register(_ scope: StateReadTracking.Scope) {
@@ -122,10 +128,17 @@ extension StateStorage {
         value = newValue
         let snapshot = readersLock.withLock { readers }
         for reader in snapshot.values {
-            if reader.whole { reader.invalidate(nil) }
-            else if let field = reader.fields.values.first(where: { $0.changed(newValue) }) {
-                reader.invalidate(field.name)
+            if reader.whole { reader.invalidate(nil); continue }
+            var invalidated = false
+            for fr in reader.fields.values {
+                if let newField = (newValue as Any)[keyPath: fr.keyPath],
+                   !stateFieldEqual(fr.observed, newField) {
+                    reader.invalidate(fr.name)
+                    invalidated = true
+                    break
+                }
             }
+            if invalidated { continue }
         }
         // Existing views keep their explicit state-write invalidation contract.
         // A tracked view is invalidated by exactly the values its body read.
@@ -136,8 +149,7 @@ extension StateStorage {
 }
 
 private func stateFieldEqual<T>(_ lhs: T, _ rhs: T) -> Bool {
-    var budget = 2_048
-    guard stateFieldIsValue(lhs, budget: &budget), stateFieldIsValue(rhs, budget: &budget),
+    guard isValueType(lhs), isValueType(rhs),
           let equatable = lhs as? any Equatable else { return false }
     func equal<E: Equatable>(_ value: E, _ other: Any) -> Bool { (other as? E).map { value == $0 } ?? false }
     return equal(equatable, rhs)
@@ -151,15 +163,33 @@ private enum StateFieldTypes {
 
 /// A reference hidden inside Equatable can mutate both the retained read and
 /// the replacement at once. Opaque/custom reflection must never prove equality.
-private func stateFieldIsValue(_ value: Any, budget: inout Int) -> Bool {
-    budget -= 1
-    guard budget >= 0 else { return false }
+/// The per-type result is memoized so hot `set` paths avoid re-reflecting the
+/// same dynamic types on every write.
+nonisolated(unsafe) private var valueTypeCache: [ObjectIdentifier: Bool] = [:]
+private let valueTypeCacheLock = NSLock()
+
+private func isValueType(_ value: Any) -> Bool {
+    let id = ObjectIdentifier(type(of: value))
+    if let cached = valueTypeCacheLock.withLock({ valueTypeCache[id] }) { return cached }
+    let result = _isValueType(of: value)
+    valueTypeCacheLock.withLock { valueTypeCache[id] = result }
+    return result
+}
+
+private func _isValueType(of value: Any) -> Bool {
     if StateFieldTypes.scalars.contains(ObjectIdentifier(type(of: value))) { return true }
     let mirror = Mirror(reflecting: value)
     guard mirror.displayStyle != .class else { return false }
+    // Optionals are value-semantic: recurse into the wrapped value. `Optional`
+    // is itself `CustomReflectable`, so it must be handled before the
+    // custom-reflection rejection below (which exists to treat opaque,
+    // reference-hiding custom reflections as non-value types).
+    if mirror.displayStyle == .optional {
+        return mirror.children.allSatisfy { isValueType($0.value) }
+    }
     if value is any CustomReflectable {
         let name = String(reflecting: type(of: value))
         guard ["Swift.Array<", "Swift.Dictionary<", "Swift.Set<", "Swift.SIMD"].contains(where: name.hasPrefix) else { return false }
     }
-    return mirror.children.allSatisfy { stateFieldIsValue($0.value, budget: &budget) }
+    return mirror.children.allSatisfy { isValueType($0.value) }
 }

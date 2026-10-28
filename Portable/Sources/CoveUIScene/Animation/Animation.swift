@@ -178,7 +178,9 @@ public struct Animation: Sendable, Equatable {
     public let allowsOvershoot: Bool
 
     /// Initial progress velocity per real second, used by spring releases.
-    let initialVelocity: Float
+    /// Readable so a derived animation (`staggered`, in the theme layer) can
+    /// rebuild itself without dropping the velocity the caller supplied.
+    public let initialVelocity: Float
     private(set) var repetition: AnimationRepetition = .once
 
     public init(duration: Double,

@@ -278,7 +278,9 @@ struct MenuHierarchyTests: CoveUIComposeSerializedSuite {
         // origins use pixel-grid rounding, allowing one point of gap variance.
         #expect(abs(titleShortcutGap - 8) <= 1)
         #expect(target.absoluteFrame.contains(shortcut.absoluteFrame))
-        #expect(title.absoluteFrame.minX - target.absoluteFrame.minX == 12)
+        // The row's own 10-pt horizontal padding, since the highlight now fills
+        // the row instead of being inset a further 4 pt.
+        #expect(title.absoluteFrame.minX - target.absoluteFrame.minX == 10)
         let short = try row("short", graph: graph)
         #expect(short.absoluteFrame.minY >= target.absoluteFrame.maxY)
         let lines = nodes(graph.tree.root).filter { $0.backgroundColor == $0.theme.colors.divider && $0.frame.height > 0 }

@@ -1,6 +1,7 @@
 internal import SwiftSyntax
 internal import SwiftSyntaxBuilder
 internal import SwiftSyntaxMacros
+internal import SwiftDiagnostics
 
 struct TrackStateReadsMacro: MemberMacro, ExtensionMacro {
     static func expansion(of node: AttributeSyntax, providingMembersOf declaration: some DeclGroupSyntax,
@@ -25,7 +26,7 @@ struct TrackStateReadsMacro: MemberMacro, ExtensionMacro {
         }
         let locals = LocalNames(viewMode: .sourceAccurate)
         locals.walk(statements)
-        let rewrite = FieldReads(states: names, shadowed: locals.names)
+        let rewrite = FieldReads(states: names, shadowed: locals.names, context: context)
         let result = rewrite.rewrite(statements)
         let modifiers = declaration.modifiers
         let access = modifiers.contains(where: { ["public", "open"].contains($0.name.text) }) ? "public " : ""
@@ -77,42 +78,98 @@ private final class LocalNames: SyntaxVisitor {
 private final class FieldReads: SyntaxRewriter {
     let states: Set<String>
     let shadowed: Set<String>
-    init(states: Set<String>, shadowed: Set<String>) {
+    let context: MacroExpansionContext
+
+    init(states: Set<String>, shadowed: Set<String>, context: MacroExpansionContext) {
         self.states = states
         self.shadowed = shadowed
+        self.context = context
         super.init(viewMode: .sourceAccurate)
     }
 
-    override func visit(_ node: MemberAccessExprSyntax) -> ExprSyntax {
-        if let (state, fields) = path(ExprSyntax(node)), !fields.isEmpty {
-            let field = fields.joined(separator: ".")
-            return ExprSyntax(stringLiteral: "self._\(state)[tracking: \\.\(field), name: \"\(state).\(field)\"]")
-                .with(\.leadingTrivia, node.leadingTrivia).with(\.trailingTrivia, node.trailingTrivia)
+    /// Warn when a `@State` property is referenced as a whole value (not through a
+    /// field member), which defeats precise invalidation. The binding initializer
+    /// `if let x = state.field` is still rewritten to a field read, so this only
+    /// fires for genuinely whole reads such as `let snapshot = state`. It is
+    /// suppressed where a whole read is unavoidable/uninformative: as the base of
+    /// a subscript (e.g. `state[signal: …]`) or as a condition (`if flag`).
+    override func visit(_ node: DeclReferenceExprSyntax) -> ExprSyntax {
+        let name = node.baseName.text
+        if states.contains(name), !shadowed.contains(name) {
+            let parent = node.parent
+            let isSubscriptBase = parent?.is(SubscriptExprSyntax.self) == true
+            let isCondition = parent?.is(ConditionElementSyntax.self) == true
+            if !isSubscriptBase, !isCondition {
+                context.diagnose(Diagnostic(node: Syntax(node), message: WholeValueReadMessage(state: name)))
+            }
         }
         return super.visit(node)
     }
 
-    override func visit(_ node: FunctionCallExprSyntax) -> ExprSyntax {
-        // A method is not a key path. Rewrite only its receiver, preserving
-        // mutations such as state.flag.toggle() and ordinary function calls.
-        guard let member = node.calledExpression.as(MemberAccessExprSyntax.self), let base = member.base else {
-            return super.visit(node)
+    override func visit(_ node: MemberAccessExprSyntax) -> ExprSyntax {
+        // A member access that is the receiver of a function call (e.g.
+        // `model.name.uppercased()` or `model.name.append("x")`) is a method
+        // invocation, not a field read: only the base (`model.name`) should be
+        // rewritten to a tracking read, and the method call kept intact.
+        if node.parent?.is(FunctionCallExprSyntax.self) != true,
+           let (state, p) = statePath(ExprSyntax(node)), !p.isEmpty {
+            let literal = "self._\(state)[tracking: \\.\(p), name: \"\(state).\(p)\"]"
+            return ExprSyntax(stringLiteral: literal)
+                .with(\.leadingTrivia, node.leadingTrivia)
+                .with(\.trailingTrivia, node.trailingTrivia)
         }
-        var result = node
-        result.calledExpression = ExprSyntax(member.with(\.base, rewrite(base).as(ExprSyntax.self)))
-        result.arguments = rewrite(node.arguments).as(LabeledExprListSyntax.self) ?? node.arguments
-        if let trailing = node.trailingClosure { result.trailingClosure = rewrite(trailing).as(ClosureExprSyntax.self) }
-        result.additionalTrailingClosures = rewrite(node.additionalTrailingClosures).as(MultipleTrailingClosureElementListSyntax.self) ?? node.additionalTrailingClosures
-        return ExprSyntax(result)
+        return super.visit(node)
     }
 
-    private func path(_ expression: ExprSyntax) -> (String, [String])? {
-        if let reference = expression.as(DeclReferenceExprSyntax.self), states.contains(reference.baseName.text),
-           !shadowed.contains(reference.baseName.text) { return (reference.baseName.text, []) }
-        guard let member = expression.as(MemberAccessExprSyntax.self), let base = member.base else { return nil }
+    /// Resolve a `state.field` / `state.a?.b` / `self.state.field` expression to
+    /// `(stateName, keyPathString)`. Returns `nil` when the expression does not
+    /// read a tracked `@State`. The key-path string preserves optional chaining
+    /// so `\state.a?.b` yields a valid optional key path.
+    private func statePath(_ expression: ExprSyntax) -> (String, String)? {
+        let expr: ExprSyntax
+        if let oc = expression.as(OptionalChainingExprSyntax.self) { expr = oc.expression }
+        else if let fu = expression.as(ForceUnwrapExprSyntax.self) { expr = fu.expression }
+        else { expr = expression }
+
+        if let ref = expr.as(DeclReferenceExprSyntax.self) {
+            if states.contains(ref.baseName.text), !shadowed.contains(ref.baseName.text) {
+                return (ref.baseName.text, "")
+            }
+            return nil
+        }
+        guard let member = expr.as(MemberAccessExprSyntax.self), let base = member.base else { return nil }
         let name = member.declName.baseName.text
-        if base.trimmedDescription == "self", states.contains(name) { return (name, []) }
-        guard let (state, fields) = path(base) else { return nil }
-        return (state, fields + [name])
+        if base.trimmedDescription == "self", states.contains(name) {
+            return (name, "")
+        }
+        guard let (state, basePath) = statePath(base) else { return nil }
+        let baseWasOptional = base.is(OptionalChainingExprSyntax.self) || base.is(ForceUnwrapExprSyntax.self)
+        let full: String
+        if basePath.isEmpty {
+            full = name
+        } else if baseWasOptional {
+            full = markLastOptional(basePath) + ".\(name)"
+        } else {
+            full = "\(basePath).\(name)"
+        }
+        return (state, full)
     }
+
+    /// Append `?` to the final component of a key-path segment so that
+    /// `\a.b?.c` (not `\a.b.c?`) is produced for mid-chain optional chaining.
+    private func markLastOptional(_ path: String) -> String {
+        guard let lastDot = path.lastIndex(of: ".") else { return path + "?" }
+        let head = String(path[..<lastDot])
+        let tail = String(path[path.index(after: lastDot)...])
+        return "\(head).\(tail)?"
+    }
+}
+
+private struct WholeValueReadMessage: DiagnosticMessage {
+    let state: String
+    var message: String {
+        "@State '\(state)' is read as a whole value; read '\(state).field' for precise invalidation"
+    }
+    var severity: DiagnosticSeverity { .warning }
+    var diagnosticID: MessageID { .init(domain: "CoveUIReadMacros", id: "whole-value-read") }
 }

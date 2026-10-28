@@ -252,16 +252,17 @@ private func builtinButtonChromeValues(state: BuiltinButtonChromeState,
         borderWidth = 0
     }
 
-    // A pointer press only changes the face; the slight compression is a touch
-    // affordance (the finger covers the control), not a desktop animation.
-    let touch = chromeNode.compositionValue(of: SurfaceEnvironment.key).input.contains(.touch)
+    // A press compresses the face on every platform: the scale on :active is
+    // the tactile "the interface heard you" feedback the design language calls
+    // for, not a desktop-only luxury. Pointer and touch both get it; reduced
+    // motion still skips the compression.
     return BuiltinButtonChromeValues(background: background,
                                      border: border,
                                      borderWidth: borderWidth,
                                      radius: metrics.radius,
                                      opacity: state.isEnabled || theme.textEmphasis.disabled != nil ? 1 : (state.isSelected ? 0.75 : 0.55),
-                                     scale: pressed && touch && !chromeNode.prefersReducedMotion
-                                        ? (theme.motion.pressScale.isFinite ? min(0.96, max(0.8, theme.motion.pressScale)) : 0.96)
+                                     scale: pressed && !chromeNode.prefersReducedMotion
+                                        ? (theme.motion.pressScale.isFinite ? min(0.99, max(0.8, theme.motion.pressScale)) : 0.97)
                                         : 1)
 }
 

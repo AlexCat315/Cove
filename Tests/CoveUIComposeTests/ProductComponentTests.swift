@@ -19,13 +19,16 @@ struct ProductComponentTests: CoveUIComposeSerializedSuite {
             let oldInteractions = InteractionRegistryHolder.current, oldFocus = FocusChainHolder.current
             let oldCapture = PointerCaptureHolder.current, oldPortal = PortalStoreHolder.current
             let oldText = TextEnvironmentHolder.current
+            let oldTips = TooltipArbitrationHolder.current
             let interactions = InteractionRegistry(), focus = FocusChain(), capture = PointerCapture(), portal = PortalStore()
             InteractionRegistryHolder.current = interactions; FocusChainHolder.current = focus
             PointerCaptureHolder.current = capture; PortalStoreHolder.current = portal
+            TooltipArbitrationHolder.current = TooltipArbitration()
             TextEnvironmentHolder.current = TextEnvironment.bootstrapped(atlasTextureID: 1, primaryFontName: SystemFontDefaults.primaryFontName)
             defer {
                 InteractionRegistryHolder.current = oldInteractions; FocusChainHolder.current = oldFocus
                 PointerCaptureHolder.current = oldCapture; PortalStoreHolder.current = oldPortal; TextEnvironmentHolder.current = oldText
+                TooltipArbitrationHolder.current = oldTips
             }
             AnimatorScheduler.$current.withValue(AnimatorScheduler()) {
                 let graph = ViewGraph(tree: NodeTree(), recomposer: Recomposer())
@@ -190,7 +193,6 @@ struct ProductComponentTests: CoveUIComposeSerializedSuite {
     @Test("Notification clocks and tooltip portals leave with their owning subtree")
     func transientResourceLifecycle() {
         withScene { graph, registry, _, _, portal in
-            TooltipArbitration.reset()
             let center = ToastController()
             center.post(ToastNotification("Saved") { $0.duration = 2 })
             graph.install(root: LayerRoot { NotificationHost(center) })
