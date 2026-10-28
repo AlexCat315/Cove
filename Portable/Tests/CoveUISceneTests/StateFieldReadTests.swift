@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import CoveUIComposeCore
+@testable import CoveUICore
 
 @Suite("Inferred value state field reads", .serialized)
 @MainActor
@@ -408,5 +409,187 @@ struct StateFieldReadTests {
         harness.model.items = [9, 9, 9]
         recomposer.commitAll()
         #expect(counter.count == 3)
+    }
+
+    @TrackStateReads
+    struct SubscriptMatrix: View {
+        struct Model: Equatable { var matrix: [[Int]]; var other: Int }
+        @State var model = Model(matrix: [[1, 2], [3, 4]], other: 0)
+        let counter: Counter
+        var body: some View {
+            let _ = counter.bump()
+            let _ = model.matrix[0][1]
+            EmptyView()
+        }
+    }
+
+    @Test("Deeply nested subscripts track the first dimension")
+    func subscriptNested() {
+        let counter = Counter(), harness = SubscriptMatrix(counter: counter)
+        let recomposer = Recomposer(), graph = ViewGraph(tree: NodeTree(), recomposer: recomposer)
+        graph.install(root: harness)
+        defer { graph.install(root: EmptyView()) }
+        #expect(counter.count == 1)
+        // Changing a different row's element must NOT invalidate.
+        harness.model.matrix[1][0] = 99
+        #expect(!recomposer.hasPending)
+        harness.model.other += 1
+        #expect(!recomposer.hasPending)
+        // Changing the read row's element (or the whole row) must invalidate.
+        harness.model.matrix[0][1] = 42
+        recomposer.commitAll()
+        #expect(counter.count == 2)
+        harness.model.matrix[0] = [7, 7]
+        recomposer.commitAll()
+        #expect(counter.count == 3)
+    }
+
+    @TrackStateReads
+    struct SubscriptDict: View {
+        struct Model: Equatable { var dict: [String: Int]; var other: Int }
+        @State var model = Model(dict: ["a": 1, "b": 2], other: 0)
+        let counter: Counter
+        var body: some View {
+            let _ = counter.bump()
+            let _ = model.dict["a"]
+            EmptyView()
+        }
+    }
+
+    @Test("Dictionary element tracking invalidates only the read key")
+    func subscriptDictionary() {
+        let counter = Counter(), harness = SubscriptDict(counter: counter)
+        let recomposer = Recomposer(), graph = ViewGraph(tree: NodeTree(), recomposer: recomposer)
+        graph.install(root: harness)
+        defer { graph.install(root: EmptyView()) }
+        #expect(counter.count == 1)
+        harness.model.dict["b"] = 99
+        #expect(!recomposer.hasPending)
+        harness.model.other += 1
+        #expect(!recomposer.hasPending)
+        harness.model.dict["a"] = 42
+        recomposer.commitAll()
+        #expect(counter.count == 2)
+        harness.model.dict = ["a": 5, "b": 6]
+        recomposer.commitAll()
+        #expect(counter.count == 3)
+    }
+
+    /// A custom subscriptable field degrades to whole-field tracking (no element
+    /// precision) but still compiles and behaves correctly.
+    @TrackStateReads
+    struct SubscriptCustom: View {
+        struct Cell: Equatable { var v: Int }
+        struct Grid: Equatable {
+            var cells: [Int]
+            subscript(_ i: Int) -> Int { cells[i] }
+        }
+        struct Model: Equatable { var grid: Grid; var other: Int }
+        @State var model = Model(grid: Grid(cells: [1, 2, 3]), other: 0)
+        let counter: Counter
+        var body: some View {
+            let _ = counter.bump()
+            let _ = model.grid[0]
+            EmptyView()
+        }
+    }
+
+    @Test("Custom subscriptable falls back to whole-field tracking")
+    func subscriptCustom() {
+        let counter = Counter(), harness = SubscriptCustom(counter: counter)
+        let recomposer = Recomposer(), graph = ViewGraph(tree: NodeTree(), recomposer: recomposer)
+        graph.install(root: harness)
+        defer { graph.install(root: EmptyView()) }
+        #expect(counter.count == 1)
+        // Whole-field granularity: any change to `grid` invalidates.
+        harness.model.grid.cells[1] = 99
+        recomposer.commitAll()
+        #expect(counter.count == 2)
+        harness.model.other += 1
+        #expect(!recomposer.hasPending)
+    }
+
+    /// Each `@State` property is its own independent root: it owns a separate
+    /// `StateStorage` with its own reader registry, so a write to one state
+    /// cannot invalidate a dependency recorded against another.
+    @TrackStateReads
+    struct TwoStates: View {
+        struct Model: Equatable { var items: [Int]; var other: Int }
+        @State var first = Model(items: [1, 2], other: 0)
+        @State var second = Model(items: [3, 4], other: 0)
+        let counter: Counter
+        var body: some View {
+            let _ = counter.bump()
+            let _ = first.items[0]
+            let _ = second.items[1]
+            EmptyView()
+        }
+    }
+
+    @Test("Separate @State properties are independent roots")
+    func twoStatesAreIndependent() {
+        let counter = Counter(), harness = TwoStates(counter: counter)
+        let recomposer = Recomposer(), graph = ViewGraph(tree: NodeTree(), recomposer: recomposer)
+        graph.install(root: harness)
+        defer { graph.install(root: EmptyView()) }
+        #expect(counter.count == 1)
+        // The read elements are first.items[0] and second.items[1]; writes to
+        // any other index of either state must not invalidate.
+        harness.first.items[1] = 99
+        harness.second.items[0] = 99
+        harness.first.other += 1
+        harness.second.other += 1
+        #expect(!recomposer.hasPending)
+        #expect(counter.count == 1)
+        // A write to the read element of either state invalidates.
+        harness.second.items[1] = 42
+        recomposer.commitAll()
+        #expect(counter.count == 2)
+        harness.first.items[0] = 7
+        recomposer.commitAll()
+        #expect(counter.count == 3)
+    }
+
+    /// Sendable box so the assertion result can cross a real thread boundary.
+    private final class BoolBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value = false
+        func set(_ v: Bool) { lock.withLock { value = v } }
+        func get() -> Bool { lock.withLock { value } }
+    }
+
+    /// The scope stack lives in native thread-local storage, implemented per
+    /// platform by `CThreadLocal`. A scope pushed on one thread must be invisible
+    /// on every other thread — the read path would otherwise record a view's
+    /// dependencies against an unrelated scope.
+    @Test("The scope stack is thread-local on every platform")
+    func scopeStackIsThreadLocal() {
+        let mainOwner = NSObject()
+        #expect(StateReadTracking.current == nil)
+
+        StateReadTracking.withScope(.init(id: ObjectIdentifier(mainOwner), invalidate: { _ in })) {
+            #expect(StateReadTracking.current?.id == ObjectIdentifier(mainOwner))
+
+            // A genuine OS thread: `DispatchQueue.global().sync` is allowed to
+            // run its block on the calling thread, which would prove nothing.
+            let done = DispatchSemaphore(value: 0)
+            let result = BoolBox()
+            let thread = Thread {
+                result.set(StateReadTracking.current == nil)
+                let bgOwner = NSObject()
+                StateReadTracking.withScope(.init(id: ObjectIdentifier(bgOwner), invalidate: { _ in })) {
+                    if StateReadTracking.current?.id != ObjectIdentifier(bgOwner) { result.set(false) }
+                }
+                if StateReadTracking.current != nil { result.set(false) }
+                done.signal()
+            }
+            thread.start()
+            done.wait()
+            #expect(result.get())
+
+            // The background work must not have disturbed this thread's scope.
+            #expect(StateReadTracking.current?.id == ObjectIdentifier(mainOwner))
+        }
+        #expect(StateReadTracking.current == nil)
     }
 }

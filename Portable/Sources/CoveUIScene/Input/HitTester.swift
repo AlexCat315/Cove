@@ -72,7 +72,7 @@ public struct HitTester {
         let childMapped = content.source(of: (Float(pointInParent.x), Float(pointInParent.y)))
         let childPoint = CGPoint(x: CGFloat(childMapped.x), y: CGFloat(childMapped.y))
         if node.childrenMayNeedZSort {
-            for child in hitTestOrderedChildren(of: node) {
+            for child in node.renderOrderedChildren.reversed() {
                 if let hit = walk(node: child, pointInParent: childPoint, path: &path) {
                     return hit
                 }
@@ -93,16 +93,5 @@ public struct HitTester {
         // Backtrack the path entry we appended.
         path.removeLast()
         return nil
-    }
-
-    private static func hitTestOrderedChildren(of node: Node) -> [Node] {
-        node.children.enumerated()
-            .sorted { lhs, rhs in
-                let lhsZ = lhs.element.zIndex
-                let rhsZ = rhs.element.zIndex
-                if lhsZ == rhsZ { return lhs.offset > rhs.offset }
-                return lhsZ > rhsZ
-            }
-            .map { $0.element }
     }
 }

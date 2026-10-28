@@ -1,4 +1,5 @@
 import Foundation
+import CThreadLocal
 
 /// Composition scopes supply invalidation without introducing a Core → Scene dependency.
 public enum StateReadTracking {
@@ -15,20 +16,32 @@ public enum StateReadTracking {
         var stack: [Scope] = []
         var deferredDepth = 0
     }
-    private static let storageKey = "cove.ui.StateReadTracking.stack"
     private static let lock = NSLock()
     nonisolated(unsafe) private static var cleaners: [ObjectIdentifier: [ObjectIdentifier: (ObjectIdentifier) -> Void]] = [:]
     nonisolated(unsafe) private static var installed: Set<ObjectIdentifier> = []
-    #if os(WASI)
-    nonisolated(unsafe) private static let stack = StackBox()
-    #else
+    /// The per-thread scope stack.
+    ///
+    /// A raw thread-local load, backed by `CThreadLocal`. This path runs on every
+    /// field read, which is why it avoids `Thread.current.threadDictionary` —
+    /// that bridges to an `NSDictionary` and hashes a string on every access.
     private static var stack: StackBox {
-        if let box = Thread.current.threadDictionary[storageKey] as? StackBox { return box }
+        _ = tlsReady
+        if let existing = cove_thread_local_get() {
+            return Unmanaged<StackBox>.fromOpaque(existing).takeUnretainedValue()
+        }
         let box = StackBox()
-        Thread.current.threadDictionary[storageKey] = box
+        cove_thread_local_set(Unmanaged.passRetained(box).toOpaque())
         return box
     }
-    #endif
+
+    /// Creates the platform slot exactly once. `swift_once` guards this, so the
+    /// destructor is published before any slot can be populated.
+    private static let tlsReady: Void = {
+        cove_thread_local_init { raw in
+            guard let raw else { return }
+            Unmanaged<StackBox>.fromOpaque(raw).release()
+        }
+    }()
 
     static var current: Scope? { stack.stack.last }
     static var isDeferredEvaluation: Bool { stack.deferredDepth > 0 }
@@ -73,55 +86,101 @@ extension StateStorage {
         let name: String
         let keyPath: AnyKeyPath
         var observed: Any
+        /// Dynamic type of `observed` at registration time. When a later body
+        /// evaluation observes the same type, the memoized comparator below is
+        /// reused without touching the global comparator cache.
+        var typeId: ObjectIdentifier
         /// Typed equality predicate for the field's dynamic type, built once and
         /// memoized per type. `nil` means the field is a reference (or otherwise
         /// non-comparable) and must always invalidate.
         var equal: ((Any, Any) -> Bool)?
     }
-    /// A single element of an array-valued field. A write that changes only other
-    /// indices — or other fields — does not invalidate the dependent scope.
+    /// A single element of a collection-valued field (array or dictionary). A
+    /// write that changes only other indices/keys — or other fields — does not
+    /// invalidate the dependent scope.
     struct ElementRead {
         let name: String
         let keyPath: AnyKeyPath
-        let index: Int
         var observed: Any
+        var typeId: ObjectIdentifier
         var equal: ((Any, Any) -> Bool)?
+        let selector: Selector
+        enum Selector: Hashable {
+            case array(Int)
+            case dictionary(AnyHashable)
+        }
     }
-    struct Reader {
+    /// Identifies a tracked element within a scope. Keying `elements` by it keeps
+    /// storage bounded by the set of distinct (collection, index/key) pairs a body
+    /// actually reads, even when the same element is read repeatedly.
+    struct ElementKey: Hashable {
+        let keyPath: AnyKeyPath
+        let selector: ElementRead.Selector
+    }
+    /// Reference type on purpose: mutating a struct copy pulled out of the
+    /// `readers` dictionary would trigger a COW copy of its nested collections on
+    /// every single field read.
+    final class Reader {
         let invalidate: (String?) -> Void
         var whole = false
         var fields: [AnyKeyPath: FieldRead] = [:]
-        var elements: [ElementRead] = []
+        var elements: [ElementKey: ElementRead] = [:]
+        init(invalidate: @escaping (String?) -> Void) { self.invalidate = invalidate }
     }
 
     private var readScope: StateReadTracking.Scope? {
+        // A non-precise owner invalidates unconditionally on write, so recorded
+        // dependencies would never be read back. Skipping them removes every
+        // tracking cost — lock, table write and value boxing — for the majority
+        // of views, which never opt into precise tracking.
+        guard preciseOwner else { return nil }
         if let current = StateReadTracking.current { return current }
-        guard preciseOwner, StateReadTracking.isDeferredEvaluation,
+        guard StateReadTracking.isDeferredEvaluation,
               let ownerScope, let onChange else { return nil }
         return .init(id: ownerScope, invalidate: { _ in onChange() })
     }
 
-    func readWhole() {
-        guard preciseOwner, let scope = readScope else { return }
-        register(scope)
+    /// Single mutation point for the reader table. Registration is scope-wide, so
+    /// it is performed only when the reader entry is created — the first read a
+    /// body makes against this state — instead of once per field read.
+    private func track(_ scope: StateReadTracking.Scope, _ mutate: (inout Reader) -> Void) {
+        var needsRegister = false
         readersLock.withLock {
-            var reader = readers[scope.id] ?? Reader(invalidate: scope.invalidate)
-            reader.whole = true
+            var reader: Reader
+            if let existing = readers[scope.id] {
+                reader = existing
+            } else {
+                reader = Reader(invalidate: scope.invalidate)
+                needsRegister = true
+            }
+            mutate(&reader)
             readers[scope.id] = reader
         }
+        // Kept outside `readersLock`: the global registration lock must never be
+        // taken while holding it, to avoid a lock-order inversion with `clear`.
+        if needsRegister { register(scope) }
+    }
+
+    func readWhole() {
+        guard preciseOwner, let scope = readScope else { return }
+        track(scope) { $0.whole = true }
     }
 
     func read<Field>(_ keyPath: KeyPath<Value, Field>, name: String) -> Field {
         let observed = value[keyPath: keyPath]
         if let scope = readScope {
-            register(scope)
-            readersLock.withLock {
-                var reader = readers[scope.id] ?? Reader(invalidate: scope.invalidate)
-                // Reuse the existing entry rather than allocating a new closure
-                // on every body re-evaluation; only the captured observed value
-                // needs refreshing.
-                reader.fields[keyPath] = FieldRead(name: name, keyPath: keyPath, observed: observed, equal: makeEqual(observed))
-                readers[scope.id] = reader
+            let typeId = ObjectIdentifier(type(of: observed))
+            track(scope) { reader in
+                if var existing = reader.fields[keyPath], existing.typeId == typeId {
+                    // Same dynamic type: reuse the memoized comparator, refresh
+                    // only the observed value.
+                    existing.observed = observed
+                    reader.fields[keyPath] = existing
+                } else {
+                    reader.fields[keyPath] = FieldRead(name: name, keyPath: keyPath,
+                                                       observed: observed, typeId: typeId,
+                                       equal: makeEqual(observed))
+                }
             }
         }
         return observed
@@ -138,17 +197,49 @@ extension StateStorage {
         let collection = value[keyPath: keyPath]
         let observed: Any = collection.indices.contains(index) ? collection[index] : NSNull()
         if let scope = readScope {
-            register(scope)
-            readersLock.withLock {
-                var reader = readers[scope.id] ?? Reader(invalidate: scope.invalidate)
-                reader.elements.append(ElementRead(name: name, keyPath: keyPath as AnyKeyPath,
-                                                  index: index, observed: observed, equal: makeEqual(observed)))
-                readers[scope.id] = reader
+            let typeId = ObjectIdentifier(type(of: observed))
+            let key = ElementKey(keyPath: keyPath as AnyKeyPath, selector: .array(index))
+            track(scope) { reader in
+                if var existing = reader.elements[key], existing.typeId == typeId {
+                    existing.observed = observed
+                    reader.elements[key] = existing
+                } else {
+                    reader.elements[key] = ElementRead(name: name, keyPath: keyPath as AnyKeyPath,
+                                                       observed: observed, typeId: typeId,
+                                                       equal: makeEqual(observed),
+                                                       selector: .array(index))
+                }
             }
         }
         // Mirror the original `state.items[i]` semantics: out-of-range reads trap,
         // exactly as an untracked subscript would.
         return collection[index]
+    }
+
+    /// Track a single value of a dictionary-valued field. Returns the optional
+    /// element (matching `Dictionary`'s own subscript) and invalidates only when
+    /// `dict[key]` actually changes.
+    func readElement<Key: Hashable, Element>(_ keyPath: WritableKeyPath<Value, [Key: Element]>, at key: Key, name: String) -> Element? {
+        let dict = value[keyPath: keyPath]
+        let observed: Any = dict[key].map { $0 as Any } ?? NSNull()
+        if let scope = readScope {
+            let typeId = ObjectIdentifier(type(of: observed))
+            let elementKey = ElementKey(keyPath: keyPath as AnyKeyPath,
+                                        selector: .dictionary(key as AnyHashable))
+            track(scope) { reader in
+                if var existing = reader.elements[elementKey], existing.typeId == typeId {
+                    existing.observed = observed
+                    reader.elements[elementKey] = existing
+                } else {
+                    reader.elements[elementKey] = ElementRead(name: name,
+                                                              keyPath: keyPath as AnyKeyPath,
+                                                              observed: observed, typeId: typeId,
+                                                              equal: makeEqual(observed),
+                                                              selector: .dictionary(key as AnyHashable))
+                }
+            }
+        }
+        return dict[key]
     }
 
     private func register(_ scope: StateReadTracking.Scope) {
@@ -178,15 +269,35 @@ extension StateStorage {
                 }
             }
             if !invalidated {
-                for er in reader.elements {
-                    guard let newCollection = (newValue as Any)[keyPath: er.keyPath] as? [Any],
-                          newCollection.indices.contains(er.index) else {
-                        // Array shrank (or element vanished) → treat as a change.
+                for er in reader.elements.values {
+                    guard let newContainer = (newValue as Any)[keyPath: er.keyPath] else {
                         reader.invalidate(er.name)
                         invalidated = true
                         break
                     }
-                    let newElement = newCollection[er.index]
+                    var newElement: Any?
+                    switch er.selector {
+                    case .array(let i):
+                        guard let array = newContainer as? [Any], array.indices.contains(i) else {
+                            // Array shrank (or index vanished) → treat as a change.
+                            reader.invalidate(er.name)
+                            invalidated = true
+                            break
+                        }
+                        newElement = array[i]
+                    case .dictionary(let k):
+                        guard let dict = newContainer as? [AnyHashable: Any] else {
+                            reader.invalidate(er.name)
+                            invalidated = true
+                            break
+                        }
+                        newElement = dict[k]
+                    }
+                    guard let newElement else {
+                        reader.invalidate(er.name)
+                        invalidated = true
+                        break
+                    }
                     let equal = er.equal.map { $0(er.observed, newElement) } ?? false
                     if !equal {
                         reader.invalidate(er.name)

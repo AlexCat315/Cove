@@ -62,6 +62,36 @@ public final class RenderObject {
     /// rects baked into `cachedLayerList.batches` are stale.
     public var lastClipStack: [UIClip] = []
 
+    /// Memoised z-ordering of `children`. Nil means "recompute on next access"
+    /// — the order only depends on `children` membership/order and each
+    /// child's `node.zIndex`, both of which flow through `invalidateZOrder()`.
+    /// Without this, `LayerAwareNodeRenderer` re-sorts every frame for any
+    /// container that has ever held a non-zero `zIndex` (the
+    /// `childrenMayNeedZSort` flag stays true after a zIndex is set).
+    private var cachedZSortedChildren: [RenderObject]?
+
+    /// Drop the memoised z-order. Called on membership/order change
+    /// (`RenderTree.reconcileChildren` / `tearDown`) and whenever a child's
+    /// `zIndex` changes (`Node.childZIndexDidChange`).
+    func invalidateZOrder() { cachedZSortedChildren = nil }
+
+    /// Children ordered for paint/hit-test, sorted by `zIndex` (stable by
+    /// sibling order) when any child uses a non-zero zIndex. Memoised: the
+    /// sort runs once per structural or zIndex change, not every frame.
+    func renderOrderedChildren() -> [RenderObject] {
+        if let cached = cachedZSortedChildren { return cached }
+        let sorted = children.enumerated()
+            .sorted { lhs, rhs in
+                let lhsZ = lhs.element.node?.zIndex ?? 0
+                let rhsZ = rhs.element.node?.zIndex ?? 0
+                if lhsZ == rhsZ { return lhs.offset < rhs.offset }
+                return lhsZ < rhsZ
+            }
+            .map { $0.element }
+        cachedZSortedChildren = sorted
+        return sorted
+    }
+
     init(node: Node) {
         self.node = node
         self.elementID = node.id
@@ -166,6 +196,7 @@ public final class RenderTree {
             _ = key
         }
         parentObject.children = rebuilt
+        parentObject.invalidateZOrder()
         for obj in rebuilt {
             obj.refreshLayerClassification()
             // Cache invalidates whenever children list changes.
@@ -181,6 +212,7 @@ public final class RenderTree {
            let idx = parent.children.firstIndex(where: { $0 === obj }) {
             parent.children.remove(at: idx)
             parent.cacheInvalid = true
+            parent.invalidateZOrder()
         }
         tearDown(obj)
         if root === obj { root = nil }

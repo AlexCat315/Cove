@@ -129,7 +129,7 @@ public struct NodeRenderer {
         let content = node.placementStep(scrolling: node.contentOffset).followed(by: placed)
         let descendantStart = list.vertices.count
         if node.childrenMayNeedZSort {
-            for child in renderOrderedChildren(of: node) {
+            for child in node.renderOrderedChildren {
                 renderNode(child, list: list, placed: content)
             }
         } else {
@@ -155,16 +155,5 @@ public struct NodeRenderer {
     private func applyOpacity(_ color: Color, _ opacity: Float) -> Color {
         guard opacity < 1 else { return color }
         return Color(r: color.r, g: color.g, b: color.b, a: color.a * opacity)
-    }
-
-    private func renderOrderedChildren(of node: Node) -> [Node] {
-        node.children.enumerated()
-            .sorted { lhs, rhs in
-                let lhsZ = lhs.element.zIndex
-                let rhsZ = rhs.element.zIndex
-                if lhsZ == rhsZ { return lhs.offset < rhs.offset }
-                return lhsZ < rhsZ
-            }
-            .map { $0.element }
     }
 }

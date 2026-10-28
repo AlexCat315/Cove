@@ -241,7 +241,7 @@ public final class LayerAwareNodeRenderer {
         // throughout motion and at rest.
         let content = node.placementStep(scrolling: node.contentOffset).followed(by: placed)
         let childClipStack: [UIClip] = clipped ? clipStack + [UIClip(clipRect!, mask: mask)] : clipStack
-        let children = node.childrenMayNeedZSort ? renderOrderedChildren(of: obj) : obj.children
+        let children = node.childrenMayNeedZSort ? obj.renderOrderedChildren() : obj.children
         let descendantStart = list.vertices.count
         for child in children {
             // A nested layer root composites separately (cache-aware), so we
@@ -351,16 +351,5 @@ public final class LayerAwareNodeRenderer {
     private func applyOpacity(_ color: Color, _ opacity: Float) -> Color {
         guard opacity < 1 else { return color }
         return Color(r: color.r, g: color.g, b: color.b, a: color.a * opacity)
-    }
-
-    private func renderOrderedChildren(of obj: RenderObject) -> [RenderObject] {
-        obj.children.enumerated()
-            .sorted { lhs, rhs in
-                let lhsZ = lhs.element.node?.zIndex ?? 0
-                let rhsZ = rhs.element.node?.zIndex ?? 0
-                if lhsZ == rhsZ { return lhs.offset < rhs.offset }
-                return lhsZ < rhsZ
-            }
-            .map { $0.element }
     }
 }

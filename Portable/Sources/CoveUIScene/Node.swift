@@ -34,6 +34,31 @@ public final class Node: @unchecked Sendable {
     /// allocating and sorting on every input/render pass.
     internal private(set) var childrenMayNeedZSort: Bool = false
 
+    /// Memoised z-ordering of `children`; nil means "recompute on next
+    /// access". Mirrors `RenderObject.renderOrderedChildren` but for the
+    /// direct `Node` walk used by `NodeRenderer`. The order only depends on
+    /// `children` membership/order and each child's `zIndex`, all of which
+    /// flow through `invalidateZOrder()` — so the sort runs once per change,
+    /// not every frame.
+    private var cachedZSortedChildren: [Node]?
+
+    /// Children ordered for paint/hit-test, sorted by `zIndex` (stable by
+    /// sibling order) when any child uses a non-zero zIndex.
+    public var renderOrderedChildren: [Node] {
+        if let cached = cachedZSortedChildren { return cached }
+        guard childrenMayNeedZSort else { return children }
+        let sorted = children.enumerated()
+            .sorted { lhs, rhs in
+                let lhsZ = lhs.element.zIndex
+                let rhsZ = rhs.element.zIndex
+                if lhsZ == rhsZ { return lhs.offset < rhs.offset }
+                return lhsZ < rhsZ
+            }
+            .map { $0.element }
+        cachedZSortedChildren = sorted
+        return sorted
+    }
+
     /// Bumped for this node and all ancestors whenever descendant membership
     /// or sibling order changes. Primitives such as ScrollView use it to keep
     /// subtree-derived caches valid without rescanning every frame.
@@ -593,6 +618,7 @@ public final class Node: @unchecked Sendable {
         if child.zIndex != 0 {
             childrenMayNeedZSort = true
         }
+        invalidateZOrder()
         bumpSubtreeStructureVersion()
         Self.invalidateInputCache()
         AccessibilityRevision.bumpStructure()
@@ -614,6 +640,7 @@ public final class Node: @unchecked Sendable {
                 recomputeChildrenMayNeedZSort()
             }
             bumpSubtreeStructureVersion()
+            invalidateZOrder()
             Self.invalidateInputCache()
             AccessibilityRevision.bumpStructure()
             markRenderDirty(reason: .structuralChange)
@@ -647,6 +674,7 @@ public final class Node: @unchecked Sendable {
         // second one that can drift). Hit-testing reads this order live.
         children = ordered
         bumpSubtreeStructureVersion()
+        invalidateZOrder()
         AccessibilityRevision.bumpStructure()
         markRenderDirty(reason: .structuralChange)
     }
@@ -657,10 +685,20 @@ public final class Node: @unchecked Sendable {
         } else if oldValue != 0, newValue == 0 {
             recomputeChildrenMayNeedZSort()
         }
+        invalidateZOrder()
     }
 
     private func recomputeChildrenMayNeedZSort() {
         childrenMayNeedZSort = children.contains { $0.zIndex != 0 }
+    }
+
+    /// Drop the memoised z-order on this node and its render mirror. The order
+    /// only changes on the membership/order/zIndex mutations below, so the
+    /// per-frame z-sort in `LayerAwareNodeRenderer`/`NodeRenderer` re-runs once
+    /// per change rather than every frame.
+    internal func invalidateZOrder() {
+        cachedZSortedChildren = nil
+        renderObject?.invalidateZOrder()
     }
 
     private func bumpSubtreeStructureVersion() {

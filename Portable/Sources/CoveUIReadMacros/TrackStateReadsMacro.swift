@@ -131,10 +131,28 @@ private final class FieldReads: SyntaxRewriter {
             return super.visit(node)
         }
         let index = indexExpr.trimmedDescription
-        let literal = "self._\(state)[trackingElement: \\.\(p), at: \(index), name: \"\(state).\(p)[\(index)]\"]"
+        // The diagnostic label embeds the source text of the index, which may
+        // itself contain a string literal (`model.dict["a"]`). Escape it so the
+        // generated literal stays syntactically valid.
+        let label = escaped("\(state).\(p)[\(index)]")
+        let literal = "self._\(state)[trackingElement: \\.\(p), at: \(index), name: \"\(label)\"]"
         return ExprSyntax(stringLiteral: literal)
             .with(\.leadingTrivia, node.leadingTrivia)
             .with(\.trailingTrivia, node.trailingTrivia)
+    }
+
+    /// Escape a string for embedding inside a Swift `"..."` literal. Written
+    /// without Foundation so the macro plugin stays dependency-free.
+    private func escaped(_ text: String) -> String {
+        var out = ""
+        for ch in text {
+            switch ch {
+            case "\\": out += "\\\\"
+            case "\"": out += "\\\""
+            default: out.append(ch)
+            }
+        }
+        return out
     }
 
     /// Resolve a `state.field` / `state.a?.b` / `self.state.field` expression to
