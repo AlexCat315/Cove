@@ -123,8 +123,9 @@ private final class FieldReads: SyntaxRewriter {
 
     /// Resolve a `state.field` / `state.a?.b` / `self.state.field` expression to
     /// `(stateName, keyPathString)`. Returns `nil` when the expression does not
-    /// read a tracked `@State`. The key-path string preserves optional chaining
-    /// so `\state.a?.b` yields a valid optional key path.
+    /// read a tracked `@State`. Key paths must place `?` at each optional
+    /// intermediate (`\state.a?.b`), so the optional-chaining markers are
+    /// preserved explicitly.
     private func statePath(_ expression: ExprSyntax) -> (String, String)? {
         let expr: ExprSyntax
         if let oc = expression.as(OptionalChainingExprSyntax.self) { expr = oc.expression }

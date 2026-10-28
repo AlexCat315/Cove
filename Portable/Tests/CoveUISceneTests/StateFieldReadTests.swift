@@ -342,4 +342,40 @@ struct StateFieldReadTests {
         recomposer.commitAll()
         #expect(counter.count == 5)
     }
+
+    @TrackStateReads
+    struct NestedOptional: View {
+        struct Inner: Equatable { var value: Int }
+        struct Outer: Equatable { var inner: Inner? }
+        struct Model: Equatable { var outer: Outer?; var other: Int }
+        @State var model = Model(outer: Outer(inner: Inner(value: 1)), other: 0)
+        let counter: Counter
+        var body: some View {
+            let _ = counter.bump()
+            let _ = model.outer?.inner?.value
+            EmptyView()
+        }
+    }
+
+    @Test("Nested optional chains track \\.outer?.inner?.value precisely")
+    func nestedOptional() {
+        let counter = Counter(), harness = NestedOptional(counter: counter)
+        let recomposer = Recomposer(), graph = ViewGraph(tree: NodeTree(), recomposer: recomposer)
+        graph.install(root: harness)
+        defer { graph.install(root: EmptyView()) }
+        #expect(counter.count == 1)
+        harness.model.other += 1
+        #expect(!recomposer.hasPending)
+        harness.model.outer?.inner?.value = 9
+        recomposer.commitAll()
+        #expect(counter.count == 2)
+        harness.model.outer = nil
+        recomposer.commitAll()
+        #expect(counter.count == 3)
+        harness.model.outer = NestedOptional.Outer(inner: NestedOptional.Inner(value: 4))
+        recomposer.commitAll()
+        #expect(counter.count == 4)
+        harness.model.other += 1
+        #expect(!recomposer.hasPending)
+    }
 }

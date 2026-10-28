@@ -73,6 +73,10 @@ extension StateStorage {
         let name: String
         let keyPath: AnyKeyPath
         var observed: Any
+        /// Typed equality predicate for the field's dynamic type, built once and
+        /// memoized per type. `nil` means the field is a reference (or otherwise
+        /// non-comparable) and must always invalidate.
+        var equal: ((Any, Any) -> Bool)?
     }
     struct Reader {
         let invalidate: (String?) -> Void
@@ -106,7 +110,7 @@ extension StateStorage {
                 // Reuse the existing entry rather than allocating a new closure
                 // on every body re-evaluation; only the captured observed value
                 // needs refreshing.
-                reader.fields[keyPath] = FieldRead(name: name, keyPath: keyPath, observed: observed)
+                reader.fields[keyPath] = FieldRead(name: name, keyPath: keyPath, observed: observed, equal: makeEqual(observed))
                 readers[scope.id] = reader
             }
         }
@@ -131,11 +135,16 @@ extension StateStorage {
             if reader.whole { reader.invalidate(nil); continue }
             var invalidated = false
             for fr in reader.fields.values {
-                if let newField = (newValue as Any)[keyPath: fr.keyPath],
-                   !stateFieldEqual(fr.observed, newField) {
-                    reader.invalidate(fr.name)
-                    invalidated = true
-                    break
+                if let newField = (newValue as Any)[keyPath: fr.keyPath] {
+                    // `equal` is a typed predicate built once at read time, so the
+                    // hot write path does a single key-path subscript plus a direct
+                    // `==` — no reflection or existential opening per field.
+                    let equal = fr.equal.map { $0(fr.observed, newField) } ?? false
+                    if !equal {
+                        reader.invalidate(fr.name)
+                        invalidated = true
+                        break
+                    }
                 }
             }
             if invalidated { continue }
@@ -146,13 +155,6 @@ extension StateStorage {
             onChange?()
         }
     }
-}
-
-private func stateFieldEqual<T>(_ lhs: T, _ rhs: T) -> Bool {
-    guard isValueType(lhs), isValueType(rhs),
-          let equatable = lhs as? any Equatable else { return false }
-    func equal<E: Equatable>(_ value: E, _ other: Any) -> Bool { (other as? E).map { value == $0 } ?? false }
-    return equal(equatable, rhs)
 }
 
 private enum StateFieldTypes {
@@ -192,4 +194,31 @@ private func _isValueType(of value: Any) -> Bool {
         guard ["Swift.Array<", "Swift.Dictionary<", "Swift.Set<", "Swift.SIMD"].contains(where: name.hasPrefix) else { return false }
     }
     return mirror.children.allSatisfy { isValueType($0.value) }
+}
+
+/// Build a typed equality predicate for `sample`'s dynamic type. The predicate
+/// captures the concrete `Equatable` conformance so the comparison on the hot
+/// write path is a direct `==` (no existential opening, no reflection). Reference
+/// types (and anything `isValueType` rejects) yield `nil`, signalling that the
+/// field must always invalidate. Results are memoized per type.
+nonisolated(unsafe) private var comparatorCache: [ObjectIdentifier: ((Any, Any) -> Bool)?] = [:]
+private let comparatorCacheLock = NSLock()
+
+private func makeEqual(_ sample: Any) -> ((Any, Any) -> Bool)? {
+    let id = ObjectIdentifier(type(of: sample))
+    if let cached = comparatorCacheLock.withLock({ comparatorCache[id] }) { return cached }
+    let result: ((Any, Any) -> Bool)?
+    if isValueType(sample), let equatable = sample as? any Equatable {
+        func build<E: Equatable>(_ proto: E) -> (Any, Any) -> Bool {
+            { lhs, rhs in
+                guard let lhs = lhs as? E, let rhs = rhs as? E else { return false }
+                return lhs == rhs
+            }
+        }
+        result = build(equatable)
+    } else {
+        result = nil
+    }
+    comparatorCacheLock.withLock { comparatorCache[id] = result }
+    return result
 }
