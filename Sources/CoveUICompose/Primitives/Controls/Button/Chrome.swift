@@ -41,7 +41,7 @@ struct BuiltinButtonChrome: _PrimitiveView {
             isSelected: isSelected,
             metrics: metrics
         )
-        applyBuiltinButtonChrome(to: node, animated: false)
+        applyBuiltinButtonChrome(to: node)
     }
 
     func _makeLayoutNode() -> LayoutNode? {
@@ -123,23 +123,22 @@ private extension BuiltinButtonChromeKind {
     }
 }
 
-func updateBuiltinButtonChromeDescendants(of buttonNode: Node, animated: Bool) {
+func updateBuiltinButtonChromeDescendants(of buttonNode: Node) {
     for child in buttonNode.children {
-        updateBuiltinButtonChromeDescendants(child, animated: animated)
+        updateBuiltinButtonChromeDescendants(child)
     }
 }
 
-private func updateBuiltinButtonChromeDescendants(_ node: Node, animated: Bool) {
+private func updateBuiltinButtonChromeDescendants(_ node: Node) {
     if node.attachments[BuiltinButtonChrome.stateKey] is BuiltinButtonChromeState {
-        applyBuiltinButtonChrome(to: node, animated: animated)
+        applyBuiltinButtonChrome(to: node)
     }
     for child in node.children {
-        updateBuiltinButtonChromeDescendants(child, animated: animated)
+        updateBuiltinButtonChromeDescendants(child)
     }
 }
 
-private func applyBuiltinButtonChrome(to chromeNode: Node, animated: Bool) {
-    let animated = animated && !chromeNode.prefersReducedMotion
+private func applyBuiltinButtonChrome(to chromeNode: Node) {
     guard let state = chromeNode.attachments[BuiltinButtonChrome.stateKey] as? BuiltinButtonChromeState else {
         return
     }
@@ -147,27 +146,16 @@ private func applyBuiltinButtonChrome(to chromeNode: Node, animated: Bool) {
     let values = builtinButtonChromeValues(state: state,
                                            chromeNode: chromeNode,
                                            buttonNode: buttonNode)
-    let apply = {
-        chromeNode.animatableSet(\.backgroundColor, to: values.background)
-        chromeNode.animatableSet(\.borderColor, to: values.border)
-        chromeNode.animatableSet(\.borderWidth, to: values.borderWidth)
-        chromeNode.animatableSet(\.cornerRadius, to: values.radius)
-        chromeNode.animatableSet(\.opacity, to: values.opacity)
-    }
-    if animated {
-        withAnimation(.semantic(.snappy, in: chromeNode.theme), apply)
-    } else {
-        apply()
-    }
+    // Hover and press snap, the way mygo's button faces do: a control that
+    // eases its fill reads as a delayed answer to the pointer.
+    chromeNode.animatableSet(\.backgroundColor, to: values.background)
+    chromeNode.animatableSet(\.borderColor, to: values.border)
+    chromeNode.animatableSet(\.borderWidth, to: values.borderWidth)
+    chromeNode.animatableSet(\.cornerRadius, to: values.radius)
+    chromeNode.animatableSet(\.opacity, to: values.opacity)
     chromeNode.transform.anchor = CGPoint(x: 0.5, y: 0.5)
-    let transform = {
-        chromeNode.animatableSet(propertyKey: "button.pressScale", current: chromeNode.transform.scale,
-                                to: values.scale) { [weak chromeNode] in chromeNode?.transform.scale = max(0, $0) }
-    }
-    if animated {
-        withAnimation(.spring(response: chromeNode.theme.motion.fast.seconds, dampingFraction: 0.9,
-                              allowsOvershoot: true), transform)
-    } else { transform() }
+    chromeNode.animatableSet(propertyKey: "button.pressScale", current: chromeNode.transform.scale,
+                             to: values.scale) { [weak chromeNode] in chromeNode?.transform.scale = max(0, $0) }
 }
 
 private func builtinButtonChromeValues(state: BuiltinButtonChromeState,
@@ -264,12 +252,17 @@ private func builtinButtonChromeValues(state: BuiltinButtonChromeState,
         borderWidth = 0
     }
 
+    // A pointer press only changes the face; the slight compression is a touch
+    // affordance (the finger covers the control), not a desktop animation.
+    let touch = chromeNode.compositionValue(of: SurfaceEnvironment.key).input.contains(.touch)
     return BuiltinButtonChromeValues(background: background,
                                      border: border,
                                      borderWidth: borderWidth,
                                      radius: metrics.radius,
                                      opacity: state.isEnabled || theme.textEmphasis.disabled != nil ? 1 : (state.isSelected ? 0.75 : 0.55),
-                                     scale: pressed && !chromeNode.prefersReducedMotion ? (theme.motion.pressScale.isFinite ? min(chromeNode.compositionValue(of: SurfaceEnvironment.key).input.contains(.touch) ? 0.96 : 1, max(0.8, theme.motion.pressScale)) : 0.97) : 1)
+                                     scale: pressed && touch && !chromeNode.prefersReducedMotion
+                                        ? (theme.motion.pressScale.isFinite ? min(0.96, max(0.8, theme.motion.pressScale)) : 0.96)
+                                        : 1)
 }
 
 private func nearestButtonHostAncestor(of node: Node) -> Node? {

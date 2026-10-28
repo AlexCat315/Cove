@@ -76,13 +76,14 @@ struct MenuItemRowHost: _PrimitiveView {
                   let background = node.attachments["__menu_visual_fill"] as? Color else {
                 return
             }
-            let width = max(0, Float(node.frame.width) - 8)
-            let rect = UIRect(x: Float(origin.x) + 4,
-                              y: Float(origin.y) + 2,
-                              width: width,
-                              height: max(0, Float(node.frame.height) - 4))
+            // The panel insets the rows; the highlight fills the row so the
+            // accent band runs to the same 4-pt gutter on both sides.
+            let rect = UIRect(x: Float(origin.x),
+                              y: Float(origin.y),
+                              width: Float(node.frame.width),
+                              height: Float(node.frame.height))
             list.addRoundedRect(rect,
-                                radius: node.theme.radius.sm,
+                                radius: node.theme.radius.md,
                                 color: background.multipliedAlpha(node.opacity))
         }
 
@@ -148,9 +149,15 @@ struct MenuItemRowHost: _PrimitiveView {
         let theme = node.theme
         let surface = node.compositionValue(of: SurfaceEnvironment.key)
         let minimumHeight = max(node.compositionValue(of: MenuRowMetrics.minimumHeight), surface.input.contains(.touch) ? surface.minimumControlExtent : 0)
+        // A highlighted row is an accent band with light ink: the same pairing
+        // mygo's select uses, so the whole row (label, icon, shortcut) inverts
+        // together instead of keeping dark text on an accent face.
+        let highlighted = item.isEnabled && isHighlighted
         let titleColor: Color = !item.isEnabled
             ? (theme.textEmphasis.disabled ?? theme.colors.onSurfaceMuted)
+            : highlighted ? theme.colors.onAccent
             : item.role == .destructive ? theme.colors.error : theme.colors.onSurface
+        let secondaryColor: Color = highlighted ? theme.colors.onAccent : theme.colors.onSurfaceMuted
         let textOpacity: Float = 1
 
         let checkmarkSize = node.iconMetrics.size(.small)
@@ -182,7 +189,7 @@ struct MenuItemRowHost: _PrimitiveView {
                         .accessibilityHidden()
                 }
                 if let detail = item.content.detail {
-                    Text(detail, lineLimit: 2).font(.caption).foregroundColor(theme.colors.onSurfaceMuted)
+                    Text(detail, lineLimit: 2).font(.caption).foregroundColor(secondaryColor)
                 }
             }
             .flex(1, shrink: 1).frame(minWidth: 0)
@@ -192,15 +199,15 @@ struct MenuItemRowHost: _PrimitiveView {
                 Text(shortcut)
                     .lineLimit(1)
                     .font(.caption)
-                    .foregroundColor(theme.colors.onSurfaceMuted)
+                    .foregroundColor(secondaryColor)
                     .opacity(textOpacity)
                     .clipped()
             }
             if item.isLink {
-                Icon(UIIcons.Action.externalLink, size: .small, color: theme.colors.onSurfaceMuted).accessibilityHidden()
+                Icon(UIIcons.Action.externalLink, size: .small, color: secondaryColor).accessibilityHidden()
             }
         }
-        .padding(horizontal: 12, vertical: 4)
+        .padding(horizontal: 10, vertical: 6)
         .frame(minHeight: minimumHeight)
 
         return [row]
@@ -236,18 +243,13 @@ private func updateMenuItemFill(_ node: Node) {
     let hovered = node.attachments["__menu_item_hovered"] as? Bool == true
     let highlighted = node.attachments["__menu_highlighted"] as? Bool == true
     let colors = node.theme.colors
-    // A solid hover face (matching the reference), the same for the pointer
-    // and for keyboard navigation; pressed darkens it one step further.
-    let fill = !enabled ? Color.clear : pressed ? colors.surfacePressed
-        : (hovered || highlighted) ? colors.surfaceVariant : .clear
-    let previous = node.attachments["__menu_visual_fill"] as? Color
-    let apply = { [node] in
-        node.animatableSet(propertyKey: "menu.fill", current: previous ?? fill, to: fill) { [weak node] color in
-            node?.attachments["__menu_visual_fill"] = color
-            node?.markRenderDirty(reason: .styleSet(field: "menu.fill"))
-        }
-    }
-    if previous != nil { withAnimation(.semantic(.fast, in: node.theme), apply) } else { apply() }
+    // mygo's select paints the row the pointer or the arrows are on with the
+    // accent, and swaps the ink to its paired colour; it snaps rather than
+    // easing, so the band follows the highlight without a trailing fade.
+    let fill = !enabled ? Color.clear : pressed ? colors.accentPressed
+        : (hovered || highlighted) ? colors.accent : .clear
+    node.attachments["__menu_visual_fill"] = fill
+    node.markRenderDirty(reason: .styleSet(field: "menu.fill"))
 }
 
 private func setMenuItemInteraction(_ node: Node, key: String, value: Bool) {

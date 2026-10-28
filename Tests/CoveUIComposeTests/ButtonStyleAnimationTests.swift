@@ -6,8 +6,12 @@ import CoveUIRuntime
 /// Drives real `Button` instances through `InteractionRegistry` pointer
 /// events so the press transition exercises the full production path:
 /// pointer handler → node-local ButtonHost interaction state → built-in
-/// chrome node `animatableSet` writes → `AnimatorScheduler`.
-@Suite("Phase 8 / ButtonStyle implicit transitions", .serialized)
+/// chrome node writes → repaint.
+///
+/// mygo's button faces swap colour on the frame of the event, so built-in
+/// chrome writes are deliberately unanimated: a tween here reads as a lagging
+/// answer to the pointer.
+@Suite("Phase 8 / ButtonStyle press faces", .serialized)
 struct ButtonStyleAnimationTests: CoveUIComposeSerializedSuite {
 
     private func findFilled(_ root: Node) -> Node? {
@@ -39,8 +43,8 @@ struct ButtonStyleAnimationTests: CoveUIComposeSerializedSuite {
         return (tree, recomp, registry, graph)
     }
 
-    @Test("PrimaryButtonStyle animates background on real pointer-down")
-    func primaryAnimatesOnPress() { GlobalTestLock.locked {
+    @Test("PrimaryButtonStyle swaps its face on real pointer-down")
+    func primarySnapsOnPress() { GlobalTestLock.locked {
         let scheduler = AnimatorScheduler()
         AnimatorScheduler.$current.withValue(scheduler) {
             let theme = Theme.defaultDark
@@ -49,6 +53,7 @@ struct ButtonStyleAnimationTests: CoveUIComposeSerializedSuite {
 
             let (tree, recomp, registry, graph) = install(
                 Button(action: {}) { Text("Hi") }
+                    .theme(theme)
             )
             _ = graph
 
@@ -60,24 +65,17 @@ struct ButtonStyleAnimationTests: CoveUIComposeSerializedSuite {
             _ = registry.handlers(for: host).pointer!(evt, .down, .target)
             recomp.commitAll()
 
-            #expect(scheduler.activeCount >= 1)
-            #expect(findFilled(tree.root!)?.backgroundColor == resting)
+            // The face is already pressed and nothing was scheduled to tween.
+            #expect(findFilled(tree.root!)?.backgroundColor == pressed)
+            #expect(scheduler.activeCount == 0)
 
             scheduler.tick(deltaTime: 0.06)
-            let mid = findFilled(tree.root!)?.backgroundColor?.r ?? -1
-            #expect(mid >= pressed.r && mid <= resting.r)
-
-            scheduler.tick(deltaTime: 0.03)
             #expect(findFilled(tree.root!)?.backgroundColor == pressed)
-            // Bounded paint has reached its endpoint; physical scale and
-            // spring controllers retain their settling tail.
-            scheduler.tick(deltaTime: 0.5)
-            #expect(scheduler.activeCount == 0)
         }
     } }
 
-    @Test("DestructiveButtonStyle animates background on real pointer-down")
-    func destructiveAnimatesOnPress() { GlobalTestLock.locked {
+    @Test("DestructiveButtonStyle swaps its face on real pointer-down")
+    func destructiveSnapsOnPress() { GlobalTestLock.locked {
         let scheduler = AnimatorScheduler()
         AnimatorScheduler.$current.withValue(scheduler) {
             let theme = Theme.defaultDark
@@ -87,34 +85,6 @@ struct ButtonStyleAnimationTests: CoveUIComposeSerializedSuite {
             let (tree, recomp, registry, graph) = install(
                 Button(action: {}) { Text("X") }
                     .buttonStyle(DestructiveButtonStyle())
-            )
-            _ = graph
-
-            #expect(findFilled(tree.root!)?.backgroundColor == resting)
-
-            let host = findHitTestable(tree.root!)!
-            let evt = MouseButtonEvent(button: .left, x: 0, y: 0, clicks: 1)
-            _ = registry.handlers(for: host).pointer!(evt, .down, .target)
-            recomp.commitAll()
-
-            #expect(scheduler.activeCount >= 1)
-            scheduler.tick(deltaTime: 0.09)
-            #expect(findFilled(tree.root!)?.backgroundColor == pressed)
-        }
-    } }
-
-    @Test("Button press animation follows theme.motion.fast")
-    func pressAnimationUsesThemeFastDuration() { GlobalTestLock.locked {
-        let scheduler = AnimatorScheduler()
-        AnimatorScheduler.$current.withValue(scheduler) {
-            var theme = Theme.defaultDark
-            theme.motion.fast = .milliseconds(50)
-
-            let resting = theme.colors.accent
-            let pressed = theme.colors.accentPressed
-
-            let (tree, recomp, registry, graph) = install(
-                Button(action: {}) { Text("Hi") }
                     .theme(theme)
             )
             _ = graph
@@ -126,8 +96,8 @@ struct ButtonStyleAnimationTests: CoveUIComposeSerializedSuite {
             _ = registry.handlers(for: host).pointer!(evt, .down, .target)
             recomp.commitAll()
 
-            scheduler.tick(deltaTime: 0.06)
             #expect(findFilled(tree.root!)?.backgroundColor == pressed)
+            #expect(scheduler.activeCount == 0)
         }
     } }
 

@@ -59,8 +59,9 @@ struct InteractionTests: CoveUIComposeSerializedSuite {
         #expect(harness.offset == .zero && scheduler.activeCount == 0)
     } }
 
-    @Test("Button chrome scales on press while the outer activation target remains stable")
+    @Test("Pointer press snaps the button face: no tween, no scale, stable hit target")
     func buttonPress() throws { try scene { graph, scheduler, _, dispatcher in
+        // A press scale belongs to touch input; on desktop it would read as lag.
         var theme = Theme.defaultLight; theme.motion.pressScale = 0.9
         var activations = 0
         graph.install(root: Button("Press") { activations += 1 }.frame(width: 200, height: 44).theme(theme)); settle(graph)
@@ -69,13 +70,16 @@ struct InteractionTests: CoveUIComposeSerializedSuite {
             if node.attachments[BuiltinButtonChrome.stateKey] != nil { chrome = node; break }
         }
         let surface = try #require(chrome)
+        let resting = surface.backgroundColor
         let event = MouseButtonEvent(button: .left, x: 1, y: 22, clicks: 1)
         dispatcher.dispatch(.mouseButtonDown(event)); settle(graph)
-        scheduler.tick(deltaTime: 0.04); settle(graph)
-        #expect(surface.transform.scale < 1 && surface.transform.scale >= 0.89)
+        // The face changes on the same frame and nothing is left to animate.
+        #expect(surface.backgroundColor != resting)
+        #expect(surface.transform.scale == 1)
+        #expect(scheduler.activeCount == 0)
         dispatcher.dispatch(.mouseButtonUp(event)); settle(graph)
         #expect(activations == 1)
-        scheduler.tick(deltaTime: 5); settle(graph)
+        #expect(surface.backgroundColor == resting)
         #expect(surface.transform.scale == 1 && scheduler.activeCount == 0)
     } }
 

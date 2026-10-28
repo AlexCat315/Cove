@@ -95,7 +95,7 @@ public struct MenuButton<Label: View>: View {
     }
 }
 
-public extension MenuButton where Label == Text {
+public extension MenuButton where Label == AnyView {
     init(_ title: String,
          entries: [MenuEntry],
          isEnabled: Bool = true,
@@ -104,7 +104,12 @@ public extension MenuButton where Label == Text {
          tooltip: String? = nil) {
         self.init(entries: entries, isEnabled: isEnabled, width: width, placement: placement,
                   accessibilityLabel: title, tooltip: tooltip) {
-            Text(title).truncatingTail()
+            // mygo's menu button draws its label and the dropdown arrow together,
+            // so a text-only MenuButton still reads as a menu trigger.
+            AnyView(Row(alignment: .center, spacing: 6) {
+                Text(title).truncatingTail()
+                Icon(UIIcons.Navigation.dropdownChevronDown, size: .small)
+            })
         }
     }
 }

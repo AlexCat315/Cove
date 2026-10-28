@@ -299,7 +299,7 @@ struct ButtonHost: _PrimitiveView {
         let focusChange = onFocusChange
         node.attachments[TextInputAttachmentKey.focusChangeHandler] = { [weak node] (focused: Bool) in
             guard let node else { return }
-            updateBuiltinButtonChromeDescendants(of: node, animated: true)
+            updateBuiltinButtonChromeDescendants(of: node)
             node.firstResource(TooltipSession.self)?.setFocused(
                 focused && FocusChainHolder.current?.isFocusVisible == true && ButtonHost.tooltipAddsText(to: node))
             if requiresInteractionRecompose { focusChange(focused) }
@@ -349,7 +349,7 @@ struct ButtonHost: _PrimitiveView {
                 PointerCaptureHolder.current?.release()
             }
         }
-        updateBuiltinButtonChromeDescendants(of: node, animated: false)
+        updateBuiltinButtonChromeDescendants(of: node)
 
         guard isEnabled, let registry = InteractionRegistryHolder.current else {
             InteractionRegistryHolder.current?.remove(node)
@@ -545,5 +545,5 @@ private func setButtonInteraction(_ node: Node,
     }
     node.attachments[key] = value
     node.markRenderDirty(reason: .styleSet(field: key))
-    updateBuiltinButtonChromeDescendants(of: node, animated: true)
+    updateBuiltinButtonChromeDescendants(of: node)
 }

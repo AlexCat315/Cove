@@ -136,13 +136,17 @@ struct MenuLevel: View {
                 // the bar while the pointer is over them.
                 ScrollView(.vertical, consumePolicy: .always, scrollbarGutter: .overlay,
                     scrollOffset: Binding(get: { session.scrollOffset }, set: { if session.scrollOffset != $0 { session.scrollOffset = $0 } })) {
+                    // mygo insets the panel by 4 and lets each row's accent band
+                    // fill the rest, so highlights keep an even gutter on all sides.
                     Box(direction: .column, alignItems: .stretch, spacing: 1) { rows() }
+                        .padding(4)
                 }
                 .modifier(MenuWindowBounds(maxVisibleRows: configuration.maxVisibleRows))
                 .modifier(MenuScrollMarker())
             }
-            // Every panel that floats over content gets the same material: a solid
-            // body, a crisp edge and the chrome's shadow under it.
+            // The dropdown shares the chrome's shadow, but its corners match the
+            // reference's 8pt popup radius rather than the wider 10pt panel tier,
+            // so it reads as a tight menu, not a floating window.
             .floatingSurface(.groupRadius, elevation: .panel)
             .frame(width: configuration.width)
         }
@@ -155,9 +159,9 @@ struct MenuLevel: View {
                 switch entry {
                 case .label(_, let title):
                     return AnyView(Text(title).font(.caption).foregroundColor(.onSurfaceMuted)
-                        .padding(horizontal: 16, vertical: 5).id(entry.id))
+                        .padding(horizontal: 8, vertical: 5).id(entry.id))
                 default: return AnyView(Box(direction: .column, alignItems: .stretch) { Divider() }
-                    .padding(horizontal: 8, vertical: 3).id(entry.id))
+                    .padding(horizontal: 4, vertical: 3).id(entry.id))
                 }
             }
             let submenu: AnyView?
@@ -192,14 +196,17 @@ struct MenuLevel: View {
     }
     private func hovered(_ entry: MenuEntry, node: Node, inside: Bool) {
         guard inside else { session.hoverIntent.cancel(id: entry.id); return }
-        // Crossing a sibling on the way into the open submenu waits longer, so
-        // a diagonal path does not swap the branch out from under the pointer.
+        // The accent band and its light ink follow the pointer at once, the way
+        // mygo's select moves its highlight; only a branch waits for the
+        // crossing delay, so a diagonal path cannot swap it out under the pointer.
+        if session.navigation.highlighted != entry.id {
+            session.navigation.highlighted = entry.id
+            FocusChainHolder.current?.focus(node, visible: false)
+        }
         let opened = session.navigation.opened
         let crossing = opened != nil && opened != entry.id && session.pointer.isHeadingToSubmenu
         session.hoverIntent.schedule(id: entry.id, delay: crossing ? 0.45 : 0.18) { [weak node] in
             guard let node, node.acceptsSubtreeInput else { return }
-            session.navigation.highlighted = entry.id
-            FocusChainHolder.current?.focus(node, visible: false)
             let next = entry.row?.hasSubmenu == true ? entry.id : nil
             if next != session.navigation.opened { session.pointer.submenuFrame = nil }
             session.navigation.opened = next

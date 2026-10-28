@@ -65,8 +65,9 @@ public enum DefaultDarkTheme {
             low:    SurfaceShadow(color: Color(red: 0, green: 0, blue: 0, alpha: 0x4D), offsetX: 0, offsetY: 1, blur: 2),
             // Cards: a hairline key shadow.
             medium: SurfaceShadow(color: Color(red: 0, green: 0, blue: 0, alpha: 0x33), offsetX: 0, offsetY: 1, blur: 3),
-            // Popups, menus, tooltips: a soft 20px lift.
-            high:   SurfaceShadow(color: Color(red: 0, green: 0, blue: 0, alpha: 0x72), offsetX: 0, offsetY: 6, blur: 20),
+            // Popups, menus, tooltips: a tight, hard 20px lift matching the
+            // reference's single 18% panel shadow rather than a soft halo.
+            high:   SurfaceShadow(color: Color(red: 0, green: 0, blue: 0, alpha: 0x2E), offsetX: 0, offsetY: 6, blur: 20),
             // Modals: a wide, faint ambient halo over a tighter directional key.
             floating: LayeredShadow(
                 ambient: SurfaceShadow(color: Color(red: 0, green: 0, blue: 0, alpha: 0x66),

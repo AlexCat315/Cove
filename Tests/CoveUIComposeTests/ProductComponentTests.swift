@@ -190,6 +190,7 @@ struct ProductComponentTests: CoveUIComposeSerializedSuite {
     @Test("Notification clocks and tooltip portals leave with their owning subtree")
     func transientResourceLifecycle() {
         withScene { graph, registry, _, _, portal in
+            TooltipArbitration.reset()
             let center = ToastController()
             center.post(ToastNotification("Saved") { $0.duration = 2 })
             graph.install(root: LayerRoot { NotificationHost(center) })
@@ -202,6 +203,7 @@ struct ProductComponentTests: CoveUIComposeSerializedSuite {
             graph.computeLayout(width: 800, height: 600)
             let host = nodes(graph.tree.root!).first { $0.attachments["tooltip.host"] as? Bool == true }!
             registry.handlers(for: host).hover?(.enter)
+            #expect(portal.entries.isEmpty)
             AnimatorScheduler.current.tick(deltaTime: 0.1)
             #expect(portal.entries.isEmpty)
             AnimatorScheduler.current.tick(deltaTime: 0.11)

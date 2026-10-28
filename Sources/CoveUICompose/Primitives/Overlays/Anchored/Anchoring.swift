@@ -50,7 +50,7 @@ struct AnchoredOverlayHost<Content: View>: _PrimitiveView {
           if surface == .bubble { PopoverSurfaceHost(anchor: anchor, placement: placement) { content } }
           else {
             Box(direction: .column, alignItems: .stretch, spacing: 0) { content }
-              .padding(EdgeInsets(top: 2))
+              .padding(EdgeInsets(top: 4))
           }
         }
       }), placement: .fixed,

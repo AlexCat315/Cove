@@ -2,7 +2,8 @@ import Foundation
 import CoveUIRuntime
 
 public struct TooltipOptions {
-    public var delay: Double = 0.45
+    /// mygo's rest time before a tip appears; moving along a toolbar skips it.
+    public var delay: Double = 0.6
     public var maxWidth: Float = 320
     public var gap: Float = 6
     public var isEnabled = true
@@ -12,7 +13,7 @@ public struct TooltipOptions {
     public var onlyWhenTruncated = false
     public init() {}
     mutating func validate() {
-        delay = delay.isFinite ? max(0, delay) : 0.45
+        delay = delay.isFinite ? max(0, delay) : 0.6
         maxWidth = maxWidth.isFinite ? max(80, maxWidth) : 320
         gap = gap.isFinite ? max(0, gap) : 6
     }
@@ -151,6 +152,93 @@ private struct TooltipHost<Target: View>: _PrimitiveView {
     var _children: [any View] { [target] }
 }
 
+/// Window-wide tooltip rules, matching mygo's engine: one tip at a time, the
+/// innermost target wins, and a tip that follows another within the warm
+/// window skips the rest delay so the pointer can travel along a toolbar.
+///
+/// Main-thread-only ambient, like the portal store: tooltips are presented
+/// and dismissed on the UI thread.
+enum TooltipArbitration {
+    private final class WeakSession {
+        weak var session: TooltipSession?
+        init(_ session: TooltipSession) { self.session = session }
+    }
+
+    /// A tip that appeared this soon before the next target shows at once.
+    static let warmWindow: TimeInterval = 0.4
+    nonisolated(unsafe) private static var sessions: [WeakSession] = []
+    nonisolated(unsafe) private static var lastShown: TimeInterval = -.greatestFiniteMagnitude
+    nonisolated(unsafe) private static var isNotifying = false
+
+    static func register(_ session: TooltipSession) {
+        prune()
+        if !sessions.contains(where: { $0.session === session }) {
+            sessions.append(WeakSession(session))
+        }
+    }
+
+    static func unregister(_ session: TooltipSession) {
+        sessions.removeAll { $0.session == nil || $0.session === session }
+    }
+
+    /// A tip went up within the warm window, so the next one needs no rest.
+    static func isWarm() -> Bool {
+        prune()
+        return Date.timeIntervalSinceReferenceDate - lastShown <= warmWindow
+    }
+
+    static func noteShown() { lastShown = Date.timeIntervalSinceReferenceDate }
+
+    /// An enabled target inside this session's element is waiting for its own
+    /// tip, so this one must stay quiet: over nested targets the inner wins.
+    static func hasInnerActive(than session: TooltipSession) -> Bool {
+        prune()
+        guard let node = session.anchorNode else { return false }
+        return sessions.contains { entry in
+            guard let other = entry.session, other !== session, other.isActive,
+                  let otherNode = other.anchorNode else { return false }
+            return isDescendant(otherNode, of: node)
+        }
+    }
+
+    /// A new tip takes the screen from any other that is still up.
+    static func hideOthers(besides session: TooltipSession) {
+        for entry in sessions {
+            guard let other = entry.session, other !== session, other.isPresented else { continue }
+            other.hide()
+        }
+    }
+
+    /// After a tip goes, a target that is still hovered may now own the screen.
+    static func reconsider(besides session: TooltipSession) {
+        guard !isNotifying else { return }
+        isNotifying = true
+        defer { isNotifying = false }
+        for entry in sessions where entry.session !== session {
+            entry.session?.reconsider()
+        }
+    }
+
+    static func reset() {
+        sessions.removeAll()
+        lastShown = -.greatestFiniteMagnitude
+        isNotifying = false
+    }
+
+    private static func prune() {
+        sessions.removeAll { $0.session == nil }
+    }
+
+    private static func isDescendant(_ node: Node, of ancestor: Node) -> Bool {
+        var parent = node.parent
+        while let candidate = parent {
+            if candidate === ancestor { return true }
+            parent = candidate.parent
+        }
+        return false
+    }
+}
+
 final class TooltipSession: NodeResource, AnyAnimationController {
     private weak var node: Node?
     private var content: AnyView?
@@ -158,6 +246,9 @@ final class TooltipSession: NodeResource, AnyAnimationController {
     private var hovered = false
     private var focused = false
     private var elapsed: Double = 0
+    /// When the pointer arrived: a target that waited behind a nested one
+    /// still measures its rest from here, so it opens as soon as it wins.
+    private var hoverSince: TimeInterval = 0
     private var presented = false
     private var dismissedUntilLeave = false
     /// Re-evaluated before the tip appears, not just when the pointer enters:
@@ -167,25 +258,58 @@ final class TooltipSession: NodeResource, AnyAnimationController {
     var isFinished = true
     /// Whether a tip is on screen; exposed for tooltip regression tests.
     var isPresented: Bool { presented }
-    func mount(node: Node) { self.node = node }
-    func unmount(node: Node) { hide(); self.node = nil }
+    /// Target node; other tips arbitrate against its place in the tree.
+    var anchorNode: Node? { node }
+    /// Hovered (or keyboard-focused) with something worth showing.
+    var isActive: Bool {
+        options.isEnabled && (hovered || focused)
+            && (!options.onlyWhenTruncated || showsTruncatedText) && canShow()
+    }
+    func mount(node: Node) {
+        self.node = node
+        TooltipArbitration.register(self)
+    }
+    func unmount(node: Node) {
+        hide()
+        TooltipArbitration.unregister(self)
+        self.node = nil
+    }
     func configure(content: AnyView, options: TooltipOptions, focused: Bool,
                    canShow: @escaping () -> Bool = { true }) {
         self.content = content; self.options = options; self.focused = focused
         self.canShow = canShow
         refresh()
     }
-    func setHovered(_ hovered: Bool) { self.hovered = hovered; refresh() }
+    func setHovered(_ hovered: Bool) {
+        if hovered, !self.hovered { hoverSince = Date.timeIntervalSinceReferenceDate }
+        self.hovered = hovered
+        refresh()
+    }
     func setFocused(_ focused: Bool) { self.focused = focused; refresh() }
     private func refresh() {
         let showsText = !options.onlyWhenTruncated || showsTruncatedText
         guard options.isEnabled && (hovered || focused) && showsText, canShow() else { dismissedUntilLeave = false; hide(); return }
         guard !dismissedUntilLeave else { return }
+        // Over elements inside one another only the inner tip shows.
+        guard !TooltipArbitration.hasInnerActive(than: self) else { hide(); return }
         if presented { show(); return }
         guard isFinished else { return }
-        elapsed = 0
-        if options.delay == 0 { show() }
-        else { isFinished = false; AnimatorScheduler.current.register(self) }
+        elapsed = hovered ? max(0, Date.timeIntervalSinceReferenceDate - hoverSince) : 0
+        // Focus shows at once; a tip that follows another in the warm window
+        // does too, so a run along a toolbar does not wait again.
+        if options.delay == 0 || focused || TooltipArbitration.isWarm() || elapsed >= options.delay {
+            show()
+        } else {
+            isFinished = false
+            AnimatorScheduler.current.register(self)
+        }
+    }
+
+    /// A tip that went may let a still-hovered target show without moving the
+    /// pointer onto it again (the inner tip of nested targets just closed).
+    func reconsider() {
+        guard !presented else { return }
+        refresh()
     }
 
     /// A truncated label marks its node while drawing. Text that fits keeps
@@ -204,14 +328,31 @@ final class TooltipSession: NodeResource, AnyAnimationController {
     }
     private func show() {
         guard let node, node.acceptsSubtreeInput, let content, canShow() else { return }
+        guard !TooltipArbitration.hasInnerActive(than: self) else { return }
         presented = true
+        // One tip at a time: anything already on screen gives way to this one.
+        TooltipArbitration.hideOthers(besides: self)
+        TooltipArbitration.noteShown()
+        let anchor = node.absoluteFrame
+        let gap = CGFloat(options.gap)
+        let window = portalWindowBounds(node)
         node.firstResource(PortalResource.self)?.present(in: node.compositionValue(of: PortalStoreEnvironment.key) ?? PortalStoreHolder.current,
-            position: position(node), width: nil,
-            content: AnyView(content.frame(maxWidth: options.maxWidth).theme(node.theme).allowsHitTesting(false)))
+            position: Self.restingSpot(size: .zero, anchor: anchor, gap: gap, window: window), width: nil,
+            content: AnyView(content.frame(maxWidth: options.maxWidth).theme(node.theme).allowsHitTesting(false)),
+            placement: .fixed,
+            positionForSize: { size in Self.restingSpot(size: size, anchor: anchor, gap: gap, window: window) })
         node.firstResource(PortalResource.self)?.setDismissal(anchor: { [weak node] in node?.absoluteFrame ?? .zero }, dismiss: { [weak self] in self?.dismiss() })
     }
+    /// Centered above the anchor, like mygo. The chip's own size decides where
+    /// it rests, and it only drops below when the top of the window would clip.
+    private static func restingSpot(size: CGSize, anchor: CGRect, gap: CGFloat, window: CGRect) -> CGPoint {
+        let above = anchor.minY - gap - size.height
+        let below = anchor.maxY + gap
+        let y = above >= window.minY ? above : (below + size.height <= window.maxY ? below : above)
+        return CGPoint(x: anchor.midX - size.width / 2, y: y)
+    }
     private func position(_ node: Node) -> CGPoint {
-        CGPoint(x: node.absoluteFrame.minX, y: node.absoluteFrame.maxY + CGFloat(options.gap))
+        Self.restingSpot(size: .zero, anchor: node.absoluteFrame, gap: CGFloat(options.gap), window: portalWindowBounds(node))
     }
     func updatePosition() {
         if let node, !node.acceptsSubtreeInput { dismiss(); return }
@@ -222,8 +363,12 @@ final class TooltipSession: NodeResource, AnyAnimationController {
     @discardableResult
     func dismiss() -> Bool { let wasPresented = presented; dismissedUntilLeave = true; hide(); return wasPresented }
     func hide() {
+        let wasPresented = presented
         isFinished = true; presented = false
         if let node { node.firstResource(PortalResource.self)?.unmount(node: node) }
+        // A target the tip was covering (a nested one that just closed) may now
+        // own the screen without the pointer moving onto it again.
+        if wasPresented { TooltipArbitration.reconsider(besides: self) }
     }
     func cancel() { hide() }
     func finishImmediately() { hide() }

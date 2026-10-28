@@ -141,6 +141,7 @@ struct ButtonIconTests: CoveUIComposeSerializedSuite {
     @Test("Button tooltips share delayed portals and leave with disabled or removed controls")
     @MainActor
     func tooltipPortalLifecycle() throws { try GlobalTestLock.locked {
+        TooltipArbitration.reset()
         let context = PlatformInputContext(), portal = PortalStore(), scheduler = AnimatorScheduler()
         context.addScopedAmbient(PortalStoreAmbient(portal))
         let prior = TextEnvironmentHolder.current; TextEnvironmentHolder.current = TestTextEnvironmentFactory.make()
@@ -154,7 +155,8 @@ struct ButtonIconTests: CoveUIComposeSerializedSuite {
             let host = try #require(findButtonHost(graph.tree.root!))
             #expect(host.accessibility?.help == "Pin")
             context.interactions.handlers(for: host).hover?(.enter)
-            scheduler.tick(deltaTime: 0.44); #expect(portal.entries.isEmpty)
+            // The tip rests for 600 ms, as mygo's engine does.
+            scheduler.tick(deltaTime: 0.59); #expect(portal.entries.isEmpty)
             scheduler.tick(deltaTime: 0.02); #expect(portal.entries.count == 1)
             graph.recomposer.commitAll(); graph.computeLayout(width: 320, height: 180)
             graph.install(root: content(enabled: false))
@@ -162,7 +164,7 @@ struct ButtonIconTests: CoveUIComposeSerializedSuite {
             scheduler.tick(deltaTime: 1); #expect(portal.entries.isEmpty)
             graph.install(root: content(enabled: true)); graph.computeLayout(width: 320, height: 180)
             let next = try #require(findButtonHost(graph.tree.root!))
-            context.interactions.handlers(for: next).hover?(.enter); scheduler.tick(deltaTime: 0.46)
+            context.interactions.handlers(for: next).hover?(.enter); scheduler.tick(deltaTime: 0.61)
             #expect(portal.entries.count == 1)
             graph.install(root: EmptyView()); #expect(portal.entries.isEmpty)
         } }
@@ -171,6 +173,7 @@ struct ButtonIconTests: CoveUIComposeSerializedSuite {
     @Test("A text button has no repeated title tooltip; an explicit explanation still opens")
     @MainActor
     func textButtonTooltipIsExplicit() throws { try GlobalTestLock.locked {
+        TooltipArbitration.reset()
         let context = PlatformInputContext(), portal = PortalStore(), scheduler = AnimatorScheduler()
         context.addScopedAmbient(PortalStoreAmbient(portal))
         let prior = TextEnvironmentHolder.current; TextEnvironmentHolder.current = TestTextEnvironmentFactory.make()
@@ -186,7 +189,7 @@ struct ButtonIconTests: CoveUIComposeSerializedSuite {
             graph.install(root: LayerRoot { Button("Cancel", tooltip: "Keep the current document") {} })
             graph.computeLayout(width: 320, height: 180)
             let explicit = try #require(findButtonHost(graph.tree.root!))
-            context.interactions.handlers(for: explicit).hover?(.enter); scheduler.tick(deltaTime: 0.5)
+            context.interactions.handlers(for: explicit).hover?(.enter); scheduler.tick(deltaTime: 0.61)
             #expect(portal.entries.count == 1 && explicit.accessibility?.help == "Keep the current document")
             // A tooltip that only repeats the visible title adds nothing, so it never opens.
             graph.install(root: EmptyView())
@@ -202,6 +205,7 @@ struct ButtonIconTests: CoveUIComposeSerializedSuite {
           arguments: [UIEnvironment.Input.touch, [.pointer, .keyboard], [.touch, .pointer, .keyboard]])
     @MainActor
     func tooltipKeyboardAndPlacement(input: UIEnvironment.Input) throws { try GlobalTestLock.locked {
+        TooltipArbitration.reset()
         let context = PlatformInputContext(), portal = PortalStore(), scheduler = AnimatorScheduler()
         context.addScopedAmbient(PortalStoreAmbient(portal))
         let prior = TextEnvironmentHolder.current; TextEnvironmentHolder.current = TestTextEnvironmentFactory.make()
@@ -216,12 +220,12 @@ struct ButtonIconTests: CoveUIComposeSerializedSuite {
             }.surfaceEnvironment(surface)); graph.computeLayout(width: 320, height: 180)
             let host = try #require(findButtonHost(graph.tree.root!))
             context.interactions.handlers(for: host).hover?(.enter)
-            scheduler.tick(deltaTime: 0.46)
+            scheduler.tick(deltaTime: 0.61)
             #expect(portal.entries.count == (input.contains(.pointer) ? 1 : 0))
             context.interactions.handlers(for: host).hover?(.leave)
             context.focusChain.focus(host, visible: true)
             for _ in 0..<4 { graph.recomposer.commitAll(); graph.computeLayout(width: 320, height: 180) }
-            scheduler.tick(deltaTime: 0.46)
+            scheduler.tick(deltaTime: 0.61)
             #expect(portal.entries.count == 1)
             graph.recomposer.commitAll(); graph.computeLayout(width: 320, height: 180)
             graph.recomposer.commitAll(); graph.computeLayout(width: 320, height: 180)
@@ -237,7 +241,7 @@ struct ButtonIconTests: CoveUIComposeSerializedSuite {
             #expect(handler(KeyEvent(scancode: Scancode.escape, keycode: 0, modifiers: [], isRepeat: false), .target) == .handled)
             #expect(portal.entries.isEmpty && context.focusChain.focused === host && activations == 0)
             scheduler.tick(deltaTime: 1); #expect(portal.entries.isEmpty)
-            context.focusChain.clear(); context.focusChain.focus(host, visible: true); scheduler.tick(deltaTime: 0.46)
+            context.focusChain.clear(); context.focusChain.focus(host, visible: true); scheduler.tick(deltaTime: 0.61)
             #expect(portal.entries.count == 1)
             _ = handler(KeyEvent(scancode: Scancode.return, keycode: 0, modifiers: [], isRepeat: false), .target)
             #expect(activations == 1 && portal.entries.isEmpty)
