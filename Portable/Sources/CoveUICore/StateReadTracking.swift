@@ -78,10 +78,20 @@ extension StateStorage {
         /// non-comparable) and must always invalidate.
         var equal: ((Any, Any) -> Bool)?
     }
+    /// A single element of an array-valued field. A write that changes only other
+    /// indices — or other fields — does not invalidate the dependent scope.
+    struct ElementRead {
+        let name: String
+        let keyPath: AnyKeyPath
+        let index: Int
+        var observed: Any
+        var equal: ((Any, Any) -> Bool)?
+    }
     struct Reader {
         let invalidate: (String?) -> Void
         var whole = false
         var fields: [AnyKeyPath: FieldRead] = [:]
+        var elements: [ElementRead] = []
     }
 
     private var readScope: StateReadTracking.Scope? {
@@ -121,6 +131,26 @@ extension StateStorage {
         read(keyPath, name: name)
     }
 
+    /// Track a single element of an array-valued field. The returned value is the
+    /// element itself (so `state.items[i]` keeps its concrete type), and the
+    /// dependent scope is invalidated only when `items[index]` actually changes.
+    func readElement<Element>(_ keyPath: WritableKeyPath<Value, [Element]>, at index: Int, name: String) -> Element {
+        let collection = value[keyPath: keyPath]
+        let observed: Any = collection.indices.contains(index) ? collection[index] : NSNull()
+        if let scope = readScope {
+            register(scope)
+            readersLock.withLock {
+                var reader = readers[scope.id] ?? Reader(invalidate: scope.invalidate)
+                reader.elements.append(ElementRead(name: name, keyPath: keyPath as AnyKeyPath,
+                                                  index: index, observed: observed, equal: makeEqual(observed)))
+                readers[scope.id] = reader
+            }
+        }
+        // Mirror the original `state.items[i]` semantics: out-of-range reads trap,
+        // exactly as an untracked subscript would.
+        return collection[index]
+    }
+
     private func register(_ scope: StateReadTracking.Scope) {
         StateReadTracking.register(owner: ObjectIdentifier(self), scope: scope.id) { [weak self] id in
             guard let self else { return }
@@ -142,6 +172,24 @@ extension StateStorage {
                     let equal = fr.equal.map { $0(fr.observed, newField) } ?? false
                     if !equal {
                         reader.invalidate(fr.name)
+                        invalidated = true
+                        break
+                    }
+                }
+            }
+            if !invalidated {
+                for er in reader.elements {
+                    guard let newCollection = (newValue as Any)[keyPath: er.keyPath] as? [Any],
+                          newCollection.indices.contains(er.index) else {
+                        // Array shrank (or element vanished) → treat as a change.
+                        reader.invalidate(er.name)
+                        invalidated = true
+                        break
+                    }
+                    let newElement = newCollection[er.index]
+                    let equal = er.equal.map { $0(er.observed, newElement) } ?? false
+                    if !equal {
+                        reader.invalidate(er.name)
                         invalidated = true
                         break
                     }

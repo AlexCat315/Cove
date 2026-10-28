@@ -121,6 +121,22 @@ private final class FieldReads: SyntaxRewriter {
         return super.visit(node)
     }
 
+    /// `state.field[i]` (or `state.field?[i]`) is rewritten to an element-level
+    /// tracking read. This must run before the inner member access is visited so
+    /// the base (`state.field`) is not itself rewritten to a whole-array read.
+    override func visit(_ node: SubscriptExprSyntax) -> ExprSyntax {
+        let base = node.calledExpression
+        guard let (state, p) = statePath(base), !p.isEmpty,
+              let indexExpr = node.arguments.first?.expression else {
+            return super.visit(node)
+        }
+        let index = indexExpr.trimmedDescription
+        let literal = "self._\(state)[trackingElement: \\.\(p), at: \(index), name: \"\(state).\(p)[\(index)]\"]"
+        return ExprSyntax(stringLiteral: literal)
+            .with(\.leadingTrivia, node.leadingTrivia)
+            .with(\.trailingTrivia, node.trailingTrivia)
+    }
+
     /// Resolve a `state.field` / `state.a?.b` / `self.state.field` expression to
     /// `(stateName, keyPathString)`. Returns `nil` when the expression does not
     /// read a tracked `@State`. Key paths must place `?` at each optional

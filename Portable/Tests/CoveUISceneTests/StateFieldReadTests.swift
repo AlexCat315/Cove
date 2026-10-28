@@ -378,4 +378,35 @@ struct StateFieldReadTests {
         harness.model.other += 1
         #expect(!recomposer.hasPending)
     }
+
+    @TrackStateReads
+    struct SubscriptItems: View {
+        struct Model: Equatable { var items: [Int]; var other: Int }
+        @State var model = Model(items: [1, 2, 3], other: 0)
+        let counter: Counter
+        var body: some View {
+            let _ = counter.bump()
+            let _ = model.items[0]
+            EmptyView()
+        }
+    }
+
+    @Test("Subscript element tracking invalidates only the read index")
+    func subscriptElement() {
+        let counter = Counter(), harness = SubscriptItems(counter: counter)
+        let recomposer = Recomposer(), graph = ViewGraph(tree: NodeTree(), recomposer: recomposer)
+        graph.install(root: harness)
+        defer { graph.install(root: EmptyView()) }
+        #expect(counter.count == 1)
+        harness.model.items[1] = 99
+        #expect(!recomposer.hasPending)
+        harness.model.other += 1
+        #expect(!recomposer.hasPending)
+        harness.model.items[0] = 42
+        recomposer.commitAll()
+        #expect(counter.count == 2)
+        harness.model.items = [9, 9, 9]
+        recomposer.commitAll()
+        #expect(counter.count == 3)
+    }
 }
