@@ -12,13 +12,18 @@ import AppKit
 /// Updates native accessibility after layout; registrations leave with the root node.
 @MainActor
 public enum NativeAccessibility {
-    public static func synchronize(host: SDL3PlatformHost, session: PlatformWindowSession, root: Node) {
+    /// `timeline` is the frame recorder the host reads. It is passed in rather
+    /// than taken from `session.tree` because the host's composed tree and the
+    /// session's tree are not the same object, and only the composed one feeds
+    /// the trace DevTools consumes.
+    public static func synchronize(host: SDL3PlatformHost, session: PlatformWindowSession, root: Node,
+                                   timeline: PerformanceTimeline) {
 #if os(macOS)
         guard case .appKit(let pointer) = host.nativeWindowReference(for: session.id),
               let view = Unmanaged<NSWindow>.fromOpaque(pointer).takeUnretainedValue().contentView else { return }
         let bridge: MacAccessibilityBridge
         if let existing = root.firstResource(MacAccessibilityBridge.self) { bridge = existing }
-        else { bridge = MacAccessibilityBridge(view: view); root.addResource(bridge) }
+        else { bridge = MacAccessibilityBridge(view: view, timeline: timeline); root.addResource(bridge) }
         bridge.update(root: root, focus: session.focusChain) { [weak session] action in
             guard let session else { return }
             session.withCurrent { action(); session.recomposer.commitAll() }
@@ -54,7 +59,17 @@ final class MacAccessibilityBridge: NodeResource {
     private var lastGeometryUpdate: Double = 0
     private static let geometryInterval: Double = 1.0 / 30.0
 
-    init(view: NSView) { self.view = view; originalChildren = view.accessibilityChildren(); originalIsElement = view.isAccessibilityElement() }
+    /// Recorder the update spans are written to. Supplied by the host; bridges
+    /// built outside one (tests) get an instance that is never enabled, so the
+    /// instrumentation costs a single disabled-check per span.
+    private let timeline: PerformanceTimeline
+
+    init(view: NSView, timeline: PerformanceTimeline = PerformanceTimeline()) {
+        self.view = view
+        self.timeline = timeline
+        originalChildren = view.accessibilityChildren()
+        originalIsElement = view.isAccessibilityElement()
+    }
     nonisolated func mount(node: Node) {}
     nonisolated func unmount(node: Node) {
         MainActor.assumeIsolated {
@@ -96,7 +111,16 @@ final class MacAccessibilityBridge: NodeResource {
         lastSignature = signature
         lastGeometryUpdate = now
 
+        // Two instrumented halves with different cost curves: the snapshot is
+        // O(nodes) over the whole tree, the commit is O(elements) of AppKit
+        // property writes plus one NSAccessibility post. They also fail
+        // differently — a deep tree shows up here, a chatty semantic set shows
+        // up there — so the frame's bill has to say which one it paid.
+        let snapshotTrace = timeline.begin()
         let snapshot = roots.flatMap { AccessibilityTree.snapshot(root: $0, viewport: root.absoluteFrame, resolveValues: false) }
+        timeline.end(snapshotTrace, phase: "frame", name: "Accessibility snapshot")
+
+        let commitTrace = timeline.begin()
         var next: [ElementID: MacSceneAccessibilityElement] = [:]
         updatedElementCount = 0
         func materialize(_ item: AccessibilityElement, parent: Any) -> MacSceneAccessibilityElement {
@@ -120,6 +144,7 @@ final class MacAccessibilityBridge: NodeResource {
         for (id, element) in elements where next[id] == nil { element.invalidate() }
         elements = next; rootIDs = snapshot.map(\.id)
         if changed { NSAccessibility.post(element: view, notification: .layoutChanged) }
+        timeline.end(commitTrace, phase: "frame", name: "Accessibility bridge commit")
     }
 
 }

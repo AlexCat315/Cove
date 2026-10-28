@@ -173,7 +173,8 @@ final class AuxiliaryAppWindow {
             configureTextEnvironment(session.contentScaleFactor)
             _ = graph.computeLayoutIfNeeded(width: Float(logicalW), height: Float(logicalH))
             syncWindowChromeHitTest()
-            NativeAccessibility.synchronize(host: host, session: session, root: root)
+            NativeAccessibility.synchronize(host: host, session: session, root: root,
+                                            timeline: session.tree.timeline)
             drawList.reset()
             drawList.pixelScale = Float(session.contentScaleFactor)
             if useLegacyRenderer {

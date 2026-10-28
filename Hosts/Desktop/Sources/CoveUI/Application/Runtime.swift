@@ -581,7 +581,8 @@ public final class Application {
 
         if let session = host.mainSession {
             let accessibilityTrace = composition.tree.timeline.begin()
-            NativeAccessibility.synchronize(host: host, session: session, root: root)
+            NativeAccessibility.synchronize(host: host, session: session, root: root,
+                                            timeline: composition.tree.timeline)
             composition.tree.timeline.end(accessibilityTrace, phase: "frame", name: "Accessibility sync")
         }
         let layoutEnd = TimingTrace.now()
