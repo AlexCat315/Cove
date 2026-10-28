@@ -2,7 +2,7 @@
 ._*
 .build/
 .swiftpm/
-.cove/
+!.cove/sdk.json
 .cache/
 node_modules/
 vendor/

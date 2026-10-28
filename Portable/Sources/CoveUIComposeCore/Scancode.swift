@@ -28,6 +28,10 @@ public enum Scancode {
     public static let digit3: UInt32 = 32
     public static let digit4: UInt32 = 33
     public static let digit5: UInt32 = 34
+    public static let digit6: UInt32 = 35
+    public static let digit7: UInt32 = 36
+    public static let digit8: UInt32 = 37
+    public static let digit9: UInt32 = 38
     public static let comma: UInt32 = 54
     public static let period: UInt32 = 55
     public static let leftBracket: UInt32 = 47

@@ -1,5 +1,9 @@
 import CoveUICore
+import Foundation
 import CovePlatformCore
+#if canImport(CoreGraphics)
+import CoreGraphics
+#endif
 
 // MARK: - Per-window ambients
 //
@@ -29,6 +33,19 @@ public enum ClipboardHolder {
     private static let writer = AmbientSlot<((String) -> Void)?>(nil)
     public static var read: (() -> String?)? { get { reader.current } set { reader.current = newValue } }
     public static var write: ((String) -> Void)? { get { writer.current } set { writer.current = newValue } }
+}
+
+/// Holds the native menu presenter, injected by the platform shell. When set,
+/// context menus and menu buttons build a system menu (NSMenu / Win32 / GTK)
+/// instead of a self-drawn panel; when nil, the in-app menu is the fallback.
+public enum NativeMenuPresenter {
+    private static let slot = AmbientSlot<((NativeMenuSnapshot, CGPoint) -> Int?)?>(nil)
+    /// Presents the snapshot at a point (window logical coordinates, top-left
+    /// origin) and returns the chosen item's id, or nil if dismissed.
+    public static var present: ((NativeMenuSnapshot, CGPoint) -> Int?)? {
+        get { slot.current }
+        set { slot.current = newValue }
+    }
 }
 
 /// Holds the active window's pointer-capture target (drag-driven primitives).

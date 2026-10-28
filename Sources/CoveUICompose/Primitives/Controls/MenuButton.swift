@@ -1,5 +1,8 @@
 import Foundation
 import CoveUIRuntime
+#if canImport(CoreGraphics)
+import CoreGraphics
+#endif
 
 /// A button that opens a menu anchored to itself. Uses the regular `Popover`
 /// trigger contract, so the menu escapes clipping, closes on Escape/outside
@@ -32,6 +35,35 @@ public struct MenuButton<Label: View>: View {
     }
 
     public var body: some View {
+        SurfaceReader { surface in
+            if NativeMenuPresenter.present != nil, !TouchPresentation.usesSheet(surface) {
+                nativeButton
+            } else {
+                popoverButton
+            }
+        }
+    }
+
+    /// A button that opens the system menu anchored at its own corner.
+    @ViewBuilder private var nativeButton: some View {
+        let frame = FrameBox()
+        let button = Button(role: .normal, isEnabled: isEnabled, tooltip: tooltip, action: {
+            guard let rect = frame.current else { return }
+            let built = NativeMenuBuilder.build(entries)
+            if let chosen = NativeMenuPresenter.present?(built.snapshot, Self.anchor(rect, placement: placement)) {
+                built.run(id: chosen)
+            }
+        }) { label }
+            .buttonStyle(AnyButtonStyle(SecondaryButtonStyle()))
+            .captureFrame(frame)
+        if let accessibilityLabel {
+            button.compositionLocal(ActionControlAccessibility.label, accessibilityLabel)
+        } else {
+            button
+        }
+    }
+
+    private var popoverButton: some View {
         var popover = Popover(isPresented: $presented,
                               isEnabled: isEnabled,
                               width: width,
@@ -44,6 +76,22 @@ public struct MenuButton<Label: View>: View {
             popover.triggerDescription = PopoverTriggerDescription(label: accessibilityLabel, help: tooltip)
         }
         return popover
+    }
+
+    /// The anchor point for a menu at a button's corner, matching the reference
+    /// framework: bottom-left (or bottom-right in RTL), top corners for top
+    /// placements.
+    private static func anchor(_ frame: CGRect, placement: PopoverPlacement) -> CGPoint {
+        switch placement {
+        case .topLeading, .top, .leadingTop:
+            return CGPoint(x: frame.minX, y: frame.minY)
+        case .topTrailing, .trailingTop:
+            return CGPoint(x: frame.maxX, y: frame.minY)
+        case .leading, .leadingBottom, .bottomLeading, .bottom:
+            return CGPoint(x: frame.minX, y: frame.maxY)
+        case .trailing, .trailingBottom, .bottomTrailing:
+            return CGPoint(x: frame.maxX, y: frame.maxY)
+        }
     }
 }
 

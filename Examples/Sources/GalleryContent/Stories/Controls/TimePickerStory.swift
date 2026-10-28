@@ -80,5 +80,16 @@ struct TimePickerStory: View {
             Text("The inline picker is independent of the trigger. Use it inside a Popover, Sheet or a form card; TimeField remains the validated text entry for keyboard-first forms.")
                 .font(.caption).foregroundColor(.onSurfaceMuted)
         }
+        StorySection(
+            "Segmented time input",
+            "Hours, minutes and AM/PM each take the focus. Up/Down step the focused segment, digits set it and advance, Left/Right move between them, and the first letter of AM/PM chooses the half."
+        ) {
+            Row(alignment: .center, spacing: 16) {
+                TimeInput(selection: $time, hourCycle: twelveHour ? .twelve : .twentyFour,
+                          isEnabled: options.isEnabled, accessibilityLabel: "Start time")
+                Text(display).font(.bodyStrong).foregroundColor(.onSurfaceMuted)
+                Box {}.flex(1)
+            }
+        }
     }
 }

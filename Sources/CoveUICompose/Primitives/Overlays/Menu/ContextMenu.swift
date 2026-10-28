@@ -25,7 +25,20 @@ public struct ContextMenu<Content: View>: View {
         SurfaceReader { surface in
             Box(direction: .column, alignItems: .stretch, spacing: 0) {
                 _ContextMenuHost(content: content, entries: point == nil ? [] : entries(), width: width, point: point,
-                                 onOpen: { position in onOpen(); point = position }, onDismiss: { point = nil })
+                                 onOpen: { position in
+                                    onOpen()
+                                    // A native backend shows the system menu and
+                                    // runs the chosen command; otherwise the
+                                    // self-drawn panel is presented via the portal.
+                                    if NativeMenuPresenter.present != nil, !TouchPresentation.usesSheet(surface) {
+                                        let built = NativeMenuBuilder.build(entries())
+                                        if let chosen = NativeMenuPresenter.present?(built.snapshot, position) {
+                                            built.run(id: chosen)
+                                        }
+                                    } else {
+                                        point = position
+                                    }
+                                 }, onDismiss: { point = nil })
                 if TouchPresentation.usesSheet(surface) {
                     TouchOverlay(isPresented: Binding(get: { point != nil }, set: { if !$0 { point = nil } }),
                         content: Menu(point == nil ? [] : entries(), onItemActivated: { point = nil }, onDismiss: { point = nil }))

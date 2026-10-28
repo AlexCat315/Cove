@@ -5,8 +5,6 @@ struct MenuStory: View {
     let options: GalleryOptions
     @State private var status = "Choose a command"
     @State private var checked = true
-    @State private var open = false
-    @State private var manyOpen = false
     var entries: [MenuEntry] {
         [.label(id: "workspace", title: "Workspace"),
          .item(MenuItem(id: "copy", title: "Copy", shortcut: KeyboardShortcut.primary("C").displayString, isEnabled: options.isEnabled, action: { status = "Copied" })),
@@ -38,19 +36,18 @@ struct MenuStory: View {
         }
     }
     var body: some View {
-        StorySection("Nested commands", "Use Up/Down, Home/End or type a label. Right opens a branch; Left and Escape return one level. A leaf closes the entire popup.") {
-            Popover(isPresented: $open, isEnabled: options.isEnabled, width: 260, surface: .content, overflow: .flip) {
+        StorySection("Native menu", "The system menu opens at the button's corner. It supports labels, separators, submenus, disabled and destructive actions, check marks and keyboard shortcuts.") {
+            MenuButton(entries: entries, isEnabled: options.isEnabled, width: 260,
+                       accessibilityLabel: "Workspace commands") {
                 Row(alignment: .center, spacing: 8) { Text("Workspace commands").font(.body); Icon(UIIcons.Navigation.chevronDown, size: 12) }
-            } content: { Menu(entries, width: 260, onItemActivated: { open = false }) }
+            }
             Text(status).font(.caption).foregroundColor(.onSurfaceMuted)
         }
-        StorySection("Inline menu", "Shared selection columns, labels, separators, disabled actions and destructive color. Submenus escape the card's clipping.") {
-            Menu(entries, width: 260)
+        StorySection("Selection columns", "Labels, separators, disabled actions, check marks and destructive color are all rendered by the system. Nested branches open to the side.") {
+            MenuButton("Show menu", entries: entries, isEnabled: options.isEnabled, width: 260)
         }
-        StorySection("Scrollable menu", "100 commands with nested branches. Keyboard navigation reveals the active row; a child closes when its anchor scrolls away.") {
-            Popover(isPresented: $manyOpen, isEnabled: options.isEnabled, width: 240, surface: .content, overflow: .flip) {
-                Row(alignment: .center, spacing: 8) { Text("100 commands").font(.body); Icon(UIIcons.Navigation.chevronDown, size: 12) }
-            } content: { Menu(manyEntries, width: 240, maxVisibleRows: 6, onItemActivated: { manyOpen = false }) }
+        StorySection("Scrollable menu", "100 commands with nested branches. The system menu scrolls and closes when a leaf command is chosen.") {
+            MenuButton("100 commands", entries: manyEntries, isEnabled: options.isEnabled, width: 240)
         }
     }
 }

@@ -204,6 +204,10 @@ public final class Application {
         PointerCaptureHolder.current = host.pointerCapture
         ClipboardHolder.read = { SDL3Clipboard.read() }
         ClipboardHolder.write = { SDL3Clipboard.write($0) }
+        // Context menus use the system menu, like the reference framework.
+        NativeMenuPresenter.present = { snapshot, point in
+            NativeMenuPopover.popUp(snapshot, at: point)
+        }
 
         host.onInit = { [weak self] native, w, h in
             guard let self else { return }
