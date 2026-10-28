@@ -1,5 +1,13 @@
 import Foundation
-import CThreadLocal
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(WinSDK)
+import WinSDK
+#endif
 
 /// Composition scopes supply invalidation without introducing a Core → Scene dependency.
 public enum StateReadTracking {
@@ -21,27 +29,62 @@ public enum StateReadTracking {
     nonisolated(unsafe) private static var installed: Set<ObjectIdentifier> = []
     /// The per-thread scope stack.
     ///
-    /// A raw thread-local load, backed by `CThreadLocal`. This path runs on every
-    /// field read, which is why it avoids `Thread.current.threadDictionary` —
-    /// that bridges to an `NSDictionary` and hashes a string on every access.
+    /// Recording a `@State` read happens on every field read, so this must be a
+    /// raw thread-local load rather than a Foundation `Thread.threadDictionary`
+    /// access — that bridges to an `NSDictionary` and hashes a string on every
+    /// call, which dominated this path.
     private static var stack: StackBox {
-        _ = tlsReady
-        if let existing = cove_thread_local_get() {
-            return Unmanaged<StackBox>.fromOpaque(existing).takeUnretainedValue()
-        }
+        if let existing = StackTLS.load() { return existing }
         let box = StackBox()
-        cove_thread_local_set(Unmanaged.passRetained(box).toOpaque())
+        StackTLS.store(box)
         return box
     }
 
-    /// Creates the platform slot exactly once. `swift_once` guards this, so the
-    /// destructor is published before any slot can be populated.
-    private static let tlsReady: Void = {
-        cove_thread_local_init { raw in
-            guard let raw else { return }
+    /// A native thread-local slot, one per platform.
+    ///
+    /// POSIX/Darwin use pthread TLS. Windows uses fiber-local storage, which is
+    /// the only Windows thread-local facility that runs a destructor when a
+    /// thread exits (plain `TlsAlloc` has none). Single-threaded WASI keeps a
+    /// single process-wide slot instead.
+    private enum StackTLS {
+        #if os(WASI)
+        nonisolated(unsafe) private static var slot: StackBox?
+        static func load() -> StackBox? { slot }
+        static func store(_ box: StackBox) { slot = box }
+        #elseif canImport(Darwin) || canImport(Glibc) || canImport(Musl)
+        private static let key: pthread_key_t = {
+            var key = pthread_key_t()
+            pthread_key_create(&key) { raw in
+                Unmanaged<StackBox>.fromOpaque(raw).release()
+            }
+            return key
+        }()
+        static func load() -> StackBox? {
+            guard let raw = pthread_getspecific(key) else { return nil }
+            return Unmanaged<StackBox>.fromOpaque(raw).takeUnretainedValue()
+        }
+        static func store(_ box: StackBox) {
+            pthread_setspecific(key, Unmanaged.passRetained(box).toOpaque())
+        }
+        #elseif canImport(WinSDK)
+        private static let index: DWORD = FlsAlloc { raw in
             Unmanaged<StackBox>.fromOpaque(raw).release()
         }
-    }()
+        static func load() -> StackBox? {
+            guard index != FLS_OUT_OF_INDEXES, let raw = FlsGetValue(index) else { return nil }
+            return Unmanaged<StackBox>.fromOpaque(raw).takeUnretainedValue()
+        }
+        static func store(_ box: StackBox) {
+            guard index != FLS_OUT_OF_INDEXES else { return }
+            FlsSetValue(index, Unmanaged.passRetained(box).toOpaque())
+        }
+        #else
+        // Unknown platform: portable (slower) Foundation fallback.
+        private static let key = "cove.ui.StateReadTracking.stack"
+        static func load() -> StackBox? { Thread.current.threadDictionary[key] as? StackBox }
+        static func store(_ box: StackBox) { Thread.current.threadDictionary[key] = box }
+        #endif
+    }
 
     static var current: Scope? { stack.stack.last }
     static var isDeferredEvaluation: Bool { stack.deferredDepth > 0 }
