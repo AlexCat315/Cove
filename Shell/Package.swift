@@ -1,0 +1,55 @@
+// swift-tools-version: 6.4
+import PackageDescription
+import Foundation
+let artifacts = ProcessInfo.processInfo.environment["COVE_RUNTIME_ARTIFACT_ROOT"].map { "../" + $0 } ?? "../Native/vendor"
+let package = Package(
+    name: "CoveUIShell",
+    platforms: [.macOS(.v26), .iOS(.v26)],
+    products: [.library(name: "CoveUIShell", targets: ["PlatformShell"])],
+    dependencies: [.package(path: "../Logging"), .package(path: "../PlatformCore")],
+    targets: [
+        .binaryTarget(name: "SDL3", path: "\(artifacts)/SDL3.artifactbundle"),
+    .target(name: "CSDL3", dependencies: ["SDL3"], path: "Sources/CSDL3", publicHeadersPath: "include",
+                linkerSettings: [
+                    .linkedFramework("AVFoundation", .when(platforms: [.macOS, .iOS])),
+                    .linkedFramework("AudioToolbox", .when(platforms: [.macOS, .iOS])),
+                    .linkedFramework("CoreAudio", .when(platforms: [.macOS, .iOS])),
+                    .linkedFramework("CoreFoundation", .when(platforms: [.macOS, .iOS])),
+                    .linkedFramework("CoreGraphics", .when(platforms: [.macOS, .iOS])),
+                    .linkedFramework("CoreHaptics", .when(platforms: [.macOS, .iOS])),
+                    .linkedFramework("CoreMedia", .when(platforms: [.macOS, .iOS])),
+                    .linkedFramework("CoreVideo", .when(platforms: [.macOS, .iOS])),
+                    .linkedFramework("GameController", .when(platforms: [.macOS, .iOS])),
+                    .linkedFramework("Metal", .when(platforms: [.macOS, .iOS])),
+                    .linkedFramework("QuartzCore", .when(platforms: [.macOS, .iOS])),
+                    .linkedFramework("UniformTypeIdentifiers", .when(platforms: [.macOS, .iOS])),
+                    .linkedFramework("Carbon", .when(platforms: [.macOS])),
+                    .linkedFramework("Cocoa", .when(platforms: [.macOS])),
+                    .linkedFramework("ForceFeedback", .when(platforms: [.macOS])),
+                    .linkedFramework("IOKit", .when(platforms: [.macOS])),
+                    .linkedFramework("UIKit", .when(platforms: [.iOS])),
+                    .linkedFramework("CoreBluetooth", .when(platforms: [.iOS])),
+                    .linkedFramework("OpenGLES", .when(platforms: [.iOS])),
+                    .linkedLibrary("winmm", .when(platforms: [.windows])),
+                    .linkedLibrary("setupapi", .when(platforms: [.windows])),
+                    .linkedLibrary("imm32", .when(platforms: [.windows])),
+                    .linkedLibrary("version", .when(platforms: [.windows])),
+                    .linkedLibrary("ole32", .when(platforms: [.windows])),
+                    .linkedLibrary("oleaut32", .when(platforms: [.windows])),
+                    .linkedLibrary("uuid", .when(platforms: [.windows])),
+                    .linkedLibrary("advapi32", .when(platforms: [.windows])),
+                    .linkedLibrary("shell32", .when(platforms: [.windows])),
+                    .linkedLibrary("user32", .when(platforms: [.windows])),
+                    .linkedLibrary("gdi32", .when(platforms: [.windows])),
+                    .linkedLibrary("d3d11", .when(platforms: [.windows])),
+                    .linkedLibrary("dxgi", .when(platforms: [.windows])),
+                    .linkedLibrary("d3d12", .when(platforms: [.windows])),
+                    .linkedLibrary("android", .when(platforms: [.android])),
+                    .linkedLibrary("GLESv2", .when(platforms: [.android])),
+                    .linkedLibrary("OpenSLES", .when(platforms: [.android]))]),
+    .target(name: "PlatformShell", dependencies: ["CSDL3",
+            .product(name: "CovePlatformCore", package: "PlatformCore"),
+            .product(name: "CoveLogging", package: "Logging")], path: "Sources/PlatformShell"),
+
+    ]
+)

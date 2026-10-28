@@ -57,7 +57,7 @@ jobs:
         run: node Tools/Release/check-version.mjs "$RELEASE_TAG" --release
       - name: Identify native inputs
         id: native-inputs
-        run: echo "digest=$(git ls-tree -r HEAD cmake third-party Runtime/third-party Tools/Cove/Sources/CoveCLI/Toolchains/Native.swift .github/actions/setup-toolchains/action.yml | git hash-object --stdin)" >> "$GITHUB_OUTPUT"
+        run: echo "digest=$(git ls-tree -r HEAD cmake third-party Native/third-party Tools/Cove/Sources/CoveCLI/Toolchains/Native.swift .github/actions/setup-toolchains/action.yml | git hash-object --stdin)" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-java@v4
         if: matrix.platform == 'android-arm64'
         with:
@@ -77,7 +77,7 @@ jobs:
           key: sdk-native-v3-${{ matrix.platform }}-${{ steps.native-inputs.outputs.digest }}
           path: |
             vendor
-            Runtime/vendor
+            Native/vendor
             Artifacts/native
             build/android-validation/native
             build/android-validation/fonts-cmake
@@ -155,7 +155,7 @@ jobs:
           test -f smoke/cove/Package.swift
           test -f smoke/cove/DevTools/Client/Performance/Performance.js
           test -f smoke/cove/Tools/Cove/Sources/CoveCLI/SDK.json
-          test -f smoke/cove/Runtime/vendor/SDL3.artifactbundle/info.json
+          test -f smoke/cove/Native/vendor/SDL3.artifactbundle/info.json
       - uses: actions/upload-artifact@v4
         with:
           name: sdk-${{ matrix.platform }}

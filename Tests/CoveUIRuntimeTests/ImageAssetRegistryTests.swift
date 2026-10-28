@@ -1,6 +1,9 @@
 import Foundation
 import Testing
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 @Suite("Owned CPU image assets")
 struct ImageAssetRegistryTests {

@@ -3,6 +3,9 @@ import Foundation
 import NativeRHI
 import Testing
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 @Suite("Draw batch clipping and coalescing", .serialized)
 struct DrawBatchCoalescingTests {

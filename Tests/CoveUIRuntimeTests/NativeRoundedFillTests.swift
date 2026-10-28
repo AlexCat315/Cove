@@ -2,6 +2,9 @@
 import Foundation
 import Testing
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 @Suite("Rounded fill pixel coverage", .serialized)
 struct NativeRoundedFillTests {

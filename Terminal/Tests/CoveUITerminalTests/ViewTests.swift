@@ -95,7 +95,7 @@ struct ViewTests {
         let atlas = FontAtlas(width: 512, height: 512)
         atlas.loadFont(path: path, size: 13)
         let shaper = TextShaper()
-        if let face = atlas.freetypeFace { shaper.setFont(ftFace: face, size: 13) }
+        if let face = atlas.fontFace { shaper.setFace(face, size: 13) }
         return TextEnvironment(atlas: atlas, shaper: shaper, atlasTextureID: 1, defaultLineHeight: 17,
                                defaultColor: .white, defaultFont: .monospaced(size: 13),
                                fontResolver: TextFontResolver(primaryFontName: "Menlo", atlas: atlas))

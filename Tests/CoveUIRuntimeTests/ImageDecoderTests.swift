@@ -11,6 +11,9 @@ import ImageIO
 import UniformTypeIdentifiers
 #endif
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 /// Coverage for `ImageDecoder` — bitmap (PNG) round-trip plus error
 /// surface for missing files and unsupported sources.

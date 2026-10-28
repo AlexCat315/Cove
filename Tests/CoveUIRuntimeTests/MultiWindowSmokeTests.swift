@@ -6,6 +6,9 @@ import CovePlatformCore
 import PlatformShell
 import Testing
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 @Suite("Multi-window smoke")
 struct MultiWindowSmokeTests {

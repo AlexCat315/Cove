@@ -45,8 +45,8 @@ enum TestTextEnvironmentFactory {
         atlas.loadFont(path: fontPath, size: size)
 
         let shaper = TextShaper()
-        if let face = atlas.freetypeFace {
-            shaper.setFont(ftFace: face, size: size)
+        if let face = atlas.fontFace {
+            shaper.setFace(face, size: size)
         }
 
         let resolver = TextFontResolver(primaryFontName: "Arial", atlas: atlas)

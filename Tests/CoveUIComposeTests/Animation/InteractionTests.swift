@@ -59,9 +59,9 @@ struct InteractionTests: CoveUIComposeSerializedSuite {
         #expect(harness.offset == .zero && scheduler.activeCount == 0)
     } }
 
-    @Test("Pointer press snaps the button face: no tween, no scale, stable hit target")
+    @Test("Pointer press applies themed compression immediately and restores the hovered face")
     func buttonPress() throws { try scene { graph, scheduler, _, dispatcher in
-        // A press scale belongs to touch input; on desktop it would read as lag.
+        // Pointer feedback uses the same themed compression as touch input.
         var theme = Theme.defaultLight; theme.motion.pressScale = 0.9
         var activations = 0
         graph.install(root: Button("Press") { activations += 1 }.frame(width: 200, height: 44).theme(theme)); settle(graph)
@@ -70,12 +70,15 @@ struct InteractionTests: CoveUIComposeSerializedSuite {
             if node.attachments[BuiltinButtonChrome.stateKey] != nil { chrome = node; break }
         }
         let surface = try #require(chrome)
+        dispatcher.dispatch(.mouseMotion(MouseMotionEvent(x: 1, y: 22, deltaX: 0, deltaY: 0)))
+        settle(graph)
         let resting = surface.backgroundColor
+        #expect(resting == theme.colors.accentHover)
         let event = MouseButtonEvent(button: .left, x: 1, y: 22, clicks: 1)
         dispatcher.dispatch(.mouseButtonDown(event)); settle(graph)
         // The face changes on the same frame and nothing is left to animate.
         #expect(surface.backgroundColor != resting)
-        #expect(surface.transform.scale == 1)
+        #expect(surface.transform.scale == theme.motion.pressScale)
         #expect(scheduler.activeCount == 0)
         dispatcher.dispatch(.mouseButtonUp(event)); settle(graph)
         #expect(activations == 1)

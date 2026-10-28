@@ -1,8 +1,10 @@
 #if canImport(CoreText)
 import CoreText
-import CFreeType
 import Testing
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 @Suite("System font instances")
 struct SystemFontInstanceTests {
@@ -23,15 +25,8 @@ struct SystemFontInstanceTests {
     }
 
     private func coordinates(_ font: ManagedFont) throws -> [UInt32: Double] {
-        var descriptor: UnsafeMutablePointer<FT_MM_Var>?
-        let face = font.rawFace
-        #expect(FT_Get_MM_Var(face, &descriptor) == 0)
-        let axes = try #require(descriptor)
-        defer { FT_Done_MM_Var(face.pointee.glyph.pointee.library, axes) }
-        var values = [FT_Fixed](repeating: 0, count: Int(axes.pointee.num_axis))
-        #expect(FT_Get_Var_Design_Coordinates(face, axes.pointee.num_axis, &values) == 0)
-        return Dictionary(uniqueKeysWithValues: values.enumerated().map {
-            (UInt32(axes.pointee.axis[$0.offset].tag), Double($0.element) / 65_536)
+        return Dictionary(uniqueKeysWithValues: font.face.appliedDesignCoordinates.map {
+            ($0.key.rawValue, $0.value)
         })
     }
 

@@ -7,14 +7,14 @@ struct NativeDependencies {
     func prepare(fromSource: Bool = false) throws -> Artifacts {
         if !fromSource, try NativeArtifacts.install(at: toolchain.root, target: "android-arm64") {
             let base = NativeArtifacts.directory(at: toolchain.root, target: "android-arm64")
-            return Artifacts(engine: base.appendingPathComponent("Runtime/vendor"), text: base.appendingPathComponent("vendor"))
+            return Artifacts(engine: base.appendingPathComponent("Native/vendor"), text: base.appendingPathComponent("vendor"))
         }
         guard NativeArtifacts.hasSourceInputs(at: toolchain.root) else {
             throw ToolError.invalid("Missing Android native libraries; reinstall a complete SDK release. Native compilation requires a source checkout.")
         }
         let engine = toolchain.cache.appendingPathComponent("native")
         let fonts = toolchain.cache.appendingPathComponent("fonts-cmake")
-        try configure(source: toolchain.root.appendingPathComponent("Runtime/third-party"), directory: engine,
+        try configure(source: toolchain.root.appendingPathComponent("Native/third-party"), directory: engine,
                       options: ["-DCOVE_BUILD_OPENEXR=OFF"])
         try Shell.run(["cmake", "--build", engine.path, "--target", "stage_sdl3", "stage_image_decode",
                        "--parallel", parallelism])

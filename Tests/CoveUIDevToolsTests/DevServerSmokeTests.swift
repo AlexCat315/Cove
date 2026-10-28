@@ -7,6 +7,9 @@ import Foundation
 import Network
 @testable import CoveUIDevTools
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 /// End-to-end smoke test: spin up DevServer on a free port, connect a
 /// real Network.framework WebSocket client, exchange hello + tree.subscribe.

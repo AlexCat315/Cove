@@ -1,13 +1,16 @@
 import CoveUICore
-import CFreeType
+internal import CFreeType
 
 /// Packs FreeType alpha glyphs and registered color glyphs into separate atlas planes.
 ///
 /// Thread safety: not thread-safe. All calls must happen on the same thread (typically the main/render thread).
 public final class FontAtlas {
 
-    private var ftLibrary: FT_Library?
-    private var ftFace: FT_Face?
+    /// The face loaded through `loadFont`, if any. Owned by this atlas.
+    private var loadedFace: FontFace?
+
+    /// The face this atlas was created with, for hosts that only need to read it.
+    public var fontFace: FontFace? { loadedFace }
 
     /// Raw glyph atlas bitmap (single-channel alpha).
     public private(set) var atlasData: [UInt8]
@@ -49,9 +52,7 @@ public final class FontAtlas {
     }
 
     private struct RegisteredFace {
-        let face: FT_Face
-        let size: Float
-        let rasterScale: Float
+        let face: FontFace
     }
 
     /// Metrics and atlas location for a single rasterized glyph.
@@ -89,10 +90,8 @@ public final class FontAtlas {
         self.atlasData = [UInt8](repeating: 0, count: width * height)
     }
 
-    deinit {
-        if let face = ftFace { FT_Done_Face(face) }
-        if let lib = ftLibrary { FT_Done_FreeType(lib) }
-    }
+    // No deinit: `FontFace` owns the FreeType face and the library handle is
+    // shared process-wide; releasing either here would outlive registered faces.
 
     // MARK: - Font loading
 
@@ -103,21 +102,12 @@ public final class FontAtlas {
     ///   - size: Font size in points.
     @discardableResult
     public func loadFont(path: String, size: Float, rasterScale: Float = 1) -> Bool {
-        if let face = ftFace {
-            FT_Done_Face(face)
-            ftFace = nil
-        }
-
-        var face: FT_Face?
-        let err = FT_New_Face(ensureLibrary(), path, 0, &face)
         // A missing or unreadable font must never crash the app — leave the atlas
         // faceless so the caller can fall back to another font.
-        guard err == 0, let face else { return false }
-        self.ftFace = face
-        self.fontSize = size
+        guard let face = FontFace(path: path, size: size, rasterScale: rasterScale) else { return false }
+        loadedFace = face
+        fontSize = size
         self.rasterScale = max(1, rasterScale)
-
-        FT_Set_Char_Size(face, 0, FT_F26Dot6(size * self.rasterScale * 64), 72, 72)
 
         atlasData = [UInt8](repeating: 0, count: atlasWidth * atlasHeight)
         shelfX = 0
@@ -136,69 +126,29 @@ public final class FontAtlas {
     /// browser. Invalid data leaves the current face and atlas untouched.
     @discardableResult
     public func loadFont(bytes: [UInt8], size: Float, rasterScale: Float = 1) -> Bool {
-        guard !bytes.isEmpty, size.isFinite, size > 0, size <= 512,
-              rasterScale.isFinite, rasterScale >= 1, rasterScale <= 4 else { return false }
-        let storage = UnsafeMutablePointer<UInt8>.allocate(capacity: bytes.count)
-        bytes.withUnsafeBufferPointer { storage.initialize(from: $0.baseAddress!, count: $0.count) }
-        var face: FT_Face?
-        guard FT_New_Memory_Face(ensureLibrary(), storage, FT_Long(bytes.count), 0, &face) == 0,
-              let face else { storage.deallocate(); return false }
-        guard FT_Set_Char_Size(face, 0, FT_F26Dot6(size * rasterScale * 64), 72, 72) == 0 else {
-            FT_Done_Face(face); storage.deallocate(); return false
-        }
-        // HarfBuzz may retain a face across an atlas reload. Attach storage to
-        // the face's finalizer, rather than releasing it with the current font.
-        face.pointee.generic.data = UnsafeMutableRawPointer(storage)
-        face.pointee.generic.finalizer = { object in
-            guard let face = object?.assumingMemoryBound(to: FT_FaceRec.self) else { return }
-            face.pointee.generic.data?.assumingMemoryBound(to: UInt8.self).deallocate()
-        }
-        if let old = ftFace { FT_Done_Face(old) }
-        ftFace = face
+        // Invalid data leaves the current face and atlas untouched.
+        guard let face = FontFace(bytes: bytes, size: size, rasterScale: rasterScale) else { return false }
+        loadedFace = face
         fontSize = size
-        self.rasterScale = rasterScale
+        self.rasterScale = max(1, rasterScale)
         metricsCache.removeAll()
         reset()
         return true
     }
 
-    /// The underlying FreeType face (for HarfBuzz integration).
-    public var freetypeFace: FT_Face? { ftFace }
-
     // MARK: - Multi-font registration
 
-    /// Registers an external FreeType face for multi-font rasterization.
+    /// Registers a face for multi-font rasterization.
     ///
-    /// The caller is responsible for keeping the face alive while the atlas uses it.
-    public func registerFace(_ face: FT_Face,
-                             fontID: Int,
-                             size: Float? = nil,
-                             rasterScale: Float? = nil) {
-        registeredFaces[fontID] = RegisteredFace(
-            face: face,
-            size: size ?? fontSize,
-            rasterScale: rasterScale ?? self.rasterScale
-        )
+    /// The caller owns the face; it must stay alive while the atlas uses it.
+    public func registerFace(_ face: FontFace, fontID: Int) {
+        registeredFaces[fontID] = RegisteredFace(face: face)
     }
 
     private func resolveFace(fontID: Int) -> RegisteredFace? {
         if let registered = registeredFaces[fontID] { return registered }
-        if fontID == 0, let ftFace {
-            return RegisteredFace(face: ftFace, size: fontSize, rasterScale: rasterScale)
-        }
+        if fontID == 0, let loadedFace { return RegisteredFace(face: loadedFace) }
         return nil
-    }
-
-    private func ensureLibrary() -> FT_Library {
-        if let ftLibrary {
-            return ftLibrary
-        }
-
-        var lib: FT_Library?
-        let err = FT_Init_FreeType(&lib)
-        precondition(err == 0, "FT_Init_FreeType failed: \(err)")
-        self.ftLibrary = lib
-        return lib!
     }
 
     public func glyphMetrics(glyphIndex: UInt32, fontID: Int = 0) -> GlyphMetrics? {
@@ -209,16 +159,16 @@ public final class FontAtlas {
         }
         guard let resolved = resolveFace(fontID: fontID) else { return nil }
 
-        let scale = max(resolved.rasterScale, 1)
+        let scale = max(resolved.face.rasterScale, 1)
         let key = GlyphKey(
             fontID: fontID,
             glyphIndex: glyphIndex,
-            size: resolved.size,
+            size: resolved.face.size,
             rasterScale: scale
         )
         if let cached = metricsCache[key] { return cached }
 
-        let face = resolved.face
+        let face = resolved.face.ftFace
         let loadFlags = FT_Int32(FT_LOAD_NO_HINTING | FT_LOAD_NO_BITMAP | FT_LOAD_COMPUTE_METRICS)
         let err = FT_Load_Glyph(face, FT_UInt(glyphIndex), loadFlags)
         guard err == 0, let glyphSlot = face.pointee.glyph else { return nil }
@@ -236,11 +186,11 @@ public final class FontAtlas {
         }
         guard let resolved = resolveFace(fontID: fontID) else { return nil }
 
-        let scale = max(resolved.rasterScale, 1)
+        let scale = max(resolved.face.rasterScale, 1)
         let key = GlyphKey(
             fontID: fontID,
             glyphIndex: glyphIndex,
-            size: resolved.size,
+            size: resolved.face.size,
             rasterScale: scale
         )
         return rasterCache[key]
@@ -249,9 +199,9 @@ public final class FontAtlas {
     public func lineMetrics(fontID: Int = 0) -> LineMetrics? {
         if let source = colorSources[fontID] { return source.lineMetrics() }
         guard let resolved = resolveFace(fontID: fontID),
-              let size = resolved.face.pointee.size else { return nil }
+              let size = resolved.face.ftFace.pointee.size else { return nil }
 
-        let scale = max(resolved.rasterScale, 1)
+        let scale = max(resolved.face.rasterScale, 1)
         let metrics = size.pointee.metrics
         let ascent = Float(metrics.ascender) / 64.0 / scale
         let descent = Float(-metrics.descender) / 64.0 / scale
@@ -289,17 +239,17 @@ public final class FontAtlas {
         if let source = colorSources[fontID] { return rasterizeColorGlyph(glyphIndex, fontID: fontID, source: source) }
         guard let resolved = resolveFace(fontID: fontID) else { return nil }
 
-        let scale = max(resolved.rasterScale, 1)
+        let scale = max(resolved.face.rasterScale, 1)
         let key = GlyphKey(
             fontID: fontID,
             glyphIndex: glyphIndex,
-            size: resolved.size,
+            size: resolved.face.size,
             rasterScale: scale
         )
         if let cached = rasterCache[key] { return cached }
 
         _ = glyphMetrics(glyphIndex: glyphIndex, fontID: fontID)
-        let face = resolved.face
+        let face = resolved.face.ftFace
 
         // FT_LOAD_TARGET_LIGHT  = (1 & 15) << 16 = 0x10000: lighter vertical hinting,
         //                         smoother diagonal strokes at small sizes.
@@ -365,7 +315,7 @@ public final class FontAtlas {
     /// Rasterizes a glyph by Unicode codepoint. Convenience wrapper over `rasterizeGlyph(glyphIndex:fontID:)`.
     public func rasterizeCodepoint(_ codepoint: UInt32, fontID: Int = 0) -> GlyphInfo? {
         guard let resolved = resolveFace(fontID: fontID) else { return nil }
-        let glyphIndex = FT_Get_Char_Index(resolved.face, FT_ULong(codepoint))
+        let glyphIndex = FT_Get_Char_Index(resolved.face.ftFace, FT_ULong(codepoint))
         guard glyphIndex != 0 else { return nil }
         return rasterizeGlyph(glyphIndex: glyphIndex, fontID: fontID)
     }

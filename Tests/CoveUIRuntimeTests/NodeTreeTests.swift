@@ -1,5 +1,8 @@
 import Testing
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 @testable import CoveUIScene
 
 @Suite("NodeTree")

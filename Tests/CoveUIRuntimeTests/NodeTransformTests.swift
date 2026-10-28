@@ -1,5 +1,8 @@
 import Testing
 import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 /// `Node.transform` is what lets a subtree be scaled about a point inside
 /// itself. These pin the geometry contract that everything downstream — hit

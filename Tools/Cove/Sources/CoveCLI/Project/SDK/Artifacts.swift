@@ -15,8 +15,8 @@ struct NativeArtifacts: Codable {
     }
 
     static func bundles(for target: String) -> [String] {
-        ["Runtime/vendor/SDL3", "Runtime/vendor/lunasvg", "Runtime/vendor/plutovg",
-         "Runtime/vendor/webp", "Runtime/vendor/sharpyuv", "vendor/CFreeType", "vendor/CHarfBuzz"]
+        ["Native/vendor/SDL3", "Native/vendor/lunasvg", "Native/vendor/plutovg",
+         "Native/vendor/webp", "Native/vendor/sharpyuv", "vendor/CFreeType", "vendor/CHarfBuzz"]
             + (target.hasPrefix("ios-") || target.hasPrefix("android-") ? [] : ["vendor/GhosttyVt"])
     }
 
@@ -30,7 +30,7 @@ struct NativeArtifacts: Codable {
     /// Packaged SDKs deliberately omit native sources. A checkout must bootstrap
     /// itself without downloading the release it is in the process of building.
     static func hasSourceInputs(at root: URL) -> Bool {
-        ["Runtime/third-party/CMakeLists.txt", "third-party/CMakeLists.txt"].allSatisfy {
+        ["Native/third-party/CMakeLists.txt", "third-party/CMakeLists.txt"].allSatisfy {
             FileManager.default.fileExists(atPath: root.appendingPathComponent($0).path)
         }
     }

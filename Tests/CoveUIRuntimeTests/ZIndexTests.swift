@@ -5,6 +5,9 @@ import Foundation
 #endif
 import Testing
 import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 @Suite("zIndex")
 struct ZIndexTests {

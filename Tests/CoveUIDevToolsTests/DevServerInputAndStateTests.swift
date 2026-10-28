@@ -6,6 +6,9 @@ import Foundation
 import CovePlatformCore
 @testable import CoveUIDevTools
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 /// Integration tests for the mirror.input bridge and state.checkpoint /
 /// state.restore round trip. These exercise the full DevServer dispatch

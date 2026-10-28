@@ -3,6 +3,9 @@ import Foundation
 import NativeRHI
 import Testing
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 /// Frost is a rendering decision, so these tests read pixels: a hard striped
 /// background must come out soft inside a frosted panel and stay sharp

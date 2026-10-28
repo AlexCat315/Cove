@@ -1,6 +1,9 @@
 import Foundation
 import Testing
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 /// The renderer has to carry a node's frame-level reveal all the way to the
 /// frame's `DrawList`, including when the node sits inside a cached layer that

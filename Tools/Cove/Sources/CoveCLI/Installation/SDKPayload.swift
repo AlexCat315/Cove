@@ -3,8 +3,7 @@ internal import Foundation
 enum SDKPayload {
     static func stageSources(from root: URL, into payload: URL) throws {
         let paths = ["Package.swift", "LICENSE", "NOTICE", "README.md", "CHANGELOG.md",
-                     "Sources", "Tests", "Runtime/Sources", "Runtime/Tests", "Text", "PlatformCore",
-                     "Portable", "System", "Logging", "Hosts", "Tools", "Platforms", "Terminal", "Examples", "DevTools", "Docs"]
+                     "Sources", "Tests", "Core", "Compose", "Text", "Imaging", "Graphics", "Shell", "Runtime", "PlatformCore", "System", "Logging", "Hosts", "Tools", "Platforms", "Terminal", "Examples", "DevTools", "Docs"]
         let excluded: Set<String> = [".git", ".build", ".cove", "build", "vendor", "node_modules", "dist"]
         for path in paths {
             let source = root.appendingPathComponent(path)
@@ -25,7 +24,7 @@ enum SDKPayload {
             }
         }
         // SDL's Java host is needed by Gradle; native dependency source trees are not shipped.
-        let java = "Runtime/third-party/sdl3/android-project/app/src/main/java"
+        let java = "Native/third-party/sdl3/android-project/app/src/main/java"
         if FileManager.default.fileExists(atPath: root.appendingPathComponent(java).path) {
             try Files.copy(root.appendingPathComponent(java), to: payload.appendingPathComponent(java))
         }

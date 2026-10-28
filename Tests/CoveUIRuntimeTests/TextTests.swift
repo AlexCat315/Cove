@@ -1,6 +1,9 @@
 import Testing
 import Foundation
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 /// Resolves a real font file from the host's system font directories. CoveUI
 /// no longer bundles a font, so tests use whatever sans the platform ships
@@ -31,7 +34,7 @@ struct TextTests {
     func fontAtlasInit() {
         let atlas = FontAtlas()
         atlas.loadFont(path: testFontPath, size: 16)
-        #expect(atlas.freetypeFace != nil)
+        #expect(atlas.fontFace != nil)
     }
 
     @Test("Rasterize ASCII 'A' produces non-empty bitmap")
@@ -129,7 +132,7 @@ struct TextTests {
         atlas.loadFont(path: testFontPath, size: 16)
 
         let shaper = TextShaper()
-        shaper.setFont(ftFace: atlas.freetypeFace!, size: 16)
+        shaper.setFace(atlas.fontFace!, size: 16)
 
         let glyphs = shaper.shape(text: "Hello")
         #expect(glyphs.count == 5)
@@ -151,7 +154,7 @@ struct TextTests {
         atlas.loadFont(path: cjkFontPath, size: 16)
 
         let shaper = TextShaper()
-        shaper.setFont(ftFace: atlas.freetypeFace!, size: 16)
+        shaper.setFace(atlas.fontFace!, size: 16)
 
         let glyphs = shaper.shape(text: "你好")
         #expect(glyphs.count == 2)
@@ -164,7 +167,7 @@ struct TextTests {
         atlas.loadFont(path: testFontPath, size: 16)
 
         let shaper = TextShaper()
-        shaper.setFont(ftFace: atlas.freetypeFace!, size: 16)
+        shaper.setFace(atlas.fontFace!, size: 16)
 
         let glyphs = shaper.shape(text: "AB")
         #expect(glyphs.count == 2)
@@ -180,13 +183,13 @@ struct TextTests {
         baseAtlas.loadFont(path: testFontPath, size: 16)
 
         let baseShaper = TextShaper()
-        baseShaper.setFont(ftFace: baseAtlas.freetypeFace!, size: 16)
+        baseShaper.setFace(baseAtlas.fontFace!, size: 16)
 
         let hidpiAtlas = FontAtlas(width: 1024, height: 1024)
         hidpiAtlas.loadFont(path: testFontPath, size: 16, rasterScale: 2)
 
         let hidpiShaper = TextShaper()
-        hidpiShaper.setFont(ftFace: hidpiAtlas.freetypeFace!, size: 16, rasterScale: 2)
+        hidpiShaper.setFace(hidpiAtlas.fontFace!, size: 16)
 
         let baseAdvance = baseShaper.shape(text: "Hello").reduce(Float(0)) { $0 + $1.xAdvance }
         let hidpiAdvance = hidpiShaper.shape(text: "Hello").reduce(Float(0)) { $0 + $1.xAdvance }
@@ -290,7 +293,7 @@ struct TextTests {
         atlas.loadFont(path: testFontPath, size: 16)
 
         let shaper = TextShaper()
-        shaper.setFont(ftFace: atlas.freetypeFace!, size: 16)
+        shaper.setFace(atlas.fontFace!, size: 16)
 
         let shaped = shaper.shape(text: "Hello")
         let result = TextLayout.layout(
@@ -312,7 +315,7 @@ struct TextTests {
         atlas.loadFont(path: testFontPath, size: 16)
 
         let shaper = TextShaper()
-        shaper.setFont(ftFace: atlas.freetypeFace!, size: 16)
+        shaper.setFace(atlas.fontFace!, size: 16)
 
         let text = "The quick brown fox jumps over the lazy dog"
         let shaped = shaper.shape(text: text)
@@ -337,7 +340,7 @@ struct TextTests {
         atlas.loadFont(path: testFontPath, size: 16)
 
         let shaper = TextShaper()
-        shaper.setFont(ftFace: atlas.freetypeFace!, size: 16)
+        shaper.setFace(atlas.fontFace!, size: 16)
 
         let text = "HI\ngj"
         let shaped = shaper.shape(text: text)
@@ -360,7 +363,7 @@ struct TextTests {
         atlas.markClean()
 
         let shaper = TextShaper()
-        shaper.setFont(ftFace: atlas.freetypeFace!, size: 16)
+        shaper.setFace(atlas.fontFace!, size: 16)
 
         let shaped = shaper.shape(text: "AB")
         let result = TextLayout.layout(
@@ -384,7 +387,7 @@ struct TextTests {
         atlas.loadFont(path: testFontPath, size: 16)
 
         let shaper = TextShaper()
-        shaper.setFont(ftFace: atlas.freetypeFace!, size: 16)
+        shaper.setFace(atlas.fontFace!, size: 16)
 
         let text = "hello\nworld"
         let shaped = shaper.shape(text: text)

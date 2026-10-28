@@ -1,5 +1,6 @@
 import Testing
 @testable import CoveUICompose
+@testable import CoveUIText
 
 @Suite("Bounded text caches")
 struct TextCacheTests {

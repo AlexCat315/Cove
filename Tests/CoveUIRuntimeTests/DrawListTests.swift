@@ -1,6 +1,9 @@
 import Foundation
 import Testing
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 /// Cross-platform test font resolved from the host's system fonts
 /// (see `systemTestFontPath()` in TextTests.swift).
@@ -168,7 +171,7 @@ struct DrawListTests {
         atlas.loadFont(path: drawListTestFontPath, size: 16)
 
         let shaper = TextShaper()
-        shaper.setFont(ftFace: atlas.freetypeFace!, size: 16)
+        shaper.setFace(atlas.fontFace!, size: 16)
 
         let shaped = shaper.shape(text: "Hi")
         let result = TextLayout.layout(
@@ -202,7 +205,7 @@ struct DrawListTests {
         atlas.loadFont(path: drawListTestFontPath, size: 16)
 
         let shaper = TextShaper()
-        shaper.setFont(ftFace: atlas.freetypeFace!, size: 16)
+        shaper.setFace(atlas.fontFace!, size: 16)
 
         let shaped = shaper.shape(text: "Hi")
         let result = TextLayout.layout(

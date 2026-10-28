@@ -1,13 +1,12 @@
 import CoveUICore
-import CFreeType
-import CHarfBuzz
+internal import CHarfBuzz
 
 /// An ordered set of owned font faces sharing one alpha atlas. This performs
 /// grapheme-safe fallback and script-run shaping; paragraph bidi is a host concern.
 /// Like FreeType and DrawList, instances belong to one render thread.
 public final class FontCollection {
     public let atlas: FontAtlas
-    private var faces: [FontAtlas] = []
+    private var faces: [FontFace] = []
     public var fontCount: Int { faces.count }
     public private(set) var size: Float = 16
     public private(set) var rasterScale: Float = 1
@@ -19,11 +18,9 @@ public final class FontCollection {
 
     /// IDs are stable, one-based, and returned only after successful loading.
     @discardableResult public func append(bytes: [UInt8]) -> Int? {
-        let owner = FontAtlas(width: 1, height: 1)
-        guard owner.loadFont(bytes: bytes, size: size, rasterScale: rasterScale),
-              let face = owner.freetypeFace else { return nil }
-        faces.append(owner)
-        atlas.registerFace(face, fontID: faces.count, size: size, rasterScale: rasterScale)
+        guard let face = FontFace(bytes: bytes, size: size, rasterScale: rasterScale) else { return nil }
+        faces.append(face)
+        atlas.registerFace(face, fontID: faces.count)
         return faces.count
     }
 
@@ -33,16 +30,15 @@ public final class FontCollection {
         guard size.isFinite, size > 0, size <= 512,
               rasterScale.isFinite, (1...4).contains(rasterScale) else { return }
         self.size = size; self.rasterScale = rasterScale
-        for (index, owner) in faces.enumerated() {
-            guard let face = owner.freetypeFace else { continue }
-            FT_Set_Char_Size(face, 0, FT_F26Dot6(size * rasterScale * 64), 72, 72)
-            atlas.registerFace(face, fontID: index + 1, size: size, rasterScale: rasterScale)
+        for (index, face) in faces.enumerated() {
+            guard face.applying(size: size, rasterScale: rasterScale) else { continue }
+            atlas.registerFace(face, fontID: index + 1)
         }
     }
 
     public func shape(_ text: String) -> [ShapedGlyph] {
         guard !faces.isEmpty else { return [] }
-        struct Run { var text: String; var font: Int; var script: hb_script_t; var offset: UInt32 }
+        struct Run { var text: String; var font: Int; var script: ScriptTag; var offset: UInt32 }
         var runs: [Run] = []
         var offset: UInt32 = 0
         let unicode = hb_unicode_funcs_get_default()
@@ -53,13 +49,12 @@ public final class FontCollection {
                 $0.properties.generalCategory != .format &&
                 !(0xFE00...0xFE0F).contains($0.value) && !(0xE0100...0xE01EF).contains($0.value)
             }
-            let strongScript = scalars.lazy.map { hb_unicode_script(unicode, $0.value) }.first {
-                $0 != HB_SCRIPT_COMMON && $0 != HB_SCRIPT_INHERITED && $0 != HB_SCRIPT_UNKNOWN
+            let strongScript = scalars.lazy.map { hb_unicode_script(unicode, $0.value).rawValue }.first {
+                $0 != Script.common && $0 != Script.inherited && $0 != Script.unknown
             }
-            let script = strongScript ?? runs.last?.script ?? HB_SCRIPT_COMMON
+            let script = strongScript ?? runs.last?.script ?? Script.common
             func covers(_ index: Int) -> Bool {
-                let face = faces[index].freetypeFace!
-                return scalars.allSatisfy { FT_Get_Char_Index(face, FT_ULong($0.value)) != 0 }
+                scalars.allSatisfy { faces[index].glyphIndex(for: $0) != 0 }
             }
             // Common punctuation/spacing stays in the current face when possible.
             let previous = runs.last?.font
@@ -71,9 +66,8 @@ public final class FontCollection {
             offset += UInt32(string.utf8.count)
         }
         return runs.flatMap { run in
-            let shaper = TextShaper()
-            shaper.setFont(ftFace: faces[run.font].freetypeFace!, size: size, rasterScale: rasterScale)
-            return shaper.shape(text: run.text, direction: nil, script: run.script, language: nil).map {
+            return faces[run.font].shape(run.text, direction: nil, script: run.script,
+                                language: nil, utf8Offset: 0, fontID: 0).map {
                 ShapedGlyph(glyphID: $0.glyphID, xOffset: $0.xOffset, yOffset: $0.yOffset,
                             xAdvance: $0.xAdvance, yAdvance: $0.yAdvance,
                             cluster: $0.cluster + run.offset, fontID: run.font + 1)

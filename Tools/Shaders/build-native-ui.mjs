@@ -13,7 +13,7 @@ const versionResult = spawnSync(compiler, ['-version'], { encoding: 'utf8' });
 if (versionResult.status !== 0) throw new Error('Failed to query Slang version');
 const version = (versionResult.stdout + versionResult.stderr).trim();
 if (version !== '2026.19') throw new Error(`Expected Slang 2026.19, got ${version}`);
-const shaders = join(root, 'Sources/CoveUIRuntime/Resources/Shaders');
+const shaders = join(root, 'Graphics/Sources/CoveUIGraphics/Resources/Shaders');
 const output = resolve(process.argv[2] ?? join(shaders, 'Native/dxil'));
 mkdirSync(output, { recursive: true });
 const temporary = mkdtempSync(join(tmpdir(), 'cove-ui-dxil-'));

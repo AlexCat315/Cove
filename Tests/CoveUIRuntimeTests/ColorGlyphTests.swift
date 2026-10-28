@@ -1,5 +1,8 @@
 import Testing
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 #if canImport(CoreText)
 @Suite("Native color glyph raster pipeline", .serialized)

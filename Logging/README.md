@@ -97,12 +97,12 @@ COVE_LOG_FORMAT=json COVE_LOG_DIRECTORY=/tmp/cove-logs cove doctor
 
 ## 模块边界和验证
 
-`CoveLogCore` 只拥有配置、记录、上下文和查询；`CoveLogging` 拥有后端、输出和订阅；`CCoveLog` 适配 C/JNI/平台控制台和文件 lease。Portable 协议只依赖 Core，浏览器不引入 NIO，Editor 与 DevTools 都是日志消费者。原生代码使用 `CoveLog.h` 的 `COVE_LOG/COVE_LOGF`，SDL 回调和 Android Java RuntimeLog 接入同一后端。
+`CoveLogCore` 只拥有配置、记录、上下文和查询；`CoveLogging` 拥有后端、输出和订阅；`CCoveLog` 适配 C/JNI/平台控制台和文件 lease。DevTools 协议只依赖 Core，浏览器不引入 NIO，Editor 与 DevTools 都是日志消费者。原生代码使用 `CoveLog.h` 的 `COVE_LOG/COVE_LOGF`，SDL 回调和 Android Java RuntimeLog 接入同一后端。
 
 ```bash
 swift test --package-path Engine/Logging
 swift test --package-path Tools/Cove
-swift test --package-path CoveUI/Portable
+./cove test DevTools --no-parallel
 swift test --package-path Editor --filter ConsoleLoggingTests
 swift run --package-path Tools/Developer cove-dev devtools session /path/to/App mac
 swift run --package-path Tools/Developer cove-dev devtools session /path/to/App android

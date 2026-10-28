@@ -19,7 +19,7 @@ struct IOSBuild {
         let variant = "ios-\(arch)" + (device == nil ? "-simulator" : "")
         try NativeSDK.prepare(root: root, apple: .init(sdk: sdk, architecture: arch))
         var environment = try SwiftPackage.environment(root: root)
-        environment["COVE_RUNTIME_ARTIFACT_ROOT"] = "Artifacts/native/\(variant)/Runtime/vendor"
+        environment["COVE_RUNTIME_ARTIFACT_ROOT"] = "Artifacts/native/\(variant)/Native/vendor"
         environment["COVE_TEXT_ARTIFACT_ROOT"] = "Artifacts/native/\(variant)/vendor"
         let derived = project.buildDirectory.appendingPathComponent("\(variant)/xcode")
         let configuration = arguments.configuration == .debug ? "Debug" : "Release"

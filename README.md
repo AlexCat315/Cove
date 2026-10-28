@@ -51,7 +51,7 @@ cd Cove
 
 `System` 提供独立的 `CoveFileSystem`、`CoveProcess` 产品，供应用、CLI 和 Studio 共用，不依赖 SDL 或图形环境；接口语义和移动端支持见 [CoveSystem](System/README.md)。可直接运行 `./cove test System --no-parallel`。
 
-`Runtime` 管理 NativeRHI、窗口与输入宿主及原生图像解码；`PlatformCore` 管理平台值；`Sources`、`Portable`、`Text` 管理 UI。场景、物理、脚本 HUD 和编辑器集成由 Diffuse 管理。GPU 生产的图像通过 `TextureImage` 进入现有图像绘制和资源持有流程；离屏视图使用 `OffscreenView` 返回绘制快照。
+框架按 Core、Text、Imaging、Graphics、Shell、Compose、Runtime、DevTools、Hosts 分层。各能力包独立声明 target，根包保留应用 API；依赖规则、部署需求及 Core 的 Yoga 迁移项见 [架构](Docs/architecture.md)。
 
 ## 发布
 

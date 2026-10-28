@@ -11,6 +11,6 @@
 	url = https://github.com/ghostty-org/ghostty.git
 	shallow = true
 [submodule "Runtime/third-party/sdl3"]
-	path = Runtime/third-party/sdl3
+	path = Native/third-party/sdl3
 	url = https://github.com/libsdl-org/SDL.git
 	shallow = true

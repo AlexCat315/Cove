@@ -6,7 +6,7 @@ cd "$(dirname "$0")"
 sdk="${COVE_WASM_SDK:-swift-6.4.1-RELEASE_wasm}"
 configuration="${COVE_WASM_CONFIGURATION:-debug}"
 swift run --package-path ../../Tools/Developer cove-dev browser build-fonts
-export COVE_TEXT_ARTIFACT_ROOT="../Browser/.build/font-vendor"
+export COVE_TEXT_ARTIFACT_ROOT="Browser/.build/font-vendor"
 exports=(cove_render cove_set_scale cove_font_alloc cove_font_load cove_atlas cove_atlas_size
          cove_pointer cove_key cove_text cove_vertices cove_vertex_bytes
          cove_indices cove_index_count cove_snapshot cove_snapshot_size

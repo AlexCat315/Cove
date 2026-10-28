@@ -4,6 +4,9 @@ import NativeRHI
 import enum NativeRHI.RHIError
 import Testing
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 @Suite("Native owned image asset delivery", .serialized)
 struct NativeImageAssetTests {
@@ -74,6 +77,24 @@ struct NativeImageAssetTests {
             renderer: referenceSibling) == expected)
         let foreign = try NativeUIDrawTestContext()
         #expect(throws: RHIError.self) { try foreign.reference.synchronizeTextures(from: context.reference) }
+    }
+
+    private final class ForeignBacking: TextureImageBacking {}
+
+    @Test("a renderer rejects an image owned by a different backend")
+    func rejectsForeignTextureBacking() throws {
+        let context = try NativeUIDrawTestContext()
+        let image = try TextureImage(backing: ForeignBacking(), pixelSize: SIMD2(16, 16))
+        let list = DrawList()
+        list.retainResource(image)
+        list.addImageQuad(rect: UIRect(x: 0, y: 0, width: 16, height: 16), textureID: image.textureID)
+        let viewport = NativeUIViewport(pixels: SIMD2(16, 16), logical: SIMD2(16, 16))
+        let output = try context.nativeOutput(format: .bgra8Unorm, size: viewport.pixels)
+        try context.device.beginFrame()
+        defer { context.device.endFrame() }
+        #expect(throws: RHIError.self) {
+            try context.native.record(list: list, into: CommandBuffer(), target: RenderColorTarget(texture: output.texture), viewport: viewport)
+        }
     }
 
     private func image(_ asset: ImageAssetRegistry.Asset, x: Float) -> DrawList {

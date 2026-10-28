@@ -5,6 +5,9 @@ import CoreGraphics
 import Foundation
 #endif
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 /// `Node.transform` is only worth anything if the scale reaches the vertices.
 /// `NodeTransformTests` pins the geometry the rest of the system asks the node

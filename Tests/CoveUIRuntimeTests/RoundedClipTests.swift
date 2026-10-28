@@ -5,6 +5,9 @@ import CoreGraphics
 import Foundation
 #endif
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 @testable import CoveUICore
 
 /// Rounded clipping containers must keep child geometry inside their corners

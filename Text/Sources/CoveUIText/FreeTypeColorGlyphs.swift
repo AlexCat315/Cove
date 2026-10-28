@@ -1,5 +1,5 @@
 import CoveUICore
-import CFreeType
+internal import CFreeType
 
 /// FreeType-backed color glyphs for hosts without a native color rasterizer
 /// (Linux, Windows). Handles COLRv0 layered outlines, which FreeType blends
@@ -9,14 +9,14 @@ import CFreeType
 ///
 /// Like `FontAtlas`, an instance belongs to one render thread and must not
 /// outlive the face.
-public final class FreeTypeColorGlyphFace {
+final class FreeTypeColorGlyphFace {
     private let face: FT_Face
     public let size: Float
     public let rasterScale: Float
     /// Physical-to-strike ratio; 1 for scalable faces.
     private let strikeScale: Float
 
-    public static func hasColorGlyphs(_ face: FT_Face) -> Bool {
+    static func hasColorGlyphs(_ face: FT_Face) -> Bool {
         face.pointee.face_flags & FT_Long(FT_FACE_FLAG_COLOR) != 0
     }
 

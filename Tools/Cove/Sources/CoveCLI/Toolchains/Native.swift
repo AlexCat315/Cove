@@ -18,13 +18,13 @@ enum NativeSDK {
         #if os(Windows)
         try WindowsBuildEnvironment.activate(&environment)
         #endif
-        for domain in ["Runtime", "Text"] {
-            let source = root.appendingPathComponent(domain == "Runtime" ? "Runtime/third-party" : "third-party")
-            let base = domain == "Runtime" ? root.appendingPathComponent("Runtime") : root
+        for domain in ["Native", "Text"] {
+            let source = root.appendingPathComponent(domain == "Native" ? "Native/third-party" : "third-party")
+            let base = domain == "Native" ? root.appendingPathComponent("Native") : root
             let build = base.appendingPathComponent("build/\(apple?.variant ?? "native")")
             let artifacts = NativeArtifacts.directory(at: root, target: target)
-            let vendor = artifacts.appendingPathComponent(domain == "Runtime" ? "Runtime/vendor" : "vendor")
-            let names = domain == "Runtime" ? ["SDL3", "lunasvg", "plutovg", "webp", "sharpyuv"]
+            let vendor = artifacts.appendingPathComponent(domain == "Native" ? "Native/vendor" : "vendor")
+            let names = domain == "Native" ? ["SDL3", "lunasvg", "plutovg", "webp", "sharpyuv"]
                 : ["CFreeType", "CHarfBuzz"] + (apple == nil ? ["GhosttyVt"] : [])
             if names.allSatisfy({ FileManager.default.fileExists(atPath: vendor.appendingPathComponent("\($0).artifactbundle/info.json").path) }) { continue }
             var configure = ["cmake", "-S", source.path, "-B", build.path,
@@ -36,7 +36,7 @@ enum NativeSDK {
             }
             try Shell.run(configure, environment: environment)
             try Shell.run(["cmake", "--build", build.path, "--config", "Release", "--parallel", "4"], environment: environment)
-            if domain == "Runtime" {
+            if domain == "Native" {
                 try Shell.run(["cmake", "--build", build.path, "--config", "Release", "--target", "stage_sdl3", "stage_image_decode", "--parallel", "4"], environment: environment)
             }
             try Shell.run(["cmake", "--install", build.path, "--config", "Release", "--prefix", build.appendingPathComponent("install").path], environment: environment)

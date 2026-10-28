@@ -6,6 +6,9 @@ import Foundation
 #endif
 import PlatformShell
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 import CovePlatformCore
 
 @Suite("EventDispatcher cursor sink")

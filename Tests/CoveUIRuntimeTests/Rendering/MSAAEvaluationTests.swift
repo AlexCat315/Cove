@@ -5,6 +5,9 @@ import ImageIO
 import NativeRHI
 import Testing
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 /// Opt-in measurement, independent from normal CI regression runs.
 @Suite("MSAA evaluation", .serialized)

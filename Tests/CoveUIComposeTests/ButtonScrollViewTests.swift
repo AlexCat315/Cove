@@ -932,7 +932,7 @@ struct ButtonScrollViewTests: CoveUIComposeSerializedSuite {
         #expect(parentScrollView.contentOffset.y == 0)
     } }
 
-    @Test("Menu item hover and press update render state without recomposing")
+    @Test("Menu highlight commits once; press feedback only updates render state")
     func menuItemInteractionDoesNotRecompose() { GlobalTestLock.locked {
         let registry = InteractionRegistry()
         let capture = PointerCapture()
@@ -973,9 +973,14 @@ struct ButtonScrollViewTests: CoveUIComposeSerializedSuite {
         #expect(graph.recomposer.hasPending == false)
 
         hover(.enter)
-        #expect(graph.recomposer.hasPending == false)
+        #expect(graph.recomposer.hasPending == true)
         #expect(tree.hasRenderUpdates == true)
         #expect(item.attachments["__menu_item_hovered"] as? Bool == true)
+        // Explicit pointer highlight updates the row's foreground as well as
+        // its background. Settle that navigation change before testing press feedback.
+        graph.recomposer.commitAll()
+        graph.computeLayout(width: 180, height: 80)
+        #expect(graph.recomposer.hasPending == false)
 
         tree.flush()
         let event = MouseButtonEvent(button: .left, x: 8, y: 8, clicks: 1)

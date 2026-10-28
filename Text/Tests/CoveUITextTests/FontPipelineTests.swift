@@ -34,14 +34,27 @@ final class FontPipelineTests: XCTestCase {
     func testOwnedMemoryAndInvalidFontPreserveCurrentFace() throws {
         let atlas = FontAtlas()
         XCTAssertTrue(atlas.loadFont(bytes: try bytes("NotoSans.ttf"), size: 16))
-        let face = atlas.freetypeFace
+        let face = atlas.fontFace
         XCTAssertFalse(atlas.loadFont(bytes: [1, 2, 3], size: 16))
-        XCTAssertEqual(atlas.freetypeFace, face)
+        XCTAssertEqual(atlas.fontFace?.postScriptName, face?.postScriptName)
         let shaper = TextShaper()
-        shaper.setFont(ftFace: atlas.freetypeFace!, size: 16)
+        guard let resolved = atlas.fontFace else { return }
+        shaper.setFace(resolved, size: 16)
         XCTAssertTrue(shaper.shape(text: "memory survives the temporary input array").allSatisfy { $0.glyphID != 0 })
         XCTAssertTrue(atlas.loadFont(bytes: try bytes("NotoSansArabic.ttf"), size: 16))
         XCTAssertTrue(shaper.shape(text: "old face remains alive while HarfBuzz references it").allSatisfy { $0.glyphID != 0 })
+    }
+
+    func testFileFaceOwnsItsStorageAfterThePathIsRemoved() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".ttf")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try Data(bytes("NotoSans.ttf")).write(to: url)
+        let face = try XCTUnwrap(FontFace(path: url.path, size: 16))
+        try FileManager.default.removeItem(at: url)
+        let glyphs = face.shape("owned file storage")
+        XCTAssertFalse(glyphs.isEmpty)
+        XCTAssertTrue(glyphs.allSatisfy { $0.glyphID != 0 })
+        XCTAssertNotNil(face.rasterize(glyph: try XCTUnwrap(glyphs.first).glyphID))
     }
 
     func testGraphemeFallbackPreservesUTF8ClustersAndLigatures() throws {

@@ -1,5 +1,8 @@
 import Testing
 import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 @Suite("Phase 8 / AnimationController & Scheduler")
 struct AnimationControllerTests {

@@ -2,6 +2,9 @@
 import CoreText
 import Testing
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 @Suite("Font fallback keeps the requested style")
 struct FallbackStyleTests {

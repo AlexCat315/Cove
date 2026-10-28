@@ -6,6 +6,9 @@ import Foundation
 #endif
 import CovePlatformCore
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 /// Phase 6 acceptance: every node-keyed external registration is released by the
 /// node lifecycle (规则 2 / 坏味 #4), with no ViewGraph teardown side-effect.

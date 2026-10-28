@@ -4,6 +4,9 @@
 
 ## Unreleased
 
+- 按能力拆分 Core、Text、Imaging、Graphics、Shell、Compose、Runtime、DevTools 与 Hosts，移除 Portable 与根 manifest 对下层 target 的重复声明；根包收拢为应用与扩展产品，内部模块产品改为从所属能力入口消费。
+- Compose 去除 Runtime/窗口/GPU 依赖；字体、文本环境和缓存统一归 Text，图片解码与资源所有权归 Imaging，GPU 渲染和上传归 Graphics。保留 `import CoveUI` 与 `TextureImage(texture:)` 应用入口；CLI、Browser 使用窄协议/组合/检查依赖。修复字号切换后 HarfBuzz 缓存未同步和映射字体逐字节复制的问题。新增架构边界检查；Core 的 Yoga 布局依赖仍明确保留，尚未达到全量纯 Swift。
+
 - 文本选择补齐跨组件一致性与触摸细节：`RichText`/`Markdown` 与 `Text` 共用同一套端点手柄、放大镜与命中测试（`TextSelectionChrome`），手指或笔可拖动手柄精修选区；`RichTextFlow.caretRect(at:)` 提供手柄定位。
 - 选择区内的 `Text` 不再进入 Tab 焦点序列，点击按钮、列表行或表格单元格中的标签时不再抢走控件焦点与点击；`Text`/`RichText` 在控件内部自动退出选择。
 - 键盘可扩展选区：`Shift+←/→` 按字素步进，`Shift+Home/End` 扩到段首段尾，可跨段落延伸。

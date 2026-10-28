@@ -1,18 +1,13 @@
 # CoveUIText
 
-Desktop and browser hosts share the same FreeType atlas and HarfBuzz shaper.
-This package depends on `Portable/CoveUICore` and two static C libraries; it
-does not import SDL, Engine rendering, sockets, or platform font discovery.
-The lightweight Portable package does not depend on this package.
+Desktop and browser hosts share font discovery, owned font faces, shaping,
+rasterization, atlases and text caches through `CoveUIText`. Only this package
+binds FreeType and HarfBuzz. It depends on Core and has no window, GPU or socket
+dependency. Platform font discovery and color-glyph adapters live here too.
 
-Build desktop dependencies with the existing bootstrap/CMake workflow:
-
-```bash
-git submodule update --init CoveUI/third-party/freetype CoveUI/third-party/harfbuzz
-cmake -S CoveUI/third-party -B CoveUI/build/native -DCMAKE_BUILD_TYPE=Release
-cmake --build CoveUI/build/native --parallel 4
-cmake --install CoveUI/build/native --prefix /tmp/cove-font-install
-swift test --package-path CoveUI/Text
+```sh
+./cove setup
+./cove test Text --no-parallel
 ```
 
 The browser's `cove-dev browser build-fonts` operation builds these pinned

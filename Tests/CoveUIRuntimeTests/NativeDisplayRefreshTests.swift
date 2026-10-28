@@ -3,6 +3,9 @@ import Foundation
 import XCTest
 import PlatformShell
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 final class NativeDisplayRefreshTests: XCTestCase {
     @MainActor

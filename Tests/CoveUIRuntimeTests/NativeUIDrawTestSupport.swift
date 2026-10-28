@@ -3,6 +3,9 @@ import Foundation
 import NativeRHI
 import Testing
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 struct NativeUITestFormat {
     let native: TextureFormat

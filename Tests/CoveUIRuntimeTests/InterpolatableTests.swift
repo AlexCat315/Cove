@@ -5,6 +5,9 @@ import CoreGraphics
 import Foundation
 #endif
 import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 @Suite("Phase 8 / Interpolatable")
 struct InterpolatableTests {

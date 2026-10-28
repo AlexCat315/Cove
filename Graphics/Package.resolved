@@ -1,0 +1,24 @@
+{
+  "originHash" : "eee3c18d1de225f5a758967264dc27c6ba1105f0a4e8239910c7f3c82d6e4039",
+  "pins" : [
+    {
+      "identity" : "swift-log",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-log.git",
+      "state" : {
+        "revision" : "c9c6bb9d275ec0d95c3ad16391f3f045dc623104",
+        "version" : "1.16.2"
+      }
+    },
+    {
+      "identity" : "yoga",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/facebook/yoga.git",
+      "state" : {
+        "revision" : "042f5013152eb81c1552dec945b88f7b95ca350f",
+        "version" : "3.2.1"
+      }
+    }
+  ],
+  "version" : 3
+}

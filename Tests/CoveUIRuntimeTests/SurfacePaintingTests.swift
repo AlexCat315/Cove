@@ -5,6 +5,9 @@ import CoreGraphics
 import Foundation
 #endif
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 /// How a shadow layer and a rim light become geometry. These assert the two
 /// properties a floating panel depends on: the layers really are separate and

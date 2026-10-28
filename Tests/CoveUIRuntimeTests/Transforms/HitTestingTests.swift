@@ -5,6 +5,9 @@ import CoreGraphics
 import Foundation
 #endif
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 /// The contract for a scale: what is drawn and what is clickable are the same
 /// rectangle. When they disagree the failure is not a subtle offset — a control

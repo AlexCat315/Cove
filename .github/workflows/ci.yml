@@ -34,9 +34,16 @@ jobs:
       - uses: ./.github/actions/setup-toolchains
       - uses: ./.github/actions/build-cache
         id: build-cache
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Check capability boundaries
+        run: |
+          python Tools/Architecture/check.py
+          python Tools/Architecture/test_check.py
       - name: Identify native inputs
         id: native-inputs
-        run: echo "digest=$(git ls-tree -r HEAD cmake third-party Runtime/third-party Tools/Cove/Sources/CoveCLI/Toolchains/Native.swift .github/actions/setup-toolchains/action.yml | git hash-object --stdin)" >> "$GITHUB_OUTPUT"
+        run: echo "digest=$(git ls-tree -r HEAD cmake third-party Native/third-party Tools/Cove/Sources/CoveCLI/Toolchains/Native.swift .github/actions/setup-toolchains/action.yml | git hash-object --stdin)" >> "$GITHUB_OUTPUT"
       - name: Test system contracts before preparing graphics dependencies
         timeout-minutes: 5
         run: ./cove test System --no-parallel --timeout 120
@@ -45,7 +52,7 @@ jobs:
         with:
           path: |
             vendor
-            Runtime/vendor
+            Native/vendor
           key: sdk-native-v3-${{ runner.os }}-${{ runner.arch }}-${{ steps.native-inputs.outputs.digest }}
       - name: Prepare native dependencies
         id: native
@@ -55,7 +62,7 @@ jobs:
         with:
           path: |
             vendor
-            Runtime/vendor
+            Native/vendor
           key: ${{ steps.native-cache.outputs.cache-primary-key }}
       - name: Test standalone CLI
         timeout-minutes: 10
@@ -80,6 +87,11 @@ jobs:
           else
             env -i PATH=/usr/bin:/bin smoke/cove/cove --version
           fi
+      - name: Test capability packages
+        run: |
+          for package in Core Text Logging PlatformCore Tests/Headless DevTools Graphics; do
+            ./cove test "$package" --no-parallel --timeout 600
+          done
       - name: Build SDK tests
         if: ${{ !cancelled() && steps.native.conclusion == 'success' }}
         run: ./cove test . --build-only

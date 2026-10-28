@@ -3,6 +3,9 @@ import Foundation
 import NativeRHI
 import Testing
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 private struct NativeUITiming: Encodable {
     let p50Microseconds: Double

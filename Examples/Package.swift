@@ -46,17 +46,13 @@ let package = Package(
     platforms: [.macOS(.v26), .iOS(.v26)],
     products: [
         .library(name: "GalleryContent", targets: ["GalleryContent"]),
-        .library(name: "CounterExample", targets: ["CounterExample"]),
         .executable(name: "CoveUIDemo", targets: ["CoveUIDemo"]),
         .executable(name: "PetDemo", targets: ["PetDemo"]),
     ],
-    dependencies: [.package(name: "CoveUI", path: resolvedSDK.path)],
+    dependencies: [.package(path: "Counter"), .package(path: resolvedSDK.appendingPathComponent("DevTools/Inspection").path), .package(name: "CoveUI", path: resolvedSDK.path)],
     targets: [
-        .target(name: "CounterExample", dependencies: [
-            .product(name: "CoveUIComposeCore", package: "CoveUI"),
-        ], path: "Counter/Sources/CounterExample"),
         .target(name: "GalleryContent", dependencies: [
-            "CounterExample",
+            .product(name: "CounterExample", package: "Counter"),
             .product(name: "CoveUI", package: "CoveUI"),
             .product(name: "CoveUIWebView", package: "CoveUI"),
             .product(name: "CoveUIWorkspace", package: "CoveUI"),
@@ -64,14 +60,14 @@ let package = Package(
         .executableTarget(name: "CoveUIDemo", dependencies: [
             "GalleryContent",
             .product(name: "CoveUI", package: "CoveUI"),
-            "CounterExample",
+            .product(name: "CounterExample", package: "Counter"),
         ]),
         .executableTarget(name: "PetDemo", dependencies: [
             .product(name: "CoveUI", package: "CoveUI"),
         ], resources: [.process("Resources")]),
         .testTarget(name: "GalleryContentTests", dependencies: [
             "GalleryContent",
-            .product(name: "CoveUIDevToolsScene", package: "CoveUI"),
+            .product(name: "CoveUIInspection", package: "Inspection"),
         ]),
     ]
 )

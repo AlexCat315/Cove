@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, readdirSync, rmSyn
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-const shaders = resolve(process.argv[2] ?? 'Sources/CoveUIRuntime/Resources/Shaders');
+const shaders = resolve(process.argv[2] ?? 'Graphics/Sources/CoveUIGraphics/Resources/Shaders');
 const selected = process.argv[3] ?? 'all';
 const targets = [
   ['macos', 'macosx', 'air64-apple-macosx26.0.0'],

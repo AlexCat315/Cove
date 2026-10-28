@@ -1,5 +1,8 @@
 import Testing
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 /// Phase 2 acceptance: external registrations are released by the node
 /// lifecycle (坏味 #4). A resource attached to a node must `unmount` whenever

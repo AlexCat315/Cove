@@ -5,6 +5,9 @@ import CoreGraphics
 import Foundation
 #endif
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 /// Phase 0 acceptance baseline for the in-place architecture refactor
 /// (docs/coveui-inplace-architecture-refactor.md, 坏味 #1), kept current

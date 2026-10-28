@@ -22,13 +22,13 @@ enum NativeArchive {
             target = apple?.variant ?? CLIUpdate.platform
             try NativeSDK.prepare(root: root, apple: apple, fromSource: true)
             let base = NativeArtifacts.directory(at: root, target: target)
-            runtime = base.appendingPathComponent("Runtime/vendor"); text = base.appendingPathComponent("vendor")
+            runtime = base.appendingPathComponent("Native/vendor"); text = base.appendingPathComponent("vendor")
         }
         let staging = FileManager.default.temporaryDirectory.appendingPathComponent("cove-native-" + UUID().uuidString)
         defer { try? Files.remove(staging) }
         for path in NativeArtifacts.bundles(for: target) {
             let name = URL(fileURLWithPath: path).lastPathComponent + ".artifactbundle"
-            try Files.copy((path.hasPrefix("Runtime/") ? runtime : text).appendingPathComponent(name),
+            try Files.copy((path.hasPrefix("Native/") ? runtime : text).appendingPathComponent(name),
                            to: staging.appendingPathComponent(path + ".artifactbundle"))
         }
         let release = try SDKRelease.read(at: root)

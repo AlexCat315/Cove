@@ -1,0 +1,551 @@
+import Foundation
+import CoveUIScene
+import CoveUIText
+import CoveUIImaging
+import CovePlatformCore
+
+// NOTE: This file used to host a primitive `Button` that wrapped a label and
+// emitted no visual state. Phase 7.5 promotes `Button` to a stateful composite
+// that delegates its body to the active `ButtonStyle`. The label is type-
+// erased into the configuration so styles can compose it freely.
+
+/// Tappable control. The `label` produces the visual content; the active
+/// `ButtonStyle` (defaulting to `PrimaryButtonStyle`) decides how it is
+/// painted, padded, and decorated for each interaction state.
+///
+/// Override the visual style for any subtree:
+/// ```swift
+/// Column {
+///     Button("Save") { … }
+///     Button("Discard", role: .destructive) { … }
+/// }.buttonStyle(.secondary)
+/// ```
+public struct Button<Label: View>: View {
+    public let role: ButtonRole
+    public let isEnabled: Bool
+    public let isLoading: Bool
+    /// On/off state surfaced to the active style via
+    /// `ButtonStyleConfiguration.isSelected` (used by `.toggle` and friends).
+    public let isSelected: Bool
+    public let tooltip: String?
+    public let action: () -> Void
+    public let label: Label
+
+    public init(role: ButtonRole = .normal,
+                isEnabled: Bool = true,
+                isLoading: Bool = false,
+                isSelected: Bool = false,
+                tooltip: String? = nil,
+                action: @escaping () -> Void,
+                @ViewBuilder label: () -> Label) {
+        self.role = role
+        self.isEnabled = isEnabled
+        self.isLoading = isLoading
+        self.isSelected = isSelected
+        self.tooltip = tooltip
+        self.action = action
+        self.label = label()
+    }
+
+    public var body: some View {
+        _StatefulButton(role: role,
+                        isEnabled: isEnabled && !isLoading,
+                        isSelected: isSelected,
+                        isIconOnly: Label.self == ButtonIcon.self,
+                        tooltip: tooltip,
+                        action: action,
+                        label: loadingLabel)
+    }
+    private var loadingLabel: AnyView {
+        guard isLoading else { return AnyView(label) }
+        if let icon = label as? ButtonIcon {
+            return AnyView(ThemeReader { theme in
+                IconMetricsReader { metrics in Spinner(size: metrics.size(icon.size ?? theme.icons.medium)) }
+            })
+        }
+        return AnyView(IconMetricsReader { metrics in
+            Row(alignment: .center, spacing: 6) { Spinner(size: metrics.size(.medium)); label }
+        })
+    }
+}
+
+public struct ButtonIcon: View {
+    public enum Source {
+        /// Pre-registered texture, for callers that already own a renderer texture.
+        case texture(TextureID)
+        /// File on disk, resolved through `ImageAssetRegistryHolder.current`.
+        case file(path: String)
+        /// Bundle-packaged image resource resolved by the UI layer.
+        case resource(BundleImageResource)
+    }
+
+    public let source: Source
+    public let size: Float?
+    public let tint: Color?
+
+    public init(_ source: Source, size: Float? = nil, tint: Color? = nil) {
+        self.source = source
+        self.size = size
+        self.tint = tint
+    }
+
+    public var body: some View {
+        ThemeReader { theme in
+            IconMetricsReader { metrics in
+                Box(direction: .row, alignItems: .center, justifyContent: .center) {
+                    image(size: metrics.size(size ?? theme.icons.medium), theme: theme)
+                }
+            }
+        }
+    }
+
+    private func image(size: Float, theme: Theme) -> AnyView {
+        let image: Image
+        switch source {
+        case .texture(let id):
+            image = Image(textureID: id, width: size, height: size, renderingMode: .alphaMask)
+        case .file(let path):
+            image = Image(file: path, width: size, height: size, contentMode: .fit, renderingMode: .alphaMask)
+        case .resource(let resource):
+            // The size is already resolved. Use the same Image path for all
+            // sources so bundle icons cannot accidentally scale twice.
+            image = Image(resource: theme.icons.resolve(resource), width: size, height: size,
+                          contentMode: .fit, renderingMode: .alphaMask)
+        }
+        if let tint { return AnyView(image.foregroundColor(tint)) }
+        return AnyView(image)
+    }
+}
+
+public extension Button where Label == Text {
+    /// Title-only convenience initializer.
+    init(_ title: String,
+         role: ButtonRole = .normal,
+         isEnabled: Bool = true,
+                isLoading: Bool = false,
+         isSelected: Bool = false,
+         tooltip: String? = nil,
+         action: @escaping () -> Void) {
+        self.init(role: role, isEnabled: isEnabled, isLoading: isLoading, isSelected: isSelected,
+                  tooltip: tooltip, action: action) {
+            Text(title).truncatingTail()
+        }
+    }
+
+    /// Localized title convenience initializer.
+    init(_ key: LocalizedStringKey,
+         role: ButtonRole = .normal,
+         isEnabled: Bool = true,
+                isLoading: Bool = false,
+         isSelected: Bool = false,
+         tooltip: String? = nil,
+         action: @escaping () -> Void) {
+        self.init(role: role, isEnabled: isEnabled, isLoading: isLoading, isSelected: isSelected,
+                  tooltip: tooltip, action: action) {
+            Text(key)
+        }
+    }
+}
+
+public extension Button where Label == ButtonIcon {
+    /// Icon-only convenience initializer. Use the regular `Button` style
+    /// pipeline; this only supplies a square image label.
+    init(icon source: ButtonIcon.Source,
+         size: Float? = nil,
+         role: ButtonRole = .normal,
+         isEnabled: Bool = true,
+                isLoading: Bool = false,
+         isSelected: Bool = false,
+         tooltip: String? = nil,
+         tint: Color? = nil,
+         action: @escaping () -> Void) {
+        self.init(role: role, isEnabled: isEnabled, isLoading: isLoading, isSelected: isSelected,
+                  tooltip: tooltip, action: action) {
+            ButtonIcon(source, size: size, tint: tint)
+        }
+    }
+}
+
+/// Internal presentation semantics shared by action controls such as Link.
+/// A provider survives child-only recomposition, unlike a one-time node write.
+enum ActionControlAccessibility {
+    static let role = CompositionLocal<AccessibilityRole>(defaultValue: .button)
+    static let label = CompositionLocal<String?>(defaultValue: nil)
+    static let value = CompositionLocal<String>(defaultValue: "")
+    static let isExpanded = CompositionLocal<Bool?>(defaultValue: nil)
+}
+
+// MARK: - StatefulButton
+
+/// User-view wrapper around `ButtonHost` that keeps the compatibility state
+/// used by custom `ButtonStyle`s. Built-in styles use node-local interaction
+/// state instead, so hover / press does not recompose the button subtree.
+struct _StatefulButton: View {
+    let role: ButtonRole
+    let isEnabled: Bool
+    let isSelected: Bool
+    let isIconOnly: Bool
+    let tooltip: String?
+    let action: () -> Void
+    let label: AnyView
+
+    @State var isPressed: Bool = false
+    @State var isHovered: Bool = false
+    /// Focus that deserves to be drawn.
+    ///
+    /// A declarative style reads the focus flag during composition, so the
+    /// transition has to be a state change: the focus chain notifies the host
+    /// node, and this flag is what re-renders styles that paint a ring.
+    /// Visibility is folded in here (not read at compose time) because
+    /// `isFocusVisible` flips without the focused node changing.
+    @State var showsFocusRing: Bool = false
+
+    var body: some View {
+        ButtonHost(
+            role: role,
+            isEnabled: isEnabled,
+            isSelected: isSelected,
+            isIconOnly: isIconOnly,
+            tooltip: tooltip,
+            isPressed: isEnabled ? isPressed : false,
+            isHovered: isEnabled ? isHovered : false,
+            showsFocusRing: isEnabled && showsFocusRing,
+            label: label,
+            onHoverChange: { hovered in
+                if isHovered != hovered {
+                    isHovered = hovered
+                }
+            },
+            onDown: {
+                if !isPressed {
+                    isPressed = true
+                }
+            },
+            onPressChange: { pressed in
+                if isPressed != pressed {
+                    isPressed = pressed
+                }
+            },
+            onFocusChange: { focused in
+                let visible = focused && (FocusChainHolder.current?.isFocusVisible == true)
+                if showsFocusRing != visible {
+                    showsFocusRing = visible
+                }
+            },
+            action: { [action] in
+                action()
+            }
+        )
+    }
+}
+
+// MARK: - ButtonHost
+
+/// The actual primitive node behind `Button`. It owns hit-testing and keeps
+/// fast-path interaction state in node attachments for built-in styles.
+struct ButtonHost: _PrimitiveView {
+    let role: ButtonRole
+    let isEnabled: Bool
+    let isSelected: Bool
+    let isIconOnly: Bool
+    let tooltip: String?
+    let isPressed: Bool
+    let isHovered: Bool
+    /// Whether this button should paint a focus ring. Owned by `_StatefulButton`
+    /// so a focus change re-renders declarative styles reliably.
+    let showsFocusRing: Bool
+    let label: AnyView
+    let onHoverChange: (Bool) -> Void
+    let onDown: () -> Void
+    let onPressChange: (Bool) -> Void
+    let onFocusChange: (Bool) -> Void
+    let action: () -> Void
+
+    func _makeNode() -> Node {
+        let n = Node()
+        n.isHitTestable = true
+        n.isFocusable = true
+        return n
+    }
+
+    func _updateNode(_ node: Node) {
+        node.applyTouchControlExtent()
+        if !node.supportsControlHover {
+            node.attachments[ButtonHost.hoveredKey] = false
+            onHoverChange(false)
+            node.firstResource(TooltipSession.self)?.setHovered(false)
+        }
+        node.isFocusable = isEnabled
+        node.accessibility = AccessibilitySemantics(node.compositionValue(of: ActionControlAccessibility.role)) {
+            $0.state.isEnabled = isEnabled; $0.state.isSelected = isSelected
+            $0.state.isExpanded = node.compositionValue(of: ActionControlAccessibility.isExpanded)
+            $0.value = node.compositionValue(of: ActionControlAccessibility.value)
+            $0.help = tooltip ?? ""; $0.combinesChildren = true
+            if let label = node.compositionValue(of: ActionControlAccessibility.label) { $0.label = label }
+            else if isIconOnly { $0.label = tooltip ?? "" }
+        }
+        node.accessibilityActions = AccessibilityActions()
+        let activate = { [weak node, action] in
+            if let node { WindowRevealContext.recordActivation(node) }
+            action()
+        }
+        if isEnabled { node.accessibilityActions.activate = activate }
+        node.attachments[ButtonHost.markerKey] = true
+        let style = node.compositionValue(of: ButtonStyleEnvironment.key)
+        let requiresInteractionRecompose = style.requiresInteractionRecompose
+        node.attachments[ButtonHost.requiresInteractionRecomposeKey] = requiresInteractionRecompose
+        // A declarative style only learns about focus by being rebuilt, so the
+        // host lifts the focus change into view state — for those styles alone.
+        // Node-driven chrome repaints itself in place and must not pay for a
+        // rebuild on every Tab.
+        let focusChange = onFocusChange
+        node.attachments[TextInputAttachmentKey.focusChangeHandler] = { [weak node] (focused: Bool) in
+            guard let node else { return }
+            updateBuiltinButtonChromeDescendants(of: node)
+            node.firstResource(TooltipSession.self)?.setFocused(
+                focused && FocusChainHolder.current?.isFocusVisible == true && ButtonHost.tooltipAddsText(to: node))
+            if requiresInteractionRecompose { focusChange(focused) }
+        }
+        if requiresInteractionRecompose {
+            node.attachments[ButtonHost.pressedKey] = isEnabled ? isPressed : false
+            node.attachments[ButtonHost.hoveredKey] = isEnabled && node.supportsControlHover ? isHovered : false
+        } else if isEnabled {
+            if node.attachments[ButtonHost.pressedKey] == nil {
+                node.attachments[ButtonHost.pressedKey] = false
+            }
+            if node.attachments[ButtonHost.hoveredKey] == nil {
+                node.attachments[ButtonHost.hoveredKey] = false
+            }
+        } else {
+            node.attachments[ButtonHost.pressedKey] = false
+            node.attachments[ButtonHost.hoveredKey] = false
+        }
+        let resolvedTooltip = tooltip?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let resolvedTooltip, !resolvedTooltip.isEmpty {
+            if node.firstResource(PortalResource.self) == nil { node.addResource(PortalResource()) }
+            if node.firstResource(TooltipSession.self) == nil { node.addResource(TooltipSession()) }
+            var options = TooltipOptions(); options.isEnabled = isEnabled
+            // The description is checked against the drawn label every time the
+            // tip would appear, so hover that starts before the label lays out
+            // cannot leave a duplicate chip behind.
+            node.firstResource(TooltipSession.self)?.configure(
+                content: tooltipDescription(resolvedTooltip), options: options,
+                focused: FocusChainHolder.current?.focused === node && FocusChainHolder.current?.isFocusVisible == true,
+                canShow: { [weak node] in
+                    guard let node else { return false }
+                    return ButtonHost.tooltipAddsText(to: node)
+                })
+            node.layoutDidUpdate = { [weak node] _ in node?.firstResource(TooltipSession.self)?.updatePosition() }
+        } else {
+            node.firstResource(TooltipSession.self)?.dismiss()
+        }
+
+        // Default cursor for buttons: `.pointer` when interactive,
+        // `.notAllowed` when disabled. Users can override via `.cursor(_:)`
+        // applied closer to the leaf — modifier wrappers run after this
+        // primitive and therefore win.
+        node.cursor = isEnabled ? .pointer : .notAllowed
+        if !isEnabled {
+            node.attachments.removeValue(forKey: ButtonHost.activePressKey)
+            if PointerCaptureHolder.current?.target === node {
+                PointerCaptureHolder.current?.release()
+            }
+        }
+        updateBuiltinButtonChromeDescendants(of: node)
+
+        guard isEnabled, let registry = InteractionRegistryHolder.current else {
+            InteractionRegistryHolder.current?.remove(node)
+            return
+        }
+        let hoverChange = onHoverChange
+        let down = onDown
+        let pressChange = onPressChange
+        node.attachments[PointerCaptureAttachmentKey.didLoseCapture] = { [weak node] in
+            guard let node else { return }
+            node.attachments.removeValue(forKey: ButtonHost.activePressKey)
+            setButtonInteraction(node, key: ButtonHost.pressedKey, value: false,
+                                 requiresRecompose: requiresInteractionRecompose, onChange: pressChange)
+        } as () -> Void
+        registry.setHover(node) { phase in
+            node.firstResource(TooltipSession.self)?.setHovered(phase == .enter && node.supportsControlHover
+                && ButtonHost.tooltipAddsText(to: node))
+            switch phase {
+            case .enter:
+                setButtonInteraction(node,
+                                     key: ButtonHost.hoveredKey,
+                                     value: node.supportsControlHover,
+                                     requiresRecompose: requiresInteractionRecompose,
+                                     onChange: hoverChange)
+            case .leave:
+                setButtonInteraction(node,
+                                     key: ButtonHost.hoveredKey,
+                                     value: false,
+                                     requiresRecompose: requiresInteractionRecompose,
+                                     onChange: hoverChange)
+            }
+        }
+        registry.setPointer(node) { event, phase, eventPhase in
+            guard eventPhase != .capture else { return .ignored }
+            // Buttons handle the primary mouse button only. Right- and
+            // middle-clicks bubble so parent chrome can surface context-menu
+            // or middle-click semantics.
+            if event.button != .left { return .ignored }
+            switch phase {
+            case .down:
+                node.firstResource(TooltipSession.self)?.dismiss()
+                node.attachments[ButtonHost.activePressKey] = true
+                PointerCaptureHolder.current?.acquire(node, allowsGestureTransfer: true)
+                if requiresInteractionRecompose {
+                    down()
+                } else {
+                    setButtonInteraction(node,
+                                         key: ButtonHost.pressedKey,
+                                         value: true,
+                                         requiresRecompose: false,
+                                         onChange: pressChange)
+                }
+                return .handled
+            case .up:
+                let wasActive = node.attachments[ButtonHost.activePressKey] as? Bool == true
+                node.attachments.removeValue(forKey: ButtonHost.activePressKey)
+                let isInside = isPointInsideButton(event.x, event.y, node: node)
+                defer {
+                    if PointerCaptureHolder.current?.target === node {
+                        PointerCaptureHolder.current?.release()
+                    }
+                }
+                guard wasActive else { return .ignored }
+                setButtonInteraction(node,
+                                     key: ButtonHost.pressedKey,
+                                     value: false,
+                                     requiresRecompose: requiresInteractionRecompose,
+                                     onChange: pressChange)
+                guard isInside else {
+                    return .handled
+                }
+                activate()
+                return .handled
+            }
+        }
+        registry.setMotion(node) { event, _ in
+            guard node.attachments[ButtonHost.activePressKey] as? Bool == true else {
+                return .ignored
+            }
+            let isInside = isPointInsideButton(event.x, event.y, node: node)
+            setButtonInteraction(node,
+                                 key: ButtonHost.hoveredKey,
+                                 value: isInside && node.supportsControlHover,
+                                 requiresRecompose: requiresInteractionRecompose,
+                                 onChange: hoverChange)
+            if isInside {
+                if requiresInteractionRecompose {
+                    down()
+                } else {
+                    setButtonInteraction(node,
+                                         key: ButtonHost.pressedKey,
+                                         value: true,
+                                         requiresRecompose: false,
+                                         onChange: pressChange)
+                }
+            } else {
+                setButtonInteraction(node,
+                                     key: ButtonHost.pressedKey,
+                                     value: false,
+                                     requiresRecompose: requiresInteractionRecompose,
+                                     onChange: pressChange)
+            }
+            return .handled
+        }
+        registry.setKey(node) { event, _ in
+            if event.scancode == Scancode.escape, node.firstResource(TooltipSession.self)?.dismiss() == true { return .handled }
+            guard !event.isRepeat else { return .ignored }
+            switch event.scancode {
+            case Scancode.return, Scancode.space, Scancode.keypadEnter:
+                node.firstResource(TooltipSession.self)?.dismiss()
+                activate()
+                return .handled
+            default:
+                return .ignored
+            }
+        }
+    }
+
+    func _makeLayoutNode() -> LayoutNode? {
+        let l = LayoutNode()
+        // Center the styled body horizontally and vertically. Built-in styles
+        // already supply their own padding via the configuration.
+        l.flexDirection = .row
+        l.alignItems = .center
+        l.justifyContent = .center
+        return l
+    }
+
+    func _children(for node: Node) -> [any View] {
+        let style = node.compositionValue(of: ButtonStyleEnvironment.key)
+        let theme = node.theme
+        // Split from pointer focus on purpose: a click focuses the control but
+        // must not leave a ring behind. `showsFocusRing` is fed by the focus
+        // chain through `onFocusChange`.
+        let isFocused = showsFocusRing
+        let configPressed = style.requiresInteractionRecompose
+            ? isPressed
+            : (node.attachments[ButtonHost.pressedKey] as? Bool == true)
+        let configHovered = style.requiresInteractionRecompose
+            ? isHovered
+            : (node.attachments[ButtonHost.hoveredKey] as? Bool == true)
+        let config = ButtonStyleConfiguration(
+            label:      label,
+            role:       role,
+            isPressed:  isEnabled ? configPressed : false,
+            isHovered:  isEnabled && node.supportsControlHover ? configHovered : false,
+            isFocused:  isFocused,
+            isEnabled:  isEnabled,
+            isSelected: isSelected,
+            theme:      theme,
+            controlSize: node.compositionValue(of: ControlSizeEnvironment.key),
+            isIconOnly: isIconOnly,
+            input: node.compositionValue(of: SurfaceEnvironment.key).input
+        )
+        return [style.makeBody(config)]
+    }
+
+    /// A tooltip that repeats the button's own text tells nothing new, so it stays
+    /// hidden; it still reaches assistive technology as the button's help.
+    static func tooltipAddsText(to node: Node) -> Bool {
+        let tooltip = comparable(node.accessibility?.help ?? "")
+        guard !tooltip.isEmpty else { return false }
+        let visible = comparable(AccessibilityTree.drawnText(in: node))
+        return visible.isEmpty || !visible.contains(tooltip)
+    }
+
+    private static func comparable(_ text: String) -> String {
+        text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ".…:：")))
+    }
+
+    static let markerKey = "__button_host"
+    static let pressedKey = "__button_pressed"
+    static let hoveredKey = "__button_hovered"
+    static let activePressKey = "__button_active_press"
+    static let requiresInteractionRecomposeKey = "__button_requires_interaction_recompose"
+}
+
+private func isPointInsideButton(_ x: Float, _ y: Float, node: Node) -> Bool {
+    node.absoluteFrame.contains(CGPoint(x: CGFloat(x), y: CGFloat(y)))
+}
+
+private func setButtonInteraction(_ node: Node,
+                                  key: String,
+                                  value: Bool,
+                                  requiresRecompose: Bool,
+                                  onChange: (Bool) -> Void) {
+    if requiresRecompose {
+        onChange(value)
+        return
+    }
+    if node.attachments[key] as? Bool == value {
+        return
+    }
+    node.attachments[key] = value
+    node.markRenderDirty(reason: .styleSet(field: key))
+    updateBuiltinButtonChromeDescendants(of: node)
+}

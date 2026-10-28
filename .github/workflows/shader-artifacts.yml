@@ -48,7 +48,7 @@ jobs:
           node Tools/Shaders/build-metal-libraries.mjs
           node Tools/Shaders/build-metal-libraries.mjs diffuse/Engine/Sources/RenderBackend/Resources/Shaders
           mkdir -p dist/metal/ui dist/metal/engine
-          cp -R Sources/CoveUIRuntime/Resources/Shaders/Native/metal-* dist/metal/ui/
+          cp -R Graphics/Sources/CoveUIGraphics/Resources/Shaders/Native/metal-* dist/metal/ui/
           cp -R diffuse/Engine/Sources/RenderBackend/Resources/Shaders/Native/metal-* dist/metal/engine/
       - uses: actions/upload-artifact@v4
         with:

@@ -2,6 +2,9 @@
 import AppKit
 import Testing
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 @Suite("Native accessibility", .serialized)
 @MainActor

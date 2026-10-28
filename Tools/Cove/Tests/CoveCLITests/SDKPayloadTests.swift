@@ -7,11 +7,11 @@ private import ToolSupport
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? Files.remove(root) }
     try makeSDK(at: root)
-    try Files.text("# native source", to: root.appendingPathComponent("Runtime/third-party/CMakeLists.txt"))
+    try Files.text("# native source", to: root.appendingPathComponent("Native/third-party/CMakeLists.txt"))
     try Files.text("# fonts", to: root.appendingPathComponent("third-party/CMakeLists.txt"))
     try Files.json(NativeArtifacts(version: "0.0.1", platforms: [:]), to: root.appendingPathComponent("Artifacts/native.json"))
     #expect(try !NativeArtifacts.install(at: root))
-    try Files.remove(root.appendingPathComponent("Runtime/third-party/CMakeLists.txt"))
+    try Files.remove(root.appendingPathComponent("Native/third-party/CMakeLists.txt"))
     #expect(throws: (any Error).self) { try NativeArtifacts.install(at: root) }
 }
 
@@ -23,14 +23,21 @@ private import ToolSupport
     try Files.text("// runtime", to: source.appendingPathComponent("Sources/Runtime/Runtime.swift"))
     try Files.text("// inspector", to: source.appendingPathComponent("DevTools/Client/Application.js"))
     try Files.text("cache", to: source.appendingPathComponent("Tools/Cove/.build/cache"))
-    try Files.text("native source", to: source.appendingPathComponent("Runtime/third-party/sdl3/src/SDL.c"))
-    try Files.text("java host", to: source.appendingPathComponent("Runtime/third-party/sdl3/android-project/app/src/main/java/SDL.java"))
+    try Files.text("native source", to: source.appendingPathComponent("Native/third-party/sdl3/src/SDL.c"))
+    try Files.text("java host", to: source.appendingPathComponent("Native/third-party/sdl3/android-project/app/src/main/java/SDL.java"))
+    let capabilities = ["Core", "Text", "Imaging", "Graphics", "Shell", "Compose", "Compose/Composition", "Runtime", "DevTools/Protocol", "DevTools/Inspection"]
+    for capability in capabilities {
+        try Files.text("// capability", to: source.appendingPathComponent("\(capability)/Package.swift"))
+    }
     try SDKPayload.stageSources(from: source, into: payload)
+    for capability in capabilities {
+        #expect(FileManager.default.fileExists(atPath: payload.appendingPathComponent("\(capability)/Package.swift").path))
+    }
     #expect(FileManager.default.fileExists(atPath: payload.appendingPathComponent("Sources/Runtime/Runtime.swift").path))
     #expect(FileManager.default.fileExists(atPath: payload.appendingPathComponent("DevTools/Client/Application.js").path))
     #expect(!FileManager.default.fileExists(atPath: payload.appendingPathComponent("Tools/Cove/.build").path))
-    #expect(!FileManager.default.fileExists(atPath: payload.appendingPathComponent("Runtime/third-party/sdl3/src").path))
-    #expect(FileManager.default.fileExists(atPath: payload.appendingPathComponent("Runtime/third-party/sdl3/android-project/app/src/main/java/SDL.java").path))
+    #expect(!FileManager.default.fileExists(atPath: payload.appendingPathComponent("Native/third-party/sdl3/src").path))
+    #expect(FileManager.default.fileExists(atPath: payload.appendingPathComponent("Native/third-party/sdl3/android-project/app/src/main/java/SDL.java").path))
 }
 
 @Test func mobileNativeLibrariesArePreparedOnceInTheSharedSDK() throws {

@@ -3,7 +3,7 @@
 Minimal standalone client for the in-process `CoveUIDevTools` WebSocket server.
 
 The server uses SwiftNIO on macOS, Linux and Windows. Protocol dispatch and
-socket transport live in the independent [Portable package](../Portable/README.md).
+socket transport live in the [Protocol](Protocol/Package.swift), [Inspection](Inspection/Package.swift) and [DevTools](Package.swift) capability packages.
 The previous Network.framework-only server and non-Apple no-op were removed.
 
 1. Start a CoveUI app with DevTools enabled:
@@ -98,7 +98,7 @@ hosts advertise tree, selection, log, timing and configured state providers,
 and omit the unavailable mirror capability.
 
 For a headless connection test, run
-`swift run --package-path CoveUI/Portable CoveUIDevToolsProbe` from the repository
+`./cove internal build-package DevTools --product CoveUIDevToolsProbe` from the repository
 root. It serves a real Node/Yoga diagnostic tree without GPU dependencies.
 
 ## Pick, inspect layout, edit styles
@@ -236,7 +236,7 @@ reallocates its MSAA target when the drawable dimensions change.
 Run the native Inspector acceptance suite without a Wasm SDK or GPU:
 
 ```bash
-swift build --package-path CoveUI/Portable --product CoveUIDevToolsProbe
+./cove internal build-package DevTools --product CoveUIDevToolsProbe
 swift run --package-path Tools/Developer cove-dev browser verify --native-only
 ```
 
@@ -364,7 +364,7 @@ it; the mirror remains useful without foregrounding or OS automation.
 - `Client/Inspector` owns the tree, runtime inventory and temporary layout/style edits.
 - `Client/Analysis`, `Client/State`, `Client/Diagnostics`, and `Client/Mirror` own their respective panels.
 - `Client/Session` owns grouped session state and common controls; `Application.js` only composes factories and startup events. Factories receive explicit session/elements/peer operations.
-- `Protocol` documents the shared protocol. Swift message models remain canonical in Portable, separate from HTML rendering.
-- Portable server `Session`, `Transport`, `Tree` and `Requests` separate lifecycle, sockets, tree encoding and request domains. Typed host adapters group scene, checkpoints, recordings, observations and mirror callbacks.
+- `Protocol` documents the shared protocol. Swift message models remain canonical in Protocol, separate from HTML rendering.
+- DevTools server `Session`, `Transport`, `Tree` and `Requests` separate lifecycle, sockets, tree encoding and request domains. Typed host adapters group scene, checkpoints, recordings, observations and mirror callbacks.
 
 CLI discovery files, connection tokens, ADB forwarding and temporary edits are session data, never application manifest or authored checkpoint fields.

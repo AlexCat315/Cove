@@ -2,6 +2,7 @@ import Foundation
 import Testing
 import CoveUIRuntime
 @testable import CoveUIText
+@testable import CoveUIText
 
 @Suite("FreeType color glyph source")
 struct ColorGlyphResampleTests {
@@ -17,8 +18,7 @@ struct ColorGlyphResampleTests {
     func monochromeFace() {
         let atlas = FontAtlas(width: 64, height: 64)
         atlas.loadFont(path: systemTestFontPath(), size: 16)
-        guard let face = atlas.freetypeFace else { return }
-        #expect(!FreeTypeColorGlyphFace.hasColorGlyphs(face))
-        #expect(FreeTypeColorGlyphFace(face: face, size: 16, rasterScale: 1) == nil)
+        guard let face = atlas.fontFace else { return }
+        #expect(!face.hasColorSource)
     }
 }

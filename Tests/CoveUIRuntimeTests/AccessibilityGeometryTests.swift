@@ -1,6 +1,9 @@
 import Foundation
 import Testing
 import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 @Suite("Accessibility placement")
 struct AccessibilityGeometryTests {

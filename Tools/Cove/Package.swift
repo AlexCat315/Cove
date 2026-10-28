@@ -9,13 +9,13 @@ let package = Package(
     dependencies: [
         .package(path: "../Support"),
         .package(path: "../../System"),
-        .package(path: "../../Logging"),.package(path: "../../Hosts/Android/Contract"), .package(path: "../../Portable")],
+        .package(path: "../../Logging"),.package(path: "../../Hosts/Android/Contract"), .package(path: "../../DevTools/Protocol")],
     targets: [
         .executableTarget(name: "CoveCLI", dependencies: [.product(name: "ToolSupport", package: "Support"),.product(name: "CoveLogging", package: "Logging"),
             .product(name: "CoveFileSystem", package: "System"),
             .product(name: "CoveProcess", package: "System"),
             .product(name: "CoveAndroidContract", package: "Contract"),
-            .product(name: "CoveUIDevToolsProtocol", package: "Portable"),
+            .product(name: "CoveUIDevToolsProtocol", package: "Protocol"),
         ], resources: [.copy("Templates"), .copy("SDK.json")]),
         .testTarget(name: "CoveCLITests", dependencies: ["CoveCLI"]),
     ]

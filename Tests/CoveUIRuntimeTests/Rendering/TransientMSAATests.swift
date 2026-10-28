@@ -3,6 +3,9 @@ import Foundation
 import NativeRHI
 import Testing
 @testable import CoveUIRuntime
+@testable import CoveUIGraphics
+@testable import CoveUIImaging
+@testable import CoveUIText
 
 @Suite("Transient 4x MSAA", .serialized)
 struct TransientMSAATests {
