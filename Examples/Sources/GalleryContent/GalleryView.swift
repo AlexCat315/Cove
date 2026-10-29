@@ -2,6 +2,7 @@ import CoveUI
 import CoveUIRuntime
 
 /// Navigation state belongs to the shell; each story owns and resets its own example state.
+@TrackStateReads
 public struct GalleryView: View {
   @State private var page: GalleryPage
   @State private var search: TextBuffer = ""
@@ -43,28 +44,8 @@ public struct GalleryView: View {
             navigationFooter
           }
         ) {
-          // The page is one soft pane on the window surface; no rules split it.
-          Box(direction: .column, alignItems: .stretch, spacing: 0) {
-          Box(direction: .column, alignItems: .stretch, spacing: 0) {
-            header
-            toolbar
-            ScrollView(.vertical, scrollbarGutter: .stable) {
-              TextScalerReader { inherited in
-                page.makeStory(options: options)
-                  .id("\(page.rawValue)-\(resetGeneration)")
-                  .controlSize(options.size)
-                  .textScaler(inherited.multiplied(by: Float(textScale ?? 1)))
-                  .padding(24)
-                  .flex(0, shrink: 0)
-                  .frame(minWidth: 0)
-              }
-            }.flex(1, shrink: 1, basis: 0).frame(minHeight: 0).debugName("gallery-content")
-            Text("\(GalleryCatalog.entries.count) stories   ·   CoveUI component showcase")
-              .font(.caption).foregroundColor(.onSurfaceMuted).padding(horizontal: 24, vertical: 8)
-          }.flex(1, shrink: 1, basis: 0).frame(minWidth: 0, minHeight: 0)
-            .background(.background)
-          }.padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-            .flex(1, shrink: 1, basis: 0).frame(minWidth: 0, minHeight: 0)
+          GalleryPagePane(page: $page, options: $options,
+                          resetGeneration: $resetGeneration, textScale: $textScale)
         }.flex(1, shrink: 1, basis: 0).frame(minHeight: 0).debugName("gallery-shell")
       }
     }
@@ -136,13 +117,39 @@ public struct GalleryView: View {
   }
 
   private func toggleTheme() { appearance = appearance == .light ? .dark : .light }
+}
 
-  private var header: some View {
-    Column(alignment: .leading, spacing: 6) {
-      Text(page.entry.title).font(.title).foregroundColor(.onSurface)
-      Text(page.entry.summary).font(.body).foregroundColor(.onSurfaceMuted).frame(
-        width: .percent(100))
-    }.padding(horizontal: 24, vertical: 20).flex(0, shrink: 0)
+/// Page selection is read inside the outlet, away from the adaptive shell.
+private struct GalleryPagePane: View {
+  let page: Binding<GalleryPage>
+  let options: Binding<GalleryOptions>
+  let resetGeneration: Binding<Int>
+  let textScale: Binding<Double?>
+
+  var body: some View {
+    Box(direction: .column, alignItems: .stretch, spacing: 0) {
+      Box(direction: .column, alignItems: .stretch, spacing: 0) {
+        GalleryPageHeader(page: page)
+        toolbar
+        RouteOutlet(selection: page) { route in
+          ScrollView(.vertical, scrollbarGutter: .stable) {
+            TextScalerReader { inherited in
+              route.makeStory(options: options.wrappedValue)
+                .id("\(route.rawValue)-\(resetGeneration.wrappedValue)")
+                .controlSize(options.wrappedValue.size)
+                .textScaler(inherited.multiplied(by: Float(textScale.wrappedValue ?? 1)))
+                .padding(24)
+                .flex(0, shrink: 0)
+                .frame(minWidth: 0)
+            }
+          }.debugName("gallery-content")
+        }.flex(1, shrink: 1, basis: 0).frame(minHeight: 0)
+        Text("\(GalleryCatalog.entries.count) stories   ·   CoveUI component showcase")
+          .font(.caption).foregroundColor(.onSurfaceMuted).padding(horizontal: 24, vertical: 8)
+      }.flex(1, shrink: 1, basis: 0).frame(minWidth: 0, minHeight: 0)
+        .background(.background)
+    }.padding(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+      .flex(1, shrink: 1, basis: 0).frame(minWidth: 0, minHeight: 0)
   }
 
   private var toolbar: some View {
@@ -150,7 +157,7 @@ public struct GalleryView: View {
       Row(alignment: .center, spacing: 8) {
         Text("Size").font(.caption).foregroundColor(.onSurfaceMuted)
         Select(
-          selection: Binding(get: { options.size }, set: { options.size = $0 }),
+          selection: Binding(get: { options.wrappedValue.size }, set: { options.wrappedValue.size = $0 }),
           options: [
             SelectOption(value: .mini, label: "Mini"), SelectOption(value: .small, label: "Small"),
             SelectOption(value: .regular, label: "Medium"),
@@ -161,7 +168,7 @@ public struct GalleryView: View {
       Row(alignment: .center, spacing: 8) {
         Text("Scale").font(.caption).foregroundColor(.onSurfaceMuted)
         Select(
-          selection: $textScale,
+          selection: textScale,
           options: [
             SelectOption(value: 1.0, label: "100%"), SelectOption(value: 1.25, label: "125%"),
             SelectOption(value: 1.5, label: "150%"), SelectOption(value: 2.0, label: "200%"),
@@ -169,12 +176,23 @@ public struct GalleryView: View {
         ).frame(width: 86).debugName("gallery-text-scale")
       }
       Row(alignment: .center, spacing: 8) {
-        Checkbox(isOn: Binding(get: { !options.isEnabled }, set: { options.isEnabled = !$0 }))
+        Checkbox(isOn: Binding(get: { !options.wrappedValue.isEnabled }, set: { options.wrappedValue.isEnabled = !$0 }))
         Text("Disabled").font(.caption).foregroundColor(.onSurfaceVariant)
       }
-      Button("Reset example") { resetGeneration += 1 }.buttonStyle(.secondary).debugName(
+      Button("Reset example") { resetGeneration.wrappedValue += 1 }.buttonStyle(.secondary).debugName(
         "gallery-reset")
     }.controlSize(.small).padding(horizontal: 24, vertical: 10).flex(0, shrink: 0)
+  }
+}
+
+private struct GalleryPageHeader: View {
+  let page: Binding<GalleryPage>
+  var body: some View {
+    Column(alignment: .leading, spacing: 6) {
+      Text(page.wrappedValue.entry.title).font(.title).foregroundColor(.onSurface)
+      Text(page.wrappedValue.entry.summary).font(.body).foregroundColor(.onSurfaceMuted).frame(
+        width: .percent(100))
+    }.padding(horizontal: 24, vertical: 20).flex(0, shrink: 0)
   }
 }
 

@@ -14,24 +14,26 @@ struct EstimatedVirtualStack<Data: RandomAccessCollection, ID: Hashable, Content
     private let estimate: Float
     private let spacing: Float
     private let overscan: Int
+    private let preload: Float
     private let scrollToIndex: Int?
     private let content: (Data.Element) -> Content
     private let generation = UUID()
     @State private var metrics = EstimatedRowMetrics<ID>()
     @State private var viewport = ScrollViewport(offset: .zero, size: .zero)
-    @State private var offset = CGPoint.zero
+    @State private var window = VirtualWindow()
     @State private var previousTarget: Int?
     /// Bumped when a mounted row reports a new height.
     @State private var revision = 0
 
     init(_ data: Data, id: KeyPath<Data.Element, ID>, estimatedRowHeight: Float,
-         spacing: Float = 0, overscan: Int = 3, scrollToIndex: Int? = nil,
+         spacing: Float = 0, overscan: Int = 3, preload: Float = 0.3, scrollToIndex: Int? = nil,
          @ViewBuilder content: @escaping (Data.Element) -> Content) {
         self.data = data
         self.id = id
         self.estimate = estimatedRowHeight.isFinite ? max(1, estimatedRowHeight) : 44
         self.spacing = spacing.isFinite ? max(0, spacing) : 0
         self.overscan = max(0, overscan)
+        self.preload = preload
         self.scrollToIndex = scrollToIndex
         self.content = content
     }
@@ -48,36 +50,46 @@ struct EstimatedVirtualStack<Data: RandomAccessCollection, ID: Hashable, Content
         let width = max(0, Float(viewport.size.width) - gutter)
         var nextOffset = metrics.synchronize(data, id: id, generation: generation, width: width, scaler: scaler,
                                              estimate: scaler.scale(estimate), spacing: spacing,
-                                             offset: Double(offset.y), viewport: height)
+                                             offset: Double(window.offset.y), viewport: height)
         let rows = metrics.rows
         if scrollToIndex == nil, previousTarget != nil { previousTarget = nil }
         if let target = scrollToIndex, target != previousTarget, height > 0, rows.count > 0 {
             nextOffset = rows.reveal(target, offset: nextOffset, viewport: height)
             previousTarget = target
         }
-        if Double(offset.y) != nextOffset { offset.y = CGFloat(nextOffset) }
-        let range = rows.visibleRange(offset: rows.clamp(nextOffset, viewport: height),
-                                      viewport: height, overscan: overscan)
+        if Double(window.offset.y) != nextOffset { window.offset.y = CGFloat(nextOffset) }
+        let visible = rows.visibleRange(offset: rows.clamp(nextOffset, viewport: height),
+                                        viewport: height, overscan: 0)
+        let prepared = VirtualWindow.preparation(offset: rows.clamp(nextOffset, viewport: height), viewport: height, preload: preload)
+        let range = rows.visibleRange(offset: prepared.offset, viewport: prepared.height, overscan: overscan)
+        window.record(range: range, visible: visible, count: rows.count, size: viewport.size)
         let before = rows.top(of: range.lowerBound)
         let after = max(0, rows.total - rows.top(of: range.upperBound))
         let metrics = metrics
         return ScrollView(.vertical, scrollbarGutter: .stable,
-                          scrollOffset: Binding(get: { offset }, set: { if offset != $0 { offset = $0 } }),
-                          onViewportChange: { if viewport != $0 { viewport = $0 } }) {
+                          scrollOffset: Binding(get: { window.offset }, set: { if window.offset != $0 { window.offset = $0 } }),
+                          onViewportChange: { next in
+                              window.offset = next.offset
+                              let visible = rows.visibleRange(offset: rows.clamp(Double(next.offset.y), viewport: Double(next.size.height)),
+                                                              viewport: Double(next.size.height), overscan: 0)
+                              if window.needsRefill(visible: visible, size: next.size) { viewport = next }
+                          }) {
             Box(direction: .column, alignItems: .stretch, spacing: 0) {
                 Box {}.frame(height: Float(before)).flex(0, shrink: 0)
                 range.map { index in
                     let element = data[data.index(data.startIndex, offsetBy: index)]
                     let rowID = element[keyPath: id]
                     let gap = index + 1 < rows.count ? Float(rows.spacing) : 0
-                    return AnyView(EstimatedRowHost(gap: gap, onHeight: { measured in
-                        if metrics.record(rowID, height: measured) { revision &+= 1 }
-                    }) {
-                        Box(direction: .column, alignItems: .stretch) { content(element) }
-                    }
-                    .padding(EdgeInsets(bottom: gap))
-                    .flex(0, shrink: 0)
-                    .id(rowID))
+                    return AnyView(MemoizedView(key: VirtualRowKey(generation: generation, index: index,
+                        extent: Float(rows.extent(at: index)), width: width)) {
+                        EstimatedRowHost(gap: gap, onHeight: { measured in
+                            if metrics.record(rowID, height: measured) { revision &+= 1 }
+                        }) {
+                            Box(direction: .column, alignItems: .stretch) { content(element) }
+                        }
+                        .padding(EdgeInsets(bottom: gap))
+                        .flex(0, shrink: 0)
+                    }.id(rowID))
                 }
                 Box {}.frame(height: Float(after)).flex(0, shrink: 0)
             }

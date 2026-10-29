@@ -12,12 +12,14 @@ struct FixedVirtualStack<Data: RandomAccessCollection, ID: Hashable, Content: Vi
     private let rowHeight: Float
     private let spacing: Float
     private let overscan: Int
+    private let preload: Float
     private let scrollToIndex: Int?
     private let onScrollOffsetChange: ((CGPoint) -> Void)?
     private let refresh: RefreshOptions?
+    private let generation = UUID()
     private let content: (Data.Element) -> Content
     @State private var viewport = ScrollViewport(offset: .zero, size: .zero)
-    @State private var offset = CGPoint.zero
+    @State private var window = VirtualWindow()
     @State private var previousTarget: Int?
     @State private var pull: CGFloat = 0
     @State private var refreshArmed = false
@@ -25,13 +27,13 @@ struct FixedVirtualStack<Data: RandomAccessCollection, ID: Hashable, Content: Vi
     /// `onScrollOffsetChange` lets containers pin content to the live offset
     /// (for example `SectionedList`'s sticky header).
     init(_ data: Data, id: KeyPath<Data.Element, ID>, rowHeight: Float,
-         spacing: Float = 0, overscan: Int = 3, scrollToIndex: Int? = nil,
+         spacing: Float = 0, overscan: Int = 3, preload: Float = 0.3, scrollToIndex: Int? = nil,
          onScrollOffsetChange: ((CGPoint) -> Void)? = nil,
          refresh: RefreshOptions? = nil,
          @ViewBuilder content: @escaping (Data.Element) -> Content) {
         self.data = data; self.id = id
         self.rowHeight = max(1, rowHeight); self.spacing = max(0, spacing)
-        self.overscan = max(0, overscan); self.scrollToIndex = scrollToIndex
+        self.overscan = max(0, overscan); self.preload = preload; self.scrollToIndex = scrollToIndex
         self.onScrollOffsetChange = onScrollOffsetChange
         self.refresh = refresh
         self.content = content
@@ -40,6 +42,7 @@ struct FixedVirtualStack<Data: RandomAccessCollection, ID: Hashable, Content: Vi
     var body: some View {
         let stride = rowHeight + spacing
         let count = data.count
+        if scrollToIndex == nil, previousTarget != nil { previousTarget = nil }
         // The first layout has no viewport yet. Revealing against a zero-height
         // viewport scrolls a row too far and the request is then consumed, so a
         // target that is already visible still starts the stack scrolled past
@@ -48,24 +51,34 @@ struct FixedVirtualStack<Data: RandomAccessCollection, ID: Hashable, Content: Vi
             previousTarget = target
             let top = CGFloat(max(0, min(target, count - 1))) * CGFloat(stride)
             let bottom = top + CGFloat(rowHeight)
-            if top < offset.y { offset.y = top }
-            else if bottom > offset.y + viewport.size.height {
-                offset.y = max(0, bottom - max(CGFloat(rowHeight), viewport.size.height))
+            if top < window.offset.y { window.offset.y = top }
+            else if bottom > window.offset.y + viewport.size.height {
+                window.offset.y = max(0, bottom - max(CGFloat(rowHeight), viewport.size.height))
             }
         }
         let total = max(0, Float(count) * stride - spacing)
         let refreshInset: Float = refresh?.isRefreshing.wrappedValue == true ? 36 : 0
-        let clampedOffset = max(0, min(Float(offset.y), max(0, total - Float(viewport.size.height))))
-        let range = Self.visibleRange(count: count, rowStride: stride, offset: clampedOffset,
-                                      height: Float(viewport.size.height), overscan: overscan)
+        let clampedOffset = max(0, min(Float(window.offset.y), max(0, total - Float(viewport.size.height))))
+        let visible = Self.visibleRange(count: count, rowStride: stride, offset: clampedOffset,
+                                        height: Float(viewport.size.height), overscan: 0)
+        let prepared = VirtualWindow.preparation(offset: Double(clampedOffset), viewport: Double(viewport.size.height), preload: preload)
+        let range = Self.visibleRange(count: count, rowStride: stride, offset: Float(prepared.offset),
+                                      height: Float(prepared.height), overscan: overscan)
+        window.record(range: range, visible: visible, count: count, size: viewport.size)
         let scroll = ScrollView(.vertical, scrollbarGutter: .stable,
-                                scrollOffset: Binding(get: { offset }, set: {
-            if offset != $0 {
-                offset = $0
+                                scrollOffset: Binding(get: { window.offset }, set: {
+            if window.offset != $0 {
+                window.offset = $0
                 updateRefresh($0)
             }
         }),
-                                onViewportChange: { if viewport != $0 { viewport = $0 } },
+                                onViewportChange: { next in
+                                    window.offset = next.offset
+                                    let visible = Self.visibleRange(count: count, rowStride: stride,
+                                        offset: max(0, min(Float(next.offset.y), max(0, total - Float(next.size.height)))),
+                                        height: Float(next.size.height), overscan: 0)
+                                    if window.needsRefill(visible: visible, size: next.size) { viewport = next }
+                                },
                                 onGeometryChange: { geometry in
                                     onScrollOffsetChange?(geometry.offset)
                                 }) {
@@ -93,9 +106,9 @@ struct FixedVirtualStack<Data: RandomAccessCollection, ID: Hashable, Content: Vi
     }
 
     private func updateRefresh(_ next: CGPoint) {
+        guard let refresh else { return }
         let nextPull = max(0, -next.y)
         if pull != nextPull { pull = nextPull }
-        guard let refresh else { return }
         if nextPull <= 1 { refreshArmed = false }
         guard nextPull >= CGFloat(refresh.threshold),
               !refreshArmed,
@@ -106,11 +119,12 @@ struct FixedVirtualStack<Data: RandomAccessCollection, ID: Hashable, Content: Vi
 
     private func row(at index: Int) -> AnyView {
         let element = data[data.index(data.startIndex, offsetBy: index)]
-        return AnyView(Box(direction: .column, alignItems: .stretch) { content(element) }
+        return AnyView(MemoizedView(key: VirtualRowKey(generation: generation, index: index, extent: rowHeight + spacing)) {
+            Box(direction: .column, alignItems: .stretch) { content(element) }
             .frame(height: rowHeight + (index < data.count - 1 ? spacing : 0))
             .padding(EdgeInsets(bottom: index < data.count - 1 ? spacing : 0))
             .clipped()
-            .id(element[keyPath: id]))
+        }.id(element[keyPath: id]))
     }
 
     static func visibleRange(count: Int, rowStride: Float, offset: Float,

@@ -7,6 +7,8 @@ struct SidebarDestination<ID: Hashable>: View {
     let entry: SidebarHierarchy<ID>.Entry
     let selection: Binding<ID?>
     let expanded: Binding<Set<ID>>
+    let isSelected: Bool
+    let isExpanded: Bool
     let isTabStop: Bool
     let iconWidth: Float?
     let minimumRowHeight: Float
@@ -18,11 +20,9 @@ struct SidebarDestination<ID: Hashable>: View {
     private var item: SidebarItem<ID> {
         var value = entry.item; value.isEnabled = entry.isEnabled; return value
     }
-    private var isExpanded: Bool { expanded.wrappedValue.contains(item.id) }
     /// Only the active leaf paints as selected. Branches that contain it stay
     /// expanded and disclose the path, but three blue rows would read as three
     /// simultaneous selections.
-    private var isSelected: Bool { selection.wrappedValue == item.id }
     @State private var showsActions = false
     private var actionsWidth: Float { item.contextMenu.isEmpty ? 0 : 44 }
     /// Title inset that keeps text clear of the absolutely placed accessory and actions.
@@ -32,7 +32,7 @@ struct SidebarDestination<ID: Hashable>: View {
 
     @ViewBuilder
     var body: some View {
-        let row = SidebarSelectionRevealHost(isSelected: selection.wrappedValue == item.id, presentation: presentation) {
+        let row = SidebarSelectionRevealHost(isSelected: isSelected, presentation: presentation) {
             Box(direction: .row, alignItems: .stretch, spacing: 0) {
                 // The hit/selection surface is the whole row, not the label's
                 // intrinsic width. Otherwise short items get a shorter hover

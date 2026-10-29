@@ -19,7 +19,8 @@ struct SidebarHierarchyHost<ID: Hashable, Content: View>: _PrimitiveView {
   func _makeLayoutNode() -> LayoutNode? { nil }
   func _updateNode(_ node: Node) {
     session.root = node
-    let path = hierarchy.path(to: selection.wrappedValue)
+    let selected = selection.wrappedValue
+    let path = hierarchy.path(to: selected)
     if session.revealedPath != path {
       session.revealedPath = path
       let ancestors = Set(path.dropLast())
@@ -35,7 +36,7 @@ struct SidebarHierarchyHost<ID: Hashable, Content: View>: _PrimitiveView {
     session.previous = hierarchy
     node.layoutDidUpdate = { node in
       let tabStop = session.tabStop(in: hierarchy, expanded: expanded.wrappedValue,
-                                    selection: selection.wrappedValue).map(AnyHashable.init)
+                                    selection: selected).map(AnyHashable.init)
       var pending = node.children
       while let item = pending.popLast() {
         if let id = item.attachments["__roving.item"] as? AnyHashable { item.isTabStop = id == tabStop }

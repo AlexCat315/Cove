@@ -11,7 +11,9 @@ import CoveUIImaging
 /// after rendering. The closure receives the element, the available content
 /// width and the inherited text scaler, and returns the complete row height;
 /// heights are cached until data, width, spacing or text scale change, and
-/// scrolling locates rows in O(log n).
+/// scrolling locates rows in O(log n). `preload` adds a fraction of the
+/// viewport across both edges (0.3 prepares about 130%); `overscan` is the
+/// minimum extra row count per edge. Refill happens before that buffer runs out.
 public struct VirtualStack<Data: RandomAccessCollection, ID: Hashable, Content: View>: View {
     private enum Rows {
         case fixed(Float)
@@ -23,21 +25,22 @@ public struct VirtualStack<Data: RandomAccessCollection, ID: Hashable, Content: 
     private let rows: Rows
     private let spacing: Float
     private let overscan: Int
+    private let preload: Float
     private let scrollToIndex: Int?
     private let content: (Data.Element) -> Content
 
     public init(_ data: Data, id: KeyPath<Data.Element, ID>, rowHeight: Float,
-                spacing: Float = 0, overscan: Int = 3, scrollToIndex: Int? = nil,
+                spacing: Float = 0, overscan: Int = 3, preload: Float = 0.3, scrollToIndex: Int? = nil,
                 @ViewBuilder content: @escaping (Data.Element) -> Content) {
-        self.init(data, id: id, rows: .fixed(rowHeight), spacing: spacing, overscan: overscan,
+        self.init(data, id: id, rows: .fixed(rowHeight), spacing: spacing, overscan: overscan, preload: preload,
                   scrollToIndex: scrollToIndex, content: content)
     }
 
     public init(_ data: Data, id: KeyPath<Data.Element, ID>,
                 rowHeight: @escaping (Data.Element, Float, TextScaler) -> Float,
-                spacing: Float = 0, overscan: Int = 3, scrollToIndex: Int? = nil,
+                spacing: Float = 0, overscan: Int = 3, preload: Float = 0.3, scrollToIndex: Int? = nil,
                 @ViewBuilder content: @escaping (Data.Element) -> Content) {
-        self.init(data, id: id, rows: .variable(rowHeight), spacing: spacing, overscan: overscan,
+        self.init(data, id: id, rows: .variable(rowHeight), spacing: spacing, overscan: overscan, preload: preload,
                   scrollToIndex: scrollToIndex, content: content)
     }
 
@@ -45,29 +48,29 @@ public struct VirtualStack<Data: RandomAccessCollection, ID: Hashable, Content: 
     /// (logical points, scaled with text), and each mounted row's laid-out
     /// height replaces the estimate for the current width and text scale.
     public init(_ data: Data, id: KeyPath<Data.Element, ID>, estimatedRowHeight: Float,
-                spacing: Float = 0, overscan: Int = 3, scrollToIndex: Int? = nil,
+                spacing: Float = 0, overscan: Int = 3, preload: Float = 0.3, scrollToIndex: Int? = nil,
                 @ViewBuilder content: @escaping (Data.Element) -> Content) {
-        self.init(data, id: id, rows: .estimated(estimatedRowHeight), spacing: spacing, overscan: overscan,
+        self.init(data, id: id, rows: .estimated(estimatedRowHeight), spacing: spacing, overscan: overscan, preload: preload,
                   scrollToIndex: scrollToIndex, content: content)
     }
 
-    private init(_ data: Data, id: KeyPath<Data.Element, ID>, rows: Rows, spacing: Float, overscan: Int,
+    private init(_ data: Data, id: KeyPath<Data.Element, ID>, rows: Rows, spacing: Float, overscan: Int, preload: Float,
                  scrollToIndex: Int?, content: @escaping (Data.Element) -> Content) {
         self.data = data; self.id = id; self.rows = rows
-        self.spacing = spacing; self.overscan = overscan
+        self.spacing = spacing; self.overscan = overscan; self.preload = preload
         self.scrollToIndex = scrollToIndex; self.content = content
     }
 
     public var body: some View {
         switch rows {
         case .fixed(let height):
-            FixedVirtualStack(data, id: id, rowHeight: height, spacing: spacing, overscan: overscan,
+            FixedVirtualStack(data, id: id, rowHeight: height, spacing: spacing, overscan: overscan, preload: preload,
                               scrollToIndex: scrollToIndex, content: content)
         case .variable(let height):
-            VariableVirtualStack(data, id: id, rowHeight: height, spacing: spacing, overscan: overscan,
+            VariableVirtualStack(data, id: id, rowHeight: height, spacing: spacing, overscan: overscan, preload: preload,
                                  scrollToIndex: scrollToIndex, content: content)
         case .estimated(let estimate):
-            EstimatedVirtualStack(data, id: id, estimatedRowHeight: estimate, spacing: spacing, overscan: overscan,
+            EstimatedVirtualStack(data, id: id, estimatedRowHeight: estimate, spacing: spacing, overscan: overscan, preload: preload,
                                   scrollToIndex: scrollToIndex, content: content)
         }
     }

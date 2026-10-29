@@ -1,4 +1,5 @@
 import CoveUIScene
+private import Foundation
 import CoveUIText
 import CoveUIImaging
 
@@ -12,6 +13,9 @@ public struct Sidebar<ID: Hashable, Header: View, Footer: View>: View {
     private let onActivate: (ID) -> Void
     private let header: Header
     private let footer: Footer
+    // Fresh parent inputs must refresh opaque slots and callbacks. Selection-only
+    // updates keep this generation and change just the affected row keys.
+    private let generation = UUID()
     @State private var localExpanded: Set<ID> = []
     @State private var hierarchySession = SidebarHierarchySession<ID>()
     public init(selection: Binding<ID?>, sections: [SidebarSection<ID>], presentation: SidebarPresentation = .expanded,
@@ -31,14 +35,16 @@ public struct Sidebar<ID: Hashable, Header: View, Footer: View>: View {
     public var body: some View {
         let hierarchy = SidebarHierarchy(sections)
         let expanded = expansion ?? $localExpanded
+        let selectedID = selection.wrappedValue
+        let expandedIDs = expanded.wrappedValue
         let enabled = hierarchy.entries.filter { $0.isEnabled && $0.isVisible(in: expanded.wrappedValue) }.map { $0.item.id }
-        let tabStop = hierarchySession.tabStop(in: hierarchy, expanded: expanded.wrappedValue, selection: selection.wrappedValue)
+        let tabStop = hierarchySession.tabStop(in: hierarchy, expanded: expandedIDs, selection: selectedID)
         Box(direction: .column, alignItems: .stretch, spacing: 0) {
             Box(direction: .column, alignItems: .stretch) { header }.flex(0, shrink: 0)
             SidebarHierarchyHost(hierarchy: hierarchy, expanded: expanded, selection: selection, session: hierarchySession) {
             RovingFocusHost(enabledItems: enabled.map { AnyHashable($0) }, selection: {
-                                hierarchySession.tabStop(in: hierarchy, expanded: expanded.wrappedValue,
-                                                         selection: selection.wrappedValue).map(AnyHashable.init)
+                                hierarchySession.tabStop(in: hierarchy, expanded: expandedIDs,
+                                                         selection: selectedID).map(AnyHashable.init)
                             }, onSelect: {
                                 if let id = $0.base as? ID, hierarchy.entry(id)?.isBranch == false { selection.wrappedValue = id }
                             }, command: { event in
@@ -70,16 +76,23 @@ public struct Sidebar<ID: Hashable, Header: View, Footer: View>: View {
                                             .padding(horizontal: 8, vertical: 8)
                                     }
                                     for entry in entries {
-                                        AnyView(AnimatedVisibility(isVisible: entry.isVisible(in: expanded.wrappedValue),
+                                        let selected = selection.wrappedValue == entry.item.id
+                                        let isExpanded = expanded.wrappedValue.contains(entry.item.id)
+                                        let visible = entry.isVisible(in: expanded.wrappedValue)
+                                        MemoizedView(key: SidebarRowKey(generation: generation, selected: selected,
+                                            expanded: isExpanded, visible: visible, tabStop: entry.item.id == tabStop)) {
+                                        AnyView(AnimatedVisibility(isVisible: visible,
                                                                    transition: .identity, retainsContent: true) {
                                         SidebarDestination(entry: entry, selection: selection, expanded: expanded,
+                                                           isSelected: selected, isExpanded: isExpanded,
                                                            isTabStop: entry.item.id == tabStop, iconWidth: iconWidth,
                                                            minimumRowHeight: minimumRowHeight, onActivate: onActivate,
                                                            presentation: presentation,
                                                            iconExtent: metrics.size(entry.item.icon == nil ? .medium : entry.item.iconSize),
                                                            disclosureLane: entries.contains { $0.isBranch },
                                                            contextLabel: hierarchy.context(for: entry))
-                                        }.id(entry.item.id))
+                                        })
+                                        }.id(entry.item.id)
                                     }
                                 }
                             }.id(section.id))
@@ -92,6 +105,14 @@ public struct Sidebar<ID: Hashable, Header: View, Footer: View>: View {
         }.background(.surface).frame(width: presentation.railWidth.map(FrameDimension.points) ?? .auto,
                                     minWidth: 0, minHeight: 0)
     }
+}
+
+private struct SidebarRowKey: Equatable {
+    let generation: UUID
+    let selected: Bool
+    let expanded: Bool
+    let visible: Bool
+    let tabStop: Bool
 }
 
 public extension Sidebar where Header == EmptyView, Footer == EmptyView {

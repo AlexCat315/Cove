@@ -11,6 +11,9 @@ enum ViewInputComparison {
         UInt.self, UInt8.self, UInt16.self, UInt32.self, UInt64.self, Float.self, Double.self,
         String.self, Character.self, UUID.self, Date.self, CGFloat.self].map(ObjectIdentifier.init))
     static func equal(_ lhs: Any, _ rhs: Any, environment: Bool = false) -> Bool {
+        if !environment, let lhs = lhs as? any _MemoizedView, let rhs = rhs as? any View {
+            return lhs._hasSameInputs(as: rhs)
+        }
         var remaining = 2_048
         if !environment {
             guard type(of: lhs) == type(of: rhs) else { return false }

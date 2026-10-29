@@ -8,6 +8,54 @@ import Testing
 @Suite("Gallery adaptive shell", .serialized)
 @MainActor
 struct AdaptiveShellTests {
+  @Test("Page switches leave the adaptive shell and unrelated sidebar destinations untouched")
+  func pageSwitchIsolation() throws {
+    try scene { gallery, graph, _, _ in
+      let all = nodes(graph.tree.root)
+      let shellNode = all.first { $0.viewTag == String(reflecting: GalleryView.self) }
+      let shell = try #require(shellNode)
+      let beforeShell = shell.recompositionMetrics?.count
+      let sizeControl = try named("gallery-size", graph)
+      var before: [ElementID: UInt64] = [:]
+      for node in all where node.viewTag?.hasPrefix("CoveUICompose.SidebarDestination<") == true {
+        before[node.id] = node.recompositionMetrics?.count ?? 0
+      }
+      #expect(before.count > 80)
+      let renderer = LayerAwareNodeRenderer()
+      // Match a running application: the shell already has retained geometry.
+      for _ in 0..<2 { renderer.render(tree: graph.renderTree, into: DrawList()) }
+      graph.tree.flush()
+      let start = ContinuousClock.now
+      gallery.selectPage(.slider)
+      let commitStart = ContinuousClock.now
+      graph.recomposer.commitAll()
+      let commitEnd = ContinuousClock.now
+      graph.computeLayoutIfNeeded(width: 1280, height: 820)
+      let layoutEnd = ContinuousClock.now
+      renderer.render(tree: graph.renderTree, into: DrawList())
+      let drawEnd = ContinuousClock.now
+      settle(graph, width: 1280)
+      let elapsed = start.duration(to: .now).components
+      var changed: [Node] = []
+      for node in nodes(graph.tree.root) {
+        if let previous = before[node.id], (node.recompositionMetrics?.count ?? 0) > previous {
+          changed.append(node)
+        }
+      }
+      #expect(shell.recompositionMetrics?.count == beforeShell)
+      #expect(try named("gallery-size", graph) === sizeControl)
+      #expect(changed.count <= 3)
+      #expect(gallery.currentPage == .slider)
+      #expect(try named("sidebar-item-slider", graph).accessibility?.state.isSelected == true)
+      print("COVE_ROUTE_SWITCH rows=\(changed.count)/\(before.count) settleMs=\(Double(elapsed.seconds) * 1_000 + Double(elapsed.attoseconds) / 1e15)")
+      func milliseconds(_ start: ContinuousClock.Instant, _ end: ContinuousClock.Instant) -> Double {
+        let parts = start.duration(to: end).components
+        return Double(parts.seconds) * 1_000 + Double(parts.attoseconds) / 1e15
+      }
+      print("COVE_ROUTE_FIRST_FRAME commitMs=\(milliseconds(commitStart, commitEnd)) layoutMs=\(milliseconds(commitEnd, layoutEnd)) drawMs=\(milliseconds(layoutEnd, drawEnd))")
+    }
+  }
+
   private func nodes(_ root: Node?) -> [Node] {
     var pending = root.map { [$0] } ?? []
     var result: [Node] = []
