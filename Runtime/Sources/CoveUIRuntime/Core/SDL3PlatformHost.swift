@@ -37,6 +37,11 @@ public final class PlatformWindowSession {
     fileprivate var nextRenderAttemptTime: Double = 0
 
     public private(set) var isPresentationActive = true
+    /// When true, the frame loop keeps driving this window (so the DevTools
+    /// mirror can capture offscreen frames) even while it is occluded or the app
+    /// is backgrounded. Presentation resources are still released on occlusion,
+    /// so this does not keep GPU memory resident.
+    var keepRendering = false
     public var onPresentationChanged: (@MainActor (Bool) -> Void)?
 
     fileprivate func updatePresentation(active: Bool) -> Bool {
@@ -466,6 +471,14 @@ public final class SDL3PlatformHost: PlatformHost {
         }
     }
 
+    /// Keep driving frames for `windowID` even when it is occluded or the app is
+    /// backgrounded. Used by the DevTools mirror so offscreen capture keeps
+    /// working while the window is not on screen. Presentation is still
+    /// suspended, so this stays memory-efficient.
+    public func setWindowKeepRendering(_ windowID: WindowID, _ keep: Bool) {
+        sessions[windowID]?.keepRendering = keep
+    }
+
     public var safeArea: WindowSafeArea {
         guard let id = mainWindowID else { return WindowSafeArea() }
         return shell?.window(for: id)?.safeArea ?? WindowSafeArea()
@@ -566,10 +579,11 @@ public final class SDL3PlatformHost: PlatformHost {
         }
         let wantsNativeRefresh = frameDrive.mode == .displayRefresh
             || (frameDrive.mode == .eventDriven && animationsWereActive)
+        let anyKeepRenderingOccluded = sessions.values.contains { $0.keepRendering && !$0.isPresentationActive }
         var nativeWindows = Set<WindowID>()
         var refreshTicks: [WindowID: DisplayRefreshTick] = [:]
         for id in sessionOrder {
-            let enabled = wantsNativeRefresh && sessions[id]?.isPresentationActive == true
+            let enabled = wantsNativeRefresh && (sessions[id]?.isPresentationActive == true || sessions[id]?.keepRendering == true)
             if shell.setDisplayRefreshEnabled(enabled, windowID: id), enabled {
                 nativeWindows.insert(id)
                 if let tick = shell.takeDisplayRefresh(windowID: id) { refreshTicks[id] = tick }
@@ -583,6 +597,11 @@ public final class SDL3PlatformHost: PlatformHost {
         }
         let fallbackInterval: Double? = {
             if case let .fixed(fps) = frameDrive.mode, activeWindowCount > 0 { return 1.0 / fps }
+            if anyKeepRenderingOccluded {
+                // Occluded / backgrounded windows receive no OS vsync callback,
+                // so drive them with a software deadline instead.
+                return 1.0 / Self.sanitizedDisplayRefreshRate(shell.displayRefreshRate(windowID: mainWindowID))
+            }
             guard needsRefreshFallback else { return nil }
             return 1.0 / Self.sanitizedDisplayRefreshRate(shell.displayRefreshRate(windowID: mainWindowID))
         }()
@@ -679,7 +698,7 @@ public final class SDL3PlatformHost: PlatformHost {
             if nativeWindows.contains(id), refreshTicks[id] != nil {
                 session.nextRenderAttemptTime = 0
             }
-            let shouldRender = session.isPresentationActive && (session.needsDisplay || hasRenderInvalidation)
+            let shouldRender = (session.isPresentationActive || session.keepRendering) && (session.needsDisplay || hasRenderInvalidation)
                 && frameStart >= session.nextRenderAttemptTime
                 && (!isCadenceDriven || refreshTicks[id] != nil || (!nativeWindows.contains(id) && fallbackDue))
                 && (isCadenceDriven || !nativeWindows.contains(id) || refreshTicks[id] != nil || session.needsDisplay)

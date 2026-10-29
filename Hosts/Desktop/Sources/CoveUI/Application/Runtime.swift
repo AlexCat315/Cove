@@ -118,6 +118,12 @@ public final class Application {
     }
 
     private func configureHostFrameDrive() {
+        applyFrameRatePolicy()
+    }
+
+    /// Apply the configured frame-drive policy. Also used to restore the policy
+    /// after a mirror session forces continuous presentation.
+    private func applyFrameRatePolicy() {
         if let targetFrameRate = config.frames.validatedTargetRate {
             host.setTargetFrameRate(targetFrameRate)
             return
@@ -167,7 +173,24 @@ public final class Application {
                 self?.host.mainSession?.injectEvent(event)
             }
             dev.onMirrorStart = { [weak self] in
-                self?.host.requestDisplay()
+                guard let self else { return }
+                // Force continuous presentation and keep the frame loop driving
+                // even when the window is occluded / backgrounded, so the mirror
+                // keeps receiving offscreen frames. The swapchain is still
+                // released on occlusion (see `onWindowPresentationChanged`), so
+                // this does not keep GPU presentation memory resident —
+                // background mirroring stays memory-efficient.
+                self.host.setFrameRateMode(.displayRefresh)
+                if let id = self.host.mainSession?.id {
+                    self.host.setWindowKeepRendering(id, true)
+                }
+            }
+            dev.onMirrorStop = { [weak self] in
+                guard let self else { return }
+                if let id = self.host.mainSession?.id {
+                    self.host.setWindowKeepRendering(id, false)
+                }
+                self.applyFrameRatePolicy()
             }
             dev.server.host.window.resize = { [weak self] size in
                 guard let host = self?.host, let window = host.mainWindow else { return "No main window" }
@@ -257,6 +280,15 @@ public final class Application {
                 if self.host.mainSession?.id == windowID {
                     try self.windowRenderer?.setPresentationActive(active)
                     self.callbacks.events.publish(active ? .windowExposed : .windowOccluded)
+                    // When the window goes off-screen we already release the
+                    // swapchain / MSAA / framebuffer. Also drop the heavy CPU
+                    // caches (glyph atlas, image assets, render tree) so
+                    // backgrounding actually reclaims memory. Skip this while
+                    // mirroring so the offscreen capture path keeps its shared
+                    // texture uploads warm.
+                    if !active, !(self.diagnostics.devTools?.mirrorIsActive ?? false) {
+                        self.trimMemory()
+                    }
                 } else {
                     try self.auxiliaryWindows[windowID]?.setPresentationActive(active)
                 }

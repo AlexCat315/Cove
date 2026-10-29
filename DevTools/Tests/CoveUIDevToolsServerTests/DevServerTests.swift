@@ -462,6 +462,34 @@ func observationStreamsAreIndependentAndTimelineStopsAfterLastDisconnect() async
 
 
 @Test @MainActor
+func timingFramesStreamOnlyToSubscribedClients() async throws {
+    let transport = TestTransport(), subscriber = TestConnection(), observer = TestConnection()
+    let server = DevServer(config: DevToolsConfig(), transport: transport)
+    try server.start(); defer { server.stop() }
+    transport.onEvent?(.connected(subscriber)); _ = try await receive("hello", from: subscriber)
+    transport.onEvent?(.connected(observer)); _ = try await receive("hello", from: observer)
+
+    func frame(_ number: UInt64) -> TimingFramePayload {
+        TimingFramePayload(frame: number, layoutMs: 1, drawMs: 2, presentMs: 3, totalMs: 6,
+                           nodeCount: 4, batchCount: 1, presented: true)
+    }
+
+    // Silence before anyone subscribes: the publisher must not queue work.
+    server.broadcastTiming(frame(1))
+    try await Task.sleep(for: .milliseconds(50))
+    #expect(!subscriber.take().contains { $0.type == "timing.frame" })
+
+    try transport.request("timing.subscribe", connection: subscriber)
+    _ = try await receive("timing.subscribe.ok", from: subscriber)
+    server.broadcastTiming(frame(2))
+    let delivered = try await receive("timing.frame", from: subscriber)
+    let payload = try #require(DevToolsCodec.decode(TimingFramePayload.self, delivered.payload))
+    #expect(payload.frame == 2 && payload.totalMs == 6 && payload.presented == true)
+    // A second client only receives frames after its own subscribe.
+    #expect(!observer.take().contains { $0.type == "timing.frame" })
+}
+
+@Test @MainActor
 func logsReplayBeforeConnectionFilterAndReportSlowConsumerLoss() async throws {
     let label = "test.server." + UUID().uuidString
     let logger = LogSystem.logger(label)

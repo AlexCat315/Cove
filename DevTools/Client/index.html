@@ -190,6 +190,12 @@
           </div>
 
           <div class="perfSection">
+            <strong>Frame bookkeeping · CPU timeline</strong>
+            <p class="panelStatus">Per-frame non-render work (surface, accessibility, node count, flush). Spans overlap and nest; never sum them. Enable Auto trace to collect.</p>
+            <div id="perfFrameSpans" class="perfTable"></div>
+          </div>
+
+          <div class="perfSection">
             <strong>Markers</strong>
             <div id="perfMarkers" class="markerList">No markers. Use Mark to tag a point for before/after comparisons.</div>
           </div>
@@ -197,7 +203,7 @@
           <section class="analysisPanel">
             <strong>CPU timeline</strong>
             <div class="editActions"><button id="startTimeline" disabled>Record timeline</button><button id="stopTimeline" disabled>Stop</button><button id="exportTimeline" disabled>Export trace</button></div>
-            <select id="timelinePhase" aria-label="Timeline phase"><option value="">All stages</option><option value="recomposition">Recomposition commits</option><option value="component">Component bodies</option><option value="layout">Layout</option><option value="draw">Draw</option></select>
+            <select id="timelinePhase" aria-label="Timeline phase"><option value="">All stages</option><option value="frame">Frame bookkeeping</option><option value="recomposition">Recomposition commits</option><option value="component">Component bodies</option><option value="layout">Layout</option><option value="draw">Draw</option></select>
             <div id="timelineStatus" class="panelStatus">Stopped</div><div id="timelineEvents" class="timelineEvents"></div>
             <p class="panelStatus">CPU spans use one monotonic clock. Component and commit spans overlap. Draw measures command generation; GPU execution is excluded. Keeps the latest 2048 events.</p>
           </section>

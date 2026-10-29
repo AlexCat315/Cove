@@ -105,7 +105,7 @@ function resetObservations() {
 }
 function timelineTrace() {
   return { displayTimeUnit: "ms", traceEvents: observation.events.map(e => ({ name: e.name, cat: e.phase, ph: "X", pid: 1,
-    tid: ({component: 1, recomposition: 1, layout: 2, draw: 3})[e.phase] ?? 4, ts: e.startMs * 1000, dur: e.durationMs * 1000,
+    tid: ({component: 1, recomposition: 1, layout: 2, draw: 3, frame: 5})[e.phase] ?? 4, ts: e.startMs * 1000, dur: e.durationMs * 1000,
     args: { scopeID: e.scopeID, reasons: e.reasons ?? [] } })) };
 }
 document.addEventListener("DOMContentLoaded", () => {

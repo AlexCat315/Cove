@@ -707,3 +707,28 @@ textarea {
   color: var(--muted);
   font-size: 12px;
 }
+
+/* Heatmap time axis under the stage rows */
+.heatmap .heatAxis {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  text-align: right;
+}
+
+/* Worst-frame composition bar (8-column "composed" row) */
+.perfTableRow.composed {
+  grid-template-columns: 64px 60px 56px 56px 56px 56px 84px minmax(140px, 1fr);
+}
+.compBar {
+  display: flex;
+  height: 14px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+}
+.compSegment { height: 100%; }
+
+/* Frame-bookkeeping timeline spans */
+.timelineBar.frame { background: #f59e0b; }

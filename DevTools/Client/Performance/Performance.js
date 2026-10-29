@@ -17,6 +17,7 @@ const perf = context.session.performance = {
   frames: [],
   markers: [],
   connectedAt: null,
+  lastFrameAt: null,
   autoTrace: readPref("cove.devtools.autoTrace", true),
   timer: null,
   memoryToolsId: null,
@@ -37,12 +38,27 @@ function isPerformanceTab() {
   return document.querySelector(".dockTab[data-tab='performance']")?.classList.contains("active") === true;
 }
 
+// Coalesced render: when the performance tab is visible, incoming frames drive
+// a render on the next frame (throttled) so data appears without waiting for the
+// 1-second timer. The panel is small; we cap to ~3 renders/second.
+let perfRenderScheduled = false;
+let perfLastRenderAt = 0;
+function scheduleRender() {
+  if (!isPerformanceTab()) return;
+  const now = performance.now();
+  if (now - perfLastRenderAt >= 350) { perfLastRenderAt = now; render(); return; }
+  if (perfRenderScheduled) return;
+  perfRenderScheduled = true;
+  requestAnimationFrame(() => { perfRenderScheduled = false; perfLastRenderAt = performance.now(); render(); });
+}
+
 function setConnected(connected) {
   perf.memory = null;
   const memory = el("perfMemory");
   if (memory) memory.textContent = "";
   if (connected) {
     perf.connectedAt = Date.now();
+    perf.lastFrameAt = null;
     perf.memoryAvailable = false;
     perf.memoryToolsId = context.connection.send("diagnostics.tools");
     if (perf.timer == null) perf.timer = setInterval(() => {
@@ -97,6 +113,7 @@ function reset() {
   perf.frames = [];
   perf.markers = [];
   perf.connectedAt = null;
+  perf.lastFrameAt = null;
   render();
   updateControls();
 }
@@ -104,6 +121,7 @@ function reset() {
 function recordFrame(payload) {
   if (!payload) return;
   const now = performance.now();
+  perf.lastFrameAt = now;
   perf.frames.push({
     t: now,
     wall: Date.now(),
@@ -118,6 +136,7 @@ function recordFrame(payload) {
     batchCount: finite(payload.batchCount),
   });
   if (perf.frames.length > MAX_FRAMES) perf.frames.splice(0, perf.frames.length - MAX_FRAMES);
+  scheduleRender();
 }
 
 function framesInWindow() {
@@ -171,12 +190,12 @@ function heatColor(value, budget) {
 
 function buildReport() {
   const frames = framesInWindow();
-  const stages = STAGES
-    .filter(stage => stage.optional !== true || frames.some(frame => frame[stage.key] != null))
+  const activeStages = STAGES.filter(stage => stage.optional !== true || frames.some(frame => frame[stage.key] != null));
+  const stages = activeStages
     .map(stage => stageStats(frames, stage))
     .filter(Boolean);
-  const totals = sortedValues(frames, "totalMs");
   const total = stageStats(frames, STAGES[0]);
+  const totals = sortedValues(frames, "totalMs");
   const fpsValues = frames.map(frame => frame.totalMs > 0 ? 1000 / frame.totalMs : 0);
   const presentKnown = frames.filter(frame => frame.presented != null);
   const presented = presentKnown.filter(frame => frame.presented).length;
@@ -185,7 +204,6 @@ function buildReport() {
   const spanMs = frames.length > 1 ? frames[frames.length - 1].t - frames[0].t : 0;
 
   // Heatmap: bucket frames by wall time, worst frame wins per bucket.
-  const activeStages = STAGES.filter(stage => stage.optional !== true || frames.some(frame => frame[stage.key] != null));
   const buckets = [];
   for (let i = 0; i < HEAT_BUCKETS; i++) buckets.push(null);
   if (frames.length) {
@@ -202,6 +220,7 @@ function buildReport() {
   };
 
   const worst = frames.slice().sort((a, b) => b.totalMs - a.totalMs).slice(0, 8);
+  const frameSpans = aggregatePhaseSpans("frame");
   const hotComponents = aggregateComponents();
   const markers = perf.markers
     .filter(marker => !frames.length || marker.t >= frames[0].t - 1000)
@@ -234,6 +253,7 @@ function buildReport() {
     stages,
     heatmap,
     worstFrames: worst,
+    frameSpans,
     hotComponents,
     markers,
     timeline: {
@@ -267,16 +287,40 @@ function aggregateComponents() {
     .slice(0, 15);
 }
 
+// Frame-bookkeeping spans (Surface, chrome hit-test, accessibility split,
+// node count, flush) share the "frame" phase. They overlap and nest, so this
+// is an average-per-captured-frame view, never summed.
+function aggregatePhaseSpans(phase) {
+  const events = context.session.observation?.events ?? [];
+  const map = new Map();
+  for (const event of events) {
+    if (!event || event.phase !== phase || !event.name) continue;
+    let entry = map.get(event.name);
+    if (!entry) { entry = { name: event.name, count: 0, totalMs: 0, maxMs: 0 }; map.set(event.name, entry); }
+    entry.count += 1;
+    entry.totalMs += finite(event.durationMs);
+    entry.maxMs = Math.max(entry.maxMs, finite(event.durationMs));
+  }
+  return [...map.values()]
+    .map(entry => ({ ...entry, averageMs: entry.count ? round(entry.totalMs / entry.count, 3) : 0, totalMs: round(entry.totalMs, 3), maxMs: round(entry.maxMs, 3) }))
+    .sort((a, b) => b.totalMs - a.totalMs)
+    .slice(0, 12);
+}
+
+function fmt(value, digits = 2) {
+  return value == null ? "—" : `${round(value, digits)} ms`;
+}
+
 function renderSummary(report) {
   const target = el("perfSummary");
   target.replaceChildren();
   const cards = [
-    { label: "CPU throughput", value: report.summary.cpuThroughputFPS == null ? "—" : `${report.summary.cpuThroughputFPS} fps`, tone: report.summary.hitchPercent > 10 ? "bad" : report.summary.hitchPercent > 2 ? "warn" : "good" },
     { label: "avg frame", value: fmt(report.summary.totalAverageMs) },
     { label: "p95", value: fmt(report.summary.totalP95Ms), tone: report.summary.totalP95Ms > FRAME_BUDGET_MS ? "warn" : "good" },
     { label: "p99", value: fmt(report.summary.totalP99Ms), tone: report.summary.totalP99Ms > FRAME_BUDGET_MS ? "bad" : "good" },
     { label: "max", value: fmt(report.summary.totalMaxMs) },
     { label: "hitches", value: `${report.summary.hitches}`, tone: report.summary.hitchPercent > 2 ? "warn" : "good" },
+    { label: "samples/s", value: report.frame.spanSeconds ? round(report.frame.sampleCount / report.frame.spanSeconds, 1) : "—" },
     { label: "presented", value: report.summary.presentedPercent == null ? "—" : `${report.summary.presentedPercent}%` },
     { label: "nodes", value: report.summary.averageNodeCount ?? "—" },
     { label: "batches", value: report.summary.averageBatchCount ?? "—" },
@@ -296,10 +340,6 @@ function renderSummary(report) {
   }
 }
 
-function fmt(value, digits = 2) {
-  return value == null ? "—" : `${round(value, digits)} ms`;
-}
-
 function renderHeatmap(report) {
   const target = el("perfHeatmap");
   target.replaceChildren();
@@ -310,31 +350,40 @@ function renderHeatmap(report) {
     return;
   }
   target.className = "heatmap";
-  for (const stage of report.heatmap.stages) {
+  const renderRow = (labelText, key, budget) => {
     const label = document.createElement("div");
     label.className = "heatRowLabel";
-    label.textContent = stage.name;
+    label.textContent = labelText;
     const cells = document.createElement("div");
     cells.className = "heatCells";
-    cells.style.gridTemplateRows = `repeat(${report.heatmap.stages.length}, 20px)`;
     for (const frame of buckets) {
       const cell = document.createElement("div");
       cell.className = "heatCell";
-      const value = frame ? frame[stage.key] : 0;
-      cell.style.background = heatColor(value ?? 0, stage.budget);
+      const value = frame ? frame[key] : 0;
+      cell.style.background = heatColor(value ?? 0, budget);
       if (frame) {
-        cell.title = `${stage.name}: ${round(value ?? 0, 2)} ms / budget ${stage.budget} ms\n`
+        cell.title = `${labelText}: ${round(value ?? 0, 2)} ms / budget ${round(budget, 2)} ms\n`
           + `frame ${frame.frame} · total ${round(frame.totalMs, 2)} ms · ${new Date(frame.wall).toLocaleTimeString()}`;
       }
       cells.append(cell);
     }
     target.append(label, cells);
+  };
+  // Frame-total overview first, then the individual stages.
+  renderRow("Frame total", "totalMs", FRAME_BUDGET_MS);
+  for (const stage of report.heatmap.stages) {
+    if (stage.key === "totalMs") continue;
+    renderRow(stage.name, stage.key, stage.budget);
   }
+  const axis = document.createElement("div");
+  axis.className = "heatAxis";
+  axis.textContent = "oldest → newest";
+  target.append(axis);
 }
 
-function tableRow(cells, head = false) {
+function tableRow(cells, head = false, variant = "") {
   const row = document.createElement("div");
-  row.className = `perfTableRow${head ? " head" : ""}`;
+  row.className = `perfTableRow${variant ? " " + variant : ""}${head ? " head" : ""}`;
   for (const cell of cells) {
     const node = document.createElement(head ? "span" : "span");
     node.className = `cell ${cell.tone ?? ""}${head ? " head" : ""}`;
@@ -372,6 +421,30 @@ function renderStages(report) {
   }
 }
 
+function compositionBar(frame) {
+  const total = Math.max(frame.totalMs, 0.001);
+  const segments = [
+    { label: "recomp", value: frame.recompositionMs ?? 0, color: "#c084fc" },
+    { label: "layout", value: frame.layoutMs, color: "#38bdf8" },
+    { label: "draw", value: frame.drawMs, color: "#34d399" },
+    { label: "present", value: frame.presentMs, color: "#f59e0b" },
+  ];
+  const accounted = segments.reduce((sum, seg) => sum + Math.max(0, seg.value), 0);
+  const other = Math.max(0, total - accounted);
+  if (other > 0) segments.push({ label: "other", value: other, color: "rgba(255,255,255,0.25)" });
+  const bar = document.createElement("div");
+  bar.className = "compBar";
+  for (const seg of segments) {
+    const part = document.createElement("span");
+    part.className = "compSegment";
+    part.style.width = `${(Math.max(0, seg.value) / total) * 100}%`;
+    part.style.background = seg.color;
+    part.title = `${seg.label}: ${round(seg.value, 2)} ms`;
+    bar.append(part);
+  }
+  return bar;
+}
+
 function renderWorst(report) {
   const target = el("perfWorst");
   target.replaceChildren();
@@ -380,10 +453,10 @@ function renderWorst(report) {
     return;
   }
   target.append(tableRow([
-    { label: "frame" }, { label: "total" }, { label: "recomp" }, { label: "layout" }, { label: "draw" }, { label: "present" }, { label: "nodes/batches" },
-  ], true));
+    { label: "frame" }, { label: "total" }, { label: "recomp" }, { label: "layout" }, { label: "draw" }, { label: "present" }, { label: "nodes/batches" }, { label: "composition" },
+  ], true, "composed"));
   for (const frame of report.worstFrames) {
-    target.append(tableRow([
+    const cells = [
       { value: String(frame.frame) },
       { value: round(frame.totalMs), tone: frame.totalMs > FRAME_BUDGET_MS ? "bad" : "" },
       { value: frame.recompositionMs == null ? "—" : round(frame.recompositionMs) },
@@ -391,6 +464,35 @@ function renderWorst(report) {
       { value: round(frame.drawMs) },
       { value: round(frame.presentMs) },
       { value: `${frame.nodeCount}/${frame.batchCount}` },
+    ];
+    const row = tableRow(cells, false, "composed");
+    const barCell = document.createElement("span");
+    barCell.className = "cell";
+    barCell.append(compositionBar(frame));
+    row.append(barCell);
+    target.append(row);
+  }
+}
+
+function renderFrameSpans(report) {
+  const target = el("perfFrameSpans");
+  if (!target) return;
+  target.replaceChildren();
+  if (!report.frameSpans.length) {
+    target.textContent = "No frame-bookkeeping spans captured. Enable Auto trace and interact with the app to record Surface, accessibility, and flush costs.";
+    return;
+  }
+  target.append(tableRow([
+    { label: "span" }, { label: "avg" }, { label: "max" }, { label: "count" }, { label: "total" }, { label: "" },
+  ], true));
+  for (const span of report.frameSpans) {
+    target.append(tableRow([
+      { value: span.name, title: span.name },
+      { value: `${span.averageMs} ms`, tone: span.averageMs > 4 ? "warn" : "" },
+      { value: `${span.maxMs} ms` },
+      { value: String(span.count) },
+      { value: `${span.totalMs} ms` },
+      { value: "" },
     ]));
   }
 }
@@ -435,8 +537,13 @@ function renderMarkers(report) {
 
 function renderStatus(report) {
   const status = el("perfStatus");
+  const connected = context.session.connection.connected;
+  if (!connected) {
+    status.textContent = "Disconnected. Connect to a CoveUI app to collect timing frames.";
+    return;
+  }
   if (!report.frame.sampleCount) {
-    status.textContent = "No timing data. Timing is collected automatically once connected.";
+    status.textContent = "Connected, but no timing frames received yet. Timing is streamed automatically once the host renders; if this persists, the host may be idle, or the timing subscription was not accepted.";
     return;
   }
   const range = report.frame.first != null ? `frames ${report.frame.first}–${report.frame.last}` : "";
@@ -444,7 +551,8 @@ function renderStatus(report) {
     ? ` · ${report.timeline.recording ? "recording" : "captured"} ${report.timeline.eventCount} spans${report.timeline.dropped ? ` (${report.timeline.dropped} evicted)` : ""}`
     : "";
   const window = el("perfWindow").value === "all" ? "all" : `${el("perfWindow").value}s`;
-  status.textContent = `Window ${window} · ${report.frame.sampleCount} samples · ${report.frame.spanSeconds}s · ${range}${trace} · ${perf.markers.length} markers`;
+  const age = perf.lastFrameAt == null ? "—" : `${Math.round(performance.now() - perf.lastFrameAt)} ms ago`;
+  status.textContent = `Window ${window} · ${report.frame.sampleCount} samples · ${report.frame.spanSeconds}s · ${range} · last frame ${age}${trace} · ${perf.markers.length} markers`;
 }
 
 function render() {
@@ -455,6 +563,7 @@ function render() {
   renderHeatmap(report);
   renderStages(report);
   renderWorst(report);
+  renderFrameSpans(report);
   renderHot(report);
   renderMarkers(report);
   updateControls();
@@ -474,6 +583,7 @@ function addMarker() {
 function clearCapture() {
   perf.frames = [];
   perf.markers = [];
+  perf.lastFrameAt = null;
   const observation = context.session.observation;
   if (observation?.recording && context.session.connection.connected) {
     // Restart the host capture so the timeline window is also reset.
@@ -535,11 +645,26 @@ function stageTableMarkdown(report) {
 
 function heatSeriesMarkdown(report) {
   const lines = ["Worst frame per bucket (ms), oldest → newest:", ""];
+  const series = report.heatmap.buckets.map(frame => frame ? round(frame.totalMs ?? 0, 1) : "·").join(" ");
+  lines.push(`- Frame total (budget ${round(FRAME_BUDGET_MS, 1)} ms): ${series}`);
   for (const stage of report.heatmap.stages) {
-    const series = report.heatmap.buckets
+    if (stage.key === "totalMs") continue;
+    const s = report.heatmap.buckets
       .map(frame => frame ? round(frame[stage.key] ?? 0, 1) : "·")
       .join(" ");
-    lines.push(`- ${stage.name} (budget ${stage.budget} ms): ${series}`);
+    lines.push(`- ${stage.name} (budget ${stage.budget} ms): ${s}`);
+  }
+  return lines.join("\n");
+}
+
+function frameSpanMarkdown(report) {
+  if (!report.frameSpans.length) return "";
+  const lines = ["", "## Frame bookkeeping spans (CPU timeline · frame phase)", "",
+    "Per captured frame; spans overlap and nest, so do not sum them.", "",
+    "| Span | avg (ms) | max (ms) | count | total (ms) |",
+    "| --- | ---: | ---: | ---: | ---: |"];
+  for (const span of report.frameSpans) {
+    lines.push(`| ${span.name} | ${span.averageMs} | ${span.maxMs} | ${span.count} | ${span.totalMs} |`);
   }
   return lines.join("\n");
 }
@@ -571,6 +696,7 @@ function markdownReport(report) {
     }
     lines.push("");
   }
+  lines.push(frameSpanMarkdown(report));
   if (report.hotComponents.length) {
     lines.push("## Hot components (CPU timeline)", "");
     lines.push(`Spans: ${report.timeline.eventCount} retained${report.timeline.dropped ? `, ${report.timeline.dropped} evicted at host` : ""}. Parent and child spans overlap; do not sum them.`, "");
@@ -622,6 +748,7 @@ function jsonReport(report) {
       } : null),
     },
     worstFrames: report.worstFrames,
+    frameSpans: report.frameSpans,
     hotComponents: report.hotComponents,
     markers: report.markers,
     timeline: report.timeline,

@@ -49,9 +49,18 @@ public final class DevTools {
     public var mirrorIsActive: Bool { frameTap?.isActive ?? false }
 
     /// Invoked on the main actor immediately after `mirror.start` wires up
-    /// the FrameTap. Hosts using a demand-render loop (e.g. SDL3) must call
-    /// `requestDisplay()` here so the first mirror frame can be produced.
+    /// the FrameTap. Hosts must ensure the run loop keeps presenting while the
+    /// mirror is active. Relying on a single `requestDisplay()` is racy on
+    /// demand-render hosts: once the loop blocks waiting for input it may not
+    /// wake for a second mirror session, freezing the mirror on its last frame.
+    /// Prefer forcing continuous presentation (e.g.
+    /// `host.setFrameRateMode(.displayRefresh)`) for the duration of the
+    /// session, and restore the normal policy in `onMirrorStop`.
     public var onMirrorStart: (@MainActor () -> Void)?
+
+    /// Invoked when a remote client stops mirroring. Hosts should restore their
+    /// normal frame-drive policy here (e.g. return to event-driven cadence).
+    public var onMirrorStop: (@MainActor () -> Void)?
 
     /// Invoked when a remote client selects a node. Hosts can redraw a
     /// diagnostic overlay without mutating the normal UI tree.
@@ -207,6 +216,7 @@ public final class DevTools {
         }
         server.host.mirror.stop = { @MainActor [weak self] in
             self?.frameTap?.stop()
+            self?.onMirrorStop?()
             self?.server.broadcastMirrorStopped(reason: "client")
         }
         server.host.mirror.input = { @MainActor [weak self] payload in
