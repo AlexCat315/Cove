@@ -4,7 +4,7 @@ import CoreGraphics
 #endif
 import Foundation
 
-/// Phase 4b. RenderTree-aware renderer that records each layer-root subtree
+/// Executes a flat paint plan and records each layer-root subtree
 /// into its own cached `DrawList`, then composites cached layer slices into
 /// the frame `DrawList` by appending their vertices/indices.
 ///
@@ -27,254 +27,202 @@ import Foundation
 public final class LayerAwareNodeRenderer {
 
     public init() {}
+    private var contentPlacements: [Affine2D] = []
 
-    /// Composite `tree` into `frame`. The caller resets the frame DrawList
-    /// before each render pass.
+    private final class OpenNode {
+        let object: RenderObject
+        let node: Node
+        let end: Int
+        let list: DrawList
+        let destination: DrawList?
+        let own: Affine2D
+        let parentClips: [UIClip]
+        let childClips: [UIClip]
+        let allowsContainerCache: Bool
+        let firstVertex: Int
+        let descendantStart: Int
+        let mask: UIRoundedRect?
+        let clipped: Bool
+        let inheritedClipRevision: UInt64
+
+        init(object: RenderObject, node: Node, end: Int, list: DrawList, destination: DrawList?,
+             own: Affine2D, parentClips: [UIClip], childClips: [UIClip],
+             allowsContainerCache: Bool, firstVertex: Int, descendantStart: Int,
+             mask: UIRoundedRect?, clipped: Bool, inheritedClipRevision: UInt64) {
+            self.object = object; self.node = node; self.end = end
+            self.list = list; self.destination = destination
+            self.own = own
+            self.parentClips = parentClips; self.childClips = childClips
+            self.allowsContainerCache = allowsContainerCache
+            self.firstVertex = firstVertex; self.descendantStart = descendantStart
+            self.mask = mask; self.clipped = clipped; self.inheritedClipRevision = inheritedClipRevision
+        }
+    }
+
+    /// Execute the cached preorder plan. Exit records preserve painter, mask,
+    /// overlay and opacity ordering without using the call stack.
     public func render(tree: RenderTree, into frame: DrawList) {
-        guard let root = tree.root else { return }
-        if let node = root.node {
-            frame.setViewportBounds(UIRect(x: Float(node.frame.origin.x),
-                                           y: Float(node.frame.origin.y),
-                                           width: Float(node.frame.width),
-                                           height: Float(node.frame.height)))
+        guard let node = tree.root?.node else { return }
+        frame.setViewportBounds(UIRect(x: Float(node.frame.origin.x), y: Float(node.frame.origin.y),
+                                       width: Float(node.frame.width), height: Float(node.frame.height)))
+        let plan = tree.paintPlan()
+        // Keep the hot buffer locally owned, avoiding a property access for
+        // every node. A reentrant render can borrow its own independent buffer.
+        var placements: [Affine2D] = []
+        swap(&placements, &contentPlacements)
+        defer { contentPlacements = placements }
+        if placements.count != plan.objects.count {
+            placements = Array(repeating: .identity, count: plan.objects.count)
         }
-        compose(root, into: frame, placed: .identity,
-               parentClipStack: [], allowsContainerCache: true)
-    }
+        var open: [OpenNode] = []
+        var index = 0
+        while index < plan.objects.count || !open.isEmpty {
+            let parent = open.last
+            if let parent, index >= parent.end {
+                finish(open.removeLast())
+                continue
+            }
+            let object = plan.objects[index]
+            let end = plan.subtreeEnds[index]
+            guard let node = object.node, node.isLayoutVisible else { index = end; continue }
+            let destination = parent?.list ?? frame
+            let parentIndex = plan.parents[index]
+            let placed = parentIndex >= 0 ? placements[parentIndex] : .identity
+            let parentClips = parent?.childClips ?? []
+            let allowsCache = parent?.allowsContainerCache ?? true
+            let own = node.placementStep(scrolling: .zero).followed(by: placed)
+            let bounds = UIRect(x: own.e, y: own.f,
+                                width: Float(node.frame.width) * own.a, height: Float(node.frame.height) * own.a)
+            if node.clipsToBounds, bounds.width > 0, bounds.height > 0,
+               RenderCulling.isOutside(bounds, list: destination) { index = end; continue }
 
-    /// `placed` is where the parent's content sits; the node composes its own
-    /// placement onto it. Carrying the transform rather than a resolved origin
-    /// is what lets a scale reach the subtree and, through `lastPlacement`, what
-    /// makes the cache notice when it changes.
-    private func compose(_ obj: RenderObject,
-                         into frame: DrawList,
-                         placed: Affine2D,
-                         parentClipStack: [UIClip],
-                         allowsContainerCache: Bool) {
-        guard let node = obj.node, node.isLayoutVisible else { return }
-        let f = node.frame
-        let own = node.placementStep(scrolling: .zero).followed(by: placed)
-        let origin = own.origin
-        let absX = origin.x
-        let absY = origin.y
-        let scale = own.a
-        let width = Float(f.width) * scale
-        let height = Float(f.height) * scale
-
-        if node.clipsToBounds, width > 0, height > 0,
-           RenderCulling.isOutside(UIRect(x: absX, y: absY, width: width, height: height), list: frame) {
-            return
-        }
-
-        if obj.isLayerRoot {
-            // Try to reuse a cached layer DrawList.
-            let placementUnchanged = obj.lastPlacement == own
-            let clipUnchanged = obj.lastClipStack == parentClipStack
-            if !obj.cacheInvalid,
-               clipUnchanged,
-               let cached = obj.cachedLayerList,
-               cached.pixelScale == frame.pixelScale, cached.geometryAntialiasing == frame.geometryAntialiasing {
-                if obj.children.isEmpty, let bounds = obj.cachedPaintBounds,
-                   let cachedPlacement = obj.lastPlacement,
-                   own.a == cachedPlacement.a, own.shadowScale == cachedPlacement.shadowScale {
-                    let translated = UIRect(x: bounds.x + absX - cachedPlacement.e,
-                                            y: bounds.y + absY - cachedPlacement.f,
-                                            width: bounds.width, height: bounds.height)
-                    if RenderCulling.isOutside(translated, list: frame) { return }
-                }
-                if placementUnchanged {
-                    frame.appendPreclipped(cached, clips: parentClipStack)
-                    return
-                }
-                // Translation-only reuse. Only valid at an unchanged scale: the
-                // cached vertices were baked at the old size and moving them
-                // cannot resize them.
-                if obj.children.isEmpty,
-                   !node.clipsToBounds,
-                   !obj.cachedLayerUsesLocalClips,
-                   own.a == obj.lastPlacement?.a,
-                   own.shadowScale == obj.lastPlacement?.shadowScale,
-                   let cachedPlacement = obj.lastPlacement,
-                   !Self.crossesRoundedCorner(obj.cachedPaintBounds, from: cachedPlacement, to: own, clips: parentClipStack) {
-                    frame.append(
-                        cached,
-                        vertexTranslationX: own.e - cachedPlacement.e,
-                        vertexTranslationY: own.f - cachedPlacement.f
-                    )
-                    return
-                }
+            if !object.children.isEmpty {
+                placements[index] = node.contentOffset == .zero ? own :
+                    node.placementStep(scrolling: node.contentOffset).followed(by: placed)
+            }
+            // Pure structural wrappers contribute only placement. They need
+            // neither a paint record nor an exit operation.
+            if !object.isLayerRoot, node.opacity == 1, node.subtreeOpacity == 1,
+               node.backgroundColor == nil, node.backgroundGradient == nil,
+               node.borderColor == nil || node.borderWidth <= 0, node.revealRequest == nil {
+                index += 1
+                continue
             }
 
-            if !obj.children.isEmpty {
-                // A changed container renders directly into its parent. This
-                // avoids rebuilding/copying a stack of flattened ancestor
-                // caches during scrolling or live chart updates. If another
-                // frame arrives without invalidation, cache it then; stable
-                // continuous frames subsequently become one bulk append.
-                // While building an ancestor cache, do not also build a
-                // flattened copy at every nested container on the same path.
-                if !allowsContainerCache || obj.cacheInvalid || !placementUnchanged || !clipUnchanged {
-                    recordSelfAndDescendants(
-                        obj,
-                        node: node,
-                        into: frame,
-                        placed: placed,
-                        clipStack: parentClipStack,
-                        allowsContainerCache: allowsContainerCache
-                    )
-                    obj.cachedLayerList = nil
-                    obj.lastPlacement = own
-                    obj.lastClipStack = parentClipStack
-                    obj.cacheInvalid = false
-                    return
+            var list = destination
+            var cacheDestination: DrawList?
+            var childAllowsCache = allowsCache
+            var inheritedClipRevision: UInt64 = 0
+            if object.isLayerRoot {
+                let placementUnchanged = object.lastPlacement == own
+                let clipUnchanged = object.lastClipStack == parentClips
+                if reuse(object, node: node, into: destination, own: own, clips: parentClips,
+                         placementUnchanged: placementUnchanged, clipUnchanged: clipUnchanged) {
+                    index = end
+                    continue
+                }
+                let deferContainer = !object.children.isEmpty &&
+                    (!allowsCache || object.cacheInvalid || !placementUnchanged || !clipUnchanged)
+                if !deferContainer {
+                    list = DrawList()
+                    list.pixelScale = destination.pixelScale
+                    list.geometryAntialiasing = destination.geometryAntialiasing
+                    list.setViewportBounds(destination.viewportBounds)
+                    for clip in parentClips { list.pushClip(clip) }
+                    inheritedClipRevision = list.clipRevision
+                    cacheDestination = destination
+                    childAllowsCache = false
                 }
             }
-
-            // Re-record. Use a fresh per-layer DrawList so the cache is
-            // independent of the frame DrawList and reusable next time.
-            let layerList = DrawList()
-            layerList.pixelScale = frame.pixelScale
-            layerList.geometryAntialiasing = frame.geometryAntialiasing
-            layerList.setViewportBounds(frame.viewportBounds)
-            // Push the parent clip stack so nested clips intersect properly.
-            for clip in parentClipStack { layerList.pushClip(clip) }
-            let inheritedClips = layerList.clipRevision
-            recordSelfAndDescendants(
-                obj,
-                node: node,
-                into: layerList,
-                placed: placed,
-                clipStack: parentClipStack,
-                allowsContainerCache: false
-            )
-            for clip in parentClipStack.reversed() { layerList.popClip(clip) }
-            obj.cachedLayerList = layerList
-            obj.cachedLayerUsesLocalClips = layerList.clipRevision != inheritedClips
-            obj.cachedPaintBounds = obj.children.isEmpty ? RenderCulling.bounds(of: layerList) : nil
-            obj.lastPlacement = own
-            obj.lastClipStack = parentClipStack
-            obj.cacheInvalid = false
-            // Do not bake an offscreen leaf into its ancestor's first cache.
-            // Its painter runs once to establish actual bounds, then the
-            // cached geometry remains available when it enters the viewport.
-            if let bounds = obj.cachedPaintBounds, RenderCulling.isOutside(bounds, list: frame) { return }
-            frame.appendPreclipped(layerList, clips: parentClipStack)
-            return
+            open.append(begin(object, node: node, end: end, into: list, destination: cacheDestination,
+                              own: own, parentClips: parentClips,
+                              allowsContainerCache: childAllowsCache, inheritedClipRevision: inheritedClipRevision))
+            index += 1
         }
-
-        // Non-layer object never reached at top level (root is always a
-        // layer root), so this branch only runs as a child of a non-layer
-        // path. We still emit directly into `frame` for safety.
-        recordSelfAndDescendants(
-            obj,
-            node: node,
-            into: frame,
-            placed: placed,
-            clipStack: parentClipStack,
-            allowsContainerCache: allowsContainerCache
-        )
     }
 
-    /// Record `node`'s own paint output and recurse into children. Nested
-    /// layer roots are NOT recorded into `list`; instead their composite
-    /// happens via `compose(...)` (which may reuse a cached slice).
-    private func recordSelfAndDescendants(_ obj: RenderObject,
-                                          node: Node,
-                                          into list: DrawList,
-                                          placed: Affine2D,
-                                          clipStack: [UIClip],
-                                          allowsContainerCache: Bool) {
-        guard node.isLayoutVisible else { return }
+    /// A cache hit also handles offscreen leaves: its whole subtree is skipped.
+    private func reuse(_ object: RenderObject, node: Node, into list: DrawList, own: Affine2D,
+                       clips: [UIClip], placementUnchanged: Bool, clipUnchanged: Bool) -> Bool {
+        guard !object.cacheInvalid, clipUnchanged, let cached = object.cachedLayerList,
+              cached.pixelScale == list.pixelScale,
+              cached.geometryAntialiasing == list.geometryAntialiasing else { return false }
+        if object.children.isEmpty, let bounds = object.cachedPaintBounds,
+           let old = object.lastPlacement, own.a == old.a, own.shadowScale == old.shadowScale {
+            let moved = UIRect(x: bounds.x + own.e - old.e, y: bounds.y + own.f - old.f,
+                               width: bounds.width, height: bounds.height)
+            if RenderCulling.isOutside(moved, list: list) { return true }
+        }
+        if placementUnchanged { list.appendPreclipped(cached, clips: clips); return true }
+        if object.children.isEmpty, !node.clipsToBounds, !object.cachedLayerUsesLocalClips,
+           let old = object.lastPlacement, own.a == old.a, own.shadowScale == old.shadowScale,
+           !Self.crossesRoundedCorner(object.cachedPaintBounds, from: old, to: own, clips: clips) {
+            list.appendPreclipped(cached, clips: clips,
+                                  vertexTranslationX: own.e - old.e, vertexTranslationY: own.f - old.f)
+            return true
+        }
+        return false
+    }
+
+    private func begin(_ object: RenderObject, node: Node, end: Int, into list: DrawList,
+                       destination: DrawList?, own: Affine2D, parentClips: [UIClip],
+                       allowsContainerCache: Bool, inheritedClipRevision: UInt64) -> OpenNode {
         let firstVertex = list.vertices.count
-        let own = node.placementStep(scrolling: .zero).followed(by: placed)
-        let origin = own.origin
-        let originX = origin.x
-        let originY = origin.y
-        let scale = own.a
-        let width = Float(node.frame.size.width) * scale
-        let height = Float(node.frame.size.height) * scale
-
-        // Lengths on the node's own box are measured in the node's units, so
-        // they scale with it — see `NodeRenderer` for the same reasoning.
-        let radius = node.cornerRadius * scale
-        let borderWidth = node.borderWidth * scale
-
-        // A reveal describes the frame, not this box, so it rides along with
-        // whatever geometry the node emits. `DrawList.append` carries it into
-        // the frame list when the node is recorded into a layer cache.
+        let scale = own.a, x = own.e, y = own.f
+        let width = Float(node.frame.width) * scale, height = Float(node.frame.height) * scale
+        let radius = node.cornerRadius * scale, borderWidth = node.borderWidth * scale
         if let reveal = node.revealRequest { list.beginReveal(reveal) }
-
-        // Clip push if applicable. clipsToBounds always implies layer root,
-        // so only the root-of-this-layer node can push a new clip rect.
         let clipped = node.clipsToBounds && width > 0 && height > 0
-        var clipRect: UIRect? = nil
-        if clipped {
-            clipRect = UIRect(x: originX, y: originY, width: width, height: height)
-            list.pushClip(clipRect!)
-        }
-
-        // Painters (mirror NodeRenderer order):
-        emitShadow(node, into: list, x: originX, y: originY, w: width, h: height,
+        let clip = UIRect(x: x, y: y, width: width, height: height)
+        if clipped { list.pushClip(clip) }
+        emitShadow(node, into: list, x: x, y: y, w: width, h: height,
                    radius: radius, scale: own.shadowScale)
-        // A frosted node rings its fill afterwards: the backdrop composite is
-        // attached to the fill's batch and would otherwise cover the border.
         let frosted = node.backdropBlur > 0 && node.backgroundColor != nil
         if !frosted {
-            emitBorder(node, into: list, x: originX, y: originY, w: width, h: height,
-                       radius: radius, borderWidth: borderWidth)
+            emitBorder(node, into: list, x: x, y: y, w: width, h: height, radius: radius, borderWidth: borderWidth)
         }
-        emitBackground(node, into: list, x: originX, y: originY, w: width, h: height,
-                       radius: radius, borderWidth: borderWidth)
+        emitBackground(node, into: list, x: x, y: y, w: width, h: height, radius: radius, borderWidth: borderWidth)
         if frosted {
-            emitBorder(node, into: list, x: originX, y: originY, w: width, h: height,
-                       radius: radius, borderWidth: borderWidth)
+            emitBorder(node, into: list, x: x, y: y, w: width, h: height, radius: radius, borderWidth: borderWidth)
         }
-        let mask = contentMask(node, x: originX, y: originY, width: width, height: height,
+        let mask = contentMask(node, x: x, y: y, width: width, height: height,
                                radius: radius, borderWidth: borderWidth)
         if let mask { list.pushMask(mask) }
         if let draw = node.draw {
-            paintScaled(draw, into: list, origin: CGPoint(x: Double(originX), y: Double(originY)), scale: scale)
+            paintScaled(draw, into: list, origin: CGPoint(x: Double(x), y: Double(y)), scale: scale)
         }
+        return OpenNode(object: object, node: node, end: end, list: list, destination: destination,
+                        own: own,
+                        parentClips: parentClips, childClips: clipped ? parentClips + [UIClip(clip, mask: mask)] : parentClips,
+                        allowsContainerCache: allowsContainerCache, firstVertex: firstVertex,
+                        descendantStart: list.vertices.count, mask: mask, clipped: clipped,
+                        inheritedClipRevision: inheritedClipRevision)
+    }
 
-        // Children, placed where this node's *content* sits: its own frame slid
-        // by -contentOffset and then scaled. The offset stays fractional
-        // throughout motion and at rest.
-        let content = node.placementStep(scrolling: node.contentOffset).followed(by: placed)
-        let childClipStack: [UIClip] = clipped ? clipStack + [UIClip(clipRect!, mask: mask)] : clipStack
-        let children = node.childrenMayNeedZSort ? obj.renderOrderedChildren() : obj.children
-        let descendantStart = list.vertices.count
-        for child in children {
-            // A nested layer root composites separately (cache-aware), so we
-            // call `compose` rather than recording inline.
-            if child.isLayerRoot {
-                compose(child,
-                        into: list,
-                        placed: content,
-                        parentClipStack: childClipStack,
-                        allowsContainerCache: allowsContainerCache)
-            } else {
-                guard let childNode = child.node else { continue }
-                recordSelfAndDescendants(
-                    child,
-                    node: childNode,
-                    into: list,
-                    placed: content,
-                    clipStack: childClipStack,
-                    allowsContainerCache: allowsContainerCache
-                )
-            }
-        }
-        if mask != nil { list.popMask() }
-
-        list.multiplyOpacity(fromVertexIndex: descendantStart, by: node.opacity)
+    private func finish(_ record: OpenNode) {
+        let list = record.list, object = record.object, node = record.node
+        if record.mask != nil { list.popMask() }
+        list.multiplyOpacity(fromVertexIndex: record.descendantStart, by: node.opacity)
         if let overlay = node.overlayDraw {
-            paintScaled(overlay, into: list, origin: CGPoint(x: Double(originX), y: Double(originY)), scale: scale)
+            paintScaled(overlay, into: list, origin: CGPoint(x: Double(record.own.e), y: Double(record.own.f)),
+                        scale: record.own.a)
         }
-
-        list.multiplyOpacity(node.subtreeOpacity, fromVertex: firstVertex)
-        if clipped {
-            list.popClip()
+        list.multiplyOpacity(node.subtreeOpacity, fromVertex: record.firstVertex)
+        if record.clipped { list.popClip() }
+        guard object.isLayerRoot else { return }
+        object.lastPlacement = record.own
+        object.lastClipStack = record.parentClips
+        object.cacheInvalid = false
+        guard let destination = record.destination else {
+            object.cachedLayerList = nil
+            return
         }
+        for clip in record.parentClips.reversed() { list.popClip(clip) }
+        object.cachedLayerList = list
+        object.cachedLayerUsesLocalClips = list.clipRevision != record.inheritedClipRevision
+        object.cachedPaintBounds = object.children.isEmpty ? RenderCulling.bounds(of: list) : nil
+        if let bounds = object.cachedPaintBounds, RenderCulling.isOutside(bounds, list: destination) { return }
+        destination.appendPreclipped(list, clips: record.parentClips)
     }
 
     /// A cached leaf was clipped where it was recorded. If the mask cut any of

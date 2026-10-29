@@ -6,7 +6,10 @@ let package = Package(
     products: [.library(name: "CoveUICore", targets: ["CoveUIScene"])],
     dependencies: [.package(path: "../PlatformCore"), .package(url: "https://github.com/facebook/yoga.git", from: "3.2.1")],
     targets: [
-        .target(name: "CoveUICore"),
+        .target(name: "CRenderKernels", publicHeadersPath: "include",
+            cSettings: [.unsafeFlags(["-O3"])],
+            linkerSettings: [.linkedLibrary("m", .when(platforms: [.linux, .android]))]),
+        .target(name: "CoveUICore", dependencies: ["CRenderKernels"]),
         .target(name: "CYoga", dependencies: [.product(name: "yoga", package: "yoga")], publicHeadersPath: "include",
                 linkerSettings: [.linkedLibrary("msvcrt", .when(platforms: [.windows])), .linkedLibrary("msvcprt", .when(platforms: [.windows]))]),
         .target(name: "CoveUIScene", dependencies: ["CoveUICore", "CYoga", .product(name: "CovePlatformCore", package: "PlatformCore")]),

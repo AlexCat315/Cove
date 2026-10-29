@@ -31,6 +31,7 @@ public final class NodeTree: @unchecked Sendable {
     private var cachedNodeCountRoot: ObjectIdentifier?
     /// Reused by each recomputation so even a structural frame allocates nothing.
     private var nodeCountStack: [Node] = []
+    private var flushStack: [Node] = []
 
     public init() {}
 
@@ -88,19 +89,16 @@ public final class NodeTree: @unchecked Sendable {
         // shows up as frame time, and it sits outside the layout / draw spans
         // the trace already records.
         let trace = timeline.begin()
-        traverse(root)
-        timeline.end(trace, phase: "frame", name: "Flush dirty flags")
-    }
-
-    private func traverse(_ node: Node) {
-        let shouldVisitChildren = node.isDirty || node.renderDirty
-        node.isDirty = false
-        node.renderDirty = false
-        guard shouldVisitChildren else { return }
-        for child in node.children {
-            if child.isDirty || child.renderDirty {
-                traverse(child)
+        flushStack.append(root)
+        while let node = flushStack.popLast() {
+            let shouldVisitChildren = node.isDirty || node.renderDirty
+            node.isDirty = false
+            node.renderDirty = false
+            guard shouldVisitChildren else { continue }
+            for child in node.children.reversed() where child.isDirty || child.renderDirty {
+                flushStack.append(child)
             }
         }
+        timeline.end(trace, phase: "frame", name: "Flush dirty flags")
     }
 }

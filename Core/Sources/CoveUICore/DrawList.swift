@@ -201,10 +201,11 @@ public final class DrawList {
     public func multiplyOpacity(fromVertexIndex start: Int, by opacity: Float) {
         let alpha = max(0, min(1, opacity))
         guard alpha < 1 else { return }
-        for index in start..<vertices.count {
-            let packed = vertices[index].color
-            let next = UInt32((Float(packed >> 24) * alpha).rounded())
-            vertices[index].color = (packed & 0x00FF_FFFF) | (next << 24)
+        precondition(start >= 0 && start <= vertices.count)
+        if start < vertices.count {
+            vertices.withUnsafeMutableBufferPointer { buffer in
+                GeometryKernels.opacity(buffer.baseAddress!.advanced(by: start), count: buffer.count - start, alpha: alpha)
+            }
         }
         // Frost is a separate composite pass, so fading only the panel's
         // vertices leaves a fully opaque glass plate behind its content.
@@ -271,13 +272,15 @@ public final class DrawList {
         if masks.contains(where: { $0.radius > 0 }) { maskBatches(from: firstBatch) }
     }
 
-    /// The scene cache recorded these clips into its geometry at this exact
-    /// placement. Additional destination masks still require ordinary clipping.
-    package func appendPreclipped(_ other: DrawList, clips: [UIClip]) {
+    /// The scene cache already applied these clips. For a translation, the
+    /// caller also verifies that no rounded corner is crossed. Additional
+    /// destination masks still require ordinary clipping.
+    package func appendPreclipped(_ other: DrawList, clips: [UIClip],
+                                 vertexTranslationX: Float = 0, vertexTranslationY: Float = 0) {
         if masks.allSatisfy({ mask in clips.contains { $0.mask == mask } }) {
-            appendUnmasked(other, vertexTranslationX: 0, vertexTranslationY: 0)
+            appendUnmasked(other, vertexTranslationX: vertexTranslationX, vertexTranslationY: vertexTranslationY)
         } else {
-            append(other)
+            append(other, vertexTranslationX: vertexTranslationX, vertexTranslationY: vertexTranslationY)
         }
     }
 
@@ -326,14 +329,12 @@ public final class DrawList {
 
         let baseVertex = UInt32(vertices.count)
         let baseIndex = UInt32(indices.count)
-        if vertexTranslationX == 0, vertexTranslationY == 0 {
-            vertices.append(contentsOf: other.vertices)
-        } else {
-            vertices.reserveCapacity(vertices.count + other.vertices.count)
-            for var vertex in other.vertices {
-                vertex.posX += vertexTranslationX
-                vertex.posY += vertexTranslationY
-                vertices.append(vertex)
+        vertices.append(contentsOf: other.vertices)
+        if !other.vertices.isEmpty, vertexTranslationX != 0 || vertexTranslationY != 0 {
+            vertices.withUnsafeMutableBufferPointer { buffer in
+                let start = buffer.baseAddress!.advanced(by: Int(baseVertex))
+                GeometryKernels.translate(start, count: buffer.count - Int(baseVertex),
+                                          x: vertexTranslationX, y: vertexTranslationY)
             }
         }
         appendIndices(other.indices, adding: baseVertex)
@@ -353,35 +354,22 @@ public final class DrawList {
         }
     }
 
-    /// Bulk-copy cached indices, then offset them in SIMD-sized chunks. This
-    /// preserves the renderer's proven flat-index contract while avoiding the
-    /// per-element Array append loop that dominates Debug scrolling profiles.
+    /// Bulk copy followed by a vectorisable C pass; large buffers are split
+    /// into independent ranges and joined before the Array borrow ends.
     private func appendIndices(_ source: [UInt32], adding offset: UInt32) {
         guard !source.isEmpty else { return }
         let start = indices.count
         indices.append(contentsOf: source)
         guard offset != 0 else { return }
 
-        let end = indices.count
-        let lanes = 16
-        let delta = SIMD16<UInt32>(repeating: offset)
         indices.withUnsafeMutableBufferPointer { buffer in
-            guard let base = buffer.baseAddress else { return }
-            var index = start
-            while index + lanes <= end {
-                let pointer = base.advanced(by: index)
-                let values = UnsafeRawPointer(pointer)
-                    .loadUnaligned(as: SIMD16<UInt32>.self)
-                UnsafeMutableRawPointer(pointer)
-                    .storeBytes(of: values &+ delta, as: SIMD16<UInt32>.self)
-                index += lanes
-            }
-            while index < end {
-                buffer[index] &+= offset
-                index += 1
-            }
+            let base = buffer.baseAddress!.advanced(by: start)
+            GeometryKernels.indices(base, count: buffer.count - start, offset: offset)
         }
     }
+
+    /// Actual emitted geometry, including painter overflow and shadows.
+    package var paintBounds: UIRect? { GeometryKernels.bounds(vertices) }
 
     // MARK: - Primitives
 

@@ -4,17 +4,12 @@ import Foundation
 import CoreGraphics
 #endif
 
-/// Phase 4a foundation. A `RenderObject` is the per-`Node` retained record
-/// that a future per-layer DrawList cache will hang state off.
-///
-/// In Phase 4a the type only mirrors structure and classifies layer roots;
-/// `NodeRenderer` still walks the `Node` tree directly each frame.
-/// Phase 4b will pivot the renderer to walk this tree and reuse cached
-/// DrawList vertices for layers whose subtree is unchanged.
+/// Retained geometry and layer classification for one scene node.
 public final class RenderObject {
 
     public weak var node: Node?
     public weak var parent: RenderObject?
+    private weak var tree: RenderTree?
     public internal(set) var children: [RenderObject] = []
 
     /// Stable identity inherited from the paired Node. Survives reuse across
@@ -73,7 +68,10 @@ public final class RenderObject {
     /// Drop the memoised z-order. Called on membership/order change
     /// (`RenderTree.reconcileChildren` / `tearDown`) and whenever a child's
     /// `zIndex` changes (`Node.childZIndexDidChange`).
-    func invalidateZOrder() { cachedZSortedChildren = nil }
+    func invalidateZOrder() {
+        cachedZSortedChildren = nil
+        tree?.invalidateFlatOrder()
+    }
 
     /// Children ordered for paint/hit-test, sorted by `zIndex` (stable by
     /// sibling order) when any child uses a non-zero zIndex. Memoised: the
@@ -92,8 +90,9 @@ public final class RenderObject {
         return sorted
     }
 
-    init(node: Node) {
+    init(node: Node, tree: RenderTree) {
         self.node = node
+        self.tree = tree
         self.elementID = node.id
         node.renderObject = self
         refreshLayerClassification()
@@ -138,9 +137,7 @@ public final class RenderObject {
     }
 }
 
-/// Mirror of the `Node` tree dedicated to the render side. Owns one
-/// `RenderObject` per Node and answers structural queries (layer inventory,
-/// nearest enclosing layer root, etc) that the future per-layer cache needs.
+/// Retained render records and a memoised linear paint plan.
 public final class RenderTree {
 
     public private(set) var root: RenderObject?
@@ -148,7 +145,21 @@ public final class RenderTree {
     /// Node identity → RenderObject map. Lookups are O(1).
     private var byNode: [ObjectIdentifier: RenderObject] = [:]
 
+    struct PaintPlan {
+        var objects: [RenderObject] = []
+        var parents: [Int] = []
+        /// Exclusive subtree bounds let cached or culled branches skip in O(1).
+        var subtreeEnds: [Int] = []
+    }
+    private var flatOrderCache: PaintPlan?
+
+    fileprivate func invalidateFlatOrder() { flatOrderCache = nil }
+
     public init() {}
+
+    deinit {
+        if let root { tearDown(root) }
+    }
 
     public func renderObject(for node: Node) -> RenderObject? {
         byNode[ObjectIdentifier(node)]
@@ -157,11 +168,13 @@ public final class RenderTree {
     /// Replace the root and rebuild the entire RenderObject mirror from
     /// `node`. Called by `ViewGraph.install(root:)`.
     public func install(rootNode: Node) {
+        if let root { tearDown(root) }
         byNode.removeAll(keepingCapacity: true)
-        let obj = RenderObject(node: rootNode)
+        let obj = RenderObject(node: rootNode, tree: self)
         byNode[ObjectIdentifier(rootNode)] = obj
         root = obj
         rebuildSubtree(parent: obj)
+        flatOrderCache = nil
     }
 
     /// Re-mirror the children of a `Node` after structural reconcile. New
@@ -183,7 +196,7 @@ public final class RenderTree {
                 kept.parent = parentObject
                 rebuilt.append(kept)
             } else {
-                let made = RenderObject(node: childNode)
+                let made = RenderObject(node: childNode, tree: self)
                 made.parent = parentObject
                 byNode[key] = made
                 rebuilt.append(made)
@@ -197,6 +210,7 @@ public final class RenderTree {
         }
         parentObject.children = rebuilt
         parentObject.invalidateZOrder()
+        flatOrderCache = nil
         for obj in rebuilt {
             obj.refreshLayerClassification()
             // Cache invalidates whenever children list changes.
@@ -219,26 +233,31 @@ public final class RenderTree {
     }
 
     private func tearDown(_ obj: RenderObject) {
-        for child in obj.children { tearDown(child) }
-        obj.children.removeAll(keepingCapacity: false)
-        if let n = obj.node {
-            byNode.removeValue(forKey: ObjectIdentifier(n))
+        flatOrderCache = nil
+        var pending = [obj]
+        while let object = pending.popLast() {
+            pending.append(contentsOf: object.children)
+            object.children.removeAll(keepingCapacity: false)
+            if let node = object.node {
+                byNode.removeValue(forKey: ObjectIdentifier(node))
+                if node.renderObject === object { node.renderObject = nil }
+            }
         }
     }
 
     private func rebuildSubtree(parent: RenderObject) {
-        guard let parentNode = parent.node else { return }
-        var built: [RenderObject] = []
-        built.reserveCapacity(parentNode.children.count)
-        for child in parentNode.children {
-            let obj = RenderObject(node: child)
-            obj.parent = parent
-            byNode[ObjectIdentifier(child)] = obj
-            built.append(obj)
-            rebuildSubtree(parent: obj)
+        var pending = [parent]
+        while let object = pending.popLast() {
+            guard let node = object.node else { continue }
+            object.children = node.children.map { child in
+                let made = RenderObject(node: child, tree: self)
+                made.parent = object
+                byNode[ObjectIdentifier(child)] = made
+                return made
+            }
+            object.refreshLayerClassification()
+            pending.append(contentsOf: object.children.reversed())
         }
-        parent.children = built
-        parent.refreshLayerClassification()
     }
 
     // MARK: - Diagnostics
@@ -256,15 +275,54 @@ public final class RenderTree {
     public func layerRoots() -> [RenderObject] {
         guard let root else { return [] }
         var out: [RenderObject] = []
-        collectLayerRoots(root, into: &out)
+        var pending = [root]
+        while let object = pending.popLast() {
+            if object.isLayerRoot { out.append(object) }
+            pending.append(contentsOf: object.children.reversed())
+        }
         return out
-    }
-
-    private func collectLayerRoots(_ obj: RenderObject, into out: inout [RenderObject]) {
-        if obj.isLayerRoot { out.append(obj) }
-        for child in obj.children { collectLayerRoots(child, into: &out) }
     }
 
     /// Count of RenderObjects in the tree (testing/diagnostic).
     public var objectCount: Int { byNode.count }
+
+    /// Flat, depth-first, parent-before-child list of every `RenderObject` in
+    /// final paint order. Sibling groups are emitted in z-order (via
+    /// `renderOrderedChildren`) so the result is directly drawable without a
+    /// per-frame sort. Memoised; rebuilt only when `invalidateFlatOrder` runs
+    /// (structural change, child membership/order, or a `zIndex` change).
+    ///
+    /// This is the precomputed draw-order table the renderer consumes to turn its
+    /// per-frame recursive walk into a single linear scan.
+    public func flatDrawOrder() -> [RenderObject] {
+        paintPlan().objects
+    }
+
+    func paintPlan() -> PaintPlan {
+        if let cached = flatOrderCache { return cached }
+        var plan = PaintPlan()
+        guard let root else { flatOrderCache = plan; return plan }
+        plan.objects.reserveCapacity(byNode.count)
+        plan.parents.reserveCapacity(byNode.count)
+        plan.subtreeEnds.reserveCapacity(byNode.count)
+        var pending: [(object: RenderObject, parent: Int, exit: Int?)] = [(root, -1, nil)]
+        while let step = pending.popLast() {
+            if let index = step.exit {
+                plan.subtreeEnds[index] = plan.objects.count
+                continue
+            }
+            let index = plan.objects.count
+            plan.objects.append(step.object)
+            plan.parents.append(step.parent)
+            plan.subtreeEnds.append(index + 1)
+            let children = (step.object.node?.childrenMayNeedZSort ?? false)
+                ? step.object.renderOrderedChildren() : step.object.children
+            if !children.isEmpty {
+                pending.append((step.object, step.parent, index))
+                for child in children.reversed() { pending.append((child, index, nil)) }
+            }
+        }
+        flatOrderCache = plan
+        return plan
+    }
 }

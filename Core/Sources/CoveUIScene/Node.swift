@@ -587,9 +587,18 @@ public final class Node: @unchecked Sendable {
     /// resources and releases the per-window singletons keyed by this exact node
     /// (pointer capture, focus). Idempotent.
     private func releaseFromTree() {
-        for child in children {
-            child.releaseFromTree()
+        var pending: [(node: Node, exiting: Bool)] = [(self, false)]
+        while let step = pending.popLast() {
+            if step.exiting {
+                step.node.releaseOwnResources()
+            } else {
+                pending.append((step.node, true))
+                for child in step.node.children.reversed() { pending.append((child, false)) }
+            }
         }
+    }
+
+    private func releaseOwnResources() {
         for resource in resources {
             resource.unmount(node: self)
         }
@@ -702,8 +711,11 @@ public final class Node: @unchecked Sendable {
     }
 
     private func bumpSubtreeStructureVersion() {
-        subtreeStructureVersion &+= 1
-        parent?.bumpSubtreeStructureVersion()
+        var node: Node? = self
+        while let current = node {
+            current.subtreeStructureVersion &+= 1
+            node = current.parent
+        }
     }
 
     // MARK: - Geometry single funnel (坏味 #1)
@@ -772,19 +784,13 @@ public final class Node: @unchecked Sendable {
     }
 
     private func propagateDirty(layoutDirty: Bool, renderDirty: Bool) {
-        let needsLayoutPropagation = layoutDirty && !isDirty
-        let needsRenderPropagation = renderDirty && !self.renderDirty
-        let shouldPropagate = needsLayoutPropagation || needsRenderPropagation
-
-        if layoutDirty {
-            isDirty = true
-        }
-        if renderDirty {
-            self.renderDirty = true
-        }
-
-        if shouldPropagate {
-            parent?.propagateDirty(layoutDirty: layoutDirty, renderDirty: renderDirty)
+        var node: Node? = self
+        while let current = node {
+            let shouldPropagate = (layoutDirty && !current.isDirty) || (renderDirty && !current.renderDirty)
+            if layoutDirty { current.isDirty = true }
+            if renderDirty { current.renderDirty = true }
+            guard shouldPropagate else { return }
+            node = current.parent
         }
     }
 
