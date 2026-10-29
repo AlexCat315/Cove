@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Point {
     pub x: f32,

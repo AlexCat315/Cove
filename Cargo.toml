@@ -18,6 +18,8 @@ clap = { version = "4", features = ["derive"] }
 tempfile = "3"
 libc = "0.2"
 os_pipe = "1"
+unicode-general-category = "1"
+unicode-segmentation = "1"
 cove-core = { path = "Core" }
 cove-platform = { path = "PlatformCore" }
 cove-system = { path = "System" }

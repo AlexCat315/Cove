@@ -66,20 +66,22 @@ pub struct TextInputArea {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[repr(u8)]
 pub enum MouseButton {
-    Left,
-    Middle,
-    Right,
-    X1,
-    X2,
+    Left = 1,
+    Middle = 2,
+    Right = 3,
+    X1 = 4,
+    X2 = 5,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[repr(u8)]
 pub enum PointerKind {
     #[default]
-    Mouse,
-    Touch,
-    Pen,
+    Mouse = 1,
+    Touch = 2,
+    Pen = 3,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
