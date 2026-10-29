@@ -33,6 +33,7 @@ pub use source_location::*;
 pub use identified_view::*;
 pub use memoized_view::*;
 pub use view_modifier::*;
+pub use modified_content_materialise::*;
 pub use around_applying_modifier::*;
 pub use composition_local_provider::*;
 pub use layout_tree::*;

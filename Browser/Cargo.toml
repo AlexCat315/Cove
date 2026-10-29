@@ -1,0 +1,21 @@
+[package]
+name = "cove-browser"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Browser/WebAssembly prototype host"
+
+[lib]
+path = "rust/lib.rs"
+
+[dependencies]
+cove-composition.workspace = true
+cove-core.workspace = true
+cove-platform.workspace = true
+cove-graphics.workspace = true
+cove-logging.workspace = true
+serde.workspace = true
+
+[lints]
+workspace = true

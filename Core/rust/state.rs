@@ -6,6 +6,14 @@ use std::{any::{Any, TypeId}, collections::{BTreeMap, HashMap}, hash::{Hash, Has
 type Observer = Arc<dyn Fn(u64) + Send + Sync>;
 type Invalidator = Arc<dyn Fn(Option<&str>) + Send + Sync>;
 type Summary<T> = Arc<dyn Fn(&T) -> String + Send + Sync>;
+/// Scene-side observers are not `Send`: composition and node trees live on the
+/// UI thread. They are registered in thread-local storage keyed by state id so
+/// `Storage<T>` stays `Send + Sync` for cross-thread value access.
+type LocalObserver = std::rc::Rc<dyn Fn(u64)>;
+use std::cell::RefCell;
+thread_local! {
+    static LOCAL_OBSERVERS: RefCell<BTreeMap<u64, BTreeMap<u64, LocalObserver>>> = const { RefCell::new(BTreeMap::new()) };
+}
 trait DictionaryKey: Any + Send + Sync { fn key_type(&self) -> TypeId; fn key_hash(&self) -> u64; fn key_eq(&self, other: &dyn DictionaryKey) -> bool; fn as_any(&self) -> &dyn Any; }
 struct TypedKey<K>(K);
 impl<K: Hash + Eq + Send + Sync + 'static> DictionaryKey for TypedKey<K> {
@@ -116,8 +124,12 @@ impl<T: Send + 'static> State<T> {
             (value.1, pending)
         };
         let callbacks: Vec<_> = self.0.observers.lock().unwrap_or_else(|e| e.into_inner()).values().cloned().collect();
+        let local_callbacks: Vec<LocalObserver> = LOCAL_OBSERVERS.with(|observers| {
+            observers.borrow().get(&self.0.id).map(|entries| entries.values().cloned().collect()).unwrap_or_default()
+        });
         for (invalidate, field) in invalidations { invalidate(field.as_deref()); }
         for callback in callbacks { callback(revision); }
+        for callback in local_callbacks { callback(revision); }
     }
     pub fn set(&self, value: T) { self.update(|current| *current = value); }
     pub fn copy_runtime_value(&self, other: &Self) where T: Clone {
@@ -127,6 +139,30 @@ impl<T: Send + 'static> State<T> {
     pub fn subscribe(&self, observer: impl Fn(u64) + Send + Sync + 'static) -> Subscription<T> {
         let id = self.0.next_id.fetch_add(1, Ordering::Relaxed); self.0.observers.lock().unwrap_or_else(|e| e.into_inner()).insert(id, Arc::new(observer));
         Subscription { storage: Arc::downgrade(&self.0), id }
+    }
+    /// Observer confined to the current thread, for UI scopes that cannot be
+    /// `Send` (`Rc`-based composition and node graph owners).
+    pub fn subscribe_local(&self, observer: impl Fn(u64) + 'static) -> LocalSubscription {
+        let id = self.0.next_id.fetch_add(1, Ordering::Relaxed);
+        LOCAL_OBSERVERS.with(|observers| {
+            observers.borrow_mut().entry(self.0.id).or_default().insert(id, std::rc::Rc::new(observer));
+        });
+        LocalSubscription { state_id: self.0.id, observer_id: id }
+    }
+}
+
+/// Dropping the token releases its thread-local observer.
+pub struct LocalSubscription {
+    state_id: u64,
+    observer_id: u64,
+}
+impl Drop for LocalSubscription {
+    fn drop(&mut self) {
+        LOCAL_OBSERVERS.with(|observers| {
+            if let Some(entries) = observers.borrow_mut().get_mut(&self.state_id) {
+                entries.remove(&self.observer_id);
+            }
+        });
     }
 }
 /// Dropping the token releases its observer without keeping the state alive.

@@ -1,5 +1,28 @@
 [workspace]
-members = [".", "Core", "PlatformCore", "System", "Logging", "Graphics", "Text", "Imaging", "Shell", "Runtime", "Compose/Composition", "DevTools/Protocol", "Tools/Cove", "Examples/RustCounter"]
+members = [
+    ".",
+    "Core",
+    "PlatformCore",
+    "System",
+    "Logging",
+    "Graphics",
+    "Text",
+    "Imaging",
+    "Shell",
+    "Runtime",
+    "Compose",
+    "Compose/Composition",
+    "Terminal",
+    "Hosts",
+    "DevTools",
+    "DevTools/Protocol",
+    "Sources",
+    "Tools/Cove",
+    "Tools/Support",
+    "Browser",
+    "Examples",
+    "Examples/RustCounter",
+]
 resolver = "3"
 
 [workspace.package]
@@ -59,6 +82,13 @@ cove-platform.workspace = true
 cove-system.workspace = true
 cove-logging.workspace = true
 cove-devtools-protocol.workspace = true
+cove-composition = { path = "Compose/Composition" }
+cove-ui-compose = { path = "Compose" }
+cove-terminal = { path = "Terminal" }
+cove-hosts = { path = "Hosts" }
+cove-devtools = { path = "DevTools" }
+cove-ui-addons = { path = "Sources" }
+cove-browser = { path = "Browser" }
 
 [lints]
 workspace = true

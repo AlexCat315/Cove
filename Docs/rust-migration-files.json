@@ -2735,8 +2735,10 @@
       "source": "Compose/Sources/CoveUICompose/Theme/Styles/Components/InputAppearance.swift",
       "source_sha256": "5dd9bd7ac10b53129a7adb4201ec1fd3f60bfee3386b21241bc62c939430db77",
       "source_lines": 72,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/theme/styles/components/input_appearance.rs"
+      ]
     },
     {
       "source": "Compose/Sources/CoveUICompose/Theme/Styles/Components/ListRowStyle.swift",
@@ -2784,155 +2786,199 @@
       "source": "Compose/Sources/CoveUICompose/Theme/Styles/DefaultDarkTheme.swift",
       "source_sha256": "d62a72207d4c85e05c72ab989d893c699c0d61f51495bc21994d2a567a044706",
       "source_lines": 95,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/theme/styles/default_dark_theme.rs"
+      ]
     },
     {
       "source": "Compose/Sources/CoveUICompose/Theme/Styles/DefaultLightTheme.swift",
       "source_sha256": "322e6a0ce80fbc08ba1c2066f5a875d5aa6eb0075948168afd11528fe4a8f566",
       "source_lines": 85,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/theme/styles/default_light_theme.rs"
+      ]
     },
     {
       "source": "Compose/Sources/CoveUICompose/Theme/Theme.swift",
       "source_sha256": "3ac1d71fee60c67917cdb7335a278700ea4051879d901a31e0495d273763b72a",
       "source_lines": 58,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/theme/theme.rs"
+      ]
     },
     {
       "source": "Compose/Sources/CoveUICompose/Theme/ThemeEnvironment.swift",
       "source_sha256": "039d6a18e5bf15cff401878e390f19253458930edf3867fcee35eb479597a5ac",
       "source_lines": 63,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/theme/theme_environment.rs"
+      ]
     },
     {
       "source": "Compose/Sources/CoveUICompose/Theme/ThemeReader.swift",
       "source_sha256": "f4a6bc43ff55274dbe0b784bf9ea7a918a3f3692fdb591343b91a1cb241f78a7",
       "source_lines": 20,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/theme/theme_reader.rs"
+      ]
     },
     {
       "source": "Compose/Sources/CoveUICompose/Theme/Tokens/ColorScheme.swift",
       "source_sha256": "ffcc66c3f54824e6f768cceb09df5eba912f26287a5cfaff0345965f2bd1e415",
       "source_lines": 151,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/theme/tokens/color_scheme.rs"
+      ]
     },
     {
       "source": "Compose/Sources/CoveUICompose/Theme/Tokens/ControlSize.swift",
       "source_sha256": "839f4ef501293674cbe9e019a20d0f3a5cd6fc00d69b889e04e21ac0733b8621",
       "source_lines": 61,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/theme/tokens/control_size.rs"
+      ]
     },
     {
       "source": "Compose/Sources/CoveUICompose/Theme/Tokens/ElevationScale.swift",
       "source_sha256": "705d92608da4287409095c3d0f3fa4b965c04f54ae94a3bcad69b9fec9060001",
       "source_lines": 26,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/theme/tokens/elevation_scale.rs"
+      ]
     },
     {
       "source": "Compose/Sources/CoveUICompose/Theme/Tokens/Extensions.swift",
       "source_sha256": "c382419e5e0d08925fdc6bb286259f36fe5f41862021228a965cc045cc8c12af",
       "source_lines": 21,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/theme/tokens/extensions.rs"
+      ]
     },
     {
       "source": "Compose/Sources/CoveUICompose/Theme/Tokens/FloatingSurfaceTokens.swift",
       "source_sha256": "7424120edab2a9385e61415fcf498a5f399c0f4c2b97c6918523ce8d96021492",
       "source_lines": 17,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/theme/tokens/floating_surface_tokens.rs"
+      ]
     },
     {
       "source": "Compose/Sources/CoveUICompose/Theme/Tokens/Icons.swift",
       "source_sha256": "2b2204650c99fade293efce43117f5703a645b6fbd71d507588dce34e4e9da7e",
       "source_lines": 78,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/theme/tokens/icons.rs"
+      ]
     },
     {
       "source": "Compose/Sources/CoveUICompose/Theme/Tokens/Metrics.swift",
       "source_sha256": "91de226e248ed090800b3d01eb96376b77e4645217db4438f57f0cb0be175245",
       "source_lines": 26,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/theme/tokens/metrics.rs"
+      ]
     },
     {
       "source": "Compose/Sources/CoveUICompose/Theme/Tokens/MotionScale.swift",
       "source_sha256": "d5b13cc267e5a29f5ff0bb18338f7af064b9f083bdce95e85e2387bff774f338",
       "source_lines": 59,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/theme/tokens/motion_scale.rs"
+      ]
     },
     {
       "source": "Compose/Sources/CoveUICompose/Theme/Tokens/RadiusScale.swift",
       "source_sha256": "dcf333326088313b3faa6916c5791e881f6558c5afc1a323807c33105166503b",
       "source_lines": 19,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/theme/tokens/radius_scale.rs"
+      ]
     },
     {
       "source": "Compose/Sources/CoveUICompose/Theme/Tokens/ReducedMotionEnvironment.swift",
       "source_sha256": "70bdb0784b059b493d21676601f7d2b3468c071252b9d96a0cba0349cede85b9",
       "source_lines": 13,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/theme/tokens/reduced_motion_environment.rs"
+      ]
     },
     {
       "source": "Compose/Sources/CoveUICompose/Theme/Tokens/SemanticColor.swift",
       "source_sha256": "e1b30b67a0f9fc951ad2692486c592260aa181c12ea05d1f02205d6c82748e11",
       "source_lines": 86,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/theme/tokens/semantic_color.rs"
+      ]
     },
     {
       "source": "Compose/Sources/CoveUICompose/Theme/Tokens/SemanticModifiers.swift",
       "source_sha256": "44f73638de897eea06ec2e0644c9d50b9d5d992d1aeba33845031715e879db50",
       "source_lines": 92,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/theme/tokens/semantic_modifiers.rs"
+      ]
     },
     {
       "source": "Compose/Sources/CoveUICompose/Theme/Tokens/SemanticMotion.swift",
       "source_sha256": "79d42c2c5c347672dc2e23cf4d2ae0a844c24ca99c518b10e6066409f18192bc",
       "source_lines": 108,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/theme/tokens/semantic_motion.rs"
+      ]
     },
     {
       "source": "Compose/Sources/CoveUICompose/Theme/Tokens/SpacingScale.swift",
       "source_sha256": "ae500e09883e1d3b368a608334a78c9c8a3f054e4eea16cbaba745398074f018",
       "source_lines": 20,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/theme/tokens/spacing_scale.rs"
+      ]
     },
     {
       "source": "Compose/Sources/CoveUICompose/Theme/Tokens/TextEmphasis.swift",
       "source_sha256": "5a4bfb3b94e11ff275427ac31ca7fbe4f8b7e4211c9f59dc6b295039f1645179",
       "source_lines": 12,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/theme/tokens/text_emphasis.rs"
+      ]
     },
     {
       "source": "Compose/Sources/CoveUICompose/Theme/Tokens/TextScaler.swift",
       "source_sha256": "4dd4ad8544276b44404490570acaed239030a6551abefb324780afdb79e7336f",
       "source_lines": 76,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/theme/tokens/text_scaler.rs"
+      ]
     },
     {
       "source": "Compose/Sources/CoveUICompose/Theme/Tokens/Typography.swift",
       "source_sha256": "17672f882433b0d2eb9042693f8a28af434f49cac4acbc2adf1824122f7c56d0",
       "source_lines": 74,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/theme/tokens/typography.rs"
+      ]
     },
     {
       "source": "Core/Package.swift",

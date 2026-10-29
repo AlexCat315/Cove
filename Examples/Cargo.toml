@@ -1,0 +1,28 @@
+[package]
+name = "cove-examples"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Gallery, demo and mobile example content"
+
+[lib]
+path = "rust/lib.rs"
+
+[dependencies]
+cove-ui-compose = { path = "../Compose" }
+cove-ui-addons = { path = "../Sources" }
+cove-terminal = { path = "../Terminal" }
+cove-hosts = { path = "../Hosts" }
+cove-composition.workspace = true
+cove-runtime.workspace = true
+cove-core.workspace = true
+cove-platform.workspace = true
+cove-graphics.workspace = true
+cove-imaging.workspace = true
+cove-text.workspace = true
+cove-logging.workspace = true
+serde.workspace = true
+
+[lints]
+workspace = true

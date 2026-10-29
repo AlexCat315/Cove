@@ -1,0 +1,20 @@
+[package]
+name = "cove-tool-support"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Shared support code for Cove command line tools"
+
+[lib]
+path = "rust/lib.rs"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tempfile.workspace = true
+clap.workspace = true
+
+[lints]
+workspace = true

@@ -1,11 +1,13 @@
 //! Translation of CoveUIScene/NodeTree.swift.
 use super::{InvalidationSource, Node, PerformanceTimeline};
 use std::cell::RefCell;
+use std::rc::Rc;
 
 /// Owns the root node and drives depth-first traversal.
 pub struct NodeTree {
     root: Option<Node>,
-    pub timeline: RefCell<PerformanceTimeline>,
+    /// Shared so a `Recomposer` can record component spans on the same timeline.
+    pub timeline: Rc<RefCell<PerformanceTimeline>>,
     cached_node_count: usize,
     cached_node_count_version: u64,
     cached_node_count_root: Option<usize>,
@@ -14,7 +16,7 @@ pub struct NodeTree {
 }
 impl NodeTree {
     pub fn new() -> Self {
-        Self { root: None, timeline: RefCell::new(PerformanceTimeline::default()), cached_node_count: 0,
+        Self { root: None, timeline: Rc::new(RefCell::new(PerformanceTimeline::default())), cached_node_count: 0,
             cached_node_count_version: 0, cached_node_count_root: None, node_count_stack: Vec::new(), flush_stack: Vec::new() }
     }
     pub fn root(&self) -> Option<Node> {

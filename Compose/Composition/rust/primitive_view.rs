@@ -8,4 +8,7 @@ pub trait PrimitiveView{
     fn children(&self,_node:&Node)->Vec<AnyView>{Vec::new()}
 }
 #[macro_export]
-macro_rules! impl_primitive_view{($type:ty)=>{impl $crate::View for $type{fn kind(&self)->$crate::ViewKind<'_>{$crate::ViewKind::Primitive(self)}}};}
+macro_rules! impl_primitive_view{($type:ty)=>{impl $crate::View for $type{
+    fn kind(&self)->$crate::ViewKind<'_>{$crate::ViewKind::Primitive(self)}
+    fn tag(&self)->&'static str{std::any::type_name::<Self>()}
+}};}

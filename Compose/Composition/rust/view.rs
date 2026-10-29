@@ -15,7 +15,11 @@ pub trait View:AsAny{
 pub trait ViewExt:View+Sized+'static{
     fn erased(self)->AnyView{AnyView::new(self)}
     fn id<K:std::hash::Hash+Eq+'static>(self,key:K)->IdentifiedView{IdentifiedView::new(self,key)}
-    fn modifier<M:crate::ViewModifier+'static>(self,modifier:M)->crate::ModifiedContent{crate::ModifiedContent::new(self,modifier)}
+    fn modifier<M:crate::ViewModifier+'static>(self,modifier:M)->crate::ModifiedContent{crate::ModifiedContent::new(AnyView::new(self),modifier)}
+    /// Provide `value` for `local` to every descendant of this view.
+    fn composition_local<Value:Clone+PartialEq+'static>(self,local:std::rc::Rc<cove_core::CompositionLocal<Value>>,value:Value)->crate::ModifiedContent{
+        self.modifier(crate::ProvideCompositionLocalModifier::new(local,value))
+    }
     #[track_caller]fn source_location(self)->SourceLocatedView{SourceLocatedView::explicit(self)}
 }
 impl<T:View+Sized+'static>ViewExt for T{}

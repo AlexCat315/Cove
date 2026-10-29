@@ -1,0 +1,28 @@
+[package]
+name = "cove-hosts"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Platform application hosts (desktop, Android, iOS)"
+
+[lib]
+path = "rust/lib.rs"
+
+[dependencies]
+cove-runtime.workspace = true
+cove-composition.workspace = true
+cove-ui-compose = { path = "../Compose" }
+cove-core.workspace = true
+cove-platform.workspace = true
+cove-graphics.workspace = true
+cove-text.workspace = true
+cove-imaging.workspace = true
+cove-system.workspace = true
+cove-logging.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+libc.workspace = true
+
+[lints]
+workspace = true

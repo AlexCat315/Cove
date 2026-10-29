@@ -978,6 +978,11 @@ impl Node {
         }
         local.default_value()
     }
+    /// Value provided for `local` directly on this node, without walking
+    /// ancestors. Used by surface-theme probing and diagnostics.
+    pub fn composition_value_here<Value: Clone + 'static>(&self, local: &CompositionLocal<Value>) -> Option<Value> {
+        self.0.borrow().composition_values.get(&local.key()).and_then(|raw| raw.downcast_ref::<Value>()).cloned()
+    }
 
     // MARK: - Resources
 
