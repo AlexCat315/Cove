@@ -89,7 +89,7 @@ enum NativeMenuBuilder {
     /// Rasterizes a bundle glyph (an alpha-mask SVG) into a black-on-transparent
     /// template PNG so the native menu can tint it alongside the item text.
     static func makeIcon(_ resource: BundleImageResource?, points: Float = 16) -> NativeMenuIcon? {
-        #if canImport(CoreGraphics)
+        #if canImport(CoreGraphics) && canImport(ImageIO)
         guard let resource, let url = resource.url else { return nil }
         let pixels = Int(points * 2)
         guard let decoded = try? ImageDecoder.decode(url: url, targetSize: (width: pixels, height: pixels)),
@@ -106,7 +106,7 @@ enum NativeMenuBuilder {
         #endif
     }
 
-    #if canImport(CoreGraphics)
+    #if canImport(CoreGraphics) && canImport(ImageIO)
     private static func encodePNG(rgba: [UInt8], width: Int, height: Int) -> Data? {
         let bytesPerRow = width * 4
         let colorSpace = CGColorSpaceCreateDeviceRGB()

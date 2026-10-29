@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- 修复 Linux/Windows 原生菜单测试：PNG 图标按 CoreGraphics/ImageIO 编码能力验证，未提供编码器的平台仍验证图标为空；统一实现与测试的平台条件。
+
 ## 0.2.11 — 2026-10-29
 
 - 修复 0.2.10 发布验证：Compose 按所属包查找资源，线程局部存储析构回调处理空指针并消除 Windows 的 UUID 名称冲突，Android 的 Float 数学运算使用明确重载，iOS 不再引用 AppKit 菜单适配器。

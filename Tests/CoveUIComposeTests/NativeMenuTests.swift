@@ -136,7 +136,7 @@ struct NativeMenuTests: CoveUIComposeSerializedSuite {
         #expect(NativeMenuBuilder.parseShortcut(nil) == nil)
     }
 
-    @Test("Item icons rasterize into a template PNG")
+    @Test("Native menu icons follow platform PNG encoding support")
     func iconRasterizes() {
         let entries: [MenuEntry] = [
             .item(MenuItem(id: "save", title: "Save",
@@ -144,11 +144,15 @@ struct NativeMenuTests: CoveUIComposeSerializedSuite {
             .item(MenuItem(id: "plain", title: "Plain", action: {})),
         ]
         let items = NativeMenuBuilder.build(entries).snapshot.items
+        #if canImport(CoreGraphics) && canImport(ImageIO)
         guard let icon = items[0].icon else {
             Issue.record("expected a template icon"); return
         }
         #expect(icon.isTemplate == true)
         #expect(!icon.png.isEmpty)
+        #else
+        #expect(items[0].icon == nil)
+        #endif
         #expect(items[1].icon == nil)
     }
 }
