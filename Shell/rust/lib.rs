@@ -23,3 +23,7 @@ pub fn make_default_shell() -> Result<Sdl3Shell, ShellError> { Sdl3Shell::new() 
 pub type AppKitShell = Sdl3Shell;
 #[cfg(target_os = "macos")]
 pub type MacShell = Sdl3Shell;
+
+/// Monotonic host-clock seconds, aligned with native display-link timestamps.
+pub fn monotonic_seconds() -> f64 { // SAFETY: SDL performance counters are thread-safe and require no initialized subsystem.
+    unsafe { native::cove_shell_monotonic_seconds() } }

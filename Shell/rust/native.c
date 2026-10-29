@@ -201,3 +201,5 @@ bool cove_shell_refresh_take(CoveShellWindow *h,double *timestamp,double *target
 }
 static CoveShellLogCallback log_callback;static void SDLCALL log_output(void *context,int category,SDL_LogPriority priority,const char *message){(void)context;if(log_callback)log_callback(category,(int)priority,message);}
 void cove_shell_log_install(CoveShellLogCallback callback){log_callback=callback;SDL_SetLogOutputFunction(log_output,NULL);}
+
+double cove_shell_monotonic_seconds(void){return (double)SDL_GetPerformanceCounter()/(double)SDL_GetPerformanceFrequency();}

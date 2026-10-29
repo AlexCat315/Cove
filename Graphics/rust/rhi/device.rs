@@ -93,6 +93,9 @@ pub struct Device {
     state: Mutex<DeviceState>,
     session: Mutex<()>,
     logger: Mutex<Option<LogRuntime>>,
+    retirements: Mutex<HashMap<u64, super::Completion>>,
+    ready_retirements: Arc<Mutex<Vec<u64>>>,
+    next_retirement: std::sync::atomic::AtomicU64,
 }
 impl Device {
     fn lock(&self) -> MutexGuard<'_, DeviceState> {
@@ -131,6 +134,9 @@ impl Device {
             }),
             session: Mutex::new(()),
             logger: Mutex::new(None),
+            retirements: Mutex::new(HashMap::new()),
+            ready_retirements: Arc::new(Mutex::new(Vec::new())),
+            next_retirement: std::sync::atomic::AtomicU64::new(1),
         })
     }
 
@@ -234,7 +240,7 @@ impl Device {
         let stale: Vec<Texture> = previous.textures.iter().copied().collect();
         Self::validate_surface(&descriptor)?;
         Self::validate_unique_surface(&state, &descriptor, Some(handle))?;
-        self.frame_ring.wait_until_idle();
+        self.drain_retirements(self.frame_ring.wait_until_idle());
         self.backend().wait_until_idle()?;
         self.backend().configure_swapchain(handle, descriptor)?;
         for texture in stale {
@@ -273,7 +279,7 @@ impl Device {
             state.planner.forget_resource(super::ResourceRef::texture(texture.id()));
         }
         let backend = Arc::clone(&self.backend);
-        self.frame_ring.retire_current(Box::new(move || {
+        self.retire_current(Box::new(move || {
             backend
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -289,7 +295,7 @@ impl Device {
             return Ok(());
         }
         rhi_require(state.current_slot.is_none(), "close a swapchain outside a frame")?;
-        self.frame_ring.wait_until_idle();
+        self.drain_retirements(self.frame_ring.wait_until_idle());
         self.backend().wait_until_idle()?;
         self.destroy_swapchain_locked(&mut state, handle);
         Ok(())
@@ -519,7 +525,7 @@ impl Device {
             .planner
             .forget_resource(super::ResourceRef::acceleration_structure(structure.id()));
         let backend = Arc::clone(&self.backend);
-        self.frame_ring.retire_current(Box::new(move || {
+        self.retire_current(Box::new(move || {
             backend
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -533,7 +539,7 @@ impl Device {
         let mut state = self.lock();
         state.planner.forget_resource(super::ResourceRef::buffer(buffer.id()));
         let backend = Arc::clone(&self.backend);
-        self.frame_ring.retire_current(Box::new(move || {
+        self.retire_current(Box::new(move || {
             backend.lock().unwrap_or_else(std::sync::PoisonError::into_inner).destroy_buffer(buffer);
         }));
     }
@@ -542,7 +548,7 @@ impl Device {
         let mut state = self.lock();
         state.planner.forget_resource(super::ResourceRef::texture(texture.id()));
         let backend = Arc::clone(&self.backend);
-        self.frame_ring.retire_current(Box::new(move || {
+        self.retire_current(Box::new(move || {
             backend.lock().unwrap_or_else(std::sync::PoisonError::into_inner).destroy_texture(texture);
         }));
     }
@@ -550,7 +556,7 @@ impl Device {
     pub fn destroy_sampler(&self, sampler: Sampler) {
         let _state = self.lock();
         let backend = Arc::clone(&self.backend);
-        self.frame_ring.retire_current(Box::new(move || {
+        self.retire_current(Box::new(move || {
             backend.lock().unwrap_or_else(std::sync::PoisonError::into_inner).destroy_sampler(sampler);
         }));
     }
@@ -561,7 +567,7 @@ impl Device {
             return;
         }
         let backend = Arc::clone(&self.backend);
-        self.frame_ring.retire_current(Box::new(move || {
+        self.retire_current(Box::new(move || {
             backend
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -722,7 +728,7 @@ impl Device {
         }
         state.interfaces.uses.remove(&pipeline.id());
         let backend = Arc::clone(&self.backend);
-        self.frame_ring.retire_current(Box::new(move || {
+        self.retire_current(Box::new(move || {
             backend
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -737,7 +743,7 @@ impl Device {
         }
         state.interfaces.uses.remove(&pipeline.id());
         let backend = Arc::clone(&self.backend);
-        self.frame_ring.retire_current(Box::new(move || {
+        self.retire_current(Box::new(move || {
             backend
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -752,7 +758,7 @@ impl Device {
         }
         state.interfaces.uses.remove(&pipeline.id());
         let backend = Arc::clone(&self.backend);
-        self.frame_ring.retire_current(Box::new(move || {
+        self.retire_current(Box::new(move || {
             backend
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -906,7 +912,7 @@ impl Device {
         state.planner.remove_binding_set_entries(handle_id);
         let handle = BindingSet::new(handle_id);
         let backend = Arc::clone(&self.backend);
-        self.frame_ring.retire_current(Box::new(move || {
+        self.retire_current(Box::new(move || {
             backend
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -958,7 +964,8 @@ impl Device {
     pub fn begin_frame(&self) -> RhiResult<()> {
         let mut state = self.lock();
         rhi_require(state.current_slot.is_none(), "a frame is already active")?;
-        let slot = self.frame_ring.begin();
+        let (slot, ready) = self.frame_ring.begin();
+        self.drain_retirements(ready);
         match self.backend().make_frame_uploader(slot) {
             Ok(mut uploader) => {
                 uploader.reset();
@@ -968,7 +975,7 @@ impl Device {
                 Ok(())
             }
             Err(error) => {
-                self.frame_ring.end();
+                self.drain_retirements(self.frame_ring.end());
                 Err(error)
             }
         }
@@ -988,7 +995,7 @@ impl Device {
                 )));
             }
         }
-        self.frame_ring.end();
+        self.drain_retirements(self.frame_ring.end());
         state.current_slot = None;
         state.current_uploader = None;
     }
@@ -1069,13 +1076,15 @@ impl Device {
         for planned_submit in &plan.submits {
             self.frame_ring.register_command_buffer(slot);
             let frame_ring = Arc::clone(&self.frame_ring);
+            let ready = Arc::clone(&self.ready_retirements);
             let completion: super::Completion = Box::new(move || {
-                frame_ring.command_buffer_completed(slot);
+                let completed = frame_ring.command_buffer_completed(slot);
+                ready.lock().unwrap_or_else(std::sync::PoisonError::into_inner).extend(completed);
             });
             match self.backend().submit(planned_submit, cpu_profile.as_deref_mut(), completion) {
                 Ok(()) => submitted = true,
                 Err(error) => {
-                    self.frame_ring.unregister_command_buffer(slot);
+                    self.drain_retirements(self.frame_ring.unregister_command_buffer(slot));
                     if submitted {
                         state.submission_fault = Some(RhiError::submit_failed(
                             "partial submission failed; recreate the device before further submissions",
@@ -1199,11 +1208,13 @@ impl Device {
         }
         self.frame_ring.register_command_buffer(slot);
         let frame_ring = Arc::clone(&self.frame_ring);
+        let ready = Arc::clone(&self.ready_retirements);
         let completion: super::Completion = Box::new(move || {
-            frame_ring.command_buffer_completed(slot);
+            let completed = frame_ring.command_buffer_completed(slot);
+            ready.lock().unwrap_or_else(std::sync::PoisonError::into_inner).extend(completed);
         });
         if let Err(error) = self.backend().present(image, completion) {
-            self.frame_ring.unregister_command_buffer(slot);
+            self.drain_retirements(self.frame_ring.unregister_command_buffer(slot));
             return Err(error);
         }
         if let Some(window) = state.swapchains.get_mut(&image.swapchain.id()) {
@@ -1296,8 +1307,25 @@ impl Device {
             state.current_slot.is_none(),
             "end_frame must precede wait_until_idle",
         )?;
-        self.frame_ring.wait_until_idle();
+        self.drain_retirements(self.frame_ring.wait_until_idle());
         self.backend().wait_until_idle()
+    }
+
+    fn retire_current(&self, action: super::Completion) {
+        let id = self.next_retirement.fetch_add(1, Ordering::Relaxed);
+        assert!(id != 0 && id != u64::MAX, "retirement sequence exhausted");
+        self.retirements.lock().unwrap_or_else(std::sync::PoisonError::into_inner).insert(id, action);
+        self.drain_retirements(self.frame_ring.register_retirement(id));
+    }
+
+    /// GPU callbacks only enqueue identifiers; native destruction stays on the API thread.
+    fn drain_retirements(&self, mut ready: Vec<u64>) {
+        ready.extend(std::mem::take(&mut *self.ready_retirements.lock().unwrap_or_else(std::sync::PoisonError::into_inner)));
+        let actions = {
+            let mut pending = self.retirements.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            ready.into_iter().filter_map(|id| pending.remove(&id)).collect::<Vec<_>>()
+        };
+        for action in actions { action(); }
     }
 
     // MARK: Diagnostics
@@ -1348,6 +1376,15 @@ impl Device {
                 line: line!(),
             },
         );
+    }
+}
+
+impl Drop for Device {
+    fn drop(&mut self) {
+        let active = { self.lock().current_slot.is_some() };
+        if active { self.end_frame(); }
+        let _ = self.wait_until_idle();
+        self.drain_retirements(Vec::new());
     }
 }
 

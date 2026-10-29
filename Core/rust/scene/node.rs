@@ -242,6 +242,7 @@ impl Node {
     pub(crate) fn cell(&self) -> &NodeCell {
         &self.0
     }
+    pub fn upgrade(weak: &NodeWeak) -> Option<Self> { weak.upgrade().map(Self) }
     pub fn downgrade(&self) -> NodeWeak {
         Rc::downgrade(&self.0)
     }

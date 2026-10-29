@@ -71,9 +71,11 @@ impl Sdl3Shell {
         // SAFETY: the bridge copies all filter/path strings synchronously, and releases context via done exactly once.
         unsafe{native::cove_shell_dialog(self.parent(id),folder,path.as_ref().map_or(std::ptr::null(),|s|s.as_ptr()),name_ptrs.as_ptr(),pattern_ptrs.as_ptr(),names.len(),multiple,done,Box::into_raw(context).cast())};
     }
-    fn complete_dialogs(&self) {
+    fn complete_dialogs(&self) -> Vec<Box<dyn FnOnce()>> {
+        let mut work: Vec<Box<dyn FnOnce()>> = Vec::new();
         loop { let next={let mut dialogs=self.dialogs.borrow_mut();match dialogs.receiver.try_recv(){Ok(result)=>dialogs.callbacks.remove(&result.id).map(|callback|(callback,result.files)),Err(_)=>None}};
-            if let Some((callback,files))=next{callback(files);}else{break;}}
+            if let Some((callback,files))=next{work.push(Box::new(move||callback(files)));}else{break;}}
+        work
     }
 }
 impl Shell for Sdl3Shell {
@@ -99,7 +101,7 @@ impl Shell for Sdl3Shell {
     fn destroy_window(&mut self,id:WindowId){if let Some(window)=self.windows.remove(&id){window.close();}self.order.retain(|entry|*entry!=id);}
     fn initialize_window(&mut self,title:&str)->Result<(),ShellError>{if self.main_window_id().is_none(){self.create_window(title,self.default_options.clone())?;}Ok(())}
     fn poll_window_events(&mut self)->Vec<WindowInputEvent>{
-        self.complete_dialogs();if self.session.is_none(){return Vec::new();}let mut collected=Vec::new();
+        if self.session.is_none(){return Vec::new();}let mut collected=Vec::new();
         loop{let mut event=native::Event::default(); // SAFETY: event owns any text copied by the bridge and releases it on Drop.
             if !unsafe{native::cove_shell_poll(&mut event)}{break;}
             let mut id=WindowId(event.window);
@@ -108,6 +110,7 @@ impl Shell for Sdl3Shell {
         }
         collected
     }
+    fn take_deferred_callbacks(&self)->Vec<Box<dyn FnOnce()>>{self.complete_dialogs()}
     fn wait_for_events(&self,timeout:Duration)->bool{if self.session.is_none(){return false;} // SAFETY: SDL owns the queue; wait preserves the event for the next poll.
         unsafe{native::cove_shell_wait(timeout.as_nanos().min(u64::MAX as u128) as u64)}}
     fn wake_event_loop(&self){Self::wake();}

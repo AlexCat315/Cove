@@ -49,6 +49,8 @@ pub trait Shell {
     fn window(&self, id: WindowId) -> Option<Rc<dyn WindowHandle>>;
     fn destroy_window(&mut self, id: WindowId);
     fn poll_window_events(&mut self) -> Vec<WindowInputEvent>;
+    /// Execute the returned work after releasing any external shell borrow.
+    fn take_deferred_callbacks(&self) -> Vec<Box<dyn FnOnce()>> { Vec::new() }
     fn wait_for_events(&self, timeout: Duration) -> bool;
     fn wake_event_loop(&self);
     fn set_text_input_area(&self, id: WindowId, area: Option<TextInputArea>);

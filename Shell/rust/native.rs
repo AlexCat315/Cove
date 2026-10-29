@@ -14,7 +14,7 @@ unsafe extern "C" {
     pub fn cove_shell_create(title: *const c_char, width: i32, height: i32, inset: bool, dock: bool) -> *mut Window;
     pub fn cove_shell_destroy(window: *mut Window); pub fn cove_shell_state(window: *mut Window, state: *mut WindowState) -> bool;
     pub fn cove_shell_poll(event: *mut Event) -> bool; fn cove_shell_event_free(event: *mut Event);
-    pub fn cove_shell_wait(timeout_ns: u64) -> bool; pub fn cove_shell_wake();
+    pub fn cove_shell_wait(timeout_ns: u64) -> bool; pub fn cove_shell_wake(); pub fn cove_shell_monotonic_seconds() -> f64;
     pub fn cove_shell_command(window: *mut Window, command: i32, a: i32, b: i32);
     pub fn cove_shell_chrome(window: *mut Window, chrome: *const Chrome);
     pub fn cove_shell_text_area(window: *mut Window, area: *const f32); pub fn cove_shell_cursor(window: *mut Window, cursor: i32);

@@ -26,15 +26,15 @@ impl Node {
 
 /// Process-wide bridge for work that must run on the UI run-loop thread.
 pub struct UIWorkSchedulerHolder;
+thread_local! {
+    static ENQUEUE: RefCell<Option<Rc<dyn Fn(Rc<dyn Fn()>)>>> = const { RefCell::new(None) };
+}
 impl UIWorkSchedulerHolder {
-    thread_local! {
-        static ENQUEUE: RefCell<Option<Rc<dyn Fn(Rc<dyn Fn()>)>>> = const { RefCell::new(None) };
-    }
     pub fn set_enqueue(enqueue: Option<Rc<dyn Fn(Rc<dyn Fn()>)>>) {
-        Self::ENQUEUE.with(|slot| *slot.borrow_mut() = enqueue);
+        ENQUEUE.with(|slot| *slot.borrow_mut() = enqueue);
     }
     pub fn schedule(work: Rc<dyn Fn()>) {
-        Self::ENQUEUE.with(|slot| {
+        ENQUEUE.with(|slot| {
             if let Some(enqueue) = slot.borrow().as_ref() {
                 enqueue(work);
             }
@@ -99,4 +99,15 @@ mod tests {
         assert_eq!(seen.get(), 1);
         UIWorkSchedulerHolder::set_enqueue(None);
     }
+}
+
+/// WindowReveal.swift: activation origin belongs to the root window's attachment store.
+pub struct WindowRevealContext;
+impl WindowRevealContext {
+    const KEY: &'static str = "CoveUI.control.activation-origin";
+    fn root(node: &Node) -> Node { let mut root=node.clone(); while let Some(parent)=root.parent(){root=parent;}root }
+    pub fn record_activation(node:&Node){let frame=node.absolute_frame();Self::root(node).set_attachment(Self::KEY,crate::Point::new(frame.x+frame.width/2.0,frame.y+frame.height/2.0));}
+    pub fn activation_origin(node:&Node)->Option<crate::Point>{Self::root(node).attachment(Self::KEY)}
+    pub fn clear_activation(node:Option<&Node>){if let Some(node)=node{node.remove_attachment(Self::KEY);}}
+    pub fn bounds(node:&Node)->Rect{Self::root(node).frame()}
 }

@@ -67,7 +67,10 @@ impl NativeUITextureStore{
     pub fn has_atlased_placements(&self)->bool{!self.placements.is_empty()}
     pub fn remap_atlas_uvs(&self,list:&DrawList)->Vec<Vertex>{
         let mut vertices=list.vertices().to_vec();for batch in list.batches(){let Some(p)=self.placements.get(&batch.texture_id)else{continue;};let size=self.atlases[p.atlas].size as f32;
-            for &index in &list.indices()[batch.index_offset as usize..(batch.index_offset+batch.index_count) as usize]{let mut v=list.vertices()[index as usize];let base=if v.u>=15.0{20.0}else if v.u>=5.0{10.0}else{continue;};v.u=base+((p.x+1) as f32+(v.u-base)*p.w as f32)/size;v.v=((p.y+1) as f32+v.v*p.h as f32)/size;vertices[index as usize]=v;}}
+            let indices=&list.indices()[batch.index_offset as usize..(batch.index_offset+batch.index_count) as usize];
+            // SAFETY: geometry was validated before remapping; output has the same vertex count as the disjoint immutable source.
+            unsafe{cove_ui_remap_uvs(list.vertices().as_ptr(),vertices.as_mut_ptr(),indices.as_ptr(),indices.len(),(p.x+1) as f32,(p.y+1) as f32,p.w as f32,p.h as f32,size);}}
+
         vertices
     }
     pub fn build_atlas_uploads(&self)->RhiResult<(Vec<TextureBufferUpload>,usize,u64)>{let(mut result,mut bytes,mut sequence)=(Vec::new(),0,0);for upload in &self.pending{let location=self.device.upload_transient(&upload.pixels,4)?;let mut command=TextureBufferUpload::new(location.buffer,upload.region.width as usize*4,self.atlases[upload.atlas].texture.texture(),upload.region);command.offset=location.offset;result.push(command);bytes+=upload.logical_bytes;sequence=upload.sequence;}Ok((result,bytes,sequence))}
@@ -76,4 +79,6 @@ impl NativeUITextureStore{
     pub fn synchronize(&mut self,source:&Self)->RhiResult<()>{if !Arc::ptr_eq(&self.device,&source.device){return Err(RhiError::invalid_argument("UI texture synchronization requires the same device"));}self.textures=source.textures.clone();self.residency=source.residency.clone();self.atlases=source.atlases.clone();self.placements=source.placements.clone();self.pending=source.pending.clone();self.sequence=source.sequence;Ok(())}
 }
 fn allocate(atlas:&mut ImageAtlas,w:usize,h:usize)->Option<(usize,usize)>{let(pw,ph)=(w+2,h+2);if pw>atlas.size||ph>atlas.size{return None;}if atlas.x+pw>atlas.size{atlas.x=0;atlas.y+=atlas.shelf;atlas.shelf=0;}if atlas.y+ph>atlas.size{return None;}let result=(atlas.x,atlas.y);atlas.x+=pw;atlas.shelf=atlas.shelf.max(ph);Some(result)}
-unsafe extern "C"{fn cove_ui_pad_rgba(source:*const u8,width:usize,height:usize,destination:*mut u8);}
+unsafe extern "C"{
+fn cove_ui_remap_uvs(source:*const Vertex,out:*mut Vertex,indices:*const u32,count:usize,x:f32,y:f32,width:f32,height:f32,size:f32);
+fn cove_ui_pad_rgba(source:*const u8,width:usize,height:usize,destination:*mut u8);}

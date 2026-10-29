@@ -36,7 +36,7 @@ impl UploadLocation {
 /// Swift declares two `write` overloads (one taking `Data`, one taking an
 /// `UnsafeRawBufferPointer` that defaults to wrapping the bytes). A Rust `&[u8]`
 /// covers both: the backend copies from the slice before returning.
-pub trait FrameUploader {
+pub trait FrameUploader: Send {
     /// Returns the uploader to a zero-used state. Called when a frame begins.
     fn reset(&mut self);
     /// Suballocates from GPU-visible ring storage and copies `bytes` there.
@@ -221,6 +221,7 @@ impl FrameRing {
         state.slots[index].sealed = true;
         state.current = None;
         finish_if_ready(&mut state, index);
+        self.condition.notify_all();
         let ready = drain_retirements(&mut state);
         drop(state);
         ready
@@ -251,8 +252,9 @@ impl FrameRing {
         state.slots[slot_index].pending_command_buffers += 1;
     }
 
-    pub fn unregister_command_buffer(&self, slot_index: usize) {
+    pub fn unregister_command_buffer(&self, slot_index: usize) -> Vec<u64> {
         self.complete_command_buffer(slot_index);
+        drain_retirements(&mut self.lock())
     }
 
     /// Notes GPU completion of a command buffer and returns retirements that
@@ -270,9 +272,11 @@ impl FrameRing {
         );
         state.slots[slot_index].pending_command_buffers -= 1;
         finish_if_ready(&mut state, slot_index);
-        let ready = drain_retirements(&mut state);
+        self.condition.notify_all();
+        // Retirements remain in the ring until the API thread drains them.
+        // Observing completed slots and extracting IDs therefore use one lock.
         drop(state);
-        ready
+        Vec::new()
     }
 
     /// Blocks until every slot has retired, returning retirements that became
@@ -309,7 +313,7 @@ fn finish_if_ready(state: &mut FrameRingState, index: usize) {
 /// Removes every retirement whose slots have all completed and returns the
 /// actions to run. The caller releases the lock before invoking them so a
 /// destruction callback cannot deadlock against the ring.
-fn drain_retirements(state: &mut FrameRingState) -> Vec<Box<dyn FnOnce()>> {
+fn drain_retirements(state: &mut FrameRingState) -> Vec<u64> {
     let mut ready = Vec::new();
     let mut pending = Vec::with_capacity(state.retirements.len());
     for retirement in state.retirements.drain(..) {
@@ -318,19 +322,13 @@ fn drain_retirements(state: &mut FrameRingState) -> Vec<Box<dyn FnOnce()>> {
             .iter()
             .all(|(index, epoch)| state.slots[*index].completed_epoch >= *epoch);
         if complete {
-            ready.push(retirement.action);
+            ready.push(retirement.id);
         } else {
             pending.push(retirement);
         }
     }
     state.retirements = pending;
     ready
-}
-
-fn run_retirements(actions: Vec<Box<dyn FnOnce()>>) {
-    for action in actions {
-        action();
-    }
 }
 
 // MARK: - Upload ring
@@ -383,7 +381,7 @@ struct ChunkEntry<C> {
 /// suballocation is automatically kept alive until the frame that uses it
 /// completes.
 pub struct ChunkUploadAllocator<C> {
-    factory: Box<dyn FnMut(usize) -> RhiResult<C>>,
+    factory: Box<dyn FnMut(usize) -> RhiResult<C> + Send>,
     default_chunk_size: usize,
     entries: Vec<ChunkEntry<C>>,
     current_index: Option<usize>,
@@ -391,7 +389,7 @@ pub struct ChunkUploadAllocator<C> {
 impl<C: UploadRingChunk + Clone> ChunkUploadAllocator<C> {
     pub fn new(
         default_chunk_size: usize,
-        factory: impl FnMut(usize) -> RhiResult<C> + 'static,
+        factory: impl FnMut(usize) -> RhiResult<C> + Send + 'static,
     ) -> Self {
         Self {
             factory: Box::new(factory),
@@ -728,24 +726,18 @@ mod tests {
     }
 
     #[test]
-    fn the_frame_ring_retires_deferred_actions() {
+    fn the_frame_ring_retires_only_completed_epochs() {
         let ring = FrameRing::new(2);
-        assert_eq!(ring.slot_count(), 2);
-        let slot = ring.begin();
+        let (slot, ready) = ring.begin();
+        assert!(ready.is_empty());
         assert_eq!(ring.current_slot_index(), Some(slot));
         ring.register_command_buffer(slot);
-        let retired = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
-        let counter = std::sync::Arc::clone(&retired);
-        ring.retire_current(Box::new(move || {
-            counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        }));
-        assert_eq!(retired.load(std::sync::atomic::Ordering::SeqCst), 0);
-        ring.end();
-        assert_eq!(retired.load(std::sync::atomic::Ordering::SeqCst), 0);
-        ring.command_buffer_completed(slot);
-        assert_eq!(retired.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert!(ring.register_retirement(7).is_empty());
+        assert!(ring.end().is_empty());
+        assert!(ring.command_buffer_completed(slot).is_empty());
         assert_eq!(ring.completed_frames(), 1);
-        ring.wait_until_idle();
+        assert_eq!(ring.wait_until_idle(), vec![7]);
+        assert_eq!(ring.register_retirement(8), vec![8]);
     }
 
     #[test]

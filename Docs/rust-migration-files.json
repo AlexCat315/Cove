@@ -4879,85 +4879,109 @@
       "source": "Graphics/Sources/CoveUIGraphics/Exports.swift",
       "source_sha256": "4bdb98a8f57ae2243db158bf322aa28c8c21503cf77104984c00fe51e9b904cd",
       "source_lines": 2,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/ui/mod.rs"
+      ]
     },
     {
       "source": "Graphics/Sources/CoveUIGraphics/Images/TextureImage.swift",
       "source_sha256": "e6de02e671b57ec3b9da7be183b094f1b1553ad0d4900ea35cc28847ed4e3fe9",
       "source_lines": 26,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/ui/texture_image.rs"
+      ]
     },
     {
       "source": "Graphics/Sources/CoveUIGraphics/Images/UIAssetResidency.swift",
       "source_sha256": "ed5310f0fe7cc8820a72aa6b56fb45d14b435b61c2c30cae6f12c4b2cf3dc842",
       "source_lines": 33,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/ui/asset_residency.rs"
+      ]
     },
     {
       "source": "Graphics/Sources/CoveUIGraphics/NativeUIViewport.swift",
       "source_sha256": "68d84472063af6c072beab2c05fb6a216efed3069d86b0dfd63fe31639ed52af",
       "source_lines": 44,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/ui/viewport.rs"
+      ]
     },
     {
       "source": "Graphics/Sources/CoveUIGraphics/Rendering/DrawGeometry.swift",
       "source_sha256": "8f945a9131ef729789206c7af192653996a47a39c5bbd119014080b24fc6f8db",
       "source_lines": 99,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/ui/draw_geometry.rs"
+      ]
     },
     {
       "source": "Graphics/Sources/CoveUIGraphics/Rendering/NativeDrawListRenderer.swift",
       "source_sha256": "61d97192a943331de2f5cd815d79bcec12eb75f8819096bd0203f6afaa0151d5",
       "source_lines": 473,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/ui/draw_list_renderer.rs"
+      ]
     },
     {
       "source": "Graphics/Sources/CoveUIGraphics/Rendering/NativeUIBackdropPass.swift",
       "source_sha256": "d3eb5ee7662573d9f4f69afa97a06b798b497abfc0472db639bcd29d0890b868",
       "source_lines": 531,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/ui/backdrop_pass.rs"
+      ]
     },
     {
       "source": "Graphics/Sources/CoveUIGraphics/Rendering/NativeUIRasterWorkspace.swift",
       "source_sha256": "4cc56dbf9722f1ea724972f2dfaa0c162a19cb72d061cf383487d989fc8085b5",
       "source_lines": 59,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/ui/raster_workspace.rs"
+      ]
     },
     {
       "source": "Graphics/Sources/CoveUIGraphics/Rendering/NativeUIShaderResources.swift",
       "source_sha256": "c19b280830741666450ac46f9834ad0b37161394fdb562d2ba7963624a275230",
       "source_lines": 75,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/ui/shader_resources.rs"
+      ]
     },
     {
       "source": "Graphics/Sources/CoveUIGraphics/Rendering/NativeUITextureStore.swift",
       "source_sha256": "b9c210e22b6ae06c0beeba85603b7ecb5aa32371feb0f356920a20e878f05864",
       "source_lines": 379,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/ui/texture_store.rs"
+      ]
     },
     {
       "source": "Graphics/Sources/CoveUIGraphics/Rendering/Resources.swift",
       "source_sha256": "4855ca8f989a1530ad377dcbce78459e3b92ebb929d962272eb4c24c6cc3a608",
       "source_lines": 9,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/ui/resources.rs"
+      ]
     },
     {
       "source": "Graphics/Sources/CoveUIGraphics/Text/AtlasUpload.swift",
       "source_sha256": "c4a605884ff4b4a3028055bd756edefd60dbe1c0e1734b8d3f67b1ea7ec73a6c",
       "source_lines": 27,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/ui/atlas_upload.rs"
+      ]
     },
     {
       "source": "Graphics/Sources/NativeRHI/BackendFactory.swift",
@@ -5264,8 +5288,10 @@
       "source": "Graphics/Sources/NativeRHI/Resources/ShaderArtifactLoading.swift",
       "source_sha256": "ff236a5114e7e88319b07932234e4d9f239c99f29a7670a1b07977926cd3a543",
       "source_lines": 47,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/rhi/shader_artifact_loading.rs"
+      ]
     },
     {
       "source": "Graphics/Sources/NativeRHI/Resources/ShaderSpecialization.swift",
@@ -6573,7 +6599,7 @@
       "source": "Runtime/Package.swift",
       "source_sha256": "05a7de153cf78eb0177d31213f7af9de6693ecc3a969e60787d0792b0d7229a4",
       "source_lines": 16,
-      "status": "pending",
+      "status": "manifest_written",
       "rust": [
         "Runtime/Cargo.toml"
       ]
@@ -6582,78 +6608,102 @@
       "source": "Runtime/Sources/CoveUIRuntime/Core/AppBridge.swift",
       "source_sha256": "09a1ecf82193431d710261ad71aae8486758a85da2a3ee2343d25ef9b0e108c9",
       "source_lines": 34,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Runtime/rust/app_bridge.rs"
+      ]
     },
     {
       "source": "Runtime/Sources/CoveUIRuntime/Core/CoveUIRuntime.swift",
       "source_sha256": "bdbcf4123b52556a7ebb2916eea3115e34691c0cd8ce80ae297693ec76825e3f",
       "source_lines": 17,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Runtime/rust/lib.rs"
+      ]
     },
     {
       "source": "Runtime/Sources/CoveUIRuntime/Core/FrameDeadline.swift",
       "source_sha256": "65ba35101f004df35a94d6aaf0c5888f41fafe7d2f8a15d46920f6d1bf39e694",
       "source_lines": 28,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Runtime/rust/frame_deadline.rs"
+      ]
     },
     {
       "source": "Runtime/Sources/CoveUIRuntime/Core/FrameDrive.swift",
       "source_sha256": "10b4afcfdec774c173b9b934a1041f972252f0c5e180b3fd8a642f3db9401419",
       "source_lines": 24,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Runtime/rust/frame_drive.rs"
+      ]
     },
     {
       "source": "Runtime/Sources/CoveUIRuntime/Core/Log.swift",
       "source_sha256": "29f45ee5f810927ac228640bca6e34b2dbdbd779be2933eccd5372ab6e9bb690",
       "source_lines": 9,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Runtime/rust/log.rs"
+      ]
     },
     {
       "source": "Runtime/Sources/CoveUIRuntime/Core/NativeAccessibility.swift",
       "source_sha256": "9fee31e27b7463b02eaabc1183c042143bc662d87320e3b5e257b5ed51ea46a5",
       "source_lines": 303,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Runtime/rust/native_accessibility.rs",
+        "Runtime/rust/accessibility.m"
+      ]
     },
     {
       "source": "Runtime/Sources/CoveUIRuntime/Core/PlatformHost.swift",
       "source_sha256": "74d7e699851c3ceff1924a5af1c4c1f39ec3a4de369a591617faaf5aeadc50d5",
       "source_lines": 17,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Runtime/rust/platform_host.rs"
+      ]
     },
     {
       "source": "Runtime/Sources/CoveUIRuntime/Core/SDL3PlatformHost.swift",
       "source_sha256": "b2dd04c83b700232f97788fa37d589804e79ef0fabe7655a15a4ce866f90553b",
       "source_lines": 993,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Runtime/rust/sdl3_platform_host.rs"
+      ]
     },
     {
       "source": "Runtime/Sources/CoveUIRuntime/Core/iOS/DisplayDriver.swift",
       "source_sha256": "e360429e51d08a45245544a6ea5e568fb727025daee33d30ae41e1cc3d401108",
       "source_lines": 22,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Runtime/rust/ios/mod.rs",
+        "Runtime/rust/lifecycle.m"
+      ]
     },
     {
       "source": "Runtime/Sources/CoveUIRuntime/Exports.swift",
       "source_sha256": "4cbc110fe00f8ace5f3e1ddc8dd499564e99077b7a86470813d5961b3adec342",
       "source_lines": 4,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Runtime/rust/lib.rs"
+      ]
     },
     {
       "source": "Runtime/Sources/CoveUIRuntime/Rendering/SurfaceFactory.swift",
       "source_sha256": "f01e41705db8bf7088c28b5e3bcbbaead07186e12db089ce75fb96c1d965f3db",
       "source_lines": 34,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Runtime/rust/surface_factory.rs"
+      ]
     },
     {
       "source": "Shell/Package.swift",

@@ -18,6 +18,7 @@ bool cove_shell_poll(CoveShellEvent *out);
 void cove_shell_event_free(CoveShellEvent *event);
 bool cove_shell_wait(uint64_t timeout_ns);
 void cove_shell_wake(void);
+double cove_shell_monotonic_seconds(void);
 void cove_shell_command(CoveShellWindow *window,int command,int a,int b);
 void cove_shell_chrome(CoveShellWindow *window,const CoveShellChrome *chrome);
 void cove_shell_text_area(CoveShellWindow *window,const float *area);

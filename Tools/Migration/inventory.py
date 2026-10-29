@@ -57,6 +57,18 @@ def mapped_paths(source: str) -> tuple[str, list[str]]:
         return "written_unverified", ["Core/rust/scene/" + target]
     if source.startswith("PlatformCore/Sources/"):
         return "written_unverified", ["PlatformCore/rust/resources.rs" if path.stem == "PackageResourceBundle" else "PlatformCore/rust/lib.rs"]
+    if source.startswith("Runtime/Sources/CoveUIRuntime/"):
+        targets = {"CoveUIRuntime": ["lib.rs"], "Exports": ["lib.rs"], "DisplayDriver": ["ios/mod.rs", "lifecycle.m"],
+            "NativeAccessibility": ["native_accessibility.rs", "accessibility.m"]}
+        return "written_unverified", ["Runtime/rust/" + target for target in targets.get(path.stem, [snake(path.stem) + ".rs"])]
+    if source.startswith("Graphics/Sources/CoveUIGraphics/"):
+        targets = {"Exports": "mod", "UIAssetResidency": "asset_residency", "NativeUIViewport": "viewport",
+            "DrawGeometry": "draw_geometry", "Resources": "resources", "NativeUIShaderResources": "shader_resources",
+            "NativeUIRasterWorkspace": "raster_workspace", "NativeUITextureStore": "texture_store",
+            "NativeUIBackdropPass": "backdrop_pass", "NativeDrawListRenderer": "draw_list_renderer"}
+        return "written_unverified", ["Graphics/rust/ui/" + targets.get(path.stem, snake(path.stem)) + ".rs"]
+    if source == "Graphics/Sources/NativeRHI/Resources/ShaderArtifactLoading.swift":
+        return "written_unverified", ["Graphics/rust/rhi/shader_artifact_loading.rs"]
     if source.startswith("Shell/Sources/PlatformShell/"):
         targets = {
             "PlatformShell": ["platform_shell.rs", "sdl3_shell.rs", "apple.m"],
