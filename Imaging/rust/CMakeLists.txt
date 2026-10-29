@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.20)
+project(cove-rust-imaging-native LANGUAGES C CXX)
+get_filename_component(COVE_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON CACHE BOOL "" FORCE)
+include("${COVE_ROOT}/cmake/ArtifactBundleManifest.cmake")
+include("${COVE_ROOT}/Native/third-party/cmake/BuildImageDecode.cmake")

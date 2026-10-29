@@ -1,0 +1,21 @@
+[package]
+name = "cove-imaging"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+build = "rust/build.rs"
+links = "cove_imaging"
+
+[lib]
+path = "rust/lib.rs"
+
+[dependencies]
+cove-core.workspace = true
+thiserror.workspace = true
+
+[build-dependencies]
+cc.workspace = true
+
+[lints]
+workspace = true

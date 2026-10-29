@@ -5,3 +5,7 @@ pub use cove_devtools_protocol as devtools_protocol;
 pub use cove_logging as logging;
 pub use cove_platform as platform;
 pub use cove_system as system;
+
+pub use cove_text as text;
+pub use cove_imaging as imaging;
+pub use cove_graphics as graphics;

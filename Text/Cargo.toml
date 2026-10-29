@@ -1,0 +1,23 @@
+[package]
+name = "cove-text"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+build = "rust/build.rs"
+links = "cove_text"
+
+[lib]
+path = "rust/lib.rs"
+
+[dependencies]
+cove-core.workspace = true
+unicode-segmentation.workspace = true
+unicode-general-category.workspace = true
+thiserror.workspace = true
+
+[build-dependencies]
+cc.workspace = true
+
+[lints]
+workspace = true

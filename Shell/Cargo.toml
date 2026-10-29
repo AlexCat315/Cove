@@ -1,0 +1,18 @@
+[package]
+name = "cove-shell"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+build = "rust/build.rs"
+links = "cove_shell"
+[lib]
+path = "rust/lib.rs"
+[dependencies]
+cove-platform.workspace = true
+cove-logging.workspace = true
+thiserror.workspace = true
+[build-dependencies]
+cc.workspace = true
+[lints]
+workspace = true

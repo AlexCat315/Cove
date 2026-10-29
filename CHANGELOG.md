@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- 继续逐文件迁移 Text/Imaging：加入 Rust 字体发现、FreeType/HarfBuzz 整形与图集、CoreText 彩色字形、图片/动画解码、EXIF 方向和资源缓存；新增带源码指纹的迁移清单。按要求留待全量转换后统一测试。
+
 - 开始 Swift → Rust 2024 迁移，新增 `0.3.0-dev` Cargo 工作区；`cove` / `cove.cmd` 改用 Rust CLI，不再调用 Swift 编译器。
 - 加入 Core 几何/状态/绘制缓冲区/弹簧/位图/字号缩放、PlatformCore 输入与资源契约、System 文件与进程服务、Logging 管线和 DevTools 协议的 Rust 实现；绘制热路径继续使用 C，mipmap 面积过滤增加共享 C 实现。
 - Rust DevTools 协议改为 0.2，输入录制格式为 3；CLI 增加 Cargo 构建/运行/检查/格式化/测试/清理与迁移盘点。新增无窗口 RustCounter 示例及桌面/移动共享基础层 CI 配置。

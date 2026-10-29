@@ -1,0 +1,28 @@
+//! Text implementation translated from CoveUIText. Native font handles remain private.
+mod native;
+mod font_face;
+mod font_atlas;
+mod color_glyph_source;
+mod color_glyph_atlas;
+mod free_type_color_glyphs;
+mod native_color_glyph_font;
+mod font_collection;
+mod font_provider;
+mod text_style;
+mod text_shaper;
+mod text_cache;
+mod text_environment;
+mod draw_list_text;
+pub use cove_core::*;
+pub use font_face::*;
+pub use font_atlas::*;
+pub use color_glyph_source::*;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+pub use native_color_glyph_font::*;
+pub use font_collection::*;
+pub use font_provider::*;
+pub use text_style::*;
+pub use text_shaper::*;
+pub use text_cache::{TextCacheLimits, TextCacheSnapshot};
+pub use text_environment::*;
+pub use draw_list_text::DrawListText;

@@ -4,13 +4,23 @@
 
 最后更新：2026-10-29。
 
+## 记录口径与当前工作
+
+按最新要求：**实施过程中不运行测试，全部文件转换结束后再统一测试。** 本次继续迁移不会运行 `cargo test`、编译测试程序、跨平台验收或 GUI 冒烟测试。历史编译记录只说明当时的工作区状态，不能作为后续修改或其他平台的验证结论。
+
+文中“已写入”只表示有对应 Rust/C 实现，**不表示通过编译、行为覆盖或平台验收**。Swift 文件暂留作逐文件对照，因此其数量是“仍保留的源文件”，不能直接作为尚未翻译文件的数量。旧表格中的“完成”按这一口径理解，最终完成还需逐文件对照和统一验收。
+
+逐文件清单保存在 [rust-migration-files.json](rust-migration-files.json)，记录原始路径、源码 SHA-256、对应 Rust/C 路径及状态。状态含义：`pending` 尚未建立实现映射；`partial` 对应实现仍有缺项；`written_unverified` 已写入、未验证；`manifest_written` 已建立 Cargo 清单。清单仍在补充，不用文件名对应代替行为审阅。
+
+当前顺序：迁移记录 → Text/Imaging 生产源码（已写入）→ Shell/Runtime 与 Graphics 各原生后端、UI 渲染 → Compose/各宿主、工具和示例 → 全部测试迁移与最终统一验证。所有原有平台都保留在迁移范围内。
+
 ## 总量
 
 | 指标 | 数值 |
 | --- | --- |
-| 待迁移 Swift 文件 | 1,436 |
-| 待迁移 Swift 行数 | 183,294 |
-| 已写入 Rust 文件 | 130 |
+| 仍保留的 Swift 文件（历史快照） | 1,436 |
+| 仍保留的 Swift 行数（历史快照） | 183,294 |
+| 已写入 Rust 文件（持续变化，见逐文件清单） | 159 |
 | 已写入 Rust 行数 | 25,686 |
 | 已迁移 crate | `cove-core`、`cove-graphics`（RHI 前端）、`cove-platform`、`cove-system`、`cove-logging`、`cove-devtools-protocol`、`cove-cli`、`cove-ui`、`cove-rust-counter` |
 
@@ -20,13 +30,13 @@
 
 | 模块 | Swift 文件 | Swift 行 | Rust 文件 | Rust 行 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| Core | 104 | 12,548 | 92 | 12,696 | 完成 |
-| PlatformCore | 8 | 581 | 2 | 425 | 完成 |
-| System | 24 | 1,452 | 5 | 1,154 | 完成 |
-| Logging | 19 | 906 | 1 | 511 | 完成 |
+| Core | 104 | 12,548 | 92 | 12,696 | 已写入，未统一验证 |
+| PlatformCore | 8 | 581 | 2 | 425 | 已写入，未统一验证 |
+| System | 24 | 1,452 | 5 | 1,154 | 已写入，待逐文件行为对照 |
+| Logging | 19 | 906 | 1 | 511 | 基础管线已写入；上下文与异步行为待对照 |
 | Graphics | 144 | 18,365 | 30 | 9,771 | RHI 前端完成；三个平台后端与 `CoveUIGraphics` 未开始 |
-| Text | 17 | 2,803 | — | — | 未开始 |
-| Imaging | 10 | 718 | — | — | 未开始 |
+| Text | 17 | 2,803 | 16 | 1,002 | 生产源码已写入；未编译/测试 |
+| Imaging | 10 | 718 | 11 | 415 | 生产源码已写入；未编译/测试 |
 | Compose | 416 | 52,590 | — | — | 未开始 |
 | Runtime | 12 | 1,501 | — | — | 未开始 |
 | Shell | 14 | 2,584 | — | — | 未开始 |
@@ -39,9 +49,9 @@
 | Examples | 84 | 9,723 | — | — | 未开始 |
 | Tests | 325 | 55,154 | — | — | 未开始 |
 
-## 已完成的 crate
+## 已写入的 crate
 
-### `cove-core`（104 个 Swift 文件 → 92 个 Rust 文件）
+### `cove-core`（对应实现已写入，待统一验证）
 
 `CoveUICore` 与 `CoveUIScene` 的全部内容：几何/颜色/仿射变换、共享绘制缓冲区与 C 内核、位图与 mipmap、状态订阅与读取追踪、场景树与布局引擎（含 Flexbox 与自定义布局桥接）、渲染树镜像、无障碍树、命中测试与输入（指针捕获、焦点链、文本输入、滚轮手势、事件分发）、滚动（物理、回弹、弹簧、速度追踪、揭示）、动画（插值、曲线、可动画属性、写入）、重组器、四类渲染器（`NodeRenderer`、`LayerAwareNodeRenderer`、`RenderCulling`、`SurfacePainting`）、`Recomposer`、`Exports`。
 
@@ -65,6 +75,15 @@
 
 `cove-platform`（键盘/IME/指针/滚动/游戏手柄/窗口事件/菜单/资源目录）、`cove-system`（权限与身份、锁、同卷原子替换、恢复目录、回收站、进程环境、双流读取、限额/超时/取消、POSIX 进程组与 Windows Job Object）、`cove-logging`（级别过滤、递归脱敏、UTF-8 限长、有界历史、JSONL 轮转）、`cove-devtools-protocol`（树/布局/状态/时间线协议、订阅会话、状态差异、输入录制）、`cove-cli`（build/run/test/check/fmt/clippy/clean、doctor/setup、迁移盘点）。
 
+
+### `cove-text` 与 `cove-imaging`（本次继续转换）
+
+Text 的 FontFace、FontAtlas、FontProvider、FontCollection、TextStyle、TextShaper、TextCache、TextEnvironment、DrawList+Text、彩色字形源和图集都有 Rust 对应文件。FreeType/HarfBuzz 调用、位图复制/缩放为 C；macOS/iOS 的 CoreText 功能使用 Objective-C/C 桥接，没有新增 Swift。字体数据和原生句柄绑定生命周期，图集缓存按字体/字号/密度区分。
+
+Imaging 的 ImageDecoder、Animation、Orientation、Rasterization、Progressive、TextureImage、BundleImageResource、ImageAssetRegistry 和 Exports 已写入。复用原有 stb_image/lunasvg/libwebp 解码，方向重排使用 C，macOS/iOS 的 PDF/ImageIO 路径使用 Objective-C/C。加入动画帧预算、源像素预算、缓存 LRU、共享 mipmap 与全进程纹理 ID。其他平台保留可移植解码路径；原有 Apple 专用格式能力边界没有冒充全平台支持。
+
+以上均未编译和测试；Cargo.lock、原生库交叉链接、宿主集成及统一验收尚未完成。Browser/Wasm 的 C 运行时与宿主接入仍待实现，不能把桌面原生桥接记作浏览器完成。
+
 ## 迁移约定
 
 这些是移植过程中确定的规则，后续文件应保持一致。
@@ -82,13 +101,13 @@
 - **`#if canImport`**：`BackendFactory` 改为构造器注册表（`register_backend`）。未注册时返回 "not built for this platform"，不引用不存在的符号。
 - **`Duration`**：统一传纳秒 `u64`。
 - **原生句柄**：`SurfaceDescriptor` 用 `usize` 地址（0 表示无），避免 `unsafe impl Send`。
-- **新增外部 crate**：暂不引入；freetype/harfbuzz 为 vendored 依赖，留给 Text/Graphics 阶段。
+- **原生字体依赖**：FreeType/HarfBuzz 复用 vendored 源码；Unicode 字素和类别由 `unicode-segmentation` / `unicode-general-category` 提供。
 
 ## 尚未迁移
 
 - **Graphics 平台后端**：`Metal`（15 文件 / 2,712 行）、`Vulkan`（31 / 6,010）、`DX12`（8 / 500）；`CoveUIGraphics`（12 / 1,757，含 `NativeUIBackdropPass` 531、`NativeDrawListRenderer` 473、`NativeUITextureStore` 379）。
-- **Text**：字体发现、FreeType/HarfBuzz 整形、栅格化、彩色字形、图集、选择与文本布局。
-- **Imaging**：位图/动画/SVG 解码、缓存、方向、纹理 backing。
+- **Text**：生产源码已逐文件写入。剩余项为测试迁移、原生依赖跨平台构建接入与最终行为对照；上层 Compose 文本选择仍待迁移。
+- **Imaging**：生产源码已逐文件写入。剩余项为图形纹理上传接入与最终行为对照。
 - **Compose**：视图图、控件、主题、组合与重组（416 文件，最大单块）。
 - **Runtime / Shell / Terminal**：应用运行时、SDL 窗口与事件循环、Ghostty 引擎与 PTY/ConPTY。
 - **Hosts / Browser**：桌面、Android、iOS 宿主与 WebGPU/Canvas 宿主。
@@ -101,24 +120,26 @@ Swift 源码没有被删除，也没有用空 Rust 模块替代。新 CLI 不会
 
 | 平台 | 已写入 | 尚缺 | 验证 |
 | --- | --- | --- | --- |
-| macOS | 共享 Rust/C、POSIX、权限/锁/身份、回收站桥接、RHI 前端 | Metal 后端、原生窗口、宿主、应用包与签名 | 仅 `cargo check` |
-| Windows | 共享 Rust/C、UTF-16 进程参数、继承句柄白名单、Job Object、ACL、文件替换重试、RHI 前端 | DX12 后端、原生窗口、ConPTY UI、应用打包 | 仅 `cargo check` |
-| Linux | 共享 Rust/C、POSIX、权限/锁/身份、恢复目录、RHI 前端 | Vulkan 后端、原生窗口、系统集成、应用打包 | 仅 `cargo check` |
-| iOS | 共享 Rust/C、文件/资源/协议；进程 API 由系统能力决定 | 触摸/IME/生命周期宿主、Metal、Xcode 打包签名 | 仅 `cargo check` |
-| Android | 共享 Rust/C、NDK 配置、文件/资源/协议、POSIX 进程调用 | Activity/JNI、触摸/IME/生命周期、Vulkan、APK 签名部署 | 仅 `cargo check` |
+| macOS | 共享 Rust/C、POSIX、权限/锁/身份、回收站桥接、RHI 前端 | Metal 后端、原生窗口、宿主、应用包与签名 | 最新实现未验证 |
+| Windows | 共享 Rust/C、UTF-16 进程参数、继承句柄白名单、Job Object、ACL、文件替换重试、RHI 前端 | DX12 后端、原生窗口、ConPTY UI、应用打包 | 最新实现未验证 |
+| Linux | 共享 Rust/C、POSIX、权限/锁/身份、恢复目录、RHI 前端 | Vulkan 后端、原生窗口、系统集成、应用打包 | 最新实现未验证 |
+| iOS | 共享 Rust/C、文件/资源/协议；进程 API 由系统能力决定 | 触摸/IME/生命周期宿主、Metal、Xcode 打包签名 | 最新实现未验证 |
+| Android | 共享 Rust/C、NDK 配置、文件/资源/协议、POSIX 进程调用 | Activity/JNI、触摸/IME/生命周期、Vulkan、APK 签名部署 | 最新实现未验证 |
 | Browser/Wasm | 平台数据类型 | 字体、图形、资源、浏览器事件循环与宿主 | 未建立构建链 |
 
 不能因为本机无法运行其他平台而删除其实现。
 
 ## 当前验证状态
 
-按用户要求，实施阶段不运行测试，只做 `cargo check` 保证编译安全：
+以下为先前文档保留的历史记录，本次继续迁移没有重新运行；它不代表所有目标平台已经检查，也不能保证后续实现的编译或行为正确：
 
 ```
 cargo check --workspace --tests   # 通过（仅剩若干 dead_code / deprecated 警告）
 ```
 
 尚未运行 `cargo test`、`cargo fmt --check`、`cargo clippy`。
+
+后续统一验证放在全量翻译完成之后，实施阶段不通过分批测试扩大这里的通过范围。
 
 ## 最终统一验收
 

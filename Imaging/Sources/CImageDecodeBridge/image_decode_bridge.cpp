@@ -12,6 +12,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include <exception>
 
 #define STBI_ONLY_JPEG
 #define STBI_ONLY_PNG
@@ -122,12 +123,12 @@ bool output_rgba(const uint8_t* pixels,
                  int target_width,
                  int target_height,
                  CoveImageDecodeResult* result) {
-    if (width <= 0 || height <= 0) {
+    if (width <= 0 || height <= 0 || width > 16384 || height > 16384 || static_cast<int64_t>(width) * height > 64LL * 1024 * 1024) {
         return fail(result, "decoded image has invalid dimensions");
     }
     const int out_width = target_width > 0 ? target_width : width;
     const int out_height = target_height > 0 ? target_height : height;
-    if (out_width <= 0 || out_height <= 0) {
+    if (out_width <= 0 || out_height <= 0 || out_width > 16384 || out_height > 16384 || static_cast<int64_t>(out_width) * out_height > 64LL * 1024 * 1024) {
         return fail(result, "target image dimensions are invalid");
     }
     return assign_pixels(resize_rgba(pixels, width, height, out_width, out_height),
@@ -203,7 +204,7 @@ bool decode_svg(const uint8_t* data,
 
 } // namespace
 
-extern "C" bool cove_image_decode_memory(const uint8_t* data,
+static bool decode_memory_impl(const uint8_t* data,
                                            size_t data_size,
                                            const char* extension,
                                            int32_t target_width,
@@ -217,10 +218,15 @@ extern "C" bool cove_image_decode_memory(const uint8_t* data,
     out_result->height = 0;
     out_result->error_message = nullptr;
 
-    if (data == nullptr || data_size == 0) {
+    if (data == nullptr || data_size == 0 || data_size > INT_MAX) {
         return fail(out_result, "empty image data");
     }
 
+    int source_width = 0, source_height = 0;
+    if (!cove_image_dimensions_memory(data, data_size, extension, &source_width, &source_height) ||
+        source_width > 16384 || source_height > 16384 || static_cast<int64_t>(source_width) * source_height > 64LL * 1024 * 1024 ||
+        target_width < 0 || target_height < 0 || target_width > 16384 || target_height > 16384 ||
+        static_cast<int64_t>(target_width) * target_height > 64LL * 1024 * 1024) return fail(out_result, "invalid or oversized image dimensions");
     const std::string ext = lower_extension(extension);
     if (ext == "webp" || (data_size >= 12 && std::memcmp(data, "RIFF", 4) == 0 && std::memcmp(data + 8, "WEBP", 4) == 0)) {
         return decode_webp(data, data_size, target_width, target_height, out_result);
@@ -303,20 +309,21 @@ void append_frame(AnimationFrames& frames, const uint8_t* canvas, int canvas_wid
 
 bool decode_gif_frames(const uint8_t* data, size_t data_size, int target_width, int target_height,
                        int max_frames, AnimationFrames& frames, const char** error) {
-    int* delays = nullptr;
-    int width = 0, height = 0, count = 0, channels = 0;
-    stbi_uc* decoded = stbi_load_gif_from_memory(data, static_cast<int>(data_size), &delays,
-                                                 &width, &height, &count, &channels, 4);
-    if (decoded == nullptr) { *error = stbi_failure_reason(); return false; }
-    const size_t frame_bytes = static_cast<size_t>(width) * static_cast<size_t>(height) * 4;
-    const int kept = std::min(count, max_frames);
-    for (int index = 0; index < kept; ++index) {
-        append_frame(frames, decoded + frame_bytes * index, width, height,
-                     delays ? delays[index] : 100, target_width, target_height);
+    stbi__context context; stbi__start_mem(&context, data, static_cast<int>(data_size));
+    stbi__gif gif{}; int channels = 0;
+    std::vector<uint8_t> previous, two_back;
+    bool success = false;
+    for (int index = 0; index < max_frames; ++index) {
+        stbi_uc* pixels = stbi__gif_load_next(&context, &gif, &channels, 4, two_back.empty() ? nullptr : two_back.data());
+        if (pixels == reinterpret_cast<stbi_uc*>(&context)) break;
+        if (!pixels) { *error = stbi_failure_reason(); break; }
+        if (gif.w <= 0 || gif.h <= 0 || gif.w > 16384 || gif.h > 16384 || static_cast<int64_t>(gif.w) * gif.h > 64LL * 1024 * 1024) { *error = "oversized GIF frame"; break; }
+        append_frame(frames, pixels, gif.w, gif.h, gif.delay, target_width, target_height);
+        two_back = std::move(previous); previous.assign(pixels, pixels + static_cast<size_t>(gif.w) * gif.h * 4);
+        success = true;
     }
-    stbi_image_free(decoded);
-    std::free(delays);
-    return kept > 0;
+    STBI_FREE(gif.out); STBI_FREE(gif.history); STBI_FREE(gif.background);
+    return success;
 }
 
 uint32_t read_le24(const uint8_t* p) { return p[0] | (p[1] << 8) | (p[2] << 16); }
@@ -405,7 +412,7 @@ bool decode_webp_frames(const uint8_t* data, size_t data_size, int target_width,
 
 } // namespace
 
-extern "C" bool cove_image_decode_animation_memory(const uint8_t* data,
+static bool decode_animation_impl(const uint8_t* data,
                                                      size_t data_size,
                                                      const char* extension,
                                                      int32_t target_width,
@@ -415,7 +422,12 @@ extern "C" bool cove_image_decode_animation_memory(const uint8_t* data,
     if (out_result == nullptr) return false;
     *out_result = CoveImageAnimationResult{};
     if (data == nullptr || data_size == 0 || data_size > INT_MAX) return fail_animation(out_result, "empty image data");
-    const int limit = std::max(1, static_cast<int>(max_frames));
+    int source_width = 0, source_height = 0;
+    if (!cove_image_dimensions_memory(data, data_size, extension, &source_width, &source_height) ||
+        source_width > 16384 || source_height > 16384 || static_cast<int64_t>(source_width) * source_height > 64LL * 1024 * 1024 ||
+        target_width <= 0 || target_height <= 0 || target_width > 16384 || target_height > 16384 || max_frames <= 0 ||
+        static_cast<int64_t>(target_width) * target_height * max_frames > 64LL * 1024 * 1024) return fail_animation(out_result, "invalid or oversized animation dimensions");
+    const int limit = max_frames;
     const std::string ext = lower_extension(extension);
     AnimationFrames frames;
     const char* error = "unsupported animation format";
@@ -447,4 +459,16 @@ extern "C" void cove_image_animation_free(CoveImageAnimationResult* result) {
     std::free(result->durations_ms);
     std::free(result->error_message);
     *result = CoveImageAnimationResult{};
+}
+
+// Do not allow allocation/parser exceptions to unwind across the Rust C ABI.
+extern "C" bool cove_image_decode_memory(const uint8_t* data, size_t count, const char* extension, int32_t width, int32_t height, CoveImageDecodeResult* out) {
+    try { return decode_memory_impl(data, count, extension, width, height, out); }
+    catch (const std::exception& error) { if (out) cove_image_decode_free(out); return fail(out, error.what()); }
+    catch (...) { if (out) cove_image_decode_free(out); return fail(out, "native decoder exception"); }
+}
+extern "C" bool cove_image_decode_animation_memory(const uint8_t* data, size_t count, const char* extension, int32_t width, int32_t height, int32_t maximum_frames, CoveImageAnimationResult* out) {
+    try { return decode_animation_impl(data, count, extension, width, height, maximum_frames, out); }
+    catch (const std::exception& error) { if (out) cove_image_animation_free(out); return fail_animation(out, error.what()); }
+    catch (...) { if (out) cove_image_animation_free(out); return fail_animation(out, "native animation decoder exception"); }
 }
