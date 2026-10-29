@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## 0.2.11 — 2026-10-29
+
 - 修复 0.2.10 发布验证：Compose 按所属包查找资源，线程局部存储析构回调处理空指针并消除 Windows 的 UUID 名称冲突，Android 的 Float 数学运算使用明确重载，iOS 不再引用 AppKit 菜单适配器。
 - 修复后续 Linux CI：文本选择几何测试仅依赖 Foundation，移除已删除工具包的测试与缓存入口。
 - 修复 Windows 的 HarfBuzz 枚举桥接，保留公开 `ScriptTag` 的 UInt32 语义，兼容原生枚举底层的有符号整数。
