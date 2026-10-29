@@ -1,5 +1,7 @@
 # 能力分层与包边界
 
+> 本文记录保留中的 Swift 0.2.x 架构，作为 Rust 迁移的功能与边界验收依据。当前 Rust 工作区状态见 [rust-migration.md](rust-migration.md)，本页的 Swift 构建命令不再适用于当前 `cove` 入口。
+
 每个能力拥有自己的源码、target 声明与测试。部署需求附着在能力及其实现上；目录和依赖方向不再由「能否脱离原生环境运行」决定。根 `Package.swift` 只定义应用入口与扩展，不重新声明下层 target。
 
 ## 依赖方向

@@ -1,0 +1,57 @@
+[workspace]
+members = [".", "Core", "PlatformCore", "System", "Logging", "DevTools/Protocol", "Tools/Cove", "Examples/RustCounter"]
+resolver = "3"
+
+[workspace.package]
+version = "0.3.0-dev"
+edition = "2024"
+rust-version = "1.90"
+license = "Apache-2.0"
+repository = "https://github.com/AlexCat315/Cove"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = "1"
+thiserror = "2"
+cc = "1"
+clap = { version = "4", features = ["derive"] }
+tempfile = "3"
+libc = "0.2"
+os_pipe = "1"
+cove-core = { path = "Core" }
+cove-platform = { path = "PlatformCore" }
+cove-system = { path = "System" }
+cove-logging = { path = "Logging" }
+cove-devtools-protocol = { path = "DevTools/Protocol" }
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+undocumented_unsafe_blocks = "deny"
+
+[package]
+name = "cove-ui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Cove Rust foundation; UI migration is in progress"
+
+[lib]
+path = "rust/lib.rs"
+
+[dependencies]
+cove-core.workspace = true
+cove-platform.workspace = true
+cove-system.workspace = true
+cove-logging.workspace = true
+cove-devtools-protocol.workspace = true
+
+[lints]
+workspace = true
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

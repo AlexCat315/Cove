@@ -1,0 +1,134 @@
+# Historical Swift SDK CI; retained as the acceptance inventory for the Rust port.
+name: SDK CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: sdk-ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    env:
+      SWIFT_BACKTRACE: 'enable=yes,interactive=no'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: xcode-27
+            platform: macos-arm64
+          - runner: windows-2025-vs2026
+            platform: windows-x86_64
+          - runner: ubuntu-24.04
+            platform: linux-x86_64
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: ./.github/actions/fetch-submodules
+      - uses: ./.github/actions/setup-toolchains
+      - uses: ./.github/actions/build-cache
+        id: build-cache
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Check capability boundaries
+        run: |
+          python Tools/Architecture/check.py
+          python Tools/Architecture/test_check.py
+      - name: Identify native inputs
+        id: native-inputs
+        run: echo "digest=$(git ls-tree -r HEAD cmake third-party Native/third-party Tools/Cove/Sources/CoveCLI/Toolchains/Native.swift .github/actions/setup-toolchains/action.yml | git hash-object --stdin)" >> "$GITHUB_OUTPUT"
+      - name: Test system contracts before preparing graphics dependencies
+        timeout-minutes: 5
+        run: ./cove test System --no-parallel --timeout 120
+      - uses: actions/cache/restore@v5
+        id: native-cache
+        with:
+          path: |
+            vendor
+            Native/vendor
+          key: sdk-native-v3-${{ runner.os }}-${{ runner.arch }}-${{ steps.native-inputs.outputs.digest }}
+      - name: Prepare native dependencies
+        id: native
+        run: ./cove setup
+      - uses: actions/cache/save@v5
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            vendor
+            Native/vendor
+          key: ${{ steps.native-cache.outputs.cache-primary-key }}
+      - name: Test standalone CLI
+        timeout-minutes: 10
+        run: ./cove test Tools/Cove --timeout 480
+      - name: Stage native metadata for the SDK package
+        shell: bash
+        run: |
+          ./cove internal package-native --output "$PWD/dist"
+          mkdir -p Artifacts
+          cp "dist/native-${{ matrix.platform }}.json" Artifacts/native.json
+      - name: Package complete SDK
+        run: ./cove internal package-cli --output "$PWD/dist"
+      - name: Verify CLI without a developer toolchain on PATH
+        run: |
+          mkdir smoke
+          tar -xf "dist/cove-${{ matrix.platform }}.tar.gz" -C smoke
+          if [ "$RUNNER_OS" = Windows ]; then
+            env -i SystemRoot="$SYSTEMROOT" WINDIR="$WINDIR" PATH=/c/Windows/System32 smoke/cove/cove.exe --version
+          else
+            env -i PATH=/usr/bin:/bin smoke/cove/cove --version
+          fi
+      - name: Test capability packages
+        run: |
+          for package in Core Text Logging PlatformCore Tests/Headless DevTools Graphics; do
+            ./cove test "$package" --no-parallel --timeout 600
+          done
+      - name: Build SDK tests
+        if: ${{ !cancelled() && steps.native.conclusion == 'success' }}
+        run: ./cove test . --build-only
+      - uses: actions/cache/save@v5
+        if: steps.build-cache.outputs.hit != 'true'
+        with:
+          key: ${{ steps.build-cache.outputs.key }}
+          path: |
+            Tools/Cove/.build
+            System/.build
+            .build
+      - name: Run SDK XCTest
+        if: runner.os != 'Windows'
+        run: ./cove test . --skip-build --no-parallel --testing-library xctest --timeout 300
+      - name: Run SDK XCTest with hang diagnostics
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./Tools/Testing/Windows.ps1 -Package . -Library xctest -Timeout 300 -SkipBuild -Output test-results/xctest
+      - name: Run SDK Swift Testing
+        if: runner.os != 'Windows'
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a ./cove test . --skip-build --no-parallel --testing-library swift-testing --timeout 600 --event-output test-results/events.jsonl
+          else
+            ./cove test . --skip-build --no-parallel --testing-library swift-testing --timeout 600 --event-output test-results/events.jsonl
+          fi
+      - name: Run SDK Swift Testing with hang diagnostics
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./Tools/Testing/Windows.ps1 -Package . -SkipBuild -Output test-results
+      - name: Collect macOS crash reports
+        if: failure() && runner.os == 'macOS'
+        run: |
+          mkdir -p test-results/crashes
+          find "$HOME/Library/Logs/DiagnosticReports" -type f -mmin -60 \( -name '*Cove*' -o -name '*swift*' \) -exec cp {} test-results/crashes/ \;
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-diagnostics-${{ matrix.platform }}
+          path: test-results
+          if-no-files-found: ignore
+          retention-days: 7

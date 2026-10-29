@@ -1,0 +1,20 @@
+[package]
+name = "cove-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+build = "rust/build.rs"
+
+[lib]
+path = "rust/lib.rs"
+
+[dependencies]
+serde.workspace = true
+thiserror.workspace = true
+
+[build-dependencies]
+cc.workspace = true
+
+[lints]
+workspace = true

@@ -3,8 +3,6 @@ set -eu
 COVE_CHECKOUT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 COVE_SDK_ROOT=${COVE_SDK_ROOT:-$COVE_CHECKOUT}
 export COVE_SDK_ROOT
-COVE_SOURCE_SWIFT=${COVE_SWIFT_EXECUTABLE:-swift}
-"$COVE_SOURCE_SWIFT" build --package-path "$COVE_CHECKOUT/Tools/Cove" --product cove --jobs 4
-COVE_SOURCE_PRODUCTS=$("$COVE_SOURCE_SWIFT" build --package-path "$COVE_CHECKOUT/Tools/Cove" --show-bin-path)
-# Keep the caller's environment when the CLI launches the compiler itself.
-exec "$COVE_SOURCE_PRODUCTS/cove" "$@"
+RUSTUP_TOOLCHAIN=${RUSTUP_TOOLCHAIN:-1.99.1}
+export RUSTUP_TOOLCHAIN
+exec "${COVE_CARGO_EXECUTABLE:-cargo}" run --quiet --manifest-path "$COVE_CHECKOUT/Cargo.toml" --package cove-cli --bin cove -- "$@"

@@ -17,7 +17,19 @@ concurrency:
   group: sdk-release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 jobs:
+  rust-migration:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - name: Require the completed Rust migration before publishing
+        shell: bash
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal
+          ./cove migration status --require-complete
   native:
+    needs: rust-migration
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false

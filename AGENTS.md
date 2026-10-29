@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Make effective use of new Swift 6 features. 
+Use Rust 2024 for all new implementations. Migrate existing Swift capabilities to Rust; do not add Swift code.
 
 Avoid unnecessary supporting text, descriptive copy, and redundant UI microcopy.
 

@@ -1,0 +1,24 @@
+[package]
+name = "cove-system"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+build = "rust/build.rs"
+
+[lib]
+path = "rust/lib.rs"
+
+[dependencies]
+thiserror.workspace = true
+tempfile.workspace = true
+os_pipe.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
+[build-dependencies]
+cc.workspace = true
+
+[lints]
+workspace = true

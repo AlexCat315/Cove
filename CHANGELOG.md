@@ -4,6 +4,11 @@
 
 ## Unreleased
 
+- 开始 Swift → Rust 2024 迁移，新增 `0.3.0-dev` Cargo 工作区；`cove` / `cove.cmd` 改用 Rust CLI，不再调用 Swift 编译器。
+- 加入 Core 几何/状态/绘制缓冲区/弹簧/位图/字号缩放、PlatformCore 输入与资源契约、System 文件与进程服务、Logging 管线和 DevTools 协议的 Rust 实现；绘制热路径继续使用 C，mipmap 面积过滤增加共享 C 实现。
+- Rust DevTools 协议改为 0.2，输入录制格式为 3；CLI 增加 Cargo 构建/运行/检查/格式化/测试/清理与迁移盘点。新增无窗口 RustCounter 示例及桌面/移动共享基础层 CI 配置。
+- 全量迁移尚未完成：Swift UI、原生 GPU/窗口/移动宿主、终端、WebView、Workspace、Gallery 与 SDK 发布等实现保留并列入 `Docs/rust-migration.md`；尚未统一测试，不宣称功能或平台验收完成。
+
 ## 0.2.13 — 2026-10-29
 
 - 增加 `RouteOutlet` 活动路由组合边界；Gallery 将页面状态读取移入内容区，Sidebar 按输入代次和行状态复用，切页只更新受影响的目标行。

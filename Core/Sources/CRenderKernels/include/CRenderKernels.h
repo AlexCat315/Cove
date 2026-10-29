@@ -15,4 +15,8 @@ void cove_render_indices(uint32_t *indices, size_t count, uint32_t offset);
 void cove_render_opacity(void *vertices, size_t count, float opacity);
 void cove_render_bounds(const void *vertices, size_t count, float *bounds);
 
+// Area-filter straight RGBA8 into floor(width/2) x floor(height/2), minimum 1x1.
+// Callers validate dimensions and allocate the full output buffer.
+void cove_image_reduced_mip(const uint8_t *pixels, size_t width, size_t height, uint8_t *output);
+
 #endif
