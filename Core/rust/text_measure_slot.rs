@@ -18,7 +18,6 @@ impl PartialEq for TextLayoutCacheKey {
 impl Eq for TextLayoutCacheKey {}
 impl std::hash::Hash for TextLayoutCacheKey {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        use std::hash::Hash;
         self.text.hash(state); self.font.hash(state); self.alignment.hash(state); self.atlas_id.hash(state);
         float_key(self.line_height).hash(state); float_key(self.max_width).hash(state); float_key(self.letter_spacing).hash(state);
     }

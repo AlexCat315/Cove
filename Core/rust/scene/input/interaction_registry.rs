@@ -1,6 +1,6 @@
 //! Translation of CoveUIScene/Input/InteractionRegistry.swift.
-use super::Node;
-use super::NodeResource;
+use crate::scene::Node;
+use crate::scene::NodeResource;
 use cove_platform::{KeyEvent, MouseButtonEvent, MouseMotionEvent, MouseWheelEvent, TextEditingEvent};
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -125,7 +125,7 @@ pub enum InputDispatchKind {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InputDispatchTrace {
     pub kind: InputDispatchKind,
-    pub node_id: super::ElementId,
+    pub node_id: crate::ElementId,
     pub phase: EventPhase,
     pub route: Option<InputHandlerRoute>,
     pub result: EventResult,

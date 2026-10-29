@@ -86,8 +86,8 @@ impl Hash for NodeKey {
     }
 }
 
-type DrawHook = Rc<dyn Fn(&mut DrawList, Point)>;
-type LayoutUpdateHook = Rc<dyn Fn(&Node)>;
+pub type DrawHook = Rc<dyn Fn(&mut DrawList, Point)>;
+pub type LayoutUpdateHook = Rc<dyn Fn(&Node)>;
 
 pub struct NodeData {
     pub id: super::ElementId,

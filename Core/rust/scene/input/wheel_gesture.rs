@@ -1,11 +1,11 @@
 //! Translation of CoveUIScene/Input/WheelGesture.swift.
-use super::{Node, NodeTree};
+use crate::scene::{Node, NodeTree};
 use cove_platform::{ScrollPhase, ScrollInput};
 
 /// A phased stream keeps its consuming viewport even when the pointer moves.
 /// A click catches OS momentum; only fresh input can start scrolling again.
 #[derive(Default)]
-pub(crate) struct WheelGesture {
+pub struct WheelGesture {
     target: Option<Node>,
     has_target: bool,
     interrupted: bool,

@@ -1,5 +1,5 @@
 //! Translation of CoveUIScene/Input/ModalFocusResource.swift.
-use super::{FocusChain, Node, NodeResource, PointerCaptureHolder};
+use crate::scene::{FocusChain, Node, NodeResource, PointerCaptureHolder};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -58,10 +58,11 @@ impl NodeResource for ModalFocusResource {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::scene::FocusChainHolder;
 
     #[test]
     fn modal_resource_ends_its_scope_on_unmount() {
-        let context = super::super::PlatformInputContext::new();
+        let context = crate::scene::PlatformInputContext::new();
         context.with_current(|| {
             let root = Node::new();
             let dialog = Node::new();

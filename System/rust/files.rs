@@ -180,7 +180,9 @@ pub fn move_to_recovery(source: &Path, directory: &Path) -> io::Result<PathBuf> 
         io::Error::new(io::ErrorKind::InvalidInput, "cannot move a filesystem root")
     })?);
     fs::rename(source, &target)?;
-    reservation.keep();
+    // The caller owns the renamed file now; keeping the reservation makes the
+    // temporary path permanent so `Drop` will not delete it.
+    let _ = reservation.keep();
     Ok(target)
 }
 

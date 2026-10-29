@@ -6,6 +6,11 @@ pub struct Point {
     pub x: f32,
     pub y: f32,
 }
+impl Point {
+    pub const fn new(x: f32, y: f32) -> Self {
+        Self { x, y }
+    }
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Size {
@@ -29,6 +34,12 @@ impl Rect {
             width,
             height,
         }
+    }
+    pub fn max_x(self) -> f32 {
+        self.x + self.width
+    }
+    pub fn max_y(self) -> f32 {
+        self.y + self.height
     }
     pub fn contains(self, point: Point) -> bool {
         self.width > 0.0

@@ -1,5 +1,5 @@
 //! Translation of CoveUIScene/Input/FocusAccessoryResource.swift.
-use super::{FocusChain, FocusChainHolder, Node, NodeResource, PointerCapture, PointerCaptureHolder};
+use crate::scene::{FocusChain, FocusChainHolder, Node, NodeResource, PointerCapture, PointerCaptureHolder};
 use crate::scene::NodeWeak;
 use std::cell::RefCell;
 use std::rc::Rc;

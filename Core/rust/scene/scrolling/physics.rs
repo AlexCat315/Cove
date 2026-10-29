@@ -304,13 +304,16 @@ impl ScrollAxisMotion {
     }
     /// Returns `(raw position, visible offset)`.
     pub fn advance(&mut self, position: f32, maximum: f32, extent: f32, physics: ScrollPhysics, duration: f32) -> (f32, f32) {
-        if let Some(spring) = self.spring.as_mut() {
-            spring.advance(duration);
-            let visible = spring.value;
-            if spring.is_at_rest() {
+        if self.spring.is_some() {
+            let (visible, at_rest) = {
+                let spring = self.spring.as_mut().expect("checked above");
+                spring.advance(duration);
+                (spring.value, spring.is_at_rest())
+            };
+            if at_rest {
                 self.spring = None;
             }
-            let excess = RubberBand::excess(spring.value, maximum);
+            let excess = RubberBand::excess(visible, maximum);
             let raw = if excess == 0.0 {
                 visible
             } else {

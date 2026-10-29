@@ -3,6 +3,11 @@ use super::{placement_step, Affine2D, Node};
 use crate::{Point, Rect};
 
 impl Node {
+    /// This node's frame placed by its own transform, with `scrolling` applied
+    /// to everything inside the node before the scale.
+    pub fn placement_step(&self, scrolling: Point) -> Affine2D {
+        placement_step(self.frame(), self.transform(), scrolling)
+    }
     /// Window-space origin of this node: its local frame composed down the
     /// chain, with every ancestor's scroll offset applied to its content and
     /// every ancestor's `transform` applied about its own anchor.

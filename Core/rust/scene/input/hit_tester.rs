@@ -1,5 +1,5 @@
 //! Translation of CoveUIScene/Input/HitTester.swift.
-use super::{placement_step, Node};
+use crate::scene::{placement_step, Node};
 use crate::{Point, Rect};
 
 /// Result of a hit test — the deepest hit-testable node containing the point,
@@ -99,7 +99,7 @@ mod tests {
         // Inside: the overflowing child still answers inside the clip.
         assert_eq!(HitTester::hit_test(&root, Point { x: 50.0, y: 10.0 }).unwrap().node, child);
 
-        left.set_transform(super::super::NodeTransform::anchored(2.0, 0.0, 0.0));
+        left.set_transform(crate::scene::NodeTransform::anchored(2.0, 0.0, 0.0));
         let hit = HitTester::hit_test(&root, Point { x: 50.0, y: 10.0 }).unwrap();
         assert_eq!(hit.local_point, Point { x: 25.0, y: 10.0 });
     }

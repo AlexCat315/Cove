@@ -1,6 +1,6 @@
 //! Translation of CoveUIScene/Input/PointerCapture.swift and the per-window
 //! ambient holders declared in PlatformInputContext.swift.
-use super::Node;
+use crate::scene::Node;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 

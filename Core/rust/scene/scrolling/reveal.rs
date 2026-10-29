@@ -1,5 +1,5 @@
 //! Translation of CoveUIScene/Scrolling/Reveal.swift.
-use super::Node;
+use crate::scene::Node;
 use crate::Rect;
 use std::rc::Rc;
 

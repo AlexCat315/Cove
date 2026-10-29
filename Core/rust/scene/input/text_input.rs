@@ -1,5 +1,5 @@
 //! Translation of CoveUIScene/TextInputAttachment.swift and TextInputClient.swift.
-use super::Node;
+use crate::scene::Node;
 use crate::Point;
 use cove_platform::TextInputArea;
 use serde::{Deserialize, Serialize};

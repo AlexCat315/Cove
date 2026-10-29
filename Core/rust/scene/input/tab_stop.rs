@@ -1,17 +1,17 @@
 //! Translation of CoveUIScene/Input/TabStop.swift.
-use super::Node;
+use crate::scene::Node;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Bumped when any property that decides sequential focus / subtree input
 /// eligibility changes.
 pub struct FocusRevision;
+static FOCUS_REVISION: AtomicU64 = AtomicU64::new(0);
 impl FocusRevision {
-    static CURRENT: AtomicU64 = AtomicU64::new(0);
     pub fn current() -> u64 {
-        Self::CURRENT.load(Ordering::Relaxed)
+        FOCUS_REVISION.load(Ordering::Relaxed)
     }
     pub fn bump() {
-        Self::CURRENT.fetch_add(1, Ordering::Relaxed);
+        FOCUS_REVISION.fetch_add(1, Ordering::Relaxed);
     }
 }
 

@@ -1,0 +1,35 @@
+[package]
+name = "cove-graphics"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+path = "rust/lib.rs"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+cove-core.workspace = true
+cove-platform.workspace = true
+cove-logging.workspace = true
+
+[build-dependencies]
+cc.workspace = true
+
+# The Metal backend talks to the Objective-C frameworks directly; these crates
+# are only compiled on Apple targets so Windows/Linux builds stay unaffected.
+[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
+objc2 = "0.6"
+objc2-foundation = "0.3"
+objc2-metal = "0.3"
+objc2-quartz-core = "0.3"
+block2 = "0.6"
+# `MTLDevice.newLibraryWithData:error:` consumes a `dispatch_data_t`, so loading
+# a precompiled `.metallib` goes through `DispatchData`.
+dispatch2 = "0.3"
+
+[lints]
+workspace = true

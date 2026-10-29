@@ -1,5 +1,5 @@
 //! Translation of CoveUIScene/Input/FocusChain.swift.
-use super::{Node, ObservableStateRegistrar, StateAccessKey, TextEditActions, TextEditCommand, TextInputAttachmentKey};
+use crate::scene::{Node, ObservableStateRegistrar, StateAccessKey, TextEditActions, TextEditCommand, TextInputAttachmentKey};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -165,7 +165,7 @@ impl FocusChain {
             })
             .collect()
     }
-    fn belongs_to_scope(&self, node: &Node, root: &Node, visited: &mut Vec<super::ElementId>) -> bool {
+    fn belongs_to_scope(&self, node: &Node, root: &Node, visited: &mut Vec<crate::ElementId>) -> bool {
         if is_descendant(node, root) {
             return true;
         }
@@ -258,7 +258,7 @@ impl FocusChain {
             }
             return;
         }
-        let previous = self.focused.borrow_mut().replace(node.cloned());
+        let previous = std::mem::replace(&mut *self.focused.borrow_mut(), node.cloned());
         self.registrar.invalidate(&StateAccessKey::text("focus"));
         self.notify_focus_change(previous.as_ref(), false);
         self.notify_focus_change(node, true);

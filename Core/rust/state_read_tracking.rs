@@ -1,7 +1,7 @@
 //! Translation of CoveUICore/StateReadTracking.swift. Rust TLS owns and destroys its stack on every platform.
 use std::{cell::RefCell, collections::{HashMap, HashSet}, sync::{Arc, Mutex, OnceLock, atomic::{AtomicU64, Ordering}}};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ReadScopeId(pub u64);
 type Invalidator = Arc<dyn Fn(Option<&str>) + Send + Sync>;
 #[derive(Clone)]

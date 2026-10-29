@@ -8,15 +8,19 @@ use std::rc::Rc;
 /// an ancestor; loading indicators keep a visible static form when enabled.
 pub struct ReducedMotionEnvironment;
 impl ReducedMotionEnvironment {
-    pub fn key() -> &'static CompositionLocal<bool> {
-        static KEY: std::sync::OnceLock<CompositionLocal<bool>> = std::sync::OnceLock::new();
-        KEY.get_or_init(|| CompositionLocal::constant(false))
+    /// The declaration is per-thread: `CompositionLocal` carries a non-`Sync`
+    /// default closure, and the scene is single-threaded by contract.
+    pub fn key() -> Rc<CompositionLocal<bool>> {
+        thread_local! {
+            static KEY: Rc<CompositionLocal<bool>> = Rc::new(CompositionLocal::constant(false));
+        }
+        KEY.with(|key| key.clone())
     }
 }
 impl Node {
     /// `true` when this node's nearest provider disables motion.
     pub fn prefers_reduced_motion(&self) -> bool {
-        self.composition_value(ReducedMotionEnvironment::key())
+        self.composition_value(&ReducedMotionEnvironment::key())
     }
 }
 
@@ -82,7 +86,7 @@ mod tests {
     fn reduced_motion_defaults_to_false_and_honours_providers() {
         let node = Node::new();
         assert!(!node.prefers_reduced_motion());
-        node.set_composition_value(ReducedMotionEnvironment::key(), true);
+        node.set_composition_value(&ReducedMotionEnvironment::key(), true);
         assert!(node.prefers_reduced_motion());
     }
 

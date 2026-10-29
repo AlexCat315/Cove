@@ -55,6 +55,7 @@ impl DrawList {
         self.resources = resources; self.clip_stack.clear(); self.masks.clear(); self.mask_outlines.clear(); self.viewport_bounds = None; self.reveal = None; Ok(())
     }
     pub fn begin_reveal(&mut self, reveal: Reveal) { self.reveal = Some(reveal); }
+    pub fn set_viewport_bounds(&mut self, bounds: Option<Rect>) { self.viewport_bounds = bounds; }
     pub fn begin_backdrop(&mut self, backdrop: Backdrop) { self.pending_backdrop = Some(backdrop); }
     pub fn paint_bounds(&self) -> Option<Rect> { geometry_kernels::bounds(&self.vertices) }
     pub fn push_clip_rect(&mut self, rect: Rect) {

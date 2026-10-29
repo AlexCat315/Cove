@@ -65,9 +65,10 @@ pub struct TextInputArea {
     pub cursor_x: f32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum MouseButton {
+    #[default]
     Left = 1,
     Middle = 2,
     Right = 3,
@@ -84,7 +85,7 @@ pub enum PointerKind {
     Pen = 3,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct MouseMotionEvent {
     pub x: f32,
     pub y: f32,
@@ -94,7 +95,7 @@ pub struct MouseMotionEvent {
     pub kind: PointerKind,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct MouseButtonEvent {
     pub button: MouseButton,
     pub x: f32,

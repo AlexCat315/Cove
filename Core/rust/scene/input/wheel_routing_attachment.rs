@@ -1,5 +1,5 @@
 //! Translation of CoveUIScene/Input/WheelRoutingAttachment.swift.
-use super::{EventResult, Node};
+use crate::scene::{EventResult, Node};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WheelRoutingPriority {

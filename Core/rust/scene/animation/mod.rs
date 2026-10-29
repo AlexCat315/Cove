@@ -3,6 +3,7 @@ mod controller;
 mod interpolatable;
 mod linear;
 mod motion_vector;
+mod oscillation;
 mod playback;
 mod spring_solution;
 mod timeline;

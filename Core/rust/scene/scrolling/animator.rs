@@ -1,15 +1,9 @@
 //! Translation of CoveUIScene/Scrolling/ScrollAnimator.swift.
 use super::physics::{constrain, RubberBand, ScrollAxisMotion, ScrollPhysics, ScrollSpring, ScrollVelocityTracker};
-use crate::scene::{Animation, AnimationController, AnimationCurve, AnyAnimationController, AnimatorScheduler, Interpolatable};
+use crate::scene::{Animation, AnimationController, AnyAnimationController, AnimatorScheduler};
 use crate::{Point, Size};
 use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
-
-impl Interpolatable for Point {
-    fn interpolate(a: &Self, b: &Self, t: f32) -> Self {
-        Point { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }
-    }
-}
 
 struct State {
     position: Point,
@@ -301,8 +295,9 @@ impl ScrollAnimator {
             let mut state = self.state.borrow_mut();
             let maximum = state.maximum_offset;
             let viewport = state.viewport_size;
-            let x = state.x_motion.advance(state.position.x, maximum.x, viewport.width, physics, step);
-            let y = state.y_motion.advance(state.position.y, maximum.y, viewport.height, physics, step);
+            let position = state.position;
+            let x = state.x_motion.advance(position.x, maximum.x, viewport.width, physics, step);
+            let y = state.y_motion.advance(position.y, maximum.y, viewport.height, physics, step);
             state.position = Point { x: x.0, y: y.0 };
             (x.1, y.1)
         };

@@ -1,9 +1,10 @@
 //! Translation of CoveUIScene/Input/PlatformInputContext.swift.
-use super::{FocusChain, FocusChainHolder, InteractionRegistry, InvalidationLog, InvalidationLogHolder, PointerCapture, PointerCaptureHolder};
+use crate::scene::{FocusChain, FocusChainHolder, InteractionRegistry, InvalidationLog, InvalidationLogHolder, PointerCapture, PointerCaptureHolder};
 use crate::Point;
 use cove_platform::NativeMenuSnapshot;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 
 // MARK: - Per-window ambients
 //
@@ -79,7 +80,7 @@ pub struct PlatformInputContext {
     pub interactions: Rc<InteractionRegistry>,
     pub focus_chain: Rc<FocusChain>,
     pub pointer_capture: Rc<PointerCapture>,
-    pub invalidation_log: Rc<InvalidationLog>,
+    pub invalidation_log: Arc<InvalidationLog>,
     scoped_ambients: RefCell<Vec<Rc<dyn ScopedAmbient>>>,
 }
 impl PlatformInputContext {
@@ -88,7 +89,7 @@ impl PlatformInputContext {
             interactions: Rc::new(InteractionRegistry::new()),
             focus_chain: Rc::new(FocusChain::new()),
             pointer_capture: Rc::new(PointerCapture::new()),
-            invalidation_log: Rc::new(InvalidationLog::default()),
+            invalidation_log: Arc::new(InvalidationLog::default()),
             scoped_ambients: RefCell::new(Vec::new()),
         }
     }
@@ -116,7 +117,7 @@ impl PlatformInputContext {
             interactions: Option<Rc<InteractionRegistry>>,
             focus: Option<Rc<FocusChain>>,
             capture: Option<Rc<PointerCapture>>,
-            log: Option<Rc<InvalidationLog>>,
+            log: Option<Arc<InvalidationLog>>,
         }
         impl Drop for Restore {
             fn drop(&mut self) {

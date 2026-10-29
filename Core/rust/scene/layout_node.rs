@@ -1192,7 +1192,7 @@ mod tests {
         root.set_flex_direction(FlexDirection::Column);
         let leaf = LayoutNode::new();
         let measure: MeasureFunc = Rc::new(|width, width_mode, _height, _height_mode| {
-            let natural = 80.0;
+            let natural: f32 = 80.0;
             Size { width: if width_mode == MeasureMode::AtMost { natural.min(width) } else { natural }, height: 18.0 }
         });
         leaf.set_measure_func(Some(measure));

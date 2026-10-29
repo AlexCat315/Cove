@@ -137,6 +137,23 @@ pub fn resolves_right_to_left(directions: impl Iterator<Item = Direction>) -> bo
     false
 }
 
+impl super::Node {
+    /// Effective writing direction from the nearest explicit `layoutDirection`.
+    ///
+    /// Direction can be applied after a primitive's update pass, so input and
+    /// drawing resolve it lazily rather than snapshotting a stale value.
+    pub fn resolves_right_to_left(&self) -> bool {
+        let mut layout = self.layout_node();
+        while let Some(current) = layout {
+            if current.direction() != Direction::Inherit {
+                return current.direction() == Direction::Rtl;
+            }
+            layout = current.parent();
+        }
+        false
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

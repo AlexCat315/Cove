@@ -145,21 +145,21 @@ impl AccessibilityValueProvider {
 
 /// Monotonic counters for mutations that can change the accessibility tree.
 pub struct AccessibilityRevision;
+static STRUCTURE_REVISION: AtomicU64 = AtomicU64::new(0);
+static GEOMETRY_REVISION: AtomicU64 = AtomicU64::new(0);
 impl AccessibilityRevision {
-    static STRUCTURE: AtomicU64 = AtomicU64::new(0);
-    static GEOMETRY: AtomicU64 = AtomicU64::new(0);
     pub fn structure() -> u64 {
-        Self::STRUCTURE.load(Ordering::Relaxed)
+        STRUCTURE_REVISION.load(Ordering::Relaxed)
     }
     pub fn geometry() -> u64 {
-        Self::GEOMETRY.load(Ordering::Relaxed)
+        GEOMETRY_REVISION.load(Ordering::Relaxed)
     }
     pub fn bump_structure() {
-        Self::STRUCTURE.fetch_add(1, Ordering::Relaxed);
-        Self::GEOMETRY.fetch_add(1, Ordering::Relaxed);
+        STRUCTURE_REVISION.fetch_add(1, Ordering::Relaxed);
+        GEOMETRY_REVISION.fetch_add(1, Ordering::Relaxed);
     }
     pub fn bump_geometry() {
-        Self::GEOMETRY.fetch_add(1, Ordering::Relaxed);
+        GEOMETRY_REVISION.fetch_add(1, Ordering::Relaxed);
     }
 }
 
