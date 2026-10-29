@@ -13,5 +13,7 @@ pub fn install_sdl_logging(){
         });
     }
     // SAFETY: static function pointer outlives SDL, contains panics and accesses synchronized state only.
-    unsafe{crate::native::cove_shell_log_install(output)};
+    static INSTALLED: std::sync::Once = std::sync::Once::new();
+    INSTALLED.call_once(|| { // SAFETY: this static callback is installed only once before SDL begins producing logs.
+        unsafe{crate::native::cove_shell_log_install(output)}; });
 }

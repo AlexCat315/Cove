@@ -39,7 +39,7 @@
 | Imaging | 10 | 718 | 11 | 415 | 生产源码已写入；未编译/测试 |
 | Compose | 416 | 52,590 | — | — | 未开始 |
 | Runtime | 12 | 1,501 | — | — | 未开始 |
-| Shell | 14 | 2,584 | — | — | 未开始 |
+| Shell | 14 | 2,584 | 14 | 472 | SDL 窗口/输入/对话框与 Apple 桥接已写入；未验证 |
 | Terminal | 38 | 4,030 | — | — | 未开始 |
 | Hosts | 55 | 4,349 | — | — | 未开始 |
 | Browser | 2 | 419 | — | — | 未开始 |
@@ -83,6 +83,14 @@ Text 的 FontFace、FontAtlas、FontProvider、FontCollection、TextStyle、Text
 Imaging 的 ImageDecoder、Animation、Orientation、Rasterization、Progressive、TextureImage、BundleImageResource、ImageAssetRegistry 和 Exports 已写入。复用原有 stb_image/lunasvg/libwebp 解码，方向重排使用 C，macOS/iOS 的 PDF/ImageIO 路径使用 Objective-C/C。加入动画帧预算、源像素预算、缓存 LRU、共享 mipmap 与全进程纹理 ID。其他平台保留可移植解码路径；原有 Apple 专用格式能力边界没有冒充全平台支持。
 
 以上均未编译和测试；Cargo.lock、原生库交叉链接、宿主集成及统一验收尚未完成。Browser/Wasm 的 C 运行时与宿主接入仍待实现，不能把桌面原生桥接记作浏览器完成。
+
+### `cove-shell`（继续转换中）
+
+PlatformShell、SDL3Shell、ApplicationEntry、Cursor、SDL3Clipboard、日志接入、NativeMenuPopover、显示刷新 inbox/Apple 驱动、AppKitInput 已写入 Rust/C/Objective-C 对应实现。SDL 事件转换保留窗口路由、关闭拦截、IME、触摸、游戏手柄、滚轮单位/阶段，文件对话框结果通过队列回到应用线程。窗口关闭后使保留的句柄失效，防止访问已销毁原生窗口。
+
+macOS/iOS 使用原生 CAMetalLayer；Windows、X11、Wayland 和 Android 原生窗口引用已实现。AppKit 菜单仍遵循原版 macOS 能力边界；其他平台的 Compose 菜单呈现器待上层迁移。显示刷新在无原生回调的 SDL 平台上显式报告不可用，Runtime 必须保留原有截止时间回退。
+
+Shell 代码尚未编译/测试；SDL 链接、各平台宿主生命周期、菜单与窗口集成仍在最终对照范围内。接下来继续 Graphics 的 UI 纹理、资源驻留与绘制路径。
 
 ## 迁移约定
 

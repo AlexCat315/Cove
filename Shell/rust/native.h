@@ -33,6 +33,9 @@ bool cove_shell_refresh_take(CoveShellWindow *,double *timestamp,double *target)
 typedef void (*CoveShellLogCallback)(int category,int priority,const char *message);
 void cove_shell_log_install(CoveShellLogCallback callback);
 #if defined(__APPLE__)
+void cove_shell_apple_prepare(bool dock);
+bool cove_shell_apple_wheel_owned(uint32_t id);
+bool cove_shell_apple_shortcut(uint32_t id,int scancode,uint16_t modifiers);
 void *cove_shell_apple_attach(void *window,void *layer,bool inset,bool dock);
 void cove_shell_apple_detach(void *context);
 void cove_shell_apple_update(void *context,CoveShellWindowState *state);

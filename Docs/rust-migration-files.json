@@ -6659,7 +6659,7 @@
       "source": "Shell/Package.swift",
       "source_sha256": "d587c6ea0b928c8cdd4b2a48ca4f29a9d3dbd0156a1eb2e6be91191f999345a1",
       "source_lines": 55,
-      "status": "pending",
+      "status": "manifest_written",
       "rust": [
         "Shell/Cargo.toml"
       ]
@@ -6668,92 +6668,126 @@
       "source": "Shell/Sources/PlatformShell/ApplicationEntry.swift",
       "source_sha256": "eeb7775d13086aec6d8bdd7bd045fbdb389a1d3abfe5849a454e09db0243a4e8",
       "source_lines": 34,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Shell/rust/application_entry.rs"
+      ]
     },
     {
       "source": "Shell/Sources/PlatformShell/Cursor.swift",
       "source_sha256": "761df43bcf16e9052b53e7ed0fff5fe719fcbe3dc8d24afc7db59219b476d71d",
       "source_lines": 2,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Shell/rust/cursor.rs"
+      ]
     },
     {
       "source": "Shell/Sources/PlatformShell/Diagnostics/SDL.swift",
       "source_sha256": "ff9e81587b4cbbce836eb4ff76aa60cd3b862aebd34ed6ba6dcfd60da5fafea7",
       "source_lines": 18,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Shell/rust/diagnostics/mod.rs"
+      ]
     },
     {
       "source": "Shell/Sources/PlatformShell/DisplayRefresh/CoreVideo.swift",
       "source_sha256": "b5c014ca008a666f5a6a299fa939fbb0aeb62635cf2db2da473c20c5fb772c09",
       "source_lines": 62,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Shell/rust/display_refresh/mod.rs",
+        "Shell/rust/apple.m"
+      ]
     },
     {
       "source": "Shell/Sources/PlatformShell/DisplayRefresh/MacDisplayLink.swift",
       "source_sha256": "ebcbc82e5658097645c685677d7ce04b5cb8d6acc7c1f7e3293198fa1735f76a",
       "source_lines": 29,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Shell/rust/display_refresh/mod.rs",
+        "Shell/rust/apple.m"
+      ]
     },
     {
       "source": "Shell/Sources/PlatformShell/DisplayRefresh/Signal.swift",
       "source_sha256": "9d187c84e4d0bf9c0e47f5c5e1aeaa28196622bb3888bd454e91c9938343394c",
       "source_lines": 50,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Shell/rust/display_refresh/signal.rs"
+      ]
     },
     {
       "source": "Shell/Sources/PlatformShell/DisplayRefresh/WindowDisplayLink.swift",
       "source_sha256": "cffb7f5ef0d776132e99b488d05272b480f9c6fba339aa1ede83bccd5440c46c",
       "source_lines": 45,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Shell/rust/display_refresh/mod.rs",
+        "Shell/rust/apple.m"
+      ]
     },
     {
       "source": "Shell/Sources/PlatformShell/Log.swift",
       "source_sha256": "7144112f78afbbb5e0af5a7aecec8dbf871ce37ada52cb0f1c18639ad9948fd1",
       "source_lines": 5,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Shell/rust/log.rs"
+      ]
     },
     {
       "source": "Shell/Sources/PlatformShell/NativeMenuPopover.swift",
       "source_sha256": "c6755f0c90009b7f09cfda1be1259fe41b55e08eafae40d8d61095bc938e258e",
       "source_lines": 100,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Shell/rust/native_menu_popover.rs"
+      ]
     },
     {
       "source": "Shell/Sources/PlatformShell/PlatformShell.swift",
       "source_sha256": "be86249fa7e3719db70e0bd7c9ea2a9b163fcf528f0a6ac8eb283b8ede1ea0ca",
       "source_lines": 579,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Shell/rust/platform_shell.rs",
+        "Shell/rust/sdl3_shell.rs",
+        "Shell/rust/apple.m"
+      ]
     },
     {
       "source": "Shell/Sources/PlatformShell/SDL3Clipboard.swift",
       "source_sha256": "0b52dcdf3ecbc39ce82e0201861c9fc9d6cf634c1c3f755322f4e12dd8a4d581",
       "source_lines": 22,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Shell/rust/sdl3_clipboard.rs"
+      ]
     },
     {
       "source": "Shell/Sources/PlatformShell/SDL3Shell.swift",
       "source_sha256": "3572d9d4c53a6699a16ec46151fc8dd929910a4ac23f80ab140810db9aa2f64b",
       "source_lines": 1510,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Shell/rust/sdl3_shell.rs",
+        "Shell/rust/native.c",
+        "Shell/rust/apple.m"
+      ]
     },
     {
       "source": "Shell/Sources/PlatformShell/Scroll/AppKitInput.swift",
       "source_sha256": "dd05e2a7393200da26df237c8ff2a6534b449abde83e6bdabe97ac5f74bca0de",
       "source_lines": 73,
-      "status": "pending",
-      "rust": []
+      "status": "written_unverified",
+      "rust": [
+        "Shell/rust/scroll/mod.rs",
+        "Shell/rust/apple.m"
+      ]
     },
     {
       "source": "Sources/CoveUIWebView/Apple/WebKitHost.swift",

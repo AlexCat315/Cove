@@ -31,7 +31,7 @@ use super::{
 /// Completion callback run once the GPU has retired the work.
 pub type Completion = Box<dyn FnOnce() + Send + 'static>;
 
-pub trait RhiBackend {
+pub trait RhiBackend: Send {
     /// The graphics API this backend implements.
     fn api(&self) -> GraphicsApi;
     /// Human-readable physical device / adapter name.

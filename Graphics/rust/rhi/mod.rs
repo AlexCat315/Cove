@@ -22,6 +22,7 @@ mod queue;
 mod resource_preparation;
 mod resources;
 mod shader_artifact;
+mod shader_artifact_loading;
 mod specialization;
 mod resource_ownership;
 mod state_tracker;

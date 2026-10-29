@@ -39,6 +39,9 @@ impl DrawList {
         Ok(Self { clip_revision: u64::from(batches.iter().any(|b| b.scissor.is_some())),
             vertices: Arc::new(vertices), indices: Arc::new(indices), batches: Arc::new(batches), ..Self::default() })
     }
+    pub fn geometry_shares_storage(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.vertices, &other.vertices) && Arc::ptr_eq(&self.indices, &other.indices) && Arc::ptr_eq(&self.batches, &other.batches)
+    }
     pub fn vertices(&self) -> &[Vertex] { &self.vertices }
     pub fn indices(&self) -> &[u32] { &self.indices }
     pub fn batches(&self) -> &[DrawBatch] { &self.batches }

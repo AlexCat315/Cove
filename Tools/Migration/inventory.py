@@ -57,6 +57,18 @@ def mapped_paths(source: str) -> tuple[str, list[str]]:
         return "written_unverified", ["Core/rust/scene/" + target]
     if source.startswith("PlatformCore/Sources/"):
         return "written_unverified", ["PlatformCore/rust/resources.rs" if path.stem == "PackageResourceBundle" else "PlatformCore/rust/lib.rs"]
+    if source.startswith("Shell/Sources/PlatformShell/"):
+        targets = {
+            "PlatformShell": ["platform_shell.rs", "sdl3_shell.rs", "apple.m"],
+            "SDL3Shell": ["sdl3_shell.rs", "native.c", "apple.m"],
+            "Signal": ["display_refresh/signal.rs"],
+            "WindowDisplayLink": ["display_refresh/mod.rs", "apple.m"],
+            "CoreVideo": ["display_refresh/mod.rs", "apple.m"],
+            "MacDisplayLink": ["display_refresh/mod.rs", "apple.m"],
+            "AppKitInput": ["scroll/mod.rs", "apple.m"],
+            "SDL": ["diagnostics/mod.rs"],
+        }
+        return "written_unverified", ["Shell/rust/" + target for target in targets.get(path.stem, [snake(path.stem) + ".rs"])]
     if source.startswith("Text/Sources/CoveUIText/"):
         return "written_unverified", ["Text/rust/" + ("lib.rs" if path.stem == "Exports" else snake(path.stem) + ".rs")]
     if source.startswith("Imaging/Sources/CoveUIImaging/"):

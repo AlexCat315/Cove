@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- 继续迁移 Shell：写入 Rust SDL3 窗口/输入/剪贴板/对话框，C 事件桥接，以及 macOS/iOS 原生窗口、精确滚动和显示刷新桥接；尚未统一验证。
+
 - 继续逐文件迁移 Text/Imaging：加入 Rust 字体发现、FreeType/HarfBuzz 整形与图集、CoreText 彩色字形、图片/动画解码、EXIF 方向和资源缓存；新增带源码指纹的迁移清单。按要求留待全量转换后统一测试。
 
 - 开始 Swift → Rust 2024 迁移，新增 `0.3.0-dev` Cargo 工作区；`cove` / `cove.cmd` 改用 Rust CLI，不再调用 Swift 编译器。

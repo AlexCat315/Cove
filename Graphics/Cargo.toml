@@ -13,6 +13,10 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 cove-core.workspace = true
+cove-text.workspace = true
+cove-imaging.workspace = true
+base64 = "0.22"
+sha2 = "0.10"
 cove-platform.workspace = true
 cove-logging.workspace = true
 

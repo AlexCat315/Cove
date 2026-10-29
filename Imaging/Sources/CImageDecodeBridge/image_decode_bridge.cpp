@@ -240,7 +240,7 @@ static bool decode_memory_impl(const uint8_t* data,
     return decode_stb(data, data_size, target_width, target_height, out_result);
 }
 
-extern "C" bool cove_image_dimensions_memory(const uint8_t* data, size_t data_size,
+static bool dimensions_memory_impl(const uint8_t* data, size_t data_size,
                                                 const char* extension, int32_t* width, int32_t* height) {
     if (!data || !data_size || !width || !height || data_size > INT_MAX) return false;
     const std::string ext = lower_extension(extension);
@@ -310,7 +310,9 @@ void append_frame(AnimationFrames& frames, const uint8_t* canvas, int canvas_wid
 bool decode_gif_frames(const uint8_t* data, size_t data_size, int target_width, int target_height,
                        int max_frames, AnimationFrames& frames, const char** error) {
     stbi__context context; stbi__start_mem(&context, data, static_cast<int>(data_size));
-    stbi__gif gif{}; int channels = 0;
+    stbi__gif gif{};
+    struct GifGuard { stbi__gif* gif; ~GifGuard() { STBI_FREE(gif->out); STBI_FREE(gif->history); STBI_FREE(gif->background); } } guard{&gif};
+    int channels = 0;
     std::vector<uint8_t> previous, two_back;
     bool success = false;
     for (int index = 0; index < max_frames; ++index) {
@@ -322,7 +324,6 @@ bool decode_gif_frames(const uint8_t* data, size_t data_size, int target_width, 
         two_back = std::move(previous); previous.assign(pixels, pixels + static_cast<size_t>(gif.w) * gif.h * 4);
         success = true;
     }
-    STBI_FREE(gif.out); STBI_FREE(gif.history); STBI_FREE(gif.background);
     return success;
 }
 
@@ -471,4 +472,9 @@ extern "C" bool cove_image_decode_animation_memory(const uint8_t* data, size_t c
     try { return decode_animation_impl(data, count, extension, width, height, maximum_frames, out); }
     catch (const std::exception& error) { if (out) cove_image_animation_free(out); return fail_animation(out, error.what()); }
     catch (...) { if (out) cove_image_animation_free(out); return fail_animation(out, "native animation decoder exception"); }
+}
+
+extern "C" bool cove_image_dimensions_memory(const uint8_t* data, size_t count, const char* extension, int32_t* width, int32_t* height) {
+    try { return dimensions_memory_impl(data, count, extension, width, height); }
+    catch (...) { return false; }
 }
