@@ -12,6 +12,7 @@ struct RichTextSurface: _PrimitiveView {
     private struct PaintIdentity: Equatable {
         let paragraph: RichParagraph
         let palette: RichTextPalette
+        let selectionScope: ObjectIdentifier?
     }
 
     func _makeNode() -> Node {
@@ -36,6 +37,7 @@ struct RichTextSurface: _PrimitiveView {
         }
         let source = source
         let scope = node.compositionValue(of: TextSelectionScope.key)
+        if scope == nil { TextSelectionScope.unregister(node) }
         // Selectable paragraphs take focus on click for copy shortcuts, but are
         // not Tab stops: links are the keyboard targets inside text. Focus is
         // applied explicitly by the press handler, so automatic focus stays off
@@ -52,20 +54,22 @@ struct RichTextSurface: _PrimitiveView {
             return RichTextFlow.layout(source.paragraph, maxWidth: Float(frame.width), env: env)
                 .offset(at: Float(point.x - frame.minX), Float(point.y - frame.minY))
         })
-        node.updateDraw(identity: PaintIdentity(paragraph: source.paragraph, palette: source.palette)) { [weak node] list, origin in
+        node.updateDraw(identity: PaintIdentity(paragraph: source.paragraph, palette: source.palette,
+                                              selectionScope: scope.map(ObjectIdentifier.init))) { [weak node] list, origin in
             guard let node, let env = TextEnvironmentHolder.current else { return }
             let paragraph = source.paragraph, palette = source.palette
             let flow = RichTextFlow.layout(paragraph, maxWidth: Float(node.frame.width), env: env)
+            let selection = scope?.range(for: node)
             RichTextPainter(flow: flow, paragraph: paragraph, palette: palette,
                             hoveredLink: node.attachments[Self.hoveredLinkKey] as? Int,
                             focusedLink: FocusChainHolder.current?.isFocusVisible == true
                                 ? node.attachments[Self.focusedLinkKey] as? Int : nil,
-                            selection: scope?.range(for: node),
+                            selection: selection,
                             opacity: node.opacity)
                 .paint(into: list, x: Float(origin.x), y: Float(origin.y), env: env)
             // Handles and the magnifier sit above the glyphs so a finger or pen can
             // keep refining the selection without losing sight of the endpoints.
-            guard let selection = scope?.range(for: node) else { return }
+            guard let selection else { return }
             let length = source.plainText.utf8.count
             let start = selection.lowerBound > 0 ? flow.caretRect(at: selection.lowerBound) : nil
             let end = selection.upperBound < length ? flow.caretRect(at: selection.upperBound) : nil

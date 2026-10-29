@@ -2,7 +2,7 @@ import Foundation
 import CoveUIScene
 import CoveUIText
 import CoveUIImaging
-import CoveUIScene
+import CTextSelection
 
 /// One selection shared by every paragraph of a document, so a drag can run
 /// from a heading through a list into a code block and copy as one string.
@@ -23,7 +23,24 @@ public final class TextSelectionScope {
         let offsetAt: (CGPoint) -> Int
     }
 
+    private struct Span {
+        let lower: Int
+        let upper: Int
+        let start: Int
+        let end: Int
+    }
+
+    private final class Registration: NodeResource {
+        weak var scope: TextSelectionScope?
+        func mount(node: Node) {}
+        func unmount(node: Node) { TextSelectionScope.unregister(node) }
+    }
+
     private var members: [ObjectIdentifier: Member] = [:]
+    private var orderedIDs: [ObjectIdentifier] = []
+    private var memberIndices: [ObjectIdentifier: Int] = [:]
+    private var frames: [CoveSelectionFrame] = []
+    private var geometryRevision: UInt64?
     private(set) var anchor: Position?
     private(set) var focus: Position?
     /// Opens the root's context menu at a window-space point.
@@ -38,16 +55,93 @@ public final class TextSelectionScope {
     public var share: ((String) -> Void)?
 
     func register(_ node: Node, text: @escaping () -> String, offsetAt: @escaping (CGPoint) -> Int) {
-        members[ObjectIdentifier(node)] = Member(node: node, text: text, offsetAt: offsetAt)
+        let registration: Registration
+        if let existing = node.firstResource(Registration.self) {
+            registration = existing
+        } else {
+            registration = Registration()
+            node.addResource(registration)
+        }
+        if registration.scope !== self {
+            Self.unregister(node)
+            registration.scope = self
+        }
+        let id = ObjectIdentifier(node)
+        if members[id]?.node !== node { geometryRevision = nil }
+        members[id] = Member(node: node, text: text, offsetAt: offsetAt)
+    }
+
+    static func unregister(_ node: Node) {
+        guard let registration = node.firstResource(Registration.self), let scope = registration.scope else { return }
+        scope.members.removeValue(forKey: ObjectIdentifier(node))
+        scope.geometryRevision = nil
+        registration.scope = nil
+    }
+
+    /// Geometry and structure share the scene's revision funnel. Capture each
+    /// absolute frame once per change, never inside a sort comparator or painter.
+    private func updateOrder() {
+        guard geometryRevision != AccessibilityRevision.geometry else { return }
+        let previousIDs = orderedIDs
+        let previousSpan = selectionSpan
+        members = members.filter { $0.value.node?.parent != nil }
+        var ids: [ObjectIdentifier] = []
+        frames.removeAll(keepingCapacity: true)
+        ids.reserveCapacity(members.count)
+        frames.reserveCapacity(members.count)
+        for (id, member) in members {
+            guard let node = member.node else { continue }
+            let frame = node.absoluteFrame
+            frames.append(CoveSelectionFrame(x: Double(frame.minX), y: Double(frame.minY),
+                                             width: Double(frame.width), height: Double(frame.height),
+                                             member: ids.count))
+            ids.append(id)
+        }
+        frames.withUnsafeMutableBufferPointer { cove_selection_sort($0.baseAddress, $0.count) }
+        orderedIDs = frames.map { ids[$0.member] }
+        memberIndices = Dictionary(uniqueKeysWithValues: orderedIDs.enumerated().map { ($0.element, $0.offset) })
+        geometryRevision = AccessibilityRevision.geometry
+        // A reflow or insertion can move paragraphs across the endpoints even
+        // without a pointer event. Invalidate any highlights that changed sides.
+        if previousIDs != orderedIDs {
+            let previous = ranges(in: previousSpan, ids: previousIDs)
+            let current = ranges(in: selectionSpan, ids: orderedIDs)
+            for id in Set(previous.keys).union(current.keys) where previous[id] != current[id] {
+                members[id]?.node?.markRenderDirty(reason: .styleSet(field: "textSelection"))
+            }
+        }
     }
 
     /// Mounted members in reading order: top to bottom, then leading to trailing.
     private var ordered: [(ObjectIdentifier, Member)] {
-        members = members.filter { $0.value.node?.parent != nil }
-        return members.map { ($0.key, $0.value) }.sorted { lhs, rhs in
-            let a = lhs.1.node!.absoluteFrame, b = rhs.1.node!.absoluteFrame
-            return abs(a.minY - b.minY) > 0.5 ? a.minY < b.minY : a.minX < b.minX
+        updateOrder()
+        return orderedIDs.compactMap { id in members[id].map { (id, $0) } }
+    }
+
+    private var selectionSpan: Span? {
+        guard let anchor, let focus, anchor != focus,
+              let a = memberIndices[anchor.member], let f = memberIndices[focus.member] else { return nil }
+        return (a, anchor.offset) <= (f, focus.offset)
+            ? Span(lower: a, upper: f, start: anchor.offset, end: focus.offset)
+            : Span(lower: f, upper: a, start: focus.offset, end: anchor.offset)
+    }
+
+    private func range(at index: Int, in span: Span?, ids: [ObjectIdentifier]) -> Range<Int>? {
+        guard let span, index >= span.lower, index <= span.upper,
+              let member = members[ids[index]] else { return nil }
+        let length = member.text().utf8.count
+        let lower = index == span.lower ? min(length, max(0, span.start)) : 0
+        let upper = index == span.upper ? min(length, max(0, span.end)) : length
+        return lower < upper ? lower..<upper : nil
+    }
+
+    private func ranges(in span: Span?, ids: [ObjectIdentifier]) -> [ObjectIdentifier: Range<Int>] {
+        guard let span else { return [:] }
+        var result: [ObjectIdentifier: Range<Int>] = [:]
+        for index in span.lower...span.upper {
+            if let range = range(at: index, in: span, ids: ids) { result[ids[index]] = range }
         }
+        return result
     }
 
     /// Whether anything is actually selected (an anchor with no focus is a caret,
@@ -60,22 +154,25 @@ public final class TextSelectionScope {
     // MARK: - Changing the selection
 
     func select(from anchor: Position, to focus: Position) {
+        guard self.anchor != anchor || self.focus != focus else { return }
+        updateOrder()
+        let previous = selectionSpan
         self.anchor = anchor
         self.focus = focus
-        invalidate()
+        invalidate(from: previous, to: selectionSpan)
     }
 
     func extend(to focus: Position) {
-        guard anchor != nil else { return select(from: focus, to: focus) }
-        self.focus = focus
-        invalidate()
+        select(from: anchor ?? focus, to: focus)
     }
 
     public func clear() {
         guard anchor != nil || focus != nil else { return }
+        updateOrder()
+        let previous = selectionSpan
         anchor = nil
         focus = nil
-        invalidate()
+        invalidate(from: previous, to: nil)
     }
 
     /// Moves the endpoint of the selection that belongs to `node`, keeping the
@@ -171,67 +268,50 @@ public final class TextSelectionScope {
     /// The position under a window-space point; points between or beyond
     /// paragraphs snap to the nearest paragraph edge in reading order.
     func position(at point: CGPoint) -> Position? {
-        let list = ordered
-        guard !list.isEmpty else { return nil }
-        if let hit = list.first(where: { $0.1.node!.absoluteFrame.contains(point) }) {
-            return Position(member: hit.0, offset: hit.1.offsetAt(point))
+        updateOrder()
+        var edge: Int32 = 0
+        let index = frames.withUnsafeBufferPointer {
+            cove_selection_find($0.baseAddress, $0.count, Double(point.x), Double(point.y), true, &edge)
         }
-        // Same line band: the nearest paragraph horizontally (table rows, list markers).
-        let band = list.filter { let f = $0.1.node!.absoluteFrame; return point.y >= f.minY && point.y < f.maxY }
-        if let nearest = band.min(by: { distance(point, $0.1) < distance(point, $1.1) }) {
-            return Position(member: nearest.0, offset: nearest.1.offsetAt(point))
-        }
-        if let next = list.first(where: { $0.1.node!.absoluteFrame.minY > point.y }) {
-            return Position(member: next.0, offset: 0)
-        }
-        let last = list[list.count - 1]
-        return Position(member: last.0, offset: last.1.text().utf8.count)
+        guard index >= 0, let member = members[orderedIDs[index]] else { return nil }
+        let offset = edge < 0 ? 0 : (edge > 0 ? member.text().utf8.count : member.offsetAt(point))
+        return Position(member: orderedIDs[index], offset: offset)
     }
 
-    /// Whether a window-space point lands on a paragraph this scope owns. The
-    /// region uses it to ignore secondary clicks and long presses anywhere else,
-    /// so a selection region spanning a whole page (or the whole app) never
-    /// shadows the context menus of the controls inside it.
+    /// Whether a window-space point lands on a paragraph this scope owns.
     func textUnder(_ point: CGPoint) -> Bool {
-        ordered.contains { $0.1.node?.absoluteFrame.contains(point) ?? false }
-    }
-
-    private func distance(_ point: CGPoint, _ member: Member) -> CGFloat {
-        let frame = member.node!.absoluteFrame
-        return point.x < frame.minX ? frame.minX - point.x : max(0, point.x - frame.maxX)
+        updateOrder()
+        var edge: Int32 = 0
+        return frames.withUnsafeBufferPointer {
+            cove_selection_find($0.baseAddress, $0.count, Double(point.x), Double(point.y), false, &edge) >= 0
+        }
     }
 
     // MARK: - Reading the selection
 
     /// The selected UTF-8 range within one paragraph.
     func range(for node: Node) -> Range<Int>? {
-        guard let anchor, let focus, anchor != focus else { return nil }
-        let ids = ordered.map(\.0)
-        guard let a = ids.firstIndex(of: anchor.member), let f = ids.firstIndex(of: focus.member),
-              let index = ids.firstIndex(of: ObjectIdentifier(node)) else { return nil }
-        let (start, end) = (a, anchor.offset) <= (f, focus.offset) ? (anchor, focus) : (focus, anchor)
-        let (low, high) = (min(a, f), max(a, f))
-        guard (low...high).contains(index) else { return nil }
-        let length = members[ObjectIdentifier(node)]?.text().utf8.count ?? 0
-        let lower = index == low ? start.offset : 0
-        let upper = index == high ? end.offset : length
-        return lower < upper ? lower..<upper : nil
+        guard hasSelection else { return nil }
+        updateOrder()
+        guard let index = memberIndices[ObjectIdentifier(node)] else { return nil }
+        return range(at: index, in: selectionSpan, ids: orderedIDs)
     }
 
     /// Paragraphs on one row (table cells) join with tabs, rows with newlines.
     public var selectedText: String {
+        guard hasSelection else { return "" }
+        updateOrder()
+        guard let span = selectionSpan else { return "" }
         var result = ""
-        var previousFrame: CGRect?
-        for (_, member) in ordered {
-            guard let node = member.node, let range = range(for: node) else { continue }
-            let bytes = Array(member.text().utf8)
-            let part = String(decoding: bytes[max(0, range.lowerBound)..<min(bytes.count, range.upperBound)], as: UTF8.self)
-            if let previousFrame {
-                let frame = node.absoluteFrame
-                result += abs(frame.minY - previousFrame.minY) < 1 ? "\t" : "\n"
-            }
+        var previousY: Double?
+        for index in span.lower...span.upper {
+            guard let member = members[orderedIDs[index]],
+                  let range = range(at: index, in: span, ids: orderedIDs) else { continue }
+            let bytes = member.text().utf8
+            let part = String(decoding: bytes.dropFirst(range.lowerBound).prefix(range.count), as: UTF8.self)
+            if let previousY { result += abs(frames[index].y - previousY) < 1 ? "\t" : "\n" }
             result += part
-            previousFrame = node.absoluteFrame
+            previousY = frames[index].y
         }
         return result
     }
@@ -241,8 +321,33 @@ public final class TextSelectionScope {
         ClipboardHolder.write?(selectedText)
     }
 
-    private func invalidate() {
-        for member in members.values { member.node?.markRenderDirty(reason: .styleSet(field: "textSelection")) }
+    /// Interior paragraphs shared by both spans keep their cached drawing.
+    /// Only entering/leaving paragraphs and the four possible endpoints change.
+    private func invalidate(from previous: Span?, to current: Span?) {
+        let endpoints = Set([previous?.lower, previous?.upper, current?.lower, current?.upper].compactMap { $0 })
+        func mark(_ index: Int) {
+            members[orderedIDs[index]]?.node?.markRenderDirty(reason: .styleSet(field: "textSelection"))
+        }
+        func markOutside(_ span: Span?, _ other: Span?) {
+            guard let span else { return }
+            let lowEnd = min(span.upper + 1, other?.lower ?? (span.upper + 1))
+            if span.lower < lowEnd {
+                for index in span.lower..<lowEnd where !endpoints.contains(index) { mark(index) }
+            }
+            if let other {
+                let highStart = max(span.lower, other.upper + 1)
+                if highStart <= span.upper {
+                    for index in highStart...span.upper where !endpoints.contains(index) { mark(index) }
+                }
+            }
+        }
+        markOutside(previous, current)
+        markOutside(current, previous)
+        for index in endpoints {
+            if range(at: index, in: previous, ids: orderedIDs) != range(at: index, in: current, ids: orderedIDs) {
+                mark(index)
+            }
+        }
     }
 }
 

@@ -28,6 +28,7 @@ public struct Text: _PrimitiveView {
         let color: Color?
         let lineLimit: Int?
         let truncates: Bool
+        let selectionScope: ObjectIdentifier?
     }
 
     public init(_ string: String,
@@ -84,6 +85,7 @@ public struct Text: _PrimitiveView {
         // labels inside buttons and toolbars keep every click for their control.
         let scope = node.compositionValue(of: TextSelectionScope.key)
         let selectable = isSelectable && scope != nil
+        if !selectable { TextSelectionScope.unregister(node) }
         // A label inside a button, row or cell belongs to that control: it stays
         // out of the focus order so the control keeps focus and the click.
         let inControl = selectable && TextSelectionChrome.isInsideControl(node)
@@ -100,7 +102,8 @@ public struct Text: _PrimitiveView {
         node.updateDraw(identity: PaintIdentity(string: string,
                                                 alignment: alignment,
                                                 color: color,
-                                                lineLimit: lineLimit, truncates: truncates)) { list, origin in
+                                                lineLimit: lineLimit, truncates: truncates,
+                                                selectionScope: scope.map(ObjectIdentifier.init))) { list, origin in
             guard let env = TextEnvironmentHolder.current else { return }
             let fontOverride = node.textStyleValue(StyleAttachmentKey.font) as Font?
             let lineHeightOverride = node.textStyleValue(StyleAttachmentKey.lineHeight) as Float?
@@ -123,7 +126,8 @@ public struct Text: _PrimitiveView {
                 }
             }
             // Paint the selection behind the glyphs so the highlight reads under text.
-            if let selection = scope?.range(for: node), !selection.isEmpty {
+            let selection = scope?.range(for: node)
+            if let selection, !selection.isEmpty {
                 let selColor = node.theme.colors.selection
                 for rect in result.layout.selectionRects(selection) {
                     list.addRect(UIRect(x: Float(origin.x) + (padding?.left ?? 0) + Float(rect.origin.x),
@@ -143,7 +147,7 @@ public struct Text: _PrimitiveView {
                          atlas: env.atlas)
             // Selection handles and the magnifier are drawn above the glyphs so they
             // stay visible while a finger or pen refines either endpoint.
-            if let selection = scope?.range(for: node), !selection.isEmpty {
+            if let selection, !selection.isEmpty {
                 let padL = CGFloat(padding?.left ?? 0), padT = CGFloat(padding?.top ?? 0)
                 let length = snapshot.string.utf8.count
                 let start = selection.lowerBound > 0
