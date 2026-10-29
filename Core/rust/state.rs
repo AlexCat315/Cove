@@ -38,8 +38,7 @@ pub struct State<T>(Arc<Storage<T>>);
 impl<T> Clone for State<T> { fn clone(&self) -> Self { Self(self.0.clone()) } }
 impl<T: Send + 'static> State<T> {
     pub fn new(value: T) -> Self {
-        static NEXT_STATE: AtomicU64 = AtomicU64::new(1);
-        Self(Arc::new(Storage { id: NEXT_STATE.fetch_add(1, Ordering::Relaxed), value: Mutex::new((value, 0)),
+        Self(Arc::new(Storage { id: crate::state_read_tracking::allocate_tracking_owner(), value: Mutex::new((value, 0)),
             observers: Mutex::new(BTreeMap::new()), next_id: AtomicU64::new(1), tracking: Mutex::new(Tracking::default()), summary: Mutex::new(None) }))
     }
     pub fn id(&self) -> u64 { self.0.id }

@@ -7,6 +7,7 @@ type Invalidator = Arc<dyn Fn(Option<&str>) + Send + Sync>;
 #[derive(Clone)]
 pub struct ReadScope { pub id: ReadScopeId, pub(crate) invalidate: Invalidator }
 impl ReadScope {
+    pub(crate) fn with_id(id: ReadScopeId, invalidate: impl Fn(Option<&str>) + Send + Sync + 'static) -> Self { Self { id, invalidate: Arc::new(invalidate) } }
     pub fn new(invalidate: impl Fn(Option<&str>) + Send + Sync + 'static) -> Self {
         static NEXT: AtomicU64 = AtomicU64::new(1);
         Self { id: ReadScopeId(NEXT.fetch_add(1, Ordering::Relaxed)), invalidate: Arc::new(invalidate) }
@@ -61,3 +62,5 @@ impl<K: SnapshotValue + Ord, V: SnapshotValue> SnapshotValue for std::collection
 impl<K: SnapshotValue + Eq + std::hash::Hash, V: SnapshotValue> SnapshotValue for std::collections::HashMap<K, V> {}
 impl<T: SnapshotValue + Ord> SnapshotValue for std::collections::BTreeSet<T> {}
 impl<T: SnapshotValue + Eq + std::hash::Hash> SnapshotValue for std::collections::HashSet<T> {}
+
+pub(crate) fn allocate_tracking_owner() -> u64 { static NEXT: AtomicU64 = AtomicU64::new(1); NEXT.fetch_add(1, Ordering::Relaxed) }

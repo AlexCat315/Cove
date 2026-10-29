@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "Core", "PlatformCore", "System", "Logging", "Graphics", "Text", "Imaging", "Shell", "Runtime", "DevTools/Protocol", "Tools/Cove", "Examples/RustCounter"]
+members = [".", "Core", "PlatformCore", "System", "Logging", "Graphics", "Text", "Imaging", "Shell", "Runtime", "Compose/Composition", "DevTools/Protocol", "Tools/Cove", "Examples/RustCounter"]
 resolver = "3"
 
 [workspace.package]
@@ -29,6 +29,7 @@ cove-text = { path = "Text" }
 cove-imaging = { path = "Imaging" }
 cove-shell = { path = "Shell" }
 cove-runtime = { path = "Runtime" }
+cove-composition = { path = "Compose/Composition" }
 cove-devtools-protocol = { path = "DevTools/Protocol" }
 
 [workspace.lints.rust]

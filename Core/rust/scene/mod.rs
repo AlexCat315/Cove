@@ -60,3 +60,6 @@ pub use timing_trace::*;
 pub use animation::*;
 pub use input::*;
 pub use scrolling::*;
+
+mod local_invalidation;
+pub use local_invalidation::*;

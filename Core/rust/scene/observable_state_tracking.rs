@@ -73,15 +73,13 @@ impl ObservableStateTracking {
         let scope = Arc::new(ObservableStateScope { id, invalidate: invalidate.clone(), invalidate_tracked });
         SCOPE_STACK.with(|stack| stack.borrow_mut().push(scope.clone()));
         let tracked = scope.invalidate_tracked.clone();
-        let read_scope = ReadScope::new(move |field: Option<&str>| match &tracked {
+        let read_scope = ReadScope::with_id(id, move |field: Option<&str>| match &tracked {
             Some(tracked) => tracked(RecompositionReason::new("state").with_detail(field.unwrap_or_default())),
             None => invalidate(),
         });
-        let result = with_read_scope(&read_scope, body);
-        SCOPE_STACK.with(|stack| {
-            stack.borrow_mut().pop();
-        });
-        result
+        struct Pop; impl Drop for Pop { fn drop(&mut self) { SCOPE_STACK.with(|stack| { stack.borrow_mut().pop(); }); } }
+        let _pop = Pop;
+        with_read_scope(&read_scope, body)
     }
     /// Track a single evaluation boundary.
     pub fn observe_reads<R>(body: impl FnOnce() -> R) -> R {
@@ -128,8 +126,7 @@ pub struct ObservableStateRegistrar {
 }
 impl ObservableStateRegistrar {
     pub fn new() -> Self {
-        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
-        Self { inner: Arc::new(RegistrarInner::default()), identity: NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed) }
+        Self { inner: Arc::new(RegistrarInner::default()), identity: crate::state_read_tracking::allocate_tracking_owner() }
     }
     pub fn access(&self, key: StateAccessKey) {
         let Some(scope) = ObservableStateTracking::current() else { return };

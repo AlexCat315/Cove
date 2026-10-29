@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- 继续迁移 Graphics UI 渲染层与 Runtime：写入纹理驻留/图集、背景模糊/揭幕、分条 MSAA、多窗口事件与帧调度、iOS 显示循环及 Apple 无障碍桥接；这些实现仍未编译或测试，原生 GPU 后端与上层控件迁移继续进行。
+
 - 继续迁移 Shell：写入 Rust SDL3 窗口/输入/剪贴板/对话框，C 事件桥接，以及 macOS/iOS 原生窗口、精确滚动和显示刷新桥接；尚未统一验证。
 
 - 继续逐文件迁移 Text/Imaging：加入 Rust 字体发现、FreeType/HarfBuzz 整形与图集、CoreText 彩色字形、图片/动画解码、EXIF 方向和资源缓存；新增带源码指纹的迁移清单。按要求留待全量转换后统一测试。

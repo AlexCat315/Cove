@@ -34,11 +34,11 @@
 | PlatformCore | 8 | 581 | 2 | 425 | 已写入，未统一验证 |
 | System | 24 | 1,452 | 5 | 1,154 | 已写入，待逐文件行为对照 |
 | Logging | 19 | 906 | 1 | 511 | 基础管线已写入；上下文与异步行为待对照 |
-| Graphics | 144 | 18,365 | 30 | 9,771 | RHI 前端完成；三个平台后端与 `CoveUIGraphics` 未开始 |
+| Graphics | 144 | 18,365 | 见下述快照 | — | RHI 前端及 UI 渲染对应源码已写入；原生后端仍待完成 |
 | Text | 17 | 2,803 | 16 | 1,002 | 生产源码已写入；未编译/测试 |
 | Imaging | 10 | 718 | 11 | 415 | 生产源码已写入；未编译/测试 |
 | Compose | 416 | 52,590 | — | — | 未开始 |
-| Runtime | 12 | 1,501 | — | — | 未开始 |
+| Runtime | 12 | 1,501 | 见下述快照 | — | 多窗口/调度/宿主桥接已写入；未验证 |
 | Shell | 14 | 2,584 | 14 | 472 | SDL 窗口/输入/对话框与 Apple 桥接已写入；未验证 |
 | Terminal | 38 | 4,030 | — | — | 未开始 |
 | Hosts | 55 | 4,349 | — | — | 未开始 |
@@ -69,7 +69,7 @@
 | `device.rs` `resource_ownership.rs` `backend.rs` `backend_factory.rs` | `Device/Device`、`Resources/{Swapchain,Texture}Resource`、`RHIBackend`、`BackendFactory` |
 | `testing.rs` | 测试用空后端（Swift 无对应文件） |
 
-`Graphics/rust/lib.rs` 目前只导出 `rhi`。
+`Graphics/rust/lib.rs` 同时导出 `rhi` 和 `ui`；平台后端仍在迁移范围内。
 
 ### 其余基础 crate
 
@@ -92,6 +92,24 @@ macOS/iOS 使用原生 CAMetalLayer；Windows、X11、Wayland 和 Android 原生
 
 Shell 代码尚未编译/测试；SDL 链接、各平台宿主生命周期、菜单与窗口集成仍在最终对照范围内。接下来继续 Graphics 的 UI 纹理、资源驻留与绘制路径。
 
+## 本次继续迁移的最新快照
+
+以下统计只计算自有 Rust 源码，含新写入文件与构建脚本，不代表功能覆盖率：
+
+| 范围 | Rust 文件 | Rust 行数 | 当前边界 |
+| --- | --- | --- | --- |
+| Text | 16 | 1,002 | 生产源码已写入；未验证 |
+| Imaging | 11 | 415 | 生产源码已写入；未验证 |
+| Shell | 14 | 483 | 窗口/输入/原生桥接已写入；未验证 |
+| Graphics | 44 | 10,644 | 前端与 UI 层已写入；原生 GPU 后端未完成 |
+| Runtime | 12 | 328 | 会话/帧调度/Apple 无障碍桥接已写入；未验证 |
+
+Graphics 新增 UI 视口、几何缓存验证、着色器资源载入、纹理所有权/弱驻留、带边缘填充的图片图集、失败录制重试上传、背景模糊、揭幕及有限预算的分条 MSAA。几何扫描、UV 重映射和图集填充使用 C。RHI 的帧回收改为 GPU 回调只更新完成状态，设备 API 线程执行销毁回调，并补充空闲等待的通知。
+
+Runtime 新增多窗口会话、原生/注入输入仲裁、对话框回调回到主线程、事件驱动/显示刷新/固定帧率、绝对截止时间回退、光标刷新、隐藏窗口释放通知、iOS CADisplayLink 生命周期，以及 macOS/iOS 无障碍树和动作桥接。同步补回 Core 的 WindowRevealContext 接口。新实现全部尚未验证。
+
+接下来继续 Compose/Composition 的 View、构建器、修饰器、组合作用域、布局树和状态订阅。全量项目尚未完成，Swift 源码继续作为行为对照保留。
+
 ## 迁移约定
 
 这些是移植过程中确定的规则，后续文件应保持一致。
@@ -113,7 +131,7 @@ Shell 代码尚未编译/测试；SDL 链接、各平台宿主生命周期、菜
 
 ## 尚未迁移
 
-- **Graphics 平台后端**：`Metal`（15 文件 / 2,712 行）、`Vulkan`（31 / 6,010）、`DX12`（8 / 500）；`CoveUIGraphics`（12 / 1,757，含 `NativeUIBackdropPass` 531、`NativeDrawListRenderer` 473、`NativeUITextureStore` 379）。
+- **Graphics 平台后端**：`Metal`（15 文件 / 2,712 行）、`Vulkan`（31 / 6,010）、`DX12`（8 / 500）；`CoveUIGraphics` 的 12 个生产文件已写入 `Graphics/rust/ui/`，待接入实际 GPU 后统一验证。
 - **Text**：生产源码已逐文件写入。剩余项为测试迁移、原生依赖跨平台构建接入与最终行为对照；上层 Compose 文本选择仍待迁移。
 - **Imaging**：生产源码已逐文件写入。剩余项为图形纹理上传接入与最终行为对照。
 - **Compose**：视图图、控件、主题、组合与重组（416 文件，最大单块）。
