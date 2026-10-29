@@ -49,7 +49,7 @@ public final class FontCollection {
                 $0.properties.generalCategory != .format &&
                 !(0xFE00...0xFE0F).contains($0.value) && !(0xE0100...0xE01EF).contains($0.value)
             }
-            let strongScript = scalars.lazy.map { hb_unicode_script(unicode, $0.value).rawValue }.first {
+            let strongScript = scalars.lazy.map { ScriptTag(truncatingIfNeeded: hb_unicode_script(unicode, $0.value).rawValue) }.first {
                 $0 != Script.common && $0 != Script.inherited && $0 != Script.unknown
             }
             let script = strongScript ?? runs.last?.script ?? Script.common

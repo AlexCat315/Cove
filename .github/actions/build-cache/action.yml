@@ -8,7 +8,6 @@ runs:
       with:
         path: |
           Tools/Cove/.build
-          Tools/Developer/.build
           System/.build
           .build
         key: sdk-swift-v1-${{ runner.os }}-${{ runner.arch }}-6.4.1-${{ hashFiles('**/Package.swift', '**/Package.resolved', '.github/actions/setup-toolchains/action.yml') }}-${{ github.sha }}

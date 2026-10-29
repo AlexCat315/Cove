@@ -439,7 +439,7 @@ public final class FontFace {
             hb_buffer_add_utf8(buffer, pointer, Int32(text.utf8.count), 0, Int32(text.utf8.count))
         }
         if let direction { hb_buffer_set_direction(buffer, direction.hbValue) }
-        if let script { hb_buffer_set_script(buffer, hb_script_t(rawValue: script)) }
+        if let script { hb_buffer_set_script(buffer, hb_script_t(rawValue: .init(truncatingIfNeeded: script))) }
         if let language {
             language.withCString { pointer in
                 hb_buffer_set_language(buffer, hb_language_from_string(pointer, Int32(language.utf8.count)))

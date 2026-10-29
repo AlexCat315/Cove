@@ -1,6 +1,5 @@
 import Testing
 import Foundation
-import CoreGraphics
 import CoveUICore
 import CovePlatformCore
 @testable import CoveUICompose

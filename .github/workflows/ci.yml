@@ -67,9 +67,6 @@ jobs:
       - name: Test standalone CLI
         timeout-minutes: 10
         run: ./cove test Tools/Cove --timeout 480
-      - name: Test standalone developer tools
-        if: runner.os != 'Windows'
-        run: ./cove test Tools/Developer --timeout 300
       - name: Stage native metadata for the SDK package
         shell: bash
         run: |
@@ -101,7 +98,6 @@ jobs:
           key: ${{ steps.build-cache.outputs.key }}
           path: |
             Tools/Cove/.build
-            Tools/Developer/.build
             System/.build
             .build
       - name: Run SDK XCTest
