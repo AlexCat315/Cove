@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "docs:api": "python3 scripts/extract-api.py"
   },
   "dependencies": {
     "gsap": "^3.12.5",

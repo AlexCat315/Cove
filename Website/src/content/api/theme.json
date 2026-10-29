@@ -1,0 +1,5155 @@
+[
+ {
+  "id": "button-interaction-key",
+  "name": "_ButtonInteractionKey",
+  "kind": "struct",
+  "declaration": "public struct _ButtonInteractionKey: Equatable, Sendable",
+  "abstract": "Equatable snapshot of the interaction-driven flags of a `ButtonStyleConfiguration`. Built-in styles use this as the keying value for `.animation(_:value:)` so hover / press / focus / enabled transitions auto-animate without the call site having to wrap state mutation in `withAnimation`.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "isPressed",
+    "kind": "let",
+    "declaration": "public let isPressed: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isHovered",
+    "kind": "let",
+    "declaration": "public let isHovered: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isFocused",
+    "kind": "let",
+    "declaration": "public let isFocused: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isSelected",
+    "kind": "let",
+    "declaration": "public let isSelected: Bool",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Buttons/ButtonStyle.swift",
+  "line": 71,
+  "owner": "",
+  "overloads": [
+   "public struct _ButtonInteractionKey: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "list-row-interaction-key",
+  "name": "_ListRowInteractionKey",
+  "kind": "struct",
+  "declaration": "public struct _ListRowInteractionKey: Equatable, Sendable",
+  "abstract": "Equatable interaction snapshot used by built-in list row styles to key implicit transitions without requiring external `withAnimation` calls.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "isSelected",
+    "kind": "let",
+    "declaration": "public let isSelected: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isHovered",
+    "kind": "let",
+    "declaration": "public let isHovered: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/ListRowStyle.swift",
+  "line": 21,
+  "owner": "",
+  "overloads": [
+   "public struct _ListRowInteractionKey: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "slider-interaction-key",
+  "name": "_SliderInteractionKey",
+  "kind": "struct",
+  "declaration": "public struct _SliderInteractionKey: Equatable, Sendable",
+  "abstract": "Equatable subset of the interaction flags used by built-in styles to key implicit transitions, mirroring `_ButtonInteractionKey`.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "isPressed",
+    "kind": "let",
+    "declaration": "public let isPressed: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isHovered",
+    "kind": "let",
+    "declaration": "public let isHovered: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isFocused",
+    "kind": "let",
+    "declaration": "public let isFocused: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/SliderStyle.swift",
+  "line": 26,
+  "owner": "",
+  "overloads": [
+   "public struct _SliderInteractionKey: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "text-field-interaction-key",
+  "name": "_TextFieldInteractionKey",
+  "kind": "struct",
+  "declaration": "public struct _TextFieldInteractionKey: Equatable, Sendable",
+  "abstract": "Equatable interaction snapshot used by built-in text field styles to key implicit transitions.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "isFocused",
+    "kind": "let",
+    "declaration": "public let isFocused: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEditing",
+    "kind": "let",
+    "declaration": "public let isEditing: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isError",
+    "kind": "let",
+    "declaration": "public let isError: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/TextFieldStyle.swift",
+  "line": 24,
+  "owner": "",
+  "overloads": [
+   "public struct _TextFieldInteractionKey: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "tree-row-interaction-key",
+  "name": "_TreeRowInteractionKey",
+  "kind": "struct",
+  "declaration": "public struct _TreeRowInteractionKey: Equatable, Sendable",
+  "abstract": "Equatable interaction snapshot used by built-in tree row styles to key implicit transitions.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "isSearchHit",
+    "kind": "let",
+    "declaration": "public let isSearchHit: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isSelected",
+    "kind": "let",
+    "declaration": "public let isSelected: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isHovered",
+    "kind": "let",
+    "declaration": "public let isHovered: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/TreeRowStyle.swift",
+  "line": 21,
+  "owner": "",
+  "overloads": [
+   "public struct _TreeRowInteractionKey: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "any-button-style",
+  "name": "AnyButtonStyle",
+  "kind": "struct",
+  "declaration": "public struct AnyButtonStyle: @unchecked Sendable, Hashable, ImmutableViewInput",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "ImmutableViewInput"
+  ],
+  "members": [
+   {
+    "name": "makeBody",
+    "kind": "let",
+    "declaration": "public let makeBody: (ButtonStyleConfiguration) -> any View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "styleID",
+    "kind": "let",
+    "declaration": "public let styleID: ObjectIdentifier",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AnyButtonStyle",
+    "kind": "init",
+    "declaration": "public init<S: ButtonStyle>(_ style: S)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "",
+    "kind": "func",
+    "declaration": "public static func == (lhs: AnyButtonStyle, rhs: AnyButtonStyle) -> Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "hash",
+    "kind": "func",
+    "declaration": "public func hash(into hasher: inout Hasher)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Buttons/ButtonStyle.swift",
+  "line": 115,
+  "owner": "",
+  "overloads": [
+   "public struct AnyButtonStyle: @unchecked Sendable, Hashable, ImmutableViewInput"
+  ]
+ },
+ {
+  "id": "any-divider-style",
+  "name": "AnyDividerStyle",
+  "kind": "struct",
+  "declaration": "public struct AnyDividerStyle: @unchecked Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "makeBody",
+    "kind": "let",
+    "declaration": "public let makeBody: (DividerStyleConfiguration) -> any View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AnyDividerStyle",
+    "kind": "init",
+    "declaration": "public init<S: DividerStyle>(_ style: S)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/DividerStyle.swift",
+  "line": 21,
+  "owner": "",
+  "overloads": [
+   "public struct AnyDividerStyle: @unchecked Sendable"
+  ]
+ },
+ {
+  "id": "any-list-row-style",
+  "name": "AnyListRowStyle",
+  "kind": "struct",
+  "declaration": "public struct AnyListRowStyle: @unchecked Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "makeBody",
+    "kind": "let",
+    "declaration": "public let makeBody: (ListRowStyleConfiguration) -> any View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AnyListRowStyle",
+    "kind": "init",
+    "declaration": "public init<S: ListRowStyle>(_ style: S)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/ListRowStyle.swift",
+  "line": 43,
+  "owner": "",
+  "overloads": [
+   "public struct AnyListRowStyle: @unchecked Sendable"
+  ]
+ },
+ {
+  "id": "any-panel-style",
+  "name": "AnyPanelStyle",
+  "kind": "struct",
+  "declaration": "public struct AnyPanelStyle: @unchecked Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "makeBody",
+    "kind": "let",
+    "declaration": "public let makeBody: (PanelStyleConfiguration) -> any View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AnyPanelStyle",
+    "kind": "init",
+    "declaration": "public init<S: PanelStyle>(_ style: S)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/PanelStyle.swift",
+  "line": 19,
+  "owner": "",
+  "overloads": [
+   "public struct AnyPanelStyle: @unchecked Sendable"
+  ]
+ },
+ {
+  "id": "any-slider-style",
+  "name": "AnySliderStyle",
+  "kind": "struct",
+  "declaration": "public struct AnySliderStyle: @unchecked Sendable",
+  "abstract": "Type-erased `SliderStyle` ferried through the composition tree via `SliderStyleEnvironment`.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "resolve",
+    "kind": "let",
+    "declaration": "public let resolve: (SliderStyleConfiguration) -> SliderAppearance",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AnySliderStyle",
+    "kind": "init",
+    "declaration": "public init<S: SliderStyle>(_ style: S)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/SliderStyle.swift",
+  "line": 104,
+  "owner": "",
+  "overloads": [
+   "public struct AnySliderStyle: @unchecked Sendable"
+  ]
+ },
+ {
+  "id": "any-text-field-style",
+  "name": "AnyTextFieldStyle",
+  "kind": "struct",
+  "declaration": "public struct AnyTextFieldStyle: @unchecked Sendable",
+  "abstract": "Type-erased style ferried through `TextFieldStyleEnvironment`. See `AnyButtonStyle` for the rationale behind `@unchecked Sendable`.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "makeBody",
+    "kind": "let",
+    "declaration": "public let makeBody: (TextFieldStyleConfiguration) -> any View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AnyTextFieldStyle",
+    "kind": "init",
+    "declaration": "public init<S: TextFieldStyle>(_ style: S)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/TextFieldStyle.swift",
+  "line": 50,
+  "owner": "",
+  "overloads": [
+   "public struct AnyTextFieldStyle: @unchecked Sendable"
+  ]
+ },
+ {
+  "id": "any-tree-row-style",
+  "name": "AnyTreeRowStyle",
+  "kind": "struct",
+  "declaration": "public struct AnyTreeRowStyle: @unchecked Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "makeBody",
+    "kind": "let",
+    "declaration": "public let makeBody: (TreeRowStyleConfiguration) -> any View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "requiresHoverRecompose",
+    "kind": "let",
+    "declaration": "public let requiresHoverRecompose: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "scope",
+    "kind": "let",
+    "declaration": "public let scope: TreeRowStyleScope",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AnyTreeRowStyle",
+    "kind": "init",
+    "declaration": "public init<S: TreeRowStyle>(_ style: S, scope: TreeRowStyleScope = .content)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/TreeRowStyle.swift",
+  "line": 52,
+  "owner": "",
+  "overloads": [
+   "public struct AnyTreeRowStyle: @unchecked Sendable"
+  ]
+ },
+ {
+  "id": "appearance",
+  "name": "Appearance",
+  "kind": "enum",
+  "declaration": "public enum Appearance: Sendable, Equatable",
+  "abstract": "Coarse light / dark switch. Set via `.appearance(_:)` to swap the active theme for an entire subtree without spelling out a custom `Theme`.",
+  "discussion": [
+   "(The token slot bag in this codebase is already named `ColorScheme`, so\nthe SwiftUI-flavoured `ColorScheme` enum is spelled `Appearance` here to\navoid the collision.)"
+  ],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/AppearanceModifier.swift",
+  "line": 11,
+  "owner": "",
+  "overloads": [
+   "public enum Appearance: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "button-role",
+  "name": "ButtonRole",
+  "kind": "enum",
+  "declaration": "public enum ButtonRole: Sendable, Equatable",
+  "abstract": "Semantic role of a button. Styles consult this to decide whether to swap in destructive coloring, etc. The role is orthogonal to the concrete style: any `ButtonStyle` may opt to render `.destructive` differently from `.normal`, but is not required to.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Buttons/ButtonStyle.swift",
+  "line": 10,
+  "owner": "",
+  "overloads": [
+   "public enum ButtonRole: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "button-style",
+  "name": "ButtonStyle",
+  "kind": "protocol",
+  "declaration": "public protocol ButtonStyle",
+  "abstract": "SwiftUI-shaped style protocol. Implementors describe a button's complete visual tree given its configuration; the `Button` primitive itself only owns hit-testing and state.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "primary",
+    "kind": "var",
+    "declaration": "static var primary: PrimaryButtonStyle",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "secondary",
+    "kind": "var",
+    "declaration": "static var secondary: SecondaryButtonStyle",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ghost",
+    "kind": "var",
+    "declaration": "static var ghost: GhostButtonStyle",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destructive",
+    "kind": "var",
+    "declaration": "static var destructive: DestructiveButtonStyle",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "toggle",
+    "kind": "var",
+    "declaration": "static var toggle: ToggleButtonStyle",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "plain",
+    "kind": "var",
+    "declaration": "static var plain: PlainButtonStyle",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "success",
+    "kind": "var",
+    "declaration": "static var success: StatusButtonStyle",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "warning",
+    "kind": "var",
+    "declaration": "static var warning: StatusButtonStyle",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "info",
+    "kind": "var",
+    "declaration": "static var info: StatusButtonStyle",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "tab",
+    "kind": "var",
+    "declaration": "static var tab: TabButtonStyle",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "toolToggle",
+    "kind": "var",
+    "declaration": "static var toolToggle: ToolbarToggleButtonStyle",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Buttons/ButtonStyle.swift",
+  "line": 96,
+  "owner": "",
+  "overloads": [
+   "public protocol ButtonStyle"
+  ]
+ },
+ {
+  "id": "button-style-configuration",
+  "name": "ButtonStyleConfiguration",
+  "kind": "struct",
+  "declaration": "public struct ButtonStyleConfiguration",
+  "abstract": "Snapshot of state passed to `ButtonStyle.makeBody` on every recompose.",
+  "discussion": [
+   "The label is type-erased to avoid leaking the user's `Label` generic into\nevery style's body return type. `theme` is captured at body-construction\ntime so style implementations stay pure (no node lookup required)."
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "label",
+    "kind": "let",
+    "declaration": "public let label: any View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "role",
+    "kind": "let",
+    "declaration": "public let role: ButtonRole",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isPressed",
+    "kind": "let",
+    "declaration": "public let isPressed: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isHovered",
+    "kind": "let",
+    "declaration": "public let isHovered: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isFocused",
+    "kind": "let",
+    "declaration": "public let isFocused: Bool",
+    "abstract": "Focus worth drawing: true only while the button holds focus *and* the last focus change came from the keyboard. Pointer focus shares the same keyboard routing but never leaves a ring behind, so a style can paint `isFocused` unconditionally without special-casing the input device.",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isSelected",
+    "kind": "let",
+    "declaration": "public let isSelected: Bool",
+    "abstract": "On/off state for toggle-shaped buttons (tool chips, segmented choices, tabs). A first-class style input: styles decide the selected look once, instead of every call site hand-mixing accent tokens around the label.",
+    "discussion": []
+   },
+   {
+    "name": "theme",
+    "kind": "let",
+    "declaration": "public let theme: Theme",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "controlSize",
+    "kind": "let",
+    "declaration": "public let controlSize: ControlSize",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isIconOnly",
+    "kind": "var",
+    "declaration": "public var isIconOnly = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "input",
+    "kind": "let",
+    "declaration": "public let input: UIEnvironment.Input",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ButtonStyleConfiguration",
+    "kind": "init",
+    "declaration": "public init(label: any View, role: ButtonRole, isPressed: Bool, isHovered: Bool, isFocused: Bool, isEnabled: Bool, isSelected: Bool = false, theme: Theme, controlSize: ControlSize = .regular, isIconOnly: Bool = false, input: UIEnvironment.Input = [.pointer, .keyboard])",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "interactionKey",
+    "kind": "var",
+    "declaration": "var interactionKey: _ButtonInteractionKey",
+    "abstract": "The interaction-state subset used by built-in styles to key implicit transitions. Custom styles may use this same key, or define their own.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Buttons/ButtonStyle.swift",
+  "line": 21,
+  "owner": "",
+  "overloads": [
+   "public struct ButtonStyleConfiguration"
+  ]
+ },
+ {
+  "id": "button-style-environment",
+  "name": "ButtonStyleEnvironment",
+  "kind": "enum",
+  "declaration": "public enum ButtonStyleEnvironment",
+  "abstract": "CompositionLocal that carries the active `AnyButtonStyle`. The default is `PrimaryButtonStyle`, so a bare `Button(...)` always renders.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "key",
+    "kind": "let",
+    "declaration": "public static let key = CompositionLocal<AnyButtonStyle>( defaultValue: AnyButtonStyle(PrimaryButtonStyle()) )",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Buttons/ButtonStyle.swift",
+  "line": 156,
+  "owner": "",
+  "overloads": [
+   "public enum ButtonStyleEnvironment"
+  ]
+ },
+ {
+  "id": "color-scheme",
+  "name": "ColorScheme",
+  "kind": "struct",
+  "declaration": "public struct ColorScheme: Sendable, Equatable",
+  "abstract": "Semantic color slots. Slot names describe the role, not a specific hue, so dark/light themes can swap concrete colors without changing call sites.",
+  "discussion": [
+   "Slot taxonomy:",
+   "- **Surfaces** form a 5-layer elevation system. Pick the layer that\n  matches the visual hierarchy of the surface you are painting:\n    - `background`       — Layer 0, the window backdrop.\n    - `surface`          — Layer 1, panels, sidebars, tab strips.\n    - `surfaceVariant`   — Layer 1.5, inset wells inside Layer 1\n                           (text fields, badges, well backgrounds).\n    - `surfaceSunken`    — Layer 0.5, recessed grooves below Layer 1\n                           (disabled-field background, pressed-in tracks).\n    - `surfaceRaised`    — Layer 2, cards / list rows lifted above Layer 1.\n    - `surfaceFloating`  — Layer 3, popovers, dropdowns, context menus.\n    - `surfaceOverlay`   — Layer 4, modal dialogs / sheet panels.\n- **On-surfaces** are foreground tones with descending contrast against\n  their matching surface (`onBackground` / `onSurface` /\n  `onSurfaceVariant` / `onSurfaceMuted`).\n- **Accent** carries the brand action colour as a 4-step ramp:\n  `accentMuted` → `accent` → `accentHover` → `accentPressed`. Built-in\n  styles read these directly so palette swaps don't require recomputing\n  `lighter()`/`darker()` mixes per call site.\n- **State layers** are translucent overlays painted on top of any surface\n  to express interaction state. Composing `stateLayerHover` over\n  `surface` gives the canonical hover look without committing the\n  underlying surface to a different fill colour.\n- **Status** (`success` / `warning` / `error` / `info`) carry semantic\n  intent — never substitute hard-coded equivalents.\n- **Structure** (`border` / `borderStrong` / `divider` / `focusRing`\n  / `selection` / `overlay`) describes lines, focus indication, and\n  modal scrims."
+  ],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "background",
+    "kind": "var",
+    "declaration": "public var background: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "surface",
+    "kind": "var",
+    "declaration": "public var surface: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "surfaceVariant",
+    "kind": "var",
+    "declaration": "public var surfaceVariant: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "surfacePressed",
+    "kind": "var",
+    "declaration": "public var surfacePressed: Color",
+    "abstract": "Solid fill for a pressed surface control (secondary button, menu item). One step below `surfaceVariant` (the hover fill).",
+    "discussion": []
+   },
+   {
+    "name": "surfaceSunken",
+    "kind": "var",
+    "declaration": "public var surfaceSunken: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "surfaceRaised",
+    "kind": "var",
+    "declaration": "public var surfaceRaised: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "surfaceFloating",
+    "kind": "var",
+    "declaration": "public var surfaceFloating: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "surfaceOverlay",
+    "kind": "var",
+    "declaration": "public var surfaceOverlay: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onBackground",
+    "kind": "var",
+    "declaration": "public var onBackground: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onSurface",
+    "kind": "var",
+    "declaration": "public var onSurface: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onSurfaceVariant",
+    "kind": "var",
+    "declaration": "public var onSurfaceVariant: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onSurfaceMuted",
+    "kind": "var",
+    "declaration": "public var onSurfaceMuted: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "accent",
+    "kind": "var",
+    "declaration": "public var accent: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "accentHover",
+    "kind": "var",
+    "declaration": "public var accentHover: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "accentPressed",
+    "kind": "var",
+    "declaration": "public var accentPressed: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onAccent",
+    "kind": "var",
+    "declaration": "public var onAccent: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "accentMuted",
+    "kind": "var",
+    "declaration": "public var accentMuted: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "accentSecondary",
+    "kind": "var",
+    "declaration": "public var accentSecondary: Color",
+    "abstract": "Secondary accent for content classification (scene / audio assets, special syntax, badges) — the purple of the editor palette. Not part of the interactive accent ramp; never used for hover/press states.",
+    "discussion": []
+   },
+   {
+    "name": "stateLayerHover",
+    "kind": "var",
+    "declaration": "public var stateLayerHover: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "stateLayerPressed",
+    "kind": "var",
+    "declaration": "public var stateLayerPressed: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "stateLayerSelected",
+    "kind": "var",
+    "declaration": "public var stateLayerSelected: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "success",
+    "kind": "var",
+    "declaration": "public var success: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "warning",
+    "kind": "var",
+    "declaration": "public var warning: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "error",
+    "kind": "var",
+    "declaration": "public var error: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "info",
+    "kind": "var",
+    "declaration": "public var info: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "border",
+    "kind": "var",
+    "declaration": "public var border: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "borderStrong",
+    "kind": "var",
+    "declaration": "public var borderStrong: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "divider",
+    "kind": "var",
+    "declaration": "public var divider: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "focusRing",
+    "kind": "var",
+    "declaration": "public var focusRing: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "selection",
+    "kind": "var",
+    "declaration": "public var selection: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "overlay",
+    "kind": "var",
+    "declaration": "public var overlay: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ColorScheme",
+    "kind": "init",
+    "declaration": "public init(background: Color, surface: Color, surfaceVariant: Color, surfacePressed: Color? = nil, surfaceSunken: Color, surfaceRaised: Color, surfaceFloating: Color, surfaceOverlay: Color, onBackground: Color, onSurface: Color, onSurfaceVariant: Color, onSurfaceMuted: Color, accent: Color, accentHover: Color, accentPressed: Color, onAccent: Color, accentMuted: Color, accentSecondary: Color? = nil, stateLayerHover: Color, stateLayerPressed: Color, stateLayerSelected: Color, success: Color, warning: Color, error: Color, info: Color, border: Color, borderStrong: Color, divider: Color, focusRing: Color, selection: Color,",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "floatingOutline",
+    "kind": "var",
+    "declaration": "var floatingOutline: Color",
+    "abstract": "The outer hairline of a floating panel. A light panel has no darker body to separate it from a light page, so its edge is a crisp neutral line rather than the palette's tinted border.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/ColorScheme.swift",
+  "line": 37,
+  "owner": "",
+  "overloads": [
+   "public struct ColorScheme: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "control-size",
+  "name": "ControlSize",
+  "kind": "enum",
+  "declaration": "public enum ControlSize: Sendable, Hashable, CaseIterable",
+  "abstract": "Shared control density. Touch chrome resolves its own geometry from this scale. Explicit per-control sizes take precedence; otherwise the nearest `.controlSize` provider sizes a whole toolbar or form.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Hashable",
+   "CaseIterable"
+  ],
+  "members": [
+   {
+    "name": "buttonHeight",
+    "kind": "var",
+    "declaration": "public var buttonHeight: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "horizontalPadding",
+    "kind": "var",
+    "declaration": "public var horizontalPadding: Float",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/ControlSize.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public enum ControlSize: Sendable, Hashable, CaseIterable"
+  ]
+ },
+ {
+  "id": "control-size-environment",
+  "name": "ControlSizeEnvironment",
+  "kind": "enum",
+  "declaration": "public enum ControlSizeEnvironment",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "key",
+    "kind": "let",
+    "declaration": "public static let key = CompositionLocal<ControlSize>(defaultValue: .regular)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/ControlSize.swift",
+  "line": 53,
+  "owner": "",
+  "overloads": [
+   "public enum ControlSizeEnvironment"
+  ]
+ },
+ {
+  "id": "default-dark-theme",
+  "name": "DefaultDarkTheme",
+  "kind": "enum",
+  "declaration": "public enum DefaultDarkTheme",
+  "abstract": "Default dark theme bundled with CoveUI.",
+  "discussion": [
+   "Neutral-zinc palette matching the reference design: a zinc-900 window,\nzinc-800 control faces, a single blue accent ramp (lighter on hover than\nat rest, as the reference), and flat zinc borders."
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "value",
+    "kind": "let",
+    "declaration": "public static let value: Theme = Theme( colors: ColorScheme( background: Color(red: 0x18, green: 0x18, blue: 0x1B), surface: Color(red: 0x27, green: 0x27, blue: 0x2A), surfaceVariant: Color(red: 0x32, green: 0x32, blue: 0x36), surfacePressed: Color(red: 0x3C, green: 0x3C, blue: 0x41), surfaceSunken: Color(red: 0x18, green: 0x18, blue: 0x1B), surfaceRaised: Color(red: 0x1D, green: 0x1D, blue: 0x20), surfaceFloating: Color(red: 0x18, green: 0x18, blue: 0x1B), surfaceOverlay: Color(red: 0x18, green: 0x18, blue: 0x1B), onBackground: Color(red: 0xF4, green: 0xF4, blue: 0xF5), onSurface: Color(red: 0xF4, green: 0xF4, blue: 0xF5), onSurfaceVariant: Color(red: 0xA1, green: 0xA1, blue: 0xAA), onSurfaceMuted: Color(red: 0xA1, green: 0xA1, blue: 0xAA), accent: Color(red: 0x3B, green: 0x82, blue: 0xF6), accentHover: Color(red: 0x60, green: 0xA5, blue: 0xFA), accentPressed: Color(red: 0x25, green: 0x63, blue: 0xEB), onAccent: Color(red: 0xFF, green: 0xFF, blue: 0xFF), accentMuted: Color(red: 0x3B, green: 0x82, blue: 0xF6, alpha: 0x33), accentSecondary: Color(red: 0xA8, green: 0x55, blue: 0xF7), stateLayerHover: Color(red: 0xFF, green: 0xFF, blue: 0xFF, alpha: 0x0F), stateLayerPressed: Color(red: 0xFF, green: 0xFF, blue: 0xFF, alpha: 0x1A), stateLayerSelected: Color(red: 0x3B, green: 0x82, blue: 0xF6, alpha: 0x38), success: Color(red: 0x22, green: 0xC5, blue: 0x5E), warning: Color(red: 0xF5, green: 0x9E, blue: 0x0B), error: Color(red: 0xEF, green: 0x44, blue: 0x44),",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/DefaultDarkTheme.swift",
+  "line": 10,
+  "owner": "",
+  "overloads": [
+   "public enum DefaultDarkTheme"
+  ]
+ },
+ {
+  "id": "default-divider-style",
+  "name": "DefaultDividerStyle",
+  "kind": "struct",
+  "declaration": "public struct DefaultDividerStyle: DividerStyle",
+  "abstract": "Divider default: 1-px line drawn with the `divider` color slot. Spans 100 % of the cross-axis. Returning the legacy `Divider` primitive directly keeps the layout behaviour (`width: 100%` for horizontal, `height: 100%` for vertical) unchanged.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "DividerStyle"
+  ],
+  "members": [
+   {
+    "name": "DefaultDividerStyle",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeBody",
+    "kind": "func",
+    "declaration": "public func makeBody(configuration: DividerStyleConfiguration) -> some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/DefaultDividerStyle.swift",
+  "line": 9,
+  "owner": "",
+  "overloads": [
+   "public struct DefaultDividerStyle: DividerStyle"
+  ]
+ },
+ {
+  "id": "default-light-theme",
+  "name": "DefaultLightTheme",
+  "kind": "enum",
+  "declaration": "public enum DefaultLightTheme",
+  "abstract": "Default light theme.",
+  "discussion": [
+   "Neutral-zinc palette matching the reference design: a pure white window\nwith zinc control faces (the face of buttons, inputs, sidebars and chips),\na single blue accent ramp, and subtle borders that separate flat regions\nrather than translucent state washes."
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "value",
+    "kind": "let",
+    "declaration": "public static let value: Theme = Theme( colors: ColorScheme( background: Color(red: 0xFF, green: 0xFF, blue: 0xFF), // window surface: Color(red: 0xF4, green: 0xF4, blue: 0xF5), // control faces / sidebar surfaceVariant: Color(red: 0xE9, green: 0xE9, blue: 0xEC), // wells / hover / badges surfacePressed: Color(red: 0xDD, green: 0xDD, blue: 0xE1), surfaceSunken: Color(red: 0xFF, green: 0xFF, blue: 0xFF), // island bodies surfaceRaised: Color(red: 0xFF, green: 0xFF, blue: 0xFF), surfaceFloating: Color(red: 0xFF, green: 0xFF, blue: 0xFF), // menus / popovers surfaceOverlay: Color(red: 0xFF, green: 0xFF, blue: 0xFF), onBackground: Color(red: 0x18, green: 0x18, blue: 0x1B), onSurface: Color(red: 0x18, green: 0x18, blue: 0x1B), onSurfaceVariant: Color(red: 0x52, green: 0x52, blue: 0x5B), onSurfaceMuted: Color(red: 0x71, green: 0x71, blue: 0x7A), accent: Color(red: 0x25, green: 0x63, blue: 0xEB), accentHover: Color(red: 0x1D, green: 0x4E, blue: 0xD8), accentPressed: Color(red: 0x1E, green: 0x40, blue: 0xAF), onAccent: Color(red: 0xFF, green: 0xFF, blue: 0xFF), accentMuted: Color(red: 0x25, green: 0x63, blue: 0xEB, alpha: 0x24), accentSecondary: Color(red: 0x93, green: 0x33, blue: 0xEA), stateLayerHover: Color(red: 0x18, green: 0x18, blue: 0x1B, alpha: 0x0A), // ~surfaceHover stateLayerPressed: Color(red: 0x18, green: 0x18, blue: 0x1B, alpha: 0x14), // ~surfacePressed stateLayerSelected: Color(red: 0x25, green: 0x63, blue: 0xEB, alpha: 0x29), success: Color(red: 0x16, green: 0xA3, blue: 0x4A), warning: Color(red: 0xD9, green: 0x77, blue: 0x06), error: Color(red: 0xDC, green: 0x26, blue: 0x26),",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/DefaultLightTheme.swift",
+  "line": 11,
+  "owner": "",
+  "overloads": [
+   "public enum DefaultLightTheme"
+  ]
+ },
+ {
+  "id": "default-list-row-style",
+  "name": "DefaultListRowStyle",
+  "kind": "struct",
+  "declaration": "public struct DefaultListRowStyle: ListRowStyle",
+  "abstract": "Pointer rows use the shared navigation highlight; touch rows use a full-width band with an inset separator. The host owns the fixed row slot so oversized content cannot expand the hit region into a neighboring row.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ListRowStyle"
+  ],
+  "members": [
+   {
+    "name": "DefaultListRowStyle",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeBody",
+    "kind": "func",
+    "declaration": "public func makeBody(configuration: ListRowStyleConfiguration) -> some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/DefaultListRowStyle.swift",
+  "line": 13,
+  "owner": "",
+  "overloads": [
+   "public struct DefaultListRowStyle: ListRowStyle"
+  ]
+ },
+ {
+  "id": "default-panel-style",
+  "name": "DefaultPanelStyle",
+  "kind": "struct",
+  "declaration": "public struct DefaultPanelStyle: PanelStyle",
+  "abstract": "Panel default — the \"floating island\" idiom: the panel body is a rounded (radius.xl) slab of `surfaceSunken`, *darker* than the window canvas, with NO border and no header fill. Separation between neighbouring panels comes from the canvas showing through the gutters, not from lines. The header has a 34pt minimum and grows with its title and accessories. Active panels brighten the title rather than repainting the header.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "PanelStyle"
+  ],
+  "members": [
+   {
+    "name": "DefaultPanelStyle",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeBody",
+    "kind": "func",
+    "declaration": "public func makeBody(configuration: PanelStyleConfiguration) -> some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/DefaultPanelStyle.swift",
+  "line": 11,
+  "owner": "",
+  "overloads": [
+   "public struct DefaultPanelStyle: PanelStyle"
+  ]
+ },
+ {
+  "id": "default-slider-style",
+  "name": "DefaultSliderStyle",
+  "kind": "struct",
+  "declaration": "public struct DefaultSliderStyle: SliderStyle",
+  "abstract": "Built-in style, matching the reference control: a 6-pt track with a neutral empty half and an accent filled half, and a white 20×16 capsule knob with a small key shadow. The knob stays white; the fill carries the accent, and the track reacts to hover / press.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "SliderStyle"
+  ],
+  "members": [
+   {
+    "name": "DefaultSliderStyle",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "resolve",
+    "kind": "func",
+    "declaration": "public func resolve(configuration c: SliderStyleConfiguration) -> SliderAppearance",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/SliderStyle.swift",
+  "line": 135,
+  "owner": "",
+  "overloads": [
+   "public struct DefaultSliderStyle: SliderStyle"
+  ]
+ },
+ {
+  "id": "default-text-field-style",
+  "name": "DefaultTextFieldStyle",
+  "kind": "struct",
+  "declaration": "public struct DefaultTextFieldStyle: TextFieldStyle",
+  "abstract": "Recessed field chrome for dense desktop forms. The resting fill is a sunken surface so inspector rows and toolbar fields read as inputs rather than as generic cards.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "TextFieldStyle"
+  ],
+  "members": [
+   {
+    "name": "DefaultTextFieldStyle",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeBody",
+    "kind": "func",
+    "declaration": "public func makeBody(configuration: TextFieldStyleConfiguration) -> some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/DefaultTextFieldStyle.swift",
+  "line": 15,
+  "owner": "",
+  "overloads": [
+   "public struct DefaultTextFieldStyle: TextFieldStyle"
+  ]
+ },
+ {
+  "id": "default-tree-row-style",
+  "name": "DefaultTreeRowStyle",
+  "kind": "struct",
+  "declaration": "public struct DefaultTreeRowStyle: TreeRowStyle",
+  "abstract": "Tree row default: same density and hierarchy cues as the list style, with enough selection contrast to read as an outline tree in an editor shell.",
+  "discussion": [
+   "The navigation highlight leaves the hierarchy gutter clear. Subtle vertical\nguides carry depth without connecting horizontal strokes to the row chrome."
+  ],
+  "availability": [],
+  "conforms": [
+   "TreeRowStyle"
+  ],
+  "members": [
+   {
+    "name": "DefaultTreeRowStyle",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeBody",
+    "kind": "func",
+    "declaration": "public func makeBody(configuration: TreeRowStyleConfiguration) -> some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/DefaultTreeRowStyle.swift",
+  "line": 15,
+  "owner": "",
+  "overloads": [
+   "public struct DefaultTreeRowStyle: TreeRowStyle"
+  ]
+ },
+ {
+  "id": "destructive-button-style",
+  "name": "DestructiveButtonStyle",
+  "kind": "struct",
+  "declaration": "public struct DestructiveButtonStyle: ButtonStyle",
+  "abstract": "Filled button using the `error` color slot. Used for irreversible actions (delete, discard). Same chrome as `PrimaryButtonStyle` but keyed off the `error` colour. State variants are produced by compositing the theme's state-layer overlays so the destructive ramp tracks the rest of the system without per-style colour math.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ButtonStyle"
+  ],
+  "members": [
+   {
+    "name": "DestructiveButtonStyle",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeBody",
+    "kind": "func",
+    "declaration": "public func makeBody(configuration: ButtonStyleConfiguration) -> some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Buttons/DestructiveButtonStyle.swift",
+  "line": 10,
+  "owner": "",
+  "overloads": [
+   "public struct DestructiveButtonStyle: ButtonStyle"
+  ]
+ },
+ {
+  "id": "divider-orientation",
+  "name": "DividerOrientation",
+  "kind": "enum",
+  "declaration": "public enum DividerOrientation: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/DividerStyle.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public enum DividerOrientation: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "divider-style",
+  "name": "DividerStyle",
+  "kind": "protocol",
+  "declaration": "public protocol DividerStyle",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "",
+    "kind": "var",
+    "declaration": "static var `default`: DefaultDividerStyle",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/DividerStyle.swift",
+  "line": 15,
+  "owner": "",
+  "overloads": [
+   "public protocol DividerStyle"
+  ]
+ },
+ {
+  "id": "divider-style-configuration",
+  "name": "DividerStyleConfiguration",
+  "kind": "struct",
+  "declaration": "public struct DividerStyleConfiguration",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "orientation",
+    "kind": "let",
+    "declaration": "public let orientation: DividerOrientation",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "thickness",
+    "kind": "let",
+    "declaration": "public let thickness: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "theme",
+    "kind": "let",
+    "declaration": "public let theme: Theme",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/DividerStyle.swift",
+  "line": 9,
+  "owner": "",
+  "overloads": [
+   "public struct DividerStyleConfiguration"
+  ]
+ },
+ {
+  "id": "divider-style-environment",
+  "name": "DividerStyleEnvironment",
+  "kind": "enum",
+  "declaration": "public enum DividerStyleEnvironment",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "key",
+    "kind": "let",
+    "declaration": "public static let key = CompositionLocal<AnyDividerStyle>( defaultValue: AnyDividerStyle(DefaultDividerStyle()) )",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/DividerStyle.swift",
+  "line": 28,
+  "owner": "",
+  "overloads": [
+   "public enum DividerStyleEnvironment"
+  ]
+ },
+ {
+  "id": "easing",
+  "name": "Easing",
+  "kind": "struct",
+  "declaration": "public struct Easing: Sendable, Equatable",
+  "abstract": "Authored Bezier control points, resolved to runtime curves at the use site.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "c1x",
+    "kind": "var",
+    "declaration": "public var c1x: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "c1y",
+    "kind": "var",
+    "declaration": "public var c1y: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "c2x",
+    "kind": "var",
+    "declaration": "public var c2x: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "c2y",
+    "kind": "var",
+    "declaration": "public var c2y: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Easing",
+    "kind": "init",
+    "declaration": "public init(_ c1x: Float, _ c1y: Float, _ c2x: Float, _ c2y: Float)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "cubicBezier",
+    "kind": "func",
+    "declaration": "public static func cubicBezier(_ c1x: Float, _ c1y: Float, _ c2x: Float, _ c2y: Float) -> Easing",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "standard",
+    "kind": "let",
+    "declaration": "public static let standard = Easing(0.4, 0.0, 0.2, 1.0)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "emphasized",
+    "kind": "let",
+    "declaration": "public static let emphasized = Easing(0.2, 0.0, 0.0, 1.0)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "decelerate",
+    "kind": "let",
+    "declaration": "public static let decelerate = Easing(0, 0, 0.2, 1)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/MotionScale.swift",
+  "line": 4,
+  "owner": "",
+  "overloads": [
+   "public struct Easing: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "editor-text-field-style",
+  "name": "EditorTextFieldStyle",
+  "kind": "struct",
+  "declaration": "public struct EditorTextFieldStyle: TextFieldStyle",
+  "abstract": "A flat document surface for text/code editors whose caller owns the chrome. Focus stays visible through the caret, selection and active code line.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "TextFieldStyle"
+  ],
+  "members": [
+   {
+    "name": "EditorTextFieldStyle",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeBody",
+    "kind": "func",
+    "declaration": "public func makeBody(configuration: TextFieldStyleConfiguration) -> some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/EditorTextFieldStyle.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public struct EditorTextFieldStyle: TextFieldStyle"
+  ]
+ },
+ {
+  "id": "elevation-scale",
+  "name": "ElevationScale",
+  "kind": "struct",
+  "declaration": "public struct ElevationScale: Sendable, Equatable",
+  "abstract": "Four-step elevation scale matching common surface tiers in tooling UI: no shadow, panel edge, floating popover, and dragged / context-menu, plus the two-layer shadow every floating surface actually wants.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "none",
+    "kind": "var",
+    "declaration": "public var none: SurfaceShadow",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "low",
+    "kind": "var",
+    "declaration": "public var low: SurfaceShadow",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "medium",
+    "kind": "var",
+    "declaration": "public var medium: SurfaceShadow",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "high",
+    "kind": "var",
+    "declaration": "public var high: SurfaceShadow",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "floating",
+    "kind": "var",
+    "declaration": "public var floating: LayeredShadow",
+    "abstract": "Menus, popovers and hover cards: a broad ambient halo under a tighter key shadow. `low`/`medium`/`high` stay single-layer because a surface that sits *in* the chrome only needs one.",
+    "discussion": []
+   },
+   {
+    "name": "ElevationScale",
+    "kind": "init",
+    "declaration": "public init(none: SurfaceShadow, low: SurfaceShadow, medium: SurfaceShadow, high: SurfaceShadow, floating: LayeredShadow)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/ElevationScale.swift",
+  "line": 8,
+  "owner": "",
+  "overloads": [
+   "public struct ElevationScale: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "ghost-button-style",
+  "name": "GhostButtonStyle",
+  "kind": "struct",
+  "declaration": "public struct GhostButtonStyle: ButtonStyle",
+  "abstract": "Background-less button. At rest only the label is drawn; hover/press fade in a state-layer overlay. Used for tertiary actions and toolbar items. Focus ring still appears on keyboard focus.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ButtonStyle"
+  ],
+  "members": [
+   {
+    "name": "GhostButtonStyle",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeBody",
+    "kind": "func",
+    "declaration": "public func makeBody(configuration: ButtonStyleConfiguration) -> some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Buttons/GhostButtonStyle.swift",
+  "line": 8,
+  "owner": "",
+  "overloads": [
+   "public struct GhostButtonStyle: ButtonStyle"
+  ]
+ },
+ {
+  "id": "icon-metrics",
+  "name": "IconMetrics",
+  "kind": "struct",
+  "declaration": "public struct IconMetrics",
+  "abstract": "Resolves icon and slot geometry with the same policy. Display density is handled by the renderer and must never be multiplied into these values.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "factor",
+    "kind": "let",
+    "declaration": "public let factor: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "size",
+    "kind": "func",
+    "declaration": "public func size(_ points: Float) -> Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "size",
+    "kind": "func",
+    "declaration": "public func size(_ role: SemanticIconSize) -> Float",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/Icons.swift",
+  "line": 32,
+  "owner": "",
+  "overloads": [
+   "public struct IconMetrics"
+  ]
+ },
+ {
+  "id": "icon-metrics-reader",
+  "name": "IconMetricsReader",
+  "kind": "struct",
+  "declaration": "public struct IconMetricsReader<Content: View>: _PrimitiveView",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "IconMetricsReader",
+    "kind": "init",
+    "declaration": "public init(@ViewBuilder content: @escaping (IconMetrics) -> Content)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/Icons.swift",
+  "line": 50,
+  "owner": "",
+  "overloads": [
+   "public struct IconMetricsReader<Content: View>: _PrimitiveView"
+  ]
+ },
+ {
+  "id": "icon-scaling",
+  "name": "IconScaling",
+  "kind": "enum",
+  "declaration": "public enum IconScaling: Hashable, Sendable",
+  "abstract": "Icon sizes use logical points. Accessibility text scaling also enlarges icons by default; fixed artwork or a custom design system can override it.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/Icons.swift",
+  "line": 20,
+  "owner": "",
+  "overloads": [
+   "public enum IconScaling: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "icon-theme",
+  "name": "IconTheme",
+  "kind": "struct",
+  "declaration": "public struct IconTheme: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "small",
+    "kind": "var",
+    "declaration": "public var small: Float = 12",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "medium",
+    "kind": "var",
+    "declaration": "public var medium: Float = 16",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "large",
+    "kind": "var",
+    "declaration": "public var large: Float = 24",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "scaling",
+    "kind": "var",
+    "declaration": "public var scaling: IconScaling = .text",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "IconTheme",
+    "kind": "init",
+    "declaration": "public init(configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "replace",
+    "kind": "func",
+    "declaration": "public mutating func replace(_ resource: BundleImageResource, with replacement: BundleImageResource)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/Icons.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct IconTheme: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "input-appearance",
+  "name": "InputAppearance",
+  "kind": "struct",
+  "declaration": "public struct InputAppearance: Sendable, Equatable",
+  "abstract": "Token group for editable text inputs (`TextField` and any future `Input`-shaped composite). Centralises the chrome the primitive paints so palette swaps and density tweaks land in one place rather than via inline `theme.colors.*` reads scattered through the primitive.",
+  "discussion": [
+   "Slot taxonomy:\n- **Backgrounds**: `background` (resting fill), `backgroundDisabled`\n  (deemphasised fill applied when the field is non-editable). Both\n  already account for nesting inside `surface`-coloured panels — no\n  separate readonly slot is required because read-only retains the\n  resting background.\n- **Borders**: 1-px stroke per state (`borderColor`, `borderHover`,\n  `borderFocused`, `borderError`, `borderDisabled`); `focusRingWidth`\n  replaces the resting `borderWidth` while focused so focus reads as a\n  thicker ring without requiring a separate halo node.\n- **Addons** (`prepend` / `append`): `addonBackground` for the joined\n  slab fill, `addonForeground` for the label text, `dividerColor` for\n  the 1-px hairline between slab and editable surface.\n- **Geometry**: `radius` controls corner rounding (typically the same as\n  `theme.radius.sm`); `borderWidth` is the resting stroke thickness so\n  layout-critical paint and the focused ring agree."
+  ],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "background",
+    "kind": "var",
+    "declaration": "public var background: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "backgroundDisabled",
+    "kind": "var",
+    "declaration": "public var backgroundDisabled: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "borderColor",
+    "kind": "var",
+    "declaration": "public var borderColor: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "borderHover",
+    "kind": "var",
+    "declaration": "public var borderHover: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "borderFocused",
+    "kind": "var",
+    "declaration": "public var borderFocused: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "borderError",
+    "kind": "var",
+    "declaration": "public var borderError: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "borderDisabled",
+    "kind": "var",
+    "declaration": "public var borderDisabled: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "borderWidth",
+    "kind": "var",
+    "declaration": "public var borderWidth: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "focusRingWidth",
+    "kind": "var",
+    "declaration": "public var focusRingWidth: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "addonBackground",
+    "kind": "var",
+    "declaration": "public var addonBackground: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "addonForeground",
+    "kind": "var",
+    "declaration": "public var addonForeground: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "dividerColor",
+    "kind": "var",
+    "declaration": "public var dividerColor: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "radius",
+    "kind": "var",
+    "declaration": "public var radius: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "InputAppearance",
+    "kind": "init",
+    "declaration": "public init(background: Color, backgroundDisabled: Color, borderColor: Color, borderHover: Color, borderFocused: Color, borderError: Color, borderDisabled: Color, borderWidth: Float, focusRingWidth: Float, addonBackground: Color, addonForeground: Color, dividerColor: Color, radius: Float)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/InputAppearance.swift",
+  "line": 26,
+  "owner": "",
+  "overloads": [
+   "public struct InputAppearance: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "list-row-style",
+  "name": "ListRowStyle",
+  "kind": "protocol",
+  "declaration": "public protocol ListRowStyle",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "",
+    "kind": "var",
+    "declaration": "static var `default`: DefaultListRowStyle",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/ListRowStyle.swift",
+  "line": 37,
+  "owner": "",
+  "overloads": [
+   "public protocol ListRowStyle"
+  ]
+ },
+ {
+  "id": "list-row-style-configuration",
+  "name": "ListRowStyleConfiguration",
+  "kind": "struct",
+  "declaration": "public struct ListRowStyleConfiguration",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "content",
+    "kind": "let",
+    "declaration": "public let content: AnyView",
+    "abstract": "User-supplied row content (the closure body of `List`'s `rowContent`).",
+    "discussion": []
+   },
+   {
+    "name": "isSelected",
+    "kind": "let",
+    "declaration": "public let isSelected: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isHovered",
+    "kind": "let",
+    "declaration": "public let isHovered: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rowHeight",
+    "kind": "let",
+    "declaration": "public let rowHeight: Float",
+    "abstract": "The row box is fixed at this height, so a style lays its content out *inside* it instead of letting a taller child (a badge, a two-line cell) push the painted row past its own slot.",
+    "discussion": []
+   },
+   {
+    "name": "theme",
+    "kind": "let",
+    "declaration": "public let theme: Theme",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "input",
+    "kind": "var",
+    "declaration": "public var input: UIEnvironment.Input = [.pointer, .keyboard]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "interactionKey",
+    "kind": "var",
+    "declaration": "var interactionKey: _ListRowInteractionKey",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/ListRowStyle.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct ListRowStyleConfiguration"
+  ]
+ },
+ {
+  "id": "list-row-style-environment",
+  "name": "ListRowStyleEnvironment",
+  "kind": "enum",
+  "declaration": "public enum ListRowStyleEnvironment",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "key",
+    "kind": "let",
+    "declaration": "public static let key = CompositionLocal<AnyListRowStyle>( defaultValue: AnyListRowStyle(DefaultListRowStyle()) )",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/ListRowStyle.swift",
+  "line": 50,
+  "owner": "",
+  "overloads": [
+   "public enum ListRowStyleEnvironment"
+  ]
+ },
+ {
+  "id": "motion-scale",
+  "name": "MotionScale",
+  "kind": "struct",
+  "declaration": "public struct MotionScale: Sendable, Equatable",
+  "abstract": "Theme-owned timing and easing. Surface presentation and press feedback own their defaults here; components resolve against the active node's theme.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "fast",
+    "kind": "var",
+    "declaration": "public var fast: Duration",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "standard",
+    "kind": "var",
+    "declaration": "public var standard: Duration",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "slow",
+    "kind": "var",
+    "declaration": "public var slow: Duration",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "emphasized",
+    "kind": "var",
+    "declaration": "public var emphasized: Easing",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "standardEasing",
+    "kind": "var",
+    "declaration": "public var standardEasing: Easing",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "surface",
+    "kind": "var",
+    "declaration": "public var surface = SurfaceMotion()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "pressScale",
+    "kind": "var",
+    "declaration": "public var pressScale: Float = 0.97",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "MotionScale",
+    "kind": "init",
+    "declaration": "public init(fast: Duration, standard: Duration, slow: Duration, emphasized: Easing, standardEasing: Easing)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/MotionScale.swift",
+  "line": 39,
+  "owner": "",
+  "overloads": [
+   "public struct MotionScale: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "panel-style",
+  "name": "PanelStyle",
+  "kind": "protocol",
+  "declaration": "public protocol PanelStyle",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "",
+    "kind": "var",
+    "declaration": "static var `default`: DefaultPanelStyle",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/PanelStyle.swift",
+  "line": 13,
+  "owner": "",
+  "overloads": [
+   "public protocol PanelStyle"
+  ]
+ },
+ {
+  "id": "panel-style-configuration",
+  "name": "PanelStyleConfiguration",
+  "kind": "struct",
+  "declaration": "public struct PanelStyleConfiguration",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "title",
+    "kind": "let",
+    "declaration": "public let title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "accessory",
+    "kind": "let",
+    "declaration": "public let accessory: AnyView",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "content",
+    "kind": "let",
+    "declaration": "public let content: AnyView",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isActive",
+    "kind": "let",
+    "declaration": "public let isActive: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "theme",
+    "kind": "let",
+    "declaration": "public let theme: Theme",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/PanelStyle.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct PanelStyleConfiguration"
+  ]
+ },
+ {
+  "id": "panel-style-environment",
+  "name": "PanelStyleEnvironment",
+  "kind": "enum",
+  "declaration": "public enum PanelStyleEnvironment",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "key",
+    "kind": "let",
+    "declaration": "public static let key = CompositionLocal<AnyPanelStyle>( defaultValue: AnyPanelStyle(DefaultPanelStyle()) )",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/PanelStyle.swift",
+  "line": 26,
+  "owner": "",
+  "overloads": [
+   "public enum PanelStyleEnvironment"
+  ]
+ },
+ {
+  "id": "plain-button-style",
+  "name": "PlainButtonStyle",
+  "kind": "struct",
+  "declaration": "public struct PlainButtonStyle: ButtonStyle",
+  "abstract": "Zero-chrome button style. Returns the label exactly as given without any padding, background, or focus ring. Useful for tappable affordances that must blend into custom container chrome (tree disclosures, list rows that own their own selection fill, icon-only toolbar buttons drawn as glyphs).",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ButtonStyle"
+  ],
+  "members": [
+   {
+    "name": "PlainButtonStyle",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeBody",
+    "kind": "func",
+    "declaration": "public func makeBody(configuration: ButtonStyleConfiguration) -> some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Buttons/PlainButtonStyle.swift",
+  "line": 9,
+  "owner": "",
+  "overloads": [
+   "public struct PlainButtonStyle: ButtonStyle"
+  ]
+ },
+ {
+  "id": "primary-button-style",
+  "name": "PrimaryButtonStyle",
+  "kind": "struct",
+  "declaration": "public struct PrimaryButtonStyle: ButtonStyle",
+  "abstract": "Filled, accent-coloured button. Default style for `Button`.",
+  "discussion": [
+   "Visual recipe (consumes the theme's accent ramp directly):\n- Rest:    fill = `accent`,         border = transparent.\n- Hover:   fill = `accentHover`.\n- Pressed: fill = `accentPressed`.\n- Disabled: fill = `surfaceVariant`, foreground = `onSurfaceMuted`.\n- Focused: 2px `focusRing` border replaces the highlight ring.",
+   "No drop shadow at this layer — primary buttons live on top of `surface`\n(Layer 1); they don't need to \"lift\" off it. Use `.shadow(...)` on the\nowning button if a popover-style elevation is required."
+  ],
+  "availability": [],
+  "conforms": [
+   "ButtonStyle"
+  ],
+  "members": [
+   {
+    "name": "PrimaryButtonStyle",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeBody",
+    "kind": "func",
+    "declaration": "public func makeBody(configuration: ButtonStyleConfiguration) -> some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Buttons/PrimaryButtonStyle.swift",
+  "line": 17,
+  "owner": "",
+  "overloads": [
+   "public struct PrimaryButtonStyle: ButtonStyle"
+  ]
+ },
+ {
+  "id": "radius-scale",
+  "name": "RadiusScale",
+  "kind": "struct",
+  "declaration": "public struct RadiusScale: Sendable, Equatable",
+  "abstract": "Corner-radius scale in logical pixels. `pill` is large enough to fully round any reasonable control height, used by chip / pill buttons.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "none",
+    "kind": "var",
+    "declaration": "public var none: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "sm",
+    "kind": "var",
+    "declaration": "public var sm: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "md",
+    "kind": "var",
+    "declaration": "public var md: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "lg",
+    "kind": "var",
+    "declaration": "public var lg: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "xl",
+    "kind": "var",
+    "declaration": "public var xl: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "pill",
+    "kind": "var",
+    "declaration": "public var pill: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "RadiusScale",
+    "kind": "init",
+    "declaration": "public init(none: Float, sm: Float, md: Float, lg: Float, xl: Float, pill: Float)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/RadiusScale.swift",
+  "line": 3,
+  "owner": "",
+  "overloads": [
+   "public struct RadiusScale: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "secondary-button-style",
+  "name": "SecondaryButtonStyle",
+  "kind": "struct",
+  "declaration": "public struct SecondaryButtonStyle: ButtonStyle",
+  "abstract": "Tonal / surface-variant button. Lower visual weight than primary. Reads from the theme's state-layer ramp for hover/press so palette changes don't require recomputing `lighter`/`darker` mixes here.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ButtonStyle"
+  ],
+  "members": [
+   {
+    "name": "SecondaryButtonStyle",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeBody",
+    "kind": "func",
+    "declaration": "public func makeBody(configuration: ButtonStyleConfiguration) -> some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Buttons/SecondaryButtonStyle.swift",
+  "line": 8,
+  "owner": "",
+  "overloads": [
+   "public struct SecondaryButtonStyle: ButtonStyle"
+  ]
+ },
+ {
+  "id": "selection-appearance",
+  "name": "SelectionAppearance",
+  "kind": "struct",
+  "declaration": "public struct SelectionAppearance: Equatable, Sendable",
+  "abstract": "One definition of \"this row is selected\", shared by every selectable surface.",
+  "discussion": [
+   "Styles used to re-derive their fill and corner treatment straight from raw\ntheme colours, so a list row, a tree row, a table row and a sidebar item\neach ended up looking like a different component. A style still chooses a\n*role* — that is what says why a surface looks the way it does — but the\ncolours and the geometry of each role live here and nowhere else, so a new\nrow style inherits the house selection instead of inventing one.",
+   "Three roles, because the surfaces answer different questions:",
+   "- `sidebar`: the iOS/macOS source list pill. A neutral grouped fill keeps\n  the selected destination quiet; the accent is reserved for controls.\n- `navigation`: an accent-tinted pill for tabs and compact navigation.\n- `dataRow`: an edge-to-edge band, for dense grids whose rows share\n  horizontal rules with their neighbours and must keep column alignment.",
+   "Hover/press are state layers on top of the resting fill, so a selected row\nstill answers the pointer without turning into a second accent colour."
+  ],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "fill",
+    "kind": "let",
+    "declaration": "public let fill: Color",
+    "abstract": "Fill of the resting selection.",
+    "discussion": []
+   },
+   {
+    "name": "hoverFill",
+    "kind": "let",
+    "declaration": "public let hoverFill: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "pressedFill",
+    "kind": "let",
+    "declaration": "public let pressedFill: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "cornerRadius",
+    "kind": "let",
+    "declaration": "public let cornerRadius: Float",
+    "abstract": "0 paints an edge-to-edge band; anything else rounds the highlight.",
+    "discussion": []
+   },
+   {
+    "name": "horizontalInset",
+    "kind": "let",
+    "declaration": "public let horizontalInset: Float",
+    "abstract": "Canvas the caller keeps clear on the leading and trailing edge, so the pill does not touch the row it belongs to.",
+    "discussion": []
+   },
+   {
+    "name": "verticalInset",
+    "kind": "let",
+    "declaration": "public let verticalInset: Float",
+    "abstract": "Canvas kept clear above and below the highlight.",
+    "discussion": []
+   },
+   {
+    "name": "resolve",
+    "kind": "func",
+    "declaration": "public static func resolve(_ role: Role, theme: Theme) -> SelectionAppearance",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "fill",
+    "kind": "func",
+    "declaration": "public func fill(isSelected: Bool, isHovered: Bool, isPressed: Bool) -> Color",
+    "abstract": "The fill for one interaction state. Selection is a resting state, not a replacement for feedback: a selected row still answers hover and press.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/SelectionAppearance.swift",
+  "line": 24,
+  "owner": "",
+  "overloads": [
+   "public struct SelectionAppearance: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "semantic-background-modifier",
+  "name": "SemanticBackgroundModifier",
+  "kind": "struct",
+  "declaration": "public struct SemanticBackgroundModifier: ViewModifier",
+  "abstract": "Modifier that resolves a `SemanticColorRef` against the target node's active theme and writes the result into `node.backgroundColor`. Resolution happens at apply-time, so `.theme(_:)` overrides on ancestors take effect without any explicit re-binding by the call site.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "ref",
+    "kind": "let",
+    "declaration": "public let ref: SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SemanticBackgroundModifier",
+    "kind": "init",
+    "declaration": "public init(_ ref: SemanticColorRef)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/SemanticModifiers.swift",
+  "line": 9,
+  "owner": "",
+  "overloads": [
+   "public struct SemanticBackgroundModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "semantic-border-modifier",
+  "name": "SemanticBorderModifier",
+  "kind": "struct",
+  "declaration": "public struct SemanticBorderModifier: ViewModifier",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "ref",
+    "kind": "let",
+    "declaration": "public let ref: SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "width",
+    "kind": "let",
+    "declaration": "public let width: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SemanticBorderModifier",
+    "kind": "init",
+    "declaration": "public init(_ ref: SemanticColorRef, width: Float)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/SemanticModifiers.swift",
+  "line": 25,
+  "owner": "",
+  "overloads": [
+   "public struct SemanticBorderModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "semantic-color-ref",
+  "name": "SemanticColorRef",
+  "kind": "struct",
+  "declaration": "public struct SemanticColorRef: Sendable, ImmutableViewInput",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "ImmutableViewInput"
+  ],
+  "members": [
+   {
+    "name": "SemanticColorRef",
+    "kind": "init",
+    "declaration": "public init(_ resolve: @escaping @Sendable (Theme) -> Color)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "",
+    "kind": "func",
+    "declaration": "public static func == (lhs: Self, rhs: Self) -> Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "opacity",
+    "kind": "func",
+    "declaration": "public func opacity(_ opacity: Float) -> SemanticColorRef",
+    "abstract": "A translucent variant of this token — e.g. `.warning.opacity(0.16)` for a tinted icon chip. Resolves the base color from the active theme, then scales its alpha.",
+    "discussion": []
+   },
+   {
+    "name": "clear",
+    "kind": "let",
+    "declaration": "static let clear = SemanticColorRef",
+    "abstract": "Nothing at all. Lets a state-driven fill stay type-consistent — `background(isSelected ? .selection : .clear)` — instead of dropping to a `Color` and losing the theme-bound branch.",
+    "discussion": []
+   },
+   {
+    "name": "background",
+    "kind": "let",
+    "declaration": "static let background = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "surface",
+    "kind": "let",
+    "declaration": "static let surface = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "surfaceVariant",
+    "kind": "let",
+    "declaration": "static let surfaceVariant = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "surfaceSunken",
+    "kind": "let",
+    "declaration": "static let surfaceSunken = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "surfaceRaised",
+    "kind": "let",
+    "declaration": "static let surfaceRaised = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "surfaceFloating",
+    "kind": "let",
+    "declaration": "static let surfaceFloating = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "surfaceOverlay",
+    "kind": "let",
+    "declaration": "static let surfaceOverlay = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onBackground",
+    "kind": "let",
+    "declaration": "static let onBackground = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onSurface",
+    "kind": "let",
+    "declaration": "static let onSurface = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onSurfaceVariant",
+    "kind": "let",
+    "declaration": "static let onSurfaceVariant = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onSurfaceMuted",
+    "kind": "let",
+    "declaration": "static let onSurfaceMuted = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onSurfaceDisabled",
+    "kind": "let",
+    "declaration": "static let onSurfaceDisabled = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "placeholder",
+    "kind": "let",
+    "declaration": "static let placeholder = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "accent",
+    "kind": "let",
+    "declaration": "static let accent = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "accentHover",
+    "kind": "let",
+    "declaration": "static let accentHover = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "accentPressed",
+    "kind": "let",
+    "declaration": "static let accentPressed = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onAccent",
+    "kind": "let",
+    "declaration": "static let onAccent = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "accentMuted",
+    "kind": "let",
+    "declaration": "static let accentMuted = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "accentSecondary",
+    "kind": "let",
+    "declaration": "static let accentSecondary = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "stateLayerHover",
+    "kind": "let",
+    "declaration": "static let stateLayerHover = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "stateLayerPressed",
+    "kind": "let",
+    "declaration": "static let stateLayerPressed = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "stateLayerSelected",
+    "kind": "let",
+    "declaration": "static let stateLayerSelected = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "success",
+    "kind": "let",
+    "declaration": "static let success = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "warning",
+    "kind": "let",
+    "declaration": "static let warning = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "error",
+    "kind": "let",
+    "declaration": "static let error = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "info",
+    "kind": "let",
+    "declaration": "static let info = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "border",
+    "kind": "let",
+    "declaration": "static let border = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "borderStrong",
+    "kind": "let",
+    "declaration": "static let borderStrong = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "divider",
+    "kind": "let",
+    "declaration": "static let divider = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "focusRing",
+    "kind": "let",
+    "declaration": "static let focusRing = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "selection",
+    "kind": "let",
+    "declaration": "static let selection = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "overlay",
+    "kind": "let",
+    "declaration": "static let overlay = SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/SemanticColor.swift",
+  "line": 13,
+  "owner": "",
+  "overloads": [
+   "public struct SemanticColorRef: Sendable, ImmutableViewInput"
+  ]
+ },
+ {
+  "id": "semantic-font-modifier",
+  "name": "SemanticFontModifier",
+  "kind": "struct",
+  "declaration": "public struct SemanticFontModifier: ViewModifier",
+  "abstract": "Resolves a `SemanticFontRef` and writes both the font and its companion line-height into the same attachment slots used by `FontModifier` / `LineHeightModifier`. `Text` and `TextField` already read these slots, so no primitive changes are required.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "ref",
+    "kind": "let",
+    "declaration": "public let ref: SemanticFontRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SemanticFontModifier",
+    "kind": "init",
+    "declaration": "public init(_ ref: SemanticFontRef)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/SemanticModifiers.swift",
+  "line": 44,
+  "owner": "",
+  "overloads": [
+   "public struct SemanticFontModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "semantic-font-ref",
+  "name": "SemanticFontRef",
+  "kind": "struct",
+  "declaration": "public struct SemanticFontRef: Sendable, ImmutableViewInput",
+  "abstract": "Late-bound text-style reference resolved against the active `Typography`.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "ImmutableViewInput"
+  ],
+  "members": [
+   {
+    "name": "SemanticFontRef",
+    "kind": "init",
+    "declaration": "public init(_ resolve: @escaping @Sendable (Theme) -> TextStyleToken)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "",
+    "kind": "func",
+    "declaration": "public static func == (lhs: Self, rhs: Self) -> Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "display",
+    "kind": "let",
+    "declaration": "static let display = SemanticFontRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "title",
+    "kind": "let",
+    "declaration": "static let title = SemanticFontRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "headline",
+    "kind": "let",
+    "declaration": "static let headline = SemanticFontRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "let",
+    "declaration": "static let body = SemanticFontRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "bodyStrong",
+    "kind": "let",
+    "declaration": "static let bodyStrong = SemanticFontRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "caption",
+    "kind": "let",
+    "declaration": "static let caption = SemanticFontRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "let",
+    "declaration": "static let label = SemanticFontRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "mono",
+    "kind": "let",
+    "declaration": "static let mono = SemanticFontRef",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/SemanticColor.swift",
+  "line": 74,
+  "owner": "",
+  "overloads": [
+   "public struct SemanticFontRef: Sendable, ImmutableViewInput"
+  ]
+ },
+ {
+  "id": "semantic-foreground-color-modifier",
+  "name": "SemanticForegroundColorModifier",
+  "kind": "struct",
+  "declaration": "public struct SemanticForegroundColorModifier: ViewModifier",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "ref",
+    "kind": "let",
+    "declaration": "public let ref: SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SemanticForegroundColorModifier",
+    "kind": "init",
+    "declaration": "public init(_ ref: SemanticColorRef)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/SemanticModifiers.swift",
+  "line": 17,
+  "owner": "",
+  "overloads": [
+   "public struct SemanticForegroundColorModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "semantic-icon-size",
+  "name": "SemanticIconSize",
+  "kind": "struct",
+  "declaration": "public struct SemanticIconSize: Sendable",
+  "abstract": "Custom roles can resolve application-defined ThemeExtensions as well.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "SemanticIconSize",
+    "kind": "init",
+    "declaration": "public init(_ resolve: @escaping @Sendable (Theme) -> Float)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "small",
+    "kind": "let",
+    "declaration": "public static let small = Self",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "medium",
+    "kind": "let",
+    "declaration": "public static let medium = Self",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "large",
+    "kind": "let",
+    "declaration": "public static let large = Self",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/Icons.swift",
+  "line": 72,
+  "owner": "",
+  "overloads": [
+   "public struct SemanticIconSize: Sendable"
+  ]
+ },
+ {
+  "id": "semantic-motion-ref",
+  "name": "SemanticMotionRef",
+  "kind": "struct",
+  "declaration": "public struct SemanticMotionRef: Sendable",
+  "abstract": "Late-bound animation reference resolved against the active `Theme`.",
+  "discussion": [
+   "Mirrors `SemanticColorRef` / `SemanticFontRef`: callers write\n`Animation.semantic(.fast)` instead of hard-coding a duration so theme\nswaps (or accessibility \"reduce motion\" passes in the future) can rescale\nevery animation in one place."
+  ],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "SemanticMotionRef",
+    "kind": "init",
+    "declaration": "public init(_ resolve: @escaping @Sendable (Theme) -> Animation)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "entering",
+    "kind": "let",
+    "declaration": "static let entering = SemanticMotionRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "exiting",
+    "kind": "let",
+    "declaration": "static let exiting = SemanticMotionRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "fast",
+    "kind": "let",
+    "declaration": "static let fast = SemanticMotionRef",
+    "abstract": "80 ms in the default themes — micro-interactions, hover/press.",
+    "discussion": []
+   },
+   {
+    "name": "medium",
+    "kind": "let",
+    "declaration": "static let medium = SemanticMotionRef",
+    "abstract": "180 ms in the default themes — surface state changes, default choice.",
+    "discussion": []
+   },
+   {
+    "name": "slow",
+    "kind": "let",
+    "declaration": "static let slow = SemanticMotionRef",
+    "abstract": "320 ms in the default themes — emphasized motion (theme swap, modal presentation).",
+    "discussion": []
+   },
+   {
+    "name": "snappy",
+    "kind": "let",
+    "declaration": "static let snappy = SemanticMotionRef",
+    "abstract": "Spring-tuned fast interaction motion. Duration tracks `theme.motion.fast`; damping is biased toward snappy settle.",
+    "discussion": []
+   },
+   {
+    "name": "bouncy",
+    "kind": "let",
+    "declaration": "static let bouncy = SemanticMotionRef",
+    "abstract": "Spring-tuned medium interaction motion. Duration tracks `theme.motion.standard`; damping allows a more playful settle.",
+    "discussion": []
+   },
+   {
+    "name": "smooth",
+    "kind": "let",
+    "declaration": "static let smooth = SemanticMotionRef",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/SemanticMotion.swift",
+  "line": 12,
+  "owner": "",
+  "overloads": [
+   "public struct SemanticMotionRef: Sendable"
+  ]
+ },
+ {
+  "id": "slider-appearance",
+  "name": "SliderAppearance",
+  "kind": "struct",
+  "declaration": "public struct SliderAppearance: Equatable, Sendable",
+  "abstract": "Pure-data description of how a slider should be drawn for one frame.",
+  "discussion": [
+   "`SliderStyle` returns this instead of a `View` because the filled-track and\nthumb positions depend on the host's measured width, which is only known at\ndraw time. The host primitive consumes the appearance and emits the actual\nquads."
+  ],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "trackHeight",
+    "kind": "var",
+    "declaration": "public var trackHeight: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "trackColor",
+    "kind": "var",
+    "declaration": "public var trackColor: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "fillColor",
+    "kind": "var",
+    "declaration": "public var fillColor: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "thumbDiameter",
+    "kind": "var",
+    "declaration": "public var thumbDiameter: Float",
+    "abstract": "Cross-axis knob size (16 in the reference).",
+    "discussion": []
+   },
+   {
+    "name": "thumbLength",
+    "kind": "var",
+    "declaration": "public var thumbLength: Float",
+    "abstract": "Along-axis knob size; a capsule knob is longer than it is tall (20×16). Defaults to `thumbDiameter` for a circular knob.",
+    "discussion": []
+   },
+   {
+    "name": "thumbColor",
+    "kind": "var",
+    "declaration": "public var thumbColor: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "thumbBorderColor",
+    "kind": "var",
+    "declaration": "public var thumbBorderColor: Color?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "thumbBorderWidth",
+    "kind": "var",
+    "declaration": "public var thumbBorderWidth: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "thumbShadow",
+    "kind": "var",
+    "declaration": "public var thumbShadow: SurfaceShadow?",
+    "abstract": "Drop shadow under the knob; `nil` for a flat knob.",
+    "discussion": []
+   },
+   {
+    "name": "trackCornerRadius",
+    "kind": "var",
+    "declaration": "public var trackCornerRadius: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SliderAppearance",
+    "kind": "init",
+    "declaration": "public init(trackHeight: Float, trackColor: Color, fillColor: Color, thumbDiameter: Float, thumbLength: Float? = nil, thumbColor: Color, thumbBorderColor: Color? = nil, thumbBorderWidth: Float = 0, thumbShadow: SurfaceShadow? = nil, trackCornerRadius: Float)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/SliderStyle.swift",
+  "line": 57,
+  "owner": "",
+  "overloads": [
+   "public struct SliderAppearance: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "slider-style",
+  "name": "SliderStyle",
+  "kind": "protocol",
+  "declaration": "public protocol SliderStyle",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "",
+    "kind": "var",
+    "declaration": "static var `default`: DefaultSliderStyle",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/SliderStyle.swift",
+  "line": 98,
+  "owner": "",
+  "overloads": [
+   "public protocol SliderStyle"
+  ]
+ },
+ {
+  "id": "slider-style-configuration",
+  "name": "SliderStyleConfiguration",
+  "kind": "struct",
+  "declaration": "public struct SliderStyleConfiguration",
+  "abstract": "Snapshot of state passed to `SliderStyle.resolve` on every recompose.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "value",
+    "kind": "let",
+    "declaration": "public let value: Double",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "range",
+    "kind": "let",
+    "declaration": "public let range: ClosedRange<Double>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isPressed",
+    "kind": "let",
+    "declaration": "public let isPressed: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isHovered",
+    "kind": "let",
+    "declaration": "public let isHovered: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isFocused",
+    "kind": "let",
+    "declaration": "public let isFocused: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "theme",
+    "kind": "let",
+    "declaration": "public let theme: Theme",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "fraction",
+    "kind": "var",
+    "declaration": "public var fraction: Double",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "interactionKey",
+    "kind": "var",
+    "declaration": "var interactionKey: _SliderInteractionKey",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/SliderStyle.swift",
+  "line": 8,
+  "owner": "",
+  "overloads": [
+   "public struct SliderStyleConfiguration"
+  ]
+ },
+ {
+  "id": "slider-style-environment",
+  "name": "SliderStyleEnvironment",
+  "kind": "enum",
+  "declaration": "public enum SliderStyleEnvironment",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "key",
+    "kind": "let",
+    "declaration": "public static let key = CompositionLocal<AnySliderStyle>( defaultValue: AnySliderStyle(DefaultSliderStyle()) )",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/SliderStyle.swift",
+  "line": 112,
+  "owner": "",
+  "overloads": [
+   "public enum SliderStyleEnvironment"
+  ]
+ },
+ {
+  "id": "spacing-scale",
+  "name": "SpacingScale",
+  "kind": "struct",
+  "declaration": "public struct SpacingScale: Sendable, Equatable",
+  "abstract": "Six-step linear spacing scale in logical pixels. Components compose padding, gap and inset using these tokens so themes can rescale density (e.g. a “compact” theme halves every value) without touching call sites.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "xs",
+    "kind": "var",
+    "declaration": "public var xs: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "sm",
+    "kind": "var",
+    "declaration": "public var sm: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "md",
+    "kind": "var",
+    "declaration": "public var md: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "lg",
+    "kind": "var",
+    "declaration": "public var lg: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "xl",
+    "kind": "var",
+    "declaration": "public var xl: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "xxl",
+    "kind": "var",
+    "declaration": "public var xxl: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SpacingScale",
+    "kind": "init",
+    "declaration": "public init(xs: Float, sm: Float, md: Float, lg: Float, xl: Float, xxl: Float)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/SpacingScale.swift",
+  "line": 4,
+  "owner": "",
+  "overloads": [
+   "public struct SpacingScale: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "status-button-style",
+  "name": "StatusButtonStyle",
+  "kind": "struct",
+  "declaration": "public struct StatusButtonStyle: ButtonStyle, Hashable",
+  "abstract": "Tinted semantic actions. Uses status tokens for legible text instead of assuming white ink.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ButtonStyle",
+   "Hashable"
+  ],
+  "members": [
+   {
+    "name": "tone",
+    "kind": "let",
+    "declaration": "public let tone: StatusTone",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "StatusButtonStyle",
+    "kind": "init",
+    "declaration": "public init(_ tone: StatusTone)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeBody",
+    "kind": "func",
+    "declaration": "public func makeBody(configuration c: ButtonStyleConfiguration) -> some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Buttons/StatusButtonStyle.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct StatusButtonStyle: ButtonStyle, Hashable"
+  ]
+ },
+ {
+  "id": "surface-motion",
+  "name": "SurfaceMotion",
+  "kind": "struct",
+  "declaration": "public struct SurfaceMotion: Sendable, Equatable",
+  "abstract": "Floating surfaces share entrance, exit and reveal sizing across components.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "entrance",
+    "kind": "var",
+    "declaration": "public var entrance: Duration = .milliseconds(200)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "exit",
+    "kind": "var",
+    "declaration": "public var exit: Duration = .milliseconds(90)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "revealScale",
+    "kind": "var",
+    "declaration": "public var revealScale: Float = 0.94",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SurfaceMotion",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/MotionScale.swift",
+  "line": 30,
+  "owner": "",
+  "overloads": [
+   "public struct SurfaceMotion: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "tab-button-style",
+  "name": "TabButtonStyle",
+  "kind": "struct",
+  "declaration": "public struct TabButtonStyle: ButtonStyle, Hashable",
+  "abstract": "IDE tab with the shared selection pill and full keyboard/hover focus states. The same style can be used for document tabs and tool-panel tabs.",
+  "discussion": [
+   "The tab takes its fill, radius and insets from `SelectionAppearance` rather\nthan composing its own, so a tab strip, a list row and a sidebar destination\nare the same selection three times over. A hard-edged full-bleed band read\nas a box sitting *in* the header instead of a tab that belongs to it."
+  ],
+  "availability": [],
+  "conforms": [
+   "ButtonStyle",
+   "Hashable"
+  ],
+  "members": [
+   {
+    "name": "height",
+    "kind": "var",
+    "declaration": "public var height: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TabButtonStyle",
+    "kind": "init",
+    "declaration": "public init(height: Float = 28)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeBody",
+    "kind": "func",
+    "declaration": "public func makeBody(configuration: ButtonStyleConfiguration) -> some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Buttons/TabButtonStyle.swift",
+  "line": 12,
+  "owner": "",
+  "overloads": [
+   "public struct TabButtonStyle: ButtonStyle, Hashable"
+  ]
+ },
+ {
+  "id": "text-emphasis",
+  "name": "TextEmphasis",
+  "kind": "struct",
+  "declaration": "public struct TextEmphasis: Sendable, Equatable",
+  "abstract": "Foregrounds for text that communicates availability rather than content. Nil inherits the palette's muted foreground.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "placeholder",
+    "kind": "var",
+    "declaration": "public var placeholder: Color? = nil",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "disabled",
+    "kind": "var",
+    "declaration": "public var disabled: Color? = nil",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextEmphasis",
+    "kind": "init",
+    "declaration": "public init(_ configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/TextEmphasis.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public struct TextEmphasis: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "text-field-style",
+  "name": "TextFieldStyle",
+  "kind": "protocol",
+  "declaration": "public protocol TextFieldStyle",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "editor",
+    "kind": "var",
+    "declaration": "static var editor: EditorTextFieldStyle",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "",
+    "kind": "var",
+    "declaration": "static var `default`: DefaultTextFieldStyle",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/TextFieldStyle.swift",
+  "line": 42,
+  "owner": "",
+  "overloads": [
+   "public protocol TextFieldStyle"
+  ]
+ },
+ {
+  "id": "text-field-style-configuration",
+  "name": "TextFieldStyleConfiguration",
+  "kind": "struct",
+  "declaration": "public struct TextFieldStyleConfiguration",
+  "abstract": "Snapshot passed to `TextFieldStyle.makeBody` on every recompose. The `content` slot is the type-erased visual produced by `TextField` itself — styles wrap it with chrome (background, border, focus ring) instead of owning the input pipeline.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "content",
+    "kind": "let",
+    "declaration": "public let content: AnyView",
+    "abstract": "The actual editable surface. Step 8 will route the `TextField` primitive's draw/measure callbacks through this slot.",
+    "discussion": []
+   },
+   {
+    "name": "placeholder",
+    "kind": "let",
+    "declaration": "public let placeholder: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isFocused",
+    "kind": "let",
+    "declaration": "public let isFocused: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEditing",
+    "kind": "let",
+    "declaration": "public let isEditing: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isError",
+    "kind": "let",
+    "declaration": "public let isError: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "theme",
+    "kind": "let",
+    "declaration": "public let theme: Theme",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isHovered",
+    "kind": "var",
+    "declaration": "public var isHovered = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "interactionKey",
+    "kind": "var",
+    "declaration": "var interactionKey: _TextFieldInteractionKey",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/TextFieldStyle.swift",
+  "line": 9,
+  "owner": "",
+  "overloads": [
+   "public struct TextFieldStyleConfiguration"
+  ]
+ },
+ {
+  "id": "text-field-style-environment",
+  "name": "TextFieldStyleEnvironment",
+  "kind": "enum",
+  "declaration": "public enum TextFieldStyleEnvironment",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "key",
+    "kind": "let",
+    "declaration": "public static let key = CompositionLocal<AnyTextFieldStyle>( defaultValue: AnyTextFieldStyle(DefaultTextFieldStyle()) )",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/TextFieldStyle.swift",
+  "line": 57,
+  "owner": "",
+  "overloads": [
+   "public enum TextFieldStyleEnvironment"
+  ]
+ },
+ {
+  "id": "text-scaler",
+  "name": "TextScaler",
+  "kind": "struct",
+  "declaration": "public struct TextScaler: Hashable, Sendable",
+  "abstract": "Text scaling is independent of display density and the application's typography ramp. Hosts can supply their accessibility setting once at the root; pages can override it. No rounding occurs in logical coordinates.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "factor",
+    "kind": "var",
+    "declaration": "public var factor: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextScaler",
+    "kind": "init",
+    "declaration": "public init(_ factor: Float = 1)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "multiplied",
+    "kind": "func",
+    "declaration": "public func multiplied(by factor: Float) -> Self",
+    "abstract": "Apply authored scaling without flattening a native accessibility ramp.",
+    "discussion": []
+   },
+   {
+    "name": "identity",
+    "kind": "let",
+    "declaration": "public static let identity = TextScaler()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "scale",
+    "kind": "func",
+    "declaration": "public func scale(_ value: Float) -> Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "scale",
+    "kind": "func",
+    "declaration": "public func scale(_ font: Font) -> Font",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/TextScaler.swift",
+  "line": 8,
+  "owner": "",
+  "overloads": [
+   "public struct TextScaler: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "text-scaler-environment",
+  "name": "TextScalerEnvironment",
+  "kind": "enum",
+  "declaration": "public enum TextScalerEnvironment",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "key",
+    "kind": "let",
+    "declaration": "public static let key = CompositionLocal<TextScaler>(defaultValue: .identity)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/TextScaler.swift",
+  "line": 34,
+  "owner": "",
+  "overloads": [
+   "public enum TextScalerEnvironment"
+  ]
+ },
+ {
+  "id": "text-scaler-reader",
+  "name": "TextScalerReader",
+  "kind": "struct",
+  "declaration": "public struct TextScalerReader<Content: View>: _PrimitiveView",
+  "abstract": "For layout with explicit row heights, resolve the same scale as text.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "TextScalerReader",
+    "kind": "init",
+    "declaration": "public init(@ViewBuilder content: @escaping (TextScaler) -> Content)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/TextScaler.swift",
+  "line": 64,
+  "owner": "",
+  "overloads": [
+   "public struct TextScalerReader<Content: View>: _PrimitiveView"
+  ]
+ },
+ {
+  "id": "text-style-token",
+  "name": "TextStyleToken",
+  "kind": "struct",
+  "declaration": "public struct TextStyleToken: Equatable, Sendable",
+  "abstract": "One typography slot — pairs a `Font` with the line-height and letter spacing that should travel with it. Components consume the entire token rather than just `font` so vertical rhythm stays stable across themes.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "font",
+    "kind": "var",
+    "declaration": "public var font: Font",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "lineHeight",
+    "kind": "var",
+    "declaration": "public var lineHeight: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "letterSpacing",
+    "kind": "var",
+    "declaration": "public var letterSpacing: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextStyleToken",
+    "kind": "init",
+    "declaration": "public init(font: Font, lineHeight: Float, letterSpacing: Float = 0)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/Typography.swift",
+  "line": 8,
+  "owner": "",
+  "overloads": [
+   "public struct TextStyleToken: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "theme",
+  "name": "Theme",
+  "kind": "struct",
+  "declaration": "public struct Theme: Sendable, ImmutableViewInput",
+  "abstract": "Six-dimensional design token bundle consumed by Compose-layer styles.",
+  "discussion": [
+   "`Theme` is a value type — switching themes means re-providing a new value\nthrough `ThemeEnvironment` (Phase 7.5 step 4). Per-axis token containers\n(`ColorScheme`, `Typography`, …) are also value types so a call site can\nderive a variant via `var copy = Theme.defaultDark; copy.colors.accent = …`\nwithout affecting other consumers."
+  ],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "ImmutableViewInput"
+  ],
+  "members": [
+   {
+    "name": "colors",
+    "kind": "var",
+    "declaration": "public var colors: ColorScheme",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "typography",
+    "kind": "var",
+    "declaration": "public var typography: Typography",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "spacing",
+    "kind": "var",
+    "declaration": "public var spacing: SpacingScale",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "radius",
+    "kind": "var",
+    "declaration": "public var radius: RadiusScale",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "elevation",
+    "kind": "var",
+    "declaration": "public var elevation: ElevationScale",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "motion",
+    "kind": "var",
+    "declaration": "public var motion: MotionScale",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "inputs",
+    "kind": "var",
+    "declaration": "public var inputs: InputAppearance",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "textEmphasis",
+    "kind": "var",
+    "declaration": "public var textEmphasis = TextEmphasis()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "icons",
+    "kind": "var",
+    "declaration": "public var icons = IconTheme()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "extensions",
+    "kind": "var",
+    "declaration": "public var extensions = ThemeExtensions()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Theme",
+    "kind": "init",
+    "declaration": "public init(colors: ColorScheme, typography: Typography, spacing: SpacingScale, radius: RadiusScale, elevation: ElevationScale, motion: MotionScale, inputs: InputAppearance? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "defaultDark",
+    "kind": "let",
+    "declaration": "static let defaultDark: Theme = DefaultDarkTheme.value",
+    "abstract": "Project-wide dark theme. Value-stable across calls; safe to compare for identity within a frame.",
+    "discussion": []
+   },
+   {
+    "name": "defaultLight",
+    "kind": "let",
+    "declaration": "static let defaultLight: Theme = DefaultLightTheme.value",
+    "abstract": "Project-wide light theme.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Theme.swift",
+  "line": 12,
+  "owner": "",
+  "overloads": [
+   "public struct Theme: Sendable, ImmutableViewInput"
+  ]
+ },
+ {
+  "id": "theme-environment",
+  "name": "ThemeEnvironment",
+  "kind": "enum",
+  "declaration": "public enum ThemeEnvironment",
+  "abstract": "`CompositionLocal` key carrying the active `Theme` down the composition tree. Always resolves: descendants without an ancestor `.theme(_:)` modifier see `Theme.defaultDark`.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "key",
+    "kind": "let",
+    "declaration": "public static let key = CompositionLocal<Theme>(defaultValue: .defaultDark)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/ThemeEnvironment.swift",
+  "line": 8,
+  "owner": "",
+  "overloads": [
+   "public enum ThemeEnvironment"
+  ]
+ },
+ {
+  "id": "theme-extension",
+  "name": "ThemeExtension",
+  "kind": "protocol",
+  "declaration": "public protocol ThemeExtension: Sendable",
+  "abstract": "Applications add design tokens without modifying CoveUI's closed set of built-in roles. Values stay typed and travel with local Theme overrides.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/Extensions.swift",
+  "line": 8,
+  "owner": "",
+  "overloads": [
+   "public protocol ThemeExtension: Sendable"
+  ]
+ },
+ {
+  "id": "theme-extensions",
+  "name": "ThemeExtensions",
+  "kind": "struct",
+  "declaration": "public struct ThemeExtensions: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "ThemeExtensions",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "",
+    "kind": "func",
+    "declaration": "public static func == (lhs: Self, rhs: Self) -> Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "",
+    "kind": "subscript",
+    "declaration": "public subscript<Value: ThemeExtension>(_ type: Value.Type) -> Value",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "remove",
+    "kind": "func",
+    "declaration": "public mutating func remove<Value: ThemeExtension>(_ type: Value.Type)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/Extensions.swift",
+  "line": 12,
+  "owner": "",
+  "overloads": [
+   "public struct ThemeExtensions: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "theme-metric",
+  "name": "ThemeMetric",
+  "kind": "struct",
+  "declaration": "public struct ThemeMetric: Sendable",
+  "abstract": "An open, late-bound numeric token. Application roles can read their own ThemeExtension without adding cases to a framework enum.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "ThemeMetric",
+    "kind": "init",
+    "declaration": "public init(_ resolve: @escaping @Sendable (Theme) -> Float)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "contentSpacing",
+    "kind": "let",
+    "declaration": "public static let contentSpacing = Self",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "sectionSpacing",
+    "kind": "let",
+    "declaration": "public static let sectionSpacing = Self",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rowRadius",
+    "kind": "let",
+    "declaration": "public static let rowRadius = Self",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "inputRadius",
+    "kind": "let",
+    "declaration": "public static let inputRadius = Self",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "controlRadius",
+    "kind": "let",
+    "declaration": "public static let controlRadius = Self",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "groupRadius",
+    "kind": "let",
+    "declaration": "public static let groupRadius = Self",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "panelRadius",
+    "kind": "let",
+    "declaration": "public static let panelRadius = Self",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/Metrics.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public struct ThemeMetric: Sendable"
+  ]
+ },
+ {
+  "id": "theme-reader",
+  "name": "ThemeReader",
+  "kind": "struct",
+  "declaration": "public struct ThemeReader<Content: View>: _PrimitiveView",
+  "abstract": "Resolves the active theme while constructing content (for syntax colors and other palettes that cannot be expressed as a single semantic token).",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "ThemeReader",
+    "kind": "init",
+    "declaration": "public init(@ViewBuilder content: @escaping (Theme) -> Content)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/ThemeReader.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public struct ThemeReader<Content: View>: _PrimitiveView"
+  ]
+ },
+ {
+  "id": "theme-transition",
+  "name": "ThemeTransition",
+  "kind": "enum",
+  "declaration": "public enum ThemeTransition: Sendable, Equatable",
+  "abstract": "A whole-window reveal from the control that changes appearance. Keyboard and accessibility activation use the same control center as pointer input.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/CircularAppearance.swift",
+  "line": 8,
+  "owner": "",
+  "overloads": [
+   "public enum ThemeTransition: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "toggle-button-style",
+  "name": "ToggleButtonStyle",
+  "kind": "struct",
+  "declaration": "public struct ToggleButtonStyle: ButtonStyle, Hashable",
+  "abstract": "On/off chip for toolbars, segmented choices, and view-mode switches. Reads `configuration.isSelected` (set via `Button(isSelected:)`): solid accent with `onAccent` foreground when on — the theme guarantees that pairing's contrast — transparent with state-layer washes when off.",
+  "discussion": [
+   "```swift\nButton(isSelected: mode == .grid, action: { mode = .grid }) { Text(\"Grid\") }\n    .buttonStyle(.toggle)\n```"
+  ],
+  "availability": [],
+  "conforms": [
+   "ButtonStyle",
+   "Hashable"
+  ],
+  "members": [
+   {
+    "name": "minWidth",
+    "kind": "var",
+    "declaration": "public var minWidth: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "height",
+    "kind": "var",
+    "declaration": "public var height: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ToggleButtonStyle",
+    "kind": "init",
+    "declaration": "public init(minWidth: Float = 28, height: Float = 26)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeBody",
+    "kind": "func",
+    "declaration": "public func makeBody(configuration: ButtonStyleConfiguration) -> some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Buttons/ToggleButtonStyle.swift",
+  "line": 14,
+  "owner": "",
+  "overloads": [
+   "public struct ToggleButtonStyle: ButtonStyle, Hashable"
+  ]
+ },
+ {
+  "id": "toolbar-toggle-button-style",
+  "name": "ToolbarToggleButtonStyle",
+  "kind": "struct",
+  "declaration": "public struct ToolbarToggleButtonStyle: ButtonStyle",
+  "abstract": "Quiet selection for dense toolbars; primary actions retain solid fills.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ButtonStyle"
+  ],
+  "members": [
+   {
+    "name": "height",
+    "kind": "var",
+    "declaration": "public var height: Float = 28",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minWidth",
+    "kind": "var",
+    "declaration": "public var minWidth: Float = 28",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ToolbarToggleButtonStyle",
+    "kind": "init",
+    "declaration": "public init(_ configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeBody",
+    "kind": "func",
+    "declaration": "public func makeBody(configuration: ButtonStyleConfiguration) -> some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Buttons/ToolbarToggleButtonStyle.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct ToolbarToggleButtonStyle: ButtonStyle"
+  ]
+ },
+ {
+  "id": "tree-row-style",
+  "name": "TreeRowStyle",
+  "kind": "protocol",
+  "declaration": "public protocol TreeRowStyle",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "",
+    "kind": "var",
+    "declaration": "static var `default`: DefaultTreeRowStyle",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/TreeRowStyle.swift",
+  "line": 39,
+  "owner": "",
+  "overloads": [
+   "public protocol TreeRowStyle"
+  ]
+ },
+ {
+  "id": "tree-row-style-configuration",
+  "name": "TreeRowStyleConfiguration",
+  "kind": "struct",
+  "declaration": "public struct TreeRowStyleConfiguration",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "content",
+    "kind": "let",
+    "declaration": "public let content: AnyView",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "depth",
+    "kind": "let",
+    "declaration": "public let depth: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "indentation",
+    "kind": "let",
+    "declaration": "public let indentation: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "disclosureWidth",
+    "kind": "let",
+    "declaration": "public let disclosureWidth: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "hasChildren",
+    "kind": "let",
+    "declaration": "public let hasChildren: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isExpanded",
+    "kind": "let",
+    "declaration": "public let isExpanded: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isSearchHit",
+    "kind": "let",
+    "declaration": "public let isSearchHit: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isSelected",
+    "kind": "let",
+    "declaration": "public let isSelected: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isHovered",
+    "kind": "let",
+    "declaration": "public let isHovered: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "theme",
+    "kind": "let",
+    "declaration": "public let theme: Theme",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "interactionKey",
+    "kind": "var",
+    "declaration": "var interactionKey: _TreeRowInteractionKey",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/TreeRowStyle.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct TreeRowStyleConfiguration"
+  ]
+ },
+ {
+  "id": "tree-row-style-environment",
+  "name": "TreeRowStyleEnvironment",
+  "kind": "enum",
+  "declaration": "public enum TreeRowStyleEnvironment",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "key",
+    "kind": "let",
+    "declaration": "public static let key = CompositionLocal<AnyTreeRowStyle>( defaultValue: AnyTreeRowStyle(DefaultTreeRowStyle()) )",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/TreeRowStyle.swift",
+  "line": 64,
+  "owner": "",
+  "overloads": [
+   "public enum TreeRowStyleEnvironment"
+  ]
+ },
+ {
+  "id": "tree-row-style-scope",
+  "name": "TreeRowStyleScope",
+  "kind": "enum",
+  "declaration": "public enum TreeRowStyleScope: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/TreeRowStyle.swift",
+  "line": 45,
+  "owner": "",
+  "overloads": [
+   "public enum TreeRowStyleScope: Sendable"
+  ]
+ },
+ {
+  "id": "typography",
+  "name": "Typography",
+  "kind": "struct",
+  "declaration": "public struct Typography: Sendable, Equatable",
+  "abstract": "Type scale slots covering display through caption plus a monospace slot for consoles and code listings. Slot names describe role, not size.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "family",
+    "kind": "var",
+    "declaration": "public var family: String? = nil",
+    "abstract": "Applies to standard semantic roles unless a token names its own family.",
+    "discussion": []
+   },
+   {
+    "name": "display",
+    "kind": "var",
+    "declaration": "public var display: TextStyleToken",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "title",
+    "kind": "var",
+    "declaration": "public var title: TextStyleToken",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "headline",
+    "kind": "var",
+    "declaration": "public var headline: TextStyleToken",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: TextStyleToken",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "bodyStrong",
+    "kind": "var",
+    "declaration": "public var bodyStrong: TextStyleToken",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "caption",
+    "kind": "var",
+    "declaration": "public var caption: TextStyleToken",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "var",
+    "declaration": "public var label: TextStyleToken",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "mono",
+    "kind": "var",
+    "declaration": "public var mono: TextStyleToken",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Typography",
+    "kind": "init",
+    "declaration": "public init(display: TextStyleToken, title: TextStyleToken, headline: TextStyleToken, body: TextStyleToken, bodyStrong: TextStyleToken, caption: TextStyleToken, label: TextStyleToken, mono: TextStyleToken)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/Typography.swift",
+  "line": 45,
+  "owner": "",
+  "overloads": [
+   "public struct Typography: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "modifier-appearance",
+  "name": "appearance",
+  "kind": "modifier",
+  "declaration": "func appearance(_ appearance: Appearance, transition: ThemeTransition = .instant) -> some View",
+  "abstract": "Apply one of the built-in `Theme.defaultDark` / `Theme.defaultLight` presets to the receiver subtree. Equivalent to `.theme(Theme.defaultLight)` for `.light`, etc. Composes naturally with `.theme(_:)` — whichever modifier appears last (innermost) wins for descendants.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/AppearanceModifier.swift",
+  "line": 22,
+  "owner": "View",
+  "overloads": [
+   "func appearance(_ appearance: Appearance, transition: ThemeTransition = .instant) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-button-style",
+  "name": "buttonStyle",
+  "kind": "modifier",
+  "declaration": "func buttonStyle<S: ButtonStyle>(_ style: S) -> some View",
+  "abstract": "Override the `ButtonStyle` used by every `Button` in this subtree. Nesting is supported; the nearest provider wins.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Buttons/ButtonStyle.swift",
+  "line": 165,
+  "owner": "View",
+  "overloads": [
+   "func buttonStyle<S: ButtonStyle>(_ style: S) -> some View",
+   "func buttonStyle(_ style: AnyButtonStyle) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-control-size",
+  "name": "controlSize",
+  "kind": "modifier",
+  "declaration": "func controlSize(_ size: ControlSize) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/ControlSize.swift",
+  "line": 58,
+  "owner": "View",
+  "overloads": [
+   "func controlSize(_ size: ControlSize) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-divider-style",
+  "name": "dividerStyle",
+  "kind": "modifier",
+  "declaration": "func dividerStyle<S: DividerStyle>(_ style: S) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/DividerStyle.swift",
+  "line": 35,
+  "owner": "View",
+  "overloads": [
+   "func dividerStyle<S: DividerStyle>(_ style: S) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-icon-scaling",
+  "name": "iconScaling",
+  "kind": "modifier",
+  "declaration": "func iconScaling(_ scaling: IconScaling) -> some View",
+  "abstract": "Overrides this subtree's icon policy without changing its typography.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/Icons.swift",
+  "line": 61,
+  "owner": "View",
+  "overloads": [
+   "func iconScaling(_ scaling: IconScaling) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-list-row-style",
+  "name": "listRowStyle",
+  "kind": "modifier",
+  "declaration": "func listRowStyle<S: ListRowStyle>(_ style: S) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/ListRowStyle.swift",
+  "line": 57,
+  "owner": "View",
+  "overloads": [
+   "func listRowStyle<S: ListRowStyle>(_ style: S) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-panel-style",
+  "name": "panelStyle",
+  "kind": "modifier",
+  "declaration": "func panelStyle<S: PanelStyle>(_ style: S) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/PanelStyle.swift",
+  "line": 33,
+  "owner": "View",
+  "overloads": [
+   "func panelStyle<S: PanelStyle>(_ style: S) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-reduced-motion",
+  "name": "reducedMotion",
+  "kind": "modifier",
+  "declaration": "func reducedMotion(_ enabled: Bool = true) -> some View",
+  "abstract": "Marks the subtree as preferring reduced motion. The preference is read by the scene-layer `ReducedMotionEnvironment` key: framework motion (animated visibility, generic animatable writes, scroll physics and loading indicators) snaps to its final state instead of scheduling.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/ReducedMotionEnvironment.swift",
+  "line": 10,
+  "owner": "View",
+  "overloads": [
+   "func reducedMotion(_ enabled: Bool = true) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-selection-highlight",
+  "name": "selectionHighlight",
+  "kind": "modifier",
+  "declaration": "func selectionHighlight(_ role: SelectionAppearance.Role, isSelected: Bool, isHovered: Bool = false, isPressed: Bool = false) -> some View",
+  "abstract": "Paints the shared selection behind this view.",
+  "discussion": [
+   "Every selectable style routes its background through here, which is what\nkeeps a list row and a sidebar item from drifting apart. The insets are\nexposed rather than applied: a surface that owns a full-height row needs\nthe highlight floated inside it, while a surface whose rows are their own\nhighlight only needs the colour and the radius."
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/SelectionAppearance.swift",
+  "line": 71,
+  "owner": "View",
+  "overloads": [
+   "func selectionHighlight(_ role: SelectionAppearance.Role, isSelected: Bool, isHovered: Bool = false, isPressed: Bool = false) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-slider-style",
+  "name": "sliderStyle",
+  "kind": "modifier",
+  "declaration": "func sliderStyle<S: SliderStyle>(_ style: S) -> some View",
+  "abstract": "Override the `SliderStyle` used by every `Slider` in this subtree.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/SliderStyle.swift",
+  "line": 120,
+  "owner": "View",
+  "overloads": [
+   "func sliderStyle<S: SliderStyle>(_ style: S) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-text-field-style",
+  "name": "textFieldStyle",
+  "kind": "modifier",
+  "declaration": "func textFieldStyle<S: TextFieldStyle>(_ style: S) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/TextFieldStyle.swift",
+  "line": 64,
+  "owner": "View",
+  "overloads": [
+   "func textFieldStyle<S: TextFieldStyle>(_ style: S) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-text-scaler",
+  "name": "textScaler",
+  "kind": "modifier",
+  "declaration": "func textScaler(_ scaler: TextScaler) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/TextScaler.swift",
+  "line": 74,
+  "owner": "View",
+  "overloads": [
+   "func textScaler(_ scaler: TextScaler) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-text-style",
+  "name": "textStyle",
+  "kind": "modifier",
+  "declaration": "func textStyle(_ token: TextStyleToken) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Tokens/TextScaler.swift",
+  "line": 75,
+  "owner": "View",
+  "overloads": [
+   "func textStyle(_ token: TextStyleToken) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-theme",
+  "name": "theme",
+  "kind": "modifier",
+  "declaration": "func theme(_ theme: Theme) -> some View",
+  "abstract": "Provide `theme` to every descendant of this view. Nearer providers override farther ones; absent providers fall back to `Theme.defaultDark`.",
+  "discussion": [
+   "```swift\nRootView().theme(.defaultDark)\n```"
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/ThemeEnvironment.swift",
+  "line": 22,
+  "owner": "View",
+  "overloads": [
+   "func theme(_ theme: Theme) -> some View",
+   "func theme<Value: Equatable>(_ theme: Theme, transition: ThemeTransition, value: Value) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-tree-row-style",
+  "name": "treeRowStyle",
+  "kind": "modifier",
+  "declaration": "func treeRowStyle<S: TreeRowStyle>(_ style: S, scope: TreeRowStyleScope = .content) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "theme",
+  "file": "Compose/Sources/CoveUICompose/Theme/Styles/Components/TreeRowStyle.swift",
+  "line": 71,
+  "owner": "View",
+  "overloads": [
+   "func treeRowStyle<S: TreeRowStyle>(_ style: S, scope: TreeRowStyleScope = .content) -> some View"
+  ]
+ }
+]

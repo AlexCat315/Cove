@@ -28,6 +28,16 @@ const router = createRouter({
       meta: { title: '文档 · Cove' },
     },
     {
+      path: '/documentation',
+      redirect: '/documentation/coveui',
+    },
+    {
+      path: '/documentation/coveui/:category?/:symbol?',
+      name: 'reference',
+      component: () => import('@/views/ReferenceView.vue'),
+      meta: { title: 'CoveUI 参考 · Cove' },
+    },
+    {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
       component: () => import('@/views/NotFoundView.vue'),

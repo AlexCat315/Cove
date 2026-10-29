@@ -1,0 +1,385 @@
+[
+ {
+  "id": "app-frame-drive-policy",
+  "name": "AppFrameDrivePolicy",
+  "kind": "enum",
+  "declaration": "public enum AppFrameDrivePolicy: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUI",
+  "category": "app",
+  "file": "Hosts/Desktop/Sources/CoveUI/Application/Configuration.swift",
+  "line": 13,
+  "owner": "",
+  "overloads": [
+   "public enum AppFrameDrivePolicy: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "application-configuration",
+  "name": "ApplicationConfiguration",
+  "kind": "struct",
+  "declaration": "public struct ApplicationConfiguration: Sendable",
+  "abstract": "Application defaults are owned by the subsystem that consumes them. Configure only the groups your application needs; native GPU setup is optional.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "logging",
+    "kind": "var",
+    "declaration": "public var logging = LoggingConfiguration()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "window",
+    "kind": "var",
+    "declaration": "public var window = Window()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "typography",
+    "kind": "var",
+    "declaration": "public var typography = Typography()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rendering",
+    "kind": "var",
+    "declaration": "public var rendering = Rendering()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "frames",
+    "kind": "var",
+    "declaration": "public var frames = Frames()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "diagnostics",
+    "kind": "var",
+    "declaration": "public var diagnostics = Diagnostics()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "memory",
+    "kind": "var",
+    "declaration": "public var memory = Memory()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ApplicationConfiguration",
+    "kind": "init",
+    "declaration": "public init(title: String? = nil, configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUI",
+  "category": "app",
+  "file": "Hosts/Desktop/Sources/CoveUI/Application/Configuration.swift",
+  "line": 35,
+  "owner": "",
+  "overloads": [
+   "public struct ApplicationConfiguration: Sendable"
+  ]
+ },
+ {
+  "id": "application-resources",
+  "name": "ApplicationResources",
+  "kind": "enum",
+  "declaration": "public enum ApplicationResources",
+  "abstract": "Resolves SwiftPM resources using the same rules on desktop and Android.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "required",
+    "kind": "func",
+    "declaration": "public static func required(named name: String) -> Bundle",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUI",
+  "category": "app",
+  "file": "Hosts/Desktop/Sources/CoveUI/ResourcesSupport/Bundle.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public enum ApplicationResources"
+  ]
+ },
+ {
+  "id": "app-memory-snapshot",
+  "name": "AppMemorySnapshot",
+  "kind": "struct",
+  "declaration": "public struct AppMemorySnapshot: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "shaping",
+    "kind": "let",
+    "declaration": "public let shaping: TextCacheSnapshot?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "textLayout",
+    "kind": "let",
+    "declaration": "public let textLayout: TextCacheSnapshot?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "cachedImageBytes",
+    "kind": "let",
+    "declaration": "public let cachedImageBytes: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "windows",
+    "kind": "let",
+    "declaration": "public let windows: [WindowID: AppWindowMemorySnapshot]",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUI",
+  "category": "app",
+  "file": "Hosts/Desktop/Sources/CoveUI/Application/Memory.swift",
+  "line": 36,
+  "owner": "",
+  "overloads": [
+   "public struct AppMemorySnapshot: Sendable"
+  ]
+ },
+ {
+  "id": "app-window-memory-snapshot",
+  "name": "AppWindowMemorySnapshot",
+  "kind": "struct",
+  "declaration": "public struct AppWindowMemorySnapshot: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "state",
+    "kind": "let",
+    "declaration": "public let state: AppWindowRendererState",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "samples",
+    "kind": "let",
+    "declaration": "public let samples: UInt32",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "hasSwapchain",
+    "kind": "let",
+    "declaration": "public let hasSwapchain: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "estimatedTargetBytes",
+    "kind": "let",
+    "declaration": "public let estimatedTargetBytes: Int",
+    "abstract": "Owned MSAA, backdrop and effect scratch. Drawable pool/driver memory is excluded.",
+    "discussion": []
+   },
+   {
+    "name": "msaaLogicalBytes",
+    "kind": "let",
+    "declaration": "public let msaaLogicalBytes: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "msaaAllocatedBytes",
+    "kind": "let",
+    "declaration": "public let msaaAllocatedBytes: Int?",
+    "abstract": "Backend allocation of the current MSAA target; nil means unavailable.",
+    "discussion": []
+   },
+   {
+    "name": "msaaMemoryless",
+    "kind": "let",
+    "declaration": "public let msaaMemoryless: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AppWindowMemorySnapshot",
+    "kind": "init",
+    "declaration": "public init(state: AppWindowRendererState, samples: UInt32, hasSwapchain: Bool, estimatedTargetBytes: Int, msaaLogicalBytes: Int = 0, msaaAllocatedBytes: Int? = nil, msaaMemoryless: Bool = false)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUI",
+  "category": "app",
+  "file": "Hosts/Desktop/Sources/CoveUI/Application/Memory.swift",
+  "line": 15,
+  "owner": "",
+  "overloads": [
+   "public struct AppWindowMemorySnapshot: Sendable"
+  ]
+ },
+ {
+  "id": "app-window-renderer-state",
+  "name": "AppWindowRendererState",
+  "kind": "enum",
+  "declaration": "public enum AppWindowRendererState: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUI",
+  "category": "app",
+  "file": "Hosts/Desktop/Sources/CoveUI/Application/Memory.swift",
+  "line": 11,
+  "owner": "",
+  "overloads": [
+   "public enum AppWindowRendererState: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "app-window-rendering",
+  "name": "AppWindowRendering",
+  "kind": "struct",
+  "declaration": "public struct AppWindowRendering: Sendable, Equatable",
+  "abstract": "Nil values inherit application rendering defaults.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "geometryAntialiasing",
+    "kind": "var",
+    "declaration": "public var geometryAntialiasing: GeometryAntialiasing?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "sampleCount",
+    "kind": "var",
+    "declaration": "public var sampleCount: UInt32?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "clearColor",
+    "kind": "var",
+    "declaration": "public var clearColor: SIMD4<Float>?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AppWindowRendering",
+    "kind": "init",
+    "declaration": "public init(sampleCount: UInt32? = nil, clearColor: SIMD4<Float>? = nil, geometryAntialiasing: GeometryAntialiasing? = nil)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUI",
+  "category": "app",
+  "file": "Hosts/Desktop/Sources/CoveUI/Application/Configuration.swift",
+  "line": 21,
+  "owner": "",
+  "overloads": [
+   "public struct AppWindowRendering: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "app-window-title-bar-style",
+  "name": "AppWindowTitleBarStyle",
+  "kind": "enum",
+  "declaration": "public enum AppWindowTitleBarStyle: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUI",
+  "category": "app",
+  "file": "Hosts/Desktop/Sources/CoveUI/Application/Configuration.swift",
+  "line": 8,
+  "owner": "",
+  "overloads": [
+   "public enum AppWindowTitleBarStyle: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "application",
+  "name": "Application",
+  "kind": "class",
+  "declaration": "public final class Application",
+  "abstract": "高层应用宿主。隐藏窗口、设备、DrawList 绘制器、 `TextEnvironment`、`ViewGraph` 等装配细节。",
+  "discussion": [
+   "调用方使用方式：",
+   "```swift\ntry Application.run(config: ApplicationConfiguration(title: \"My App\")) {\n    RootView()\n}\n```",
+   "主窗口与辅助窗口共享 UI 资源，各自拥有 presentation target。\n`backend: device` 可与生产 NativeRenderer 共享设备与 viewport。"
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "run",
+    "kind": "func",
+    "declaration": "public static func run<Root: View>(config: ApplicationConfiguration = ApplicationConfiguration(), backend: Device? = nil, events: PlatformEventBridge = PlatformEventBridge(), checkpoint: ApplicationCheckpoint? = nil, onTick: ((_ deltaTime: Double) -> Void)? = nil, onDisplayReady: ((AppDisplayHandle) -> Void)? = nil, onDiagnosticsReady: ((UIDiagnostics?) -> Void)? = nil, @ViewBuilder rootView: @escaping () -> Root) throws",
+    "abstract": "启动主窗口并阻塞直到窗口关闭。返回值仅用于错误传递。",
+    "discussion": [
+     "`onTick` 会在每一帧 layout 之前调用，用于把外部子系统（例如游戏引擎\n`EngineHost`）按 UI 帧率推进。`deltaTime` 是上一帧到这一帧之间的秒数。"
+    ]
+   }
+  ],
+  "module": "CoveUI",
+  "category": "app",
+  "file": "Hosts/Desktop/Sources/CoveUI/Application/Runtime.swift",
+  "line": 27,
+  "owner": "",
+  "overloads": [
+   "public final class Application"
+  ]
+ }
+]

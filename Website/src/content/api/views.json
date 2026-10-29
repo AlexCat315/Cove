@@ -1,0 +1,577 @@
+[
+ {
+  "id": "cove-ui-compose",
+  "name": "CoveUICompose",
+  "kind": "enum",
+  "declaration": "public enum CoveUICompose",
+  "abstract": "CoveUI Compose — 占位模块",
+  "discussion": [
+   "职责：声明式 API、状态系统、modifier、layout composable、组件集合。\n详细设计见 docs/cove-ui-blueprint.md。"
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "version",
+    "kind": "let",
+    "declaration": "public static let version = \"0.1.0-wip\" }",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "views",
+  "file": "Compose/Sources/CoveUICompose/CoveUICompose.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public enum CoveUICompose"
+  ]
+ },
+ {
+  "id": "jump-arc",
+  "name": "JumpArc",
+  "kind": "struct",
+  "declaration": "public struct JumpArc: Sendable, Equatable",
+  "abstract": "A ballistic parabola in window space.",
+  "discussion": [
+   "For air progress u ∈ [0,1]:\n  x(u) = start.x + (end.x − start.x)·u\n  y(u) = lerp(start.y,end.y,u) − 4·peakHeight·u·(1−u)",
+   "`peakHeight` is the EXTRA peak above the straight start→end chord (the\n4·u·(1−u) term is 0 at both ends and 1 at u=0.5), so a same-level jump\npeaks exactly `peakHeight` points above the perch."
+  ],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "start",
+    "kind": "let",
+    "declaration": "public let start: CGPoint",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "end",
+    "kind": "let",
+    "declaration": "public let end: CGPoint",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "peakHeight",
+    "kind": "let",
+    "declaration": "public let peakHeight: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "JumpArc",
+    "kind": "init",
+    "declaration": "public init(start: CGPoint, end: CGPoint, peakHeight: Float)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "position",
+    "kind": "func",
+    "declaration": "public func position(at u: Float) -> CGPoint",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "verticalVelocity",
+    "kind": "func",
+    "declaration": "public func verticalVelocity(at u: Float) -> Float",
+    "abstract": "Vertical velocity vs. air progress (dy/du). Negative = ascending (window y grows downward), positive = falling. Used to pick the rise/apex/fall silhouette from the SAME curve rather than timers.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "views",
+  "file": "Compose/Sources/CoveUICompose/Pet/PetTypes.swift",
+  "line": 85,
+  "owner": "",
+  "overloads": [
+   "public struct JumpArc: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "pet-pose",
+  "name": "PetPose",
+  "kind": "enum",
+  "declaration": "public enum PetPose: String, Sendable, CaseIterable, Equatable",
+  "abstract": "A named in-place silhouette. These are the ONLY things a sprite frame encodes; they never carry a position.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "String",
+   "Sendable",
+   "CaseIterable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "views",
+  "file": "Compose/Sources/CoveUICompose/Pet/PetTypes.swift",
+  "line": 25,
+  "owner": "",
+  "overloads": [
+   "public enum PetPose: String, Sendable, CaseIterable, Equatable"
+  ]
+ },
+ {
+  "id": "pet-render-state",
+  "name": "PetRenderState",
+  "kind": "struct",
+  "declaration": "public struct PetRenderState: Sendable, Equatable",
+  "abstract": "Per-frame evaluation of the pet, already in window space. The view is a pure function of this value.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "position",
+    "kind": "var",
+    "declaration": "public var position: CGPoint",
+    "abstract": "Foot anchor (window space).",
+    "discussion": []
+   },
+   {
+    "name": "pose",
+    "kind": "var",
+    "declaration": "public var pose: PetPose",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "scaleX",
+    "kind": "var",
+    "declaration": "public var scaleX: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "scaleY",
+    "kind": "var",
+    "declaration": "public var scaleY: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "facing",
+    "kind": "var",
+    "declaration": "public var facing: Float",
+    "abstract": "1 = facing right, −1 = facing left.",
+    "discussion": []
+   },
+   {
+    "name": "presence",
+    "kind": "var",
+    "declaration": "public var presence: Float",
+    "abstract": "0 at spawn → 1 once fully present (entrance).",
+    "discussion": []
+   },
+   {
+    "name": "PetRenderState",
+    "kind": "init",
+    "declaration": "public init(position: CGPoint, pose: PetPose, scaleX: Float, scaleY: Float, facing: Float, presence: Float)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "views",
+  "file": "Compose/Sources/CoveUICompose/Pet/PetTypes.swift",
+  "line": 153,
+  "owner": "",
+  "overloads": [
+   "public struct PetRenderState: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "pet-scene",
+  "name": "PetScene",
+  "kind": "struct",
+  "declaration": "public struct PetScene<Content: View>: View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "PetScene",
+    "kind": "init",
+    "declaration": "public init(world: PetWorld, @ViewBuilder content: () -> Content)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "views",
+  "file": "Compose/Sources/CoveUICompose/Pet/PetScene.swift",
+  "line": 26,
+  "owner": "",
+  "overloads": [
+   "public struct PetScene<Content: View>: View"
+  ]
+ },
+ {
+  "id": "pet-sprite-sheet",
+  "name": "PetSpriteSheet",
+  "kind": "struct",
+  "declaration": "public struct PetSpriteSheet: Sendable, Equatable",
+  "abstract": "Maps a pose to a source image file. Kept as data so the pet core is agnostic to any particular art pack — the demo supplies the files.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "displaySize",
+    "kind": "var",
+    "declaration": "public var displaySize: Float",
+    "abstract": "On-screen edge length of the (square) sprite, in points.",
+    "discussion": []
+   },
+   {
+    "name": "frames",
+    "kind": "var",
+    "declaration": "public var frames: [PetPose: String]",
+    "abstract": "Pose → absolute file path.",
+    "discussion": []
+   },
+   {
+    "name": "PetSpriteSheet",
+    "kind": "init",
+    "declaration": "public init(displaySize: Float, frames: [PetPose: String])",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "path",
+    "kind": "func",
+    "declaration": "public func path(for pose: PetPose) -> String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "resolvedPath",
+    "kind": "func",
+    "declaration": "public func resolvedPath(for pose: PetPose) -> String?",
+    "abstract": "Fallback chain used when a pose has no dedicated frame.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "views",
+  "file": "Compose/Sources/CoveUICompose/Pet/PetTypes.swift",
+  "line": 39,
+  "owner": "",
+  "overloads": [
+   "public struct PetSpriteSheet: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "pet-trip",
+  "name": "PetTrip",
+  "kind": "struct",
+  "declaration": "public struct PetTrip: Sendable, Equatable",
+  "abstract": "A single \"from one perch to another\" journey. The whole body of the jump is a deterministic evaluation of `elapsed` over this timeline — there are no discrete per-phase timers to drift or desync.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "fromAnchor",
+    "kind": "let",
+    "declaration": "public let fromAnchor: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "toAnchor",
+    "kind": "let",
+    "declaration": "public let toAnchor: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "arc",
+    "kind": "let",
+    "declaration": "public let arc: JumpArc",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "totalDuration",
+    "kind": "let",
+    "declaration": "public let totalDuration: Double",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "facing",
+    "kind": "let",
+    "declaration": "public let facing: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "windupEnd",
+    "kind": "let",
+    "declaration": "public static let windupEnd: Float = 0.16",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "airborneEnd",
+    "kind": "let",
+    "declaration": "public static let airborneEnd: Float = 0.72",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "landEnd",
+    "kind": "let",
+    "declaration": "public static let landEnd: Float = 0.84",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "PetTrip",
+    "kind": "init",
+    "declaration": "public init(fromAnchor: String, toAnchor: String, arc: JumpArc, totalDuration: Double, facing: Float)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "airProgress",
+    "kind": "func",
+    "declaration": "public func airProgress(at t: Float) -> Float?",
+    "abstract": "Air progress u ∈ [0,1] while in the airborne band; nil otherwise.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "views",
+  "file": "Compose/Sources/CoveUICompose/Pet/PetTypes.swift",
+  "line": 119,
+  "owner": "",
+  "overloads": [
+   "public struct PetTrip: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "clamp01",
+  "name": "clamp01",
+  "kind": "func",
+  "declaration": "public func clamp01(_ v: Float) -> Float",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "views",
+  "file": "Compose/Sources/CoveUICompose/Pet/PetTypes.swift",
+  "line": 178,
+  "owner": "",
+  "overloads": [
+   "public func clamp01(_ v: Float) -> Float"
+  ]
+ },
+ {
+  "id": "lerp",
+  "name": "lerp",
+  "kind": "func",
+  "declaration": "public func lerp(_ a: Float, _ b: Float, _ t: Float) -> Float",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "views",
+  "file": "Compose/Sources/CoveUICompose/Pet/PetTypes.swift",
+  "line": 181,
+  "owner": "",
+  "overloads": [
+   "public func lerp(_ a: Float, _ b: Float, _ t: Float) -> Float"
+  ]
+ },
+ {
+  "id": "modifier-pet-anchor",
+  "name": "petAnchor",
+  "kind": "modifier",
+  "declaration": "func petAnchor(_ id: String) -> some View",
+  "abstract": "Mark this view as a pet perch with the given identifier.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "views",
+  "file": "Compose/Sources/CoveUICompose/Pet/PetAnchor.swift",
+  "line": 57,
+  "owner": "View",
+  "overloads": [
+   "func petAnchor(_ id: String) -> some View"
+  ]
+ },
+ {
+  "id": "pet-world",
+  "name": "PetWorld",
+  "kind": "class",
+  "declaration": "public final class PetWorld: _ObservableObject, AnyAnimationController",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "_ObservableObject",
+   "AnyAnimationController"
+  ],
+  "members": [
+   {
+    "name": "spriteSheet",
+    "kind": "let",
+    "declaration": "public let spriteSheet: PetSpriteSheet",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "travelSpeed",
+    "kind": "var",
+    "declaration": "public var travelSpeed: Double = 430",
+    "abstract": "Horizontal travel speed, points per second (drives jump duration).",
+    "discussion": []
+   },
+   {
+    "name": "minJumpDuration",
+    "kind": "var",
+    "declaration": "public var minJumpDuration: Double = 0.58",
+    "abstract": "Minimum jump duration (s).",
+    "discussion": []
+   },
+   {
+    "name": "isFinished",
+    "kind": "var",
+    "declaration": "public var isFinished: Bool = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "PetWorld",
+    "kind": "init",
+    "declaration": "public init(spriteSheet: PetSpriteSheet, initialAnchorID: String, perchPose: PetPose = .idle)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "go",
+    "kind": "func",
+    "declaration": "public func go(to targetID: String) -> Bool",
+    "abstract": "Jump to another anchor. No-op if the target is unknown / identical / not yet laid out.",
+    "discussion": []
+   },
+   {
+    "name": "toggleRest",
+    "kind": "func",
+    "declaration": "public func toggleRest()",
+    "abstract": "Toggle the resting silhouette between standing and sitting.",
+    "discussion": []
+   },
+   {
+    "name": "wander",
+    "kind": "func",
+    "declaration": "public func wander() -> String?",
+    "abstract": "Pick a random other anchor and jump there. Returns the chosen id.",
+    "discussion": []
+   },
+   {
+    "name": "isBusy",
+    "kind": "var",
+    "declaration": "public var isBusy: Bool",
+    "abstract": "True while the pet is mid-entrance or mid-jump.",
+    "discussion": []
+   },
+   {
+    "name": "updateAnchor",
+    "kind": "func",
+    "declaration": "public func updateAnchor(id: String, frame: CGRect)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "removeAnchor",
+    "kind": "func",
+    "declaration": "public func removeAnchor(id: String)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "tick",
+    "kind": "func",
+    "declaration": "public func tick(deltaTime: Double)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "finishImmediately",
+    "kind": "func",
+    "declaration": "public func finishImmediately()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "cancel",
+    "kind": "func",
+    "declaration": "public func cancel()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "views",
+  "file": "Compose/Sources/CoveUICompose/Pet/PetWorld.swift",
+  "line": 27,
+  "owner": "",
+  "overloads": [
+   "public final class PetWorld: _ObservableObject, AnyAnimationController"
+  ]
+ },
+ {
+  "id": "pet-world-local",
+  "name": "PetWorldLocal",
+  "kind": "var",
+  "declaration": "public let PetWorldLocal = CompositionLocal<PetWorld?>(defaultValue: nil)",
+  "abstract": "Implicit channel for the active pet world. `PetScene` provides it; anchor nodes consume it, so `.petAnchor(_:)` needs no explicit world reference.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "views",
+  "file": "Compose/Sources/CoveUICompose/Pet/PetAnchor.swift",
+  "line": 23,
+  "owner": "",
+  "overloads": [
+   "public let PetWorldLocal = CompositionLocal<PetWorld?>(defaultValue: nil)"
+  ]
+ }
+]

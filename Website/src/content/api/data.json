@@ -1,0 +1,4724 @@
+[
+ {
+  "id": "app-storage",
+  "name": "AppStorage",
+  "kind": "struct",
+  "declaration": "public struct AppStorage<Value: AppStorageConvertible>: DynamicProperty",
+  "abstract": "`@State`-shaped property wrapper whose value persists across launches and stays in sync between every view that names the same key.",
+  "discussion": [
+   "```swift\n@AppStorage(\"inspector.showGrid\") var showGrid = true\n```",
+   "Reads come from the shared per-key box (seeded from the store on first\nuse); writes persist to the store and recompose every subscribed view.\nThe store defaults to `AppStorageDefaults.store` — hosts inject their own\nfile location at startup."
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "AppStorage",
+    "kind": "init",
+    "declaration": "public init(wrappedValue defaultValue: Value, _ key: String, store: AppStorageStore? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "wrappedValue",
+    "kind": "var",
+    "declaration": "public var wrappedValue: Value",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "projectedValue",
+    "kind": "var",
+    "declaration": "public var projectedValue: Binding<Value>",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/AppStorage.swift",
+  "line": 278,
+  "owner": "",
+  "overloads": [
+   "public struct AppStorage<Value: AppStorageConvertible>: DynamicProperty"
+  ]
+ },
+ {
+  "id": "app-storage-convertible",
+  "name": "AppStorageConvertible",
+  "kind": "protocol",
+  "declaration": "public protocol AppStorageConvertible: Equatable",
+  "abstract": "Types `@AppStorage` can wrap. `Equatable` so writes of an unchanged value do not schedule a recompose (see the @State no-dedupe gotcha).",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "AppStorageConvertible",
+    "kind": "init",
+    "declaration": "init?(storageValue: AppStorageValue)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "storageValue",
+    "kind": "var",
+    "declaration": "var storageValue: AppStorageValue",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/AppStorage.swift",
+  "line": 148,
+  "owner": "",
+  "overloads": [
+   "public protocol AppStorageConvertible: Equatable"
+  ]
+ },
+ {
+  "id": "app-storage-defaults",
+  "name": "AppStorageDefaults",
+  "kind": "enum",
+  "declaration": "public enum AppStorageDefaults",
+  "abstract": "Process-wide default store, used when an `@AppStorage` does not name one explicitly. Hosts (e.g. the editor) inject their own at startup.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/AppStorage.swift",
+  "line": 48,
+  "owner": "",
+  "overloads": [
+   "public enum AppStorageDefaults"
+  ]
+ },
+ {
+  "id": "app-storage-store",
+  "name": "AppStorageStore",
+  "kind": "protocol",
+  "declaration": "public protocol AppStorageStore: AnyObject",
+  "abstract": "Key-value backend for `@AppStorage`. Implementations persist however they like (file, registry, in-memory for tests). Main-thread only, like the rest of the UI layer.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "AnyObject"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/AppStorage.swift",
+  "line": 41,
+  "owner": "",
+  "overloads": [
+   "public protocol AppStorageStore: AnyObject"
+  ]
+ },
+ {
+  "id": "app-storage-value",
+  "name": "AppStorageValue",
+  "kind": "enum",
+  "declaration": "public enum AppStorageValue: Equatable, Codable",
+  "abstract": "Primitive value forms an `@AppStorage` key can hold. Mirrors SwiftUI's supported set (Bool / Int / Double / String, plus RawRepresentable of those via `AppStorageConvertible`).",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Codable"
+  ],
+  "members": [
+   {
+    "name": "AppStorageValue",
+    "kind": "init",
+    "declaration": "public init(from decoder: Decoder) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "encode",
+    "kind": "func",
+    "declaration": "public func encode(to encoder: Encoder) throws",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/AppStorage.swift",
+  "line": 13,
+  "owner": "",
+  "overloads": [
+   "public enum AppStorageValue: Equatable, Codable"
+  ]
+ },
+ {
+  "id": "avatar",
+  "name": "Avatar",
+  "kind": "struct",
+  "declaration": "public struct Avatar: _PrimitiveView",
+  "abstract": "Person image, Unicode initials or anonymous icon. Images share the bounded asynchronous loader and keep the fallback visible during loading/failure.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "name",
+    "kind": "let",
+    "declaration": "public let name: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "imageURL",
+    "kind": "let",
+    "declaration": "public let imageURL: URL?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "appearance",
+    "kind": "var",
+    "declaration": "public var appearance = AvatarAppearance()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Avatar",
+    "kind": "init",
+    "declaration": "public init(_ name: String = \"\", id: String? = nil, imageURL: URL? = nil, configure: (inout AvatarAppearance) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "initials",
+    "kind": "var",
+    "declaration": "public var initials: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "statusText",
+    "kind": "var",
+    "declaration": "public var statusText: String",
+    "abstract": "Resolved presence name, empty without a status.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Avatar/Avatar.swift",
+  "line": 54,
+  "owner": "",
+  "overloads": [
+   "public struct Avatar: _PrimitiveView"
+  ]
+ },
+ {
+  "id": "avatar-appearance",
+  "name": "AvatarAppearance",
+  "kind": "struct",
+  "declaration": "public struct AvatarAppearance",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "size",
+    "kind": "var",
+    "declaration": "public var size: ControlSize?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "diameter",
+    "kind": "var",
+    "declaration": "public var diameter: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "shape",
+    "kind": "var",
+    "declaration": "public var shape: AvatarShape = .circle",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "borderWidth",
+    "kind": "var",
+    "declaration": "public var borderWidth: Float = 1",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "colors",
+    "kind": "var",
+    "declaration": "public var colors: AvatarColors?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "placeholder",
+    "kind": "var",
+    "declaration": "public var placeholder = UIIcons.User.user",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "retryID",
+    "kind": "var",
+    "declaration": "public var retryID = 0",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "status",
+    "kind": "var",
+    "declaration": "public var status: AvatarStatus?",
+    "abstract": "Presence corner indicator; `nil` draws none.",
+    "discussion": []
+   },
+   {
+    "name": "statusLabel",
+    "kind": "var",
+    "declaration": "public var statusLabel: String?",
+    "abstract": "Overrides the status name read by assistive technology and the member list.",
+    "discussion": []
+   },
+   {
+    "name": "AvatarAppearance",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Avatar/Avatar.swift",
+  "line": 24,
+  "owner": "",
+  "overloads": [
+   "public struct AvatarAppearance"
+  ]
+ },
+ {
+  "id": "avatar-colors",
+  "name": "AvatarColors",
+  "kind": "struct",
+  "declaration": "public struct AvatarColors: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "background",
+    "kind": "var",
+    "declaration": "public var background: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "foreground",
+    "kind": "var",
+    "declaration": "public var foreground: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "border",
+    "kind": "var",
+    "declaration": "public var border: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AvatarColors",
+    "kind": "init",
+    "declaration": "public init(background: Color, foreground: Color, border: Color)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Avatar/Avatar.swift",
+  "line": 16,
+  "owner": "",
+  "overloads": [
+   "public struct AvatarColors: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "avatar-group",
+  "name": "AvatarGroup",
+  "kind": "struct",
+  "declaration": "public struct AvatarGroup: _PrimitiveView",
+  "abstract": "Shared sizing, stable optional IDs, first-person-on-top overlap and a count/ellipsis overflow slot. A zero limit can display only the overflow.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "avatars",
+    "kind": "let",
+    "declaration": "public let avatars: [Avatar]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "options",
+    "kind": "var",
+    "declaration": "public var options = AvatarGroupOptions()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AvatarGroup",
+    "kind": "init",
+    "declaration": "public init(_ avatars: [Avatar], configure: (inout AvatarGroupOptions) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Avatar/Group.swift",
+  "line": 26,
+  "owner": "",
+  "overloads": [
+   "public struct AvatarGroup: _PrimitiveView"
+  ]
+ },
+ {
+  "id": "avatar-group-options",
+  "name": "AvatarGroupOptions",
+  "kind": "struct",
+  "declaration": "public struct AvatarGroupOptions",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "limit",
+    "kind": "var",
+    "declaration": "public var limit = 3",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "overflow",
+    "kind": "var",
+    "declaration": "public var overflow: AvatarOverflow = .count",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "overlap",
+    "kind": "var",
+    "declaration": "public var overlap: Float = 0.3",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "size",
+    "kind": "var",
+    "declaration": "public var size: ControlSize?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "diameter",
+    "kind": "var",
+    "declaration": "public var diameter: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "var",
+    "declaration": "public var label = \"Members\" /// Makes the overflow marker open a member list; `nil` keeps it static.",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "memberList",
+    "kind": "var",
+    "declaration": "public var memberList: AvatarMemberList?",
+    "abstract": "Makes the overflow marker open a member list; `nil` keeps it static.",
+    "discussion": []
+   },
+   {
+    "name": "AvatarGroupOptions",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Avatar/Group.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public struct AvatarGroupOptions"
+  ]
+ },
+ {
+  "id": "avatar-member-list",
+  "name": "AvatarMemberList",
+  "kind": "struct",
+  "declaration": "public struct AvatarMemberList",
+  "abstract": "Turns an `AvatarGroup` overflow marker into a button that opens the member list. Rows show each avatar, name and presence; with `onSelect` they become buttons and the popover closes after a selection.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "title",
+    "kind": "var",
+    "declaration": "public var title = \"Members\" public var scope: Scope = .all",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onSelect",
+    "kind": "var",
+    "declaration": "public var onSelect: ((Avatar) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AvatarMemberList",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Avatar/MemberList.swift",
+  "line": 9,
+  "owner": "",
+  "overloads": [
+   "public struct AvatarMemberList"
+  ]
+ },
+ {
+  "id": "avatar-overflow",
+  "name": "AvatarOverflow",
+  "kind": "enum",
+  "declaration": "public enum AvatarOverflow: Sendable, Hashable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Hashable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Avatar/Group.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public enum AvatarOverflow: Sendable, Hashable"
+  ]
+ },
+ {
+  "id": "avatar-shape",
+  "name": "AvatarShape",
+  "kind": "enum",
+  "declaration": "public enum AvatarShape: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Avatar/Avatar.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public enum AvatarShape: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "avatar-status",
+  "name": "AvatarStatus",
+  "kind": "enum",
+  "declaration": "public enum AvatarStatus: Sendable, Hashable, CaseIterable",
+  "abstract": "Presence shown as a corner indicator on an `Avatar`. Each case pairs a hue with a distinct shape (filled, inset ring, bar, hollow ring) so presence stays readable without color.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Hashable",
+   "CaseIterable"
+  ],
+  "members": [
+   {
+    "name": "label",
+    "kind": "var",
+    "declaration": "public var label: String",
+    "abstract": "Default spoken/visible name; `AvatarAppearance.statusLabel` overrides it.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Avatar/Status.swift",
+  "line": 9,
+  "owner": "",
+  "overloads": [
+   "public enum AvatarStatus: Sendable, Hashable, CaseIterable"
+  ]
+ },
+ {
+  "id": "chart",
+  "name": "Chart",
+  "kind": "struct",
+  "declaration": "public struct Chart: View",
+  "abstract": "Line, area, bar, scatter and pie/donut charts with labelled axes, an optional legend and point selection.",
+  "discussion": [
+   "```swift\nChart([.area(revenue, title: \"Revenue\"), .bar(orders, color: .success, title: \"Orders\")],\n      x: .categorical([\"Jan\", \"Feb\", \"Mar\"]),\n      thresholds: [ChartThreshold(value: 30, label: \"Target\")],\n      bands: [ChartBand(from: 20, to: 40, color: .success, label: \"Healthy\")],\n      annotations: [ChartAnnotation(\"Launch\", index: 1)]) {\n    $0.selection.point = $selected\n    $0.legend.placement = .bottom\n    $0.axis.y.title = \"Revenue\"\n}\n.frame(height: 180)",
+   "Chart([.points(x: latency, y: errors)], x: .numeric) {\n    $0.axis.x.title = \"Latency (ms)\"\n}",
+   "Chart([.bar(orders, title: \"Orders\"),\n       .line(errorRate, color: .error, title: \"Error rate\", axis: .right)],\n      x: .categorical(months),\n      style: ChartStyle(stacking: .percent)) {\n    $0.axis.secondary.title = \"Error %\"\n}",
+   "Chart(slices: [ChartSlice(\"Desktop\", value: 58), ChartSlice(\"Mobile\", value: 31)]) {\n    $0.legend.placement = .bottom\n    $0.pie.center = .init(\"89\", label: \"Total\")\n}\n```",
+   "The x domain belongs to the chart, so a bar series and a scatter series in\none chart read the same axis. Both axes fit their data to round tick values\nand draw a grid line at each value tick, so labels never read as 11.75. Tick\nlabels reserve their own gutters: the plot shrinks to whatever the labels\nleave.",
+   "Each side of the value axis fits its own series. `ChartSeries.axis` moves a\nseries to the right-hand axis, which only exists — and only reserves a\ngutter — when something reads it. `ChartStyle.stacking` accumulates series\non each other, with positives rising from zero and negatives falling from\nit; `.percent` scales every index to 100 so columns compare by share.",
+   "`axis.y.kind` (and `axis.x.kind`) picks linear or logarithmic spacing. A log\naxis snaps to decades and ticks 1, 2 and 5 × 10ⁿ; values at or below zero\nhave no place on it and clamp to the bottom edge.",
+   "`style.orientation` turns the chart on its side: `.horizontal` puts the\ncategories down the left and the values along the bottom, which is what long\ncategory names and ranked bars need. `axis.y` keeps configuring the value\naxis and `axis.x` the independent one — only the edges they are drawn\nagainst move, so a log value axis stays `axis.y.kind = .log` when it turns.",
+   "Bind `viewport.range` to enable wheel zoom, horizontal scroll/Alt-drag pan\nand +/- keys (0 or double-click resets). Bind `selection.range` to brush an\ninterval by dragging; numeric charts return x values, categories return\nzero-based indices. Both features follow a horizontal chart's category axis.\n`animation` animates data changes, including interruptions, and also works\nthrough `withAnimation`. Reduced motion snaps to the final values.",
+   "`ChartHistogram` counts samples into bins and hands back the bars plus their\nedge labels, so a distribution needs no hand-rolled counting.",
+   "A series with more samples than the plot has pixels is drawn at the plot's\nresolution: each column keeps its highest and lowest sample, so the envelope\nsurvives while the stroke stays cheap. The resolved geometry is also cached\nper size, so a pointer move repaints without rebuilding the stacks.",
+   "Reference geometry annotates the data without replacing it: a threshold is a\nlabelled rule, a band a shaded corridor, an annotation a note pinned to one\nvalue, and `ChartSeriesStyle.showsValues` writes each value beside its mark.",
+   "Width follows the parent; the plot takes the height left after the legend\n(64pt when unconstrained). Selection is interactive only with a binding:\nhover previews on pointer surfaces, click/tap pins, drag scrubs, arrows\nstep, Escape clears. The callout lists every visible series at the selected\nx. Legend items toggle series visibility. A non-finite value is a gap: the\nline and its fill break there.",
+   "A screen reader steps through the values with or without a binding: each x\nis one stop, announced as its category, every visible series at it, and its\nposition in the series. `accessibility.exposesValues` turns that off, and\n`ChartDataTable` offers the same data as a table for reading it all at once."
+  ],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "Chart",
+    "kind": "init",
+    "declaration": "public init(_ series: [ChartSeries], x: ChartXDomain = .categorical([]), thresholds: [ChartThreshold] = [], bands: [ChartBand] = [], annotations: [ChartAnnotation] = [], markers: [ChartMarker] = [], style: ChartStyle = ChartStyle(), configure: (inout ChartConfiguration) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Chart",
+    "kind": "init",
+    "declaration": "public init(slices: [ChartSlice], style: ChartStyle = ChartStyle(showsGrid: false), configure: (inout ChartConfiguration) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Chart/Chart.swift",
+  "line": 89,
+  "owner": "",
+  "overloads": [
+   "public struct Chart: View"
+  ]
+ },
+ {
+  "id": "chart-annotation",
+  "name": "ChartAnnotation",
+  "kind": "struct",
+  "declaration": "public struct ChartAnnotation: Sendable",
+  "abstract": "A short note pinned to one value, drawn as a pill above the mark.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "text",
+    "kind": "var",
+    "declaration": "public var text: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "series",
+    "kind": "var",
+    "declaration": "public var series: Int",
+    "abstract": "The series whose mark the note points at; 0 for a single-series chart.",
+    "discussion": []
+   },
+   {
+    "name": "index",
+    "kind": "var",
+    "declaration": "public var index: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "color",
+    "kind": "var",
+    "declaration": "public var color: SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ChartAnnotation",
+    "kind": "init",
+    "declaration": "public init(_ text: String, series: Int = 0, index: Int, color: SemanticColorRef = .accent)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Chart/Model.swift",
+  "line": 224,
+  "owner": "",
+  "overloads": [
+   "public struct ChartAnnotation: Sendable"
+  ]
+ },
+ {
+  "id": "chart-band",
+  "name": "ChartBand",
+  "kind": "struct",
+  "declaration": "public struct ChartBand: Sendable",
+  "abstract": "A shaded range on the value axis: a target corridor, a healthy band.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "from",
+    "kind": "var",
+    "declaration": "public var from: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "to",
+    "kind": "var",
+    "declaration": "public var to: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "color",
+    "kind": "var",
+    "declaration": "public var color: SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "var",
+    "declaration": "public var label: String",
+    "abstract": "Drawn at the top-left corner of the band. Empty draws no text.",
+    "discussion": []
+   },
+   {
+    "name": "axis",
+    "kind": "var",
+    "declaration": "public var axis: ChartValueAxis",
+    "abstract": "The value axis the band belongs to.",
+    "discussion": []
+   },
+   {
+    "name": "ChartBand",
+    "kind": "init",
+    "declaration": "public init(from: Float, to: Float, color: SemanticColorRef = .accent, label: String = \"\", axis: ChartValueAxis = .left)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Chart/Model.swift",
+  "line": 204,
+  "owner": "",
+  "overloads": [
+   "public struct ChartBand: Sendable"
+  ]
+ },
+ {
+  "id": "chart-configuration",
+  "name": "ChartConfiguration",
+  "kind": "struct",
+  "declaration": "public struct ChartConfiguration",
+  "abstract": "Interactive behavior, configured in `Chart(...) { $0.selection.point = $point }`.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "selection",
+    "kind": "var",
+    "declaration": "public var selection = Selection()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "legend",
+    "kind": "var",
+    "declaration": "public var legend = Legend()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "axis",
+    "kind": "var",
+    "declaration": "public var axis = Axis()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "dataLabels",
+    "kind": "var",
+    "declaration": "public var dataLabels = DataLabels()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "pie",
+    "kind": "var",
+    "declaration": "public var pie = Pie()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "accessibility",
+    "kind": "var",
+    "declaration": "public var accessibility = Accessibility()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "viewport",
+    "kind": "var",
+    "declaration": "public var viewport = Viewport()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "animation",
+    "kind": "var",
+    "declaration": "public var animation: Animation?",
+    "abstract": "Data changes interpolate using this animation, or the surrounding `withAnimation` transaction. Reduced motion always reaches the target immediately.",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "var",
+    "declaration": "public var label = \"Chart\"",
+    "abstract": "Accessible name of the chart.",
+    "discussion": []
+   },
+   {
+    "name": "ChartConfiguration",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Chart/Model.swift",
+  "line": 336,
+  "owner": "",
+  "overloads": [
+   "public struct ChartConfiguration"
+  ]
+ },
+ {
+  "id": "chart-data-table",
+  "name": "ChartDataTable",
+  "kind": "struct",
+  "declaration": "public struct ChartDataTable: View",
+  "abstract": "A chart's data as a table: one row per x position, one column per series.",
+  "discussion": [
+   "The plot is a picture of this table, and a picture is the one thing a\nscreen reader cannot describe. Here the container carries the table role,\neach row a row role and each value a cell role, so a reader can move by row\nand column and always hear which series a number belongs to.",
+   "```swift\nChart(series, x: .categorical(months)).frame(height: 180)\nChartDataTable(series, x: .categorical(months), label: \"Revenue by month\")\n```",
+   "It is a view of its own rather than a chart option because a table needs\nroom the plot does not have: place it under the chart, beside it, or behind\na \"Show data\" disclosure. `maximumRows` bounds the nodes it creates; past\nthat the table says how many rows it left out rather than growing without\nlimit.",
+   "A numeric x axis gives each series its own x positions, so there is no\nshared row to put them on. Those charts — and only those — list one datum\nper row, naming its series and both of its values."
+  ],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "ChartDataTable",
+    "kind": "init",
+    "declaration": "public init(_ series: [ChartSeries], x: ChartXDomain = .categorical([]), label: String = \"Data\", axisLabel: String = \"\", maximumRows: Int = 100, format: ((Float) -> String)? = nil)",
+    "abstract": "Series over an evenly spaced or numeric x axis.",
+    "discussion": [
+     "- Parameters:\n  - x: the chart's x domain; a numeric one pairs rows by the first\n    series' own x values.\n  - label: the table's accessible name.\n  - axisLabel: heading over the label column. Empty leaves it blank.\n  - maximumRows: rows to build before the table starts counting what it\n    left out.\n  - format: a value as text; the chart's default formatter by default."
+    ]
+   },
+   {
+    "name": "ChartDataTable",
+    "kind": "init",
+    "declaration": "public init(slices: [ChartSlice], label: String = \"Data\", maximumRows: Int = 100, format: ((Float) -> String)? = nil)",
+    "abstract": "Pie and donut slices, with each slice's share of the total.",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Chart/ChartDataTable.swift",
+  "line": 26,
+  "owner": "",
+  "overloads": [
+   "public struct ChartDataTable: View"
+  ]
+ },
+ {
+  "id": "chart-datum",
+  "name": "ChartDatum",
+  "kind": "struct",
+  "declaration": "public struct ChartDatum: Sendable, Equatable",
+  "abstract": "One plotted value and the x position it belongs to.",
+  "discussion": [
+   "A non-finite `y` is a gap: the line breaks there instead of drawing a value\nthat was never measured."
+  ],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "x",
+    "kind": "var",
+    "declaration": "public var x: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "y",
+    "kind": "var",
+    "declaration": "public var y: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ChartDatum",
+    "kind": "init",
+    "declaration": "public init(x: Float, y: Float)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Chart/Model.swift",
+  "line": 20,
+  "owner": "",
+  "overloads": [
+   "public struct ChartDatum: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "chart-histogram",
+  "name": "ChartHistogram",
+  "kind": "struct",
+  "declaration": "public struct ChartHistogram: Sendable",
+  "abstract": "Counts samples into even-width bins, for a distribution chart.",
+  "discussion": [
+   "```swift\nlet histogram = ChartHistogram(binCount: 8).build(latencies, title: \"Latency\")\nChart([histogram.series], x: .categorical(histogram.labels),\n      style: ChartStyle(showsGrid: false, barSpacing: 0)) {\n    $0.axis.y.title = \"Requests\"\n}\n```",
+   "Binning is a data concern, not a drawing one, so it happens here and the\nchart just draws the bars. Each bin is labelled with its edges; samples\noutside an explicit `range` are ignored rather than folded into the end bins,\nwhich would misreport the tails."
+  ],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "binCount",
+    "kind": "var",
+    "declaration": "public var binCount: Int",
+    "abstract": "Number of bins, clamped to 1...64.",
+    "discussion": []
+   },
+   {
+    "name": "range",
+    "kind": "var",
+    "declaration": "public var range: ClosedRange<Float>?",
+    "abstract": "The span to bin over. `nil` fits the samples, so nothing is dropped.",
+    "discussion": []
+   },
+   {
+    "name": "ChartHistogram",
+    "kind": "init",
+    "declaration": "public init(binCount: Int = 10, range: ClosedRange<Float>? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "build",
+    "kind": "func",
+    "declaration": "public func build(_ values: [Float], color: SemanticColorRef = .accent, title: String = \"\") -> Result",
+    "abstract": "Bins the finite samples. Non-finite values never reach a bin.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Chart/Histogram.swift",
+  "line": 20,
+  "owner": "",
+  "overloads": [
+   "public struct ChartHistogram: Sendable"
+  ]
+ },
+ {
+  "id": "chart-mark",
+  "name": "ChartMark",
+  "kind": "enum",
+  "declaration": "public enum ChartMark: Sendable, Equatable",
+  "abstract": "How a series is drawn. Marks can be mixed in one chart; when any series uses bars, every mark is centered on the bar slots so they line up.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Chart/Model.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public enum ChartMark: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "chart-marker",
+  "name": "ChartMarker",
+  "kind": "struct",
+  "declaration": "public struct ChartMarker: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "index",
+    "kind": "var",
+    "declaration": "public var index: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "color",
+    "kind": "var",
+    "declaration": "public var color: SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "width",
+    "kind": "var",
+    "declaration": "public var width: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ChartMarker",
+    "kind": "init",
+    "declaration": "public init(index: Int, color: SemanticColorRef = .accent, width: Float = 1)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Chart/Model.swift",
+  "line": 239,
+  "owner": "",
+  "overloads": [
+   "public struct ChartMarker: Sendable"
+  ]
+ },
+ {
+  "id": "chart-orientation",
+  "name": "ChartOrientation",
+  "kind": "enum",
+  "declaration": "public enum ChartOrientation: Sendable, Equatable",
+  "abstract": "Which screen direction the value axis runs.",
+  "discussion": [
+   "A vertical chart puts categories across the bottom and values up the side.\nA horizontal one puts categories down the left and values along the bottom,\nwhich is what long category names and ranked bars need.",
+   "Orientation is a drawing decision, not a config change: `axis.y` still\nconfigures the value axis and `axis.x` the independent one, whichever edge\neach is drawn against. A log value axis stays `axis.y.kind = .log` when the\nchart turns."
+  ],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Chart/Model.swift",
+  "line": 273,
+  "owner": "",
+  "overloads": [
+   "public enum ChartOrientation: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "chart-point",
+  "name": "ChartPoint",
+  "kind": "struct",
+  "declaration": "public struct ChartPoint: Hashable, Sendable",
+  "abstract": "A selected value: the series index (or 0 for a pie) and the value index (or slice).",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "series",
+    "kind": "var",
+    "declaration": "public var series: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "index",
+    "kind": "var",
+    "declaration": "public var index: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ChartPoint",
+    "kind": "init",
+    "declaration": "public init(series: Int, index: Int)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Chart/Model.swift",
+  "line": 325,
+  "owner": "",
+  "overloads": [
+   "public struct ChartPoint: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "chart-scale-kind",
+  "name": "ChartScaleKind",
+  "kind": "enum",
+  "declaration": "public enum ChartScaleKind: Sendable, Equatable",
+  "abstract": "How an axis spaces its values.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Chart/Model.swift",
+  "line": 58,
+  "owner": "",
+  "overloads": [
+   "public enum ChartScaleKind: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "chart-series",
+  "name": "ChartSeries",
+  "kind": "struct",
+  "declaration": "public struct ChartSeries: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "data",
+    "kind": "var",
+    "declaration": "public var data: [ChartDatum]",
+    "abstract": "The plotted values, in x order.",
+    "discussion": []
+   },
+   {
+    "name": "color",
+    "kind": "var",
+    "declaration": "public var color: SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "mark",
+    "kind": "var",
+    "declaration": "public var mark: ChartMark",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "title",
+    "kind": "var",
+    "declaration": "public var title: String",
+    "abstract": "Legend and selection name. An empty title keeps the series out of the legend.",
+    "discussion": []
+   },
+   {
+    "name": "axis",
+    "kind": "var",
+    "declaration": "public var axis: ChartValueAxis",
+    "abstract": "The value axis this series reads. A chart with any `.right` series grows a right-hand axis fitted to those series alone.",
+    "discussion": []
+   },
+   {
+    "name": "style",
+    "kind": "var",
+    "declaration": "public var style: ChartSeriesStyle",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ChartSeries",
+    "kind": "init",
+    "declaration": "public init(_ values: [Float], color: SemanticColorRef = .accent, mark: ChartMark = .line, title: String = \"\", axis: ChartValueAxis = .left, style: ChartSeriesStyle = ChartSeriesStyle())",
+    "abstract": "A series on evenly spaced slots; each datum's x is its index.",
+    "discussion": []
+   },
+   {
+    "name": "ChartSeries",
+    "kind": "init",
+    "declaration": "public init(points: [ChartDatum], color: SemanticColorRef = .accent, mark: ChartMark = .line, title: String = \"\", axis: ChartValueAxis = .left, style: ChartSeriesStyle = ChartSeriesStyle())",
+    "abstract": "A series on explicit x positions, for a `.numeric` x domain. A line or area series is drawn in data order, so sort by x first.",
+    "discussion": []
+   },
+   {
+    "name": "line",
+    "kind": "func",
+    "declaration": "public static func line(_ values: [Float], color: SemanticColorRef = .accent, title: String = \"\", axis: ChartValueAxis = .left, style: ChartSeriesStyle = ChartSeriesStyle()) -> ChartSeries",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "area",
+    "kind": "func",
+    "declaration": "public static func area(_ values: [Float], color: SemanticColorRef = .accent, title: String = \"\", axis: ChartValueAxis = .left, style: ChartSeriesStyle = ChartSeriesStyle()) -> ChartSeries",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "bar",
+    "kind": "func",
+    "declaration": "public static func bar(_ values: [Float], color: SemanticColorRef = .accent, title: String = \"\", axis: ChartValueAxis = .left, style: ChartSeriesStyle = ChartSeriesStyle()) -> ChartSeries",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "points",
+    "kind": "func",
+    "declaration": "public static func points(x: [Float], y: [Float], color: SemanticColorRef = .accent, title: String = \"\", axis: ChartValueAxis = .left, style: ChartSeriesStyle = ChartSeriesStyle()) -> ChartSeries",
+    "abstract": "A scatter series; `x` and `y` are paired by index and truncated to the shorter one.",
+    "discussion": []
+   },
+   {
+    "name": "points",
+    "kind": "func",
+    "declaration": "public static func points(_ points: [ChartDatum], color: SemanticColorRef = .accent, title: String = \"\", axis: ChartValueAxis = .left, style: ChartSeriesStyle = ChartSeriesStyle()) -> ChartSeries",
+    "abstract": "A scatter series over prepared points.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Chart/Model.swift",
+  "line": 97,
+  "owner": "",
+  "overloads": [
+   "public struct ChartSeries: Sendable"
+  ]
+ },
+ {
+  "id": "chart-series-style",
+  "name": "ChartSeriesStyle",
+  "kind": "struct",
+  "declaration": "public struct ChartSeriesStyle: Sendable, Equatable",
+  "abstract": "Per-series drawing overrides. `ChartStyle` holds the chart-wide defaults.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "lineWidth",
+    "kind": "var",
+    "declaration": "public var lineWidth: Float?",
+    "abstract": "Stroke width; nil follows `ChartStyle.lineWidth`.",
+    "discussion": []
+   },
+   {
+    "name": "dash",
+    "kind": "var",
+    "declaration": "public var dash: [Float]",
+    "abstract": "Alternating on/off lengths in points. Fewer than two entries draws a solid stroke.",
+    "discussion": []
+   },
+   {
+    "name": "curve",
+    "kind": "var",
+    "declaration": "public var curve: Bool",
+    "abstract": "Smooths line and area runs into a monotone cubic instead of straight segments. Runs whose x is not strictly increasing stay straight.",
+    "discussion": []
+   },
+   {
+    "name": "pointRadius",
+    "kind": "var",
+    "declaration": "public var pointRadius: Float",
+    "abstract": "Radius of `point` marks.",
+    "discussion": []
+   },
+   {
+    "name": "fillOpacity",
+    "kind": "var",
+    "declaration": "public var fillOpacity: Float",
+    "abstract": "Alpha of the area fill.",
+    "discussion": []
+   },
+   {
+    "name": "showsValues",
+    "kind": "var",
+    "declaration": "public var showsValues: Bool",
+    "abstract": "Writes each value next to its mark, formatted by `ChartConfiguration.dataLabels.format`. Labels that would collide are dropped, so a dense series stays readable.",
+    "discussion": []
+   },
+   {
+    "name": "ChartSeriesStyle",
+    "kind": "init",
+    "declaration": "public init(lineWidth: Float? = nil, dash: [Float] = [], curve: Bool = false, pointRadius: Float = 3.5, fillOpacity: Float = 0.2, showsValues: Bool = false)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Chart/Model.swift",
+  "line": 68,
+  "owner": "",
+  "overloads": [
+   "public struct ChartSeriesStyle: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "chart-slice",
+  "name": "ChartSlice",
+  "kind": "struct",
+  "declaration": "public struct ChartSlice: Sendable",
+  "abstract": "One part of a pie or donut chart. Without a color, slices take the categorical palette in order.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "value",
+    "kind": "var",
+    "declaration": "public var value: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "title",
+    "kind": "var",
+    "declaration": "public var title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "color",
+    "kind": "var",
+    "declaration": "public var color: SemanticColorRef?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ChartSlice",
+    "kind": "init",
+    "declaration": "public init(_ title: String, value: Float, color: SemanticColorRef? = nil)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Chart/Model.swift",
+  "line": 173,
+  "owner": "",
+  "overloads": [
+   "public struct ChartSlice: Sendable"
+  ]
+ },
+ {
+  "id": "chart-stacking",
+  "name": "ChartStacking",
+  "kind": "enum",
+  "declaration": "public enum ChartStacking: Sendable, Equatable",
+  "abstract": "Whether bar and area series accumulate per index.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Chart/Model.swift",
+  "line": 252,
+  "owner": "",
+  "overloads": [
+   "public enum ChartStacking: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "chart-style",
+  "name": "ChartStyle",
+  "kind": "struct",
+  "declaration": "public struct ChartStyle: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "minValue",
+    "kind": "var",
+    "declaration": "public var minValue: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maxValue",
+    "kind": "var",
+    "declaration": "public var maxValue: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showsGrid",
+    "kind": "var",
+    "declaration": "public var showsGrid: Bool",
+    "abstract": "Draws a line at every value-axis tick. The tick values come from `ChartConfiguration.axis.y.tickCount`, so grid lines land on round numbers.",
+    "discussion": []
+   },
+   {
+    "name": "lineWidth",
+    "kind": "var",
+    "declaration": "public var lineWidth: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "barSpacing",
+    "kind": "var",
+    "declaration": "public var barSpacing: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "contentInset",
+    "kind": "var",
+    "declaration": "public var contentInset: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "background",
+    "kind": "var",
+    "declaration": "public var background: SemanticColorRef?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "gridColor",
+    "kind": "var",
+    "declaration": "public var gridColor: SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "stacking",
+    "kind": "var",
+    "declaration": "public var stacking: ChartStacking",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "innerRadiusRatio",
+    "kind": "var",
+    "declaration": "public var innerRadiusRatio: Float",
+    "abstract": "Donut hole as a fraction of the radius; 0 draws a full pie.",
+    "discussion": []
+   },
+   {
+    "name": "orientation",
+    "kind": "var",
+    "declaration": "public var orientation: ChartOrientation",
+    "abstract": "Which way the value axis runs. Ignored by a pie.",
+    "discussion": []
+   },
+   {
+    "name": "ChartStyle",
+    "kind": "init",
+    "declaration": "public init(minValue: Float? = nil, maxValue: Float? = nil, showsGrid: Bool = true, lineWidth: Float = 2, barSpacing: Float = 2, contentInset: Float = 4, background: SemanticColorRef? = nil, gridColor: SemanticColorRef = .divider, stacking: ChartStacking = .none, innerRadiusRatio: Float = 0.6, orientation: ChartOrientation = .vertical)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "sparkline",
+    "kind": "var",
+    "declaration": "public static var sparkline: ChartStyle",
+    "abstract": "A compact trend line: no grid, a thin stroke and a small inset. Pair it with `axis.x.isLabeled = false` and `axis.y.isLabeled = false`.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Chart/Model.swift",
+  "line": 278,
+  "owner": "",
+  "overloads": [
+   "public struct ChartStyle: Sendable"
+  ]
+ },
+ {
+  "id": "chart-threshold",
+  "name": "ChartThreshold",
+  "kind": "struct",
+  "declaration": "public struct ChartThreshold: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "value",
+    "kind": "var",
+    "declaration": "public var value: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "color",
+    "kind": "var",
+    "declaration": "public var color: SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "var",
+    "declaration": "public var label: String",
+    "abstract": "Drawn at the right end of the rule. Empty draws no text.",
+    "discussion": []
+   },
+   {
+    "name": "axis",
+    "kind": "var",
+    "declaration": "public var axis: ChartValueAxis",
+    "abstract": "The value axis the rule belongs to; a rule on the right axis measures against that axis, not the left one.",
+    "discussion": []
+   },
+   {
+    "name": "ChartThreshold",
+    "kind": "init",
+    "declaration": "public init(value: Float, color: SemanticColorRef = .warning, label: String = \"\", axis: ChartValueAxis = .left)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Chart/Model.swift",
+  "line": 185,
+  "owner": "",
+  "overloads": [
+   "public struct ChartThreshold: Sendable"
+  ]
+ },
+ {
+  "id": "chart-value-axis",
+  "name": "ChartValueAxis",
+  "kind": "enum",
+  "declaration": "public enum ChartValueAxis: Sendable, Equatable",
+  "abstract": "Which value axis a series reads.",
+  "discussion": [
+   "The left axis fits itself to the series on it and the right axis to its own,\nso a count and a rate share one plot without either flattening the other.\nStacking, thresholds and bands are per axis too."
+  ],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Chart/Model.swift",
+  "line": 52,
+  "owner": "",
+  "overloads": [
+   "public enum ChartValueAxis: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "chart-x-domain",
+  "name": "ChartXDomain",
+  "kind": "enum",
+  "declaration": "public enum ChartXDomain: Sendable, Equatable",
+  "abstract": "How x positions are read for every series in one chart.",
+  "discussion": [
+   "The domain belongs to the chart, not to a series: mixing a bar series and a\nscatter series reads both off the same axis."
+  ],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "isNumeric",
+    "kind": "var",
+    "declaration": "public var isNumeric: Bool",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Chart/Model.swift",
+  "line": 34,
+  "owner": "",
+  "overloads": [
+   "public enum ChartXDomain: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "data-table",
+  "name": "DataTable",
+  "kind": "struct",
+  "declaration": "public struct DataTable<Record: Sendable, ID: Hashable & Sendable>: View",
+  "abstract": "A persistent row model, fixed header, frozen leading columns and two-axis cell window. Only visible rows/columns plus overscan create view nodes. Row selection and cell edit drafts are transient, independent of the model.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "model",
+    "kind": "let",
+    "declaration": "public let model: DataTableModel<Record, ID>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "options",
+    "kind": "var",
+    "declaration": "public var options = DataTableOptions<ID>()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onActivate",
+    "kind": "var",
+    "declaration": "public var onActivate: ((Record) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rowHeight",
+    "kind": "var",
+    "declaration": "public var rowHeight: ((Record) -> Float)?",
+    "abstract": "Per-record logical height (scaled with text). `nil` keeps every row at `options.layout.rowHeight`, which also remains the minimum.",
+    "discussion": []
+   },
+   {
+    "name": "DataTable",
+    "kind": "init",
+    "declaration": "public init(_ model: DataTableModel<Record, ID>, columns: [TableColumn<Record>], configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTable.swift",
+  "line": 111,
+  "owner": "",
+  "overloads": [
+   "public struct DataTable<Record: Sendable, ID: Hashable & Sendable>: View"
+  ]
+ },
+ {
+  "id": "data-table-navigation",
+  "name": "DataTableNavigation",
+  "kind": "struct",
+  "declaration": "public struct DataTableNavigation<ID: Hashable & Sendable>",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable"
+  ],
+  "members": [
+   {
+    "name": "requestID",
+    "kind": "var",
+    "declaration": "public var requestID: AnyHashable?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rowID",
+    "kind": "var",
+    "declaration": "public var rowID: ID?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "columnID",
+    "kind": "var",
+    "declaration": "public var columnID: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "DataTableNavigation",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTable.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct DataTableNavigation<ID: Hashable & Sendable>"
+  ]
+ },
+ {
+  "id": "data-table-options",
+  "name": "DataTableOptions",
+  "kind": "struct",
+  "declaration": "public struct DataTableOptions<ID: Hashable & Sendable>",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable"
+  ],
+  "members": [
+   {
+    "name": "selection",
+    "kind": "var",
+    "declaration": "public var selection: Binding<DataTableSelection<ID>>?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "selectionMode",
+    "kind": "var",
+    "declaration": "public var selectionMode: DataTableSelectionMode = .multiple",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "columnWidths",
+    "kind": "var",
+    "declaration": "public var columnWidths: Binding<[String: Float]>?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "columnVisibility",
+    "kind": "var",
+    "declaration": "public var columnVisibility: Binding<[String: Bool]>?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "columnOrder",
+    "kind": "var",
+    "declaration": "public var columnOrder: Binding<[String]>?",
+    "abstract": "Display order by column ID; header drags and Option/Alt+Left/Right write it.",
+    "discussion": []
+   },
+   {
+    "name": "layout",
+    "kind": "var",
+    "declaration": "public var layout = TableLayout()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "frozenColumnCount",
+    "kind": "var",
+    "declaration": "public var frozenColumnCount = 1",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "navigation",
+    "kind": "var",
+    "declaration": "public var navigation = DataTableNavigation<ID>()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "DataTableOptions",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTable.swift",
+  "line": 12,
+  "owner": "",
+  "overloads": [
+   "public struct DataTableOptions<ID: Hashable & Sendable>"
+  ]
+ },
+ {
+  "id": "data-table-selection",
+  "name": "DataTableSelection",
+  "kind": "struct",
+  "declaration": "public struct DataTableSelection<ID: Hashable & Sendable>: Equatable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "selectedIDs",
+    "kind": "var",
+    "declaration": "public var selectedIDs: Set<ID> = []",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "focusedID",
+    "kind": "var",
+    "declaration": "public var focusedID: ID?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "anchorID",
+    "kind": "var",
+    "declaration": "public var anchorID: ID?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "focusedColumnID",
+    "kind": "var",
+    "declaration": "public var focusedColumnID: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "DataTableSelection",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "select",
+    "kind": "func",
+    "declaration": "public mutating func select<Record>(index: Int, in model: DataTableModel<Record, ID>, mode: DataTableSelectionMode, modifiers: KeyModifiers = [])",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "retainExisting",
+    "kind": "func",
+    "declaration": "public mutating func retainExisting<Record>(in model: DataTableModel<Record, ID>)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableSelection.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct DataTableSelection<ID: Hashable & Sendable>: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "data-table-selection-mode",
+  "name": "DataTableSelectionMode",
+  "kind": "enum",
+  "declaration": "public enum DataTableSelectionMode: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableSelection.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public enum DataTableSelectionMode: Sendable"
+  ]
+ },
+ {
+  "id": "data-table-sorting-status",
+  "name": "DataTableSortingStatus",
+  "kind": "struct",
+  "declaration": "public struct DataTableSortingStatus: Equatable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "DataTableSortingStatus",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableModel.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct DataTableSortingStatus: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "list",
+  "name": "List",
+  "kind": "struct",
+  "declaration": "public struct List<Data: RandomAccessCollection, ID: Hashable, RowContent: View>: View",
+  "abstract": "Vertical, virtualized list with single or multiple selection.",
+  "discussion": [
+   "Pass `Binding<ID?>` for single selection or `Binding<Set<ID>>` for\nmultiple selection. With multiple selection a plain click selects one row,\nShift-click extends from the anchor, Cmd/Ctrl-click toggles, Shift+Arrow\nextends, Space toggles the cursor row and Cmd/Ctrl+A selects everything.\nVisual chrome is delegated to the active `ListRowStyle`."
+  ],
+  "availability": [],
+  "conforms": [
+   "RandomAccessCollection"
+  ],
+  "members": [
+   {
+    "name": "List",
+    "kind": "init",
+    "declaration": "public init(_ data: Data, id: KeyPath<Data.Element, ID>, selection: Binding<ID?> = .constant(nil), rowHeight: Float? = nil, rowSpacing: Float = 0, onActivate: ((Data.Element) -> Void)? = nil, refresh: RefreshOptions? = nil, @ViewBuilder rowContent: @escaping (Data.Element, Bool) -> RowContent)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "List",
+    "kind": "init",
+    "declaration": "public init(_ data: Data, id: KeyPath<Data.Element, ID>, selection: Binding<Set<ID>>, rowHeight: Float? = nil, rowSpacing: Float = 0, onActivate: ((Data.Element) -> Void)? = nil, refresh: RefreshOptions? = nil, @ViewBuilder rowContent: @escaping (Data.Element, Bool) -> RowContent)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "List",
+    "kind": "init",
+    "declaration": "init(_ data: Data, selection: Binding<ID?> = .constant(nil), rowHeight: Float? = nil, rowSpacing: Float = 0, onActivate: ((Data.Element) -> Void)? = nil, refresh: RefreshOptions? = nil, @ViewBuilder rowContent: @escaping (Data.Element, Bool) -> RowContent)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "List",
+    "kind": "init",
+    "declaration": "init(_ data: Data, selection: Binding<Set<ID>>, rowHeight: Float? = nil, rowSpacing: Float = 0, onActivate: ((Data.Element) -> Void)? = nil, refresh: RefreshOptions? = nil, @ViewBuilder rowContent: @escaping (Data.Element, Bool) -> RowContent)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/List.swift",
+  "line": 13,
+  "owner": "",
+  "overloads": [
+   "public struct List<Data: RandomAccessCollection, ID: Hashable, RowContent: View>: View"
+  ]
+ },
+ {
+  "id": "list-group",
+  "name": "ListGroup",
+  "kind": "struct",
+  "declaration": "public struct ListGroup<Content: View>: View",
+  "abstract": "Inset grouped rows: an optional caption, then the rows on one rounded surface, separated by hairlines that start at the row content. The shape phones use for settings and detail screens; touch surfaces get taller rows and rounder corners.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "ListGroup",
+    "kind": "init",
+    "declaration": "public init(_ title: String? = nil, footer: String? = nil, @ViewBuilder content: () -> Content)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/InsetGroup.swift",
+  "line": 11,
+  "owner": "",
+  "overloads": [
+   "public struct ListGroup<Content: View>: View"
+  ]
+ },
+ {
+  "id": "list-row",
+  "name": "ListRow",
+  "kind": "struct",
+  "declaration": "public struct ListRow<Leading: View, Trailing: View>: View",
+  "abstract": "Title and fixed slots. Touch rows stay within their proposal; desktop rows retain horizontal overflow for dense, independently authored accessory slots.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "ListRow",
+    "kind": "init",
+    "declaration": "public init(_ title: String, configure: (inout ListRowOptions) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ListRow",
+    "kind": "init",
+    "declaration": "init(_ title: String, configure: (inout ListRowOptions) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/Row.swift",
+  "line": 15,
+  "owner": "",
+  "overloads": [
+   "public struct ListRow<Leading: View, Trailing: View>: View"
+  ]
+ },
+ {
+  "id": "list-row-options",
+  "name": "ListRowOptions",
+  "kind": "struct",
+  "declaration": "public struct ListRowOptions",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "subtitle",
+    "kind": "var",
+    "declaration": "public var subtitle: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "role",
+    "kind": "var",
+    "declaration": "public var role: ButtonRole = .normal",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showsDisclosure",
+    "kind": "var",
+    "declaration": "public var showsDisclosure = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ListRowOptions",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/Row.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct ListRowOptions"
+  ]
+ },
+ {
+  "id": "list-section",
+  "name": "ListSection",
+  "kind": "struct",
+  "declaration": "public struct ListSection<SectionID: Hashable, Item>",
+  "abstract": "One flat section in a `SectionedList`. Headers and footers are optional; headers can be pinned while their section scrolls (see `stickyHeaders`).",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable"
+  ],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: SectionID",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "title",
+    "kind": "var",
+    "declaration": "public var title: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "footer",
+    "kind": "var",
+    "declaration": "public var footer: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "items",
+    "kind": "var",
+    "declaration": "public var items: [Item]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ListSection",
+    "kind": "init",
+    "declaration": "public init(_ id: SectionID, title: String? = nil, footer: String? = nil, items: [Item])",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/SectionedList.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public struct ListSection<SectionID: Hashable, Item>"
+  ]
+ },
+ {
+  "id": "observed",
+  "name": "Observed",
+  "kind": "struct",
+  "declaration": "public struct Observed<Object: AnyObject & _ObservableObject, Value: Equatable>: DynamicProperty, _StateErased",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "AnyObject",
+   "_StateErased"
+  ],
+  "members": [
+   {
+    "name": "Observed",
+    "kind": "init",
+    "declaration": "public init(_ keyPath: KeyPath<Object, Value>, on object: Object)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "wrappedValue",
+    "kind": "var",
+    "declaration": "public var wrappedValue: Value",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "projectedValue",
+    "kind": "var",
+    "declaration": "public var projectedValue: Binding<Value>",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Observed.swift",
+  "line": 10,
+  "owner": "",
+  "overloads": [
+   "public struct Observed<Object: AnyObject & _ObservableObject, Value: Equatable>: DynamicProperty, _StateErased"
+  ]
+ },
+ {
+  "id": "property-grid",
+  "name": "PropertyGrid",
+  "kind": "struct",
+  "declaration": "public struct PropertyGrid: View",
+  "abstract": "Two-column inspector grid with collapsible section headers. The call site owns the value controls; the primitive only handles layout.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "sections",
+    "kind": "let",
+    "declaration": "public let sections: [PropertyGridSection]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "labelWidth",
+    "kind": "let",
+    "declaration": "public let labelWidth: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minValueWidth",
+    "kind": "let",
+    "declaration": "public let minValueWidth: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "labelPlacement",
+    "kind": "let",
+    "declaration": "public let labelPlacement: FieldLabelPlacement",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rowHeight",
+    "kind": "let",
+    "declaration": "public let rowHeight: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rowSpacing",
+    "kind": "let",
+    "declaration": "public let rowSpacing: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "sectionSpacing",
+    "kind": "let",
+    "declaration": "public let sectionSpacing: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "contentPadding",
+    "kind": "let",
+    "declaration": "public let contentPadding: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "scrollAxes",
+    "kind": "let",
+    "declaration": "public let scrollAxes: PropertyGridScrollAxes",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "emptyText",
+    "kind": "let",
+    "declaration": "public let emptyText: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "collapsedSectionIDs",
+    "kind": "let",
+    "declaration": "public let collapsedSectionIDs: Set<String>?",
+    "abstract": "When provided, expansion is controlled by the caller rather than the grid's local state (useful for search and Expand/Collapse All commands).",
+    "discussion": []
+   },
+   {
+    "name": "onSectionCollapseChanged",
+    "kind": "let",
+    "declaration": "public let onSectionCollapseChanged: ((String, Bool) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "PropertyGrid",
+    "kind": "init",
+    "declaration": "public init(_ sections: [PropertyGridSection], labelWidth: Float = 96, minValueWidth: Float = 220, labelPlacement: FieldLabelPlacement = .adaptive, rowHeight: Float = 24, rowSpacing: Float = 1, sectionSpacing: Float = 10, contentPadding: Float = 8, scrollAxes: PropertyGridScrollAxes = .both, emptyText: String = \"No properties\", collapsedSectionIDs: Set<String>? = nil, onSectionCollapseChanged: ((String, Bool) -> Void)? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/PropertyGrid.swift",
+  "line": 101,
+  "owner": "",
+  "overloads": [
+   "public struct PropertyGrid: View"
+  ]
+ },
+ {
+  "id": "property-grid-row",
+  "name": "PropertyGridRow",
+  "kind": "struct",
+  "declaration": "public struct PropertyGridRow: Identifiable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Identifiable"
+  ],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "let",
+    "declaration": "public let label: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rowHeight",
+    "kind": "let",
+    "declaration": "public let rowHeight: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "layout",
+    "kind": "let",
+    "declaration": "public let layout: PropertyGridRowLayout",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "sizing",
+    "kind": "let",
+    "declaration": "public let sizing: PropertyGridRowSizing",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "value",
+    "kind": "let",
+    "declaration": "public let value: AnyView",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "PropertyGridRow",
+    "kind": "init",
+    "declaration": "public init<ValueContent: View>(id: String, label: String, rowHeight: Float? = nil, layout: PropertyGridRowLayout = .twoColumn, sizing: PropertyGridRowSizing = .intrinsic, @ViewBuilder value: () -> ValueContent)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/PropertyGrid.swift",
+  "line": 29,
+  "owner": "",
+  "overloads": [
+   "public struct PropertyGridRow: Identifiable"
+  ]
+ },
+ {
+  "id": "property-grid-row-layout",
+  "name": "PropertyGridRowLayout",
+  "kind": "enum",
+  "declaration": "public enum PropertyGridRowLayout: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/PropertyGrid.swift",
+  "line": 15,
+  "owner": "",
+  "overloads": [
+   "public enum PropertyGridRowLayout: Sendable"
+  ]
+ },
+ {
+  "id": "property-grid-row-sizing",
+  "name": "PropertyGridRowSizing",
+  "kind": "enum",
+  "declaration": "public enum PropertyGridRowSizing: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/PropertyGrid.swift",
+  "line": 20,
+  "owner": "",
+  "overloads": [
+   "public enum PropertyGridRowSizing: Sendable"
+  ]
+ },
+ {
+  "id": "property-grid-scroll-axes",
+  "name": "PropertyGridScrollAxes",
+  "kind": "enum",
+  "declaration": "public enum PropertyGridScrollAxes",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/PropertyGrid.swift",
+  "line": 93,
+  "owner": "",
+  "overloads": [
+   "public enum PropertyGridScrollAxes"
+  ]
+ },
+ {
+  "id": "property-grid-section",
+  "name": "PropertyGridSection",
+  "kind": "struct",
+  "declaration": "public struct PropertyGridSection: Identifiable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Identifiable"
+  ],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "title",
+    "kind": "let",
+    "declaration": "public let title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rows",
+    "kind": "let",
+    "declaration": "public let rows: [PropertyGridRow]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "children",
+    "kind": "let",
+    "declaration": "public let children: [PropertyGridSection]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "headerLeading",
+    "kind": "let",
+    "declaration": "public let headerLeading: AnyView?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "headerTrailing",
+    "kind": "let",
+    "declaration": "public let headerTrailing: AnyView?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "footer",
+    "kind": "let",
+    "declaration": "public let footer: AnyView?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "badge",
+    "kind": "let",
+    "declaration": "public let badge: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showsRowCount",
+    "kind": "let",
+    "declaration": "public let showsRowCount: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isCollapsible",
+    "kind": "let",
+    "declaration": "public let isCollapsible: Bool",
+    "abstract": "When `true`, the header renders a collapse chevron and rows can be hidden by clicking it. `false` disables the affordance entirely.",
+    "discussion": []
+   },
+   {
+    "name": "startsCollapsed",
+    "kind": "let",
+    "declaration": "public let startsCollapsed: Bool",
+    "abstract": "Initial collapse state. Only relevant when `isCollapsible` is `true`.",
+    "discussion": []
+   },
+   {
+    "name": "PropertyGridSection",
+    "kind": "init",
+    "declaration": "public init(id: String, title: String, rows: [PropertyGridRow], isCollapsible: Bool = false, startsCollapsed: Bool = false, children: [PropertyGridSection] = [], headerLeading: AnyView? = nil, headerTrailing: AnyView? = nil, footer: AnyView? = nil, badge: String? = nil, showsRowCount: Bool = true)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/PropertyGrid.swift",
+  "line": 52,
+  "owner": "",
+  "overloads": [
+   "public struct PropertyGridSection: Identifiable"
+  ]
+ },
+ {
+  "id": "refresh-options",
+  "name": "RefreshOptions",
+  "kind": "struct",
+  "declaration": "public struct RefreshOptions",
+  "abstract": "Pull-to-refresh configuration for `List` and `VirtualStack`.",
+  "discussion": [
+   "The caller owns the asynchronous work: `action` starts it, and\n`isRefreshing` drives the indicator until the work finishes. The indicator\nappears when the touch pull crosses `threshold`, and Cmd+R / Ctrl+R invokes\nthe same action while focus is inside the list."
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "isRefreshing",
+    "kind": "let",
+    "declaration": "public let isRefreshing: Binding<Bool>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "threshold",
+    "kind": "let",
+    "declaration": "public let threshold: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "action",
+    "kind": "let",
+    "declaration": "public let action: () -> Void",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "RefreshOptions",
+    "kind": "init",
+    "declaration": "public init(isRefreshing: Binding<Bool>, threshold: Float = 64, action: @escaping () -> Void)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/Refresh.swift",
+  "line": 12,
+  "owner": "",
+  "overloads": [
+   "public struct RefreshOptions"
+  ]
+ },
+ {
+  "id": "reorderable-list",
+  "name": "ReorderableList",
+  "kind": "struct",
+  "declaration": "public struct ReorderableList<Data: RandomAccessCollection, ID: Hashable, RowContent: View>: View",
+  "abstract": "Vertical list whose rows can be reordered with a drag handle or the keyboard. The caller owns the order: `onMove` receives the source index and the final index after the row is removed, and is expected to mutate the backing collection.",
+  "discussion": [
+   "The handle is a 44pt-wide target and is the only drag surface, so row\ncontent keeps its own buttons and taps. While dragging, a 2pt accent line\nmarks the insertion boundary; Escape cancels without calling `onMove`.\nKeyboard users focus the handle and use Up/Down; assistive clients get the\nsame operations through increment/decrement."
+  ],
+  "availability": [],
+  "conforms": [
+   "RandomAccessCollection"
+  ],
+  "members": [
+   {
+    "name": "data",
+    "kind": "let",
+    "declaration": "public let data: Data",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: KeyPath<Data.Element, ID>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rowHeight",
+    "kind": "let",
+    "declaration": "public let rowHeight: Float",
+    "abstract": "Authored logical row height, before text scaling and the touch floor.",
+    "discussion": []
+   },
+   {
+    "name": "rowSpacing",
+    "kind": "let",
+    "declaration": "public let rowSpacing: Float",
+    "abstract": "Authored logical row spacing, before text scaling.",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onMove",
+    "kind": "let",
+    "declaration": "public let onMove: (Int, Int) -> Void",
+    "abstract": "Called with `(from, to)`, where `to` is the final index after removal.",
+    "discussion": []
+   },
+   {
+    "name": "rowLabel",
+    "kind": "let",
+    "declaration": "public let rowLabel: (Data.Element) -> String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rowContent",
+    "kind": "let",
+    "declaration": "public let rowContent: (Data.Element, Bool) -> RowContent",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ReorderableList",
+    "kind": "init",
+    "declaration": "public init(_ data: Data, id: KeyPath<Data.Element, ID>, rowHeight: Float = 36, rowSpacing: Float = 0, isEnabled: Bool = true, rowLabel: @escaping (Data.Element) -> String =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/Reorder/Reorderable.swift",
+  "line": 16,
+  "owner": "",
+  "overloads": [
+   "public struct ReorderableList<Data: RandomAccessCollection, ID: Hashable, RowContent: View>: View"
+  ]
+ },
+ {
+  "id": "sectioned-list",
+  "name": "SectionedList",
+  "kind": "struct",
+  "declaration": "public struct SectionedList<SectionID: Hashable, Item: Identifiable, RowContent: View>: View",
+  "abstract": "Vertically virtualized list with flat section headers/footers. Selection and keyboard navigation only visit item rows; headers are non-focusable. With `stickyHeaders`, the active section title stays pinned to the top of the viewport and is pushed out by the next section header.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable"
+  ],
+  "members": [
+   {
+    "name": "sections",
+    "kind": "let",
+    "declaration": "public let sections: [ListSection<SectionID, Item>]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "selection",
+    "kind": "let",
+    "declaration": "public let selection: Binding<Item.ID?>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rowHeight",
+    "kind": "let",
+    "declaration": "public let rowHeight: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rowSpacing",
+    "kind": "let",
+    "declaration": "public let rowSpacing: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "stickyHeaders",
+    "kind": "let",
+    "declaration": "public let stickyHeaders: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "stickyHeaderBackground",
+    "kind": "let",
+    "declaration": "public let stickyHeaderBackground: SemanticColorRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onActivate",
+    "kind": "let",
+    "declaration": "public let onActivate: ((Item) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rowContent",
+    "kind": "let",
+    "declaration": "public let rowContent: (Item, Bool) -> RowContent",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SectionedList",
+    "kind": "init",
+    "declaration": "public init(_ sections: [ListSection<SectionID, Item>], selection: Binding<Item.ID?> = .constant(nil), rowHeight: Float? = nil, rowSpacing: Float = 0, stickyHeaders: Bool = false, stickyHeaderBackground: SemanticColorRef = .surfaceRaised, onActivate: ((Item) -> Void)? = nil, @ViewBuilder rowContent: @escaping (Item, Bool) -> RowContent)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/SectionedList.swift",
+  "line": 25,
+  "owner": "",
+  "overloads": [
+   "public struct SectionedList<SectionID: Hashable, Item: Identifiable, RowContent: View>: View"
+  ]
+ },
+ {
+  "id": "swipe-action",
+  "name": "SwipeAction",
+  "kind": "struct",
+  "declaration": "public struct SwipeAction: Identifiable",
+  "abstract": "One trailing action on a `SwipeList` row. The swipe surface shows at most two actions; the row's always-available actions menu exposes every entry, so pointer, keyboard and assistive clients are never limited to swiping.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Identifiable"
+  ],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: AnyHashable",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "title",
+    "kind": "let",
+    "declaration": "public let title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "tone",
+    "kind": "let",
+    "declaration": "public let tone: StatusTone",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "action",
+    "kind": "let",
+    "declaration": "public let action: () -> Void",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SwipeAction",
+    "kind": "init",
+    "declaration": "public init<ID: Hashable>(id: ID, title: String, tone: StatusTone = .neutral, isEnabled: Bool = true, action: @escaping () -> Void)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SwipeAction",
+    "kind": "init",
+    "declaration": "public init(title: String, tone: StatusTone = .neutral, isEnabled: Bool = true, action: @escaping () -> Void)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/SwipeList.swift",
+  "line": 10,
+  "owner": "",
+  "overloads": [
+   "public struct SwipeAction: Identifiable"
+  ]
+ },
+ {
+  "id": "swipe-list",
+  "name": "SwipeList",
+  "kind": "struct",
+  "declaration": "public struct SwipeList<Data: RandomAccessCollection, ID: Hashable, RowContent: View>: View",
+  "abstract": "Vertical list with trailing swipe actions. Selection and keyboard navigation follow `List`; a swipe toward the logical leading edge reveals two actions. Every row also carries an actions menu, so the same commands are reachable with a pointer, keyboard or screen reader.",
+  "discussion": [
+   "The list mounts all rows (like `ReorderableList`); use it for settings,\ninbox rows and playlists rather than unbounded collections."
+  ],
+  "availability": [],
+  "conforms": [
+   "RandomAccessCollection"
+  ],
+  "members": [
+   {
+    "name": "data",
+    "kind": "let",
+    "declaration": "public let data: Data",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: KeyPath<Data.Element, ID>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "selection",
+    "kind": "let",
+    "declaration": "public let selection: Binding<ID?>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rowHeight",
+    "kind": "let",
+    "declaration": "public let rowHeight: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rowSpacing",
+    "kind": "let",
+    "declaration": "public let rowSpacing: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rowLabel",
+    "kind": "let",
+    "declaration": "public let rowLabel: (Data.Element) -> String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "actions",
+    "kind": "let",
+    "declaration": "public let actions: (Data.Element) -> [SwipeAction]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onActivate",
+    "kind": "let",
+    "declaration": "public let onActivate: ((Data.Element) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rowContent",
+    "kind": "let",
+    "declaration": "public let rowContent: (Data.Element, Bool) -> RowContent",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SwipeList",
+    "kind": "init",
+    "declaration": "public init(_ data: Data, id: KeyPath<Data.Element, ID>, selection: Binding<ID?> = .constant(nil), rowHeight: Float = 36, rowSpacing: Float = 0, isEnabled: Bool = true, rowLabel: @escaping (Data.Element) -> String =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/SwipeList.swift",
+  "line": 45,
+  "owner": "",
+  "overloads": [
+   "public struct SwipeList<Data: RandomAccessCollection, ID: Hashable, RowContent: View>: View"
+  ]
+ },
+ {
+  "id": "table",
+  "name": "Table",
+  "kind": "struct",
+  "declaration": "public struct Table<Record, ID: Hashable>: View",
+  "abstract": "A fixed header and virtualized rows sharing one horizontal scroll coordinate system. Cell content may include editors; embedded controls receive input before row selection.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "records",
+    "kind": "let",
+    "declaration": "public let records: [Record]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: KeyPath<Record, ID>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "options",
+    "kind": "var",
+    "declaration": "public var options = TableOptions<ID>()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onActivate",
+    "kind": "var",
+    "declaration": "public var onActivate: ((Record) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Table",
+    "kind": "init",
+    "declaration": "public init(_ records: [Record], id: KeyPath<Record, ID>, columns: [TableColumn<Record>], configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "sorted",
+    "kind": "func",
+    "declaration": "public static func sorted(_ records: [Record], columns: [TableColumn<Record>], sort: TableSort?) -> [Record]",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/Table.swift",
+  "line": 96,
+  "owner": "",
+  "overloads": [
+   "public struct Table<Record, ID: Hashable>: View"
+  ]
+ },
+ {
+  "id": "table-column",
+  "name": "TableColumn",
+  "kind": "struct",
+  "declaration": "public struct TableColumn<Record>: Identifiable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Identifiable"
+  ],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "title",
+    "kind": "let",
+    "declaration": "public let title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "layout",
+    "kind": "var",
+    "declaration": "public var layout = TableColumnLayout()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "visibility",
+    "kind": "var",
+    "declaration": "public var visibility: ColumnVisibility = .required",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "compare",
+    "kind": "var",
+    "declaration": "public var compare: (@Sendable (Record, Record) -> ComparisonResult)?",
+    "abstract": "Equal comparisons retain source order in both sort directions.",
+    "discussion": []
+   },
+   {
+    "name": "textEditing",
+    "kind": "var",
+    "declaration": "public var textEditing: TableTextEditing<Record>?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TableColumn",
+    "kind": "init",
+    "declaration": "public init<Content: View>(_ id: String, _ title: String, configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/Table.swift",
+  "line": 27,
+  "owner": "",
+  "overloads": [
+   "public struct TableColumn<Record>: Identifiable"
+  ]
+ },
+ {
+  "id": "table-column-layout",
+  "name": "TableColumnLayout",
+  "kind": "struct",
+  "declaration": "public struct TableColumnLayout",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "width",
+    "kind": "var",
+    "declaration": "public var width: Float = 160",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minWidth",
+    "kind": "var",
+    "declaration": "public var minWidth: Float = 60",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maxWidth",
+    "kind": "var",
+    "declaration": "public var maxWidth: Float = 800",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "alignment",
+    "kind": "var",
+    "declaration": "public var alignment: TextAlignment = .leading",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isResizable",
+    "kind": "var",
+    "declaration": "public var isResizable = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TableColumnLayout",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "constrained",
+    "kind": "func",
+    "declaration": "public func constrained(_ value: Float) -> Float",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/Table.swift",
+  "line": 13,
+  "owner": "",
+  "overloads": [
+   "public struct TableColumnLayout"
+  ]
+ },
+ {
+  "id": "table-layout",
+  "name": "TableLayout",
+  "kind": "struct",
+  "declaration": "public struct TableLayout",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "rowHeight",
+    "kind": "var",
+    "declaration": "public var rowHeight: Float = 36",
+    "abstract": "Authored logical height, before text scaling and the touch density floor.",
+    "discussion": []
+   },
+   {
+    "name": "headerHeight",
+    "kind": "var",
+    "declaration": "public var headerHeight: Float = 38",
+    "abstract": "Authored logical height, before text scaling and the touch density floor.",
+    "discussion": []
+   },
+   {
+    "name": "isStriped",
+    "kind": "var",
+    "declaration": "public var isStriped = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "emptyTitle",
+    "kind": "var",
+    "declaration": "public var emptyTitle = \"No records\" public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/Table.swift",
+  "line": 52,
+  "owner": "",
+  "overloads": [
+   "public struct TableLayout"
+  ]
+ },
+ {
+  "id": "table-options",
+  "name": "TableOptions",
+  "kind": "struct",
+  "declaration": "public struct TableOptions<ID: Hashable>",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "selection",
+    "kind": "var",
+    "declaration": "public var selection: Binding<ID?>?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "sort",
+    "kind": "var",
+    "declaration": "public var sort: Binding<TableSort?>?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "columnWidths",
+    "kind": "var",
+    "declaration": "public var columnWidths: Binding<[String: Float]>?",
+    "abstract": "When absent, resized widths belong to this mounted table's session.",
+    "discussion": []
+   },
+   {
+    "name": "columnVisibility",
+    "kind": "var",
+    "declaration": "public var columnVisibility: Binding<[String: Bool]>?",
+    "abstract": "Per-column user choices: true forces shown, false hides; absent is automatic.",
+    "discussion": []
+   },
+   {
+    "name": "layout",
+    "kind": "var",
+    "declaration": "public var layout = TableLayout()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TableOptions",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/Table.swift",
+  "line": 75,
+  "owner": "",
+  "overloads": [
+   "public struct TableOptions<ID: Hashable>"
+  ]
+ },
+ {
+  "id": "table-sort",
+  "name": "TableSort",
+  "kind": "struct",
+  "declaration": "public struct TableSort: Equatable, Codable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Codable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "columnID",
+    "kind": "let",
+    "declaration": "public let columnID: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "direction",
+    "kind": "let",
+    "declaration": "public let direction: TableSortDirection",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TableSort",
+    "kind": "init",
+    "declaration": "public init(_ columnID: String, direction: TableSortDirection = .ascending)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/Table.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public struct TableSort: Equatable, Codable, Sendable"
+  ]
+ },
+ {
+  "id": "table-sort-direction",
+  "name": "TableSortDirection",
+  "kind": "enum",
+  "declaration": "public enum TableSortDirection: String, Codable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "String",
+   "Codable",
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/Table.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public enum TableSortDirection: String, Codable, Sendable"
+  ]
+ },
+ {
+  "id": "table-text-editing",
+  "name": "TableTextEditing",
+  "kind": "struct",
+  "declaration": "public struct TableTextEditing<Record>",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "text",
+    "kind": "let",
+    "declaration": "public let text: (Record) -> String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "update",
+    "kind": "let",
+    "declaration": "public let update: (inout Record, String) -> Void",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "validate",
+    "kind": "var",
+    "declaration": "public var validate: ((String) -> String?)?",
+    "abstract": "A message rejects the draft and preserves the authored row.",
+    "discussion": []
+   },
+   {
+    "name": "TableTextEditing",
+    "kind": "init",
+    "declaration": "public init(text: @escaping (Record) -> String, update: @escaping (inout Record, String) -> Void)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/Table.swift",
+  "line": 42,
+  "owner": "",
+  "overloads": [
+   "public struct TableTextEditing<Record>"
+  ]
+ },
+ {
+  "id": "timeline",
+  "name": "Timeline",
+  "kind": "struct",
+  "declaration": "public struct Timeline: View",
+  "abstract": "Ordered list of events on a vertical rail.",
+  "discussion": [
+   "The rail is the content: the connector line is what turns a stack of rows\ninto a sequence, and the glyph on each node is what lets the reader scan by\noutcome (failed, succeeded, pending) before reading a single title.",
+   "```swift\nTimeline(events: [\n    TimelineEvent(\"Build started\", trailing: \"09:12\", tone: .info),\n    TimelineEvent(\"Shader compiled\", trailing: \"09:12\", tone: .success),\n    TimelineEvent(\"Link failed\", detail: \"Undefined symbol: vkCreateBuffer\",\n                  trailing: \"09:14\", tone: .danger)\n])\n```",
+   "Titled `TimelineGroup`s get a disclosure header that collapses the group;\n`spacing = .proportional(...)` spaces dated events by elapsed time, and a\n`zoom` binding scales that spacing with built-in zoom controls."
+  ],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "groups",
+    "kind": "var",
+    "declaration": "public var groups: [TimelineGroup]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showsTrailingConnector",
+    "kind": "var",
+    "declaration": "public var showsTrailingConnector: Bool",
+    "abstract": "Hides the connector line on the final entry, which is the default: the sequence ends where the list ends.",
+    "discussion": []
+   },
+   {
+    "name": "spacing",
+    "kind": "var",
+    "declaration": "public var spacing: TimelineSpacing = .uniform",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "zoom",
+    "kind": "var",
+    "declaration": "public var zoom: TimelineZoom?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "collapsedGroups",
+    "kind": "var",
+    "declaration": "public var collapsedGroups: Binding<Set<String>>?",
+    "abstract": "Collapsed group IDs; session-local when `nil`.",
+    "discussion": []
+   },
+   {
+    "name": "Timeline",
+    "kind": "init",
+    "declaration": "public init(events: [TimelineEvent], configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Timeline",
+    "kind": "init",
+    "declaration": "public init(groups: [TimelineGroup], configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "events",
+    "kind": "var",
+    "declaration": "public var events: [TimelineEvent]",
+    "abstract": "Every event in display order, across groups.",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Timeline.swift",
+  "line": 101,
+  "owner": "",
+  "overloads": [
+   "public struct Timeline: View"
+  ]
+ },
+ {
+  "id": "timeline-event",
+  "name": "TimelineEvent",
+  "kind": "struct",
+  "declaration": "public struct TimelineEvent: Identifiable",
+  "abstract": "One entry in a `Timeline`.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Identifiable"
+  ],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "title",
+    "kind": "var",
+    "declaration": "public var title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "detail",
+    "kind": "var",
+    "declaration": "public var detail: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "trailing",
+    "kind": "var",
+    "declaration": "public var trailing: String",
+    "abstract": "Trailing metadata: a timestamp, duration or actor. Moves below the title when this timeline's content width is compact or both labels cannot fit.",
+    "discussion": []
+   },
+   {
+    "name": "tone",
+    "kind": "var",
+    "declaration": "public var tone: StatusTone",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "icon",
+    "kind": "var",
+    "declaration": "public var icon: BundleImageResource?",
+    "abstract": "Glyph override. `nil` uses the tone's glyph; set `showsIcon = false` for a plain dot.",
+    "discussion": []
+   },
+   {
+    "name": "showsIcon",
+    "kind": "var",
+    "declaration": "public var showsIcon: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isCompact",
+    "kind": "var",
+    "declaration": "public var isCompact: Bool",
+    "abstract": "Draws a plain dot instead of a glyph, for dense or low-signal entries.",
+    "discussion": []
+   },
+   {
+    "name": "date",
+    "kind": "var",
+    "declaration": "public var date: Date?",
+    "abstract": "When the event happened. Proportional spacing uses the gaps between consecutive dates; events without one keep uniform spacing.",
+    "discussion": []
+   },
+   {
+    "name": "TimelineEvent",
+    "kind": "init",
+    "declaration": "public init(_ title: String, id: String? = nil, detail: String = \"\", trailing: String = \"\", tone: StatusTone = .neutral, icon: BundleImageResource? = nil, showsIcon: Bool = true, isCompact: Bool = false, date: Date? = nil)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Timeline.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public struct TimelineEvent: Identifiable"
+  ]
+ },
+ {
+  "id": "timeline-group",
+  "name": "TimelineGroup",
+  "kind": "struct",
+  "declaration": "public struct TimelineGroup: Identifiable",
+  "abstract": "A titled run of events that can collapse to its header.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Identifiable"
+  ],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "title",
+    "kind": "var",
+    "declaration": "public var title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "events",
+    "kind": "var",
+    "declaration": "public var events: [TimelineEvent]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isCollapsible",
+    "kind": "var",
+    "declaration": "public var isCollapsible = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TimelineGroup",
+    "kind": "init",
+    "declaration": "public init(_ title: String, id: String? = nil, events: [TimelineEvent], configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Timeline.swift",
+  "line": 47,
+  "owner": "",
+  "overloads": [
+   "public struct TimelineGroup: Identifiable"
+  ]
+ },
+ {
+  "id": "timeline-spacing",
+  "name": "TimelineSpacing",
+  "kind": "enum",
+  "declaration": "public enum TimelineSpacing: Equatable, Sendable",
+  "abstract": "Vertical distance between consecutive events.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Timeline.swift",
+  "line": 60,
+  "owner": "",
+  "overloads": [
+   "public enum TimelineSpacing: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "timeline-zoom",
+  "name": "TimelineZoom",
+  "kind": "struct",
+  "declaration": "public struct TimelineZoom",
+  "abstract": "Zoom range for proportional spacing. The binding is the caller's view state; Timeline adds zoom buttons only when one is supplied.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "factor",
+    "kind": "var",
+    "declaration": "public var factor: Binding<Float>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "range",
+    "kind": "var",
+    "declaration": "public var range: ClosedRange<Float> = 0.25...8",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TimelineZoom",
+    "kind": "init",
+    "declaration": "public init(_ factor: Binding<Float>)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Timeline.swift",
+  "line": 76,
+  "owner": "",
+  "overloads": [
+   "public struct TimelineZoom"
+  ]
+ },
+ {
+  "id": "tree",
+  "name": "Tree",
+  "kind": "struct",
+  "declaration": "public struct Tree<Roots: RandomAccessCollection, ID: Hashable, RowContent: View>: View",
+  "abstract": "Hierarchical, single-selection tree. Visual chrome (selection fill, indentation, disclosure chevron) is delegated to the active `TreeRowStyle` via `.treeRowStyle(_:)`; defaults to `DefaultTreeRowStyle`.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "RandomAccessCollection"
+  ],
+  "members": [
+   {
+    "name": "roots",
+    "kind": "let",
+    "declaration": "public let roots: [Element]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: KeyPath<Element, ID>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "children",
+    "kind": "let",
+    "declaration": "public let children: (Element) -> [Element]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "options",
+    "kind": "var",
+    "declaration": "public var options = TreeOptions<Element, ID>()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rowContent",
+    "kind": "let",
+    "declaration": "public let rowContent: (Element, Bool, Bool, Int) -> RowContent",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Tree",
+    "kind": "init",
+    "declaration": "public init(_ roots: Roots, id: KeyPath<Element, ID>, children: @escaping (Element) -> [Element], hasChildren: ((Element) -> Bool)? = nil, configure: (inout TreeOptions<Element, ID>) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Tree",
+    "kind": "init",
+    "declaration": "init(_ roots: Roots, id: KeyPath<Element, ID>, children: KeyPath<Element, [Element]>, configure: (inout TreeOptions<Element, ID>) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Tree",
+    "kind": "init",
+    "declaration": "init(_ roots: Roots, children: KeyPath<Element, [Element]>, configure: (inout TreeOptions<Element, ID>) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/Tree.swift",
+  "line": 33,
+  "owner": "",
+  "overloads": [
+   "public struct Tree<Roots: RandomAccessCollection, ID: Hashable, RowContent: View>: View"
+  ]
+ },
+ {
+  "id": "tree-drag-operations",
+  "name": "TreeDragOperations",
+  "kind": "struct",
+  "declaration": "public struct TreeDragOperations<Element>",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "canDrop",
+    "kind": "var",
+    "declaration": "public var canDrop: ((Element, Element, TreeDropPosition) -> Bool)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onDrop",
+    "kind": "var",
+    "declaration": "public var onDrop: ((Element, Element, TreeDropPosition) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TreeDragOperations",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/TreeOptions.swift",
+  "line": 69,
+  "owner": "",
+  "overloads": [
+   "public struct TreeDragOperations<Element>"
+  ]
+ },
+ {
+  "id": "tree-drop-position",
+  "name": "TreeDropPosition",
+  "kind": "enum",
+  "declaration": "public enum TreeDropPosition: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/Tree.swift",
+  "line": 14,
+  "owner": "",
+  "overloads": [
+   "public enum TreeDropPosition: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "tree-events",
+  "name": "TreeEvents",
+  "kind": "struct",
+  "declaration": "public struct TreeEvents<Element, ID: Hashable>",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "onKeyCommand",
+    "kind": "var",
+    "declaration": "public var onKeyCommand: ((KeyEvent, Set<ID>) -> Bool)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onSelect",
+    "kind": "var",
+    "declaration": "public var onSelect: ((Element) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TreeEvents",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/TreeOptions.swift",
+  "line": 63,
+  "owner": "",
+  "overloads": [
+   "public struct TreeEvents<Element, ID: Hashable>"
+  ]
+ },
+ {
+  "id": "tree-layout",
+  "name": "TreeLayout",
+  "kind": "struct",
+  "declaration": "public struct TreeLayout: Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "rowHeight",
+    "kind": "var",
+    "declaration": "public var rowHeight: Float = 30",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rowSpacing",
+    "kind": "var",
+    "declaration": "public var rowSpacing: Float = 0",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "indentation",
+    "kind": "var",
+    "declaration": "public var indentation: Float = 16",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "disclosureWidth",
+    "kind": "var",
+    "declaration": "public var disclosureWidth: Float = 18",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showsIndentGuides",
+    "kind": "var",
+    "declaration": "public var showsIndentGuides = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "trailingSlotWidth",
+    "kind": "var",
+    "declaration": "public var trailingSlotWidth: Float = 64",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TreeLayout",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/TreeOptions.swift",
+  "line": 16,
+  "owner": "",
+  "overloads": [
+   "public struct TreeLayout: Equatable"
+  ]
+ },
+ {
+  "id": "tree-node-key",
+  "name": "TreeNodeKey",
+  "kind": "struct",
+  "declaration": "public struct TreeNodeKey<ID: Hashable>: Hashable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: ID",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "path",
+    "kind": "let",
+    "declaration": "public let path: [Int]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TreeNodeKey",
+    "kind": "init",
+    "declaration": "public init(id: ID, path: [Int])",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/Tree.swift",
+  "line": 20,
+  "owner": "",
+  "overloads": [
+   "public struct TreeNodeKey<ID: Hashable>: Hashable"
+  ]
+ },
+ {
+  "id": "tree-options",
+  "name": "TreeOptions",
+  "kind": "struct",
+  "declaration": "public struct TreeOptions<Element, ID: Hashable>",
+  "abstract": "Configuration consists of independently reusable groups. The row renderer's generic type is deliberately absent, so Swift can infer trailing row-content closures.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "selection",
+    "kind": "var",
+    "declaration": "public var selection = TreeSelection<ID>()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "layout",
+    "kind": "var",
+    "declaration": "public var layout = TreeLayout()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "slots",
+    "kind": "var",
+    "declaration": "public var slots = TreeSlots<Element>()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "search",
+    "kind": "var",
+    "declaration": "public var search = TreeSearch<Element>()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "events",
+    "kind": "var",
+    "declaration": "public var events = TreeEvents<Element, ID>()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "drag",
+    "kind": "var",
+    "declaration": "public var drag = TreeDragOperations<Element>()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TreeOptions",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/TreeOptions.swift",
+  "line": 77,
+  "owner": "",
+  "overloads": [
+   "public struct TreeOptions<Element, ID: Hashable>"
+  ]
+ },
+ {
+  "id": "tree-search",
+  "name": "TreeSearch",
+  "kind": "struct",
+  "declaration": "public struct TreeSearch<Element>",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "query",
+    "kind": "var",
+    "declaration": "public var query = \"\" public var text: ((Element) -> String)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "policy",
+    "kind": "var",
+    "declaration": "public var policy: TreeSearchFilterPolicy = .filterAndAutoExpand",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TreeSearch",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/TreeOptions.swift",
+  "line": 56,
+  "owner": "",
+  "overloads": [
+   "public struct TreeSearch<Element>"
+  ]
+ },
+ {
+  "id": "tree-search-filter-policy",
+  "name": "TreeSearchFilterPolicy",
+  "kind": "enum",
+  "declaration": "public enum TreeSearchFilterPolicy: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/Tree.swift",
+  "line": 9,
+  "owner": "",
+  "overloads": [
+   "public enum TreeSearchFilterPolicy: Sendable"
+  ]
+ },
+ {
+  "id": "tree-selection",
+  "name": "TreeSelection",
+  "kind": "struct",
+  "declaration": "public struct TreeSelection<ID: Hashable>",
+  "abstract": "Caller-owned selection and expansion, independent of transient pointer/drag state.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "primary",
+    "kind": "var",
+    "declaration": "public var primary: Binding<ID?> = .constant(nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "multiple",
+    "kind": "var",
+    "declaration": "public var multiple: Binding<Set<ID>>?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "expanded",
+    "kind": "var",
+    "declaration": "public var expanded: Binding<Set<ID>>?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "primaryKey",
+    "kind": "var",
+    "declaration": "public var primaryKey: Binding<TreeNodeKey<ID>?> = .constant(nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "multipleKeys",
+    "kind": "var",
+    "declaration": "public var multipleKeys: Binding<Set<TreeNodeKey<ID>>>?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "expandedKeys",
+    "kind": "var",
+    "declaration": "public var expandedKeys: Binding<Set<TreeNodeKey<ID>>>?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TreeSelection",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/TreeOptions.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct TreeSelection<ID: Hashable>"
+  ]
+ },
+ {
+  "id": "tree-slots",
+  "name": "TreeSlots",
+  "kind": "struct",
+  "declaration": "public struct TreeSlots<Element>",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "disclosure",
+    "kind": "var",
+    "declaration": "public var disclosure: ((Bool) -> AnyView)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "trailing",
+    "kind": "var",
+    "declaration": "public var trailing: ((Element, Bool, Bool, Bool, Bool, Int) -> AnyView)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TreeSlots",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/TreeOptions.swift",
+  "line": 50,
+  "owner": "",
+  "overloads": [
+   "public struct TreeSlots<Element>"
+  ]
+ },
+ {
+  "id": "tree-table",
+  "name": "TreeTable",
+  "kind": "struct",
+  "declaration": "public struct TreeTable<Record: Sendable, ID: Hashable & Sendable>: View",
+  "abstract": "A DataTable whose first column carries the hierarchy: indentation and a disclosure button. Columns, widths, priorities, ordering, virtualization and keyboard grid navigation are DataTable's. With the first column focused, Right expands (or moves to the first child) and Left collapses (or moves to the parent), as in a tree. Sorting and cell editing are not offered: siblings keep their authored order.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "options",
+    "kind": "var",
+    "declaration": "public var options = TreeTableOptions<ID>()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onActivate",
+    "kind": "var",
+    "declaration": "public var onActivate: ((Record) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TreeTable",
+    "kind": "init",
+    "declaration": "public init(_ roots: [Record], id: KeyPath<Record, ID>, children: @escaping (Record) -> [Record]?, columns: [TableColumn<Record>], configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/TreeTable/TreeTable.swift",
+  "line": 36,
+  "owner": "",
+  "overloads": [
+   "public struct TreeTable<Record: Sendable, ID: Hashable & Sendable>: View"
+  ]
+ },
+ {
+  "id": "tree-table-options",
+  "name": "TreeTableOptions",
+  "kind": "struct",
+  "declaration": "public struct TreeTableOptions<ID: Hashable & Sendable>",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable"
+  ],
+  "members": [
+   {
+    "name": "expanded",
+    "kind": "var",
+    "declaration": "public var expanded: Binding<Set<ID>>?",
+    "abstract": "Expanded branch IDs; session-local when `nil`.",
+    "discussion": []
+   },
+   {
+    "name": "selection",
+    "kind": "var",
+    "declaration": "public var selection: Binding<DataTableSelection<ID>>?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "selectionMode",
+    "kind": "var",
+    "declaration": "public var selectionMode: DataTableSelectionMode = .single",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "columnWidths",
+    "kind": "var",
+    "declaration": "public var columnWidths: Binding<[String: Float]>?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "columnVisibility",
+    "kind": "var",
+    "declaration": "public var columnVisibility: Binding<[String: Bool]>?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "columnOrder",
+    "kind": "var",
+    "declaration": "public var columnOrder: Binding<[String]>?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "layout",
+    "kind": "var",
+    "declaration": "public var layout = TableLayout()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "indentation",
+    "kind": "var",
+    "declaration": "public var indentation: Float = 16",
+    "abstract": "Indentation per depth level of the first column, before text scaling.",
+    "discussion": []
+   },
+   {
+    "name": "TreeTableOptions",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/TreeTable/TreeTable.swift",
+  "line": 15,
+  "owner": "",
+  "overloads": [
+   "public struct TreeTableOptions<ID: Hashable & Sendable>"
+  ]
+ },
+ {
+  "id": "tree-table-row",
+  "name": "TreeTableRow",
+  "kind": "struct",
+  "declaration": "public struct TreeTableRow<Record: Sendable>: Sendable",
+  "abstract": "One visible line of a `TreeTable`: the caller's record plus its place in the hierarchy. Rows are rebuilt from the roots whenever expansion changes.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "record",
+    "kind": "let",
+    "declaration": "public let record: Record",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "depth",
+    "kind": "let",
+    "declaration": "public let depth: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "hasChildren",
+    "kind": "let",
+    "declaration": "public let hasChildren: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isExpanded",
+    "kind": "let",
+    "declaration": "public let isExpanded: Bool",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/TreeTable/TreeTable.swift",
+  "line": 8,
+  "owner": "",
+  "overloads": [
+   "public struct TreeTableRow<Record: Sendable>: Sendable"
+  ]
+ },
+ {
+  "id": "data-table-model",
+  "name": "DataTableModel",
+  "kind": "class",
+  "declaration": "public final class DataTableModel<Record: Sendable, ID: Hashable & Sendable>: _ObservableObject, @unchecked Sendable",
+  "abstract": "UI-owned row storage and a persistent display projection. Rendering reads rows and ID positions in O(1); sorting and its ID index are built on a serial worker, once per command. Keep this model in application state, not in body.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "DataTableModel",
+    "kind": "init",
+    "declaration": "public init(_ records: [Record], id: KeyPath<Record, ID>)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "count",
+    "kind": "var",
+    "declaration": "public var count: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "record",
+    "kind": "func",
+    "declaration": "public func record(at index: Int) -> Record",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rowID",
+    "kind": "func",
+    "declaration": "public func rowID(at index: Int) -> ID",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "index",
+    "kind": "func",
+    "declaration": "public func index(for id: ID) -> Int?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "record",
+    "kind": "func",
+    "declaration": "public func record(for id: ID) -> Record?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "replaceRows",
+    "kind": "func",
+    "declaration": "public func replaceRows(_ records: [Record])",
+    "abstract": "Replacement validates IDs once and resets the display projection. An active sort is reapplied; its old async reply cannot affect the new rows.",
+    "discussion": []
+   },
+   {
+    "name": "updateRow",
+    "kind": "func",
+    "declaration": "public func updateRow(_ id: ID, _ update: (inout Record) -> Void) -> Bool",
+    "abstract": "Mutating one row keeps its stable identity. Authored data changes here; selection, viewport and edit drafts belong to the table's session.",
+    "discussion": []
+   },
+   {
+    "name": "setSort",
+    "kind": "func",
+    "declaration": "public func setSort(_ next: TableSort?, compare: (@Sendable (Record, Record) -> ComparisonResult)? = nil)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableModel.swift",
+  "line": 17,
+  "owner": "",
+  "overloads": [
+   "public final class DataTableModel<Record: Sendable, ID: Hashable & Sendable>: _ObservableObject, @unchecked Sendable"
+  ]
+ },
+ {
+  "id": "file-app-storage-store",
+  "name": "FileAppStorageStore",
+  "kind": "class",
+  "declaration": "public final class FileAppStorageStore: AppStorageStore",
+  "abstract": "JSON-file-backed store: one flat `[key: primitive]` dictionary, written atomically on every mutation (preference-scale traffic).",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "AppStorageStore"
+  ],
+  "members": [
+   {
+    "name": "url",
+    "kind": "let",
+    "declaration": "public let url: URL",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "FileAppStorageStore",
+    "kind": "init",
+    "declaration": "public init(url: URL)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "defaultURL",
+    "kind": "func",
+    "declaration": "public static func defaultURL(appName: String = \"CoveUI\") -> URL",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "value",
+    "kind": "func",
+    "declaration": "public func value(forKey key: String) -> AppStorageValue?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "set",
+    "kind": "func",
+    "declaration": "public func set(_ value: AppStorageValue?, forKey key: String)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/AppStorage.swift",
+  "line": 56,
+  "owner": "",
+  "overloads": [
+   "public final class FileAppStorageStore: AppStorageStore"
+  ]
+ },
+ {
+  "id": "memory-app-storage-store",
+  "name": "MemoryAppStorageStore",
+  "kind": "class",
+  "declaration": "public final class MemoryAppStorageStore: AppStorageStore",
+  "abstract": "Non-persisting store for tests and previews.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "AppStorageStore"
+  ],
+  "members": [
+   {
+    "name": "MemoryAppStorageStore",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "value",
+    "kind": "func",
+    "declaration": "public func value(forKey key: String) -> AppStorageValue?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "set",
+    "kind": "func",
+    "declaration": "public func set(_ value: AppStorageValue?, forKey key: String)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "data",
+  "file": "Compose/Sources/CoveUICompose/AppStorage.swift",
+  "line": 137,
+  "owner": "",
+  "overloads": [
+   "public final class MemoryAppStorageStore: AppStorageStore"
+  ]
+ }
+]

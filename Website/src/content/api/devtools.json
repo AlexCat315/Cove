@@ -1,0 +1,29 @@
+[
+ {
+  "id": "application-checkpoint",
+  "name": "ApplicationCheckpoint",
+  "kind": "struct",
+  "declaration": "public struct ApplicationCheckpoint",
+  "abstract": "Optional DevTools checkpoint hooks for application-owned state. State capture does not include transient input, composition or GPU resources.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "ApplicationCheckpoint",
+    "kind": "init",
+    "declaration": "public init(capture: @escaping () -> [String: String], restore: @escaping ([String: String]) -> Bool)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUI",
+  "category": "devtools",
+  "file": "Hosts/Desktop/Sources/CoveUI/Diagnostics/Checkpoint.swift",
+  "line": 4,
+  "owner": "",
+  "overloads": [
+   "public struct ApplicationCheckpoint"
+  ]
+ }
+]

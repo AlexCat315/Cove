@@ -1,0 +1,500 @@
+[
+ {
+  "id": "alert",
+  "name": "Alert",
+  "kind": "struct",
+  "declaration": "public struct Alert<Actions: View>: View",
+  "abstract": "Inline feedback block: a status glyph, a title, an optional explanation, optional actions and an optional dismissal.",
+  "discussion": [
+   "The glyph is part of the content, not decoration — it carries the same\nmeaning as the tone's colour, so the block still reads correctly when the\npalette is monochrome or the reader cannot distinguish the hues.",
+   "```swift\nAlert(\"Import failed\", message: \"The selected asset format is unsupported.\", tone: .danger)",
+   "Alert(\"Update available\", message: \"Restart to use the new version.\", tone: .info) {\n    $0.onDismiss = { isPresented = false }\n} actions: {\n    Button(\"Restart now\") { restart() }.buttonStyle(.secondary)\n}\n```"
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "title",
+    "kind": "var",
+    "declaration": "public var title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "message",
+    "kind": "var",
+    "declaration": "public var message: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "tone",
+    "kind": "var",
+    "declaration": "public var tone: StatusTone",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "variant",
+    "kind": "var",
+    "declaration": "public var variant: Variant",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "icon",
+    "kind": "var",
+    "declaration": "public var icon: BundleImageResource?",
+    "abstract": "Glyph override. `nil` uses the tone's glyph.",
+    "discussion": []
+   },
+   {
+    "name": "showsIcon",
+    "kind": "var",
+    "declaration": "public var showsIcon: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onDismiss",
+    "kind": "var",
+    "declaration": "public var onDismiss: (() -> Void)?",
+    "abstract": "When set, a close button is rendered in the trailing slot.",
+    "discussion": []
+   },
+   {
+    "name": "Alert",
+    "kind": "init",
+    "declaration": "public init(_ title: String, message: String = \"\", tone: StatusTone = .info, configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Alert",
+    "kind": "init",
+    "declaration": "init(_ title: String, message: String = \"\", tone: StatusTone = .info, configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "feedback",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Feedback/Alert.swift",
+  "line": 21,
+  "owner": "",
+  "overloads": [
+   "public struct Alert<Actions: View>: View"
+  ]
+ },
+ {
+  "id": "badge",
+  "name": "Badge",
+  "kind": "struct",
+  "declaration": "public struct Badge: _PrimitiveView",
+  "abstract": "Compact, non-interactive status label.",
+  "discussion": [
+   "Three variants trade emphasis against noise: `.soft` reads as a tinted chip\ninside dense content, `.solid` as a single callout, `.outline` as a quiet\nmarker beside an already-bordered surface. Padding, glyph size and type\nfollow the shared `.controlSize` provider, so one badge definition serves a\ndense table cell and a page header.",
+   "```swift\nBadge(\"Running\", tone: .success)\nBadge(\"Deprecated\", tone: .warning) { $0.variant = .outline }\nBadge(\"3 failures\", tone: .danger) { $0.showsDot = true }\n```"
+  ],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "title",
+    "kind": "var",
+    "declaration": "public var title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "tone",
+    "kind": "var",
+    "declaration": "public var tone: StatusTone",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "variant",
+    "kind": "var",
+    "declaration": "public var variant: Variant",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "icon",
+    "kind": "var",
+    "declaration": "public var icon: BundleImageResource?",
+    "abstract": "Leading glyph override. `nil` keeps the chip text-only.",
+    "discussion": []
+   },
+   {
+    "name": "showsDot",
+    "kind": "var",
+    "declaration": "public var showsDot: Bool",
+    "abstract": "Leading status dot. Ignored when `icon` is set — a dot and a glyph compete for the same slot.",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Badge",
+    "kind": "init",
+    "declaration": "public init(_ title: String, tone: StatusTone = .neutral, configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "feedback",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Feedback/Badge.swift",
+  "line": 18,
+  "owner": "",
+  "overloads": [
+   "public struct Badge: _PrimitiveView"
+  ]
+ },
+ {
+  "id": "empty-state",
+  "name": "EmptyState",
+  "kind": "struct",
+  "declaration": "public struct EmptyState<Action: View>: View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "title",
+    "kind": "var",
+    "declaration": "public var title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "message",
+    "kind": "var",
+    "declaration": "public var message: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "icon",
+    "kind": "var",
+    "declaration": "public var icon: BundleImageResource?",
+    "abstract": "Glyph override. `nil` uses the bundled \"empty container\" glyph.",
+    "discussion": []
+   },
+   {
+    "name": "showsIcon",
+    "kind": "var",
+    "declaration": "public var showsIcon: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "prominence",
+    "kind": "var",
+    "declaration": "public var prominence: Prominence",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "EmptyState",
+    "kind": "init",
+    "declaration": "public init(_ title: String, message: String = \"\", configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "EmptyState",
+    "kind": "init",
+    "declaration": "init(_ title: String, message: String = \"\", configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "feedback",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Feedback/EmptyState.swift",
+  "line": 27,
+  "owner": "",
+  "overloads": [
+   "public struct EmptyState<Action: View>: View"
+  ]
+ },
+ {
+  "id": "empty-state-prominence",
+  "name": "EmptyStateProminence",
+  "kind": "enum",
+  "declaration": "public enum EmptyStateProminence: Sendable, Hashable",
+  "abstract": "Explains why a region is empty and offers the one action that fixes it.",
+  "discussion": [
+   "An empty region without a next step is a dead end, so the recovery action is\npart of the component rather than something every call site has to remember.\n`prominence` covers the three places an empty state realistically appears:\ninside a table body, in a full panel, and as a whole page.",
+   "```swift\nEmptyState(\"No projects yet\", message: \"Create a project to get started.\") {\n    Button(\"Create project\") { create() }\n}\n```\nVertical weight of an `EmptyState` block."
+  ],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Hashable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "feedback",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Feedback/EmptyState.swift",
+  "line": 18,
+  "owner": "",
+  "overloads": [
+   "public enum EmptyStateProminence: Sendable, Hashable"
+  ]
+ },
+ {
+  "id": "progress-circle",
+  "name": "ProgressCircle",
+  "kind": "struct",
+  "declaration": "public struct ProgressCircle: _PrimitiveView",
+  "abstract": "Determinate or indeterminate circular progress.",
+  "discussion": [
+   "Reads better than a bar when the indicator sits in a square slot — a\ntoolbar, a table cell, a card corner — where a full-width track would look\narbitrary. Set `showsValue` to print the percentage in the middle; leave it\noff when the number would crowd the ring at small diameters.",
+   "```swift\nProgressCircle(value: 0.72, diameter: 28, showsValue: true)\nProgressCircle(value: nil, diameter: 44)   // unknown duration\n```"
+  ],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "value",
+    "kind": "var",
+    "declaration": "public var value: Double?",
+    "abstract": "Fraction completed in `0...1`. `nil` renders a rotating arc.",
+    "discussion": []
+   },
+   {
+    "name": "tone",
+    "kind": "var",
+    "declaration": "public var tone: StatusTone",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "diameter",
+    "kind": "var",
+    "declaration": "public var diameter: Float?",
+    "abstract": "Explicit diameter. `nil` follows the shared `.controlSize`.",
+    "discussion": []
+   },
+   {
+    "name": "thickness",
+    "kind": "var",
+    "declaration": "public var thickness: Float?",
+    "abstract": "Ring thickness. `nil` scales with the diameter so the ring keeps the same visual weight at every size.",
+    "discussion": []
+   },
+   {
+    "name": "showsValue",
+    "kind": "var",
+    "declaration": "public var showsValue: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ProgressCircle",
+    "kind": "init",
+    "declaration": "public init(value: Double? = nil, diameter: Float? = nil, tone: StatusTone = .info, configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "feedback",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Feedback/ProgressCircle.swift",
+  "line": 17,
+  "owner": "",
+  "overloads": [
+   "public struct ProgressCircle: _PrimitiveView"
+  ]
+ },
+ {
+  "id": "progress-view",
+  "name": "ProgressView",
+  "kind": "struct",
+  "declaration": "public struct ProgressView: _PrimitiveView",
+  "abstract": "Determinate or indeterminate linear progress.",
+  "discussion": [
+   "Pass `nil` for `value` to switch to the indeterminate sweep, which is the\nhonest representation when the total work is unknown — a fake 30% that never\nadvances is worse than admitting the wait.",
+   "The sweep is driven by a clock owned by the node, so it starts and stops\nwith the view's lifetime and respects the system reduced-motion preference.",
+   "```swift\nProgressView(value: fractionComplete, tone: .success)\nProgressView(value: nil)   // unknown duration\n```"
+  ],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "value",
+    "kind": "var",
+    "declaration": "public var value: Double?",
+    "abstract": "Fraction completed in `0...1`. `nil` renders the indeterminate sweep.",
+    "discussion": []
+   },
+   {
+    "name": "tone",
+    "kind": "var",
+    "declaration": "public var tone: StatusTone",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "height",
+    "kind": "var",
+    "declaration": "public var height: Float?",
+    "abstract": "Explicit track thickness. `nil` follows the shared `.controlSize`.",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ProgressView",
+    "kind": "init",
+    "declaration": "public init(value: Double? = nil, tone: StatusTone = .info, configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "feedback",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Feedback/Progress.swift",
+  "line": 19,
+  "owner": "",
+  "overloads": [
+   "public struct ProgressView: _PrimitiveView"
+  ]
+ },
+ {
+  "id": "spinner",
+  "name": "Spinner",
+  "kind": "struct",
+  "declaration": "public struct Spinner: _PrimitiveView",
+  "abstract": "Indeterminate activity indicator.",
+  "discussion": [
+   "The animation is registered with the owning node and cancelled when it\nleaves the tree, so a spinner inside a conditionally-rendered branch never\nkeeps a clock running in the background. Reduced-motion is honoured by\nfreezing the glyph rather than hiding it — a static ring still communicates\n\"busy\" without implying a percentage."
+  ],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "size",
+    "kind": "let",
+    "declaration": "public let size: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isAnimating",
+    "kind": "let",
+    "declaration": "public let isAnimating: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Spinner",
+    "kind": "init",
+    "declaration": "public init(size: Float = 16, isAnimating: Bool = true)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "feedback",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Feedback/Spinner.swift",
+  "line": 12,
+  "owner": "",
+  "overloads": [
+   "public struct Spinner: _PrimitiveView"
+  ]
+ },
+ {
+  "id": "status-tone",
+  "name": "StatusTone",
+  "kind": "enum",
+  "declaration": "public enum StatusTone: Sendable, Hashable, CaseIterable",
+  "abstract": "Semantic intent shared by CoveUI's feedback components.",
+  "discussion": [
+   "A tone is a meaning, not a colour. Components derive their ink, fill and\nglyph from it, so re-theming — or shipping a monochrome theme — never has\nto touch a call site."
+  ],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Hashable",
+   "CaseIterable"
+  ],
+  "members": [
+   {
+    "name": "color",
+    "kind": "var",
+    "declaration": "public var color: SemanticColorRef",
+    "abstract": "The tone's primary ink: text, glyphs and outline borders.",
+    "discussion": []
+   },
+   {
+    "name": "icon",
+    "kind": "var",
+    "declaration": "public var icon: BundleImageResource",
+    "abstract": "Glyph that carries the meaning without relying on hue, so the tone stays readable for colour-blind users and in monochrome themes.",
+    "discussion": []
+   },
+   {
+    "name": "ink",
+    "kind": "func",
+    "declaration": "public func ink(onSolid theme: Theme) -> Color",
+    "abstract": "Ink that stays legible on a surface filled solidly with `color`.",
+    "discussion": [
+     "Derived from the resolved colour's Rec. 709 relative luminance rather\nthan a fixed white: a theme is free to pick a light amber for\n`.warning`, and white ink would wash out on it."
+    ]
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "feedback",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Feedback/StatusTone.swift",
+  "line": 10,
+  "owner": "",
+  "overloads": [
+   "public enum StatusTone: Sendable, Hashable, CaseIterable"
+  ]
+ }
+]

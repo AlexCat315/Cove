@@ -1,0 +1,454 @@
+[
+ {
+  "id": "animation-value-modifier",
+  "name": "_AnimationValueModifier",
+  "kind": "struct",
+  "declaration": "public struct _AnimationValueModifier<Value: Equatable>: ViewModifier, _AroundApplyingModifier",
+  "abstract": "Internal modifier installed by `View.animation(_:value:)`.",
+  "discussion": [
+   "On each materialise / update pass it caches the most recent `value` on a\ndedicated synthetic anchor `Node` (allocated by the `_AroundApplyingModifier`\npathway). When the value differs from the previous pass, the descendant\nre-render is wrapped in `ActiveAnimationContext.with(animation)` so any\n`animatableSet` write encountered during recompose flows through the\nscheduler — no explicit `withAnimation { ... }` required at the call site.",
+   "First materialisation always snaps (no previous value to compare against).\nA `nil` animation suppresses the wrap even on value change, matching the\nSwiftUI semantics where `.animation(nil, value:)` removes implicit\nanimation for the keyed value."
+  ],
+  "availability": [],
+  "conforms": [
+   "_AroundApplyingModifier"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "animation",
+  "file": "Compose/Sources/CoveUICompose/Animation/AnimationValueModifier.swift",
+  "line": 18,
+  "owner": "",
+  "overloads": [
+   "public struct _AnimationValueModifier<Value: Equatable>: ViewModifier, _AroundApplyingModifier"
+  ]
+ },
+ {
+  "id": "animated-visibility",
+  "name": "AnimatedVisibility",
+  "kind": "struct",
+  "declaration": "public struct AnimatedVisibility<Content: View>: View",
+  "abstract": "Retains content through its exit animation, then unmounts it. Unlike a conditional `if`, both insertion and removal can animate. Rapid reversal continues from the currently displayed value, preserving child state.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "isVisible",
+    "kind": "let",
+    "declaration": "public let isVisible: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "transition",
+    "kind": "let",
+    "declaration": "public let transition: Transition",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "animateOnMount",
+    "kind": "let",
+    "declaration": "public let animateOnMount: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "animation",
+    "kind": "let",
+    "declaration": "public let animation: Animation?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "staggerIndex",
+    "kind": "var",
+    "declaration": "public var staggerIndex: Int = 0",
+    "abstract": "Zero-based position of this view within its entering group. Paired with `staggerInterval` to cascade siblings instead of popping in at once.",
+    "discussion": []
+   },
+   {
+    "name": "staggerInterval",
+    "kind": "var",
+    "declaration": "public var staggerInterval: Duration = .zero",
+    "abstract": "Delay added per `staggerIndex` step on entrance. Keep short (30–80 ms).",
+    "discussion": []
+   },
+   {
+    "name": "AnimatedVisibility",
+    "kind": "init",
+    "declaration": "public init(isVisible: Bool, collapses: Bool = true, animation: Animation? = nil, staggerIndex: Int = 0, staggerInterval: Duration = .zero, @ViewBuilder content: () -> Content)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AnimatedVisibility",
+    "kind": "init",
+    "declaration": "public init(isVisible: Bool, transition: Transition, animation: Animation? = nil, animateOnMount: Bool = false, staggerIndex: Int = 0, staggerInterval: Duration = .zero, onVisibilitySettled: ((Bool) -> Void)? = nil, @ViewBuilder content: () -> Content)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "animation",
+  "file": "Compose/Sources/CoveUICompose/Animation/AnimatedVisibility.swift",
+  "line": 9,
+  "owner": "",
+  "overloads": [
+   "public struct AnimatedVisibility<Content: View>: View"
+  ]
+ },
+ {
+  "id": "keyframe-animator",
+  "name": "KeyframeAnimator",
+  "kind": "struct",
+  "declaration": "public struct KeyframeAnimator<Value: Interpolatable, Trigger: Equatable, Content: View>: View",
+  "abstract": "Plays an authored track when `trigger` changes. Repeating tracks start at mount; reducing motion shows their initial static value and stops the clock.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Interpolatable"
+  ],
+  "members": [
+   {
+    "name": "KeyframeAnimator",
+    "kind": "init",
+    "declaration": "public init(_ timeline: KeyframeTimeline<Value>, trigger: Trigger, repeating: Bool = false, @ViewBuilder content: @escaping (Value) -> Content)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "animation",
+  "file": "Compose/Sources/CoveUICompose/Animation/Keyframes/Track.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public struct KeyframeAnimator<Value: Interpolatable, Trigger: Equatable, Content: View>: View"
+  ]
+ },
+ {
+  "id": "numeric-text",
+  "name": "NumericText",
+  "kind": "struct",
+  "declaration": "public struct NumericText: View",
+  "abstract": "A formatted number with value interpolation. Assistive clients receive the final value immediately; intermediate values are only a visual transition.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "NumericText",
+    "kind": "init",
+    "declaration": "public init(_ value: Double, animation: Animation? = nil, format: @escaping (Double) -> String =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "animation",
+  "file": "Compose/Sources/CoveUICompose/Animation/Content/NumericText.swift",
+  "line": 8,
+  "owner": "",
+  "overloads": [
+   "public struct NumericText: View"
+  ]
+ },
+ {
+  "id": "phase-animator",
+  "name": "PhaseAnimator",
+  "kind": "struct",
+  "declaration": "public struct PhaseAnimator<Phase: Equatable, Trigger: Equatable, Content: View>: View",
+  "abstract": "Discrete domain phases with an animation for entering each phase. The first phase is the resting value; repeating sequences return to it each cycle.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "PhaseAnimator",
+    "kind": "init",
+    "declaration": "public init(_ phases: [Phase], trigger: Trigger, repeating: Bool = false, animation: @escaping (Phase) -> Animation =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "animation",
+  "file": "Compose/Sources/CoveUICompose/Animation/Phases/Sequence.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public struct PhaseAnimator<Phase: Equatable, Trigger: Equatable, Content: View>: View"
+  ]
+ },
+ {
+  "id": "transition",
+  "name": "Transition",
+  "kind": "struct",
+  "declaration": "public struct Transition: Equatable, Sendable",
+  "abstract": "Composable lifecycle effects. Use with AnimatedVisibility so removal retains the subtree until completion. Insertion and removal may use different effects.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "identity",
+    "kind": "let",
+    "declaration": "public static let identity = Transition(Effect())",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "opacity",
+    "kind": "let",
+    "declaration": "public static let opacity = Transition(Effect(opacity: 0))",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "collapse",
+    "kind": "let",
+    "declaration": "public static let collapse = Transition(Effect(collapse: true))",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "offset",
+    "kind": "func",
+    "declaration": "public static func offset(x: CGFloat = 0, y: CGFloat = 0) -> Transition",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "move",
+    "kind": "func",
+    "declaration": "public static func move(edge: Edge, distance: Float = 16) -> Transition",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "scale",
+    "kind": "func",
+    "declaration": "public static func scale(from factor: CGFloat, anchor: CGPoint) -> Transition",
+    "abstract": "Grows or shrinks the subtree about a normalized point in its own frame, `(0, 0)` being the top-left corner and `(0.5, 0.5)` the centre.",
+    "discussion": [
+     "Shadow offsets and blur retain their authored size during the transition.\nCombined scale transitions must share an anchor; use nested visibility\ncontainers for independent anchors.\nNonfinite factors resolve to 1; negative factors resolve to 0."
+    ]
+   },
+   {
+    "name": "combined",
+    "kind": "func",
+    "declaration": "public func combined(with other: Transition) -> Transition",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "asymmetric",
+    "kind": "func",
+    "declaration": "public static func asymmetric(insertion: Transition, removal: Transition) -> Transition",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "animation",
+  "file": "Compose/Sources/CoveUICompose/Animation/Transition.swift",
+  "line": 8,
+  "owner": "",
+  "overloads": [
+   "public struct Transition: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "transition-view",
+  "name": "TransitionView",
+  "kind": "struct",
+  "declaration": "public struct TransitionView<Content: View>: View",
+  "abstract": "Compatibility facade using the shared AnimatedVisibility lifecycle.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "TransitionView",
+    "kind": "init",
+    "declaration": "public init(isVisible: Bool, transition: Transition = .opacity, removal: Transition? = nil, motion: SemanticMotionRef = .medium, staggerIndex: Int = 0, staggerInterval: Duration = .zero, @ViewBuilder content: () -> Content)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "animation",
+  "file": "Compose/Sources/CoveUICompose/Animation/TransitionView.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct TransitionView<Content: View>: View"
+  ]
+ },
+ {
+  "id": "modifier-animation",
+  "name": "animation",
+  "kind": "modifier",
+  "declaration": "func animation<V: Equatable>(_ animation: Animation?, value: V) -> some View",
+  "abstract": "Apply `animation` to any animatable property change inside this subtree whenever `value` changes. Pass `nil` to disable implicit animation for this keyed value.",
+  "discussion": [
+   "The first render snaps; only subsequent value changes trigger the\nanimation. Compose multiple `.animation(_:value:)` calls to key on\ndifferent state (each call carries an independent cache)."
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "animation",
+  "file": "Compose/Sources/CoveUICompose/Animation/AnimationValueModifier.swift",
+  "line": 59,
+  "owner": "View",
+  "overloads": [
+   "func animation<V: Equatable>(_ animation: Animation?, value: V) -> some View",
+   "func animation<V: Equatable>(motion: SemanticMotionRef, value: V) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-matched-geometry",
+  "name": "matchedGeometry",
+  "kind": "modifier",
+  "declaration": "func matchedGeometry<ID: Hashable>(_ id: ID, animation: Animation? = nil) -> some View",
+  "abstract": "Move a surface between layout destinations with the same scene-local ID. Its frame animates while layout reserves the destination immediately.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "animation",
+  "file": "Compose/Sources/CoveUICompose/Animation/Geometry/Matched.swift",
+  "line": 9,
+  "owner": "View",
+  "overloads": [
+   "func matchedGeometry<ID: Hashable>(_ id: ID, animation: Animation? = nil) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-offset",
+  "name": "offset",
+  "kind": "modifier",
+  "declaration": "func offset(x: Float = 0, y: Float = 0) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "animation",
+  "file": "Compose/Sources/CoveUICompose/Animation/Geometry/Transforms.swift",
+  "line": 36,
+  "owner": "View",
+  "overloads": [
+   "func offset(x: Float = 0, y: Float = 0) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-scale-effect",
+  "name": "scaleEffect",
+  "kind": "modifier",
+  "declaration": "func scaleEffect(_ factor: Float, anchor: CGPoint = CGPoint(x: 0.5, y: 0.5)) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "animation",
+  "file": "Compose/Sources/CoveUICompose/Animation/Geometry/Transforms.swift",
+  "line": 31,
+  "owner": "View",
+  "overloads": [
+   "func scaleEffect(_ factor: Float, anchor: CGPoint = CGPoint(x: 0.5, y: 0.5)) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-spring-drag",
+  "name": "springDrag",
+  "kind": "modifier",
+  "declaration": "func springDrag(offset: Binding<CGPoint>, restingAt target: CGPoint = .zero, spring: SpringSolution = SpringSolution(response: 0.4, dampingFraction: 0.82), isEnabled: Bool = true) -> some View",
+  "abstract": "Direct manipulation followed by a velocity-preserving spring release. Offset is in the parent's logical points; input remains at the drawn frame.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "animation",
+  "file": "Compose/Sources/CoveUICompose/Animation/Interaction/SpringDrag.swift",
+  "line": 12,
+  "owner": "View",
+  "overloads": [
+   "func springDrag(offset: Binding<CGPoint>, restingAt target: CGPoint = .zero, spring: SpringSolution = SpringSolution(response: 0.4, dampingFraction: 0.82), isEnabled: Bool = true) -> some View"
+  ]
+ },
+ {
+  "id": "with-animation",
+  "name": "withAnimation",
+  "kind": "func",
+  "declaration": "public func withAnimation<R>(_ animation: Animation = .default, completionCriteria: AnimationCompletionCriteria = .logicallyComplete, _ body: () throws -> R, completion: (() -> Void)? = nil) rethrows -> R",
+  "abstract": "Run `body` with `animation` installed as the active animation context.",
+  "discussion": [
+   "State mutations performed inside `body` capture this animation; when the\nresulting recompose runs, modifier `apply` paths that touch animatable\nnode properties register an `AnimationController` instead of writing the\nnew value instantly.",
+   "`completion` runs at the nominal deadline with `.logicallyComplete`, or\nafter the physical spring tail with `.removed`. A mutation that animates\nnothing completes on the next scheduler sweep. It does not run when a later animation\nsupersedes these controllers: an abandoned animation was interrupted, not\ncompleted.",
+   "Mirrors SwiftUI's `withAnimation(_:_:completion:)` shape so the call-site\nidiom transfers directly."
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "animation",
+  "file": "Compose/Sources/CoveUICompose/Animation/WithAnimation.swift",
+  "line": 21,
+  "owner": "",
+  "overloads": [
+   "public func withAnimation<R>(_ animation: Animation = .default, completionCriteria: AnimationCompletionCriteria = .logicallyComplete, _ body: () throws -> R, completion: (() -> Void)? = nil) rethrows -> R",
+   "public func withAnimation<R>(_ animation: Animation?, completionCriteria: AnimationCompletionCriteria = .logicallyComplete, _ body: () throws -> R, completion: (() -> Void)? = nil) rethrows -> R"
+  ]
+ }
+]

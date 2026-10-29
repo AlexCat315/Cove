@@ -1,0 +1,675 @@
+[
+ {
+  "id": "cove-ui-runtime",
+  "name": "CoveUIRuntime",
+  "kind": "enum",
+  "declaration": "public enum CoveUIRuntime",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "version",
+    "kind": "let",
+    "declaration": "public static let version = \"0.1.0-wip\" }",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIRuntime",
+  "category": "runtime",
+  "file": "Runtime/Sources/CoveUIRuntime/Core/CoveUIRuntime.swift",
+  "line": 15,
+  "owner": "",
+  "overloads": [
+   "public enum CoveUIRuntime"
+  ]
+ },
+ {
+  "id": "native-accessibility",
+  "name": "NativeAccessibility",
+  "kind": "enum",
+  "declaration": "public enum NativeAccessibility",
+  "abstract": "Updates native accessibility after layout; registrations leave with the root node.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "synchronize",
+    "kind": "func",
+    "declaration": "public static func synchronize(host: SDL3PlatformHost, session: PlatformWindowSession, root: Node, timeline: PerformanceTimeline)",
+    "abstract": "`timeline` is the frame recorder the host reads. It is passed in rather than taken from `session.tree` because the host's composed tree and the session's tree are not the same object, and only the composed one feeds the trace DevTools consumes.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIRuntime",
+  "category": "runtime",
+  "file": "Runtime/Sources/CoveUIRuntime/Core/NativeAccessibility.swift",
+  "line": 14,
+  "owner": "",
+  "overloads": [
+   "public enum NativeAccessibility"
+  ]
+ },
+ {
+  "id": "platform-frame-rate-mode",
+  "name": "PlatformFrameRateMode",
+  "kind": "enum",
+  "declaration": "public enum PlatformFrameRateMode: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUIRuntime",
+  "category": "runtime",
+  "file": "Runtime/Sources/CoveUIRuntime/Core/SDL3PlatformHost.swift",
+  "line": 140,
+  "owner": "",
+  "overloads": [
+   "public enum PlatformFrameRateMode: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "platform-host",
+  "name": "PlatformHost",
+  "kind": "protocol",
+  "declaration": "public protocol PlatformHost: AnyObject",
+  "abstract": "Abstraction over the windowing system and per-frame event loop.",
+  "discussion": [
+   "A `PlatformHost` implementation opens a native window, drives `Recomposer`\nand `NodeTree` each frame, and (from Phase 5) submits GPU draw lists."
+  ],
+  "availability": [],
+  "conforms": [
+   "AnyObject"
+  ],
+  "members": [],
+  "module": "CoveUIRuntime",
+  "category": "runtime",
+  "file": "Runtime/Sources/CoveUIRuntime/Core/PlatformHost.swift",
+  "line": 10,
+  "owner": "",
+  "overloads": [
+   "public protocol PlatformHost: AnyObject"
+  ]
+ },
+ {
+  "id": "surface-factory",
+  "name": "SurfaceFactory",
+  "kind": "enum",
+  "declaration": "public enum SurfaceFactory",
+  "abstract": "Builds a native surface descriptor. Centralised so the per-platform `switch` lives in one place instead of being copy-pasted into every demo / app entry point.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "nativeDescriptor",
+    "kind": "func",
+    "declaration": "public static func nativeDescriptor(native: NativeRenderSurface, size: SIMD2<UInt32>, vsync: Bool) -> SurfaceDescriptor",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIRuntime",
+  "category": "runtime",
+  "file": "Runtime/Sources/CoveUIRuntime/Rendering/SurfaceFactory.swift",
+  "line": 12,
+  "owner": "",
+  "overloads": [
+   "public enum SurfaceFactory"
+  ]
+ },
+ {
+  "id": "platform-event-bridge",
+  "name": "PlatformEventBridge",
+  "kind": "class",
+  "declaration": "public final class PlatformEventBridge: @unchecked Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "PlatformEventBridge",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "subscribe",
+    "kind": "func",
+    "declaration": "public func subscribe(_ handler: @escaping (InputEvent) -> Void) -> SubscriptionToken",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "unsubscribe",
+    "kind": "func",
+    "declaration": "public func unsubscribe(_ token: SubscriptionToken)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "publish",
+    "kind": "func",
+    "declaration": "public func publish(_ event: InputEvent)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIRuntime",
+  "category": "runtime",
+  "file": "Runtime/Sources/CoveUIRuntime/Core/AppBridge.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public final class PlatformEventBridge: @unchecked Sendable"
+  ]
+ },
+ {
+  "id": "platform-window-session",
+  "name": "PlatformWindowSession",
+  "kind": "class",
+  "declaration": "public final class PlatformWindowSession",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: WindowID",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "tree",
+    "kind": "let",
+    "declaration": "public let tree: NodeTree",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "recomposer",
+    "kind": "let",
+    "declaration": "public let recomposer: Recomposer",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "inputContext",
+    "kind": "let",
+    "declaration": "public let inputContext: PlatformInputContext",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onPresentationChanged",
+    "kind": "var",
+    "declaration": "public var onPresentationChanged: (@MainActor (Bool) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "interactions",
+    "kind": "var",
+    "declaration": "public var interactions: InteractionRegistry",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "pointerCapture",
+    "kind": "var",
+    "declaration": "public var pointerCapture: PointerCapture",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "focusChain",
+    "kind": "var",
+    "declaration": "public var focusChain: FocusChain",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "inputObserver",
+    "kind": "var",
+    "declaration": "public var inputObserver: ((InputEvent) -> Void)?",
+    "abstract": "Scene-thread observation of both native and injected input.",
+    "discussion": []
+   },
+   {
+    "name": "inputInterceptor",
+    "kind": "var",
+    "declaration": "public var inputInterceptor: ((InputEvent) -> Bool)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onFrame",
+    "kind": "var",
+    "declaration": "public var onFrame: (@MainActor (NativeRenderSurface) -> Bool)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onInit",
+    "kind": "var",
+    "declaration": "public var onInit: (@MainActor (NativeRenderSurface, _ widthPx: UInt32, _ heightPx: UInt32) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onResize",
+    "kind": "var",
+    "declaration": "public var onResize: (@MainActor (UInt32, UInt32) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onEvent",
+    "kind": "var",
+    "declaration": "public var onEvent: (@MainActor (InputEvent) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "withCurrent",
+    "kind": "func",
+    "declaration": "public func withCurrent<R>(_ body: () throws -> R) rethrows -> R",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "requestDisplay",
+    "kind": "func",
+    "declaration": "public func requestDisplay()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "injectEvent",
+    "kind": "func",
+    "declaration": "public func injectEvent(_ event: InputEvent)",
+    "abstract": "Inject a synthesized `InputEvent` into this session as if it had been polled from the native shell. Used by `CoveUIDevTools` to forward pointer / keyboard events from the mirror viewport.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIRuntime",
+  "category": "runtime",
+  "file": "Runtime/Sources/CoveUIRuntime/Core/SDL3PlatformHost.swift",
+  "line": 14,
+  "owner": "",
+  "overloads": [
+   "public final class PlatformWindowSession"
+  ]
+ },
+ {
+  "id": "sdl3-platform-host",
+  "name": "SDL3PlatformHost",
+  "kind": "class",
+  "declaration": "public final class SDL3PlatformHost: PlatformHost",
+  "abstract": "`PlatformHost` backed by SDL3 via Engine's `PlatformShell`.",
+  "discussion": [
+   "The host keeps one runtime session per native window: each session owns its\nown `NodeTree`, `Recomposer`, input registry, focus chain and capture state.\nThe main-window convenience properties remain for existing single-window\ndemos and tests."
+  ],
+  "availability": [],
+  "conforms": [
+   "PlatformHost"
+  ],
+  "members": [
+   {
+    "name": "recomposer",
+    "kind": "var",
+    "declaration": "public var recomposer: Recomposer",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "interactions",
+    "kind": "var",
+    "declaration": "public var interactions: InteractionRegistry",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "pointerCapture",
+    "kind": "var",
+    "declaration": "public var pointerCapture: PointerCapture",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "focusChain",
+    "kind": "var",
+    "declaration": "public var focusChain: FocusChain",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "invalidationLog",
+    "kind": "var",
+    "declaration": "public var invalidationLog: InvalidationLog",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isRunning",
+    "kind": "var",
+    "declaration": "public var isRunning: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onFrame",
+    "kind": "var",
+    "declaration": "public var onFrame: (@MainActor (NativeRenderSurface) -> Bool)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onInit",
+    "kind": "var",
+    "declaration": "public var onInit: (@MainActor (NativeRenderSurface, _ widthPx: UInt32, _ heightPx: UInt32) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onResize",
+    "kind": "var",
+    "declaration": "public var onResize: (@MainActor (UInt32, UInt32) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onEvent",
+    "kind": "var",
+    "declaration": "public var onEvent: (@MainActor (InputEvent) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onBeforeCommit",
+    "kind": "var",
+    "declaration": "public var onBeforeCommit: (@MainActor (_ deltaTime: Double) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onWindowTeardown",
+    "kind": "var",
+    "declaration": "public var onWindowTeardown: (@MainActor (_ windowID: WindowID) -> Void)?",
+    "abstract": "Fires before an individual native window is destroyed. Consumers that own per-window GPU surfaces must release the matching surface here so it does not outlive the SDL/Wayland window it was created from.",
+    "discussion": []
+   },
+   {
+    "name": "onWindowPresentationChanged",
+    "kind": "var",
+    "declaration": "public var onWindowPresentationChanged: (@MainActor (WindowID, Bool) -> Void)?",
+    "abstract": "Delivered outside a frame, including programmatic hide/minimize.",
+    "discussion": []
+   },
+   {
+    "name": "onTeardown",
+    "kind": "var",
+    "declaration": "public var onTeardown: (@MainActor () -> Void)?",
+    "abstract": "Fires once when the run loop has exited, *before* the shell tears down its windows and quits SDL. The symmetric counterpart to `onInit`: consumers must release any GPU surfaces created from a window handle here, while the native windowing system (e.g. the Wayland display) is still alive. Releasing a native graphics surface after `SDL_Quit` has disconnected the Wayland display dereferences freed Wayland proxies and crashes in libwayland-client.",
+    "discussion": []
+   },
+   {
+    "name": "externalDisplayRequestDrain",
+    "kind": "var",
+    "declaration": "public var externalDisplayRequestDrain: (() -> Bool)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SDL3PlatformHost",
+    "kind": "init",
+    "declaration": "public init(title: String = \"CoveUI\", mainWindowOptions: WindowOptions = WindowOptions(), recomposer: Recomposer = Recomposer(), inputContext: PlatformInputContext = PlatformInputContext(), shellFactory: @escaping @MainActor () throws -> any Shell =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "openWindow",
+    "kind": "func",
+    "declaration": "public func openWindow(title: String, tree: NodeTree, recomposer: Recomposer = Recomposer(), inputContext: PlatformInputContext = PlatformInputContext(), options: WindowOptions = WindowOptions()) throws -> PlatformWindowSession",
+    "abstract": "Open an additional window and register a runtime session for it.",
+    "discussion": []
+   },
+   {
+    "name": "session",
+    "kind": "func",
+    "declaration": "public func session(for windowID: WindowID) -> PlatformWindowSession?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "mainSession",
+    "kind": "var",
+    "declaration": "public var mainSession: PlatformWindowSession?",
+    "abstract": "Convenience accessor for the main-window session, if one has been registered. Returns `nil` until `run()` / `run(tree:)` finishes bootstrapping the first window.",
+    "discussion": []
+   },
+   {
+    "name": "nativeWindowReference",
+    "kind": "func",
+    "declaration": "public func nativeWindowReference(for windowID: WindowID) -> NativeWindowReference?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "windowIDs",
+    "kind": "var",
+    "declaration": "public var windowIDs: [WindowID]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "windowPosition",
+    "kind": "func",
+    "declaration": "public func windowPosition(_ windowID: WindowID) -> (x: Float, y: Float)?",
+    "abstract": "Desktop position of `windowID`'s upper-left corner, in window-manager coordinates. Returns `nil` if the shell is not yet initialised or the window has been closed.",
+    "discussion": []
+   },
+   {
+    "name": "setWindowPosition",
+    "kind": "func",
+    "declaration": "public func setWindowPosition(_ windowID: WindowID, x: Float, y: Float)",
+    "abstract": "Move `windowID` to a desktop position.",
+    "discussion": []
+   },
+   {
+    "name": "setWindowSize",
+    "kind": "func",
+    "declaration": "public func setWindowSize(_ windowID: WindowID, width: Float, height: Float)",
+    "abstract": "Resize `windowID`'s content area, in logical points.",
+    "discussion": []
+   },
+   {
+    "name": "mainWindow",
+    "kind": "var",
+    "declaration": "public var mainWindow: WindowID?",
+    "abstract": "The main window, when one is open.",
+    "discussion": []
+   },
+   {
+    "name": "minimizeWindow",
+    "kind": "func",
+    "declaration": "public func minimizeWindow(_ windowID: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maximizeWindow",
+    "kind": "func",
+    "declaration": "public func maximizeWindow(_ windowID: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "restoreWindow",
+    "kind": "func",
+    "declaration": "public func restoreWindow(_ windowID: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "hideWindow",
+    "kind": "func",
+    "declaration": "public func hideWindow(_ windowID: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showWindow",
+    "kind": "func",
+    "declaration": "public func showWindow(_ windowID: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isWindowMaximized",
+    "kind": "func",
+    "declaration": "public func isWindowMaximized(_ windowID: WindowID) -> Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showWindowSystemMenu",
+    "kind": "func",
+    "declaration": "public func showWindowSystemMenu(_ windowID: WindowID, x: Float, y: Float)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setWindowChromeHitTest",
+    "kind": "func",
+    "declaration": "public func setWindowChromeHitTest(_ windowID: WindowID, _ hitTest: WindowChromeHitTest?)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showOpenFolderDialog",
+    "kind": "func",
+    "declaration": "public func showOpenFolderDialog(windowID: WindowID?, defaultPath: String?, accept: @escaping (String?) -> Void)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showOpenFileDialog",
+    "kind": "func",
+    "declaration": "public func showOpenFileDialog(windowID: WindowID?, defaultPath: String?, filters: [FileDialogFilter], allowsMultiple: Bool, accept: @escaping ([String]) -> Void)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "closeWindow",
+    "kind": "func",
+    "declaration": "public func closeWindow(_ windowID: WindowID)",
+    "abstract": "Destroy a window. The matching `PlatformWindowSession` is dropped on the next iteration of the run loop via `pruneClosedSessions`.",
+    "discussion": []
+   },
+   {
+    "name": "run",
+    "kind": "func",
+    "declaration": "public func run(tree: NodeTree)",
+    "abstract": "Open the main window and block until all registered windows close or `stop()` is called.",
+    "discussion": []
+   },
+   {
+    "name": "run",
+    "kind": "func",
+    "declaration": "public func run()",
+    "abstract": "Enter the run loop after windows were created through `openWindow`.",
+    "discussion": []
+   },
+   {
+    "name": "windowCloseInterceptor",
+    "kind": "var",
+    "declaration": "public var windowCloseInterceptor: ((WindowID?) -> Bool)?",
+    "abstract": "Consulted before an OS-initiated window close or app quit (`nil` = quit). Return `false` to veto; programmatic `closeWindow`/`stop` are never intercepted.",
+    "discussion": []
+   },
+   {
+    "name": "stop",
+    "kind": "func",
+    "declaration": "public func stop()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "requestDisplay",
+    "kind": "func",
+    "declaration": "public func requestDisplay(windowID: WindowID? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "enqueueMainThreadWork",
+    "kind": "func",
+    "declaration": "public nonisolated func enqueueMainThreadWork(_ work: @escaping () -> Void)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "wakeEventLoop",
+    "kind": "func",
+    "declaration": "public nonisolated func wakeEventLoop()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setTargetFrameRate",
+    "kind": "func",
+    "declaration": "public func setTargetFrameRate(_ framesPerSecond: Double?)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setFrameRateMode",
+    "kind": "func",
+    "declaration": "public func setFrameRateMode(_ mode: PlatformFrameRateMode)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setWindowKeepRendering",
+    "kind": "func",
+    "declaration": "public func setWindowKeepRendering(_ windowID: WindowID, _ keep: Bool)",
+    "abstract": "Keep driving frames for `windowID` even when it is occluded or the app is backgrounded. Used by the DevTools mirror so offscreen capture keeps working while the window is not on screen. Presentation is still suspended, so this stays memory-efficient.",
+    "discussion": []
+   },
+   {
+    "name": "safeArea",
+    "kind": "var",
+    "declaration": "public var safeArea: WindowSafeArea",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "currentDisplayRefreshRate",
+    "kind": "func",
+    "declaration": "public func currentDisplayRefreshRate(windowID: WindowID? = nil) -> Double?",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIRuntime",
+  "category": "runtime",
+  "file": "Runtime/Sources/CoveUIRuntime/Core/SDL3PlatformHost.swift",
+  "line": 157,
+  "owner": "",
+  "overloads": [
+   "public final class SDL3PlatformHost: PlatformHost"
+  ]
+ }
+]

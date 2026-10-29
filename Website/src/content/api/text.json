@@ -1,0 +1,3765 @@
+[
+ {
+  "id": "color-glyph-bitmap",
+  "name": "ColorGlyphBitmap",
+  "kind": "struct",
+  "declaration": "public struct ColorGlyphBitmap",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "pixels",
+    "kind": "let",
+    "declaration": "public let pixels: [UInt8]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "width",
+    "kind": "let",
+    "declaration": "public let width: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "height",
+    "kind": "let",
+    "declaration": "public let height: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "metrics",
+    "kind": "let",
+    "declaration": "public let metrics: GlyphMetrics",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ColorGlyphBitmap",
+    "kind": "init",
+    "declaration": "public init(pixels: [UInt8], width: Int, height: Int, metrics: GlyphMetrics)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIText",
+  "category": "text",
+  "file": "Text/Sources/CoveUIText/ColorGlyphSource.swift",
+  "line": 18,
+  "owner": "",
+  "overloads": [
+   "public struct ColorGlyphBitmap"
+  ]
+ },
+ {
+  "id": "color-glyph-source",
+  "name": "ColorGlyphSource",
+  "kind": "struct",
+  "declaration": "public struct ColorGlyphSource",
+  "abstract": "Platform fonts provide metrics and a straight-alpha RGBA bitmap without coupling paragraph layout or atlas storage to a platform rasterizer.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "size",
+    "kind": "let",
+    "declaration": "public let size: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rasterScale",
+    "kind": "let",
+    "declaration": "public let rasterScale: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "metrics",
+    "kind": "let",
+    "declaration": "public let metrics: (UInt32) -> GlyphMetrics?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "lineMetrics",
+    "kind": "let",
+    "declaration": "public let lineMetrics: () -> GlyphLineMetrics",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rasterize",
+    "kind": "let",
+    "declaration": "public let rasterize: (UInt32) -> ColorGlyphBitmap?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ColorGlyphSource",
+    "kind": "init",
+    "declaration": "public init(size: Float, rasterScale: Float, metrics: @escaping (UInt32) -> GlyphMetrics?, lineMetrics: @escaping () -> GlyphLineMetrics, rasterize: @escaping (UInt32) -> ColorGlyphBitmap?)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIText",
+  "category": "text",
+  "file": "Text/Sources/CoveUIText/ColorGlyphSource.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct ColorGlyphSource"
+  ]
+ },
+ {
+  "id": "divider",
+  "name": "Divider",
+  "kind": "struct",
+  "declaration": "public struct Divider: _PrimitiveView",
+  "abstract": "Thin one-pixel separator. Renders as a coloured rect; defaults to a flexible horizontal line when placed in a Column. When `color` is omitted, the divider resolves `theme.colors.divider` from the active theme so themed scopes paint a coherent rule colour without any plumbing at the call site.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "color",
+    "kind": "let",
+    "declaration": "public let color: Color?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "thickness",
+    "kind": "let",
+    "declaration": "public let thickness: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "axis",
+    "kind": "let",
+    "declaration": "public let axis: Axis",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Divider",
+    "kind": "init",
+    "declaration": "public init(color: Color? = nil, thickness: Float = 1, axis: Axis = .horizontal)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/Text.swift",
+  "line": 569,
+  "owner": "",
+  "overloads": [
+   "public struct Divider: _PrimitiveView"
+  ]
+ },
+ {
+  "id": "font-axis",
+  "name": "FontAxis",
+  "kind": "struct",
+  "declaration": "public struct FontAxis: Hashable, Sendable",
+  "abstract": "One design axis of a variable font, in normalized design units.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: ID",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "name",
+    "kind": "let",
+    "declaration": "public let name: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minimum",
+    "kind": "let",
+    "declaration": "public let minimum: Double",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "defaultValue",
+    "kind": "let",
+    "declaration": "public let defaultValue: Double",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maximum",
+    "kind": "let",
+    "declaration": "public let maximum: Double",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "FontAxis",
+    "kind": "init",
+    "declaration": "public init(id: ID, name: String, minimum: Double, defaultValue: Double, maximum: Double)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIText",
+  "category": "text",
+  "file": "Text/Sources/CoveUIText/FontFace.swift",
+  "line": 25,
+  "owner": "",
+  "overloads": [
+   "public struct FontAxis: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "font-face-selector",
+  "name": "FontFaceSelector",
+  "kind": "struct",
+  "declaration": "public struct FontFaceSelector: Hashable, Sendable",
+  "abstract": "A selector identifying one face inside a font file.",
+  "discussion": [
+   "The low 16 bits are the collection face index; the high 16 bits are a\n1-based named-instance index for variable fonts. CoreText's descriptor\narray lists named instances, and its index is *not* a FreeType collection\nface index, so both must travel together."
+  ],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "rawValue",
+    "kind": "let",
+    "declaration": "public let rawValue: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "FontFaceSelector",
+    "kind": "init",
+    "declaration": "public init(faceIndex: Int, namedInstance: Int = 0)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "faceIndex",
+    "kind": "var",
+    "declaration": "public var faceIndex: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "namedInstance",
+    "kind": "var",
+    "declaration": "public var namedInstance: Int",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIText",
+  "category": "text",
+  "file": "Text/Sources/CoveUIText/FontFace.swift",
+  "line": 69,
+  "owner": "",
+  "overloads": [
+   "public struct FontFaceSelector: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "font-run",
+  "name": "FontRun",
+  "kind": "struct",
+  "declaration": "public struct FontRun",
+  "abstract": "A contiguous text segment that should be shaped with a specific font.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "font",
+    "kind": "let",
+    "declaration": "public let font: ManagedFont",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "text",
+    "kind": "let",
+    "declaration": "public let text: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "utf8Offset",
+    "kind": "let",
+    "declaration": "public let utf8Offset: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isRightToLeft",
+    "kind": "var",
+    "declaration": "public var isRightToLeft: Bool?",
+    "abstract": "Resolved bidi direction; `nil` lets HarfBuzz guess from the script.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIText",
+  "category": "text",
+  "file": "Text/Sources/CoveUIText/FontProvider.swift",
+  "line": 46,
+  "owner": "",
+  "overloads": [
+   "public struct FontRun"
+  ]
+ },
+ {
+  "id": "glyph-bitmap",
+  "name": "GlyphBitmap",
+  "kind": "struct",
+  "declaration": "public struct GlyphBitmap",
+  "abstract": "A rasterized glyph together with the metrics layout needs for it.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "pixels",
+    "kind": "let",
+    "declaration": "public let pixels: [UInt8]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "width",
+    "kind": "let",
+    "declaration": "public let width: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "height",
+    "kind": "let",
+    "declaration": "public let height: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "metrics",
+    "kind": "let",
+    "declaration": "public let metrics: GlyphMetrics",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "format",
+    "kind": "let",
+    "declaration": "public let format: GlyphAtlasFormat",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "GlyphBitmap",
+    "kind": "init",
+    "declaration": "public init(pixels: [UInt8], width: Int, height: Int, metrics: GlyphMetrics, format: GlyphAtlasFormat)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIText",
+  "category": "text",
+  "file": "Text/Sources/CoveUIText/FontFace.swift",
+  "line": 47,
+  "owner": "",
+  "overloads": [
+   "public struct GlyphBitmap"
+  ]
+ },
+ {
+  "id": "localized-string-key",
+  "name": "LocalizedStringKey",
+  "kind": "struct",
+  "declaration": "public struct LocalizedStringKey: Sendable, ExpressibleByStringLiteral",
+  "abstract": "A type-safe key for localized strings.",
+  "discussion": [
+   "Pass one to `Text` or `Button` to display a UI string resolved from a\n`.strings` table at a given bundle:",
+   "```swift\nText(LocalizedStringKey(\"Save\", bundle: Bundle.module))\nButton(LocalizedStringKey(\"Cancel\", bundle: Bundle.module)) { … }\n```",
+   "`ExpressibleByStringLiteral` lets you write bare string literals where a\n`LocalizedStringKey` is expected; those literals resolve against `.main`."
+  ],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "ExpressibleByStringLiteral"
+  ],
+  "members": [
+   {
+    "name": "key",
+    "kind": "let",
+    "declaration": "public let key: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "bundle",
+    "kind": "let",
+    "declaration": "public let bundle: Bundle",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "table",
+    "kind": "let",
+    "declaration": "public let table: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "LocalizedStringKey",
+    "kind": "init",
+    "declaration": "public init(_ key: String, bundle: Bundle = .main, table: String? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "LocalizedStringKey",
+    "kind": "init",
+    "declaration": "public init(stringLiteral value: String)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "resolved",
+    "kind": "var",
+    "declaration": "public var resolved: String",
+    "abstract": "Resolves the key against the bundle. Falls back to `key` when no translation exists so UI always shows something readable.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/I18n/LocalizedStringKey.swift",
+  "line": 15,
+  "owner": "",
+  "overloads": [
+   "public struct LocalizedStringKey: Sendable, ExpressibleByStringLiteral"
+  ]
+ },
+ {
+  "id": "markdown-view",
+  "name": "MarkdownView",
+  "kind": "struct",
+  "declaration": "public struct MarkdownView: View",
+  "abstract": "Renders CommonMark with the GitHub extensions (tables, strikethrough, task lists): headings, paragraphs with inline styles and links, quotes, nested lists, code blocks that scroll sideways instead of wrapping, tables and rules. It takes the surrounding text style and width and grows to its content; place it in a `ScrollView` for long documents.",
+  "discussion": [
+   "```swift\nMarkdownView(release.notes) { destination in router.open(destination) }\n```",
+   "Links are reported to `onOpenLink`; nothing is opened on the caller's\nbehalf. Images render as their linked alternative text."
+  ],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "MarkdownView",
+    "kind": "init",
+    "declaration": "public init(_ source: String, onOpenLink: ((String) -> Void)? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/Markdown/MarkdownView.swift",
+  "line": 17,
+  "owner": "",
+  "overloads": [
+   "public struct MarkdownView: View"
+  ]
+ },
+ {
+  "id": "rich-text",
+  "name": "RichText",
+  "kind": "struct",
+  "declaration": "public struct RichText: View",
+  "abstract": "A paragraph of styled runs that wrap together: bold, italic, inline code, strikethrough and links in one flow, with the surrounding text style, foreground and `TextScaler` applied once.",
+  "discussion": [
+   "```swift\nRichText([\n    RichTextRun(\"Run \"),\n    RichTextRun(\"cove build\", traits: .code),\n    RichTextRun(\" or read the \"),\n    RichTextRun(\"guide\", link: \"https://example.com/guide\"),\n    RichTextRun(\".\"),\n]) { destination in open(destination) }\n```",
+   "Links are underlined body-copy links: they take the pointer cursor and\nactivate on click; `Markdown` builds whole documents from these paragraphs."
+  ],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "RichText",
+    "kind": "init",
+    "declaration": "public init(_ runs: [RichTextRun], alignment: TextAlignment = .leading, onOpenLink: ((String) -> Void)? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "RichText",
+    "kind": "init",
+    "declaration": "public init(_ text: String, alignment: TextAlignment = .leading)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/Rich/RichText.swift",
+  "line": 22,
+  "owner": "",
+  "overloads": [
+   "public struct RichText: View"
+  ]
+ },
+ {
+  "id": "rich-text-run",
+  "name": "RichTextRun",
+  "kind": "struct",
+  "declaration": "public struct RichTextRun: Hashable, Sendable",
+  "abstract": "One styled span of a `RichText` paragraph. Runs wrap together as a single paragraph; a `\"\\n\"` inside a run is a hard line break.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "text",
+    "kind": "var",
+    "declaration": "public var text: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "traits",
+    "kind": "var",
+    "declaration": "public var traits: RichTextTraits",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "link",
+    "kind": "var",
+    "declaration": "public var link: String?",
+    "abstract": "The destination handed to `RichText`'s link handler. Adjacent runs with the same destination form one link.",
+    "discussion": []
+   },
+   {
+    "name": "RichTextRun",
+    "kind": "init",
+    "declaration": "public init(_ text: String, traits: RichTextTraits = [], link: String? = nil)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/Rich/Run.swift",
+  "line": 15,
+  "owner": "",
+  "overloads": [
+   "public struct RichTextRun: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "rich-text-traits",
+  "name": "RichTextTraits",
+  "kind": "struct",
+  "declaration": "public struct RichTextTraits: OptionSet, Hashable, Sendable",
+  "abstract": "Inline presentation traits of one `RichTextRun`.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "OptionSet",
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "rawValue",
+    "kind": "let",
+    "declaration": "public let rawValue: UInt8",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "RichTextTraits",
+    "kind": "init",
+    "declaration": "public init(rawValue: UInt8)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "bold",
+    "kind": "let",
+    "declaration": "public static let bold = RichTextTraits(rawValue: 1 << 0)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "italic",
+    "kind": "let",
+    "declaration": "public static let italic = RichTextTraits(rawValue: 1 << 1)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "code",
+    "kind": "let",
+    "declaration": "public static let code = RichTextTraits(rawValue: 1 << 2)",
+    "abstract": "Monospaced type on a tinted chip, as for inline code.",
+    "discussion": []
+   },
+   {
+    "name": "strikethrough",
+    "kind": "let",
+    "declaration": "public static let strikethrough = RichTextTraits(rawValue: 1 << 3)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/Rich/Run.swift",
+  "line": 2,
+  "owner": "",
+  "overloads": [
+   "public struct RichTextTraits: OptionSet, Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "rope-chunk",
+  "name": "RopeChunk",
+  "kind": "struct",
+  "declaration": "public struct RopeChunk: Sendable",
+  "abstract": "A parser can read from the requested byte without materializing the document.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "leaf",
+    "kind": "let",
+    "declaration": "public let leaf: RopeLeaf",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "utf8Offset",
+    "kind": "let",
+    "declaration": "public let utf8Offset: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "startIndex",
+    "kind": "let",
+    "declaration": "public let startIndex: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "bytes",
+    "kind": "var",
+    "declaration": "public var bytes: ArraySlice<UInt8>",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/Rope/RopeStorage.swift",
+  "line": 28,
+  "owner": "",
+  "overloads": [
+   "public struct RopeChunk: Sendable"
+  ]
+ },
+ {
+  "id": "script",
+  "name": "Script",
+  "kind": "enum",
+  "declaration": "public enum Script",
+  "abstract": "Common ISO 15924 script tags, spelled out so callers never need HarfBuzz.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "latin",
+    "kind": "let",
+    "declaration": "public static let latin: ScriptTag = 0x4C61746E",
+    "abstract": "`'Latn'`.",
+    "discussion": []
+   },
+   {
+    "name": "common",
+    "kind": "let",
+    "declaration": "public static let common: ScriptTag = 0x5A797979",
+    "abstract": "`'Zyyy'` — punctuation and other characters shared across scripts.",
+    "discussion": []
+   },
+   {
+    "name": "inherited",
+    "kind": "let",
+    "declaration": "public static let inherited: ScriptTag = 0x5A696E68",
+    "abstract": "`'Zinh'` — combining marks that inherit their base character's script.",
+    "discussion": []
+   },
+   {
+    "name": "unknown",
+    "kind": "let",
+    "declaration": "public static let unknown: ScriptTag = 0x5A7A7A7A",
+    "abstract": "`'Zzzz'` — codepoints with no known script.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIText",
+  "category": "text",
+  "file": "Text/Sources/CoveUIText/FontFace.swift",
+  "line": 13,
+  "owner": "",
+  "overloads": [
+   "public enum Script"
+  ]
+ },
+ {
+  "id": "system-font-defaults",
+  "name": "SystemFontDefaults",
+  "kind": "enum",
+  "declaration": "public enum SystemFontDefaults",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "fontStack",
+    "kind": "let",
+    "declaration": "public static let fontStack: [String] = [",
+    "abstract": "Default CoveUI font-family stack. The first installed family wins; CJK glyphs are resolved through CoreText's cascade list at shape time, so we only need a single primary face here.",
+    "discussion": []
+   },
+   {
+    "name": "primaryFontName",
+    "kind": "let",
+    "declaration": "public static let primaryFontName: String = resolvePrimaryFontName()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "monospacedFontName",
+    "kind": "var",
+    "declaration": "public static var monospacedFontName: String",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIText",
+  "category": "text",
+  "file": "Text/Sources/CoveUIText/TextStyle.swift",
+  "line": 19,
+  "owner": "",
+  "overloads": [
+   "public enum SystemFontDefaults"
+  ]
+ },
+ {
+  "id": "text",
+  "name": "Text",
+  "kind": "struct",
+  "declaration": "public struct Text: _PrimitiveView",
+  "abstract": "Static text primitive. Participates in flexbox layout via Yoga's measure callback so a label sized by its parent will wrap; an unconstrained label reports its natural single-line width.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "string",
+    "kind": "let",
+    "declaration": "public let string: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "alignment",
+    "kind": "let",
+    "declaration": "public let alignment: TextAlignment",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "color",
+    "kind": "let",
+    "declaration": "public let color: Color?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "lineLimit",
+    "kind": "let",
+    "declaration": "public let lineLimit: Int?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Text",
+    "kind": "init",
+    "declaration": "public init(_ string: String, alignment: TextAlignment = .leading, color: Color? = nil, lineLimit: Int? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Text",
+    "kind": "init",
+    "declaration": "public init(_ key: LocalizedStringKey, alignment: TextAlignment = .leading, color: Color? = nil, lineLimit: Int? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "lineLimit",
+    "kind": "func",
+    "declaration": "public func lineLimit(_ limit: Int?) -> Text",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "truncated",
+    "kind": "func",
+    "declaration": "public func truncated() -> some View",
+    "abstract": "A single line with a trailing ellipsis, a full-text tooltip and the original accessible name. Truncation never splits a grapheme cluster. The tooltip appears only when the line actually had to clip.",
+    "discussion": []
+   },
+   {
+    "name": "textSelectionEnabled",
+    "kind": "func",
+    "declaration": "public func textSelectionEnabled(_ enabled: Bool = true) -> Text",
+    "abstract": "Enables text selection for this label when it is inside a `textSelection()` region, so its content can be copied like a `RichText`.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/Text.swift",
+  "line": 8,
+  "owner": "",
+  "overloads": [
+   "public struct Text: _PrimitiveView"
+  ]
+ },
+ {
+  "id": "text-breakpoint",
+  "name": "TextBreakpoint",
+  "kind": "struct",
+  "declaration": "public struct TextBreakpoint: Equatable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "line",
+    "kind": "var",
+    "declaration": "public var line: Int",
+    "abstract": "Zero-based logical source line, independent of wrapping and folding.",
+    "discussion": []
+   },
+   {
+    "name": "state",
+    "kind": "var",
+    "declaration": "public var state: State",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextBreakpoint",
+    "kind": "init",
+    "declaration": "public init(line: Int, state: State = .enabled)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterOptions.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct TextBreakpoint: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "text-buffer",
+  "name": "TextBuffer",
+  "kind": "struct",
+  "declaration": "public struct TextBuffer: Equatable, Sendable",
+  "abstract": "Immutable text with shared Rope subtrees. Copying a buffer or retaining an undo snapshot is O(1). Editing visits the search path and affected graphemes. Character indexes are Swift extended grapheme clusters; byte indexes are UTF-8.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "empty",
+    "kind": "let",
+    "declaration": "public static let empty = TextBuffer(root: .empty, version: 0)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "version",
+    "kind": "let",
+    "declaration": "public let version: UInt64",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextBuffer",
+    "kind": "init",
+    "declaration": "public init(_ string: String)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "utf8Length",
+    "kind": "var",
+    "declaration": "public var utf8Length: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "characterCount",
+    "kind": "var",
+    "declaration": "public var characterCount: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "utf16Length",
+    "kind": "var",
+    "declaration": "public var utf16Length: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "lineCount",
+    "kind": "var",
+    "declaration": "public var lineCount: Int",
+    "abstract": "An empty document has one line; CRLF counts as one separator.",
+    "discussion": []
+   },
+   {
+    "name": "isEmpty",
+    "kind": "var",
+    "declaration": "public var isEmpty: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "stringValue",
+    "kind": "var",
+    "declaration": "public var stringValue: String",
+    "abstract": "O(n). Use at file/service serialization boundaries, outside rendering.",
+    "discussion": []
+   },
+   {
+    "name": "hasSameContents",
+    "kind": "func",
+    "declaration": "public func hasSameContents(as other: TextBuffer) -> Bool",
+    "abstract": "Exact UTF-8 content equality, skipping shared subtrees. Use at edit/save boundaries and cache the result; independently loaded text may cost O(n). Ordinary == remains O(1) revision equality for rendering and observation.",
+    "discussion": []
+   },
+   {
+    "name": "substring",
+    "kind": "func",
+    "declaration": "public func substring(characterRange: Range<Int>) -> String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "character",
+    "kind": "func",
+    "declaration": "public func character(at index: Int) -> Character?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "insert",
+    "kind": "func",
+    "declaration": "public func insert(_ string: String, atCharacterIndex index: Int) -> TextBuffer",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "delete",
+    "kind": "func",
+    "declaration": "public func delete(characterRange: Range<Int>) -> TextBuffer",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "replace",
+    "kind": "func",
+    "declaration": "public func replace(characterRange: Range<Int>, with string: String) -> TextBuffer",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "editDelta",
+    "kind": "func",
+    "declaration": "public func editDelta(from previous: TextBuffer) -> TextEditDelta?",
+    "abstract": "A single edit returns its recorded delta. Multiple edits, undo and redo find the changed extent by skipping shared subtrees, without a full diff.",
+    "discussion": []
+   },
+   {
+    "name": "utf8Offset",
+    "kind": "func",
+    "declaration": "public func utf8Offset(forCharacterIndex index: Int) -> Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "characterIndex",
+    "kind": "func",
+    "declaration": "public func characterIndex(forUTF8Offset offset: Int) -> Int",
+    "abstract": "Offsets inside a grapheme snap forward to its end.",
+    "discussion": []
+   },
+   {
+    "name": "utf16Offset",
+    "kind": "func",
+    "declaration": "public func utf16Offset(forCharacterIndex index: Int) -> Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "lineRange",
+    "kind": "func",
+    "declaration": "public func lineRange(forLine line: Int) -> Range<Int>",
+    "abstract": "Range excludes the separator; out-of-range lines clamp to the document.",
+    "discussion": []
+   },
+   {
+    "name": "characterIndex",
+    "kind": "func",
+    "declaration": "public func characterIndex(forLine line: Int, character: Int) -> Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "lineIndex",
+    "kind": "func",
+    "declaration": "public func lineIndex(forCharacterIndex index: Int) -> Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "lineAndColumn",
+    "kind": "func",
+    "declaration": "public func lineAndColumn(forCharacterIndex index: Int) -> (line: Int, column: Int)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "point",
+    "kind": "func",
+    "declaration": "public func point(forUTF8Offset offset: Int) -> TextBufferPoint",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "parserPoint",
+    "kind": "func",
+    "declaration": "public func parserPoint(forUTF8Offset offset: Int) -> TextBufferPoint",
+    "abstract": "Tree-sitter rows count LF bytes; a CRLF edit can end between its two bytes, independently of the grapheme/visual-line coordinate space.",
+    "discussion": []
+   },
+   {
+    "name": "utf8Offset",
+    "kind": "func",
+    "declaration": "public func utf8Offset(forUTF16Offset offset: Int) -> Int",
+    "abstract": "UTF-16 code-unit conversion for LSP. Scalar interiors snap forward; combining-scalar boundaries remain representable within a Character.",
+    "discussion": []
+   },
+   {
+    "name": "utf16Offset",
+    "kind": "func",
+    "declaration": "public func utf16Offset(forUTF8Offset offset: Int) -> Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "visibleChunks",
+    "kind": "func",
+    "declaration": "public func visibleChunks(inUTF8Range range: Range<Int>) -> [RopeLeaf]",
+    "abstract": "Overlapping immutable leaves, including partially covered edge leaves. For an exact byte slice, use `utf8Bytes(inUTF8Range:)` or `chunk(atUTF8Offset:)`.",
+    "discussion": []
+   },
+   {
+    "name": "utf8Bytes",
+    "kind": "func",
+    "declaration": "public func utf8Bytes(inUTF8Range range: Range<Int>) -> [UInt8]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "chunk",
+    "kind": "func",
+    "declaration": "public func chunk(atUTF8Offset offset: Int) -> RopeChunk?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "visibleText",
+    "kind": "func",
+    "declaration": "public func visibleText(firstLine: Int, lastLine: Int) -> String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "",
+    "kind": "func",
+    "declaration": "public static func == (lhs: TextBuffer, rhs: TextBuffer) -> Bool",
+    "abstract": "Revision equality is O(1). Independently constructed buffers are distinct revisions even when their serialized strings have identical contents.",
+    "discussion": []
+   },
+   {
+    "name": "TextBuffer",
+    "kind": "init",
+    "declaration": "public init(stringLiteral value: String)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/TextBuffer.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct TextBuffer: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "text-buffer-point",
+  "name": "TextBufferPoint",
+  "kind": "struct",
+  "declaration": "public struct TextBufferPoint: Equatable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "row",
+    "kind": "let",
+    "declaration": "public let row: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "columnUTF8",
+    "kind": "let",
+    "declaration": "public let columnUTF8: Int",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/TextBuffer.swift",
+  "line": 174,
+  "owner": "",
+  "overloads": [
+   "public struct TextBufferPoint: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "text-cache-limits",
+  "name": "TextCacheLimits",
+  "kind": "struct",
+  "declaration": "public struct TextCacheLimits: Sendable, Equatable",
+  "abstract": "Limits apply independently to shaping and layout. Bytes estimate retained strings and result buffers, rather than the process's physical footprint.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "maximumEntries",
+    "kind": "var",
+    "declaration": "public var maximumEntries: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maximumBytes",
+    "kind": "var",
+    "declaration": "public var maximumBytes: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextCacheLimits",
+    "kind": "init",
+    "declaration": "public init(maximumEntries: Int = 512, maximumBytes: Int = 8 * 1_024 * 1_024)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIText",
+  "category": "text",
+  "file": "Text/Sources/CoveUIText/TextCache.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct TextCacheLimits: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "text-cache-snapshot",
+  "name": "TextCacheSnapshot",
+  "kind": "struct",
+  "declaration": "public struct TextCacheSnapshot: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "entries",
+    "kind": "let",
+    "declaration": "public let entries: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "estimatedBytes",
+    "kind": "let",
+    "declaration": "public let estimatedBytes: Int",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIText",
+  "category": "text",
+  "file": "Text/Sources/CoveUIText/TextCache.swift",
+  "line": 15,
+  "owner": "",
+  "overloads": [
+   "public struct TextCacheSnapshot: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "text-diagnostic",
+  "name": "TextDiagnostic",
+  "kind": "struct",
+  "declaration": "public struct TextDiagnostic: Equatable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "utf8Range",
+    "kind": "let",
+    "declaration": "public let utf8Range: Range<Int>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "severity",
+    "kind": "let",
+    "declaration": "public let severity: Severity",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "message",
+    "kind": "let",
+    "declaration": "public let message: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "style",
+    "kind": "var",
+    "declaration": "public var style = Style.underline",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextDiagnostic",
+    "kind": "init",
+    "declaration": "public init(utf8Range: Range<Int>, severity: Severity, message: String)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/TextDiagnostic.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct TextDiagnostic: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "text-diagnostics",
+  "name": "TextDiagnostics",
+  "kind": "struct",
+  "declaration": "public struct TextDiagnostics: Sendable, Equatable",
+  "abstract": "An immutable interval index. Build when a diagnostic reply changes; paint and hover query only overlapping ranges, including zero-width diagnostics.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "",
+    "kind": "func",
+    "declaration": "public static func == (lhs: Self, rhs: Self) -> Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "empty",
+    "kind": "let",
+    "declaration": "public static let empty = TextDiagnostics([])",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextDiagnostics",
+    "kind": "init",
+    "declaration": "public init(_ diagnostics: [TextDiagnostic])",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "overlapping",
+    "kind": "func",
+    "declaration": "public func overlapping(_ range: Range<Int>) -> [TextDiagnostic]",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/TextDiagnostic.swift",
+  "line": 22,
+  "owner": "",
+  "overloads": [
+   "public struct TextDiagnostics: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "text-direction",
+  "name": "TextDirection",
+  "kind": "enum",
+  "declaration": "public enum TextDirection",
+  "abstract": "Text direction for shaping.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUIText",
+  "category": "text",
+  "file": "Text/Sources/CoveUIText/TextShaper.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public enum TextDirection"
+  ]
+ },
+ {
+  "id": "text-edit-delta",
+  "name": "TextEditDelta",
+  "kind": "struct",
+  "declaration": "public struct TextEditDelta: Equatable, Sendable",
+  "abstract": "UTF-8 spans feed Tree-sitter. LSP ranges must be converted to UTF-16 positions.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "characterRange",
+    "kind": "let",
+    "declaration": "public let characterRange: Range<Int>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "startUTF8Offset",
+    "kind": "let",
+    "declaration": "public let startUTF8Offset: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "oldEndUTF8Offset",
+    "kind": "let",
+    "declaration": "public let oldEndUTF8Offset: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "newEndUTF8Offset",
+    "kind": "let",
+    "declaration": "public let newEndUTF8Offset: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "oldText",
+    "kind": "let",
+    "declaration": "public let oldText: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "newText",
+    "kind": "let",
+    "declaration": "public let newText: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isInsertion",
+    "kind": "var",
+    "declaration": "public var isInsertion: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isDeletion",
+    "kind": "var",
+    "declaration": "public var isDeletion: Bool",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/TextBuffer.swift",
+  "line": 179,
+  "owner": "",
+  "overloads": [
+   "public struct TextEditDelta: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "text-editing-commands",
+  "name": "TextEditingCommands",
+  "kind": "enum",
+  "declaration": "public enum TextEditingCommands",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "canUndo",
+    "kind": "var",
+    "declaration": "public static var canUndo: Bool?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "canRedo",
+    "kind": "var",
+    "declaration": "public static var canRedo: Bool?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "undo",
+    "kind": "func",
+    "declaration": "private static func perform(_ key: String) -> Bool",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/TextEditingCommands.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public enum TextEditingCommands"
+  ]
+ },
+ {
+  "id": "text-editor-annotations",
+  "name": "TextEditorAnnotations",
+  "kind": "struct",
+  "declaration": "public struct TextEditorAnnotations: Equatable, Sendable",
+  "abstract": "Optional caller-owned document-session annotations. This value is deliberately separate from source text, undo snapshots and persisted project configuration.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "breakpoints",
+    "kind": "var",
+    "declaration": "public var breakpoints: [TextBreakpoint] = []",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "collapsedLines",
+    "kind": "var",
+    "declaration": "public var collapsedLines: Set<Int> = []",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextEditorAnnotations",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rebase",
+    "kind": "func",
+    "declaration": "public mutating func rebase(from previous: TextBuffer, to next: TextBuffer)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterOptions.swift",
+  "line": 15,
+  "owner": "",
+  "overloads": [
+   "public struct TextEditorAnnotations: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "text-editor-folding",
+  "name": "TextEditorFolding",
+  "kind": "struct",
+  "declaration": "public struct TextEditorFolding",
+  "abstract": "Language services supply logical regions; the field owns only presentation. Omit collapsedLines for a node-local session, or bind it to caller-owned state.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "regions",
+    "kind": "var",
+    "declaration": "public var regions: [TextFoldRegion] = []",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isReady",
+    "kind": "var",
+    "declaration": "public var isReady = true",
+    "abstract": "False while an asynchronous language service is producing its snapshot. Pending ranges must not erase caller-owned collapsed headers on remount.",
+    "discussion": []
+   },
+   {
+    "name": "collapsedLines",
+    "kind": "var",
+    "declaration": "public var collapsedLines: Binding<Set<Int>>?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "labels",
+    "kind": "var",
+    "declaration": "public var labels = TextFoldingLabels()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextEditorFolding",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/Code/FoldingOptions.swift",
+  "line": 21,
+  "owner": "",
+  "overloads": [
+   "public struct TextEditorFolding"
+  ]
+ },
+ {
+  "id": "text-editor-gutter",
+  "name": "TextEditorGutter",
+  "kind": "struct",
+  "declaration": "public struct TextEditorGutter",
+  "abstract": "Breakpoints belong to the caller's document session, never the source text. Editing rebases them; callbacks can forward the resulting list to a debugger.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "breakpoints",
+    "kind": "var",
+    "declaration": "public var breakpoints: Binding<[TextBreakpoint]>?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onBreakpointsChange",
+    "kind": "var",
+    "declaration": "public var onBreakpointsChange: (([TextBreakpoint]) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "markers",
+    "kind": "var",
+    "declaration": "public var markers: [TextGutterMarker] = []",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "executionLine",
+    "kind": "var",
+    "declaration": "public var executionLine: Int?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "labels",
+    "kind": "var",
+    "declaration": "public var labels = TextGutterLabels()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextEditorGutter",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterOptions.swift",
+  "line": 61,
+  "owner": "",
+  "overloads": [
+   "public struct TextEditorGutter"
+  ]
+ },
+ {
+  "id": "text-environment",
+  "name": "TextEnvironment",
+  "kind": "struct",
+  "declaration": "public struct TextEnvironment",
+  "abstract": "Process-wide text rendering context. The Compose layer asks the host to install a `TextEnvironment` once at startup; primitives (`Text`) read from it during materialisation. Decoupled so the runtime tests do not need a real FreeType font loaded.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "atlas",
+    "kind": "let",
+    "declaration": "public let atlas: FontAtlas",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "shaper",
+    "kind": "let",
+    "declaration": "public let shaper: TextShaper",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "atlasTextureID",
+    "kind": "let",
+    "declaration": "public let atlasTextureID: TextureID",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "defaultLineHeight",
+    "kind": "var",
+    "declaration": "public var defaultLineHeight: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "defaultColor",
+    "kind": "var",
+    "declaration": "public var defaultColor: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "defaultFont",
+    "kind": "var",
+    "declaration": "public var defaultFont: Font",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "fontResolver",
+    "kind": "var",
+    "declaration": "public var fontResolver: TextFontResolver?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextEnvironment",
+    "kind": "init",
+    "declaration": "public init(atlas: FontAtlas, shaper: TextShaper, atlasTextureID: TextureID, defaultLineHeight: Float, defaultColor: Color = .white, defaultFont: Font? = nil, fontResolver: TextFontResolver? = nil, cacheLimits: TextCacheLimits = TextCacheLimits())",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "shapingCacheSnapshot",
+    "kind": "var",
+    "declaration": "public var shapingCacheSnapshot: TextCacheSnapshot",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "layoutCacheSnapshot",
+    "kind": "var",
+    "declaration": "public var layoutCacheSnapshot: TextCacheSnapshot",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "trimTextCaches",
+    "kind": "func",
+    "declaration": "public func trimTextCaches()",
+    "abstract": "Drops reusable results. Visible nodes keep their own layout snapshots.",
+    "discussion": []
+   },
+   {
+    "name": "bootstrapped",
+    "kind": "func",
+    "declaration": "public static func bootstrapped(atlasTextureID: TextureID, primaryFontName: String, defaultFont: Font = .system(size: 18), defaultLineHeight: Float = 22, defaultColor: Color = .white, rasterScale: Float = 1, atlasEdge: Int? = nil, cacheLimits: TextCacheLimits = TextCacheLimits()) -> TextEnvironment",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "resolvedFont",
+    "kind": "func",
+    "declaration": "public func resolvedFont(_ override: Font?) -> Font",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "resolvedLineHeight",
+    "kind": "func",
+    "declaration": "public func resolvedLineHeight(font: Font, override: Float?) -> Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "shape",
+    "kind": "func",
+    "declaration": "public func shape(text: String, font: Font?) -> [ShapedGlyph]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "cachedLayout",
+    "kind": "func",
+    "declaration": "public func cachedLayout(text: String, font: Font? = nil, lineHeight: Float? = nil, maxWidth: Float = .infinity, alignment: TextAlignment = .leading, letterSpacing: Float = 0) -> TextLayoutResult",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "prewarmGlyphs",
+    "kind": "func",
+    "declaration": "public func prewarmGlyphs(text: String, fonts: [Font])",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "prewarmGlyphs",
+    "kind": "func",
+    "declaration": "public func prewarmGlyphs(text: String, font: Font? = nil)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIText",
+  "category": "text",
+  "file": "Text/Sources/CoveUIText/TextEnvironment.swift",
+  "line": 12,
+  "owner": "",
+  "overloads": [
+   "public struct TextEnvironment"
+  ]
+ },
+ {
+  "id": "text-environment-holder",
+  "name": "TextEnvironmentHolder",
+  "kind": "enum",
+  "declaration": "public enum TextEnvironmentHolder",
+  "abstract": "Holder so views can reach the environment without threading it through every builder. Set by `SDL3PlatformHost` (or any other shell) before the first `materialise` call.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "current",
+    "kind": "var",
+    "declaration": "public static var current: TextEnvironment?",
+    "abstract": "Reads retain under the lock swaps release under, so replacing the environment never frees one another thread is still loading.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIText",
+  "category": "text",
+  "file": "Text/Sources/CoveUIText/TextEnvironment.swift",
+  "line": 199,
+  "owner": "",
+  "overloads": [
+   "public enum TextEnvironmentHolder"
+  ]
+ },
+ {
+  "id": "text-field",
+  "name": "TextField",
+  "kind": "struct",
+  "declaration": "public struct TextField: View",
+  "abstract": "Text input field. The default horizontal axis is single-line; the vertical axis accepts explicit newline insertion and grows in height to fit those lines.",
+  "discussion": [
+   "Editing state survives recomposition in the host node.",
+   "Configure meaningful groups, for example:\n`TextField(\"Password\", text: $password) { $0.behavior.secure = true }`",
+   "- Reads from `TextEnvironment` for shaping; without one installed the\n  field still accepts input but renders no glyphs."
+  ],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "text",
+    "kind": "let",
+    "declaration": "public let text: Binding<TextBuffer>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "placeholder",
+    "kind": "let",
+    "declaration": "public let placeholder: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "layout",
+    "kind": "var",
+    "declaration": "public var layout = TextFieldLayout()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "behavior",
+    "kind": "var",
+    "declaration": "public var behavior = TextFieldBehavior()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "decoration",
+    "kind": "var",
+    "declaration": "public var decoration = TextFieldDecoration()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "codeEditing",
+    "kind": "var",
+    "declaration": "public var codeEditing: TextFieldCodeEditing",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "navigation",
+    "kind": "var",
+    "declaration": "public var navigation = TextFieldNavigation()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "events",
+    "kind": "var",
+    "declaration": "public var events = TextFieldEvents()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextField",
+    "kind": "init",
+    "declaration": "public init(_ placeholder: String = \"\", text: Binding<TextBuffer>, configure: (inout TextField) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextField.swift",
+  "line": 20,
+  "owner": "",
+  "overloads": [
+   "public struct TextField: View"
+  ]
+ },
+ {
+  "id": "text-field-behavior",
+  "name": "TextFieldBehavior",
+  "kind": "struct",
+  "declaration": "public struct TextFieldBehavior: Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "disabled",
+    "kind": "var",
+    "declaration": "public var disabled = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "readOnly",
+    "kind": "var",
+    "declaration": "public var readOnly = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "secure",
+    "kind": "var",
+    "declaration": "public var secure = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "clearable",
+    "kind": "var",
+    "declaration": "public var clearable = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maxLength",
+    "kind": "var",
+    "declaration": "public var maxLength: Int?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextFieldBehavior",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldOptions.swift",
+  "line": 16,
+  "owner": "",
+  "overloads": [
+   "public struct TextFieldBehavior: Equatable"
+  ]
+ },
+ {
+  "id": "text-field-caret-state",
+  "name": "TextFieldCaretState",
+  "kind": "struct",
+  "declaration": "public struct TextFieldCaretState: Hashable, Sendable",
+  "abstract": "Current caret and selection, reported whenever either moves.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "caretIndex",
+    "kind": "let",
+    "declaration": "public let caretIndex: Int",
+    "abstract": "Caret offset in `Character` units; for a selection this is the moving end.",
+    "discussion": []
+   },
+   {
+    "name": "selectedRange",
+    "kind": "let",
+    "declaration": "public let selectedRange: Range<Int>?",
+    "abstract": "Half-open `[low, high)` selection, or `nil` when collapsed.",
+    "discussion": []
+   },
+   {
+    "name": "TextFieldCaretState",
+    "kind": "init",
+    "declaration": "public init(caretIndex: Int, selectedRange: Range<Int>?)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "initial",
+    "kind": "let",
+    "declaration": "public static let initial = TextFieldCaretState(caretIndex: 0, selectedRange: nil)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldObservation.swift",
+  "line": 30,
+  "owner": "",
+  "overloads": [
+   "public struct TextFieldCaretState: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "text-field-code-editing",
+  "name": "TextFieldCodeEditing",
+  "kind": "struct",
+  "declaration": "public struct TextFieldCodeEditing",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "gutter",
+    "kind": "var",
+    "declaration": "public var gutter = TextEditorGutter()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "folding",
+    "kind": "var",
+    "declaration": "public var folding = TextEditorFolding()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "diagnostics",
+    "kind": "var",
+    "declaration": "public var diagnostics = TextDiagnostics.empty",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onRequestCompletion",
+    "kind": "var",
+    "declaration": "public var onRequestCompletion: TextCompletionProvider?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onResolveCompletion",
+    "kind": "var",
+    "declaration": "public var onResolveCompletion: TextCompletionResolver?",
+    "abstract": "Asked once per highlighted item that arrived without documentation.",
+    "discussion": []
+   },
+   {
+    "name": "onAcceptCompletion",
+    "kind": "var",
+    "declaration": "public var onAcceptCompletion: ((TextCompletionItem) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onRequestHover",
+    "kind": "var",
+    "declaration": "public var onRequestHover: ((TextFieldHoverAnchor) -> Void)?",
+    "abstract": "F1 requests documentation at the visible caret, also in read-only code.",
+    "discussion": []
+   },
+   {
+    "name": "showsLineNumbers",
+    "kind": "var",
+    "declaration": "public var showsLineNumbers = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showsMinimap",
+    "kind": "var",
+    "declaration": "public var showsMinimap = false",
+    "abstract": "A scaled overview of the whole document on the trailing edge, with the visible region marked; clicking or dragging it scrolls. Vertical fields only.",
+    "discussion": []
+   },
+   {
+    "name": "occurrences",
+    "kind": "var",
+    "declaration": "public var occurrences: [Range<Int>] = []",
+    "abstract": "UTF-8 ranges marked as the same symbol as the one at the caret.",
+    "discussion": []
+   },
+   {
+    "name": "indentationWidth",
+    "kind": "var",
+    "declaration": "public var indentationWidth: Int?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "editHistory",
+    "kind": "var",
+    "declaration": "public var editHistory: TextEditHistory?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "lineNumberColor",
+    "kind": "var",
+    "declaration": "public var lineNumberColor: Color?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "lineNumberGutterColor",
+    "kind": "var",
+    "declaration": "public var lineNumberGutterColor: Color?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "syntaxRevision",
+    "kind": "var",
+    "declaration": "public var syntaxRevision: AnyHashable?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "syntaxColorAtUTF8Offset",
+    "kind": "var",
+    "declaration": "public var syntaxColorAtUTF8Offset: ((TextBuffer, Int) -> Color?)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextFieldCodeEditing",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldOptions.swift",
+  "line": 76,
+  "owner": "",
+  "overloads": [
+   "public struct TextFieldCodeEditing"
+  ]
+ },
+ {
+  "id": "text-field-decoration",
+  "name": "TextFieldDecoration",
+  "kind": "struct",
+  "declaration": "public struct TextFieldDecoration: Equatable",
+  "abstract": "Decoration is independent of editing behavior and can be copied as a group.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "size",
+    "kind": "var",
+    "declaration": "public var size: TextField.Size = .automatic",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showWordLimit",
+    "kind": "var",
+    "declaration": "public var showWordLimit = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "prefix",
+    "kind": "var",
+    "declaration": "public var prefix: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "suffix",
+    "kind": "var",
+    "declaration": "public var suffix: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "prepend",
+    "kind": "var",
+    "declaration": "public var prepend: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "append",
+    "kind": "var",
+    "declaration": "public var append: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "leadingIcon",
+    "kind": "var",
+    "declaration": "public var leadingIcon: BundleImageResource?",
+    "abstract": "Decorative leading glyph rendered inside the field chrome. It reserves text inset but is not hit-testable; use `prefix` for authored text.",
+    "discussion": []
+   },
+   {
+    "name": "textColor",
+    "kind": "var",
+    "declaration": "public var textColor: Color?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "placeholderColor",
+    "kind": "var",
+    "declaration": "public var placeholderColor: Color?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "cursorColor",
+    "kind": "var",
+    "declaration": "public var cursorColor: Color?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "selectionColor",
+    "kind": "var",
+    "declaration": "public var selectionColor: Color?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextFieldDecoration",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "",
+    "kind": "func",
+    "declaration": "public static func == (lhs: Self, rhs: Self) -> Bool",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldOptions.swift",
+  "line": 28,
+  "owner": "",
+  "overloads": [
+   "public struct TextFieldDecoration: Equatable"
+  ]
+ },
+ {
+  "id": "text-field-events",
+  "name": "TextFieldEvents",
+  "kind": "struct",
+  "declaration": "public struct TextFieldEvents",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "onSubmit",
+    "kind": "var",
+    "declaration": "public var onSubmit: (() -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onKeyDown",
+    "kind": "var",
+    "declaration": "public var onKeyDown: ((KeyEvent) -> Bool)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onCancel",
+    "kind": "var",
+    "declaration": "public var onCancel: (() -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onChange",
+    "kind": "var",
+    "declaration": "public var onChange: ((TextBuffer) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onHoverChange",
+    "kind": "var",
+    "declaration": "public var onHoverChange: ((TextFieldHoverAnchor?) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onCaretChange",
+    "kind": "var",
+    "declaration": "public var onCaretChange: ((TextFieldCaretState) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onFocus",
+    "kind": "var",
+    "declaration": "public var onFocus: (() -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onBlur",
+    "kind": "var",
+    "declaration": "public var onBlur: (() -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onClear",
+    "kind": "var",
+    "declaration": "public var onClear: (() -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextFieldEvents",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldOptions.swift",
+  "line": 111,
+  "owner": "",
+  "overloads": [
+   "public struct TextFieldEvents"
+  ]
+ },
+ {
+  "id": "text-field-hover-anchor",
+  "name": "TextFieldHoverAnchor",
+  "kind": "struct",
+  "declaration": "public struct TextFieldHoverAnchor: Hashable, Sendable",
+  "abstract": "Where the pointer is resting inside a ``TextField``, in editor terms.",
+  "discussion": [
+   "A text input measures offsets in `Character` units; higher layers (language\nservers, for example) need line/UTF-16 columns and a screen position has to\nbe known before anything can anchor a popup. Both are reported here so each\nconsumer converts once rather than guessing at another layer's unit."
+  ],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "characterIndex",
+    "kind": "let",
+    "declaration": "public let characterIndex: Int",
+    "abstract": "Offset in `Character` units from the start of the bound text.",
+    "discussion": []
+   },
+   {
+    "name": "windowX",
+    "kind": "let",
+    "declaration": "public let windowX: Float",
+    "abstract": "Window-space pointer position, matching the coordinate space used for overlay drawing.",
+    "discussion": []
+   },
+   {
+    "name": "windowY",
+    "kind": "let",
+    "declaration": "public let windowY: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextFieldHoverAnchor",
+    "kind": "init",
+    "declaration": "public init(characterIndex: Int, windowX: Float, windowY: Float)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldObservation.swift",
+  "line": 14,
+  "owner": "",
+  "overloads": [
+   "public struct TextFieldHoverAnchor: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "text-field-layout",
+  "name": "TextFieldLayout",
+  "kind": "struct",
+  "declaration": "public struct TextFieldLayout: Equatable",
+  "abstract": "Authored layout settings. Cursor, selection, IME and scrolling remain node-local.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "axis",
+    "kind": "var",
+    "declaration": "public var axis: TextField.Axis = .horizontal",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maxVisibleLines",
+    "kind": "var",
+    "declaration": "public var maxVisibleLines: Int = 6",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "idealWidth",
+    "kind": "var",
+    "declaration": "public var idealWidth: Float = 160",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "wrapsLines",
+    "kind": "var",
+    "declaration": "public var wrapsLines = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextFieldLayout",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldOptions.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct TextFieldLayout: Equatable"
+  ]
+ },
+ {
+  "id": "text-field-navigation",
+  "name": "TextFieldNavigation",
+  "kind": "struct",
+  "declaration": "public struct TextFieldNavigation",
+  "abstract": "One-shot navigation requests, separate from the live caret/selection state.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "focusRequestID",
+    "kind": "var",
+    "declaration": "public var focusRequestID: AnyHashable?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "caretRequestID",
+    "kind": "var",
+    "declaration": "public var caretRequestID: AnyHashable?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "caretRequestIndex",
+    "kind": "var",
+    "declaration": "public var caretRequestIndex: Int?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextFieldNavigation",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldOptions.swift",
+  "line": 104,
+  "owner": "",
+  "overloads": [
+   "public struct TextFieldNavigation"
+  ]
+ },
+ {
+  "id": "text-folding-labels",
+  "name": "TextFoldingLabels",
+  "kind": "struct",
+  "declaration": "public struct TextFoldingLabels",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "collapse",
+    "kind": "var",
+    "declaration": "public var collapse: (Int) -> String =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "expand",
+    "kind": "var",
+    "declaration": "public var expand: (Int) -> String =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "summary",
+    "kind": "var",
+    "declaration": "public var summary: (Int) -> String =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "hiddenBreakpoints",
+    "kind": "var",
+    "declaration": "public var hiddenBreakpoints: (Int) -> String =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextFoldingLabels",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/Code/FoldingOptions.swift",
+  "line": 11,
+  "owner": "",
+  "overloads": [
+   "public struct TextFoldingLabels"
+  ]
+ },
+ {
+  "id": "text-fold-region",
+  "name": "TextFoldRegion",
+  "kind": "struct",
+  "declaration": "public struct TextFoldRegion: Equatable, Sendable",
+  "abstract": "Retains the header line and hides the following lines through the closing line.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "lines",
+    "kind": "var",
+    "declaration": "public var lines: ClosedRange<Int>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextFoldRegion",
+    "kind": "init",
+    "declaration": "public init(lines: ClosedRange<Int>)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/Code/FoldingOptions.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct TextFoldRegion: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "text-gutter-labels",
+  "name": "TextGutterLabels",
+  "kind": "struct",
+  "declaration": "public struct TextGutterLabels",
+  "abstract": "Names are functions so applications can localize word order and line numbers.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "lineActions",
+    "kind": "var",
+    "declaration": "public var lineActions: (Int) -> String =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "addBreakpoint",
+    "kind": "var",
+    "declaration": "public var addBreakpoint: (Int) -> String =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "removeBreakpoint",
+    "kind": "var",
+    "declaration": "public var removeBreakpoint: (Int) -> String =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "enableBreakpoint",
+    "kind": "var",
+    "declaration": "public var enableBreakpoint: (Int) -> String =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "disableBreakpoint",
+    "kind": "var",
+    "declaration": "public var disableBreakpoint: (Int) -> String =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "execution",
+    "kind": "var",
+    "declaration": "public var execution: (Int) -> String =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "breakpointState",
+    "kind": "var",
+    "declaration": "public var breakpointState: (TextBreakpoint.State) -> String =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextGutterLabels",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterOptions.swift",
+  "line": 46,
+  "owner": "",
+  "overloads": [
+   "public struct TextGutterLabels"
+  ]
+ },
+ {
+  "id": "text-gutter-marker",
+  "name": "TextGutterMarker",
+  "kind": "struct",
+  "declaration": "public struct TextGutterMarker: Identifiable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Identifiable"
+  ],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "line",
+    "kind": "var",
+    "declaration": "public var line: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "var",
+    "declaration": "public var label: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "icon",
+    "kind": "var",
+    "declaration": "public var icon: BundleImageResource",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "color",
+    "kind": "var",
+    "declaration": "public var color: Color?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "action",
+    "kind": "var",
+    "declaration": "public var action: () -> Void",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextGutterMarker",
+    "kind": "init",
+    "declaration": "public init(_ id: String, line: Int, label: String, icon: BundleImageResource, color: Color? = nil, action: @escaping () -> Void)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterOptions.swift",
+  "line": 32,
+  "owner": "",
+  "overloads": [
+   "public struct TextGutterMarker: Identifiable"
+  ]
+ },
+ {
+  "id": "text-insert-format",
+  "name": "TextInsertFormat",
+  "kind": "enum",
+  "declaration": "public enum TextInsertFormat: Sendable, Equatable",
+  "abstract": "How a completion's `insertText` is interpreted.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/TextField/Snippet.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public enum TextInsertFormat: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "text-selection-root",
+  "name": "TextSelectionRoot",
+  "kind": "struct",
+  "declaration": "public struct TextSelectionRoot<Content: View>: View",
+  "abstract": "Owns the selection for its content and offers Copy / Select All on secondary click or a touch long press.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "TextSelectionRoot",
+    "kind": "init",
+    "declaration": "public init(@ViewBuilder content: () -> Content)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/Rich/TextSelection.swift",
+  "line": 356,
+  "owner": "",
+  "overloads": [
+   "public struct TextSelectionRoot<Content: View>: View"
+  ]
+ },
+ {
+  "id": "font-atlas",
+  "name": "FontAtlas",
+  "kind": "class",
+  "declaration": "public final class FontAtlas",
+  "abstract": "Packs FreeType alpha glyphs and registered color glyphs into separate atlas planes.",
+  "discussion": [
+   "Thread safety: not thread-safe. All calls must happen on the same thread (typically the main/render thread)."
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "fontFace",
+    "kind": "var",
+    "declaration": "public var fontFace: FontFace?",
+    "abstract": "The face this atlas was created with, for hosts that only need to read it.",
+    "discussion": []
+   },
+   {
+    "name": "atlasWidth",
+    "kind": "let",
+    "declaration": "public let atlasWidth: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "atlasHeight",
+    "kind": "let",
+    "declaration": "public let atlasHeight: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isDirty",
+    "kind": "var",
+    "declaration": "public var isDirty: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isFull",
+    "kind": "var",
+    "declaration": "public var isFull: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "FontAtlas",
+    "kind": "init",
+    "declaration": "public init(width: Int = 1024, height: Int = 1024)",
+    "abstract": "Creates an atlas with the given dimensions.",
+    "discussion": [
+     "- Parameters:\n  - width: Atlas texture width in pixels (default 1024).\n  - height: Atlas texture height in pixels (default 1024)."
+    ]
+   },
+   {
+    "name": "loadFont",
+    "kind": "func",
+    "declaration": "public func loadFont(path: String, size: Float, rasterScale: Float = 1) -> Bool",
+    "abstract": "Loads a font from a file path.",
+    "discussion": [
+     "- Parameters:\n  - path: Absolute path to a .ttf / .otf font file.\n  - size: Font size in points."
+    ]
+   },
+   {
+    "name": "loadFont",
+    "kind": "func",
+    "declaration": "public func loadFont(bytes: [UInt8], size: Float, rasterScale: Float = 1) -> Bool",
+    "abstract": "Loads an owned copy of a TTF/OTF buffer, including fonts fetched by a browser. Invalid data leaves the current face and atlas untouched.",
+    "discussion": []
+   },
+   {
+    "name": "registerFace",
+    "kind": "func",
+    "declaration": "public func registerFace(_ face: FontFace, fontID: Int)",
+    "abstract": "Registers a face for multi-font rasterization.",
+    "discussion": [
+     "The caller owns the face; it must stay alive while the atlas uses it."
+    ]
+   },
+   {
+    "name": "glyphMetrics",
+    "kind": "func",
+    "declaration": "public func glyphMetrics(glyphIndex: UInt32, fontID: Int = 0) -> GlyphMetrics?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "cachedGlyphInfo",
+    "kind": "func",
+    "declaration": "public func cachedGlyphInfo(glyphIndex: UInt32, fontID: Int = 0) -> GlyphInfo?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "lineMetrics",
+    "kind": "func",
+    "declaration": "public func lineMetrics(fontID: Int = 0) -> LineMetrics?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "dirtyUploadPayload",
+    "kind": "func",
+    "declaration": "public func dirtyUploadPayload() -> (region: DirtyRegion, pixels: [UInt8])?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rasterizeGlyph",
+    "kind": "func",
+    "declaration": "public func rasterizeGlyph(glyphIndex: UInt32, fontID: Int = 0) -> GlyphInfo?",
+    "abstract": "Rasterizes a glyph by its glyph index (not codepoint) and packs it into the atlas.",
+    "discussion": [
+     "- Parameters:\n  - glyphIndex: FreeType glyph index.\n  - fontID: Font identifier (0 = default/stored face, others = registered faces).\n- Returns: Cached or newly rasterized glyph info, or nil on failure."
+    ]
+   },
+   {
+    "name": "rasterizeCodepoint",
+    "kind": "func",
+    "declaration": "public func rasterizeCodepoint(_ codepoint: UInt32, fontID: Int = 0) -> GlyphInfo?",
+    "abstract": "Rasterizes a glyph by Unicode codepoint. Convenience wrapper over `rasterizeGlyph(glyphIndex:fontID:)`.",
+    "discussion": []
+   },
+   {
+    "name": "reset",
+    "kind": "func",
+    "declaration": "public func reset()",
+    "abstract": "Clears the atlas bitmap and raster cache. Keeps the loaded font and cached metrics so future layout passes stay cheap.",
+    "discussion": []
+   },
+   {
+    "name": "markClean",
+    "kind": "func",
+    "declaration": "public func markClean()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "registerColorSource",
+    "kind": "func",
+    "declaration": "public func registerColorSource(_ source: ColorGlyphSource, fontID: Int)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "colorDirtyUploadPayload",
+    "kind": "func",
+    "declaration": "public func colorDirtyUploadPayload() -> (region: DirtyRegion, pixels: [UInt8], textureWidth: Int, textureHeight: Int)?",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIText",
+  "category": "text",
+  "file": "Text/Sources/CoveUIText/FontAtlas.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public final class FontAtlas"
+  ]
+ },
+ {
+  "id": "font-collection",
+  "name": "FontCollection",
+  "kind": "class",
+  "declaration": "public final class FontCollection",
+  "abstract": "An ordered set of owned font faces sharing one alpha atlas. This performs grapheme-safe fallback and script-run shaping; paragraph bidi is a host concern. Like FreeType and DrawList, instances belong to one render thread.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "atlas",
+    "kind": "let",
+    "declaration": "public let atlas: FontAtlas",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "fontCount",
+    "kind": "var",
+    "declaration": "public var fontCount: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "FontCollection",
+    "kind": "init",
+    "declaration": "public init(width: Int = 2048, height: Int = 2048)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "append",
+    "kind": "func",
+    "declaration": "guard let face = FontFace(bytes: bytes, size: size, rasterScale: rasterScale) else",
+    "abstract": "IDs are stable, one-based, and returned only after successful loading.",
+    "discussion": []
+   },
+   {
+    "name": "configure",
+    "kind": "func",
+    "declaration": "public func configure(size: Float, rasterScale: Float = 1)",
+    "abstract": "Reuses atlas entries across sizes. FreeType's active size and atlas cache keys must change together, even when a previous shape is reused by a host.",
+    "discussion": []
+   },
+   {
+    "name": "shape",
+    "kind": "func",
+    "declaration": "public func shape(_ text: String) -> [ShapedGlyph]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "draw",
+    "kind": "func",
+    "declaration": "into list: DrawList, x: Float, y: Float, color: Color, textureID: TextureID = 1) -> Float",
+    "abstract": "Appends actual atlas quads to the same DrawList used for UI geometry. Returns the layout width, suitable for an IME candidate-window position.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIText",
+  "category": "text",
+  "file": "Text/Sources/CoveUIText/FontCollection.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public final class FontCollection"
+  ]
+ },
+ {
+  "id": "font-face",
+  "name": "FontFace",
+  "kind": "class",
+  "declaration": "public final class FontFace",
+  "abstract": "An owned font face: FreeType for outlines and rasterization, HarfBuzz for shaping.",
+  "discussion": [
+   "Consumers use Swift font values while native handles remain inside Text.\nFreeType and HarfBuzz are declared once by the Text package; consumers still\ninherit those deployment requirements through their dependency closure.",
+   "Each instance owns its backing storage and belongs to one render thread."
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "postScriptName",
+    "kind": "let",
+    "declaration": "public let postScriptName: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "colorGlyphFont",
+    "kind": "var",
+    "declaration": "public var colorGlyphFont: NativeColorGlyphFont?",
+    "abstract": "CoreText rasterizer for native colour glyphs; attached by the host, which owns the `CTFont` this face was resolved from.",
+    "discussion": []
+   },
+   {
+    "name": "hasColorSource",
+    "kind": "var",
+    "declaration": "public var hasColorSource: Bool",
+    "abstract": "Whether this face provides colour glyph rasterization.",
+    "discussion": []
+   },
+   {
+    "name": "colorSource",
+    "kind": "var",
+    "declaration": "public var colorSource: ColorGlyphSource?",
+    "abstract": "The colour-glyph source to register with an atlas, if this face has one.",
+    "discussion": []
+   },
+   {
+    "name": "faceIndex",
+    "kind": "var",
+    "declaration": "public var faceIndex: Int",
+    "abstract": "The collection face index this face was opened from.",
+    "discussion": []
+   },
+   {
+    "name": "designAxes",
+    "kind": "var",
+    "declaration": "public var designAxes: [FontAxis]",
+    "abstract": "The variable axes this face exposes, or an empty array for a static face.",
+    "discussion": []
+   },
+   {
+    "name": "appliedDesignCoordinates",
+    "kind": "var",
+    "declaration": "public var appliedDesignCoordinates: [FontAxis.ID: Double]",
+    "abstract": "The design coordinates currently applied, keyed by axis tag.",
+    "discussion": [
+     "Exposed so hosts and tests can verify which instance a face was opened\nat without reaching for the native handle."
+    ]
+   },
+   {
+    "name": "resolved",
+    "kind": "func",
+    "declaration": "public func resolved(axes: [FontAxis.ID: Double]) -> FontFace?",
+    "abstract": "Returns a new face with `axes` applied, or `nil` when the face is not variable or the write fails.",
+    "discussion": [
+     "Design coordinates are in each axis' own normalized units and are\nclamped to the axis' supported range. Optical size stays in logical\npoints, independent of the backing display's raster density."
+    ]
+   },
+   {
+    "name": "hasColorGlyphs",
+    "kind": "var",
+    "declaration": "public var hasColorGlyphs: Bool",
+    "abstract": "True when this face carries colour glyph outlines or strikes.",
+    "discussion": []
+   },
+   {
+    "name": "applying",
+    "kind": "func",
+    "declaration": "public func applying(size: Float, rasterScale: Float = 1) -> Bool",
+    "abstract": "Applies a new active size to this face.",
+    "discussion": [
+     "FreeType holds one active size per face, so this is visible to every\nconsumer. Atlas caches are keyed by size, so callers re-register the\nface afterwards to keep cache keys in step with the face."
+    ]
+   },
+   {
+    "name": "glyphIndex",
+    "kind": "func",
+    "declaration": "public func glyphIndex(for scalar: Unicode.Scalar) -> UInt32",
+    "abstract": "The glyph index for `scalar`, or 0 when the face has no glyph for it.",
+    "discussion": [
+     "Used for font fallback: a face that maps every scalar of a grapheme\ncluster can render that cluster."
+    ]
+   },
+   {
+    "name": "canRender",
+    "kind": "func",
+    "declaration": "public func canRender(_ text: String) -> Bool",
+    "abstract": "Whether this face can render `text` in its entirety.",
+    "discussion": []
+   },
+   {
+    "name": "metrics",
+    "kind": "func",
+    "declaration": "public func metrics(glyph: UInt32) -> GlyphMetrics?",
+    "abstract": "Metrics for a glyph, forcing rasterization only when necessary.",
+    "discussion": []
+   },
+   {
+    "name": "lineMetrics",
+    "kind": "func",
+    "declaration": "public func lineMetrics() -> GlyphLineMetrics",
+    "abstract": "Ascent, descent and line height scaled to logical points.",
+    "discussion": []
+   },
+   {
+    "name": "rasterize",
+    "kind": "func",
+    "declaration": "public func rasterize(glyph: UInt32) -> GlyphBitmap?",
+    "abstract": "Rasterizes `glyph` and returns its pixels plus logical metrics.",
+    "discussion": []
+   },
+   {
+    "name": "shape",
+    "kind": "func",
+    "declaration": "public func shape(_ text: String, direction: TextDirection? = nil, script: ScriptTag? = nil, language: String? = nil, utf8Offset: Int = 0, fontID: Int = 0) -> [ShapedGlyph]",
+    "abstract": "Shapes `text` with HarfBuzz and returns positioned glyphs.",
+    "discussion": [
+     "- Parameters:\n  - text: The string to shape.\n  - direction: Writing direction; `nil` lets HarfBuzz infer it.\n  - script: ISO 15924 tag; `nil` lets HarfBuzz infer it.\n  - language: BCP 47 tag; `nil` uses HarfBuzz's default.\n  - utf8Offset: Byte offset of `text` within the enclosing paragraph,\n    added to each cluster so hosts can map glyphs back to source text.\n  - fontID: Identifier stamped on every returned glyph."
+    ]
+   }
+  ],
+  "module": "CoveUIText",
+  "category": "text",
+  "file": "Text/Sources/CoveUIText/FontFace.swift",
+  "line": 192,
+  "owner": "",
+  "overloads": [
+   "public final class FontFace"
+  ]
+ },
+ {
+  "id": "font-provider",
+  "name": "FontProvider",
+  "kind": "class",
+  "declaration": "public final class FontProvider",
+  "abstract": "Resolves system fonts and provides shaping for text runs.",
+  "discussion": [
+   "Font loading, rasterization and shaping all live in `CoveUIText`. This type\nonly knows how to *find* fonts on the current platform — CoreText on Apple\nplatforms, a directory probe elsewhere — and therefore never binds FreeType\nor HarfBuzz.",
+   "Like `FontAtlas`, an instance belongs to one render thread."
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "FontProvider",
+    "kind": "init",
+    "declaration": "public init(size: Float, rasterScale: Float = 1, idBase: Int = 0)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "primaryFont",
+    "kind": "var",
+    "declaration": "public var primaryFont: ManagedFont?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "allFonts",
+    "kind": "var",
+    "declaration": "public var allFonts: [ManagedFont]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "registerAllFonts",
+    "kind": "func",
+    "declaration": "public func registerAllFonts(in atlas: FontAtlas)",
+    "abstract": "Registers every resolved face with `atlas`.",
+    "discussion": [
+     "Faces with a colour source use it instead of the alpha plane, so colour\nglyphs never fall back to monochrome rasterization."
+    ]
+   },
+   {
+    "name": "loadPrimaryFont",
+    "kind": "func",
+    "declaration": "public func loadPrimaryFont(name: String, weight: FontWeight = .regular, isItalic: Bool = false) -> ManagedFont?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "resolveRuns",
+    "kind": "func",
+    "declaration": "public func resolveRuns(text: String) -> [FontRun]",
+    "abstract": "Splits text into runs, each assigned the font that can render it.",
+    "discussion": []
+   },
+   {
+    "name": "shapeRun",
+    "kind": "func",
+    "declaration": "public func shapeRun(_ run: FontRun) -> [ShapedGlyph]",
+    "abstract": "Shapes one run. Colour faces route through their native rasterizer; everything else goes to the face's HarfBuzz shaper.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIText",
+  "category": "text",
+  "file": "Text/Sources/CoveUIText/FontProvider.swift",
+  "line": 62,
+  "owner": "",
+  "overloads": [
+   "public final class FontProvider"
+  ]
+ },
+ {
+  "id": "managed-font",
+  "name": "ManagedFont",
+  "kind": "class",
+  "declaration": "public final class ManagedFont",
+  "abstract": "A font resolved for rendering, with its runtime identity.",
+  "discussion": [
+   "Face ownership and all native font handles live in `FontFace`. This type\ncarries only what the runtime needs on top of that: a stable font ID, the\nrequested size, and — on Apple platforms — a CoreText rasterizer for native\ncolour glyphs."
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "postScriptName",
+    "kind": "let",
+    "declaration": "public let postScriptName: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "pointSize",
+    "kind": "let",
+    "declaration": "public let pointSize: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rasterScale",
+    "kind": "let",
+    "declaration": "public let rasterScale: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "face",
+    "kind": "let",
+    "declaration": "public let face: FontFace",
+    "abstract": "The text-layer face backing this font.",
+    "discussion": []
+   },
+   {
+    "name": "colorGlyphFont",
+    "kind": "var",
+    "declaration": "public var colorGlyphFont: NativeColorGlyphFont?",
+    "abstract": "CoreText rasterizer for native colour glyphs, when the face has them.",
+    "discussion": [
+     "Storage lives on the face, so whichever layer resolves the font decides\nhow colour glyphs are rasterized."
+    ]
+   }
+  ],
+  "module": "CoveUIText",
+  "category": "text",
+  "file": "Text/Sources/CoveUIText/FontProvider.swift",
+  "line": 13,
+  "owner": "",
+  "overloads": [
+   "public final class ManagedFont"
+  ]
+ },
+ {
+  "id": "native-color-glyph-font",
+  "name": "NativeColorGlyphFont",
+  "kind": "class",
+  "declaration": "public final class NativeColorGlyphFont",
+  "abstract": "Native bitmap/color fonts use CoreText for both metrics and rasterization. They share the same positioned-glyph layout as normal HarfBuzz runs.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "source",
+    "kind": "var",
+    "declaration": "public var source: ColorGlyphSource",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "shape",
+    "kind": "func",
+    "declaration": "public func shape(_ text: String, fontID: Int, utf8Offset: Int) -> [ShapedGlyph]",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIText",
+  "category": "text",
+  "file": "Text/Sources/CoveUIText/NativeColorGlyphFont.swift",
+  "line": 9,
+  "owner": "",
+  "overloads": [
+   "public final class NativeColorGlyphFont"
+  ]
+ },
+ {
+  "id": "rope-leaf",
+  "name": "RopeLeaf",
+  "kind": "class",
+  "declaration": "public final class RopeLeaf: Sendable",
+  "abstract": "Valid UTF-8, cut only at extended grapheme boundaries. A single grapheme can exceed the nominal chunk size (for example a long sequence of combining marks); preserving that grapheme takes precedence over the 1024-byte packing target.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "bytes",
+    "kind": "let",
+    "declaration": "public let bytes: [UInt8]",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/Rope/RopeStorage.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public final class RopeLeaf: Sendable"
+  ]
+ },
+ {
+  "id": "text-edit-history",
+  "name": "TextEditHistory",
+  "kind": "class",
+  "declaration": "public final class TextEditHistory",
+  "abstract": "Per-document text transactions. Selection is restored with the text; a new edit after undo discards the redo branch. Adjacent typing/deletion coalesces.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "canUndo",
+    "kind": "var",
+    "declaration": "public var canUndo: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "canRedo",
+    "kind": "var",
+    "declaration": "public var canRedo: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextEditHistory",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "synchronize",
+    "kind": "func",
+    "declaration": "public func synchronize(_ buffer: TextBuffer)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "breakGroup",
+    "kind": "func",
+    "declaration": "public func breakGroup()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "record",
+    "kind": "func",
+    "declaration": "public func record(before: Snapshot, after: Snapshot, kind: Kind, time: Double)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "undo",
+    "kind": "func",
+    "declaration": "public func undo() -> Snapshot?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "redo",
+    "kind": "func",
+    "declaration": "public func redo() -> Snapshot?",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/TextEditHistory.swift",
+  "line": 8,
+  "owner": "",
+  "overloads": [
+   "public final class TextEditHistory"
+  ]
+ },
+ {
+  "id": "text-font-resolver",
+  "name": "TextFontResolver",
+  "kind": "class",
+  "declaration": "public final class TextFontResolver: @unchecked Sendable",
+  "abstract": "Lazily creates sized/weighted `FontProvider`s that share a single atlas. Each provider gets its own font-ID range so glyph rasterization remains unambiguous even when multiple sizes are used in the same frame.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "TextFontResolver",
+    "kind": "init",
+    "declaration": "public init(primaryFontName: String, atlas: FontAtlas, providerIDBlockSize: Int = 256, rasterScale: Float = 1)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "shape",
+    "kind": "func",
+    "declaration": "public func shape(text: String, font: Font) -> [ShapedGlyph]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "preparePrimaryFont",
+    "kind": "func",
+    "declaration": "public func preparePrimaryFont(_ font: Font) -> ManagedFont?",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIText",
+  "category": "text",
+  "file": "Text/Sources/CoveUIText/TextStyle.swift",
+  "line": 92,
+  "owner": "",
+  "overloads": [
+   "public final class TextFontResolver: @unchecked Sendable"
+  ]
+ },
+ {
+  "id": "modifier-text-selection",
+  "name": "textSelection",
+  "kind": "modifier",
+  "declaration": "func textSelection(_ enabled: Bool = true) -> AnyView",
+  "abstract": "Opt a region of the view tree into text selection. Every `Text` and `RichText` inside shares one selection, so a drag can run from one through another and copy as one string; Copy / Select All are offered on secondary click or a touch long press (like SwiftUI's `textSelection`).",
+  "discussion": [
+   "The app root already installs one, so labels are selectable out of the\nbox. Use `.textSelection(false)` on a subtree to make it inert again —\nfor example a preview pane whose text belongs to an embedded editor."
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/Rich/TextSelection.swift",
+  "line": 475,
+  "owner": "View",
+  "overloads": [
+   "func textSelection(_ enabled: Bool = true) -> AnyView"
+  ]
+ },
+ {
+  "id": "modifier-text-selection-actions",
+  "name": "textSelectionActions",
+  "kind": "modifier",
+  "declaration": "func textSelectionActions(lookup: ((String) -> Void)? = nil, share: ((String) -> Void)? = nil) -> some View",
+  "abstract": "Adds Look Up and Share to the selection menu of the enclosing `textSelection()` region. Each entry appears only when its action is supplied; without them the menu offers Copy and Select All.",
+  "discussion": [
+   "```swift\nMarkdownView(notes)\n    .textSelection()\n    .textSelectionActions(lookup: { dictionary.lookUp($0) },\n                          share: { shareSheet.present($0) })\n```"
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/Rich/TextSelection.swift",
+  "line": 490,
+  "owner": "View",
+  "overloads": [
+   "func textSelectionActions(lookup: ((String) -> Void)? = nil, share: ((String) -> Void)? = nil) -> some View"
+  ]
+ },
+ {
+  "id": "text-selection-scope",
+  "name": "TextSelectionScope",
+  "kind": "class",
+  "declaration": "public final class TextSelectionScope",
+  "abstract": "One selection shared by every paragraph of a document, so a drag can run from a heading through a list into a code block and copy as one string. Transient view state: owned by the mounted root, never persisted.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "key",
+    "kind": "let",
+    "declaration": "public static let key = CompositionLocal<TextSelectionScope?>(defaultValue: nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "lookup",
+    "kind": "var",
+    "declaration": "public var lookup: ((String) -> Void)?",
+    "abstract": "Optional hooks wired by the host so the selection toolbar can offer Look Up and Share. On Apple platforms the context menu already surfaces these natively; on Android they map to the action-mode bar's items. Both menu entries stay hidden until a hook is set, so a stock selection never offers a row that does nothing.",
+    "discussion": []
+   },
+   {
+    "name": "share",
+    "kind": "var",
+    "declaration": "public var share: ((String) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "hasSelection",
+    "kind": "var",
+    "declaration": "public var hasSelection: Bool",
+    "abstract": "Whether anything is actually selected (an anchor with no focus is a caret, not a selection).",
+    "discussion": []
+   },
+   {
+    "name": "clear",
+    "kind": "func",
+    "declaration": "public func clear()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "selectAll",
+    "kind": "func",
+    "declaration": "public func selectAll()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "selectedText",
+    "kind": "var",
+    "declaration": "public var selectedText: String",
+    "abstract": "Paragraphs on one row (table cells) join with tabs, rows with newlines.",
+    "discussion": []
+   },
+   {
+    "name": "copy",
+    "kind": "func",
+    "declaration": "public func copy()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "text",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Text/Rich/TextSelection.swift",
+  "line": 10,
+  "owner": "",
+  "overloads": [
+   "public final class TextSelectionScope"
+  ]
+ },
+ {
+  "id": "text-shaper",
+  "name": "TextShaper",
+  "kind": "class",
+  "declaration": "public final class TextShaper",
+  "abstract": "Shapes text with HarfBuzz through a face owned by `CoveUIText`.",
+  "discussion": [
+   "The shaper holds no native handles of its own. It delegates to `FontFace`,\nwhich is the only type in the tree that owns an `hb_font_t` — that is what\nlets callers such as the desktop runtime work with text without binding\nHarfBuzz themselves."
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "TextShaper",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setFace",
+    "kind": "func",
+    "declaration": "public func setFace(_ face: FontFace, size: Float)",
+    "abstract": "Associates a face with this shaper.",
+    "discussion": [
+     "- Parameters:\n  - face: A face loaded by `CoveUIText`.\n  - size: Font size in logical points."
+    ]
+   },
+   {
+    "name": "shape",
+    "kind": "func",
+    "declaration": "public func shape( text: String, direction: TextDirection? = .ltr, script: ScriptTag? = Script.latin, language: String? = \"en\" ) -> [ShapedGlyph]",
+    "abstract": "Shapes a string of text and returns positioned glyphs.",
+    "discussion": [
+     "- Parameters:\n  - text: The input string.\n  - direction: Writing direction (default LTR); `nil` lets HarfBuzz guess.\n  - script: ISO 15924 tag (default Latin); `nil` lets HarfBuzz guess.\n  - language: BCP 47 tag (default \"en\"); `nil` uses HarfBuzz's default.\n- Returns: Array of shaped glyphs with positions."
+    ]
+   }
+  ],
+  "module": "CoveUIText",
+  "category": "text",
+  "file": "Text/Sources/CoveUIText/TextShaper.swift",
+  "line": 24,
+  "owner": "",
+  "overloads": [
+   "public final class TextShaper"
+  ]
+ }
+]

@@ -1,0 +1,4075 @@
+[
+ {
+  "id": "absolute-position-modifier",
+  "name": "AbsolutePositionModifier",
+  "kind": "struct",
+  "declaration": "public struct AbsolutePositionModifier: ViewModifier",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "left",
+    "kind": "let",
+    "declaration": "public let left: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "top",
+    "kind": "let",
+    "declaration": "public let top: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "right",
+    "kind": "let",
+    "declaration": "public let right: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "bottom",
+    "kind": "let",
+    "declaration": "public let bottom: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AbsolutePositionModifier",
+    "kind": "init",
+    "declaration": "public init(left: Float? = nil, top: Float? = nil, right: Float? = nil, bottom: Float? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(layout: LayoutNode)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Layout/AbsolutePositionModifier.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct AbsolutePositionModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "accordion",
+  "name": "Accordion",
+  "kind": "struct",
+  "declaration": "public struct Accordion<ID: Hashable>: View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "items",
+    "kind": "let",
+    "declaration": "public let items: [AccordionItem<ID>]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "expanded",
+    "kind": "let",
+    "declaration": "public let expanded: Binding<Set<ID>>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "allowsMultiple",
+    "kind": "var",
+    "declaration": "public var allowsMultiple = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Accordion",
+    "kind": "init",
+    "declaration": "public init(_ items: [AccordionItem<ID>], expanded: Binding<Set<ID>>, configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "toggle",
+    "kind": "func",
+    "declaration": "public func toggle(_ id: ID)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Accordion.swift",
+  "line": 14,
+  "owner": "",
+  "overloads": [
+   "public struct Accordion<ID: Hashable>: View"
+  ]
+ },
+ {
+  "id": "accordion-item",
+  "name": "AccordionItem",
+  "kind": "struct",
+  "declaration": "public struct AccordionItem<ID: Hashable>: Identifiable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: ID",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "title",
+    "kind": "let",
+    "declaration": "public let title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "content",
+    "kind": "let",
+    "declaration": "public let content: AnyView",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AccordionItem",
+    "kind": "init",
+    "declaration": "public init<C: View>(_ id: ID, _ title: String, isEnabled: Bool = true, @ViewBuilder content: () -> C)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Accordion.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct AccordionItem<ID: Hashable>: Identifiable"
+  ]
+ },
+ {
+  "id": "adaptive-sidebar",
+  "name": "AdaptiveSidebar",
+  "kind": "struct",
+  "declaration": "public struct AdaptiveSidebar<ID: Hashable, Header: View, Footer: View, Content: View>: View",
+  "abstract": "One navigation tree and one content tree across sidebar, rail and drawer layouts. Breakpoints use this container's allocation. Optional presentation belongs to the caller's session and survives a temporary return to the expanded layout.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable"
+  ],
+  "members": [
+   {
+    "name": "AdaptiveSidebar",
+    "kind": "init",
+    "declaration": "public init( _ title: String, isPresented: Binding<Bool>? = nil, isCollapsed: Binding<Bool>? = nil, selection: Binding<ID?>, width: Binding<Float>? = nil, expanded: Binding<Set<ID>>? = nil, sections: [SidebarSection<ID>], configure: (inout AdaptiveSidebarOptions) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/AdaptiveSidebar.swift",
+  "line": 9,
+  "owner": "",
+  "overloads": [
+   "public struct AdaptiveSidebar<ID: Hashable, Header: View, Footer: View, Content: View>: View"
+  ]
+ },
+ {
+  "id": "adaptive-sidebar-options",
+  "name": "AdaptiveSidebarOptions",
+  "kind": "struct",
+  "declaration": "public struct AdaptiveSidebarOptions",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "layout",
+    "kind": "var",
+    "declaration": "public var layout = SidebarLayoutPolicy()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "resizing",
+    "kind": "var",
+    "declaration": "public var resizing = SidebarResizeOptions()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "drawer",
+    "kind": "var",
+    "declaration": "public var drawer = NavigationDrawerOptions()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "openLabel",
+    "kind": "var",
+    "declaration": "public var openLabel = \"Open navigation\" public var collapseLabel = \"Collapse sidebar\" public var expandLabel = \"Expand sidebar\" /// A rightward gesture beginning within the leading 24pt opens compact navigation.",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "allowsEdgeSwipe",
+    "kind": "var",
+    "declaration": "public var allowsEdgeSwipe = false",
+    "abstract": "A rightward gesture beginning within the leading 24pt opens compact navigation. Enabled only on surfaces that support touch; ordinary taps still reach content.",
+    "discussion": []
+   },
+   {
+    "name": "AdaptiveSidebarOptions",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/AdaptiveOptions.swift",
+  "line": 21,
+  "owner": "",
+  "overloads": [
+   "public struct AdaptiveSidebarOptions"
+  ]
+ },
+ {
+  "id": "bounded-scroll-view",
+  "name": "BoundedScrollView",
+  "kind": "struct",
+  "declaration": "public struct BoundedScrollView: View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "axes",
+    "kind": "let",
+    "declaration": "public let axes: ScrollAxis",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "contentHeight",
+    "kind": "let",
+    "declaration": "public let contentHeight: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minHeight",
+    "kind": "let",
+    "declaration": "public let minHeight: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maxHeight",
+    "kind": "let",
+    "declaration": "public let maxHeight: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "consumePolicy",
+    "kind": "let",
+    "declaration": "public let consumePolicy: ScrollConsumePolicy",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "scrollbarGutter",
+    "kind": "let",
+    "declaration": "public let scrollbarGutter: ScrollView<AnyView>.ScrollbarGutter",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "content",
+    "kind": "let",
+    "declaration": "public let content: AnyView",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "BoundedScrollView",
+    "kind": "init",
+    "declaration": "public init<Content: View>(_ axes: ScrollAxis = .vertical, contentHeight: Float, minHeight: Float, maxHeight: Float, consumePolicy: ScrollConsumePolicy = .whenScrollable, scrollbarGutter: ScrollView<AnyView>.ScrollbarGutter = .stable, @ViewBuilder content: () -> Content)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "viewportHeight",
+    "kind": "var",
+    "declaration": "public var viewportHeight: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "viewportHeight",
+    "kind": "func",
+    "declaration": "public static func viewportHeight(contentHeight: Float, minHeight: Float, maxHeight: Float) -> Float",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/BoundedScrollView.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct BoundedScrollView: View"
+  ]
+ },
+ {
+  "id": "breadcrumb",
+  "name": "Breadcrumb",
+  "kind": "struct",
+  "declaration": "public struct Breadcrumb<ID: Hashable>: View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "items",
+    "kind": "let",
+    "declaration": "public let items: [BreadcrumbItem<ID>]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onSelect",
+    "kind": "let",
+    "declaration": "public let onSelect: (ID) -> Void",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maxVisibleItems",
+    "kind": "var",
+    "declaration": "public var maxVisibleItems = 4",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Breadcrumb",
+    "kind": "init",
+    "declaration": "public init(_ items: [BreadcrumbItem<ID>], maxVisibleItems: Int = 4, onSelect: @escaping (ID) -> Void)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/NavigationComponents.swift",
+  "line": 11,
+  "owner": "",
+  "overloads": [
+   "public struct Breadcrumb<ID: Hashable>: View"
+  ]
+ },
+ {
+  "id": "breadcrumb-item",
+  "name": "BreadcrumbItem",
+  "kind": "struct",
+  "declaration": "public struct BreadcrumbItem<ID: Hashable>: Identifiable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: ID",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "title",
+    "kind": "let",
+    "declaration": "public let title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "BreadcrumbItem",
+    "kind": "init",
+    "declaration": "public init(_ id: ID, _ title: String, isEnabled: Bool = true)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/NavigationComponents.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct BreadcrumbItem<ID: Hashable>: Identifiable"
+  ]
+ },
+ {
+  "id": "button-group",
+  "name": "ButtonGroup",
+  "kind": "struct",
+  "declaration": "public struct ButtonGroup<ID: Hashable>: View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "items",
+    "kind": "let",
+    "declaration": "public let items: [ButtonGroupItem<ID>]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "selection",
+    "kind": "let",
+    "declaration": "public let selection: Binding<ID?>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ButtonGroup",
+    "kind": "init",
+    "declaration": "public init(_ items: [ButtonGroupItem<ID>], selection: Binding<ID?>, isEnabled: Bool = true)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/NavigationComponents.swift",
+  "line": 90,
+  "owner": "",
+  "overloads": [
+   "public struct ButtonGroup<ID: Hashable>: View"
+  ]
+ },
+ {
+  "id": "button-group-item",
+  "name": "ButtonGroupItem",
+  "kind": "struct",
+  "declaration": "public struct ButtonGroupItem<ID: Hashable>: Identifiable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: ID",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "title",
+    "kind": "let",
+    "declaration": "public let title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ButtonGroupItem",
+    "kind": "init",
+    "declaration": "public init(_ id: ID, _ title: String, isEnabled: Bool = true)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/NavigationComponents.swift",
+  "line": 84,
+  "owner": "",
+  "overloads": [
+   "public struct ButtonGroupItem<ID: Hashable>: Identifiable"
+  ]
+ },
+ {
+  "id": "carousel",
+  "name": "Carousel",
+  "kind": "struct",
+  "declaration": "public struct Carousel<ID: Hashable>: View",
+  "abstract": "A paged view: one page fills the viewport, the rest are one gesture away.",
+  "discussion": [
+   "Paging is worth the extra chrome only when the pages are meaningfully\ndifferent views rather than a row that could have been scrolled, so the\ncomponent commits to it: arrows at the edges, indicators underneath,\nleft/right/Home/End on the keyboard, and a horizontal drag with the same\nthreshold-based feel as a native swipe.",
+   "```swift\nCarousel(pages: [\n    CarouselPage(\"intro\", caption: \"Welcome\") { IntroCard() },\n    CarouselPage(\"themes\", caption: \"Themes\") { ThemeCard() }\n]) { $0.height = 180 }\n```"
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "pages",
+    "kind": "var",
+    "declaration": "public var pages: [CarouselPage<ID>]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "selection",
+    "kind": "var",
+    "declaration": "public var selection: Binding<ID>?",
+    "abstract": "Caller-owned selection. `nil` keeps the current page inside the view.",
+    "discussion": []
+   },
+   {
+    "name": "showsArrows",
+    "kind": "var",
+    "declaration": "public var showsArrows = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "indicator",
+    "kind": "var",
+    "declaration": "public var indicator: CarouselIndicator = .automatic",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "autoplay",
+    "kind": "var",
+    "declaration": "public var autoplay: CarouselAutoplay?",
+    "abstract": "Automatic rotation; `nil` (the default) only moves on request.",
+    "discussion": []
+   },
+   {
+    "name": "allowsWrap",
+    "kind": "var",
+    "declaration": "public var allowsWrap = true",
+    "abstract": "Wrapping keeps the gesture useful on the last page; turn it off for onboarding flows that must end.",
+    "discussion": []
+   },
+   {
+    "name": "height",
+    "kind": "var",
+    "declaration": "public var height: Float? = nil",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Carousel",
+    "kind": "init",
+    "declaration": "public init(pages: [CarouselPage<ID>], selection: Binding<ID>? = nil, configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Carousel/Carousel.swift",
+  "line": 35,
+  "owner": "",
+  "overloads": [
+   "public struct Carousel<ID: Hashable>: View"
+  ]
+ },
+ {
+  "id": "carousel-autoplay",
+  "name": "CarouselAutoplay",
+  "kind": "struct",
+  "declaration": "public struct CarouselAutoplay: Sendable, Equatable",
+  "abstract": "Automatic advance for a `Carousel`. Rotation pauses while the pointer is over the carousel or keyboard focus is inside it, restarts its interval after any manual page change, and always offers a pause control. With reduced motion it starts paused.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "interval",
+    "kind": "var",
+    "declaration": "public var interval: Double",
+    "abstract": "Seconds each page stays before advancing, 2–60.",
+    "discussion": []
+   },
+   {
+    "name": "CarouselAutoplay",
+    "kind": "init",
+    "declaration": "public init(interval: Double = 5)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Carousel/Autoplay.swift",
+  "line": 9,
+  "owner": "",
+  "overloads": [
+   "public struct CarouselAutoplay: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "carousel-indicator",
+  "name": "CarouselIndicator",
+  "kind": "enum",
+  "declaration": "public enum CarouselIndicator: Sendable, Hashable",
+  "abstract": "How a carousel shows position. `.automatic` uses dots up to eight pages and a \"3 / 12\" count beyond, where dots stop being countable.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Hashable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Carousel/Indicator.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public enum CarouselIndicator: Sendable, Hashable"
+  ]
+ },
+ {
+  "id": "carousel-page",
+  "name": "CarouselPage",
+  "kind": "struct",
+  "declaration": "public struct CarouselPage<ID: Hashable>: Identifiable",
+  "abstract": "One page of a `Carousel`.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: ID",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "caption",
+    "kind": "var",
+    "declaration": "public var caption: String",
+    "abstract": "Optional line shown under the viewport; changes with the page.",
+    "discussion": []
+   },
+   {
+    "name": "content",
+    "kind": "let",
+    "declaration": "public let content: AnyView",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "CarouselPage",
+    "kind": "init",
+    "declaration": "public init<C: View>(_ id: ID, caption: String = \"\", @ViewBuilder content: () -> C)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Carousel/Carousel.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct CarouselPage<ID: Hashable>: Identifiable"
+  ]
+ },
+ {
+  "id": "disclosure-group",
+  "name": "DisclosureGroup",
+  "kind": "struct",
+  "declaration": "public struct DisclosureGroup<Label: View, Content: View>: View",
+  "abstract": "A keyboard-focusable disclosure header with naturally sized content. Expansion belongs to the caller, so it survives panel reconstruction and can also be controlled by search or an Expand All command.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "isExpanded",
+    "kind": "let",
+    "declaration": "public let isExpanded: Binding<Bool>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "DisclosureGroup",
+    "kind": "init",
+    "declaration": "public init(isExpanded: Binding<Bool>, isEnabled: Bool = true, @ViewBuilder content: () -> Content, @ViewBuilder label: () -> Label)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "DisclosureGroup",
+    "kind": "init",
+    "declaration": "init(_ title: String, isExpanded: Binding<Bool>, isEnabled: Bool = true, @ViewBuilder content: () -> Content)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/DisclosureGroup.swift",
+  "line": 8,
+  "owner": "",
+  "overloads": [
+   "public struct DisclosureGroup<Label: View, Content: View>: View"
+  ]
+ },
+ {
+  "id": "edge-insets",
+  "name": "EdgeInsets",
+  "kind": "struct",
+  "declaration": "public struct EdgeInsets: Equatable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "top",
+    "kind": "var",
+    "declaration": "public var top: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "leading",
+    "kind": "var",
+    "declaration": "public var leading: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "bottom",
+    "kind": "var",
+    "declaration": "public var bottom: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "trailing",
+    "kind": "var",
+    "declaration": "public var trailing: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "EdgeInsets",
+    "kind": "init",
+    "declaration": "public init(top: Float = 0, leading: Float = 0, bottom: Float = 0, trailing: Float = 0)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "EdgeInsets",
+    "kind": "init",
+    "declaration": "public init(all v: Float)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "zero",
+    "kind": "let",
+    "declaration": "public static let zero = EdgeInsets()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "interpolate",
+    "kind": "func",
+    "declaration": "public static func interpolate(_ a: EdgeInsets, _ b: EdgeInsets, t: Float) -> EdgeInsets",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Layout/PaddingModifier.swift",
+  "line": 10,
+  "owner": "",
+  "overloads": [
+   "public struct EdgeInsets: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "flex-modifier",
+  "name": "FlexModifier",
+  "kind": "struct",
+  "declaration": "public struct FlexModifier: ViewModifier",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "grow",
+    "kind": "let",
+    "declaration": "public let grow: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "shrink",
+    "kind": "let",
+    "declaration": "public let shrink: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "basis",
+    "kind": "let",
+    "declaration": "public let basis: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "FlexModifier",
+    "kind": "init",
+    "declaration": "public init(grow: Float = 1, shrink: Float = 1, basis: Float? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Layout/FlexModifier.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct FlexModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "frame-dimension",
+  "name": "FrameDimension",
+  "kind": "enum",
+  "declaration": "public enum FrameDimension: Equatable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Layout/FrameModifier.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public enum FrameDimension: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "frame-modifier",
+  "name": "FrameModifier",
+  "kind": "struct",
+  "declaration": "public struct FrameModifier: ViewModifier",
+  "abstract": "Omitted dimensions preserve the content's own sizing. Use `.auto` to explicitly return an axis to intrinsic sizing.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "width",
+    "kind": "let",
+    "declaration": "public let width: FrameDimension?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "height",
+    "kind": "let",
+    "declaration": "public let height: FrameDimension?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minWidth",
+    "kind": "let",
+    "declaration": "public let minWidth: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minHeight",
+    "kind": "let",
+    "declaration": "public let minHeight: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maxWidth",
+    "kind": "let",
+    "declaration": "public let maxWidth: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maxHeight",
+    "kind": "let",
+    "declaration": "public let maxHeight: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "FrameModifier",
+    "kind": "init",
+    "declaration": "public init(width: FrameDimension? = nil, height: FrameDimension? = nil, minWidth: Float? = nil, minHeight: Float? = nil, maxWidth: Float? = nil, maxHeight: Float? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(layout: LayoutNode)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Layout/FrameModifier.swift",
+  "line": 33,
+  "owner": "",
+  "overloads": [
+   "public struct FrameModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "grid",
+  "name": "Grid",
+  "kind": "struct",
+  "declaration": "public struct Grid<Content: View>: View",
+  "abstract": "Places each direct child in one cell. Use `LazyGrid` for large collections.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "Grid",
+    "kind": "init",
+    "declaration": "public init(columns: [GridColumn], columnSpacing: CGFloat = 0, rowSpacing: CGFloat = 0, alignment: Alignment = .topLeading, columnVisibility: Binding<[String: Bool]>? = nil, isEnabled: Bool = true, @ViewBuilder content: () -> Content)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Grid/Grid.swift",
+  "line": 228,
+  "owner": "",
+  "overloads": [
+   "public struct Grid<Content: View>: View"
+  ]
+ },
+ {
+  "id": "grid-column",
+  "name": "GridColumn",
+  "kind": "enum",
+  "declaration": "public enum GridColumn: Equatable, Sendable",
+  "abstract": "Width policy for one grid column. An adaptive column expands into as many columns as its allocated width can hold. Children occupy one cell each.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Grid/Columns.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public enum GridColumn: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "grid-layout",
+  "name": "GridLayout",
+  "kind": "struct",
+  "declaration": "public struct GridLayout: Layout",
+  "abstract": "A general row-major grid built on the public measurement and placement contract. Row heights come from the tallest measured child in each row. Children may cover several cells with `.gridCellSpan(columns:rows:)`.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Layout"
+  ],
+  "members": [
+   {
+    "name": "columns",
+    "kind": "var",
+    "declaration": "public var columns: [GridColumn]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "columnSpacing",
+    "kind": "var",
+    "declaration": "public var columnSpacing: CGFloat = 0",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rowSpacing",
+    "kind": "var",
+    "declaration": "public var rowSpacing: CGFloat = 0",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "alignment",
+    "kind": "var",
+    "declaration": "public var alignment: Alignment = .topLeading",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "columnVisibility",
+    "kind": "var",
+    "declaration": "public var columnVisibility: [String: Bool] = [:]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "GridLayout",
+    "kind": "init",
+    "declaration": "public init(columns: [GridColumn], columnSpacing: CGFloat = 0, rowSpacing: CGFloat = 0, alignment: Alignment = .topLeading, columnVisibility: [String: Bool] = [:])",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "sizeThatFits",
+    "kind": "func",
+    "declaration": "public func sizeThatFits(proposal: ProposedViewSize, subviews: [LayoutSubview]) -> CGSize",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "placeSubviews",
+    "kind": "func",
+    "declaration": "public func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: [LayoutSubview])",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Grid/Grid.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct GridLayout: Layout"
+  ]
+ },
+ {
+  "id": "grid-row-heights",
+  "name": "GridRowHeights",
+  "kind": "struct",
+  "declaration": "public struct GridRowHeights: Sendable",
+  "abstract": "Authored row heights for `LazyGrid`. Construct variable heights when the data changes and reuse the value while scrolling; prefix sums are built once, and viewport lookup is logarithmic in the number of rows. Supply unscaled logical heights; LazyGrid applies the active TextScaler.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "fixed",
+    "kind": "func",
+    "declaration": "public static func fixed(_ height: CGFloat) -> GridRowHeights",
+    "abstract": "Every row has this height. Fixed rows need no per-row allocation.",
+    "discussion": []
+   },
+   {
+    "name": "variable",
+    "kind": "func",
+    "declaration": "public static func variable(_ heights: [CGFloat]) -> GridRowHeights",
+    "abstract": "One known height per row, including the last partial row. Heights must be updated together with the data or column count. Unknown content heights require an eager `Grid` measurement instead.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Grid/RowHeights.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public struct GridRowHeights: Sendable"
+  ]
+ },
+ {
+  "id": "grid-span",
+  "name": "GridSpan",
+  "kind": "struct",
+  "declaration": "public struct GridSpan: Equatable, Sendable",
+  "abstract": "Cells a grid child covers. Spans are clamped to the resolved column count; named field columns ignore spans because hiding a field column would otherwise move every spanning cell.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "columns",
+    "kind": "var",
+    "declaration": "public var columns: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rows",
+    "kind": "var",
+    "declaration": "public var rows: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "GridSpan",
+    "kind": "init",
+    "declaration": "public init(columns: Int = 1, rows: Int = 1)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "single",
+    "kind": "let",
+    "declaration": "public static let single = GridSpan()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Grid/Span.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct GridSpan: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "layout-that-fits",
+  "name": "LayoutThatFits",
+  "kind": "struct",
+  "declaration": "public struct LayoutThatFits: Layout",
+  "abstract": "Selects the first layout whose measured size fits every specified proposal axis. The last candidate is the fallback even when it overflows.",
+  "discussion": [
+   "All candidates measure and place the same subviews. Changing the selected\nlayout preserves the child tree, identity, focus, and local state."
+  ],
+  "availability": [],
+  "conforms": [
+   "Layout"
+  ],
+  "members": [
+   {
+    "name": "LayoutThatFits",
+    "kind": "init",
+    "declaration": "public init(_ candidates: [any Layout])",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "sizeThatFits",
+    "kind": "func",
+    "declaration": "public func sizeThatFits(proposal: ProposedViewSize, subviews: [LayoutSubview]) -> CGSize",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "placeSubviews",
+    "kind": "func",
+    "declaration": "public func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: [LayoutSubview])",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Responsive/Candidates.swift",
+  "line": 8,
+  "owner": "",
+  "overloads": [
+   "public struct LayoutThatFits: Layout"
+  ]
+ },
+ {
+  "id": "lazy-grid",
+  "name": "LazyGrid",
+  "kind": "struct",
+  "declaration": "public struct LazyGrid<Data: RandomAccessCollection, ID: Hashable, Content: View>: View",
+  "abstract": "A vertically scrolling, equal-column grid that constructs only visible rows plus overscan. Row heights are explicit so scrolling never measures the full collection. Stable item identities preserve overlapping cells. Row heights and row spacing are authored logical values and follow TextScaler once. Row state that must survive leaving the viewport belongs in the model.",
+  "discussion": [
+   "With `columnWidth` the grid is wider than its viewport: it scrolls on both\naxes and also constructs only the visible columns. `columnSpan` lets an\nitem cover several columns; rows are packed in order, and an item that does\nnot fit the rest of a row starts the next one."
+  ],
+  "availability": [],
+  "conforms": [
+   "RandomAccessCollection"
+  ],
+  "members": [
+   {
+    "name": "LazyGrid",
+    "kind": "init",
+    "declaration": "public init(_ data: Data, id: KeyPath<Data.Element, ID>, columns: Int, rowHeights: GridRowHeights = .fixed(30), columnSpacing: CGFloat = 0, rowSpacing: CGFloat = 0, overscan: Int = 3, scrollOffset: Binding<CGPoint>? = nil, columnWidth: CGFloat? = nil, columnSpan: ((Data.Element) -> Int)? = nil, @ViewBuilder content: @escaping (Data.Element) -> Content)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Grid/LazyGrid.swift",
+  "line": 13,
+  "owner": "",
+  "overloads": [
+   "public struct LazyGrid<Data: RandomAccessCollection, ID: Hashable, Content: View>: View"
+  ]
+ },
+ {
+  "id": "letter-spacing-modifier",
+  "name": "LetterSpacingModifier",
+  "kind": "struct",
+  "declaration": "public struct LetterSpacingModifier: ViewModifier",
+  "abstract": "Additional logical space between shaped clusters, shared by measure and draw.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "value",
+    "kind": "let",
+    "declaration": "public let value: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "LetterSpacingModifier",
+    "kind": "init",
+    "declaration": "public init(_ value: Float)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(layout: LayoutNode)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Layout/LetterSpacingModifier.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct LetterSpacingModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "masonry",
+  "name": "Masonry",
+  "kind": "struct",
+  "declaration": "public struct Masonry<Content: View>: View",
+  "abstract": "Convenience wrapper around `MasonryLayout`.",
+  "discussion": [
+   "```swift\nMasonry(minimumColumnWidth: 200, maximumColumns: 2, itemSpacing: 12) {\n    ForEach(cards) { CardView(card: $0) }\n}\n```"
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "Masonry",
+    "kind": "init",
+    "declaration": "public init(minimumColumnWidth: CGFloat = 160, maximumColumns: Int = 2, columnSpacing: CGFloat = 12, itemSpacing: CGFloat = 12, alignment: Alignment = .topLeading, @ViewBuilder content: () -> Content)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Masonry/Masonry.swift",
+  "line": 146,
+  "owner": "",
+  "overloads": [
+   "public struct Masonry<Content: View>: View"
+  ]
+ },
+ {
+  "id": "masonry-layout",
+  "name": "MasonryLayout",
+  "kind": "struct",
+  "declaration": "public struct MasonryLayout: Layout",
+  "abstract": "A balanced waterfall layout: each child is measured at the column width and placed in the currently shortest column. Rows are not fixed, so cards with different heights pack without leaving the vertical gaps a row grid leaves.",
+  "discussion": [
+   "The layout itself owns only geometry. It does not virtualize children: use\n`LazyGrid` for large fixed-height collections and `VirtualStack` for large\nknown-height lists."
+  ],
+  "availability": [],
+  "conforms": [
+   "Layout"
+  ],
+  "members": [
+   {
+    "name": "minimumColumnWidth",
+    "kind": "var",
+    "declaration": "public var minimumColumnWidth: CGFloat",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maximumColumns",
+    "kind": "var",
+    "declaration": "public var maximumColumns: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "columnSpacing",
+    "kind": "var",
+    "declaration": "public var columnSpacing: CGFloat",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "itemSpacing",
+    "kind": "var",
+    "declaration": "public var itemSpacing: CGFloat",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "alignment",
+    "kind": "var",
+    "declaration": "public var alignment: Alignment",
+    "abstract": "Horizontal alignment of a child inside its column. The vertical component is ignored because every column places children back to back.",
+    "discussion": []
+   },
+   {
+    "name": "MasonryLayout",
+    "kind": "init",
+    "declaration": "public init(minimumColumnWidth: CGFloat = 160, maximumColumns: Int = 2, columnSpacing: CGFloat = 12, itemSpacing: CGFloat = 12, alignment: Alignment = .topLeading)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "sizeThatFits",
+    "kind": "func",
+    "declaration": "public func sizeThatFits(proposal: ProposedViewSize, subviews: [LayoutSubview]) -> CGSize",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "placeSubviews",
+    "kind": "func",
+    "declaration": "public func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: [LayoutSubview])",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Masonry/Masonry.swift",
+  "line": 13,
+  "owner": "",
+  "overloads": [
+   "public struct MasonryLayout: Layout"
+  ]
+ },
+ {
+  "id": "navigation-drawer",
+  "name": "NavigationDrawer",
+  "kind": "struct",
+  "declaration": "public struct NavigationDrawer<ID: Hashable, Header: View, Footer: View>: View",
+  "abstract": "Modal navigation, sharing Sidebar destinations and the standard modal lifecycle. The application owns presentation and selection, so resizing never resets them.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable"
+  ],
+  "members": [
+   {
+    "name": "NavigationDrawer",
+    "kind": "init",
+    "declaration": "public init( _ title: String, isPresented: Binding<Bool>, selection: Binding<ID?>, expanded: Binding<Set<ID>>? = nil, sections: [SidebarSection<ID>], configure: (inout NavigationDrawerOptions) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Drawer.swift",
+  "line": 15,
+  "owner": "",
+  "overloads": [
+   "public struct NavigationDrawer<ID: Hashable, Header: View, Footer: View>: View"
+  ]
+ },
+ {
+  "id": "navigation-drawer-options",
+  "name": "NavigationDrawerOptions",
+  "kind": "struct",
+  "declaration": "public struct NavigationDrawerOptions",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "dismissal",
+    "kind": "var",
+    "declaration": "public var dismissal = ModalDismissal()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "closesOnSelection",
+    "kind": "var",
+    "declaration": "public var closesOnSelection = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "allowsSwipeDismissal",
+    "kind": "var",
+    "declaration": "public var allowsSwipeDismissal = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "closeLabel",
+    "kind": "var",
+    "declaration": "public var closeLabel = \"Collapse navigation\" public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Drawer.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct NavigationDrawerOptions"
+  ]
+ },
+ {
+  "id": "navigation-rail",
+  "name": "NavigationRail",
+  "kind": "struct",
+  "declaration": "public struct NavigationRail<ID: Hashable, Header: View, Footer: View>: View",
+  "abstract": "Compact destination navigation. Applications choose it for medium/expanded surfaces and use NavigationDrawer for compact surfaces.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable"
+  ],
+  "members": [
+   {
+    "name": "NavigationRail",
+    "kind": "init",
+    "declaration": "public init( selection: Binding<ID?>, items: [SidebarItem<ID>], showsLabels: Bool = true, expanded: Binding<Set<ID>>? = nil, onActivate: @escaping (ID) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Rail.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public struct NavigationRail<ID: Hashable, Header: View, Footer: View>: View"
+  ]
+ },
+ {
+  "id": "overlay",
+  "name": "Overlay",
+  "kind": "struct",
+  "declaration": "public struct Overlay<Base: View, Content: View>: View",
+  "abstract": "Base view plus one overlay child. The base owns the measured size; the overlay is aligned inside those bounds and may paint outside them if larger.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "base",
+    "kind": "let",
+    "declaration": "public let base: Base",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "overlay",
+    "kind": "let",
+    "declaration": "public let overlay: Content",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "alignment",
+    "kind": "let",
+    "declaration": "public let alignment: Alignment",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Overlay",
+    "kind": "init",
+    "declaration": "public init(base: Base, overlay: Content, alignment: Alignment)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Overlay.swift",
+  "line": 69,
+  "owner": "",
+  "overloads": [
+   "public struct Overlay<Base: View, Content: View>: View"
+  ]
+ },
+ {
+  "id": "overlay-layout",
+  "name": "OverlayLayout",
+  "kind": "struct",
+  "declaration": "public struct OverlayLayout: Layout",
+  "abstract": "Places overlay content on top of the base view without changing the base's measured size. This is the layout behind `.overlay(alignment:content:)`.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Layout"
+  ],
+  "members": [
+   {
+    "name": "alignment",
+    "kind": "var",
+    "declaration": "public var alignment: Alignment",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "OverlayLayout",
+    "kind": "init",
+    "declaration": "public init(alignment: Alignment = .center)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "sizeThatFits",
+    "kind": "func",
+    "declaration": "public func sizeThatFits(proposal: ProposedViewSize, subviews: [LayoutSubview]) -> CGSize",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "placeSubviews",
+    "kind": "func",
+    "declaration": "public func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: [LayoutSubview])",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Overlay.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct OverlayLayout: Layout"
+  ]
+ },
+ {
+  "id": "padding-modifier",
+  "name": "PaddingModifier",
+  "kind": "struct",
+  "declaration": "public struct PaddingModifier: ViewModifier",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "insets",
+    "kind": "let",
+    "declaration": "public let insets: EdgeInsets",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "PaddingModifier",
+    "kind": "init",
+    "declaration": "public init(insets: EdgeInsets)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(layout: LayoutNode)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Layout/PaddingModifier.swift",
+  "line": 27,
+  "owner": "",
+  "overloads": [
+   "public struct PaddingModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "pagination",
+  "name": "Pagination",
+  "kind": "struct",
+  "declaration": "public struct Pagination: View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "page",
+    "kind": "let",
+    "declaration": "public let page: Binding<Int>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "totalPages",
+    "kind": "let",
+    "declaration": "public let totalPages: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "siblings",
+    "kind": "var",
+    "declaration": "public var siblings = 1",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Pagination",
+    "kind": "init",
+    "declaration": "public init(page: Binding<Int>, totalPages: Int, configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/NavigationComponents.swift",
+  "line": 56,
+  "owner": "",
+  "overloads": [
+   "public struct Pagination: View"
+  ]
+ },
+ {
+  "id": "pagination-item",
+  "name": "PaginationItem",
+  "kind": "enum",
+  "declaration": "public enum PaginationItem: Hashable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/NavigationComponents.swift",
+  "line": 41,
+  "owner": "",
+  "overloads": [
+   "public enum PaginationItem: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "pagination-model",
+  "name": "PaginationModel",
+  "kind": "enum",
+  "declaration": "public enum PaginationModel",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "normalized",
+    "kind": "func",
+    "declaration": "public static func normalized(_ current: Int, total: Int) -> Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "items",
+    "kind": "func",
+    "declaration": "public static func items(current: Int, total: Int, siblings: Int = 1) -> [PaginationItem]",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/NavigationComponents.swift",
+  "line": 42,
+  "owner": "",
+  "overloads": [
+   "public enum PaginationModel"
+  ]
+ },
+ {
+  "id": "panel",
+  "name": "Panel",
+  "kind": "struct",
+  "declaration": "public struct Panel<Accessory: View, Content: View>: View",
+  "abstract": "Surface container with a labelled header bar. Visual chrome is delegated to the active `PanelStyle` (defaults to `DefaultPanelStyle`); call sites only supply title, optional accessory, and content.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "title",
+    "kind": "let",
+    "declaration": "public let title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isActive",
+    "kind": "let",
+    "declaration": "public let isActive: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "accessory",
+    "kind": "let",
+    "declaration": "public let accessory: Accessory",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "content",
+    "kind": "let",
+    "declaration": "public let content: Content",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Panel",
+    "kind": "init",
+    "declaration": "public init(_ title: String, isActive: Bool = false, @ViewBuilder accessory: () -> Accessory, @ViewBuilder content: () -> Content)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Panel",
+    "kind": "init",
+    "declaration": "init(_ title: String, isActive: Bool = false, @ViewBuilder content: () -> Content)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Panel.swift",
+  "line": 8,
+  "owner": "",
+  "overloads": [
+   "public struct Panel<Accessory: View, Content: View>: View"
+  ]
+ },
+ {
+  "id": "resizable-editor",
+  "name": "ResizableEditor",
+  "kind": "struct",
+  "declaration": "public struct ResizableEditor<Content: View>: View",
+  "abstract": "Vertical resize surface for multiline/code inputs. Drag the bottom grip; content owns its text scrolling and the parent owns its surrounding layout.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "ResizableEditor",
+    "kind": "init",
+    "declaration": "public init(initialHeight: Float = 160, minHeight: Float = 96, maxHeight: Float = 520, resizeLabel: String = \"Editor height\", isResizable: Bool = true, @ViewBuilder content: () -> Content)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/ResizableEditor.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public struct ResizableEditor<Content: View>: View"
+  ]
+ },
+ {
+  "id": "resizable-text-area",
+  "name": "ResizableTextArea",
+  "kind": "struct",
+  "declaration": "public struct ResizableTextArea: View",
+  "abstract": "Multiline input with a draggable lower edge and internal text scrolling.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "ResizableTextArea",
+    "kind": "init",
+    "declaration": "public init(_ placeholder: String = \"\", text: Binding<TextBuffer>, minHeight: Float = 96, maxHeight: Float = 360, disabled: Bool = false, resizeLabel: String = \"Editor height\", codeEditing: TextFieldCodeEditing = TextFieldCodeEditing(), onSubmit: (() -> Void)? = nil, onFocus: (() -> Void)? = nil, onBlur: (() -> Void)? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/ResizableTextArea.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct ResizableTextArea: View"
+  ]
+ },
+ {
+  "id": "safe-area",
+  "name": "SafeArea",
+  "kind": "struct",
+  "declaration": "public struct SafeArea<Content: View>: _PrimitiveView",
+  "abstract": "Insets supplied by the host are consumed once, by the selected logical edges. Nested SafeArea containers receive only the remaining edges.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "SafeArea",
+    "kind": "init",
+    "declaration": "public init(_ edges: SafeAreaEdges = .all, @ViewBuilder content: () -> Content)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Insets/SafeArea.swift",
+  "line": 23,
+  "owner": "",
+  "overloads": [
+   "public struct SafeArea<Content: View>: _PrimitiveView"
+  ]
+ },
+ {
+  "id": "safe-area-edges",
+  "name": "SafeAreaEdges",
+  "kind": "struct",
+  "declaration": "public struct SafeAreaEdges: OptionSet, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "OptionSet",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "rawValue",
+    "kind": "let",
+    "declaration": "public let rawValue: UInt8",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SafeAreaEdges",
+    "kind": "init",
+    "declaration": "public init(rawValue: UInt8)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "top",
+    "kind": "let",
+    "declaration": "public static let top = Self(rawValue: 1 << 0)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "leading",
+    "kind": "let",
+    "declaration": "public static let leading = Self(rawValue: 1 << 1)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "bottom",
+    "kind": "let",
+    "declaration": "public static let bottom = Self(rawValue: 1 << 2)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "trailing",
+    "kind": "let",
+    "declaration": "public static let trailing = Self(rawValue: 1 << 3)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "horizontal",
+    "kind": "let",
+    "declaration": "public static let horizontal: Self = [.leading, .trailing]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "vertical",
+    "kind": "let",
+    "declaration": "public static let vertical: Self = [.top, .bottom]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "all",
+    "kind": "let",
+    "declaration": "public static let all: Self = [.horizontal, .vertical]",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Insets/SafeArea.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct SafeAreaEdges: OptionSet, Sendable"
+  ]
+ },
+ {
+  "id": "scroll-axis",
+  "name": "ScrollAxis",
+  "kind": "enum",
+  "declaration": "public enum ScrollAxis: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/ScrollView.swift",
+  "line": 109,
+  "owner": "",
+  "overloads": [
+   "public enum ScrollAxis: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "scroll-geometry",
+  "name": "ScrollGeometry",
+  "kind": "struct",
+  "declaration": "public struct ScrollGeometry: Equatable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "offset",
+    "kind": "let",
+    "declaration": "public let offset: CGPoint",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "viewportSize",
+    "kind": "let",
+    "declaration": "public let viewportSize: CGSize",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "contentSize",
+    "kind": "let",
+    "declaration": "public let contentSize: CGSize",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/ScrollView.swift",
+  "line": 126,
+  "owner": "",
+  "overloads": [
+   "public struct ScrollGeometry: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "scroll-physics-environment",
+  "name": "ScrollPhysicsEnvironment",
+  "kind": "enum",
+  "declaration": "public enum ScrollPhysicsEnvironment",
+  "abstract": "Scroll overscroll behaviour shared by every scrollable container below the provider.",
+  "discussion": [
+   "The key is global rather than per-axis on purpose: a horizontal carousel\nnested in a vertical list opts out by adding its own nearer provider, and\neverything else keeps agreeing with its surroundings."
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "key",
+    "kind": "let",
+    "declaration": "public static let key = CompositionLocal<ScrollPhysics>(defaultValue: .default)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Scrolling/ScrollPhysicsEnvironment.swift",
+  "line": 11,
+  "owner": "",
+  "overloads": [
+   "public enum ScrollPhysicsEnvironment"
+  ]
+ },
+ {
+  "id": "scroll-request",
+  "name": "ScrollRequest",
+  "kind": "struct",
+  "declaration": "public struct ScrollRequest: Equatable, Sendable",
+  "abstract": "One declarative programmatic scroll. A new identity starts a new animation; a duration of zero (or reduced motion) snaps immediately.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: UUID",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "offset",
+    "kind": "let",
+    "declaration": "public let offset: CGPoint",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "duration",
+    "kind": "let",
+    "declaration": "public let duration: Double",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ScrollRequest",
+    "kind": "init",
+    "declaration": "public init(offset: CGPoint, duration: Double = 0.32)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/ScrollView.swift",
+  "line": 113,
+  "owner": "",
+  "overloads": [
+   "public struct ScrollRequest: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "scroll-view",
+  "name": "ScrollView",
+  "kind": "struct",
+  "declaration": "public struct ScrollView<Content: View>: _PrimitiveView",
+  "abstract": "Clipped scrolling with optional offset binding and viewport observations. Content must retain its natural extent on the scrolling axis, e.g. a no-shrink column. Use a virtualized collection for large datasets.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "axes",
+    "kind": "let",
+    "declaration": "public let axes: ScrollAxis",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "content",
+    "kind": "let",
+    "declaration": "public let content: Content",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onViewportChange",
+    "kind": "var",
+    "declaration": "public var onViewportChange: ((ScrollViewport) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "scrollOffset",
+    "kind": "var",
+    "declaration": "public var scrollOffset: Binding<CGPoint>?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onGeometryChange",
+    "kind": "let",
+    "declaration": "public let onGeometryChange: ((ScrollGeometry) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "accessibilityLabel",
+    "kind": "let",
+    "declaration": "public let accessibilityLabel: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "scrollRequest",
+    "kind": "let",
+    "declaration": "public let scrollRequest: ScrollRequest?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "wheelStep",
+    "kind": "var",
+    "declaration": "public var wheelStep: Float = 30",
+    "abstract": "Logical points per line increment. Precise point input bypasses this.",
+    "discussion": []
+   },
+   {
+    "name": "consumePolicy",
+    "kind": "let",
+    "declaration": "public let consumePolicy: ScrollConsumePolicy",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "scrollbarGutter",
+    "kind": "let",
+    "declaration": "public let scrollbarGutter: ScrollbarGutter",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ScrollView",
+    "kind": "init",
+    "declaration": "public init(_ axes: ScrollAxis = .vertical, consumePolicy: ScrollConsumePolicy = .whenScrollable, scrollbarGutter: ScrollbarGutter = .overlay, scrollOffset: Binding<CGPoint>? = nil, onViewportChange: ((ScrollViewport) -> Void)? = nil, onGeometryChange: ((ScrollGeometry) -> Void)? = nil, accessibilityLabel: String? = nil, scrollRequest: ScrollRequest? = nil, @ViewBuilder content: () -> Content)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/ScrollView.swift",
+  "line": 139,
+  "owner": "",
+  "overloads": [
+   "public struct ScrollView<Content: View>: _PrimitiveView"
+  ]
+ },
+ {
+  "id": "scroll-viewport",
+  "name": "ScrollViewport",
+  "kind": "struct",
+  "declaration": "public struct ScrollViewport: Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "offset",
+    "kind": "var",
+    "declaration": "public var offset: CGPoint",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "size",
+    "kind": "var",
+    "declaration": "public var size: CGSize",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ScrollViewport",
+    "kind": "init",
+    "declaration": "public init(offset: CGPoint, size: CGSize)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/ScrollView.swift",
+  "line": 1085,
+  "owner": "",
+  "overloads": [
+   "public struct ScrollViewport: Equatable"
+  ]
+ },
+ {
+  "id": "sidebar",
+  "name": "Sidebar",
+  "kind": "struct",
+  "declaration": "public struct Sidebar<ID: Hashable, Header: View, Footer: View>: View",
+  "abstract": "Navigation chrome with independent header/footer slots and one Tab stop among enabled destinations.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable"
+  ],
+  "members": [
+   {
+    "name": "selection",
+    "kind": "let",
+    "declaration": "public let selection: Binding<ID?>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "sections",
+    "kind": "let",
+    "declaration": "public let sections: [SidebarSection<ID>]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minimumRowHeight",
+    "kind": "let",
+    "declaration": "public let minimumRowHeight: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Sidebar",
+    "kind": "init",
+    "declaration": "public init(selection: Binding<ID?>, sections: [SidebarSection<ID>], presentation: SidebarPresentation = .expanded, expanded: Binding<Set<ID>>? = nil, minimumRowHeight: Float = 38, onActivate: @escaping (ID) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Sidebar",
+    "kind": "init",
+    "declaration": "init(selection: Binding<ID?>, sections: [SidebarSection<ID>], presentation: SidebarPresentation = .expanded, expanded: Binding<Set<ID>>? = nil, minimumRowHeight: Float = 38, onActivate: @escaping (ID) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Sidebar.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public struct Sidebar<ID: Hashable, Header: View, Footer: View>: View"
+  ]
+ },
+ {
+  "id": "sidebar-item",
+  "name": "SidebarItem",
+  "kind": "struct",
+  "declaration": "public struct SidebarItem<ID: Hashable>: Identifiable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: ID",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "title",
+    "kind": "let",
+    "declaration": "public let title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "icon",
+    "kind": "var",
+    "declaration": "public var icon: BundleImageResource?",
+    "abstract": "Uses the active IconTheme, including resource replacements and scaling.",
+    "discussion": []
+   },
+   {
+    "name": "iconSize",
+    "kind": "var",
+    "declaration": "public var iconSize: SemanticIconSize = .medium",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "badge",
+    "kind": "var",
+    "declaration": "public var badge: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "children",
+    "kind": "var",
+    "declaration": "public var children: [Self] = []",
+    "abstract": "A nonempty group expands instead of activating a destination.",
+    "discussion": []
+   },
+   {
+    "name": "contextMenu",
+    "kind": "var",
+    "declaration": "public var contextMenu: [MenuEntry] = []",
+    "abstract": "Per-item actions. macOS right-click opens them; a trailing ellipsis keeps the same menu reachable by pointer, keyboard and touch.",
+    "discussion": []
+   },
+   {
+    "name": "slots",
+    "kind": "var",
+    "declaration": "public var slots = SidebarItemSlots()",
+    "abstract": "Caller views placed inside the row (expanded presentation only).",
+    "discussion": []
+   },
+   {
+    "name": "SidebarItem",
+    "kind": "init",
+    "declaration": "public init(_ id: ID, _ title: String, configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Items.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct SidebarItem<ID: Hashable>: Identifiable"
+  ]
+ },
+ {
+  "id": "sidebar-item-slots",
+  "name": "SidebarItemSlots",
+  "kind": "struct",
+  "declaration": "public struct SidebarItemSlots",
+  "abstract": "Inline views for one sidebar row. `leading` and `trailing` sit inside the destination's hit area, so they are decorative and hidden from assistive technology (the title remains the row's name). `accessory` sits outside the destination button at the trailing edge and may be interactive, such as a visibility toggle; it reserves `accessoryWidth` so the title never runs under it. Rail presentations keep only the icon.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "leading",
+    "kind": "var",
+    "declaration": "public var leading: AnyView?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "trailing",
+    "kind": "var",
+    "declaration": "public var trailing: AnyView?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "accessory",
+    "kind": "var",
+    "declaration": "public var accessory: AnyView?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "accessoryWidth",
+    "kind": "var",
+    "declaration": "public var accessoryWidth: Float = 44",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SidebarItemSlots",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Items.swift",
+  "line": 38,
+  "owner": "",
+  "overloads": [
+   "public struct SidebarItemSlots"
+  ]
+ },
+ {
+  "id": "sidebar-layout-policy",
+  "name": "SidebarLayoutPolicy",
+  "kind": "struct",
+  "declaration": "public struct SidebarLayoutPolicy: Sendable, Hashable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Hashable"
+  ],
+  "members": [
+   {
+    "name": "compactMaximumWidth",
+    "kind": "var",
+    "declaration": "public var compactMaximumWidth = UIEnvironment.Viewport.compactMaximumWidth",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "expandedMinimumWidth",
+    "kind": "var",
+    "declaration": "public var expandedMinimumWidth = UIEnvironment.Viewport.expandedMinimumWidth",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "sidebarWidth",
+    "kind": "var",
+    "declaration": "public var sidebarWidth: Float = 240",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showsRailLabels",
+    "kind": "var",
+    "declaration": "public var showsRailLabels = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SidebarLayoutPolicy",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/AdaptiveOptions.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct SidebarLayoutPolicy: Sendable, Hashable"
+  ]
+ },
+ {
+  "id": "sidebar-presentation",
+  "name": "SidebarPresentation",
+  "kind": "enum",
+  "declaration": "public enum SidebarPresentation: Sendable, Hashable",
+  "abstract": "Present the same destination nodes as a full sidebar or a narrow rail.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Hashable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Presentation.swift",
+  "line": 2,
+  "owner": "",
+  "overloads": [
+   "public enum SidebarPresentation: Sendable, Hashable"
+  ]
+ },
+ {
+  "id": "sidebar-resize-options",
+  "name": "SidebarResizeOptions",
+  "kind": "struct",
+  "declaration": "public struct SidebarResizeOptions: Sendable, Hashable",
+  "abstract": "Bounds for a caller-owned sidebar width. Layout fitting never writes a narrower temporary allocation back into the caller's requested width.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Hashable"
+  ],
+  "members": [
+   {
+    "name": "minimumWidth",
+    "kind": "var",
+    "declaration": "public var minimumWidth: Float = 180",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maximumWidth",
+    "kind": "var",
+    "declaration": "public var maximumWidth: Float = 480",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minimumContentWidth",
+    "kind": "var",
+    "declaration": "public var minimumContentWidth: Float = 320",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "var",
+    "declaration": "public var label = \"Resize navigation\" public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Resizing.swift",
+  "line": 3,
+  "owner": "",
+  "overloads": [
+   "public struct SidebarResizeOptions: Sendable, Hashable"
+  ]
+ },
+ {
+  "id": "sidebar-section",
+  "name": "SidebarSection",
+  "kind": "struct",
+  "declaration": "public struct SidebarSection<ID: Hashable>: Identifiable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "title",
+    "kind": "let",
+    "declaration": "public let title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "items",
+    "kind": "let",
+    "declaration": "public let items: [SidebarItem<ID>]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SidebarSection",
+    "kind": "init",
+    "declaration": "public init(_ id: String, title: String = \"\", items: [SidebarItem<ID>])",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Items.swift",
+  "line": 25,
+  "owner": "",
+  "overloads": [
+   "public struct SidebarSection<ID: Hashable>: Identifiable"
+  ]
+ },
+ {
+  "id": "split-axis",
+  "name": "SplitAxis",
+  "kind": "enum",
+  "declaration": "public enum SplitAxis: Sendable, Hashable",
+  "abstract": "Orientation of a `SplitView`.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Hashable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/SplitView.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public enum SplitAxis: Sendable, Hashable"
+  ]
+ },
+ {
+  "id": "split-compact-presentation",
+  "name": "SplitCompactPresentation",
+  "kind": "struct",
+  "declaration": "public struct SplitCompactPresentation",
+  "abstract": "Opt-in single-pane presentation, measured along the split's allocated axis. Pane titles are supplied by the application for localization and accessibility.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "firstTitle",
+    "kind": "let",
+    "declaration": "public let firstTitle: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "secondTitle",
+    "kind": "let",
+    "declaration": "public let secondTitle: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "threshold",
+    "kind": "var",
+    "declaration": "public var threshold: Float = 600",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "selection",
+    "kind": "var",
+    "declaration": "public var selection: Binding<SplitPane>?",
+    "abstract": "Omit to let the split retain its own selection, initially `.first`.",
+    "discussion": []
+   },
+   {
+    "name": "SplitCompactPresentation",
+    "kind": "init",
+    "declaration": "public init(firstTitle: String, secondTitle: String, configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Split/Compact.swift",
+  "line": 12,
+  "owner": "",
+  "overloads": [
+   "public struct SplitCompactPresentation"
+  ]
+ },
+ {
+  "id": "split-constraints",
+  "name": "SplitConstraints",
+  "kind": "struct",
+  "declaration": "public struct SplitConstraints: Sendable, Equatable",
+  "abstract": "Pane bounds use logical points. Impossible minimums share space in proportion to their minimums. Maximums constrain the divider whenever both panes can fill the container; if their sum is too small, surplus is shared in proportion to the maximums. This keeps a filling split deterministic without overflow.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "fraction",
+    "kind": "var",
+    "declaration": "public var fraction: ClosedRange<Float> = 0.1...0.9",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minimumFirst",
+    "kind": "var",
+    "declaration": "public var minimumFirst: Float = 0",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minimumSecond",
+    "kind": "var",
+    "declaration": "public var minimumSecond: Float = 0",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maximumFirst",
+    "kind": "var",
+    "declaration": "public var maximumFirst: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maximumSecond",
+    "kind": "var",
+    "declaration": "public var maximumSecond: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SplitConstraints",
+    "kind": "init",
+    "declaration": "public init(fraction: ClosedRange<Float> = 0.1...0.9, minimumFirst: Float = 0, minimumSecond: Float = 0, maximumFirst: Float? = nil, maximumSecond: Float? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "range",
+    "kind": "func",
+    "declaration": "public func range(available: Float) -> ClosedRange<Float>",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Split/Constraints.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct SplitConstraints: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "split-pane",
+  "name": "SplitPane",
+  "kind": "enum",
+  "declaration": "public enum SplitPane: Sendable, Hashable",
+  "abstract": "The pane presented when a split has room for only one pane.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Hashable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Split/Compact.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public enum SplitPane: Sendable, Hashable"
+  ]
+ },
+ {
+  "id": "split-view",
+  "name": "SplitView",
+  "kind": "struct",
+  "declaration": "public struct SplitView<First: View, Second: View>: View",
+  "abstract": "Two panes sharing one axis, split by a fraction of the available space.",
+  "discussion": [
+   "Pass a `Float` for a layout the application owns, or a `Binding<Float>` for\none the user owns — the binding form renders a draggable divider that writes\nclamped fractions back through it, so the application can persist the user's\nrequested proportion. Supply `compact` to switch to retained single panes\nwhen the container is smaller than its threshold.",
+   "```swift\nSplitView(.horizontal, fraction: 0.35) { sidebar } second: { content }\nSplitView(.horizontal, fraction: $sidebarFraction) { sidebar } second: { content }\n```"
+  ],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "axis",
+    "kind": "let",
+    "declaration": "public let axis: SplitAxis",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "fraction",
+    "kind": "var",
+    "declaration": "public var fraction: Float",
+    "abstract": "Current fraction, whether or not the user can change it.",
+    "discussion": []
+   },
+   {
+    "name": "spacing",
+    "kind": "let",
+    "declaration": "public let spacing: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "dividerThickness",
+    "kind": "let",
+    "declaration": "public let dividerThickness: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "dividerColor",
+    "kind": "let",
+    "declaration": "public let dividerColor: Color?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "constraints",
+    "kind": "let",
+    "declaration": "public let constraints: SplitConstraints",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "compact",
+    "kind": "let",
+    "declaration": "public let compact: SplitCompactPresentation?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "first",
+    "kind": "let",
+    "declaration": "public let first: First",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "second",
+    "kind": "let",
+    "declaration": "public let second: Second",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SplitView",
+    "kind": "init",
+    "declaration": "public init(_ axis: SplitAxis = .horizontal, fraction: Float = 0.5, spacing: Float = 0, dividerThickness: Float = 1, dividerColor: Color? = nil, constraints: SplitConstraints = .init(fraction: 0.05...0.95), compact: SplitCompactPresentation? = nil, @ViewBuilder first: () -> First, @ViewBuilder second: () -> Second)",
+    "abstract": "Static split. The application drives `fraction` (a slider, a stored preference); the divider is a plain separator.",
+    "discussion": []
+   },
+   {
+    "name": "SplitView",
+    "kind": "init",
+    "declaration": "public init(_ axis: SplitAxis = .horizontal, fraction: Binding<Float>, spacing: Float = 0, dividerThickness: Float = 1, dividerColor: Color? = nil, constraints: SplitConstraints = .init(), compact: SplitCompactPresentation? = nil, @ViewBuilder first: () -> First, @ViewBuilder second: () -> Second)",
+    "abstract": "User-resizable split. The divider becomes a drag target and keyboard control that writes clamped fractions into `fraction`.",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/SplitView.swift",
+  "line": 25,
+  "owner": "",
+  "overloads": [
+   "public struct SplitView<First: View, Second: View>: View"
+  ]
+ },
+ {
+  "id": "stack-layout",
+  "name": "StackLayout",
+  "kind": "struct",
+  "declaration": "public struct StackLayout: Layout",
+  "abstract": "A natural-size stack algorithm for use in custom and candidate layouts. Children receive the offered cross-axis size and an intrinsic main axis; use Box/Row/Column when flex growth or compression is required.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Layout"
+  ],
+  "members": [
+   {
+    "name": "axis",
+    "kind": "var",
+    "declaration": "public var axis: Axis = .vertical",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "spacing",
+    "kind": "var",
+    "declaration": "public var spacing: CGFloat = 0",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "alignment",
+    "kind": "var",
+    "declaration": "public var alignment: Alignment = .topLeading",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "StackLayout",
+    "kind": "init",
+    "declaration": "public init(_ axis: Axis = .vertical, spacing: CGFloat = 0, alignment: Alignment = .topLeading)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "sizeThatFits",
+    "kind": "func",
+    "declaration": "public func sizeThatFits(proposal: ProposedViewSize, subviews: [LayoutSubview]) -> CGSize",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "placeSubviews",
+    "kind": "func",
+    "declaration": "public func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: [LayoutSubview])",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Responsive/Stack.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct StackLayout: Layout"
+  ]
+ },
+ {
+  "id": "status-bar",
+  "name": "StatusBar",
+  "kind": "struct",
+  "declaration": "public struct StatusBar<Leading: View, Trailing: View>: View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "leading",
+    "kind": "let",
+    "declaration": "public let leading: Leading",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "trailing",
+    "kind": "let",
+    "declaration": "public let trailing: Trailing",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showsDivider",
+    "kind": "var",
+    "declaration": "public var showsDivider: Bool",
+    "abstract": "The hairline that separates the bar from the content above it.",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "StatusBar",
+    "kind": "init",
+    "declaration": "public init(showsDivider: Bool = true, isEnabled: Bool = true, @ViewBuilder leading: () -> Leading, @ViewBuilder trailing: () -> Trailing)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "StatusBar",
+    "kind": "init",
+    "declaration": "init(showsDivider: Bool = true, isEnabled: Bool = true, @ViewBuilder leading: () -> Leading)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "StatusBar",
+    "kind": "init",
+    "declaration": "init(showsDivider: Bool = true, isEnabled: Bool = true, @ViewBuilder trailing: () -> Trailing)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/StatusBar.swift",
+  "line": 28,
+  "owner": "",
+  "overloads": [
+   "public struct StatusBar<Leading: View, Trailing: View>: View"
+  ]
+ },
+ {
+  "id": "status-bar-metrics",
+  "name": "StatusBarMetrics",
+  "kind": "enum",
+  "declaration": "public enum StatusBarMetrics",
+  "abstract": "One line of persistent context at the bottom of a window.",
+  "discussion": [
+   "A status bar is the only chrome in a window that is allowed to hold many\nsmall facts at once — cursor position, encoding, branch, connection state —\nso it enforces the two things that keep such a row legible: a single height\nfor every cell, and leading/trailing slots that never fight for space.",
+   "```swift\nStatusBar {\n    StatusBarText(\"main\", icon: UIIcons.Development.gitBranch)\n    StatusBarText(\"UTF-8\", isMonospaced: true)\n} trailing: {\n    StatusBarText(\"Ln 42, Col 7\", isMonospaced: true)\n    StatusBarText(\"Connected\", tone: .success)\n}\n```"
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "height",
+    "kind": "let",
+    "declaration": "public static let height: Float = 26",
+    "abstract": "Shared height, so a status bar swapping cells never changes the window's content height and never reflows the view above it.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/StatusBar.swift",
+  "line": 22,
+  "owner": "",
+  "overloads": [
+   "public enum StatusBarMetrics"
+  ]
+ },
+ {
+  "id": "status-bar-text",
+  "name": "StatusBarText",
+  "kind": "struct",
+  "declaration": "public struct StatusBarText: View",
+  "abstract": "A single status-bar cell: one short fact, optionally toned and optionally monospaced so numbers stay column-aligned while they change.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "text",
+    "kind": "var",
+    "declaration": "public var text: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "detail",
+    "kind": "var",
+    "declaration": "public var detail: String",
+    "abstract": "Secondary value appended in a dimmer ink: `Ln 42` + `Col 7`.",
+    "discussion": []
+   },
+   {
+    "name": "icon",
+    "kind": "var",
+    "declaration": "public var icon: BundleImageResource?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "tone",
+    "kind": "var",
+    "declaration": "public var tone: StatusTone?",
+    "abstract": "`nil` reads as neutral context; a tone marks the fact as a state worth noticing (disconnected, unsaved, failing).",
+    "discussion": []
+   },
+   {
+    "name": "isMonospaced",
+    "kind": "var",
+    "declaration": "public var isMonospaced: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "StatusBarText",
+    "kind": "init",
+    "declaration": "public init(_ text: String, detail: String = \"\", icon: BundleImageResource? = nil, tone: StatusTone? = nil, isMonospaced: Bool = false)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/StatusBar.swift",
+  "line": 81,
+  "owner": "",
+  "overloads": [
+   "public struct StatusBarText: View"
+  ]
+ },
+ {
+  "id": "surface-root",
+  "name": "SurfaceRoot",
+  "kind": "struct",
+  "declaration": "public struct SurfaceRoot<Content: View>: View",
+  "abstract": "Installs host surface facts once at the root of a scene: safe-area insets, text scale and reduced motion.",
+  "discussion": [
+   "The root deliberately does **not** pad content. Modern platforms draw apps\nedge to edge: the app paints its background behind the system bars and only\nits interactive chrome is inset. `SafeArea` consumes the insets this root\npublishes, so screens that own a status bar, navigation bar or keyboard get\nthe correct avoidance without a letterboxed surface.",
+   "Application hosts and device previews share this entry point so a preview\ncannot drift from what a real surface renders."
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "environment",
+    "kind": "let",
+    "declaration": "public let environment: UIEnvironment",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SurfaceRoot",
+    "kind": "init",
+    "declaration": "public init(_ environment: UIEnvironment, @ViewBuilder content: () -> Content)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Insets/SurfaceRoot.swift",
+  "line": 16,
+  "owner": "",
+  "overloads": [
+   "public struct SurfaceRoot<Content: View>: View"
+  ]
+ },
+ {
+  "id": "tab-item",
+  "name": "TabItem",
+  "kind": "struct",
+  "declaration": "public struct TabItem<ID: Hashable>: Identifiable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: ID",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "let",
+    "declaration": "public let label: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "content",
+    "kind": "let",
+    "declaration": "public let content: AnyView",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "icon",
+    "kind": "var",
+    "declaration": "public var icon: BundleImageResource?",
+    "abstract": "Leading glyph. Tabs read faster with one, and it survives translation.",
+    "discussion": []
+   },
+   {
+    "name": "badge",
+    "kind": "var",
+    "declaration": "public var badge: String?",
+    "abstract": "Short trailing count or status. Keep it to two or three characters.",
+    "discussion": []
+   },
+   {
+    "name": "onClose",
+    "kind": "var",
+    "declaration": "public var onClose: (() -> Void)?",
+    "abstract": "When set the tab renders a close control. `nil` makes the tab permanent.",
+    "discussion": []
+   },
+   {
+    "name": "TabItem",
+    "kind": "init",
+    "declaration": "public init<C: View>(_ label: String, id: ID, isEnabled: Bool = true, configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/TabView.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct TabItem<ID: Hashable>: Identifiable"
+  ]
+ },
+ {
+  "id": "tab-overflow",
+  "name": "TabOverflow",
+  "kind": "enum",
+  "declaration": "public enum TabOverflow: Sendable, Hashable",
+  "abstract": "What a `TabView` does when its tabs are wider than the strip.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Hashable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/TabView.swift",
+  "line": 50,
+  "owner": "",
+  "overloads": [
+   "public enum TabOverflow: Sendable, Hashable"
+  ]
+ },
+ {
+  "id": "tab-strip-placement",
+  "name": "TabStripPlacement",
+  "kind": "enum",
+  "declaration": "public enum TabStripPlacement: Sendable, Hashable",
+  "abstract": "Which edge of a `TabView` holds the strip.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Hashable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/TabView.swift",
+  "line": 42,
+  "owner": "",
+  "overloads": [
+   "public enum TabStripPlacement: Sendable, Hashable"
+  ]
+ },
+ {
+  "id": "tab-variant",
+  "name": "TabVariant",
+  "kind": "enum",
+  "declaration": "public enum TabVariant: Sendable, Hashable",
+  "abstract": "Visual treatment of a `TabView` strip.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Hashable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/TabView.swift",
+  "line": 31,
+  "owner": "",
+  "overloads": [
+   "public enum TabVariant: Sendable, Hashable"
+  ]
+ },
+ {
+  "id": "tab-view",
+  "name": "TabView",
+  "kind": "struct",
+  "declaration": "public struct TabView<ID: Hashable>: View",
+  "abstract": "Multi-panel container with a single active panel.",
+  "discussion": [
+   "Three variants cover the three places tabs realistically appear: `.bar` is a\ndocument strip (editor panels, inspector pages), `.segmented` is a value\npicker that happens to look like tabs, and `.card` is a folder metaphor for\ncontent that sits on the same surface as the page.",
+   "The strip keeps one Tab stop for the whole group: arrows, Home and End move\nbetween enabled tabs, and disabled tabs are skipped rather than announced as\nunavailable one by one.",
+   "```swift\nTabView(selection: $page, tabs: tabs) { $0.variant = .card }\nTabView(selection: $openFile, tabs: docs) { $0.overflow = .scroll }\n```"
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "selection",
+    "kind": "var",
+    "declaration": "public var selection: Binding<ID>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "tabs",
+    "kind": "var",
+    "declaration": "public var tabs: [TabItem<ID>]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "variant",
+    "kind": "var",
+    "declaration": "public var variant: TabVariant = .bar",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "placement",
+    "kind": "var",
+    "declaration": "public var placement: TabStripPlacement = .adaptive",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "overflow",
+    "kind": "var",
+    "declaration": "public var overflow: TabOverflow = .wrap",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TabView",
+    "kind": "init",
+    "declaration": "public init(selection: Binding<ID>, tabs: [TabItem<ID>], configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/TabView.swift",
+  "line": 75,
+  "owner": "",
+  "overloads": [
+   "public struct TabView<ID: Hashable>: View"
+  ]
+ },
+ {
+  "id": "view-that-fits",
+  "name": "ViewThatFits",
+  "kind": "struct",
+  "declaration": "public struct ViewThatFits<Wide: View, Compact: View>: View",
+  "abstract": "Selects wide or compact content using the allocated container width. Each branch is created on first selection and retains its own identity and local state until this container is removed. Inactive branches remain mounted but take no layout space, paint no pixels and receive no input or accessibility. App-owned drafts can still use shared bindings across the two presentations. Selection can use an explicit width threshold or measure the wide branch's intrinsic size. Intrinsic mode mounts both branches immediately so it can measure them; hidden branches still stop paint, input and accessibility.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "ViewThatFits",
+    "kind": "init",
+    "declaration": "public init(threshold: CGFloat = CGFloat(UIEnvironment.Viewport.compactMaximumWidth), @ViewBuilder wide: @escaping () -> Wide, @ViewBuilder compact: @escaping () -> Compact)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ViewThatFits",
+    "kind": "init",
+    "declaration": "public init(fitting mode: Mode, @ViewBuilder wide: @escaping () -> Wide, @ViewBuilder compact: @escaping () -> Compact)",
+    "abstract": "`intrinsic` selects wide while its measured natural width/height fit; otherwise compact. Measurement uses an unspecified proposal so a parent width cannot make a wrapping wide branch look like it fits.",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "switch mode",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Responsive/ViewThatFits.swift",
+  "line": 14,
+  "owner": "",
+  "overloads": [
+   "public struct ViewThatFits<Wide: View, Compact: View>: View"
+  ]
+ },
+ {
+  "id": "virtual-stack",
+  "name": "VirtualStack",
+  "kind": "struct",
+  "declaration": "public struct VirtualStack<Data: RandomAccessCollection, ID: Hashable, Content: View>: View",
+  "abstract": "A vertically scrolling stack that constructs only the rows around the viewport. Row identity survives scrolling; keep persistent row data in the model, since fully offscreen rows are unmounted. IDs must be unique.",
+  "discussion": [
+   "Pass a constant `rowHeight` for uniform rows, a closure for known\nvariable heights, or `estimatedRowHeight` when heights are only known\nafter rendering. The closure receives the element, the available content\nwidth and the inherited text scaler, and returns the complete row height;\nheights are cached until data, width, spacing or text scale change, and\nscrolling locates rows in O(log n). `preload` adds a fraction of the\nviewport across both edges (0.3 prepares about 130%); `overscan` is the\nminimum extra row count per edge. Refill happens before that buffer runs out."
+  ],
+  "availability": [],
+  "conforms": [
+   "RandomAccessCollection"
+  ],
+  "members": [
+   {
+    "name": "VirtualStack",
+    "kind": "init",
+    "declaration": "public init(_ data: Data, id: KeyPath<Data.Element, ID>, rowHeight: Float, spacing: Float = 0, overscan: Int = 3, preload: Float = 0.3, scrollToIndex: Int? = nil, @ViewBuilder content: @escaping (Data.Element) -> Content)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "VirtualStack",
+    "kind": "init",
+    "declaration": "public init(_ data: Data, id: KeyPath<Data.Element, ID>, rowHeight: @escaping (Data.Element, Float, TextScaler) -> Float, spacing: Float = 0, overscan: Int = 3, preload: Float = 0.3, scrollToIndex: Int? = nil, @ViewBuilder content: @escaping (Data.Element) -> Content)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "VirtualStack",
+    "kind": "init",
+    "declaration": "public init(_ data: Data, id: KeyPath<Data.Element, ID>, estimatedRowHeight: Float, spacing: Float = 0, overscan: Int = 3, preload: Float = 0.3, scrollToIndex: Int? = nil, @ViewBuilder content: @escaping (Data.Element) -> Content)",
+    "abstract": "Rows of unknown height: unmeasured rows use `estimatedRowHeight` (logical points, scaled with text), and each mounted row's laid-out height replaces the estimate for the current width and text scale.",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/VirtualStack.swift",
+  "line": 17,
+  "owner": "",
+  "overloads": [
+   "public struct VirtualStack<Data: RandomAccessCollection, ID: Hashable, Content: View>: View"
+  ]
+ },
+ {
+  "id": "z-stack",
+  "name": "ZStack",
+  "kind": "struct",
+  "declaration": "public struct ZStack<Content: View>: View",
+  "abstract": "Layer children in declaration order. The last child is painted and hit first; earlier children remain mounted and keep their state.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "alignment",
+    "kind": "var",
+    "declaration": "public var alignment: Alignment",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "content",
+    "kind": "let",
+    "declaration": "public let content: Content",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ZStack",
+    "kind": "init",
+    "declaration": "public init(alignment: Alignment = .center, @ViewBuilder content: () -> Content)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/ZStack.swift",
+  "line": 77,
+  "owner": "",
+  "overloads": [
+   "public struct ZStack<Content: View>: View"
+  ]
+ },
+ {
+  "id": "z-stack-layout",
+  "name": "ZStackLayout",
+  "kind": "struct",
+  "declaration": "public struct ZStackLayout: Layout",
+  "abstract": "Layered container. Children are measured against the available proposal and placed on top of each other in declaration order: the last child paints on top and receives pointer input before earlier children.",
+  "discussion": [
+   "The stack itself measures to its largest child. It does not clip; overflow\nremains painted and hit-testable unless the caller applies `.clipped()`."
+  ],
+  "availability": [],
+  "conforms": [
+   "Layout"
+  ],
+  "members": [
+   {
+    "name": "alignment",
+    "kind": "var",
+    "declaration": "public var alignment: Alignment",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ZStackLayout",
+    "kind": "init",
+    "declaration": "public init(alignment: Alignment = .center)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "sizeThatFits",
+    "kind": "func",
+    "declaration": "public func sizeThatFits(proposal: ProposedViewSize, subviews: [LayoutSubview]) -> CGSize",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "placeSubviews",
+    "kind": "func",
+    "declaration": "public func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: [LayoutSubview])",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/ZStack.swift",
+  "line": 9,
+  "owner": "",
+  "overloads": [
+   "public struct ZStackLayout: Layout"
+  ]
+ },
+ {
+  "id": "modifier-absolute-position",
+  "name": "absolutePosition",
+  "kind": "modifier",
+  "declaration": "func absolutePosition(left: Float? = nil, top: Float? = nil, right: Float? = nil, bottom: Float? = nil) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Layout/AbsolutePositionModifier.swift",
+  "line": 48,
+  "owner": "View",
+  "overloads": [
+   "func absolutePosition(left: Float? = nil, top: Float? = nil, right: Float? = nil, bottom: Float? = nil) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-flex",
+  "name": "flex",
+  "kind": "modifier",
+  "declaration": "func flex(_ grow: Float = 1, shrink: Float = 1, basis: Float? = nil) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Layout/FlexModifier.swift",
+  "line": 30,
+  "owner": "View",
+  "overloads": [
+   "func flex(_ grow: Float = 1, shrink: Float = 1, basis: Float? = nil) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-frame",
+  "name": "frame",
+  "kind": "modifier",
+  "declaration": "func frame(width: FrameDimension? = nil, height: FrameDimension? = nil, minWidth: Float? = nil, minHeight: Float? = nil, maxWidth: Float? = nil, maxHeight: Float? = nil) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Layout/FrameModifier.swift",
+  "line": 147,
+  "owner": "View",
+  "overloads": [
+   "func frame(width: FrameDimension? = nil, height: FrameDimension? = nil, minWidth: Float? = nil, minHeight: Float? = nil, maxWidth: Float? = nil, maxHeight: Float? = nil) -> some View",
+   "func frame(width: Float? = nil, height: Float? = nil, minWidth: Float? = nil, minHeight: Float? = nil, maxWidth: Float? = nil, maxHeight: Float? = nil) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-frame-percent",
+  "name": "framePercent",
+  "kind": "modifier",
+  "declaration": "func framePercent(width: Float? = nil, height: Float? = nil, minWidth: Float? = nil, minHeight: Float? = nil, maxWidth: Float? = nil, maxHeight: Float? = nil) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Layout/FrameModifier.swift",
+  "line": 158,
+  "owner": "View",
+  "overloads": [
+   "func framePercent(width: Float? = nil, height: Float? = nil, minWidth: Float? = nil, minHeight: Float? = nil, maxWidth: Float? = nil, maxHeight: Float? = nil) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-grid-cell-span",
+  "name": "gridCellSpan",
+  "kind": "modifier",
+  "declaration": "func gridCellSpan(columns: Int = 1, rows: Int = 1) -> some View",
+  "abstract": "Let this child cover several `Grid` columns and/or rows. Placement is row-major: a cell that does not fit the remaining columns of a row starts the next free row.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Grid/Span.swift",
+  "line": 23,
+  "owner": "View",
+  "overloads": [
+   "func gridCellSpan(columns: Int = 1, rows: Int = 1) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-overlay",
+  "name": "overlay",
+  "kind": "modifier",
+  "declaration": "func overlay<Content: View>(alignment: Alignment = .center, @ViewBuilder content: () -> Content) -> some View",
+  "abstract": "Attach content to the bounds of this view without changing its measured size. Prefer this over placing a sibling `Text`/`Badge` with padding in a surrounding `ZStack`: the overlay is laid out against the base bounds, so font scaling and clipping cannot drift it away from the base.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Overlay.swift",
+  "line": 93,
+  "owner": "View",
+  "overloads": [
+   "func overlay<Content: View>(alignment: Alignment = .center, @ViewBuilder content: () -> Content) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-padding",
+  "name": "padding",
+  "kind": "modifier",
+  "declaration": "func padding(_ value: Float) -> some View",
+  "abstract": "Apply asymmetric padding by axis. Equivalent to constructing an `EdgeInsets` with matching horizontal and vertical pairs.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Layout/PaddingModifier.swift",
+  "line": 52,
+  "owner": "View",
+  "overloads": [
+   "func padding(_ value: Float) -> some View",
+   "func padding(_ insets: EdgeInsets) -> some View",
+   "func padding(horizontal: Float = 0, vertical: Float = 0) -> some View",
+   "func padding(_ token: ThemeMetric) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-safe-area-insets",
+  "name": "safeAreaInsets",
+  "kind": "modifier",
+  "declaration": "func safeAreaInsets(_ insets: EdgeInsets) -> some View",
+  "abstract": "Provide host insets in logical points. Desktop hosts default to zero; platform chrome/keyboard geometry must be supplied by the owning host.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/Insets/SafeArea.swift",
+  "line": 62,
+  "owner": "View",
+  "overloads": [
+   "func safeAreaInsets(_ insets: EdgeInsets) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-scroll-anchor",
+  "name": "scrollAnchor",
+  "kind": "modifier",
+  "declaration": "func scrollAnchor() -> some View",
+  "abstract": "Marks this subtree as a scroll anchor. When content size changes, ScrollView keeps the topmost visible anchor at the same viewport position, which is what chat-history prepends need.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Layout/ScrollView.swift",
+  "line": 1096,
+  "owner": "View",
+  "overloads": [
+   "func scrollAnchor() -> some View"
+  ]
+ },
+ {
+  "id": "modifier-scroll-physics",
+  "name": "scrollPhysics",
+  "kind": "modifier",
+  "declaration": "func scrollPhysics(_ physics: ScrollPhysics) -> some View",
+  "abstract": "Override how descendant scrollable containers react past their bounds.",
+  "discussion": [
+   "```swift\nScrollView { console }\n    .scrollPhysics(.bouncy)\n```"
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "layout",
+  "file": "Compose/Sources/CoveUICompose/Scrolling/ScrollPhysicsEnvironment.swift",
+  "line": 22,
+  "owner": "View",
+  "overloads": [
+   "func scrollPhysics(_ physics: ScrollPhysics) -> some View"
+  ]
+ }
+]

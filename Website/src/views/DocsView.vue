@@ -103,6 +103,12 @@ onBeforeUnmount(() => headingObserver?.disconnect())
             {{ item.title }}
           </RouterLink>
         </div>
+        <div class="sidebar-group">
+          <h4>API 参考</h4>
+          <RouterLink to="/documentation/coveui" class="sidebar-link">
+            CoveUI 符号索引
+          </RouterLink>
+        </div>
       </div>
     </aside>
 

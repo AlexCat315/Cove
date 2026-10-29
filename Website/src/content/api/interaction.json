@@ -1,0 +1,564 @@
+[
+ {
+  "id": "on-hover-modifier",
+  "name": "_OnHoverModifier",
+  "kind": "struct",
+  "declaration": "public struct _OnHoverModifier: ViewModifier",
+  "abstract": "Observe pointer hover over this view's subtree. The handler fires with `true` on enter and `false` on leave; hovering a descendant (e.g. a button inside the container) keeps the container hovered, because hover is derived from the root→target hit path.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "interaction",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Interaction/HoverModifier.swift",
+  "line": 9,
+  "owner": "",
+  "overloads": [
+   "public struct _OnHoverModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "accessibility-modifier",
+  "name": "AccessibilityModifier",
+  "kind": "struct",
+  "declaration": "public struct AccessibilityModifier: ViewModifier",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "configure",
+    "kind": "let",
+    "declaration": "public let configure: (inout AccessibilitySemantics) -> Void",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "interaction",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Interaction/AccessibilityModifier.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct AccessibilityModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "cursor-modifier",
+  "name": "CursorModifier",
+  "kind": "struct",
+  "declaration": "public struct CursorModifier: ViewModifier",
+  "abstract": "Sets the OS mouse cursor that should appear while the pointer is hovering over the modified subtree. The `EventDispatcher` walks the hover path leaf → root and uses the deepest non-nil value; ancestors therefore act as fall-backs and `.cursor(.arrow)` can be used to \"reset\" within a subtree.",
+  "discussion": [
+   "Built-in primitives that imply a cursor (`Button` → `.pointer`,\n`TextField` → `.ibeam`, `SplitView` divider → `.resizeHorizontal` /\n`.resizeVertical`, `Slider` thumb → `.pointer`) wire their cursor through\nthis same `Node.cursor` slot, so user overrides win when nested closer to\nthe leaf."
+  ],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "cursor",
+    "kind": "let",
+    "declaration": "public let cursor: SystemCursor",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "CursorModifier",
+    "kind": "init",
+    "declaration": "public init(_ cursor: SystemCursor)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "interaction",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Interaction/CursorModifier.swift",
+  "line": 16,
+  "owner": "",
+  "overloads": [
+   "public struct CursorModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "draggable",
+  "name": "Draggable",
+  "kind": "struct",
+  "declaration": "public struct Draggable<Payload: Hashable, Content: View, Preview: View>: View",
+  "abstract": "A view that can start a drag with a typed payload and preview.",
+  "discussion": [
+   "A six-point movement starts the drag; a tap that never crosses the threshold\nstill reaches nested controls. Avoid placing a draggable directly inside a\nvertical `ScrollView` unless the drag gesture is wanted to win over\nscrolling; `ReorderableList` is the list-specific alternative."
+  ],
+  "availability": [],
+  "conforms": [
+   "Hashable"
+  ],
+  "members": [
+   {
+    "name": "payload",
+    "kind": "let",
+    "declaration": "public let payload: Payload",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Draggable",
+    "kind": "init",
+    "declaration": "public init(_ payload: Payload, @ViewBuilder preview: () -> Preview, @ViewBuilder content: () -> Content)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "interaction",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Interaction/DragAndDrop.swift",
+  "line": 37,
+  "owner": "",
+  "overloads": [
+   "public struct Draggable<Payload: Hashable, Content: View, Preview: View>: View"
+  ]
+ },
+ {
+  "id": "drag-scope",
+  "name": "DragScope",
+  "kind": "struct",
+  "declaration": "public struct DragScope<Content: View>: View",
+  "abstract": "Shares a typed drag payload between descendants of one `DragScope`.",
+  "discussion": [
+   "The scope owns the session so payloads never escape into global state. A\ndrag preview is portal-rendered above clipping; dropping calls the target's\ntyped callback. Keyboard reordering is intentionally not implied: use\n`ReorderableList` when the same collection needs an Up/Down path."
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "DragScope",
+    "kind": "init",
+    "declaration": "public init(@ViewBuilder content: () -> Content)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "interaction",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Interaction/DragAndDrop.swift",
+  "line": 12,
+  "owner": "",
+  "overloads": [
+   "public struct DragScope<Content: View>: View"
+  ]
+ },
+ {
+  "id": "drop-target",
+  "name": "DropTarget",
+  "kind": "struct",
+  "declaration": "public struct DropTarget<Payload: Hashable, Content: View>: View",
+  "abstract": "A drop area for one payload type. The closure runs once when a drag ends inside this target; a cancelled drag never calls it.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable"
+  ],
+  "members": [
+   {
+    "name": "DropTarget",
+    "kind": "init",
+    "declaration": "public init(onTargeted: ((Bool) -> Void)? = nil, onDrop: @escaping (Payload) -> Void, @ViewBuilder content: () -> Content)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "interaction",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Interaction/DragAndDrop.swift",
+  "line": 57,
+  "owner": "",
+  "overloads": [
+   "public struct DropTarget<Payload: Hashable, Content: View>: View"
+  ]
+ },
+ {
+  "id": "focus-request-modifier",
+  "name": "FocusRequestModifier",
+  "kind": "struct",
+  "declaration": "public struct FocusRequestModifier: ViewModifier",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "requestID",
+    "kind": "let",
+    "declaration": "public let requestID: AnyHashable?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "interaction",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Interaction/FocusRequestModifier.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct FocusRequestModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "hit-testing-modifier",
+  "name": "HitTestingModifier",
+  "kind": "struct",
+  "declaration": "public struct HitTestingModifier: ViewModifier",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "HitTestingModifier",
+    "kind": "init",
+    "declaration": "public init(_ isEnabled: Bool)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "interaction",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Interaction/HitTestingModifier.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct HitTestingModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "scrollbar",
+  "name": "Scrollbar",
+  "kind": "struct",
+  "declaration": "public struct Scrollbar: View",
+  "abstract": "Focusable scroll thumb for a caller-owned offset. It is a companion to `ScrollView`: bind the same offset and place it beside the viewport. The component paints only the track and thumb; the caller owns layout.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "axis",
+    "kind": "let",
+    "declaration": "public let axis: Axis",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "offset",
+    "kind": "let",
+    "declaration": "public let offset: Binding<CGFloat>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "contentExtent",
+    "kind": "let",
+    "declaration": "public let contentExtent: CGFloat",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "viewportExtent",
+    "kind": "let",
+    "declaration": "public let viewportExtent: CGFloat",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "thickness",
+    "kind": "let",
+    "declaration": "public let thickness: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minimumThumbExtent",
+    "kind": "let",
+    "declaration": "public let minimumThumbExtent: CGFloat",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "let",
+    "declaration": "public let label: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Scrollbar",
+    "kind": "init",
+    "declaration": "public init(axis: Axis = .vertical, offset: Binding<CGFloat>, contentExtent: CGFloat, viewportExtent: CGFloat, thickness: Float = 12, minimumThumbExtent: CGFloat = 32, label: String = \"Scrollbar\")",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "interaction",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Interaction/Scrollbar.swift",
+  "line": 9,
+  "owner": "",
+  "overloads": [
+   "public struct Scrollbar: View"
+  ]
+ },
+ {
+  "id": "modifier-accessibility",
+  "name": "accessibility",
+  "kind": "modifier",
+  "declaration": "func accessibility(_ configure: @escaping (inout AccessibilitySemantics) -> Void) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "interaction",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Interaction/AccessibilityModifier.swift",
+  "line": 26,
+  "owner": "View",
+  "overloads": [
+   "func accessibility(_ configure: @escaping (inout AccessibilitySemantics) -> Void) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-accessibility-described-by",
+  "name": "accessibilityDescribedBy",
+  "kind": "modifier",
+  "declaration": "func accessibilityDescribedBy(_ identifier: String) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "interaction",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Interaction/AccessibilityModifier.swift",
+  "line": 31,
+  "owner": "View",
+  "overloads": [
+   "func accessibilityDescribedBy(_ identifier: String) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-accessibility-hidden",
+  "name": "accessibilityHidden",
+  "kind": "modifier",
+  "declaration": "func accessibilityHidden(_ hidden: Bool = true) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "interaction",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Interaction/AccessibilityModifier.swift",
+  "line": 32,
+  "owner": "View",
+  "overloads": [
+   "func accessibilityHidden(_ hidden: Bool = true) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-accessibility-identifier",
+  "name": "accessibilityIdentifier",
+  "kind": "modifier",
+  "declaration": "func accessibilityIdentifier(_ identifier: String) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "interaction",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Interaction/AccessibilityModifier.swift",
+  "line": 30,
+  "owner": "View",
+  "overloads": [
+   "func accessibilityIdentifier(_ identifier: String) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-accessibility-label",
+  "name": "accessibilityLabel",
+  "kind": "modifier",
+  "declaration": "func accessibilityLabel(_ label: String) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "interaction",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Interaction/AccessibilityModifier.swift",
+  "line": 29,
+  "owner": "View",
+  "overloads": [
+   "func accessibilityLabel(_ label: String) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-allows-hit-testing",
+  "name": "allowsHitTesting",
+  "kind": "modifier",
+  "declaration": "func allowsHitTesting(_ isEnabled: Bool) -> some View",
+  "abstract": "Controls pointer and keyboard interaction for this subtree without altering its appearance.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "interaction",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Interaction/HitTestingModifier.swift",
+  "line": 20,
+  "owner": "View",
+  "overloads": [
+   "func allowsHitTesting(_ isEnabled: Bool) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-cursor",
+  "name": "cursor",
+  "kind": "modifier",
+  "declaration": "func cursor(_ cursor: SystemCursor) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "interaction",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Interaction/CursorModifier.swift",
+  "line": 26,
+  "owner": "View",
+  "overloads": [
+   "func cursor(_ cursor: SystemCursor) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-focus-request",
+  "name": "focusRequest",
+  "kind": "modifier",
+  "declaration": "func focusRequest(_ requestID: AnyHashable?) -> some View",
+  "abstract": "A changed, nonnil token requests keyboard focus on this control.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "interaction",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Interaction/FocusRequestModifier.swift",
+  "line": 15,
+  "owner": "View",
+  "overloads": [
+   "func focusRequest(_ requestID: AnyHashable?) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-on-hover",
+  "name": "onHover",
+  "kind": "modifier",
+  "declaration": "func onHover(_ onChange: @escaping (Bool) -> Void) -> some View",
+  "abstract": "Fires `onChange(true)` when the pointer enters this view's subtree and `onChange(false)` when it leaves. Guard `@State` writes with an equality check — hover callbacks repeat along path changes.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "interaction",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Interaction/HoverModifier.swift",
+  "line": 25,
+  "owner": "View",
+  "overloads": [
+   "func onHover(_ onChange: @escaping (Bool) -> Void) -> some View"
+  ]
+ }
+]

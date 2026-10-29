@@ -1,0 +1,3003 @@
+[
+ {
+  "id": "action-sheet",
+  "name": "ActionSheet",
+  "kind": "struct",
+  "declaration": "public struct ActionSheet<Label: View>: View",
+  "abstract": "An action drawer attached to a caller-owned trigger.",
+  "discussion": [
+   "The sheet is one bottom drawer at every width: compact surfaces get a\nfull-width panel with a drag handle and no close control; wider surfaces\nget a centered, bounded drawer with a top close control. The caller owns\nthe visible labels and supplies the localized accessibility name for that\nclose control, so the component never writes interface copy such as\n\"Cancel\" or \"Close\" itself."
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "ActionSheet",
+    "kind": "init",
+    "declaration": "public init(isPresented: Binding<Bool>, title: String, message: String = \"\", actions: [ActionSheetAction], closeLabel: String, isEnabled: Bool = true, @ViewBuilder label: () -> Label)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/ActionSheet.swift",
+  "line": 30,
+  "owner": "",
+  "overloads": [
+   "public struct ActionSheet<Label: View>: View"
+  ]
+ },
+ {
+  "id": "action-sheet-action",
+  "name": "ActionSheetAction",
+  "kind": "struct",
+  "declaration": "public struct ActionSheetAction: Identifiable",
+  "abstract": "A stable, caller-owned command. Dismissal is supplied separately by ActionSheet.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Identifiable"
+  ],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "title",
+    "kind": "let",
+    "declaration": "public let title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "icon",
+    "kind": "var",
+    "declaration": "public var icon: BundleImageResource?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "role",
+    "kind": "var",
+    "declaration": "public var role: ButtonRole = .normal",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ActionSheetAction",
+    "kind": "init",
+    "declaration": "public init(_ id: String, _ title: String, icon: BundleImageResource? = nil, role: ButtonRole = .normal, isEnabled: Bool = true, action: @escaping () -> Void)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/ActionSheet.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public struct ActionSheetAction: Identifiable"
+  ]
+ },
+ {
+  "id": "alert-dialog",
+  "name": "AlertDialog",
+  "kind": "struct",
+  "declaration": "public struct AlertDialog: View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "isPresented",
+    "kind": "let",
+    "declaration": "public let isPresented: Binding<Bool>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "title",
+    "kind": "let",
+    "declaration": "public let title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "message",
+    "kind": "let",
+    "declaration": "public let message: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onConfirm",
+    "kind": "let",
+    "declaration": "public let onConfirm: () -> Void",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "options",
+    "kind": "var",
+    "declaration": "public var options = AlertDialogOptions()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AlertDialog",
+    "kind": "init",
+    "declaration": "public init(isPresented: Binding<Bool>, title: String, message: String, configure: (inout AlertDialogOptions) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/Dialog.swift",
+  "line": 85,
+  "owner": "",
+  "overloads": [
+   "public struct AlertDialog: View"
+  ]
+ },
+ {
+  "id": "alert-dialog-options",
+  "name": "AlertDialogOptions",
+  "kind": "struct",
+  "declaration": "public struct AlertDialogOptions",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "confirmTitle",
+    "kind": "var",
+    "declaration": "public var confirmTitle = \"Confirm\" public var cancelTitle = \"Cancel\" public var isDestructive = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isConfirming",
+    "kind": "var",
+    "declaration": "public var isConfirming = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "dismissAfterConfirm",
+    "kind": "var",
+    "declaration": "public var dismissAfterConfirm = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AlertDialogOptions",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/Dialog.swift",
+  "line": 77,
+  "owner": "",
+  "overloads": [
+   "public struct AlertDialogOptions"
+  ]
+ },
+ {
+  "id": "asset-drop-payload",
+  "name": "AssetDropPayload",
+  "kind": "struct",
+  "declaration": "public struct AssetDropPayload: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "name",
+    "kind": "let",
+    "declaration": "public let name: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "subtitle",
+    "kind": "let",
+    "declaration": "public let subtitle: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "kind",
+    "kind": "let",
+    "declaration": "public let kind: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "previewPath",
+    "kind": "let",
+    "declaration": "public let previewPath: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AssetDropPayload",
+    "kind": "init",
+    "declaration": "public init(id: String, name: String, subtitle: String? = nil, kind: String, previewPath: String? = nil)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/AssetDropTarget.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct AssetDropPayload: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "asset-drop-registry-holder",
+  "name": "AssetDropRegistryHolder",
+  "kind": "enum",
+  "declaration": "public enum AssetDropRegistryHolder",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/AssetDropTarget.swift",
+  "line": 107,
+  "owner": "",
+  "overloads": [
+   "public enum AssetDropRegistryHolder"
+  ]
+ },
+ {
+  "id": "asset-drop-target",
+  "name": "AssetDropTarget",
+  "kind": "struct",
+  "declaration": "public struct AssetDropTarget<Content: View>: View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "activePayload",
+    "kind": "let",
+    "declaration": "public let activePayload: Binding<AssetDropPayload?>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "acceptedKinds",
+    "kind": "let",
+    "declaration": "public let acceptedKinds: Set<String>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onDrop",
+    "kind": "let",
+    "declaration": "public let onDrop: (AssetDropPayload) -> Void",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "content",
+    "kind": "let",
+    "declaration": "public let content: Content",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AssetDropTarget",
+    "kind": "init",
+    "declaration": "public init(activePayload: Binding<AssetDropPayload?>, acceptedKinds: Set<String> = [], isEnabled: Bool = true, onDrop: @escaping (AssetDropPayload) -> Void, @ViewBuilder content: () -> Content)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/AssetDropTarget.swift",
+  "line": 111,
+  "owner": "",
+  "overloads": [
+   "public struct AssetDropTarget<Content: View>: View"
+  ]
+ },
+ {
+  "id": "bottom-sheet",
+  "name": "BottomSheet",
+  "kind": "struct",
+  "declaration": "public struct BottomSheet<Content: View>: View",
+  "abstract": "Phone-first bottom sheet: full-width bottom panel on compact/medium surfaces, centered dialog-like panel on expanded surfaces. The content owns its layout; this component owns the handle, detents, and dismissal.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "isPresented",
+    "kind": "let",
+    "declaration": "public let isPresented: Binding<Bool>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "options",
+    "kind": "var",
+    "declaration": "public var options = BottomSheetOptions()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "BottomSheet",
+    "kind": "init",
+    "declaration": "public init(isPresented: Binding<Bool>, configure: (inout BottomSheetOptions) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/BottomSheet.swift",
+  "line": 26,
+  "owner": "",
+  "overloads": [
+   "public struct BottomSheet<Content: View>: View"
+  ]
+ },
+ {
+  "id": "bottom-sheet-options",
+  "name": "BottomSheetOptions",
+  "kind": "struct",
+  "declaration": "public struct BottomSheetOptions",
+  "abstract": "Bottom-sheet geometry and drag behavior.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "detents",
+    "kind": "var",
+    "declaration": "public var detents: [Float] = [320, 560]",
+    "abstract": "Sheet heights in logical points, from smallest to largest.",
+    "discussion": []
+   },
+   {
+    "name": "initialDetent",
+    "kind": "var",
+    "declaration": "public var initialDetent = 0",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showsHandle",
+    "kind": "var",
+    "declaration": "public var showsHandle = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "allowsDragToDismiss",
+    "kind": "var",
+    "declaration": "public var allowsDragToDismiss = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "dragDismissThreshold",
+    "kind": "var",
+    "declaration": "public var dragDismissThreshold: Float = 80",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "dragDismissVelocity",
+    "kind": "var",
+    "declaration": "public var dragDismissVelocity: Float = 900",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "dismissal",
+    "kind": "var",
+    "declaration": "public var dismissal = ModalDismissal()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "dialogWidth",
+    "kind": "var",
+    "declaration": "public var dialogWidth: Float = 560",
+    "abstract": "Width used when the surface is expanded and the sheet degrades to a centered dialog-like panel.",
+    "discussion": []
+   },
+   {
+    "name": "dialogInset",
+    "kind": "var",
+    "declaration": "public var dialogInset: Float = 16",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "BottomSheetOptions",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/BottomSheet.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public struct BottomSheetOptions"
+  ]
+ },
+ {
+  "id": "command-item",
+  "name": "CommandItem",
+  "kind": "struct",
+  "declaration": "public struct CommandItem: Identifiable",
+  "abstract": "One entry in a `CommandPalette`.",
+  "discussion": [
+   "`keywords` are the search-only aliases nobody sees — the abbreviation, the\nold name, the menu path. Without them a palette only finds commands whose\ntitle the user already remembers, which is exactly when they do not need one."
+  ],
+  "availability": [],
+  "conforms": [
+   "Identifiable"
+  ],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "title",
+    "kind": "var",
+    "declaration": "public var title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "subtitle",
+    "kind": "var",
+    "declaration": "public var subtitle: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "group",
+    "kind": "var",
+    "declaration": "public var group: String",
+    "abstract": "Section heading. Items sharing a group are listed under one header.",
+    "discussion": []
+   },
+   {
+    "name": "keywords",
+    "kind": "var",
+    "declaration": "public var keywords: [String]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "icon",
+    "kind": "var",
+    "declaration": "public var icon: BundleImageResource?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "shortcut",
+    "kind": "var",
+    "declaration": "public var shortcut: KeyboardShortcut?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "action",
+    "kind": "let",
+    "declaration": "public let action: () -> Void",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "CommandItem",
+    "kind": "init",
+    "declaration": "public init(_ title: String, id: String? = nil, subtitle: String = \"\", group: String = \"\", keywords: [String] = [], icon: BundleImageResource? = nil, shortcut: KeyboardShortcut? = nil, isEnabled: Bool = true, action: @escaping () -> Void)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/CommandPalette.swift",
+  "line": 11,
+  "owner": "",
+  "overloads": [
+   "public struct CommandItem: Identifiable"
+  ]
+ },
+ {
+  "id": "command-palette",
+  "name": "CommandPalette",
+  "kind": "struct",
+  "declaration": "public struct CommandPalette: View",
+  "abstract": "Searchable command surface presented as a modal overlay.",
+  "discussion": [
+   "A palette is worth more than the menu it replaces only if finding a command\nis faster than looking for it, so ranking is deliberately aggressive: a\ntitle prefix outranks a word start, which outranks a substring, which\noutranks a subsequence match. Typing three letters should put the intended\ncommand first without requiring the exact wording.",
+   "Keyboard is the primary path — arrows move, Return runs, Escape closes — and\nthe search field keeps focus throughout, so the hands never leave the\nkeyboard.",
+   "```swift\nCommandPalette(isPresented: $isPaletteOpen, items: [\n    CommandItem(\"Toggle Theme\", group: \"View\", shortcut: .primaryShift(\"L\")) { toggleTheme() },\n    CommandItem(\"Open Recent…\", group: \"File\", keywords: [\"history\"]) { openRecent() }\n])\n```"
+  ],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "isPresented",
+    "kind": "var",
+    "declaration": "public var isPresented: Binding<Bool>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "items",
+    "kind": "var",
+    "declaration": "public var items: [CommandItem]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "placeholder",
+    "kind": "var",
+    "declaration": "public var placeholder: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "emptyTitle",
+    "kind": "var",
+    "declaration": "public var emptyTitle: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "emptyMessage",
+    "kind": "var",
+    "declaration": "public var emptyMessage: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showsRecentCommands",
+    "kind": "var",
+    "declaration": "public var showsRecentCommands = true",
+    "abstract": "Shows the commands run in this palette above their normal groups when the query is empty. History is session-scoped and never persisted.",
+    "discussion": []
+   },
+   {
+    "name": "recentCommandLimit",
+    "kind": "var",
+    "declaration": "public var recentCommandLimit = 3",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "CommandPalette",
+    "kind": "init",
+    "declaration": "public init(isPresented: Binding<Bool>, items: [CommandItem], configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "CommandPalette",
+    "kind": "init",
+    "declaration": "public init<Footer: View>(isPresented: Binding<Bool>, items: [CommandItem], configure: (inout Self) -> Void =",
+    "abstract": "Replaces the default shortcut-hint footer with caller content.",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/CommandPalette.swift",
+  "line": 62,
+  "owner": "",
+  "overloads": [
+   "public struct CommandPalette: View"
+  ]
+ },
+ {
+  "id": "context-menu",
+  "name": "ContextMenu",
+  "kind": "struct",
+  "declaration": "public struct ContextMenu<Content: View>: View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "ContextMenu",
+    "kind": "init",
+    "declaration": "public init(width: Float = 220, entries: @escaping () -> [MenuEntry], onOpen: @escaping () -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/ContextMenu.swift",
+  "line": 18,
+  "owner": "",
+  "overloads": [
+   "public struct ContextMenu<Content: View>: View"
+  ]
+ },
+ {
+  "id": "dialog",
+  "name": "Dialog",
+  "kind": "struct",
+  "declaration": "public struct Dialog<Content: View, Footer: View>: View",
+  "abstract": "Structured modal header, scrollable content and a separate action area. On touch phones it rises from the bottom edge and is dragged away by its grabber.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "isPresented",
+    "kind": "let",
+    "declaration": "public let isPresented: Binding<Bool>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "title",
+    "kind": "let",
+    "declaration": "public let title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "options",
+    "kind": "var",
+    "declaration": "public var options = DialogOptions()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Dialog",
+    "kind": "init",
+    "declaration": "public init(isPresented: Binding<Bool>, title: String, configure: (inout DialogOptions) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Dialog",
+    "kind": "init",
+    "declaration": "init(isPresented: Binding<Bool>, title: String, configure: (inout DialogOptions) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/Dialog.swift",
+  "line": 17,
+  "owner": "",
+  "overloads": [
+   "public struct Dialog<Content: View, Footer: View>: View"
+  ]
+ },
+ {
+  "id": "dialog-options",
+  "name": "DialogOptions",
+  "kind": "struct",
+  "declaration": "public struct DialogOptions",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "modal",
+    "kind": "var",
+    "declaration": "public var modal = ModalOptions()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "description",
+    "kind": "var",
+    "declaration": "public var description = \"\" public var showsCloseButton = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "DialogOptions",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/Dialog.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct DialogOptions"
+  ]
+ },
+ {
+  "id": "focus-scope",
+  "name": "FocusScope",
+  "kind": "struct",
+  "declaration": "public struct FocusScope<Content: View>: _PrimitiveView",
+  "abstract": "Traps keyboard focus and shortcuts in a modal subtree. Nested scopes restore the prior focus and its keyboard/pointer modality when they are removed.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "FocusScope",
+    "kind": "init",
+    "declaration": "public init(restoresCommands: Bool = false, @ViewBuilder content: () -> Content)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/FocusScope.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public struct FocusScope<Content: View>: _PrimitiveView"
+  ]
+ },
+ {
+  "id": "hover-card",
+  "name": "HoverCard",
+  "kind": "struct",
+  "declaration": "public struct HoverCard<Label: View, Content: View>: View",
+  "abstract": "Pointer detail with delayed opening and a grace period for crossing onto interactive content. Touch surfaces have no hover, so a tap on the label opens the detail as a sheet. Provide a click or inline equivalent for keyboard users.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "openDelay",
+    "kind": "var",
+    "declaration": "public var openDelay = 0.3",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "closeDelay",
+    "kind": "var",
+    "declaration": "public var closeDelay = 0.15",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "width",
+    "kind": "var",
+    "declaration": "public var width: Float? = 300",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "let",
+    "declaration": "public let label: Label",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "content",
+    "kind": "let",
+    "declaration": "public let content: Content",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "HoverCard",
+    "kind": "init",
+    "declaration": "public init(width: Float? = 300, configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/HoverCard.swift",
+  "line": 10,
+  "owner": "",
+  "overloads": [
+   "public struct HoverCard<Label: View, Content: View>: View"
+  ]
+ },
+ {
+  "id": "layer-root",
+  "name": "LayerRoot",
+  "kind": "struct",
+  "declaration": "public struct LayerRoot<Content: View, Portals: View>: _PrimitiveView",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "LayerRoot",
+    "kind": "init",
+    "declaration": "public init(@ViewBuilder content: () -> Content, @ViewBuilder portals: () -> Portals)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "LayerRoot",
+    "kind": "init",
+    "declaration": "init(@ViewBuilder content: () -> Content)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/LayerRoot.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct LayerRoot<Content: View, Portals: View>: _PrimitiveView"
+  ]
+ },
+ {
+  "id": "menu",
+  "name": "Menu",
+  "kind": "struct",
+  "declaration": "public struct Menu: View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "entries",
+    "kind": "let",
+    "declaration": "public let entries: [MenuEntry]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "width",
+    "kind": "let",
+    "declaration": "public let width: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maxVisibleRows",
+    "kind": "let",
+    "declaration": "public let maxVisibleRows: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onItemActivated",
+    "kind": "let",
+    "declaration": "public let onItemActivated: (() -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onDismiss",
+    "kind": "let",
+    "declaration": "public let onDismiss: (() -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Menu",
+    "kind": "init",
+    "declaration": "public init(_ entries: [MenuEntry], width: Float? = nil, maxVisibleRows: Int = 8, onItemActivated: (() -> Void)? = nil, onDismiss: (() -> Void)? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Menu",
+    "kind": "init",
+    "declaration": "init(descriptor: MenuDescriptor, width: Float? = nil, maxVisibleRows: Int = 8, onItemActivated: (() -> Void)? = nil, onDismiss: (() -> Void)? = nil)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/Menu.swift",
+  "line": 77,
+  "owner": "",
+  "overloads": [
+   "public struct Menu: View"
+  ]
+ },
+ {
+  "id": "menu-descriptor",
+  "name": "MenuDescriptor",
+  "kind": "struct",
+  "declaration": "public struct MenuDescriptor: Sendable",
+  "abstract": "Pure data describing a context menu or popover menu. Host layers can build these descriptors without depending on a concrete menu renderer.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "items",
+    "kind": "var",
+    "declaration": "public var items: [MenuItemDescriptor]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "MenuDescriptor",
+    "kind": "init",
+    "declaration": "public init(items: [MenuItemDescriptor])",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/MenuDescriptor.swift",
+  "line": 3,
+  "owner": "",
+  "overloads": [
+   "public struct MenuDescriptor: Sendable"
+  ]
+ },
+ {
+  "id": "menu-entry",
+  "name": "MenuEntry",
+  "kind": "enum",
+  "declaration": "public enum MenuEntry",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "separator",
+    "kind": "func",
+    "declaration": "public static func separator<ID: Hashable>(_ id: ID) -> Self",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "separator",
+    "kind": "func",
+    "declaration": "public static func separator() -> Self",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/Menu.swift",
+  "line": 50,
+  "owner": "",
+  "overloads": [
+   "public enum MenuEntry"
+  ]
+ },
+ {
+  "id": "menu-item",
+  "name": "MenuItem",
+  "kind": "struct",
+  "declaration": "public struct MenuItem",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: AnyHashable",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "title",
+    "kind": "let",
+    "declaration": "public let title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "shortcut",
+    "kind": "let",
+    "declaration": "public let shortcut: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isSelected",
+    "kind": "let",
+    "declaration": "public let isSelected: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "role",
+    "kind": "let",
+    "declaration": "public let role: MenuItemRole",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "content",
+    "kind": "let",
+    "declaration": "public let content: MenuItemContent",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "action",
+    "kind": "let",
+    "declaration": "public let action: () -> Void",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "MenuItem",
+    "kind": "init",
+    "declaration": "public init<ID: Hashable>(id: ID, title: String, shortcut: String? = nil, isEnabled: Bool = true, isSelected: Bool = false, role: MenuItemRole = .normal, content: MenuItemContent = MenuItemContent(), action: @escaping () -> Void)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "MenuItem",
+    "kind": "init",
+    "declaration": "public init(title: String, shortcut: String? = nil, isEnabled: Bool = true, isSelected: Bool = false, role: MenuItemRole = .normal, content: MenuItemContent = MenuItemContent(), action: @escaping () -> Void)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/Menu.swift",
+  "line": 9,
+  "owner": "",
+  "overloads": [
+   "public struct MenuItem"
+  ]
+ },
+ {
+  "id": "menu-item-content",
+  "name": "MenuItemContent",
+  "kind": "struct",
+  "declaration": "public struct MenuItemContent",
+  "abstract": "Optional presentation for one menu row. `MenuItem.title` stays the accessible name and the type-ahead key, so rich titles never change how a row is found or announced.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "icon",
+    "kind": "var",
+    "declaration": "public var icon: BundleImageResource?",
+    "abstract": "Leading glyph. Any icon in a menu level reserves one shared lane.",
+    "discussion": []
+   },
+   {
+    "name": "richTitle",
+    "kind": "var",
+    "declaration": "public var richTitle: [RichTextRun]",
+    "abstract": "Styled visual title. Run links are ignored: the row is the only target.",
+    "discussion": []
+   },
+   {
+    "name": "detail",
+    "kind": "var",
+    "declaration": "public var detail: String?",
+    "abstract": "Secondary line under the title.",
+    "discussion": []
+   },
+   {
+    "name": "link",
+    "kind": "var",
+    "declaration": "public var link: String?",
+    "abstract": "Marks the row as a link to `link`. Activation still runs the item's action (which opens the destination); assistive technology hears a link and a trailing glyph distinguishes it from commands.",
+    "discussion": []
+   },
+   {
+    "name": "MenuItemContent",
+    "kind": "init",
+    "declaration": "public init(icon: BundleImageResource? = nil, richTitle: [RichTextRun] = [], detail: String? = nil, link: String? = nil)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/RowContent.swift",
+  "line": 9,
+  "owner": "",
+  "overloads": [
+   "public struct MenuItemContent"
+  ]
+ },
+ {
+  "id": "menu-item-descriptor",
+  "name": "MenuItemDescriptor",
+  "kind": "enum",
+  "declaration": "public enum MenuItemDescriptor: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/MenuDescriptor.swift",
+  "line": 11,
+  "owner": "",
+  "overloads": [
+   "public enum MenuItemDescriptor: Sendable"
+  ]
+ },
+ {
+  "id": "menu-item-role",
+  "name": "MenuItemRole",
+  "kind": "enum",
+  "declaration": "public enum MenuItemRole: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/Menu.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public enum MenuItemRole: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "menu-submenu",
+  "name": "MenuSubmenu",
+  "kind": "struct",
+  "declaration": "public struct MenuSubmenu",
+  "abstract": "A branch has children rather than a command. Its authored settings do not contain the hovered row, focus, timers or portal identifiers.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: AnyHashable",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "title",
+    "kind": "let",
+    "declaration": "public let title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "entries",
+    "kind": "var",
+    "declaration": "public var entries: [MenuEntry]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "width",
+    "kind": "var",
+    "declaration": "public var width: Float = 220",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "icon",
+    "kind": "var",
+    "declaration": "public var icon: BundleImageResource?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "MenuSubmenu",
+    "kind": "init",
+    "declaration": "public init<ID: Hashable>(id: ID, title: String, entries: [MenuEntry], configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/Menu.swift",
+  "line": 35,
+  "owner": "",
+  "overloads": [
+   "public struct MenuSubmenu"
+  ]
+ },
+ {
+  "id": "modal",
+  "name": "Modal",
+  "kind": "struct",
+  "declaration": "public struct Modal<Content: View>: View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "options",
+    "kind": "var",
+    "declaration": "public var options = ModalOptions()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Modal",
+    "kind": "init",
+    "declaration": "public init(isPresented: Binding<Bool>, configure: (inout ModalOptions) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/Modal.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct Modal<Content: View>: View"
+  ]
+ },
+ {
+  "id": "modal-dismissal",
+  "name": "ModalDismissal",
+  "kind": "struct",
+  "declaration": "public struct ModalDismissal",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "closesOnBackdrop",
+    "kind": "var",
+    "declaration": "public var closesOnBackdrop = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "closesOnEscape",
+    "kind": "var",
+    "declaration": "public var closesOnEscape = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ModalDismissal",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/ModalOptions.swift",
+  "line": 33,
+  "owner": "",
+  "overloads": [
+   "public struct ModalDismissal"
+  ]
+ },
+ {
+  "id": "modal-geometry",
+  "name": "ModalGeometry",
+  "kind": "struct",
+  "declaration": "public struct ModalGeometry",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "width",
+    "kind": "var",
+    "declaration": "public var width: Float = 760",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "height",
+    "kind": "var",
+    "declaration": "public var height: Float = 560",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "inset",
+    "kind": "var",
+    "declaration": "public var inset: Float = 16",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "cornerRadius",
+    "kind": "var",
+    "declaration": "public var cornerRadius: Float = 10",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "placement",
+    "kind": "var",
+    "declaration": "public var placement: ModalPlacement = .center",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ModalGeometry",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/ModalOptions.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public struct ModalGeometry"
+  ]
+ },
+ {
+  "id": "modal-options",
+  "name": "ModalOptions",
+  "kind": "struct",
+  "declaration": "public struct ModalOptions",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "geometry",
+    "kind": "var",
+    "declaration": "public var geometry = ModalGeometry()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "dismissal",
+    "kind": "var",
+    "declaration": "public var dismissal = ModalDismissal()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ModalOptions",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/ModalOptions.swift",
+  "line": 38,
+  "owner": "",
+  "overloads": [
+   "public struct ModalOptions"
+  ]
+ },
+ {
+  "id": "modal-placement",
+  "name": "ModalPlacement",
+  "kind": "enum",
+  "declaration": "public enum ModalPlacement: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/ModalOptions.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public enum ModalPlacement: Sendable"
+  ]
+ },
+ {
+  "id": "notification-host",
+  "name": "NotificationHost",
+  "kind": "struct",
+  "declaration": "public struct NotificationHost: View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "controller",
+    "kind": "let",
+    "declaration": "public let controller: ToastController",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "width",
+    "kind": "var",
+    "declaration": "public var width: Float = 360",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "position",
+    "kind": "var",
+    "declaration": "public var position: ToastPosition = .automatic",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "NotificationHost",
+    "kind": "init",
+    "declaration": "public init(_ controller: ToastController, width: Float = 360, position: ToastPosition = .automatic)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Toast/NotificationHost.swift",
+  "line": 34,
+  "owner": "",
+  "overloads": [
+   "public struct NotificationHost: View"
+  ]
+ },
+ {
+  "id": "overlay-host",
+  "name": "OverlayHost",
+  "kind": "struct",
+  "declaration": "public struct OverlayHost: View",
+  "abstract": "Compatibility wrapper for the new portal system. New roots should use `LayerRoot { ... } portals: { PortalHost() }` so overlays never participate in normal flex layout.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "OverlayHost",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/OverlayHost.swift",
+  "line": 4,
+  "owner": "",
+  "overloads": [
+   "public struct OverlayHost: View"
+  ]
+ },
+ {
+  "id": "overlay-placement",
+  "name": "OverlayPlacement",
+  "kind": "enum",
+  "declaration": "public enum OverlayPlacement",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "fit",
+    "kind": "func",
+    "declaration": "public static func fit(_ position: CGPoint, size: CGSize, in bounds: CGRect, anchor: CGRect? = nil, margin: CGFloat = 4) -> CGPoint",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/OverlayPlacement.swift",
+  "line": 9,
+  "owner": "",
+  "overloads": [
+   "public enum OverlayPlacement"
+  ]
+ },
+ {
+  "id": "popconfirm",
+  "name": "Popconfirm",
+  "kind": "struct",
+  "declaration": "public struct Popconfirm: View",
+  "abstract": "An anchored question with explicit Cancel and Confirm actions.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "Popconfirm",
+    "kind": "init",
+    "declaration": "public init(_ triggerTitle: String, icon: BundleImageResource? = nil, title: String, message: String = \"\", confirmTitle: String = \"Confirm\", cancelTitle: String = \"Cancel\", role: ButtonRole = .normal, placement: PopoverPlacement = .bottom, isEnabled: Bool = true, onConfirm: @escaping () -> Void)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Popconfirm/Popconfirm.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct Popconfirm: View"
+  ]
+ },
+ {
+  "id": "popover",
+  "name": "Popover",
+  "kind": "struct",
+  "declaration": "public struct Popover<Label: View, Content: View>: View",
+  "abstract": "Overlay opened by a labelled trigger button. Touch surfaces use a bottom sheet; pointer surfaces anchor the overlay to its trigger.",
+  "discussion": [
+   "The popup is portal-rendered, so it escapes any clipping or stacking\ncontext the trigger sits in, and it is dismissed by Escape, by losing the\npointer, or by the trigger being pressed again.",
+   "`Popover` owns the trigger button. Surfaces that need a different trigger\n(a hover card, a context menu) use `AnchoredOverlayHost` directly."
+  ],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "isPresented",
+    "kind": "let",
+    "declaration": "public let isPresented: Binding<Bool>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "width",
+    "kind": "let",
+    "declaration": "public let width: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "placement",
+    "kind": "let",
+    "declaration": "public let placement: PopoverPlacement",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "surface",
+    "kind": "let",
+    "declaration": "public let surface: PopoverSurface",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "overflow",
+    "kind": "let",
+    "declaration": "public let overflow: PopoverOverflow",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "triggerStyle",
+    "kind": "let",
+    "declaration": "public let triggerStyle: AnyButtonStyle?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "let",
+    "declaration": "public let label: Label",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "content",
+    "kind": "let",
+    "declaration": "public let content: Content",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onKey",
+    "kind": "let",
+    "declaration": "public let onKey: ((KeyEvent, EventPhase) -> EventResult)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Popover",
+    "kind": "init",
+    "declaration": "public init(isPresented: Binding<Bool>, isEnabled: Bool = true, width: Float? = nil, placement: PopoverPlacement = .bottomLeading, surface: PopoverSurface = .bubble, overflow: PopoverOverflow = .constrain, triggerStyle: AnyButtonStyle? = nil, onKey: ((KeyEvent, EventPhase) -> EventResult)? = nil, @ViewBuilder label: () -> Label, @ViewBuilder content: () -> Content)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Popover.swift",
+  "line": 21,
+  "owner": "",
+  "overloads": [
+   "public struct Popover<Label: View, Content: View>: View"
+  ]
+ },
+ {
+  "id": "popover-overflow",
+  "name": "PopoverOverflow",
+  "kind": "enum",
+  "declaration": "public enum PopoverOverflow: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Anchored/Placement.swift",
+  "line": 28,
+  "owner": "",
+  "overloads": [
+   "public enum PopoverOverflow: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "popover-placement",
+  "name": "PopoverPlacement",
+  "kind": "enum",
+  "declaration": "public enum PopoverPlacement: Sendable, Equatable, CaseIterable",
+  "abstract": "The edge and alignment of the bubble relative to its trigger. Leading and trailing follow layout direction. Explicit sides are retained by default.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable",
+   "CaseIterable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Anchored/Placement.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public enum PopoverPlacement: Sendable, Equatable, CaseIterable"
+  ]
+ },
+ {
+  "id": "popover-surface",
+  "name": "PopoverSurface",
+  "kind": "enum",
+  "declaration": "public enum PopoverSurface: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Anchored/Placement.swift",
+  "line": 35,
+  "owner": "",
+  "overloads": [
+   "public enum PopoverSurface: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "portal-entry",
+  "name": "PortalEntry",
+  "kind": "struct",
+  "declaration": "public struct PortalEntry: Identifiable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Identifiable"
+  ],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "position",
+    "kind": "var",
+    "declaration": "public var position: CGPoint",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "width",
+    "kind": "var",
+    "declaration": "public var width: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "content",
+    "kind": "var",
+    "declaration": "public var content: AnyView",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "fillsWindow",
+    "kind": "var",
+    "declaration": "public var fillsWindow: Bool = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "placement",
+    "kind": "var",
+    "declaration": "public var placement: PortalPlacementMode = .belowAnchor",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "PortalEntry",
+    "kind": "init",
+    "declaration": "public init(id: String, position: CGPoint, width: Float? = nil, content: AnyView)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/PortalRegistry.swift",
+  "line": 9,
+  "owner": "",
+  "overloads": [
+   "public struct PortalEntry: Identifiable"
+  ]
+ },
+ {
+  "id": "portal-host",
+  "name": "PortalHost",
+  "kind": "struct",
+  "declaration": "public struct PortalHost: View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "PortalHost",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/PortalHost.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct PortalHost: View"
+  ]
+ },
+ {
+  "id": "portal-placement",
+  "name": "PortalPlacement",
+  "kind": "enum",
+  "declaration": "public enum PortalPlacement",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "fit",
+    "kind": "func",
+    "declaration": "public static func fit(position: CGPoint, size: CGSize, in window: CGRect, anchor: CGRect? = nil, margin: CGFloat = 6, placement: PortalPlacementMode = .belowAnchor) -> CGRect",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/PortalPlacement.swift",
+  "line": 13,
+  "owner": "",
+  "overloads": [
+   "public enum PortalPlacement"
+  ]
+ },
+ {
+  "id": "portal-placement-mode",
+  "name": "PortalPlacementMode",
+  "kind": "enum",
+  "declaration": "public enum PortalPlacementMode: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/PortalPlacement.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public enum PortalPlacementMode: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "portal-store-environment",
+  "name": "PortalStoreEnvironment",
+  "kind": "enum",
+  "declaration": "public enum PortalStoreEnvironment",
+  "abstract": "Tree-scoped portal ownership. Application provides one store at each window root, allowing portal presenters and the matching host to resolve the same store from their node ancestry without depending on global ambient timing.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "key",
+    "kind": "let",
+    "declaration": "public static let key = CompositionLocal<PortalStore?>(defaultValue: nil)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/PortalRegistry.swift",
+  "line": 220,
+  "owner": "",
+  "overloads": [
+   "public enum PortalStoreEnvironment"
+  ]
+ },
+ {
+  "id": "portal-store-holder",
+  "name": "PortalStoreHolder",
+  "kind": "enum",
+  "declaration": "public enum PortalStoreHolder",
+  "abstract": "Holds the portal store made \"current\" by the active window's `PlatformInputContext` (via `PortalStoreAmbient`). Defaults to a shared instance so single-window hosts and tests that never install a scope keep working unchanged.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/PortalRegistry.swift",
+  "line": 210,
+  "owner": "",
+  "overloads": [
+   "public enum PortalStoreHolder"
+  ]
+ },
+ {
+  "id": "selection-navigation",
+  "name": "SelectionNavigation",
+  "kind": "enum",
+  "declaration": "public enum SelectionNavigation: Sendable",
+  "abstract": "Shared navigation policy for single-selection groups; disabled items are excluded by callers.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "command",
+    "kind": "func",
+    "declaration": "public static func command(for scancode: UInt32) -> Self?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destination",
+    "kind": "func",
+    "declaration": "public func destination<ID: Equatable>(in items: [ID], from selection: ID?, wraps: Bool = true) -> ID?",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/RovingFocus.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public enum SelectionNavigation: Sendable"
+  ]
+ },
+ {
+  "id": "sheet",
+  "name": "Sheet",
+  "kind": "struct",
+  "declaration": "public struct Sheet<Content: View>: View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "isPresented",
+    "kind": "let",
+    "declaration": "public let isPresented: Binding<Bool>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "options",
+    "kind": "var",
+    "declaration": "public var options = SheetOptions()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Sheet",
+    "kind": "init",
+    "declaration": "public init(isPresented: Binding<Bool>, configure: (inout SheetOptions) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/Dialog.swift",
+  "line": 127,
+  "owner": "",
+  "overloads": [
+   "public struct Sheet<Content: View>: View"
+  ]
+ },
+ {
+  "id": "sheet-options",
+  "name": "SheetOptions",
+  "kind": "struct",
+  "declaration": "public struct SheetOptions",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "edge",
+    "kind": "var",
+    "declaration": "public var edge: ModalPlacement = .trailing",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "extent",
+    "kind": "var",
+    "declaration": "public var extent: Float = 400",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "inset",
+    "kind": "var",
+    "declaration": "public var inset: Float = 12",
+    "abstract": "Margin from the window edge; keeps the rounded sheet visually floating.",
+    "discussion": []
+   },
+   {
+    "name": "cornerRadius",
+    "kind": "var",
+    "declaration": "public var cornerRadius: Float = 14",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "dismissal",
+    "kind": "var",
+    "declaration": "public var dismissal = ModalDismissal()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SheetOptions",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/Dialog.swift",
+  "line": 112,
+  "owner": "",
+  "overloads": [
+   "public struct SheetOptions"
+  ]
+ },
+ {
+  "id": "shortcut-host",
+  "name": "ShortcutHost",
+  "kind": "struct",
+  "declaration": "public struct ShortcutHost: _PrimitiveView",
+  "abstract": "Invisible host for application-level keyboard shortcuts.",
+  "discussion": [
+   "The dispatcher delivers normal focused key handlers first, then falls back\nto handlers registered with `.shortcut`, so text fields and focused controls\nkeep priority while app-level commands still work without panel focus."
+  ],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "route",
+    "kind": "let",
+    "declaration": "public let route: InputHandlerRoute",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ShortcutHost",
+    "kind": "init",
+    "declaration": "public init(route: InputHandlerRoute = .shortcut, onKeyDown: @escaping (KeyEvent) -> Bool)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ShortcutHost",
+    "kind": "init",
+    "declaration": "public init(route: InputHandlerRoute = .shortcut, onKeyDownResult: @escaping (KeyEvent) -> EventResult, onKeyUpResult: ((KeyEvent) -> EventResult)? = nil)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/ShortcutHost.swift",
+  "line": 11,
+  "owner": "",
+  "overloads": [
+   "public struct ShortcutHost: _PrimitiveView"
+  ]
+ },
+ {
+  "id": "toast-action",
+  "name": "ToastAction",
+  "kind": "struct",
+  "declaration": "public struct ToastAction: Identifiable",
+  "abstract": "One inline action rendered inside a toast card.",
+  "discussion": [
+   "A toast may offer up to two actions (for example Undo and Retry). The\naction is a real button, so it keeps the normal keyboard and accessibility\ncontract; invoking it dismisses the notification by default."
+  ],
+  "availability": [],
+  "conforms": [
+   "Identifiable"
+  ],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "title",
+    "kind": "let",
+    "declaration": "public let title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "role",
+    "kind": "let",
+    "declaration": "public let role: ButtonRole",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "dismissesNotification",
+    "kind": "let",
+    "declaration": "public let dismissesNotification: Bool",
+    "abstract": "Whether invoking the action also dismisses its notification.",
+    "discussion": []
+   },
+   {
+    "name": "action",
+    "kind": "let",
+    "declaration": "public let action: () -> Void",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ToastAction",
+    "kind": "init",
+    "declaration": "public init(_ title: String, id: String = UUID().uuidString, role: ButtonRole = .normal, dismissesNotification: Bool = true, action: @escaping () -> Void)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Toast/Controller.swift",
+  "line": 11,
+  "owner": "",
+  "overloads": [
+   "public struct ToastAction: Identifiable"
+  ]
+ },
+ {
+  "id": "toast-notification",
+  "name": "ToastNotification",
+  "kind": "struct",
+  "declaration": "public struct ToastNotification: Identifiable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Identifiable"
+  ],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "title",
+    "kind": "let",
+    "declaration": "public let title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "message",
+    "kind": "var",
+    "declaration": "public var message = \"\" public var tone: StatusTone = .info",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "duration",
+    "kind": "var",
+    "declaration": "public var duration: Double? = 5",
+    "abstract": "Nil keeps a notification visible until explicitly dismissed.",
+    "discussion": []
+   },
+   {
+    "name": "isDismissible",
+    "kind": "var",
+    "declaration": "public var isDismissible = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "actions",
+    "kind": "var",
+    "declaration": "public var actions: [ToastAction] = []",
+    "abstract": "At most two actions are rendered; extra entries are ignored.",
+    "discussion": []
+   },
+   {
+    "name": "ToastNotification",
+    "kind": "init",
+    "declaration": "public init(_ title: String, id: String = UUID().uuidString, configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Toast/Controller.swift",
+  "line": 32,
+  "owner": "",
+  "overloads": [
+   "public struct ToastNotification: Identifiable"
+  ]
+ },
+ {
+  "id": "toast-position",
+  "name": "ToastPosition",
+  "kind": "enum",
+  "declaration": "public enum ToastPosition: Sendable, Hashable",
+  "abstract": "Where toast cards are anchored inside the window.",
+  "discussion": [
+   "`.automatic` anchors at the top trailing edge at every width, matching an\niOS notification banner rather than a bottom snackbar. The portal fit\nclamps the final frame inside the window."
+  ],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Hashable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Toast/NotificationHost.swift",
+  "line": 11,
+  "owner": "",
+  "overloads": [
+   "public enum ToastPosition: Sendable, Hashable"
+  ]
+ },
+ {
+  "id": "tooltip",
+  "name": "Tooltip",
+  "kind": "struct",
+  "declaration": "public struct Tooltip<Target: View, Content: View>: View",
+  "abstract": "An arbitrary target and noninteractive description, presented outside clipping.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "options",
+    "kind": "var",
+    "declaration": "public var options = TooltipOptions()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Tooltip",
+    "kind": "init",
+    "declaration": "public init(configure: (inout TooltipOptions) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Tooltip",
+    "kind": "init",
+    "declaration": "public init(anchor: TooltipAnchor, isPresented: Bool = true, configure: (inout TooltipOptions) -> Void =",
+    "abstract": "Explicitly anchored tooltips are already debounced by their producer (for example LSP hover), so presentation follows isPresented directly.",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: AnyView",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Tooltip.swift",
+  "line": 34,
+  "owner": "",
+  "overloads": [
+   "public struct Tooltip<Target: View, Content: View>: View"
+  ]
+ },
+ {
+  "id": "tooltip-anchor",
+  "name": "TooltipAnchor",
+  "kind": "enum",
+  "declaration": "public enum TooltipAnchor: Equatable",
+  "abstract": "Window coordinates match TextFieldHoverAnchor and overlay placement.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Tooltip.swift",
+  "line": 25,
+  "owner": "",
+  "overloads": [
+   "public enum TooltipAnchor: Equatable"
+  ]
+ },
+ {
+  "id": "tooltip-arbitration-holder",
+  "name": "TooltipArbitrationHolder",
+  "kind": "enum",
+  "declaration": "public enum TooltipArbitrationHolder",
+  "abstract": "The active window's tooltip rules; `nil` until a window registers one.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Tooltip.swift",
+  "line": 253,
+  "owner": "",
+  "overloads": [
+   "public enum TooltipArbitrationHolder"
+  ]
+ },
+ {
+  "id": "tooltip-options",
+  "name": "TooltipOptions",
+  "kind": "struct",
+  "declaration": "public struct TooltipOptions",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "delay",
+    "kind": "var",
+    "declaration": "public var delay: Double = 0.6",
+    "abstract": "mygo's rest time before a tip appears; moving along a toolbar skips it.",
+    "discussion": []
+   },
+   {
+    "name": "maxWidth",
+    "kind": "var",
+    "declaration": "public var maxWidth: Float = 320",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "gap",
+    "kind": "var",
+    "declaration": "public var gap: Float = 6",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onlyWhenTruncated",
+    "kind": "var",
+    "declaration": "public var onlyWhenTruncated = false",
+    "abstract": "Labels that are fully visible repeat what the user already reads. Set by `Text.truncated()` so the description appears only when the node actually clipped its text.",
+    "discussion": []
+   },
+   {
+    "name": "TooltipOptions",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Tooltip.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct TooltipOptions"
+  ]
+ },
+ {
+  "id": "asset-drop-registry",
+  "name": "AssetDropRegistry",
+  "kind": "class",
+  "declaration": "public final class AssetDropRegistry: @unchecked Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "AssetDropRegistry",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "register",
+    "kind": "func",
+    "declaration": "public func register(node: Node, acceptedKinds: Set<String> = [], isEnabled: Bool = true, onDrop: @escaping (AssetDropPayload) -> Void)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "unregister",
+    "kind": "func",
+    "declaration": "public func unregister(node: Node)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "drop",
+    "kind": "func",
+    "declaration": "public func drop(_ payload: AssetDropPayload, atX x: Float, y: Float) -> Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "canDrop",
+    "kind": "func",
+    "declaration": "public func canDrop(_ payload: AssetDropPayload, on node: Node) -> Bool",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/AssetDropTarget.swift",
+  "line": 26,
+  "owner": "",
+  "overloads": [
+   "public final class AssetDropRegistry: @unchecked Sendable"
+  ]
+ },
+ {
+  "id": "modifier-context-menu",
+  "name": "contextMenu",
+  "kind": "modifier",
+  "declaration": "func contextMenu(_ entries: [MenuEntry], width: Float = 240, onOpen: (() -> Void)? = nil) -> ContextMenu<Self>",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/ContextMenu.swift",
+  "line": 8,
+  "owner": "View",
+  "overloads": [
+   "func contextMenu(_ entries: [MenuEntry], width: Float = 240, onOpen: (() -> Void)? = nil) -> ContextMenu<Self>",
+   "func contextMenu(width: Float = 220, onOpen: @escaping () -> Void ="
+  ]
+ },
+ {
+  "id": "portal-store",
+  "name": "PortalStore",
+  "kind": "class",
+  "declaration": "public final class PortalStore",
+  "abstract": "Per-window store of overlay (popover/menu/tooltip) entries.",
+  "discussion": [
+   "Phase 3 (坏味 #3): the storage moved off `PortalRegistry`'s process-global\n`enum` statics into this instance so each window owns its own overlay layer —\none window's open dropdown can never paint into, or swallow clicks for,\nanother's. Phase 8 deleted the legacy `PortalRegistry` static shim: call\nsites read `PortalStoreHolder.current` (the scoped ambient swapped by\n`withCurrent`) and entry owners remember their store for cleanup."
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "PortalStore",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "entries",
+    "kind": "var",
+    "declaration": "public var entries: [PortalEntry]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "revision",
+    "kind": "var",
+    "declaration": "public var revision: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "register",
+    "kind": "func",
+    "declaration": "public func register(id: String = UUID().uuidString, position: CGPoint, width: Float? = nil, content: AnyView) -> String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "updatePosition",
+    "kind": "func",
+    "declaration": "public func updatePosition(_ id: String, position: CGPoint)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "updateContent",
+    "kind": "func",
+    "declaration": "public func updateContent(_ id: String, content: AnyView)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "contains",
+    "kind": "func",
+    "declaration": "public func contains(_ id: String) -> Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "unregister",
+    "kind": "func",
+    "declaration": "public func unregister(_ id: String)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "clear",
+    "kind": "func",
+    "declaration": "public func clear()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/PortalRegistry.swift",
+  "line": 41,
+  "owner": "",
+  "overloads": [
+   "public final class PortalStore"
+  ]
+ },
+ {
+  "id": "portal-store-ambient",
+  "name": "PortalStoreAmbient",
+  "kind": "class",
+  "declaration": "public final class PortalStoreAmbient: ScopedAmbient",
+  "abstract": "Adapts a per-window `PortalStore` to the runtime's `ScopedAmbient` hook so it is swapped in lockstep with that window's input registries. Attach one to a window's `PlatformInputContext` via `addScopedAmbient`.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ScopedAmbient"
+  ],
+  "members": [
+   {
+    "name": "store",
+    "kind": "let",
+    "declaration": "public let store: PortalStore",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "PortalStoreAmbient",
+    "kind": "init",
+    "declaration": "public init(_ store: PortalStore)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "activate",
+    "kind": "func",
+    "declaration": "public func activate() -> () -> Void",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/PortalRegistry.swift",
+  "line": 227,
+  "owner": "",
+  "overloads": [
+   "public final class PortalStoreAmbient: ScopedAmbient"
+  ]
+ },
+ {
+  "id": "toast-controller",
+  "name": "ToastController",
+  "kind": "class",
+  "declaration": "public final class ToastController",
+  "abstract": "Window/application-owned queue with stable-ID replacement, bounded visibility and deterministic time.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "maxVisible",
+    "kind": "let",
+    "declaration": "public let maxVisible: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ToastController",
+    "kind": "init",
+    "declaration": "public init(maxVisible: Int = 3)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "notifications",
+    "kind": "var",
+    "declaration": "public var notifications: [ToastNotification]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "queuedCount",
+    "kind": "var",
+    "declaration": "public var queuedCount: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "post",
+    "kind": "func",
+    "declaration": "public func post(_ notification: ToastNotification)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "dismiss",
+    "kind": "func",
+    "declaration": "public func dismiss(_ id: String)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setPaused",
+    "kind": "func",
+    "declaration": "public func setPaused(_ paused: Bool, id: String)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "advance",
+    "kind": "func",
+    "declaration": "public func advance(by seconds: Double)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "clear",
+    "kind": "func",
+    "declaration": "public func clear()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Toast/Controller.swift",
+  "line": 55,
+  "owner": "",
+  "overloads": [
+   "public final class ToastController"
+  ]
+ },
+ {
+  "id": "modifier-tooltip",
+  "name": "tooltip",
+  "kind": "modifier",
+  "declaration": "func tooltip(_ description: String, configure: (inout TooltipOptions) -> Void =",
+  "abstract": "A description that is redundant unless the target had to clip text.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Tooltip.swift",
+  "line": 97,
+  "owner": "View",
+  "overloads": [
+   "func tooltip(_ description: String, configure: (inout TooltipOptions) -> Void =",
+   "func tooltip(_ description: String, onlyWhenTruncated: Bool, configure: (inout TooltipOptions) -> Void ="
+  ]
+ },
+ {
+  "id": "tooltip-arbitration",
+  "name": "TooltipArbitration",
+  "kind": "class",
+  "declaration": "public final class TooltipArbitration",
+  "abstract": "Window-wide tooltip rules, matching mygo's engine: one tip at a time, the innermost target wins, and a tip that follows another within the warm window skips the rest delay so the pointer can travel along a toolbar.",
+  "discussion": [
+   "Owned by the window's `PlatformInputContext`, like the portal store (规则 3):\ntwo windows must not take tips from each other, and a fresh context starts\nwith none on screen. The holder is empty until a window registers one, so a\nbare tree (previews, tests that do not care) simply has no arbitration and\nevery tip times out on its own.",
+   "Main-thread-only, like the portal store: tooltips are presented and\ndismissed on the UI thread."
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "TooltipArbitration",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Tooltip.swift",
+  "line": 169,
+  "owner": "",
+  "overloads": [
+   "public final class TooltipArbitration"
+  ]
+ },
+ {
+  "id": "tooltip-arbitration-ambient",
+  "name": "TooltipArbitrationAmbient",
+  "kind": "class",
+  "declaration": "public final class TooltipArbitrationAmbient: ScopedAmbient",
+  "abstract": "Registers a window's tooltip rules for as long as its input context is current, mirroring `PortalStoreAmbient`.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ScopedAmbient"
+  ],
+  "members": [
+   {
+    "name": "TooltipArbitrationAmbient",
+    "kind": "init",
+    "declaration": "public init(_ arbitration: TooltipArbitration = TooltipArbitration())",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "activate",
+    "kind": "func",
+    "declaration": "public func activate() -> () -> Void",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "overlays",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Overlays/Tooltip.swift",
+  "line": 259,
+  "owner": "",
+  "overloads": [
+   "public final class TooltipArbitrationAmbient: ScopedAmbient"
+  ]
+ }
+]

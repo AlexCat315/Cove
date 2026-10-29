@@ -1,0 +1,6388 @@
+[
+ {
+  "id": "acceleration-structure",
+  "name": "AccelerationStructure",
+  "kind": "struct",
+  "declaration": "public struct AccelerationStructure: RHIHandle",
+  "abstract": "Handle to a BLAS or TLAS. Creation and build support are capability-gated.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "RHIHandle"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Handles.swift",
+  "line": 22,
+  "owner": "",
+  "overloads": [
+   "public struct AccelerationStructure: RHIHandle"
+  ]
+ },
+ {
+  "id": "adapter-capabilities",
+  "name": "AdapterCapabilities",
+  "kind": "struct",
+  "declaration": "public struct AdapterCapabilities: Equatable, Sendable",
+  "abstract": "Diagnostic information about the adapter, not the implemented RHI API.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "rayTracing",
+    "kind": "var",
+    "declaration": "public var rayTracing = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "meshShading",
+    "kind": "var",
+    "declaration": "public var meshShading = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AdapterCapabilities",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Capabilities.swift",
+  "line": 41,
+  "owner": "",
+  "overloads": [
+   "public struct AdapterCapabilities: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "attachment-blend-state",
+  "name": "AttachmentBlendState",
+  "kind": "struct",
+  "declaration": "public struct AttachmentBlendState: Hashable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "enabled",
+    "kind": "var",
+    "declaration": "public var enabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "sourceColorBlendFactor",
+    "kind": "var",
+    "declaration": "public var sourceColorBlendFactor: BlendFactor",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destinationColorBlendFactor",
+    "kind": "var",
+    "declaration": "public var destinationColorBlendFactor: BlendFactor",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "colorBlendOperation",
+    "kind": "var",
+    "declaration": "public var colorBlendOperation: BlendOperation",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "sourceAlphaBlendFactor",
+    "kind": "var",
+    "declaration": "public var sourceAlphaBlendFactor: BlendFactor",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destinationAlphaBlendFactor",
+    "kind": "var",
+    "declaration": "public var destinationAlphaBlendFactor: BlendFactor",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "alphaBlendOperation",
+    "kind": "var",
+    "declaration": "public var alphaBlendOperation: BlendOperation",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AttachmentBlendState",
+    "kind": "init",
+    "declaration": "public init( enabled: Bool = false, sourceColorBlendFactor: BlendFactor = .sourceAlpha, destinationColorBlendFactor: BlendFactor = .oneMinusSourceAlpha, colorBlendOperation: BlendOperation = .add, sourceAlphaBlendFactor: BlendFactor = .one, destinationAlphaBlendFactor: BlendFactor = .oneMinusSourceAlpha, alphaBlendOperation: BlendOperation = .add )",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "alphaBlend",
+    "kind": "let",
+    "declaration": "public static let alphaBlend = AttachmentBlendState(enabled: true)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "opaque",
+    "kind": "let",
+    "declaration": "public static let opaque = AttachmentBlendState()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/RHITypes.swift",
+  "line": 93,
+  "owner": "",
+  "overloads": [
+   "public struct AttachmentBlendState: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "barrier",
+  "name": "Barrier",
+  "kind": "struct",
+  "declaration": "public struct Barrier: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "resource",
+    "kind": "var",
+    "declaration": "public var resource: ResourceRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "before",
+    "kind": "var",
+    "declaration": "public var before: ResourceState",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "after",
+    "kind": "var",
+    "declaration": "public var after: ResourceState",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "crossQueue",
+    "kind": "var",
+    "declaration": "public var crossQueue: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Barrier",
+    "kind": "init",
+    "declaration": "public init(resource: ResourceRef, before: ResourceState, after: ResourceState, crossQueue: Bool = false)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Validation/StateTracker.swift",
+  "line": 39,
+  "owner": "",
+  "overloads": [
+   "public struct Barrier: Sendable"
+  ]
+ },
+ {
+  "id": "barrier-command",
+  "name": "BarrierCommand",
+  "kind": "struct",
+  "declaration": "public struct BarrierCommand: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "resource",
+    "kind": "var",
+    "declaration": "public var resource: ResourceRef",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "sourceState",
+    "kind": "var",
+    "declaration": "public var sourceState: ResourceState",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destinationState",
+    "kind": "var",
+    "declaration": "public var destinationState: ResourceState",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "syncAction",
+    "kind": "var",
+    "declaration": "public var syncAction: BarrierSyncAction",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "passScope",
+    "kind": "var",
+    "declaration": "public var passScope: BarrierPassScope",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "sourceQueue",
+    "kind": "var",
+    "declaration": "public var sourceQueue: QueueClass",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destinationQueue",
+    "kind": "var",
+    "declaration": "public var destinationQueue: QueueClass",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "BarrierCommand",
+    "kind": "init",
+    "declaration": "public init( resource: ResourceRef, sourceState: ResourceState, destinationState: ResourceState, syncAction: BarrierSyncAction = .full, passScope: BarrierPassScope = .outsidePass, sourceQueue: QueueClass = .graphics, destinationQueue: QueueClass = .graphics )",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Commands.swift",
+  "line": 151,
+  "owner": "",
+  "overloads": [
+   "public struct BarrierCommand: Sendable"
+  ]
+ },
+ {
+  "id": "barrier-pass-scope",
+  "name": "BarrierPassScope",
+  "kind": "enum",
+  "declaration": "public enum BarrierPassScope: UInt8, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "UInt8",
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/RHITypes.swift",
+  "line": 225,
+  "owner": "",
+  "overloads": [
+   "public enum BarrierPassScope: UInt8, Sendable"
+  ]
+ },
+ {
+  "id": "barrier-sync-action",
+  "name": "BarrierSyncAction",
+  "kind": "enum",
+  "declaration": "public enum BarrierSyncAction: UInt8, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "UInt8",
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/RHITypes.swift",
+  "line": 219,
+  "owner": "",
+  "overloads": [
+   "public enum BarrierSyncAction: UInt8, Sendable"
+  ]
+ },
+ {
+  "id": "binding-layout",
+  "name": "BindingLayout",
+  "kind": "struct",
+  "declaration": "public struct BindingLayout: RHIHandle",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "RHIHandle"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Handles.swift",
+  "line": 15,
+  "owner": "",
+  "overloads": [
+   "public struct BindingLayout: RHIHandle"
+  ]
+ },
+ {
+  "id": "binding-layout-descriptor",
+  "name": "BindingLayoutDescriptor",
+  "kind": "struct",
+  "declaration": "public struct BindingLayoutDescriptor: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "entries",
+    "kind": "var",
+    "declaration": "public var entries: [BindingLayoutEntry]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "var",
+    "declaration": "public var label: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "BindingLayoutDescriptor",
+    "kind": "init",
+    "declaration": "public init(entries: [BindingLayoutEntry], label: String? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "BindingLayoutDescriptor",
+    "kind": "init",
+    "declaration": "public init(reflecting artifacts: [ShaderArtifact]) throws",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 218,
+  "owner": "",
+  "overloads": [
+   "public struct BindingLayoutDescriptor: Sendable"
+  ]
+ },
+ {
+  "id": "binding-layout-entry",
+  "name": "BindingLayoutEntry",
+  "kind": "struct",
+  "declaration": "public struct BindingLayoutEntry: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "buffer",
+    "kind": "var",
+    "declaration": "public var buffer = BufferBindingLayout()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "slot",
+    "kind": "var",
+    "declaration": "public var slot: UInt32",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "type",
+    "kind": "var",
+    "declaration": "public var type: BindingType",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "visibility",
+    "kind": "var",
+    "declaration": "public var visibility: ShaderVisibility",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "arraySize",
+    "kind": "var",
+    "declaration": "public var arraySize: UInt32",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "BindingLayoutEntry",
+    "kind": "init",
+    "declaration": "public init(slot: UInt32, type: BindingType, visibility: ShaderVisibility, arraySize: UInt32 = 1)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 203,
+  "owner": "",
+  "overloads": [
+   "public struct BindingLayoutEntry: Sendable"
+  ]
+ },
+ {
+  "id": "binding-resource",
+  "name": "BindingResource",
+  "kind": "enum",
+  "declaration": "public enum BindingResource: Hashable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 228,
+  "owner": "",
+  "overloads": [
+   "public enum BindingResource: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "binding-set",
+  "name": "BindingSet",
+  "kind": "struct",
+  "declaration": "public struct BindingSet: RHIHandle",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "RHIHandle"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Handles.swift",
+  "line": 16,
+  "owner": "",
+  "overloads": [
+   "public struct BindingSet: RHIHandle"
+  ]
+ },
+ {
+  "id": "binding-set-descriptor",
+  "name": "BindingSetDescriptor",
+  "kind": "struct",
+  "declaration": "public struct BindingSetDescriptor: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "entries",
+    "kind": "var",
+    "declaration": "public var entries: [BindingSetEntry]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "var",
+    "declaration": "public var label: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "BindingSetDescriptor",
+    "kind": "init",
+    "declaration": "public init(entries: [BindingSetEntry], label: String? = nil)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 292,
+  "owner": "",
+  "overloads": [
+   "public struct BindingSetDescriptor: Sendable"
+  ]
+ },
+ {
+  "id": "binding-set-entry",
+  "name": "BindingSetEntry",
+  "kind": "struct",
+  "declaration": "public struct BindingSetEntry: Hashable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "slot",
+    "kind": "var",
+    "declaration": "public var slot: UInt32",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "resource",
+    "kind": "var",
+    "declaration": "public var resource: BindingResource",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "BindingSetEntry",
+    "kind": "init",
+    "declaration": "public init(slot: UInt32, resource: BindingResource)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 269,
+  "owner": "",
+  "overloads": [
+   "public struct BindingSetEntry: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "binding-type",
+  "name": "BindingType",
+  "kind": "enum",
+  "declaration": "public enum BindingType: String, Codable, Hashable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "String",
+   "Codable",
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 194,
+  "owner": "",
+  "overloads": [
+   "public enum BindingType: String, Codable, Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "blend-factor",
+  "name": "BlendFactor",
+  "kind": "enum",
+  "declaration": "public enum BlendFactor: Hashable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/RHITypes.swift",
+  "line": 69,
+  "owner": "",
+  "overloads": [
+   "public enum BlendFactor: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "blend-operation",
+  "name": "BlendOperation",
+  "kind": "enum",
+  "declaration": "public enum BlendOperation: Hashable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/RHITypes.swift",
+  "line": 85,
+  "owner": "",
+  "overloads": [
+   "public enum BlendOperation: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "buffer",
+  "name": "Buffer",
+  "kind": "struct",
+  "declaration": "public struct Buffer: RHIHandle",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "RHIHandle"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Handles.swift",
+  "line": 11,
+  "owner": "",
+  "overloads": [
+   "public struct Buffer: RHIHandle"
+  ]
+ },
+ {
+  "id": "buffer-descriptor",
+  "name": "BufferDescriptor",
+  "kind": "struct",
+  "declaration": "public struct BufferDescriptor: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "size",
+    "kind": "var",
+    "declaration": "public var size: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "usage",
+    "kind": "var",
+    "declaration": "public var usage: BufferUsage",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "var",
+    "declaration": "public var label: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "BufferDescriptor",
+    "kind": "init",
+    "declaration": "public init(size: Int, usage: BufferUsage, label: String? = nil)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 45,
+  "owner": "",
+  "overloads": [
+   "public struct BufferDescriptor: Sendable"
+  ]
+ },
+ {
+  "id": "buffer-usage",
+  "name": "BufferUsage",
+  "kind": "struct",
+  "declaration": "public struct BufferUsage: OptionSet, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "OptionSet",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "rawValue",
+    "kind": "let",
+    "declaration": "public let rawValue: UInt32",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "BufferUsage",
+    "kind": "init",
+    "declaration": "public init(rawValue: UInt32)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "vertex",
+    "kind": "let",
+    "declaration": "public static let vertex = BufferUsage(rawValue: 1 << 0)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "index",
+    "kind": "let",
+    "declaration": "public static let index = BufferUsage(rawValue: 1 << 1)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "indirect",
+    "kind": "let",
+    "declaration": "public static let indirect = BufferUsage(rawValue: 1 << 2)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "uniform",
+    "kind": "let",
+    "declaration": "public static let uniform = BufferUsage(rawValue: 1 << 3)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "storageRead",
+    "kind": "let",
+    "declaration": "public static let storageRead = BufferUsage(rawValue: 1 << 4)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "storageWrite",
+    "kind": "let",
+    "declaration": "public static let storageWrite = BufferUsage(rawValue: 1 << 5)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "transferSource",
+    "kind": "let",
+    "declaration": "public static let transferSource = BufferUsage(rawValue: 1 << 6)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "transferDestination",
+    "kind": "let",
+    "declaration": "public static let transferDestination = BufferUsage(rawValue: 1 << 7)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 57,
+  "owner": "",
+  "overloads": [
+   "public struct BufferUsage: OptionSet, Sendable"
+  ]
+ },
+ {
+  "id": "cache-stats",
+  "name": "CacheStats",
+  "kind": "struct",
+  "declaration": "public struct CacheStats: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "hits",
+    "kind": "var",
+    "declaration": "public var hits: UInt64",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "misses",
+    "kind": "var",
+    "declaration": "public var misses: UInt64",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "evictions",
+    "kind": "var",
+    "declaration": "public var evictions: UInt64",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "CacheStats",
+    "kind": "init",
+    "declaration": "public init(hits: UInt64 = 0, misses: UInt64 = 0, evictions: UInt64 = 0)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "totalLookups",
+    "kind": "var",
+    "declaration": "public var totalLookups: UInt64",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "hitRate",
+    "kind": "var",
+    "declaration": "public var hitRate: Double",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "delta",
+    "kind": "func",
+    "declaration": "public func delta(since previous: CacheStats) -> CacheStats",
+    "abstract": "Counts since `previous`, saturating at zero for each field.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Validation/Caches.swift",
+  "line": 105,
+  "owner": "",
+  "overloads": [
+   "public struct CacheStats: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "capabilities",
+  "name": "Capabilities",
+  "kind": "struct",
+  "declaration": "public struct Capabilities: Equatable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "graphics",
+    "kind": "var",
+    "declaration": "public var graphics = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "compute",
+    "kind": "var",
+    "declaration": "public var compute = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "indirectDraw",
+    "kind": "var",
+    "declaration": "public var indirectDraw = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rayTracing",
+    "kind": "var",
+    "declaration": "public var rayTracing = RayTracingCapabilities()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "meshShading",
+    "kind": "var",
+    "declaration": "public var meshShading = MeshShadingCapabilities()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "textures",
+    "kind": "var",
+    "declaration": "public var textures = TextureCapabilities()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maxQueues",
+    "kind": "var",
+    "declaration": "public var maxQueues = QueueLimits(graphics: 0, compute: 0, transfer: 0)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Capabilities",
+    "kind": "init",
+    "declaration": "public init(_ configure: (inout Capabilities) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Capabilities.swift",
+  "line": 26,
+  "owner": "",
+  "overloads": [
+   "public struct Capabilities: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "color-attachment-descriptor",
+  "name": "ColorAttachmentDescriptor",
+  "kind": "struct",
+  "declaration": "public struct ColorAttachmentDescriptor: Hashable, Sendable",
+  "abstract": "One color attachment slot of a graphics pipeline. Multiple entries give MRT rendering (the Zig original supported a single color target).",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "format",
+    "kind": "var",
+    "declaration": "public var format: TextureFormat",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "blend",
+    "kind": "var",
+    "declaration": "public var blend: AttachmentBlendState",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ColorAttachmentDescriptor",
+    "kind": "init",
+    "declaration": "public init(format: TextureFormat, blend: AttachmentBlendState = .opaque)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 400,
+  "owner": "",
+  "overloads": [
+   "public struct ColorAttachmentDescriptor: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "color-load-action",
+  "name": "ColorLoadAction",
+  "kind": "enum",
+  "declaration": "public enum ColorLoadAction: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Commands.swift",
+  "line": 14,
+  "owner": "",
+  "overloads": [
+   "public enum ColorLoadAction: Sendable"
+  ]
+ },
+ {
+  "id": "compare-op",
+  "name": "CompareOp",
+  "kind": "enum",
+  "declaration": "public enum CompareOp: Hashable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/RHITypes.swift",
+  "line": 58,
+  "owner": "",
+  "overloads": [
+   "public enum CompareOp: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "compute-command",
+  "name": "ComputeCommand",
+  "kind": "enum",
+  "declaration": "public enum ComputeCommand: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Commands.swift",
+  "line": 132,
+  "owner": "",
+  "overloads": [
+   "public enum ComputeCommand: Sendable"
+  ]
+ },
+ {
+  "id": "compute-pass-encoder",
+  "name": "ComputePassEncoder",
+  "kind": "struct",
+  "declaration": "public struct ComputePassEncoder",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "setPipeline",
+    "kind": "func",
+    "declaration": "public mutating func setPipeline(_ pipeline: ComputePipeline)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setBindingSet",
+    "kind": "func",
+    "declaration": "public mutating func setBindingSet(_ set: BindingSet, slot: UInt32 = 0, dynamicOffsets: [UInt32] = [])",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "pushConstant",
+    "kind": "func",
+    "declaration": "public mutating func pushConstant<T>(stage: ShaderStage = .compute, slot: UInt32, value: T)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "dispatch",
+    "kind": "func",
+    "declaration": "public mutating func dispatch(groupsX: Int, groupsY: Int = 1, groupsZ: Int = 1)",
+    "abstract": "Dispatches workgroups; each group uses the shader module's local size.",
+    "discussion": []
+   },
+   {
+    "name": "dispatchIndirect",
+    "kind": "func",
+    "declaration": "public mutating func dispatchIndirect(buffer: Buffer, offset: Int = 0)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Commands.swift",
+  "line": 256,
+  "owner": "",
+  "overloads": [
+   "public struct ComputePassEncoder"
+  ]
+ },
+ {
+  "id": "compute-pass-record",
+  "name": "ComputePassRecord",
+  "kind": "struct",
+  "declaration": "public struct ComputePassRecord: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: [ComputeCommand]",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Commands.swift",
+  "line": 184,
+  "owner": "",
+  "overloads": [
+   "public struct ComputePassRecord: Sendable"
+  ]
+ },
+ {
+  "id": "compute-pipeline",
+  "name": "ComputePipeline",
+  "kind": "struct",
+  "declaration": "public struct ComputePipeline: RHIHandle",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "RHIHandle"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Handles.swift",
+  "line": 19,
+  "owner": "",
+  "overloads": [
+   "public struct ComputePipeline: RHIHandle"
+  ]
+ },
+ {
+  "id": "compute-pipeline-descriptor",
+  "name": "ComputePipelineDescriptor",
+  "kind": "struct",
+  "declaration": "public struct ComputePipelineDescriptor: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "layout",
+    "kind": "var",
+    "declaration": "public var layout: PipelineLayout",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "shader",
+    "kind": "var",
+    "declaration": "public var shader: ShaderModule",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "var",
+    "declaration": "public var label: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ComputePipelineDescriptor",
+    "kind": "init",
+    "declaration": "public init(layout: PipelineLayout, shader: ShaderModule, label: String? = nil)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 451,
+  "owner": "",
+  "overloads": [
+   "public struct ComputePipelineDescriptor: Sendable"
+  ]
+ },
+ {
+  "id": "copy-command",
+  "name": "CopyCommand",
+  "kind": "enum",
+  "declaration": "public enum CopyCommand: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Commands.swift",
+  "line": 140,
+  "owner": "",
+  "overloads": [
+   "public enum CopyCommand: Sendable"
+  ]
+ },
+ {
+  "id": "copy-pass-encoder",
+  "name": "CopyPassEncoder",
+  "kind": "struct",
+  "declaration": "public struct CopyPassEncoder",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "copyTexture",
+    "kind": "func",
+    "declaration": "public mutating func copyTexture(src: Texture, dst: Texture, width: Int, height: Int)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "copyBuffer",
+    "kind": "func",
+    "declaration": "public mutating func copyBuffer(src: Buffer, srcOffset: Int = 0, dst: Buffer, dstOffset: Int = 0, size: Int)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "uploadBufferToTexture",
+    "kind": "func",
+    "declaration": "public mutating func uploadBufferToTexture(_ upload: TextureBufferUpload)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "copyTextureToBuffer",
+    "kind": "func",
+    "declaration": "public mutating func copyTextureToBuffer( texture: Texture, width: Int, height: Int, buffer: Buffer, offset: Int = 0, bytesPerRow: Int )",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Commands.swift",
+  "line": 283,
+  "owner": "",
+  "overloads": [
+   "public struct CopyPassEncoder"
+  ]
+ },
+ {
+  "id": "copy-pass-record",
+  "name": "CopyPassRecord",
+  "kind": "struct",
+  "declaration": "public struct CopyPassRecord: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: [CopyCommand]",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Commands.swift",
+  "line": 188,
+  "owner": "",
+  "overloads": [
+   "public struct CopyPassRecord: Sendable"
+  ]
+ },
+ {
+  "id": "cull-mode",
+  "name": "CullMode",
+  "kind": "enum",
+  "declaration": "public enum CullMode: Hashable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/RHITypes.swift",
+  "line": 47,
+  "owner": "",
+  "overloads": [
+   "public enum CullMode: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "depth-load-action",
+  "name": "DepthLoadAction",
+  "kind": "enum",
+  "declaration": "public enum DepthLoadAction: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Commands.swift",
+  "line": 20,
+  "owner": "",
+  "overloads": [
+   "public enum DepthLoadAction: Sendable"
+  ]
+ },
+ {
+  "id": "depth-stencil-state",
+  "name": "DepthStencilState",
+  "kind": "struct",
+  "declaration": "public struct DepthStencilState: Hashable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "depthCompare",
+    "kind": "var",
+    "declaration": "public var depthCompare: CompareOp",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "depthWriteEnabled",
+    "kind": "var",
+    "declaration": "public var depthWriteEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "DepthStencilState",
+    "kind": "init",
+    "declaration": "public init(depthCompare: CompareOp = .less, depthWriteEnabled: Bool = true)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 329,
+  "owner": "",
+  "overloads": [
+   "public struct DepthStencilState: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "device-config",
+  "name": "DeviceConfig",
+  "kind": "struct",
+  "declaration": "public struct DeviceConfig: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "preferredBackends",
+    "kind": "var",
+    "declaration": "public var preferredBackends: [GraphicsAPI]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "enableValidation",
+    "kind": "var",
+    "declaration": "public var enableValidation: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "framesInFlight",
+    "kind": "var",
+    "declaration": "public var framesInFlight: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "preferLowPower",
+    "kind": "var",
+    "declaration": "public var preferLowPower: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "vsyncEnabled",
+    "kind": "var",
+    "declaration": "public var vsyncEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "DeviceConfig",
+    "kind": "init",
+    "declaration": "public init( preferredBackends: [GraphicsAPI] = NativeRHI.platformDefaultBackends, enableValidation: Bool = true, framesInFlight: Int = 2, preferLowPower: Bool = false, vsyncEnabled: Bool = true )",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct DeviceConfig: Sendable"
+  ]
+ },
+ {
+  "id": "draw-indexed-arguments",
+  "name": "DrawIndexedArguments",
+  "kind": "struct",
+  "declaration": "public struct DrawIndexedArguments: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "indexCount",
+    "kind": "var",
+    "declaration": "public var indexCount: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "instanceCount",
+    "kind": "var",
+    "declaration": "public var instanceCount: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "firstIndex",
+    "kind": "var",
+    "declaration": "public var firstIndex: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "vertexOffset",
+    "kind": "var",
+    "declaration": "public var vertexOffset: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "firstInstance",
+    "kind": "var",
+    "declaration": "public var firstInstance: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "DrawIndexedArguments",
+    "kind": "init",
+    "declaration": "public init( indexCount: Int, instanceCount: Int = 1, firstIndex: Int = 0, vertexOffset: Int = 0, firstInstance: Int = 0 )",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Commands.swift",
+  "line": 91,
+  "owner": "",
+  "overloads": [
+   "public struct DrawIndexedArguments: Sendable"
+  ]
+ },
+ {
+  "id": "dx12-backend",
+  "name": "DX12Backend",
+  "kind": "enum",
+  "declaration": "public enum DX12Backend",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "make",
+    "kind": "func",
+    "declaration": "public static func make(config: DeviceConfig) throws -> RHIBackend",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/DX12/DX12Backend.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public enum DX12Backend"
+  ]
+ },
+ {
+  "id": "fill-mode",
+  "name": "FillMode",
+  "kind": "enum",
+  "declaration": "public enum FillMode: Hashable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/RHITypes.swift",
+  "line": 42,
+  "owner": "",
+  "overloads": [
+   "public enum FillMode: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "frame-uploader",
+  "name": "FrameUploader",
+  "kind": "protocol",
+  "declaration": "public protocol FrameUploader: AnyObject",
+  "abstract": "Per-slot transient storage the backend vends to the frontend. Each frames-in-flight slot owns one uploader; it is reset only when that slot is reused (after the GPU finished the prior frame), so allocations stay alive for exactly the frame that uses them.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "AnyObject"
+  ],
+  "members": [
+   {
+    "name": "write",
+    "kind": "func",
+    "declaration": "func write(_ bytes: UnsafeRawBufferPointer, alignment: Int) throws -> UploadLocation",
+    "abstract": "Zero-copy fast path for callers that already own contiguous memory. The default wraps the bytes in a `Data` (copy); backends that care about the copy override this directly.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Submission/Plan.swift",
+  "line": 27,
+  "owner": "",
+  "overloads": [
+   "public protocol FrameUploader: AnyObject"
+  ]
+ },
+ {
+  "id": "front-winding",
+  "name": "FrontWinding",
+  "kind": "enum",
+  "declaration": "public enum FrontWinding: Hashable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/RHITypes.swift",
+  "line": 53,
+  "owner": "",
+  "overloads": [
+   "public enum FrontWinding: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "gpu-timestamp-recording",
+  "name": "GPUTimestampRecording",
+  "kind": "protocol",
+  "declaration": "public protocol GPUTimestampRecording: AnyObject",
+  "abstract": "A backend able to timestamp GPU execution for the submissions it queues.",
+  "discussion": [
+   "Conformance is optional so that backends without timestamp support keep their\nexisting submission path unchanged."
+  ],
+  "availability": [],
+  "conforms": [
+   "AnyObject"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Submission/GPUTimestampProfile.swift",
+  "line": 71,
+  "owner": "",
+  "overloads": [
+   "public protocol GPUTimestampRecording: AnyObject"
+  ]
+ },
+ {
+  "id": "graphics-api",
+  "name": "GraphicsAPI",
+  "kind": "enum",
+  "declaration": "public enum GraphicsAPI: String, CaseIterable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "String",
+   "CaseIterable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "displayName",
+    "kind": "var",
+    "declaration": "public var displayName: String",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/RHITypes.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public enum GraphicsAPI: String, CaseIterable, Sendable"
+  ]
+ },
+ {
+  "id": "graphics-pipeline",
+  "name": "GraphicsPipeline",
+  "kind": "struct",
+  "declaration": "public struct GraphicsPipeline: RHIHandle",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "RHIHandle"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Handles.swift",
+  "line": 18,
+  "owner": "",
+  "overloads": [
+   "public struct GraphicsPipeline: RHIHandle"
+  ]
+ },
+ {
+  "id": "graphics-pipeline-descriptor",
+  "name": "GraphicsPipelineDescriptor",
+  "kind": "struct",
+  "declaration": "public struct GraphicsPipelineDescriptor: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "sampleCount",
+    "kind": "var",
+    "declaration": "public var sampleCount: Int = 1",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "layout",
+    "kind": "var",
+    "declaration": "public var layout: PipelineLayout",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "vertex",
+    "kind": "var",
+    "declaration": "public var vertex: ShaderModule",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "fragment",
+    "kind": "var",
+    "declaration": "public var fragment: ShaderModule?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "colorAttachments",
+    "kind": "var",
+    "declaration": "public var colorAttachments: [ColorAttachmentDescriptor]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "depthFormat",
+    "kind": "var",
+    "declaration": "public var depthFormat: TextureFormat?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "stencilFormat",
+    "kind": "var",
+    "declaration": "public var stencilFormat: TextureFormat?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "primitive",
+    "kind": "var",
+    "declaration": "public var primitive: PrimitiveType",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rasterization",
+    "kind": "var",
+    "declaration": "public var rasterization: RasterizationState",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "depthStencil",
+    "kind": "var",
+    "declaration": "public var depthStencil: DepthStencilState?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "vertexLayout",
+    "kind": "var",
+    "declaration": "public var vertexLayout: VertexLayoutDescriptor?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "var",
+    "declaration": "public var label: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "GraphicsPipelineDescriptor",
+    "kind": "init",
+    "declaration": "public init( layout: PipelineLayout, vertex: ShaderModule, fragment: ShaderModule? = nil, colorAttachments: [ColorAttachmentDescriptor] = [], depthFormat: TextureFormat? = .depth32Float, stencilFormat: TextureFormat? = nil, primitive: PrimitiveType = .triangleList, rasterization: RasterizationState = RasterizationState(), depthStencil: DepthStencilState? = DepthStencilState(), vertexLayout: VertexLayoutDescriptor? = nil, label: String? = nil )",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 410,
+  "owner": "",
+  "overloads": [
+   "public struct GraphicsPipelineDescriptor: Sendable"
+  ]
+ },
+ {
+  "id": "index-type",
+  "name": "IndexType",
+  "kind": "enum",
+  "declaration": "public enum IndexType: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/RHITypes.swift",
+  "line": 153,
+  "owner": "",
+  "overloads": [
+   "public enum IndexType: Sendable"
+  ]
+ },
+ {
+  "id": "mesh-shading-capabilities",
+  "name": "MeshShadingCapabilities",
+  "kind": "struct",
+  "declaration": "public struct MeshShadingCapabilities: Equatable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "mesh",
+    "kind": "var",
+    "declaration": "public var mesh = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "task",
+    "kind": "var",
+    "declaration": "public var task = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "indirect",
+    "kind": "var",
+    "declaration": "public var indirect = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "MeshShadingCapabilities",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Capabilities.swift",
+  "line": 13,
+  "owner": "",
+  "overloads": [
+   "public struct MeshShadingCapabilities: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "metal-backend",
+  "name": "MetalBackend",
+  "kind": "enum",
+  "declaration": "public enum MetalBackend",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "make",
+    "kind": "func",
+    "declaration": "public static func make(config: DeviceConfig) throws -> RHIBackend",
+    "abstract": "Creates the Metal backend for the current physical device.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Metal/MetalBackend.swift",
+  "line": 10,
+  "owner": "",
+  "overloads": [
+   "public enum MetalBackend"
+  ]
+ },
+ {
+  "id": "native-rhi",
+  "name": "NativeRHI",
+  "kind": "enum",
+  "declaration": "public enum NativeRHI",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "version",
+    "kind": "let",
+    "declaration": "public static let version = \"0.1.0\"",
+    "abstract": "Semantic version of the Swift RHI port.",
+    "discussion": []
+   },
+   {
+    "name": "platformDefaultBackends",
+    "kind": "var",
+    "declaration": "public static var platformDefaultBackends: [GraphicsAPI]",
+    "abstract": "Backend preference order for the current platform. The first backend that constructs successfully wins; later entries are fallbacks.",
+    "discussion": []
+   },
+   {
+    "name": "platformDefaultSurfaceFormat",
+    "kind": "var",
+    "declaration": "public static var platformDefaultSurfaceFormat: TextureFormat",
+    "abstract": "Android presentation commonly exposes RGBA surfaces; desktop renderers use the BGRA sRGB convention shared with Metal.",
+    "discussion": []
+   },
+   {
+    "name": "isCompiledIn",
+    "kind": "func",
+    "declaration": "public static func isCompiledIn(_ api: GraphicsAPI) -> Bool",
+    "abstract": "True when a backend is part of the current build. Backends that are source-only on the host (e.g. DX12 on macOS) are reported unavailable.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/NativeRHI.swift",
+  "line": 9,
+  "owner": "",
+  "overloads": [
+   "public enum NativeRHI"
+  ]
+ },
+ {
+  "id": "native-surface-kind",
+  "name": "NativeSurfaceKind",
+  "kind": "enum",
+  "declaration": "public enum NativeSurfaceKind: Sendable",
+  "abstract": "The platform object represented by an unmanaged native surface handle.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "platformDefault",
+    "kind": "var",
+    "declaration": "public static var platformDefault: NativeSurfaceKind",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 464,
+  "owner": "",
+  "overloads": [
+   "public enum NativeSurfaceKind: Sendable"
+  ]
+ },
+ {
+  "id": "native-ui-draw-frame",
+  "name": "NativeUIDrawFrame",
+  "kind": "struct",
+  "declaration": "public struct NativeUIDrawFrame",
+  "abstract": "Retain until submission succeeds. Acknowledge with didSubmit; failed or abandoned recording leaves texture patches available for the next frame.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "statistics",
+    "kind": "let",
+    "declaration": "public let statistics: NativeUIDrawStatistics",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "didSubmit",
+    "kind": "func",
+    "declaration": "public func didSubmit()",
+    "abstract": "Acknowledge this recording only after its commands were submitted. Ownership and update sequences travel with the token, so the caller does not need to retain or select the renderer that created it.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/CoveUIGraphics/Rendering/NativeDrawListRenderer.swift",
+  "line": 23,
+  "owner": "",
+  "overloads": [
+   "public struct NativeUIDrawFrame"
+  ]
+ },
+ {
+  "id": "native-ui-draw-statistics",
+  "name": "NativeUIDrawStatistics",
+  "kind": "struct",
+  "declaration": "public struct NativeUIDrawStatistics: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/CoveUIGraphics/Rendering/NativeDrawListRenderer.swift",
+  "line": 8,
+  "owner": "",
+  "overloads": [
+   "public struct NativeUIDrawStatistics: Sendable"
+  ]
+ },
+ {
+  "id": "native-ui-viewport",
+  "name": "NativeUIViewport",
+  "kind": "struct",
+  "declaration": "public struct NativeUIViewport: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "pixels",
+    "kind": "let",
+    "declaration": "public let pixels: SIMD2<Int>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "logical",
+    "kind": "let",
+    "declaration": "public let logical: SIMD2<Float>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "NativeUIViewport",
+    "kind": "init",
+    "declaration": "public init(pixels: SIMD2<Int>, logical: SIMD2<Float>)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/CoveUIGraphics/NativeUIViewport.swift",
+  "line": 11,
+  "owner": "",
+  "overloads": [
+   "public struct NativeUIViewport: Sendable"
+  ]
+ },
+ {
+  "id": "pipeline-compile-timing",
+  "name": "PipelineCompileTiming",
+  "kind": "struct",
+  "declaration": "public struct PipelineCompileTiming: Sendable, Equatable",
+  "abstract": "Successful creations of one resource kind, measured on the calling thread.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "count",
+    "kind": "var",
+    "declaration": "public var count: UInt64 = 0",
+    "abstract": "Number of successful creations.",
+    "discussion": []
+   },
+   {
+    "name": "totalNanoseconds",
+    "kind": "var",
+    "declaration": "public var totalNanoseconds: UInt64 = 0",
+    "abstract": "Sum of creation durations.",
+    "discussion": []
+   },
+   {
+    "name": "maxNanoseconds",
+    "kind": "var",
+    "declaration": "public var maxNanoseconds: UInt64 = 0",
+    "abstract": "Longest single creation.",
+    "discussion": []
+   },
+   {
+    "name": "duringFrame",
+    "kind": "var",
+    "declaration": "public var duringFrame: UInt64 = 0",
+    "abstract": "Creations that happened between `beginFrame` and `endFrame`.",
+    "discussion": []
+   },
+   {
+    "name": "PipelineCompileTiming",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "averageMicroseconds",
+    "kind": "var",
+    "declaration": "public var averageMicroseconds: Double",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/PipelineCache.swift",
+  "line": 152,
+  "owner": "",
+  "overloads": [
+   "public struct PipelineCompileTiming: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "pipeline-kind-statistics",
+  "name": "PipelineKindStatistics",
+  "kind": "struct",
+  "declaration": "public struct PipelineKindStatistics: Sendable, Equatable",
+  "abstract": "Cold compiles plus warm cache hits for one pipeline kind.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "cold",
+    "kind": "var",
+    "declaration": "public var cold = PipelineCompileTiming()",
+    "abstract": "Cache misses, including the backend pipeline creation.",
+    "discussion": []
+   },
+   {
+    "name": "warmCount",
+    "kind": "var",
+    "declaration": "public var warmCount: UInt64 = 0",
+    "abstract": "Cache hits and the time spent looking them up.",
+    "discussion": []
+   },
+   {
+    "name": "warmTotalNanoseconds",
+    "kind": "var",
+    "declaration": "public var warmTotalNanoseconds: UInt64 = 0",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "warmMaxNanoseconds",
+    "kind": "var",
+    "declaration": "public var warmMaxNanoseconds: UInt64 = 0",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "live",
+    "kind": "var",
+    "declaration": "public var live: Int = 0",
+    "abstract": "Handles currently interned in the cache.",
+    "discussion": []
+   },
+   {
+    "name": "PipelineKindStatistics",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "warmAverageMicroseconds",
+    "kind": "var",
+    "declaration": "public var warmAverageMicroseconds: Double",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/PipelineCache.swift",
+  "line": 180,
+  "owner": "",
+  "overloads": [
+   "public struct PipelineKindStatistics: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "pipeline-layout",
+  "name": "PipelineLayout",
+  "kind": "struct",
+  "declaration": "public struct PipelineLayout: RHIHandle",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "RHIHandle"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Handles.swift",
+  "line": 17,
+  "owner": "",
+  "overloads": [
+   "public struct PipelineLayout: RHIHandle"
+  ]
+ },
+ {
+  "id": "pipeline-layout-descriptor",
+  "name": "PipelineLayoutDescriptor",
+  "kind": "struct",
+  "declaration": "public struct PipelineLayoutDescriptor: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "setLayouts",
+    "kind": "var",
+    "declaration": "public var setLayouts: [BindingLayout]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "pushConstants",
+    "kind": "var",
+    "declaration": "public var pushConstants: [PushConstantRange] = []",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "var",
+    "declaration": "public var label: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "PipelineLayoutDescriptor",
+    "kind": "init",
+    "declaration": "public init(setLayouts: [BindingLayout], label: String? = nil)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 302,
+  "owner": "",
+  "overloads": [
+   "public struct PipelineLayoutDescriptor: Sendable"
+  ]
+ },
+ {
+  "id": "pipeline-statistics",
+  "name": "PipelineStatistics",
+  "kind": "struct",
+  "declaration": "public struct PipelineStatistics: Sendable, Equatable",
+  "abstract": "Snapshot of pipeline creation and cache behavior for one `Device`.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "shaderModules",
+    "kind": "var",
+    "declaration": "public var shaderModules = PipelineCompileTiming()",
+    "abstract": "Cold shader module creations; identical modules share a leased handle.",
+    "discussion": []
+   },
+   {
+    "name": "shaderModuleCacheHits",
+    "kind": "var",
+    "declaration": "public var shaderModuleCacheHits: UInt64 = 0",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "liveShaderModules",
+    "kind": "var",
+    "declaration": "public var liveShaderModules: Int = 0",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "graphics",
+    "kind": "var",
+    "declaration": "public var graphics = PipelineKindStatistics()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "compute",
+    "kind": "var",
+    "declaration": "public var compute = PipelineKindStatistics()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "mesh",
+    "kind": "var",
+    "declaration": "public var mesh = PipelineKindStatistics()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "PipelineStatistics",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "cacheHits",
+    "kind": "var",
+    "declaration": "public var cacheHits: UInt64",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "cacheMisses",
+    "kind": "var",
+    "declaration": "public var cacheMisses: UInt64",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "livePipelines",
+    "kind": "var",
+    "declaration": "public var livePipelines: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "creationsDuringFrame",
+    "kind": "var",
+    "declaration": "public var creationsDuringFrame: UInt64",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/PipelineCache.swift",
+  "line": 211,
+  "owner": "",
+  "overloads": [
+   "public struct PipelineStatistics: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "planned-command",
+  "name": "PlannedCommand",
+  "kind": "enum",
+  "declaration": "public enum PlannedCommand: Sendable",
+  "abstract": "One linear command stream for a single queue submission. Barriers are represented as explicit `.barriers` blocks interspersed with passes.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Submission/Plan.swift",
+  "line": 68,
+  "owner": "",
+  "overloads": [
+   "public enum PlannedCommand: Sendable"
+  ]
+ },
+ {
+  "id": "planned-submit",
+  "name": "PlannedSubmit",
+  "kind": "struct",
+  "declaration": "public struct PlannedSubmit: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "queue",
+    "kind": "var",
+    "declaration": "public var queue: QueueClass",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "commands",
+    "kind": "var",
+    "declaration": "public var commands: [PlannedCommand]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "waitSemaphores",
+    "kind": "var",
+    "declaration": "public var waitSemaphores: [TimelineSemaphore]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "signalSemaphores",
+    "kind": "var",
+    "declaration": "public var signalSemaphores: [TimelineSemaphore]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "PlannedSubmit",
+    "kind": "init",
+    "declaration": "public init( queue: QueueClass, commands: [PlannedCommand], waitSemaphores: [TimelineSemaphore] = [], signalSemaphores: [TimelineSemaphore] = [] )",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Submission/Plan.swift",
+  "line": 76,
+  "owner": "",
+  "overloads": [
+   "public struct PlannedSubmit: Sendable"
+  ]
+ },
+ {
+  "id": "primitive-type",
+  "name": "PrimitiveType",
+  "kind": "enum",
+  "declaration": "public enum PrimitiveType: Hashable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/RHITypes.swift",
+  "line": 34,
+  "owner": "",
+  "overloads": [
+   "public enum PrimitiveType: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "queue-class",
+  "name": "QueueClass",
+  "kind": "enum",
+  "declaration": "public enum QueueClass: UInt8, Sendable, CaseIterable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "UInt8",
+   "Sendable",
+   "CaseIterable"
+  ],
+  "members": [
+   {
+    "name": "index",
+    "kind": "var",
+    "declaration": "public var index: Int",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/RHITypes.swift",
+  "line": 205,
+  "owner": "",
+  "overloads": [
+   "public enum QueueClass: UInt8, Sendable, CaseIterable"
+  ]
+ },
+ {
+  "id": "queue-limits",
+  "name": "QueueLimits",
+  "kind": "struct",
+  "declaration": "public struct QueueLimits: Sendable, Equatable",
+  "abstract": "Maximum number of queues per class the backend can expose simultaneously.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "graphics",
+    "kind": "var",
+    "declaration": "public var graphics: UInt8",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "compute",
+    "kind": "var",
+    "declaration": "public var compute: UInt8",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "transfer",
+    "kind": "var",
+    "declaration": "public var transfer: UInt8",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "QueueLimits",
+    "kind": "init",
+    "declaration": "public init(graphics: UInt8 = 1, compute: UInt8 = 1, transfer: UInt8 = 1)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 33,
+  "owner": "",
+  "overloads": [
+   "public struct QueueLimits: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "rasterization-state",
+  "name": "RasterizationState",
+  "kind": "struct",
+  "declaration": "public struct RasterizationState: Hashable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "fillMode",
+    "kind": "var",
+    "declaration": "public var fillMode: FillMode",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "cullMode",
+    "kind": "var",
+    "declaration": "public var cullMode: CullMode",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "frontWinding",
+    "kind": "var",
+    "declaration": "public var frontWinding: FrontWinding",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "RasterizationState",
+    "kind": "init",
+    "declaration": "public init( fillMode: FillMode = .fill, cullMode: CullMode = .none, frontWinding: FrontWinding = .counterClockwise )",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 339,
+  "owner": "",
+  "overloads": [
+   "public struct RasterizationState: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "ray-tracing-capabilities",
+  "name": "RayTracingCapabilities",
+  "kind": "struct",
+  "declaration": "public struct RayTracingCapabilities: Equatable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "accelerationStructures",
+    "kind": "var",
+    "declaration": "public var accelerationStructures = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "computeRayQuery",
+    "kind": "var",
+    "declaration": "public var computeRayQuery = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "pipelines",
+    "kind": "var",
+    "declaration": "public var pipelines = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "update",
+    "kind": "var",
+    "declaration": "public var update = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "compaction",
+    "kind": "var",
+    "declaration": "public var compaction = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "RayTracingCapabilities",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Capabilities.swift",
+  "line": 4,
+  "owner": "",
+  "overloads": [
+   "public struct RayTracingCapabilities: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "recorded-command",
+  "name": "RecordedCommand",
+  "kind": "enum",
+  "declaration": "public enum RecordedCommand: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Commands.swift",
+  "line": 192,
+  "owner": "",
+  "overloads": [
+   "public enum RecordedCommand: Sendable"
+  ]
+ },
+ {
+  "id": "render-color-target",
+  "name": "RenderColorTarget",
+  "kind": "struct",
+  "declaration": "public struct RenderColorTarget: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "resolveTexture",
+    "kind": "var",
+    "declaration": "public var resolveTexture: Texture? = nil",
+    "abstract": "Resolve the multisampled attachment into this single-sample color target.",
+    "discussion": []
+   },
+   {
+    "name": "texture",
+    "kind": "var",
+    "declaration": "public var texture: Texture",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "loadAction",
+    "kind": "var",
+    "declaration": "public var loadAction: ColorLoadAction",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "store",
+    "kind": "var",
+    "declaration": "public var store: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "RenderColorTarget",
+    "kind": "init",
+    "declaration": "public init(texture: Texture, loadAction: ColorLoadAction = .dontCare, store: Bool = true)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Commands.swift",
+  "line": 26,
+  "owner": "",
+  "overloads": [
+   "public struct RenderColorTarget: Sendable"
+  ]
+ },
+ {
+  "id": "render-command",
+  "name": "RenderCommand",
+  "kind": "enum",
+  "declaration": "public enum RenderCommand: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Commands.swift",
+  "line": 115,
+  "owner": "",
+  "overloads": [
+   "public enum RenderCommand: Sendable"
+  ]
+ },
+ {
+  "id": "render-depth-target",
+  "name": "RenderDepthTarget",
+  "kind": "struct",
+  "declaration": "public struct RenderDepthTarget: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "texture",
+    "kind": "var",
+    "declaration": "public var texture: Texture",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "loadAction",
+    "kind": "var",
+    "declaration": "public var loadAction: DepthLoadAction",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "store",
+    "kind": "var",
+    "declaration": "public var store: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "RenderDepthTarget",
+    "kind": "init",
+    "declaration": "public init(texture: Texture, loadAction: DepthLoadAction = .clear(1.0), store: Bool = true)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Commands.swift",
+  "line": 40,
+  "owner": "",
+  "overloads": [
+   "public struct RenderDepthTarget: Sendable"
+  ]
+ },
+ {
+  "id": "render-pass-descriptor",
+  "name": "RenderPassDescriptor",
+  "kind": "struct",
+  "declaration": "public struct RenderPassDescriptor: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "colorTargets",
+    "kind": "var",
+    "declaration": "public var colorTargets: [RenderColorTarget]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "depthTarget",
+    "kind": "var",
+    "declaration": "public var depthTarget: RenderDepthTarget?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "var",
+    "declaration": "public var label: String?",
+    "abstract": "Names this pass in GPU timing and validation output. Purely diagnostic, so it carries no rendering behaviour.",
+    "discussion": []
+   },
+   {
+    "name": "RenderPassDescriptor",
+    "kind": "init",
+    "declaration": "public init(colorTargets: [RenderColorTarget], depthTarget: RenderDepthTarget? = nil, label: String? = nil)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Commands.swift",
+  "line": 52,
+  "owner": "",
+  "overloads": [
+   "public struct RenderPassDescriptor: Sendable"
+  ]
+ },
+ {
+  "id": "render-pass-encoder",
+  "name": "RenderPassEncoder",
+  "kind": "struct",
+  "declaration": "public struct RenderPassEncoder",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "setMeshPipeline",
+    "kind": "func",
+    "declaration": "public mutating func setMeshPipeline(_ pipeline: MeshPipeline)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "drawMeshTasks",
+    "kind": "func",
+    "declaration": "public mutating func drawMeshTasks(x: Int, y: Int = 1, z: Int = 1)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setPipeline",
+    "kind": "func",
+    "declaration": "public mutating func setPipeline(_ pipeline: GraphicsPipeline)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setBindingSet",
+    "kind": "func",
+    "declaration": "public mutating func setBindingSet(_ set: BindingSet, slot: UInt32 = 0, dynamicOffsets: [UInt32] = [])",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setVertexBuffer",
+    "kind": "func",
+    "declaration": "public mutating func setVertexBuffer(_ buffer: Buffer, offset: Int = 0, slot: UInt32 = 0)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setIndexBuffer",
+    "kind": "func",
+    "declaration": "public mutating func setIndexBuffer(_ buffer: Buffer, offset: Int = 0, type: IndexType)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "pushConstant",
+    "kind": "func",
+    "declaration": "public mutating func pushConstant<T>(stage: ShaderStage, slot: UInt32, value: T)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setViewport",
+    "kind": "func",
+    "declaration": "public mutating func setViewport(_ viewport: Viewport)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setScissor",
+    "kind": "func",
+    "declaration": "public mutating func setScissor(_ scissor: ScissorRect)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "draw",
+    "kind": "func",
+    "declaration": "public mutating func draw(vertexCount: Int, instanceCount: Int = 1, firstVertex: Int = 0, firstInstance: Int = 0)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "drawIndexed",
+    "kind": "func",
+    "declaration": "public mutating func drawIndexed(_ args: DrawIndexedArguments)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "drawIndirect",
+    "kind": "func",
+    "declaration": "public mutating func drawIndirect(buffer: Buffer, offset: Int = 0, drawCount: Int = 1)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Commands.swift",
+  "line": 202,
+  "owner": "",
+  "overloads": [
+   "public struct RenderPassEncoder"
+  ]
+ },
+ {
+  "id": "render-pass-record",
+  "name": "RenderPassRecord",
+  "kind": "struct",
+  "declaration": "public struct RenderPassRecord: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "descriptor",
+    "kind": "var",
+    "declaration": "public var descriptor: RenderPassDescriptor",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: [RenderCommand]",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Commands.swift",
+  "line": 179,
+  "owner": "",
+  "overloads": [
+   "public struct RenderPassRecord: Sendable"
+  ]
+ },
+ {
+  "id": "resolved-binding-entry",
+  "name": "ResolvedBindingEntry",
+  "kind": "struct",
+  "declaration": "public struct ResolvedBindingEntry: Sendable",
+  "abstract": "Backend-neutral view of a resolved binding set entry. The backend encoder uses this to bind concrete GPU resources at argument `slot`.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "slot",
+    "kind": "var",
+    "declaration": "public var slot: UInt32",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "type",
+    "kind": "var",
+    "declaration": "public var type: BindingType",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "visibility",
+    "kind": "var",
+    "declaration": "public var visibility: ShaderVisibility",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "resource",
+    "kind": "var",
+    "declaration": "public var resource: BindingResource",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ResolvedBindingEntry",
+    "kind": "init",
+    "declaration": "public init(slot: UInt32, type: BindingType, visibility: ShaderVisibility, resource: BindingResource)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 315,
+  "owner": "",
+  "overloads": [
+   "public struct ResolvedBindingEntry: Sendable"
+  ]
+ },
+ {
+  "id": "resource-kind",
+  "name": "ResourceKind",
+  "kind": "enum",
+  "declaration": "public enum ResourceKind: UInt8, Hashable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "UInt8",
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Validation/StateTracker.swift",
+  "line": 10,
+  "owner": "",
+  "overloads": [
+   "public enum ResourceKind: UInt8, Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "resource-preparation-progress",
+  "name": "ResourcePreparationProgress",
+  "kind": "struct",
+  "declaration": "public struct ResourcePreparationProgress: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "phase",
+    "kind": "let",
+    "declaration": "public let phase: Phase",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "sequence",
+    "kind": "let",
+    "declaration": "public let sequence: UInt64",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "let",
+    "declaration": "public let label: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "currentStep",
+    "kind": "let",
+    "declaration": "public let currentStep: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "completedSteps",
+    "kind": "let",
+    "declaration": "public let completedSteps: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "totalSteps",
+    "kind": "let",
+    "declaration": "public let totalSteps: Int?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "completedCompilations",
+    "kind": "let",
+    "declaration": "public let completedCompilations: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "currentCompilation",
+    "kind": "let",
+    "declaration": "public let currentCompilation: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "failure",
+    "kind": "let",
+    "declaration": "public let failure: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "fraction",
+    "kind": "var",
+    "declaration": "public var fraction: Double?",
+    "abstract": "Work-item progress, not an estimate of remaining driver compilation time.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/ResourcePreparation.swift",
+  "line": 3,
+  "owner": "",
+  "overloads": [
+   "public struct ResourcePreparationProgress: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "resource-ref",
+  "name": "ResourceRef",
+  "kind": "struct",
+  "declaration": "public struct ResourceRef: Hashable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "kind",
+    "kind": "var",
+    "declaration": "public var kind: ResourceKind",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "id",
+    "kind": "var",
+    "declaration": "public var id: UInt32",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "subresourceBase",
+    "kind": "var",
+    "declaration": "public var subresourceBase: UInt16",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "subresourceCount",
+    "kind": "var",
+    "declaration": "public var subresourceCount: UInt16",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ResourceRef",
+    "kind": "init",
+    "declaration": "public init(kind: ResourceKind, id: UInt32, subresourceBase: UInt16 = 0, subresourceCount: UInt16 = 1)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Validation/StateTracker.swift",
+  "line": 16,
+  "owner": "",
+  "overloads": [
+   "public struct ResourceRef: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "resource-state",
+  "name": "ResourceState",
+  "kind": "struct",
+  "declaration": "public struct ResourceState: OptionSet, Sendable",
+  "abstract": "Tracked resource usage state. Equivalent to the Zig port's packed bit struct, but as an `OptionSet` so illegal states cannot be constructed.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "OptionSet",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "rawValue",
+    "kind": "let",
+    "declaration": "public let rawValue: UInt32",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ResourceState",
+    "kind": "init",
+    "declaration": "public init(rawValue: UInt32)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "constantBuffer",
+    "kind": "let",
+    "declaration": "public static let constantBuffer = ResourceState(rawValue: 1 << 0)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "vertexBuffer",
+    "kind": "let",
+    "declaration": "public static let vertexBuffer = ResourceState(rawValue: 1 << 1)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "indexBuffer",
+    "kind": "let",
+    "declaration": "public static let indexBuffer = ResourceState(rawValue: 1 << 2)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "indirectArgument",
+    "kind": "let",
+    "declaration": "public static let indirectArgument = ResourceState(rawValue: 1 << 3)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "shaderResource",
+    "kind": "let",
+    "declaration": "public static let shaderResource = ResourceState(rawValue: 1 << 4)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "unorderedAccess",
+    "kind": "let",
+    "declaration": "public static let unorderedAccess = ResourceState(rawValue: 1 << 5)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "renderTarget",
+    "kind": "let",
+    "declaration": "public static let renderTarget = ResourceState(rawValue: 1 << 6)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "depthWrite",
+    "kind": "let",
+    "declaration": "public static let depthWrite = ResourceState(rawValue: 1 << 7)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "depthRead",
+    "kind": "let",
+    "declaration": "public static let depthRead = ResourceState(rawValue: 1 << 8)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "copyDestination",
+    "kind": "let",
+    "declaration": "public static let copyDestination = ResourceState(rawValue: 1 << 9)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "copySource",
+    "kind": "let",
+    "declaration": "public static let copySource = ResourceState(rawValue: 1 << 10)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "present",
+    "kind": "let",
+    "declaration": "public static let present = ResourceState(rawValue: 1 << 11)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "accelerationStructureRead",
+    "kind": "let",
+    "declaration": "public static let accelerationStructureRead = ResourceState(rawValue: 1 << 12)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "accelerationStructureWrite",
+    "kind": "let",
+    "declaration": "public static let accelerationStructureWrite = ResourceState(rawValue: 1 << 13)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "resolveDestination",
+    "kind": "let",
+    "declaration": "public static let resolveDestination = ResourceState(rawValue: 1 << 14)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "resolveSource",
+    "kind": "let",
+    "declaration": "public static let resolveSource = ResourceState(rawValue: 1 << 15)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/RHITypes.swift",
+  "line": 183,
+  "owner": "",
+  "overloads": [
+   "public struct ResourceState: OptionSet, Sendable"
+  ]
+ },
+ {
+  "id": "rhi-backend",
+  "name": "RHIBackend",
+  "kind": "protocol",
+  "declaration": "public protocol RHIBackend: AnyObject",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "AnyObject"
+  ],
+  "members": [
+   {
+    "name": "readBufferData",
+    "kind": "func",
+    "declaration": "func readBufferData(_ buffer: Buffer, offset: Int, into destination: UnsafeMutableRawBufferPointer) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "registerBindingLayout",
+    "kind": "func",
+    "declaration": "func registerBindingLayout(_ handle: BindingLayout, descriptor: BindingLayoutDescriptor) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "registerPipelineLayout",
+    "kind": "func",
+    "declaration": "func registerPipelineLayout(_ handle: PipelineLayout, descriptor: PipelineLayoutDescriptor) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "createAccelerationStructure",
+    "kind": "func",
+    "declaration": "func createAccelerationStructure(_ handle: AccelerationStructure, descriptor: AccelerationStructureDescriptor) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroyAccelerationStructure",
+    "kind": "func",
+    "declaration": "func destroyAccelerationStructure(_ handle: AccelerationStructure)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "createMeshPipeline",
+    "kind": "func",
+    "declaration": "func createMeshPipeline(_ handle: MeshPipeline, descriptor: MeshPipelineDescriptor) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroyMeshPipeline",
+    "kind": "func",
+    "declaration": "func destroyMeshPipeline(_ handle: MeshPipeline)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "queryAdapterCapabilities",
+    "kind": "func",
+    "declaration": "func queryAdapterCapabilities() -> AdapterCapabilities",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/RHIBackend.swift",
+  "line": 15,
+  "owner": "",
+  "overloads": [
+   "public protocol RHIBackend: AnyObject"
+  ]
+ },
+ {
+  "id": "rhi-error",
+  "name": "RHIError",
+  "kind": "enum",
+  "declaration": "public enum RHIError: Error, CustomStringConvertible, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Error",
+   "CustomStringConvertible",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "description",
+    "kind": "var",
+    "declaration": "public var description: String",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/RHIError.swift",
+  "line": 8,
+  "owner": "",
+  "overloads": [
+   "public enum RHIError: Error, CustomStringConvertible, Equatable"
+  ]
+ },
+ {
+  "id": "rhi-handle",
+  "name": "RHIHandle",
+  "kind": "protocol",
+  "declaration": "public protocol RHIHandle: Hashable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Handles.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public protocol RHIHandle: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "sampler",
+  "name": "Sampler",
+  "kind": "struct",
+  "declaration": "public struct Sampler: RHIHandle",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "RHIHandle"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Handles.swift",
+  "line": 13,
+  "owner": "",
+  "overloads": [
+   "public struct Sampler: RHIHandle"
+  ]
+ },
+ {
+  "id": "sampler-address-mode",
+  "name": "SamplerAddressMode",
+  "kind": "enum",
+  "declaration": "public enum SamplerAddressMode: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/RHITypes.swift",
+  "line": 134,
+  "owner": "",
+  "overloads": [
+   "public enum SamplerAddressMode: Sendable"
+  ]
+ },
+ {
+  "id": "sampler-descriptor",
+  "name": "SamplerDescriptor",
+  "kind": "struct",
+  "declaration": "public struct SamplerDescriptor: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "minFilter",
+    "kind": "var",
+    "declaration": "public var minFilter: SamplerFilter",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "magFilter",
+    "kind": "var",
+    "declaration": "public var magFilter: SamplerFilter",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "mipFilter",
+    "kind": "var",
+    "declaration": "public var mipFilter: SamplerMipFilter",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "addressModeU",
+    "kind": "var",
+    "declaration": "public var addressModeU: SamplerAddressMode",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "addressModeV",
+    "kind": "var",
+    "declaration": "public var addressModeV: SamplerAddressMode",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "addressModeW",
+    "kind": "var",
+    "declaration": "public var addressModeW: SamplerAddressMode",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "compareEnabled",
+    "kind": "var",
+    "declaration": "public var compareEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "compareOp",
+    "kind": "var",
+    "declaration": "public var compareOp: CompareOp",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SamplerDescriptor",
+    "kind": "init",
+    "declaration": "public init( minFilter: SamplerFilter = .linear, magFilter: SamplerFilter = .linear, mipFilter: SamplerMipFilter = .linear, addressModeU: SamplerAddressMode = .repeat, addressModeV: SamplerAddressMode = .repeat, addressModeW: SamplerAddressMode = .repeat, compareEnabled: Bool = false, compareOp: CompareOp = .always )",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 137,
+  "owner": "",
+  "overloads": [
+   "public struct SamplerDescriptor: Sendable"
+  ]
+ },
+ {
+  "id": "sampler-filter",
+  "name": "SamplerFilter",
+  "kind": "enum",
+  "declaration": "public enum SamplerFilter: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/RHITypes.swift",
+  "line": 124,
+  "owner": "",
+  "overloads": [
+   "public enum SamplerFilter: Sendable"
+  ]
+ },
+ {
+  "id": "sampler-mip-filter",
+  "name": "SamplerMipFilter",
+  "kind": "enum",
+  "declaration": "public enum SamplerMipFilter: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/RHITypes.swift",
+  "line": 129,
+  "owner": "",
+  "overloads": [
+   "public enum SamplerMipFilter: Sendable"
+  ]
+ },
+ {
+  "id": "scissor-rect",
+  "name": "ScissorRect",
+  "kind": "struct",
+  "declaration": "public struct ScissorRect: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "x",
+    "kind": "var",
+    "declaration": "public var x: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "y",
+    "kind": "var",
+    "declaration": "public var y: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "width",
+    "kind": "var",
+    "declaration": "public var width: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "height",
+    "kind": "var",
+    "declaration": "public var height: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ScissorRect",
+    "kind": "init",
+    "declaration": "public init(x: Int = 0, y: Int = 0, width: Int, height: Int)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Commands.swift",
+  "line": 80,
+  "owner": "",
+  "overloads": [
+   "public struct ScissorRect: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "shader-format",
+  "name": "ShaderFormat",
+  "kind": "enum",
+  "declaration": "public enum ShaderFormat: String, Codable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "String",
+   "Codable",
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/RHITypes.swift",
+  "line": 19,
+  "owner": "",
+  "overloads": [
+   "public enum ShaderFormat: String, Codable, Sendable"
+  ]
+ },
+ {
+  "id": "shader-module",
+  "name": "ShaderModule",
+  "kind": "struct",
+  "declaration": "public struct ShaderModule: RHIHandle",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "RHIHandle"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Handles.swift",
+  "line": 14,
+  "owner": "",
+  "overloads": [
+   "public struct ShaderModule: RHIHandle"
+  ]
+ },
+ {
+  "id": "shader-module-descriptor",
+  "name": "ShaderModuleDescriptor",
+  "kind": "struct",
+  "declaration": "public struct ShaderModuleDescriptor: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "stage",
+    "kind": "var",
+    "declaration": "public var stage: ShaderStage",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "format",
+    "kind": "var",
+    "declaration": "public var format: ShaderFormat",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "code",
+    "kind": "var",
+    "declaration": "public var code: Data",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "threadgroupSize",
+    "kind": "var",
+    "declaration": "public var threadgroupSize = ThreadgroupSize()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "specializationConstants",
+    "kind": "var",
+    "declaration": "public var specializationConstants: [ShaderSpecializationConstant] = []",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "entryPoint",
+    "kind": "var",
+    "declaration": "public var entryPoint: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ShaderModuleDescriptor",
+    "kind": "init",
+    "declaration": "public init( stage: ShaderStage, format: ShaderFormat, code: Data, entryPoint: String = \"main\" )",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ShaderModuleDescriptor",
+    "kind": "init",
+    "declaration": "public init(metalSource: String, stage: ShaderStage, entryPoint: String = \"main\")",
+    "abstract": "Convenience for MSL source shipped as a string.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 168,
+  "owner": "",
+  "overloads": [
+   "public struct ShaderModuleDescriptor: Sendable"
+  ]
+ },
+ {
+  "id": "shader-stage",
+  "name": "ShaderStage",
+  "kind": "enum",
+  "declaration": "public enum ShaderStage: String, Codable, Hashable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "String",
+   "Codable",
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/RHITypes.swift",
+  "line": 26,
+  "owner": "",
+  "overloads": [
+   "public enum ShaderStage: String, Codable, Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "submit-descriptor",
+  "name": "SubmitDescriptor",
+  "kind": "struct",
+  "declaration": "public struct SubmitDescriptor: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "waitSemaphores",
+    "kind": "var",
+    "declaration": "public var waitSemaphores: [TimelineSemaphore]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "signalSemaphores",
+    "kind": "var",
+    "declaration": "public var signalSemaphores: [TimelineSemaphore]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SubmitDescriptor",
+    "kind": "init",
+    "declaration": "public init( waitSemaphores: [TimelineSemaphore] = [], signalSemaphores: [TimelineSemaphore] = [] )",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Queue.swift",
+  "line": 13,
+  "owner": "",
+  "overloads": [
+   "public struct SubmitDescriptor: Sendable"
+  ]
+ },
+ {
+  "id": "submit-plan",
+  "name": "SubmitPlan",
+  "kind": "struct",
+  "declaration": "public struct SubmitPlan: Sendable",
+  "abstract": "The complete result of planning one frontend submission. It is ordered for execution: release submits (cross-queue) first, then the primary submit.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "submits",
+    "kind": "var",
+    "declaration": "public var submits: [PlannedSubmit]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SubmitPlan",
+    "kind": "init",
+    "declaration": "public init(submits: [PlannedSubmit] = [])",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Submission/Plan.swift",
+  "line": 97,
+  "owner": "",
+  "overloads": [
+   "public struct SubmitPlan: Sendable"
+  ]
+ },
+ {
+  "id": "surface-descriptor",
+  "name": "SurfaceDescriptor",
+  "kind": "struct",
+  "declaration": "public struct SurfaceDescriptor: @unchecked Sendable",
+  "abstract": "Backend-neutral swapchain surface. `kind` identifies the platform handle.",
+  "discussion": [
+   "The opaque pointer is an unmanaged platform object whose lifetime is owned\nby the caller and must remain valid until the device releases the surface."
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "kind",
+    "kind": "var",
+    "declaration": "public var kind: NativeSurfaceKind = .platformDefault",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "display",
+    "kind": "var",
+    "declaration": "public var display: UnsafeMutableRawPointer? = nil",
+    "abstract": "Xlib Display* or Wayland wl_display*. Xlib nativeHandle holds the Window integer as a pointer bit pattern.",
+    "discussion": []
+   },
+   {
+    "name": "nativeHandle",
+    "kind": "var",
+    "declaration": "public var nativeHandle: UnsafeMutableRawPointer?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "width",
+    "kind": "var",
+    "declaration": "public var width: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "height",
+    "kind": "var",
+    "declaration": "public var height: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "colorFormat",
+    "kind": "var",
+    "declaration": "public var colorFormat: TextureFormat",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "vsyncEnabled",
+    "kind": "var",
+    "declaration": "public var vsyncEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SurfaceDescriptor",
+    "kind": "init",
+    "declaration": "public init( nativeHandle: UnsafeMutableRawPointer?, width: Int = 0, height: Int = 0, colorFormat: TextureFormat = NativeRHI.platformDefaultSurfaceFormat, vsyncEnabled: Bool = true )",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 484,
+  "owner": "",
+  "overloads": [
+   "public struct SurfaceDescriptor: @unchecked Sendable"
+  ]
+ },
+ {
+  "id": "swapchain",
+  "name": "Swapchain",
+  "kind": "struct",
+  "declaration": "public struct Swapchain: RHIHandle",
+  "abstract": "One native window swapchain on a device.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "RHIHandle"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Handles.swift",
+  "line": 25,
+  "owner": "",
+  "overloads": [
+   "public struct Swapchain: RHIHandle"
+  ]
+ },
+ {
+  "id": "texture",
+  "name": "Texture",
+  "kind": "struct",
+  "declaration": "public struct Texture: RHIHandle",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "RHIHandle"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Handles.swift",
+  "line": 12,
+  "owner": "",
+  "overloads": [
+   "public struct Texture: RHIHandle"
+  ]
+ },
+ {
+  "id": "texture-capabilities",
+  "name": "TextureCapabilities",
+  "kind": "struct",
+  "declaration": "public struct TextureCapabilities: Equatable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "texture3D",
+    "kind": "var",
+    "declaration": "public var texture3D = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "cube",
+    "kind": "var",
+    "declaration": "public var cube = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextureCapabilities",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Capabilities.swift",
+  "line": 20,
+  "owner": "",
+  "overloads": [
+   "public struct TextureCapabilities: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "texture-descriptor",
+  "name": "TextureDescriptor",
+  "kind": "struct",
+  "declaration": "public struct TextureDescriptor: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "width",
+    "kind": "var",
+    "declaration": "public var width: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "height",
+    "kind": "var",
+    "declaration": "public var height: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "depth",
+    "kind": "var",
+    "declaration": "public var depth: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "layers",
+    "kind": "var",
+    "declaration": "public var layers: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "mipLevels",
+    "kind": "var",
+    "declaration": "public var mipLevels: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "sampleCount",
+    "kind": "var",
+    "declaration": "public var sampleCount: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "format",
+    "kind": "var",
+    "declaration": "public var format: TextureFormat",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "usage",
+    "kind": "var",
+    "declaration": "public var usage: TextureUsage",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "dimension",
+    "kind": "var",
+    "declaration": "public var dimension: TextureDimension",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "transientAttachment",
+    "kind": "var",
+    "declaration": "public var transientAttachment: Bool",
+    "abstract": "Multisample attachment contents are discarded at the end of each pass. Supporting backends may use tile-only storage; other devices retain device-local storage.",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "var",
+    "declaration": "public var label: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextureDescriptor",
+    "kind": "init",
+    "declaration": "public init( width: Int, height: Int, format: TextureFormat, usage: TextureUsage, dimension: TextureDimension = .texture2D, depth: Int = 1, layers: Int = 1, mipLevels: Int = 1, sampleCount: Int = 1, label: String? = nil, transientAttachment: Bool = false )",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 71,
+  "owner": "",
+  "overloads": [
+   "public struct TextureDescriptor: Sendable"
+  ]
+ },
+ {
+  "id": "texture-dimension",
+  "name": "TextureDimension",
+  "kind": "enum",
+  "declaration": "public enum TextureDimension: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/RHITypes.swift",
+  "line": 158,
+  "owner": "",
+  "overloads": [
+   "public enum TextureDimension: Sendable"
+  ]
+ },
+ {
+  "id": "texture-format",
+  "name": "TextureFormat",
+  "kind": "enum",
+  "declaration": "public enum TextureFormat: Hashable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/RHITypes.swift",
+  "line": 165,
+  "owner": "",
+  "overloads": [
+   "public enum TextureFormat: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "texture-subresource",
+  "name": "TextureSubresource",
+  "kind": "struct",
+  "declaration": "public struct TextureSubresource: Hashable, Sendable",
+  "abstract": "One 2D slice of a texture mip. Cube faces use layer indices 0...5. Upload regions are relative to this mip; readback starts at (0, 0).",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "mipLevel",
+    "kind": "var",
+    "declaration": "public var mipLevel: Int = 0",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "layer",
+    "kind": "var",
+    "declaration": "public var layer: Int = 0",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextureSubresource",
+    "kind": "init",
+    "declaration": "public init(mipLevel: Int = 0, layer: Int = 0)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 115,
+  "owner": "",
+  "overloads": [
+   "public struct TextureSubresource: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "texture-usage",
+  "name": "TextureUsage",
+  "kind": "struct",
+  "declaration": "public struct TextureUsage: OptionSet, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "OptionSet",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "rawValue",
+    "kind": "let",
+    "declaration": "public let rawValue: UInt32",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextureUsage",
+    "kind": "init",
+    "declaration": "public init(rawValue: UInt32)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "sampled",
+    "kind": "let",
+    "declaration": "public static let sampled = TextureUsage(rawValue: 1 << 0)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "colorTarget",
+    "kind": "let",
+    "declaration": "public static let colorTarget = TextureUsage(rawValue: 1 << 1)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "depthStencilTarget",
+    "kind": "let",
+    "declaration": "public static let depthStencilTarget = TextureUsage(rawValue: 1 << 2)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "storageRead",
+    "kind": "let",
+    "declaration": "public static let storageRead = TextureUsage(rawValue: 1 << 3)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "storageWrite",
+    "kind": "let",
+    "declaration": "public static let storageWrite = TextureUsage(rawValue: 1 << 4)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "transferSource",
+    "kind": "let",
+    "declaration": "public static let transferSource = TextureUsage(rawValue: 1 << 5)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "transferDestination",
+    "kind": "let",
+    "declaration": "public static let transferDestination = TextureUsage(rawValue: 1 << 6)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "present",
+    "kind": "let",
+    "declaration": "public static let present = TextureUsage(rawValue: 1 << 7)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 123,
+  "owner": "",
+  "overloads": [
+   "public struct TextureUsage: OptionSet, Sendable"
+  ]
+ },
+ {
+  "id": "timeline-semaphore",
+  "name": "TimelineSemaphore",
+  "kind": "struct",
+  "declaration": "public struct TimelineSemaphore: Hashable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "id",
+    "kind": "var",
+    "declaration": "public var id: UInt32",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "value",
+    "kind": "var",
+    "declaration": "public var value: UInt64",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TimelineSemaphore",
+    "kind": "init",
+    "declaration": "public init(id: UInt32, value: UInt64)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Queue.swift",
+  "line": 3,
+  "owner": "",
+  "overloads": [
+   "public struct TimelineSemaphore: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "upload-allocation",
+  "name": "UploadAllocation",
+  "kind": "struct",
+  "declaration": "public struct UploadAllocation<Chunk: UploadRingChunk>",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "chunk",
+    "kind": "let",
+    "declaration": "public let chunk: Chunk",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "offset",
+    "kind": "let",
+    "declaration": "public let offset: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "pointer",
+    "kind": "var",
+    "declaration": "public var pointer: UnsafeMutableRawPointer",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Submission/UploadRing.swift",
+  "line": 18,
+  "owner": "",
+  "overloads": [
+   "public struct UploadAllocation<Chunk: UploadRingChunk>"
+  ]
+ },
+ {
+  "id": "upload-location",
+  "name": "UploadLocation",
+  "kind": "struct",
+  "declaration": "public struct UploadLocation: Sendable",
+  "abstract": "A buffer/slot pair produced by the per-frame upload ring.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "buffer",
+    "kind": "var",
+    "declaration": "public var buffer: Buffer",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "offset",
+    "kind": "var",
+    "declaration": "public var offset: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "UploadLocation",
+    "kind": "init",
+    "declaration": "public init(buffer: Buffer, offset: Int)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Submission/Plan.swift",
+  "line": 13,
+  "owner": "",
+  "overloads": [
+   "public struct UploadLocation: Sendable"
+  ]
+ },
+ {
+  "id": "upload-ring-chunk",
+  "name": "UploadRingChunk",
+  "kind": "protocol",
+  "declaration": "public protocol UploadRingChunk: AnyObject",
+  "abstract": "Backend-provided chunk of GPU-visible storage. On Metal this wraps a shared-storage `MTLBuffer` whose `contents` pointer is directly writable.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "AnyObject"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Submission/UploadRing.swift",
+  "line": 13,
+  "owner": "",
+  "overloads": [
+   "public protocol UploadRingChunk: AnyObject"
+  ]
+ },
+ {
+  "id": "vertex-attribute",
+  "name": "VertexAttribute",
+  "kind": "struct",
+  "declaration": "public struct VertexAttribute: Hashable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "semantic",
+    "kind": "var",
+    "declaration": "public var semantic: VertexSemantic",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "location",
+    "kind": "var",
+    "declaration": "public var location: UInt32",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "format",
+    "kind": "var",
+    "declaration": "public var format: VertexFormat",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "offset",
+    "kind": "var",
+    "declaration": "public var offset: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "bufferIndex",
+    "kind": "var",
+    "declaration": "public var bufferIndex: UInt32",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "VertexAttribute",
+    "kind": "init",
+    "declaration": "public init(location: UInt32, format: VertexFormat, offset: Int, bufferIndex: UInt32 = 0)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 362,
+  "owner": "",
+  "overloads": [
+   "public struct VertexAttribute: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "vertex-buffer-layout",
+  "name": "VertexBufferLayout",
+  "kind": "struct",
+  "declaration": "public struct VertexBufferLayout: Hashable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "stride",
+    "kind": "var",
+    "declaration": "public var stride: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "stepRate",
+    "kind": "var",
+    "declaration": "public var stepRate: VertexInputRate",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "VertexBufferLayout",
+    "kind": "init",
+    "declaration": "public init(stride: Int, stepRate: VertexInputRate = .perVertex)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 378,
+  "owner": "",
+  "overloads": [
+   "public struct VertexBufferLayout: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "vertex-format",
+  "name": "VertexFormat",
+  "kind": "enum",
+  "declaration": "public enum VertexFormat: Hashable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/RHITypes.swift",
+  "line": 145,
+  "owner": "",
+  "overloads": [
+   "public enum VertexFormat: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "vertex-input-rate",
+  "name": "VertexInputRate",
+  "kind": "enum",
+  "declaration": "public enum VertexInputRate: Hashable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/RHITypes.swift",
+  "line": 140,
+  "owner": "",
+  "overloads": [
+   "public enum VertexInputRate: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "vertex-layout-descriptor",
+  "name": "VertexLayoutDescriptor",
+  "kind": "struct",
+  "declaration": "public struct VertexLayoutDescriptor: Hashable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "attributes",
+    "kind": "var",
+    "declaration": "public var attributes: [VertexAttribute]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "bufferLayouts",
+    "kind": "var",
+    "declaration": "public var bufferLayouts: [VertexBufferLayout]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "VertexLayoutDescriptor",
+    "kind": "init",
+    "declaration": "public init(attributes: [VertexAttribute], bufferLayouts: [VertexBufferLayout])",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 388,
+  "owner": "",
+  "overloads": [
+   "public struct VertexLayoutDescriptor: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "vertex-semantic",
+  "name": "VertexSemantic",
+  "kind": "struct",
+  "declaration": "public struct VertexSemantic: Hashable, Sendable",
+  "abstract": "HLSL input semantic for DXIL. Slang's default user varying mapping uses TEXCOORD.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "name",
+    "kind": "var",
+    "declaration": "public var name = \"TEXCOORD\" public var index: UInt32",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "VertexSemantic",
+    "kind": "init",
+    "declaration": "public init(index: UInt32)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Descriptors.swift",
+  "line": 356,
+  "owner": "",
+  "overloads": [
+   "public struct VertexSemantic: Hashable, Sendable"
+  ]
+ },
+ {
+  "id": "viewport",
+  "name": "Viewport",
+  "kind": "struct",
+  "declaration": "public struct Viewport: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "x",
+    "kind": "var",
+    "declaration": "public var x: Double",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "y",
+    "kind": "var",
+    "declaration": "public var y: Double",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "width",
+    "kind": "var",
+    "declaration": "public var width: Double",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "height",
+    "kind": "var",
+    "declaration": "public var height: Double",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minDepth",
+    "kind": "var",
+    "declaration": "public var minDepth: Double",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maxDepth",
+    "kind": "var",
+    "declaration": "public var maxDepth: Double",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Viewport",
+    "kind": "init",
+    "declaration": "public init(x: Double = 0, y: Double = 0, width: Double, height: Double, minDepth: Double = 0, maxDepth: Double = 1)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Commands.swift",
+  "line": 66,
+  "owner": "",
+  "overloads": [
+   "public struct Viewport: Sendable"
+  ]
+ },
+ {
+  "id": "chunk-upload-allocator",
+  "name": "ChunkUploadAllocator",
+  "kind": "class",
+  "declaration": "public final class ChunkUploadAllocator<Chunk: UploadRingChunk>",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "ChunkUploadAllocator",
+    "kind": "init",
+    "declaration": "public init(defaultChunkSize: Int = 4 * 1_024 * 1_024, factory: @escaping (Int) throws -> Chunk)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "reset",
+    "kind": "func",
+    "declaration": "public func reset()",
+    "abstract": "Called when the owning frame slot begins (GPU work from the previous use of the slot has already been waited on).",
+    "discussion": []
+   },
+   {
+    "name": "totalChunkCapacity",
+    "kind": "var",
+    "declaration": "public var totalChunkCapacity: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "allocate",
+    "kind": "func",
+    "declaration": "public func allocate(size: Int, alignment: Int = 256) throws -> UploadAllocation<Chunk>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "write",
+    "kind": "func",
+    "declaration": "public func write(_ bytes: UnsafeRawBufferPointer, alignment: Int = 256) throws -> UploadAllocation<Chunk>",
+    "abstract": "Copies `bytes` straight into ring storage. Callers that already own contiguous memory use this to skip building an intermediate `Data`.",
+    "discussion": []
+   },
+   {
+    "name": "write",
+    "kind": "func",
+    "declaration": "public func write(_ data: Data, alignment: Int = 256) throws -> UploadAllocation<Chunk>",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Submission/UploadRing.swift",
+  "line": 27,
+  "owner": "",
+  "overloads": [
+   "public final class ChunkUploadAllocator<Chunk: UploadRingChunk>"
+  ]
+ },
+ {
+  "id": "command-buffer",
+  "name": "CommandBuffer",
+  "kind": "class",
+  "declaration": "public final class CommandBuffer",
+  "abstract": "A reusable, resettable list of recorded commands.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "CommandBuffer",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "reset",
+    "kind": "func",
+    "declaration": "public func reset()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEmpty",
+    "kind": "var",
+    "declaration": "public var isEmpty: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "renderPass",
+    "kind": "func",
+    "declaration": "public func renderPass( descriptor: RenderPassDescriptor, _ body: (inout RenderPassEncoder) throws -> Void ) rethrows",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "computePass",
+    "kind": "func",
+    "declaration": "public func computePass(_ body: (inout ComputePassEncoder) throws -> Void) rethrows",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "copyPass",
+    "kind": "func",
+    "declaration": "public func copyPass(_ body: (inout CopyPassEncoder) throws -> Void) rethrows",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "barrier",
+    "kind": "func",
+    "declaration": "public func barrier(_ barrier: BarrierCommand)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Commands.swift",
+  "line": 314,
+  "owner": "",
+  "overloads": [
+   "public final class CommandBuffer"
+  ]
+ },
+ {
+  "id": "device",
+  "name": "Device",
+  "kind": "class",
+  "declaration": "public final class Device: @unchecked Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "supportsBackgroundCompilation",
+    "kind": "var",
+    "declaration": "public var supportsBackgroundCompilation: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "backendAPI",
+    "kind": "let",
+    "declaration": "public let backendAPI: GraphicsAPI",
+    "abstract": "The graphics API of the selected backend.",
+    "discussion": []
+   },
+   {
+    "name": "capabilities",
+    "kind": "let",
+    "declaration": "public let capabilities: Capabilities",
+    "abstract": "Features implemented by this backend and supported by the selected device.",
+    "discussion": []
+   },
+   {
+    "name": "adapterCapabilities",
+    "kind": "let",
+    "declaration": "public let adapterCapabilities: AdapterCapabilities",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "config",
+    "kind": "let",
+    "declaration": "public let config: DeviceConfig",
+    "abstract": "The configuration the device was created with.",
+    "discussion": []
+   },
+   {
+    "name": "make",
+    "kind": "func",
+    "declaration": "public static func make(_ config: DeviceConfig = DeviceConfig()) throws -> Device",
+    "abstract": "Creates a device, trying the configured backends in order and using the first that constructs successfully.",
+    "discussion": []
+   },
+   {
+    "name": "deviceName",
+    "kind": "var",
+    "declaration": "public var deviceName: String",
+    "abstract": "Human-readable physical device / adapter name.",
+    "discussion": []
+   },
+   {
+    "name": "makeSwapchain",
+    "kind": "func",
+    "declaration": "public func makeSwapchain(_ descriptor: SurfaceDescriptor) throws -> Swapchain",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "configureSwapchain",
+    "kind": "func",
+    "declaration": "public func configureSwapchain(_ handle: Swapchain, descriptor: SurfaceDescriptor) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroy",
+    "kind": "func",
+    "declaration": "public func destroy(_ handle: Swapchain)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "presentationMode",
+    "kind": "func",
+    "declaration": "public func presentationMode(for handle: Swapchain) throws -> PresentationMode",
+    "abstract": "Queries the applied native mode, including a synchronized fallback when disabling VSync is unsupported. Refreshes after native swapchain recreation.",
+    "discussion": []
+   },
+   {
+    "name": "withFrameSession",
+    "kind": "func",
+    "declaration": "public func withFrameSession<T>(_ body: () throws -> T) rethrows -> T",
+    "abstract": "Serializes a complete host operation, including resource preparation, beginFrame, submissions, presentation and endFrame, on a shared device. Low-level frame methods still require balanced begin/end on their caller.",
+    "discussion": []
+   },
+   {
+    "name": "makeBuffer",
+    "kind": "func",
+    "declaration": "public func makeBuffer(_ descriptor: BufferDescriptor) throws -> Buffer",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeTexture",
+    "kind": "func",
+    "declaration": "public func makeTexture(_ descriptor: TextureDescriptor) throws -> Texture",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "textureAllocation",
+    "kind": "func",
+    "declaration": "public func textureAllocation(of texture: Texture) -> TextureAllocation?",
+    "abstract": "Allocation of this resource, when the backend can report it.",
+    "discussion": []
+   },
+   {
+    "name": "makeSampler",
+    "kind": "func",
+    "declaration": "public func makeSampler(_ descriptor: SamplerDescriptor = SamplerDescriptor()) throws -> Sampler",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeShaderModule",
+    "kind": "func",
+    "declaration": "public func makeShaderModule(_ descriptor: ShaderModuleDescriptor) throws -> ShaderModule",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeAccelerationStructure",
+    "kind": "func",
+    "declaration": "public func makeAccelerationStructure(_ descriptor: AccelerationStructureDescriptor) throws -> AccelerationStructure",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "recordBuild",
+    "kind": "func",
+    "declaration": "public func recordBuild(_ structure: AccelerationStructure, into commands: CommandBuffer) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroy",
+    "kind": "func",
+    "declaration": "public func destroy(_ structure: AccelerationStructure)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroy",
+    "kind": "func",
+    "declaration": "public func destroy(_ buffer: Buffer)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroy",
+    "kind": "func",
+    "declaration": "public func destroy(_ texture: Texture)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroy",
+    "kind": "func",
+    "declaration": "public func destroy(_ sampler: Sampler)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroy",
+    "kind": "func",
+    "declaration": "public func destroy(_ shader: ShaderModule)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeGraphicsPipeline",
+    "kind": "func",
+    "declaration": "public func makeGraphicsPipeline(_ descriptor: GraphicsPipelineDescriptor) throws -> GraphicsPipeline",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeMeshPipeline",
+    "kind": "func",
+    "declaration": "public func makeMeshPipeline(_ descriptor: MeshPipelineDescriptor) throws -> MeshPipeline",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroy",
+    "kind": "func",
+    "declaration": "public func destroy(_ pipeline: MeshPipeline)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeComputePipeline",
+    "kind": "func",
+    "declaration": "public func makeComputePipeline(_ descriptor: ComputePipelineDescriptor) throws -> ComputePipeline",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroy",
+    "kind": "func",
+    "declaration": "public func destroy(_ pipeline: GraphicsPipeline)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroy",
+    "kind": "func",
+    "declaration": "public func destroy(_ pipeline: ComputePipeline)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeBindingLayout",
+    "kind": "func",
+    "declaration": "public func makeBindingLayout(_ descriptor: BindingLayoutDescriptor) throws -> BindingLayout",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makePipelineLayout",
+    "kind": "func",
+    "declaration": "public func makePipelineLayout(_ descriptor: PipelineLayoutDescriptor) throws -> PipelineLayout",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeBindingSet",
+    "kind": "func",
+    "declaration": "public func makeBindingSet(layout: BindingLayout, descriptor: BindingSetDescriptor) throws -> BindingSet",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "beginFrame",
+    "kind": "func",
+    "declaration": "public func beginFrame() throws",
+    "abstract": "Begins a frame, blocking the CPU only if the chosen slot's prior frame is still executing on the GPU.",
+    "discussion": []
+   },
+   {
+    "name": "endFrame",
+    "kind": "func",
+    "declaration": "public func endFrame()",
+    "abstract": "Ends the frame and releases the per-frame upload context.",
+    "discussion": []
+   },
+   {
+    "name": "uploadTransient",
+    "kind": "func",
+    "declaration": "public func uploadTransient(_ data: Data, alignment: Int = 256) throws -> UploadLocation",
+    "abstract": "Suballocates transient per-frame storage (for push constants / small constants) and returns the buffer + offset to bind.",
+    "discussion": []
+   },
+   {
+    "name": "uploadTransient",
+    "kind": "func",
+    "declaration": "public func uploadTransient(_ bytes: UnsafeRawBufferPointer, alignment: Int = 256) throws -> UploadLocation",
+    "abstract": "Copies `bytes` into per-frame storage without an intermediate `Data`. The pointer is only read before this call returns.",
+    "discussion": []
+   },
+   {
+    "name": "supportsGPUTimestamps",
+    "kind": "var",
+    "declaration": "public var supportsGPUTimestamps: Bool",
+    "abstract": "Whether this backend can timestamp GPU execution for queued submissions.",
+    "discussion": []
+   },
+   {
+    "name": "setGPUTimestampProfile",
+    "kind": "func",
+    "declaration": "public func setGPUTimestampProfile(_ profile: GPUTimestampProfile?)",
+    "abstract": "Attaches a GPU timing profile, or `nil` to stop recording. Sampling starts with the next submission; results arrive asynchronously on the backend's completion thread, so read them once the sampled frames have retired.",
+    "discussion": []
+   },
+   {
+    "name": "submit",
+    "kind": "func",
+    "declaration": "public func submit( _ commandBuffer: CommandBuffer, queue: QueueClass = .graphics, waits: [TimelineSemaphore] = [], signals: [TimelineSemaphore] = [], cpuProfile: SubmissionCPUProfile? = nil ) throws",
+    "abstract": "Plans and submits a recorded command buffer. Submission is asynchronous; completion is tracked against the current frame slot.",
+    "discussion": []
+   },
+   {
+    "name": "acquireSwapchainImage",
+    "kind": "func",
+    "declaration": "public func acquireSwapchainImage(_ handle: Swapchain) throws -> SwapchainImage",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "present",
+    "kind": "func",
+    "declaration": "public func present(_ image: SwapchainImage) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "uploadBufferData",
+    "kind": "func",
+    "declaration": "public func uploadBufferData(_ buffer: Buffer, offset: Int = 0, data: Data) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "readBufferData",
+    "kind": "func",
+    "declaration": "public func readBufferData(_ buffer: Buffer, offset: Int = 0, into destination: UnsafeMutableRawBufferPointer) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "uploadTextureData",
+    "kind": "func",
+    "declaration": "public func uploadTextureData( _ texture: Texture, data: Data, region: TextureUploadRegion, bytesPerRow: Int, subresource: TextureSubresource = .init() ) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "readTextureData",
+    "kind": "func",
+    "declaration": "public func readTextureData( _ texture: Texture, width: Int, height: Int, bytesPerRow: Int, subresource: TextureSubresource = .init(), into destination: UnsafeMutableRawBufferPointer ) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "bindingSetCacheStats",
+    "kind": "var",
+    "declaration": "public var bindingSetCacheStats: CacheStats",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "pipelineStatistics",
+    "kind": "var",
+    "declaration": "public var pipelineStatistics: PipelineStatistics",
+    "abstract": "Cold/warm pipeline creation counters, per kind. Reading this is lock-protected and does not touch the GPU.",
+    "discussion": []
+   },
+   {
+    "name": "resetPipelineStatistics",
+    "kind": "func",
+    "declaration": "public func resetPipelineStatistics()",
+    "abstract": "Clears the counters but keeps interned pipelines alive.",
+    "discussion": []
+   },
+   {
+    "name": "waitUntilIdle",
+    "kind": "func",
+    "declaration": "public func waitUntilIdle() throws",
+    "abstract": "Blocks until all queued GPU work has completed.",
+    "discussion": []
+   },
+   {
+    "name": "makeShaderModuleAsync",
+    "kind": "func",
+    "declaration": "public func makeShaderModuleAsync(_ descriptor: ShaderModuleDescriptor, onProgress: @escaping @Sendable (ResourcePreparationProgress) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeGraphicsPipelineAsync",
+    "kind": "func",
+    "declaration": "public func makeGraphicsPipelineAsync(_ descriptor: GraphicsPipelineDescriptor, onProgress: @escaping @Sendable (ResourcePreparationProgress) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeComputePipelineAsync",
+    "kind": "func",
+    "declaration": "public func makeComputePipelineAsync(_ descriptor: ComputePipelineDescriptor, onProgress: @escaping @Sendable (ResourcePreparationProgress) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeMeshPipelineAsync",
+    "kind": "func",
+    "declaration": "public func makeMeshPipelineAsync(_ descriptor: MeshPipelineDescriptor, onProgress: @escaping @Sendable (ResourcePreparationProgress) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "prepareResources",
+    "kind": "func",
+    "declaration": "public func prepareResources<T>(label: String, totalSteps: Int? = nil, onProgress: @escaping @Sendable (ResourcePreparationProgress) -> Void =",
+    "abstract": "Builds owned resources off the caller's actor. The returned value is transferred once; callers need not mark mutable renderers Sendable.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/Device.swift",
+  "line": 29,
+  "owner": "",
+  "overloads": [
+   "public final class Device: @unchecked Sendable"
+  ]
+ },
+ {
+  "id": "dx12-device",
+  "name": "DX12Device",
+  "kind": "class",
+  "declaration": "public final class DX12Device: RHIBackend",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "RHIBackend"
+  ],
+  "members": [
+   {
+    "name": "deviceName",
+    "kind": "let",
+    "declaration": "public let deviceName: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "api",
+    "kind": "var",
+    "declaration": "public var api: GraphicsAPI",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "make",
+    "kind": "func",
+    "declaration": "public static func make(config: DeviceConfig) throws -> RHIBackend",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "queryCapabilities",
+    "kind": "func",
+    "declaration": "public func queryCapabilities() -> Capabilities",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "queryAdapterCapabilities",
+    "kind": "func",
+    "declaration": "public func queryAdapterCapabilities() -> AdapterCapabilities",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "configureSwapchain",
+    "kind": "func",
+    "declaration": "public func configureSwapchain(_ handle: Swapchain, descriptor surface: SurfaceDescriptor) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "acquireSwapchainImage",
+    "kind": "func",
+    "declaration": "public func acquireSwapchainImage(_ handle: Swapchain) throws -> SwapchainImage",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "presentationMode",
+    "kind": "func",
+    "declaration": "public func presentationMode(for handle: Swapchain) throws -> PresentationMode",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroySwapchain",
+    "kind": "func",
+    "declaration": "public func destroySwapchain(_ handle: Swapchain)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "present",
+    "kind": "func",
+    "declaration": "public func present(_ image: SwapchainImage, completion: @escaping () -> Void) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "waitUntilIdle",
+    "kind": "func",
+    "declaration": "public func waitUntilIdle() throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeFrameUploader",
+    "kind": "func",
+    "declaration": "public func makeFrameUploader(slot: Int) -> FrameUploader",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroyBuffer",
+    "kind": "func",
+    "declaration": "public func destroyBuffer(_ handle: Buffer)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroyTexture",
+    "kind": "func",
+    "declaration": "public func destroyTexture(_ handle: Texture)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroySampler",
+    "kind": "func",
+    "declaration": "public func destroySampler(_ handle: Sampler)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroyShaderModule",
+    "kind": "func",
+    "declaration": "public func destroyShaderModule(_ handle: ShaderModule)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroyGraphicsPipeline",
+    "kind": "func",
+    "declaration": "public func destroyGraphicsPipeline(_ handle: GraphicsPipeline)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroyComputePipeline",
+    "kind": "func",
+    "declaration": "public func destroyComputePipeline(_ handle: ComputePipeline)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroyMeshPipeline",
+    "kind": "func",
+    "declaration": "public func destroyMeshPipeline(_ handle: MeshPipeline)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroyAccelerationStructure",
+    "kind": "func",
+    "declaration": "public func destroyAccelerationStructure(_ handle: AccelerationStructure)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "unregisterBindingSet",
+    "kind": "func",
+    "declaration": "public func unregisterBindingSet(_ handle: BindingSet)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "submit",
+    "kind": "func",
+    "declaration": "public func submit(_ submit: PlannedSubmit, cpuProfile: SubmissionCPUProfile? = nil, completion: @escaping () -> Void) throws",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/DX12/DX12Device.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public final class DX12Device: RHIBackend"
+  ]
+ },
+ {
+  "id": "frame-ring",
+  "name": "FrameRing",
+  "kind": "class",
+  "declaration": "public final class FrameRing",
+  "abstract": "Frame completion requires both endFrame and completion of every submission. Condition variables avoid accumulating stale semaphore signals on slot reuse.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "FrameRing",
+    "kind": "init",
+    "declaration": "public init(slotCount: Int)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "slotCount",
+    "kind": "var",
+    "declaration": "public var slotCount: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "currentSlotIndex",
+    "kind": "var",
+    "declaration": "public var currentSlotIndex: Int?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "begin",
+    "kind": "func",
+    "declaration": "public func begin() -> Slot",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "end",
+    "kind": "func",
+    "declaration": "public func end()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "retireCurrent",
+    "kind": "func",
+    "declaration": "public func retireCurrent(_ action: @escaping () -> Void)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "registerCommandBuffer",
+    "kind": "func",
+    "declaration": "public func registerCommandBuffer(slotIndex: Int)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "unregisterCommandBuffer",
+    "kind": "func",
+    "declaration": "public func unregisterCommandBuffer(slotIndex: Int)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "commandBufferCompleted",
+    "kind": "func",
+    "declaration": "public func commandBufferCompleted(slotIndex: Int)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "waitUntilIdle",
+    "kind": "func",
+    "declaration": "public func waitUntilIdle()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Submission/FrameRing.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public final class FrameRing"
+  ]
+ },
+ {
+  "id": "gpu-timestamp-profile",
+  "name": "GPUTimestampProfile",
+  "kind": "class",
+  "declaration": "public final class GPUTimestampProfile: @unchecked Sendable",
+  "abstract": "Optional asynchronous GPU timing for queued submissions.",
+  "discussion": [
+   "Backends that cannot timestamp leave the profile untouched; callers check\n`Device.supportsGPUTimestamps` before attaching one. Results reach the profile\nfrom the backend's completion thread once the GPU retires the work, so read\nthem after the sampled frames have retired rather than right after submit.",
+   "Values cover GPU execution only. Queue wait, swapchain acquire and present are\nnot included, and an unfinished marker is omitted rather than reported as zero."
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "GPUTimestampProfile",
+    "kind": "init",
+    "declaration": "public init(markerLimit: Int = 600)",
+    "abstract": "Bounded so an unbounded session cannot grow the sample list for ever.",
+    "discussion": []
+   },
+   {
+    "name": "status",
+    "kind": "var",
+    "declaration": "public var status: String",
+    "abstract": "Why recording is or is not producing markers. `ok` means the backend is resolving queries; any other value names the gate that stopped it, which is the difference between \"slow\" and \"not measured\".",
+    "discussion": []
+   },
+   {
+    "name": "recordedMarkers",
+    "kind": "var",
+    "declaration": "public var recordedMarkers: [Marker]",
+    "abstract": "Markers retained so far, in completion order. Shorter than `sampleCount` once the limit was reached, which is how truncation becomes visible.",
+    "discussion": []
+   },
+   {
+    "name": "sampleCount",
+    "kind": "var",
+    "declaration": "public var sampleCount: Int",
+    "abstract": "Total markers completed, including any not retained past `markerLimit`.",
+    "discussion": []
+   },
+   {
+    "name": "reset",
+    "kind": "func",
+    "declaration": "public func reset()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Submission/GPUTimestampProfile.swift",
+  "line": 12,
+  "owner": "",
+  "overloads": [
+   "public final class GPUTimestampProfile: @unchecked Sendable"
+  ]
+ },
+ {
+  "id": "metal-device",
+  "name": "MetalDevice",
+  "kind": "class",
+  "declaration": "public final class MetalDevice: RHIBackend, GPUTimestampRecording",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "RHIBackend",
+   "GPUTimestampRecording"
+  ],
+  "members": [
+   {
+    "name": "gpuTimestampProfile",
+    "kind": "var",
+    "declaration": "public var gpuTimestampProfile: GPUTimestampProfile?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "api",
+    "kind": "let",
+    "declaration": "public let api: GraphicsAPI = .metal",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "make",
+    "kind": "func",
+    "declaration": "public static func make(config: DeviceConfig) throws -> RHIBackend",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "deviceName",
+    "kind": "var",
+    "declaration": "public var deviceName: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "queryAdapterCapabilities",
+    "kind": "func",
+    "declaration": "public func queryAdapterCapabilities() -> AdapterCapabilities",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "queryCapabilities",
+    "kind": "func",
+    "declaration": "public func queryCapabilities() -> Capabilities",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "configureSwapchain",
+    "kind": "func",
+    "declaration": "public func configureSwapchain(_ handle: Swapchain, descriptor: SurfaceDescriptor) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "presentationMode",
+    "kind": "func",
+    "declaration": "public func presentationMode(for handle: Swapchain) throws -> PresentationMode",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroySwapchain",
+    "kind": "func",
+    "declaration": "public func destroySwapchain(_ handle: Swapchain)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "prepareCompilation",
+    "kind": "func",
+    "declaration": "public func prepareCompilation(_ request: RHICompilationRequest) throws -> RHICompilationWork",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "createBuffer",
+    "kind": "func",
+    "declaration": "public func createBuffer(_ handle: Buffer, descriptor: BufferDescriptor) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "createTexture",
+    "kind": "func",
+    "declaration": "public func createTexture(_ handle: Texture, descriptor: TextureDescriptor) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "createSampler",
+    "kind": "func",
+    "declaration": "public func createSampler(_ handle: Sampler, descriptor: SamplerDescriptor) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "createShaderModule",
+    "kind": "func",
+    "declaration": "public func createShaderModule(_ handle: ShaderModule, descriptor: ShaderModuleDescriptor) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "createGraphicsPipeline",
+    "kind": "func",
+    "declaration": "public func createGraphicsPipeline(_ handle: GraphicsPipeline, descriptor: GraphicsPipelineDescriptor) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "createComputePipeline",
+    "kind": "func",
+    "declaration": "public func createComputePipeline(_ handle: ComputePipeline, descriptor: ComputePipelineDescriptor) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroyBuffer",
+    "kind": "func",
+    "declaration": "public func destroyBuffer(_ handle: Buffer)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroyTexture",
+    "kind": "func",
+    "declaration": "public func destroyTexture(_ handle: Texture)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroySampler",
+    "kind": "func",
+    "declaration": "public func destroySampler(_ handle: Sampler)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroyShaderModule",
+    "kind": "func",
+    "declaration": "public func destroyShaderModule(_ handle: ShaderModule)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroyGraphicsPipeline",
+    "kind": "func",
+    "declaration": "public func destroyGraphicsPipeline(_ handle: GraphicsPipeline)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroyComputePipeline",
+    "kind": "func",
+    "declaration": "public func destroyComputePipeline(_ handle: ComputePipeline)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "textureAllocation",
+    "kind": "func",
+    "declaration": "public func textureAllocation(_ texture: Texture) -> TextureAllocation?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "registerBindingLayout",
+    "kind": "func",
+    "declaration": "public func registerBindingLayout(_ handle: BindingLayout, descriptor: BindingLayoutDescriptor) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "registerPipelineLayout",
+    "kind": "func",
+    "declaration": "public func registerPipelineLayout(_ handle: PipelineLayout, descriptor: PipelineLayoutDescriptor) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "registerBindingSet",
+    "kind": "func",
+    "declaration": "public func registerBindingSet( _ handle: BindingSet, layout: BindingLayout, layoutEntries: [BindingLayoutEntry], setEntries: [BindingSetEntry] ) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "unregisterBindingSet",
+    "kind": "func",
+    "declaration": "public func unregisterBindingSet(_ handle: BindingSet)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "readBufferData",
+    "kind": "func",
+    "declaration": "public func readBufferData(_ buffer: Buffer, offset: Int, into destination: UnsafeMutableRawBufferPointer) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "uploadBufferData",
+    "kind": "func",
+    "declaration": "public func uploadBufferData(_ buffer: Buffer, offset: Int, data: Data) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "uploadTextureData",
+    "kind": "func",
+    "declaration": "public func uploadTextureData( _ texture: Texture, data: Data, region: TextureUploadRegion, bytesPerRow: Int, subresource: TextureSubresource ) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "readTextureData",
+    "kind": "func",
+    "declaration": "public func readTextureData( _ texture: Texture, width: Int, height: Int, bytesPerRow: Int, subresource: TextureSubresource, into destination: UnsafeMutableRawBufferPointer ) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "acquireSwapchainImage",
+    "kind": "func",
+    "declaration": "public func acquireSwapchainImage(_ handle: Swapchain) throws -> SwapchainImage",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "present",
+    "kind": "func",
+    "declaration": "public func present(_ image: SwapchainImage, completion: @escaping () -> Void) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeFrameUploader",
+    "kind": "func",
+    "declaration": "public func makeFrameUploader(slot: Int) -> FrameUploader",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "waitUntilIdle",
+    "kind": "func",
+    "declaration": "public func waitUntilIdle() throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "createAccelerationStructure",
+    "kind": "func",
+    "declaration": "public func createAccelerationStructure(_ handle: AccelerationStructure, descriptor: AccelerationStructureDescriptor) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroyAccelerationStructure",
+    "kind": "func",
+    "declaration": "public func destroyAccelerationStructure(_ handle: AccelerationStructure)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "createMeshPipeline",
+    "kind": "func",
+    "declaration": "public func createMeshPipeline(_ handle: MeshPipeline, descriptor: MeshPipelineDescriptor) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroyMeshPipeline",
+    "kind": "func",
+    "declaration": "public func destroyMeshPipeline(_ handle: MeshPipeline)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "submit",
+    "kind": "func",
+    "declaration": "public func submit(_ submit: PlannedSubmit, cpuProfile: SubmissionCPUProfile? = nil, completion: @escaping () -> Void) throws",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Metal/MetalDevice.swift",
+  "line": 27,
+  "owner": "",
+  "overloads": [
+   "public final class MetalDevice: RHIBackend, GPUTimestampRecording"
+  ]
+ },
+ {
+  "id": "native-draw-list-renderer",
+  "name": "NativeDrawListRenderer",
+  "kind": "class",
+  "declaration": "public final class NativeDrawListRenderer",
+  "abstract": "Consumes CoveUI geometry on a caller-owned NativeRHI frame and command list. Call methods serially per renderer. Siblings share immutable GPU resources; their frame uploads and pending-patch acknowledgements remain independent.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "NativeDrawListRenderer",
+    "kind": "init",
+    "declaration": "public init(device: Device) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "configure",
+    "kind": "func",
+    "declaration": "public func configure(format: TextureFormat, sampleCount: Int = 1) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makeSibling",
+    "kind": "func",
+    "declaration": "public func makeSibling(format: TextureFormat, sampleCount: Int = 1) throws -> NativeDrawListRenderer",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "makePresentationRenderer",
+    "kind": "func",
+    "declaration": "public func makePresentationRenderer(format: TextureFormat, sampleCount: Int = 1) throws -> NativeDrawListRenderer",
+    "abstract": "Independent presentation/history with shared font and image residency. Serialize these renderers on their device, as with a single renderer.",
+    "discussion": []
+   },
+   {
+    "name": "estimatedPresentationTextureBytes",
+    "kind": "var",
+    "declaration": "public var estimatedPresentationTextureBytes: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "presentationMSAALogicalBytes",
+    "kind": "var",
+    "declaration": "public var presentationMSAALogicalBytes: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "presentationMSAAAllocatedBytes",
+    "kind": "var",
+    "declaration": "public var presentationMSAAAllocatedBytes: Int?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "presentationMSAAMemoryless",
+    "kind": "var",
+    "declaration": "public var presentationMSAAMemoryless: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "trimPresentationResources",
+    "kind": "func",
+    "declaration": "public func trimPresentationResources()",
+    "abstract": "Drops derived per-presentation resources, keeping shared texture uploads and warmed pipelines. A resumed reveal needs a fresh previous frame.",
+    "discussion": []
+   },
+   {
+    "name": "supportsBackdrop",
+    "kind": "var",
+    "declaration": "public var supportsBackdrop: Bool",
+    "abstract": "Whether the renderer has configured its backdrop/compositing pipeline.",
+    "discussion": []
+   },
+   {
+    "name": "recordBlit",
+    "kind": "func",
+    "declaration": "public func recordBlit(source: Texture, into commands: CommandBuffer, target: RenderColorTarget, size: SIMD2<Int>) throws",
+    "abstract": "Hands an owned frame to the swapchain, which is a render target only and must never be sampled by a backdrop.",
+    "discussion": []
+   },
+   {
+    "name": "synchronizeTextures",
+    "kind": "func",
+    "declaration": "public func synchronizeTextures(from source: NativeDrawListRenderer) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "registerTexture",
+    "kind": "func",
+    "declaration": "public func registerTexture(id: TextureID, pixels: Data, size: SIMD2<Int>, region: TextureUploadRegion, format: TextureFormat) throws",
+    "abstract": "Stages tightly packed R8 or RGBA8 pixels. Initial partial registration zeroes untouched texels; uploads execute on the next recorded frame.",
+    "discussion": []
+   },
+   {
+    "name": "registerExternalColorTexture",
+    "kind": "func",
+    "declaration": "public func registerExternalColorTexture(id: TextureID, resource: TextureResource) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "unregisterTexture",
+    "kind": "func",
+    "declaration": "public func unregisterTexture(id: TextureID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "record",
+    "kind": "func",
+    "declaration": "public func record(list: DrawList, into commands: CommandBuffer, target: RenderColorTarget, viewport: NativeUIViewport, backdropSource: Texture? = nil) throws -> NativeUIDrawFrame",
+    "abstract": "- Parameter backdropSource: the texture holding this frame so far, when the caller renders into one it owns. `nil` disables frosted panels: the blur needs to sample the frame, and a swapchain image cannot be.",
+    "discussion": []
+   },
+   {
+    "name": "recordPresentation",
+    "kind": "func",
+    "declaration": "public func recordPresentation(list: DrawList, into commands: CommandBuffer, output: Texture, viewport: NativeUIViewport, clear: SIMD4<Float>, msaaBudgetBytes: Int = 16 * 1024 * 1024) throws -> NativeUIDrawFrame",
+    "abstract": "Complete window frame, retaining only resolved history between passes. The same memory budget applies to ordinary content, frost and reveals.",
+    "discussion": []
+   },
+   {
+    "name": "uploadFontAtlas",
+    "kind": "func",
+    "declaration": "public func uploadFontAtlas(_ atlas: FontAtlas, textureID: TextureID) throws",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/CoveUIGraphics/Rendering/NativeDrawListRenderer.swift",
+  "line": 67,
+  "owner": "",
+  "overloads": [
+   "public final class NativeDrawListRenderer"
+  ]
+ },
+ {
+  "id": "resource-preparation-context",
+  "name": "ResourcePreparationContext",
+  "kind": "class",
+  "declaration": "public final class ResourcePreparationContext: @unchecked Sendable",
+  "abstract": "One preparation runs serially on its worker. Only cancellation crosses threads; progress snapshots are immutable and callbacks are Sendable.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "checkCancellation",
+    "kind": "func",
+    "declaration": "public func checkCancellation() throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "step",
+    "kind": "func",
+    "declaration": "public func step<T>(_ label: String, _ operation: () throws -> T) throws -> T",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Device/ResourcePreparation.swift",
+  "line": 23,
+  "owner": "",
+  "overloads": [
+   "public final class ResourcePreparationContext: @unchecked Sendable"
+  ]
+ },
+ {
+  "id": "submission-cpu-profile",
+  "name": "SubmissionCPUProfile",
+  "kind": "class",
+  "declaration": "public final class SubmissionCPUProfile",
+  "abstract": "Optional synchronous CPU instrumentation for one or more submissions. Use a fresh instance per sample; read it after `Device.submit` returns. These durations exclude GPU completion and frame-slot waits. Completed phases accumulate; a phase that throws may have no sample.",
+  "discussion": [
+   "The encoding sub-phases stay zero unless the profile is created with\n`recordsEncodingDetail`, so ordinary sampling keeps its original clocks."
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "recordsEncodingDetail",
+    "kind": "let",
+    "declaration": "public let recordsEncodingDetail: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SubmissionCPUProfile",
+    "kind": "init",
+    "declaration": "public init(recordsEncodingDetail: Bool = false)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Submission/SubmissionCPUProfile.swift",
+  "line": 10,
+  "owner": "",
+  "overloads": [
+   "public final class SubmissionCPUProfile"
+  ]
+ },
+ {
+  "id": "swapchain-image",
+  "name": "SwapchainImage",
+  "kind": "class",
+  "declaration": "public final class SwapchainImage: Equatable, Sendable",
+  "abstract": "A distinct immutable acquisition ticket. The borrowed `texture` is valid through this frame; retaining a ticket does not make it a persistent image. Backend texture IDs may be recycled, but old tickets never become current.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "",
+    "kind": "func",
+    "declaration": "public static func == (lhs: SwapchainImage, rhs: SwapchainImage) -> Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "swapchain",
+    "kind": "let",
+    "declaration": "public let swapchain: Swapchain",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "generation",
+    "kind": "let",
+    "declaration": "public let generation: UInt64",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "texture",
+    "kind": "let",
+    "declaration": "public let texture: Texture",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "width",
+    "kind": "let",
+    "declaration": "public let width: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "height",
+    "kind": "let",
+    "declaration": "public let height: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SwapchainImage",
+    "kind": "init",
+    "declaration": "public init(swapchain: Swapchain, generation: UInt64, texture: Texture, width: Int, height: Int)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIGraphics",
+  "category": "graphics",
+  "file": "Graphics/Sources/NativeRHI/Submission/Plan.swift",
+  "line": 49,
+  "owner": "",
+  "overloads": [
+   "public final class SwapchainImage: Equatable, Sendable"
+  ]
+ }
+]

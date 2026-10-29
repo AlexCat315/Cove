@@ -1,0 +1,5150 @@
+[
+ {
+  "id": "app-bar",
+  "name": "AppBar",
+  "kind": "struct",
+  "declaration": "public struct AppBar: View",
+  "abstract": "A bounded application header. The host owns safe-area insets; the bar owns a full-name heading, back action and at most one/three inline commands.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "AppBar",
+    "kind": "init",
+    "declaration": "public init(_ title: String, subtitle: String? = nil, back: MenuItem? = nil, primary: ToolbarItem? = nil, actions: [ToolbarItem] = [], configure: (inout AppBarOptions) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/AppBar.swift",
+  "line": 19,
+  "owner": "",
+  "overloads": [
+   "public struct AppBar: View"
+  ]
+ },
+ {
+  "id": "app-bar-options",
+  "name": "AppBarOptions",
+  "kind": "struct",
+  "declaration": "public struct AppBarOptions",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "var",
+    "declaration": "public var label = \"Application bar\" public var compactMaximumWidth = UIEnvironment.Viewport.compactMaximumWidth",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "divider",
+    "kind": "var",
+    "declaration": "public var divider = ToolbarDividerEdge.bottom",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AppBarOptions",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/AppBar.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct AppBarOptions"
+  ]
+ },
+ {
+  "id": "asset-ref",
+  "name": "AssetRef",
+  "kind": "struct",
+  "declaration": "public struct AssetRef: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "name",
+    "kind": "let",
+    "declaration": "public let name: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "subtitle",
+    "kind": "let",
+    "declaration": "public let subtitle: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "kind",
+    "kind": "let",
+    "declaration": "public let kind: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "previewPath",
+    "kind": "let",
+    "declaration": "public let previewPath: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AssetRef",
+    "kind": "init",
+    "declaration": "public init(id: String, name: String, subtitle: String? = nil, kind: String, previewPath: String? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AssetRef",
+    "kind": "init",
+    "declaration": "public init(payload: AssetDropPayload)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/AssetRefField.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct AssetRef: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "asset-ref-field",
+  "name": "AssetRefField",
+  "kind": "struct",
+  "declaration": "public struct AssetRefField: View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "value",
+    "kind": "let",
+    "declaration": "public let value: Binding<AssetRef?>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "activePayload",
+    "kind": "let",
+    "declaration": "public let activePayload: Binding<AssetDropPayload?>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "acceptedKinds",
+    "kind": "let",
+    "declaration": "public let acceptedKinds: Set<String>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "pickerOptions",
+    "kind": "let",
+    "declaration": "public let pickerOptions: [AssetRef]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "placeholder",
+    "kind": "let",
+    "declaration": "public let placeholder: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AssetRefField",
+    "kind": "init",
+    "declaration": "public init(value: Binding<AssetRef?>, activePayload: Binding<AssetDropPayload?> = .constant(nil), acceptedKinds: Set<String> = [], pickerOptions: [AssetRef] = [], placeholder: String = \"Drop asset\", isEnabled: Bool = true)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/AssetRefField.swift",
+  "line": 33,
+  "owner": "",
+  "overloads": [
+   "public struct AssetRefField: View"
+  ]
+ },
+ {
+  "id": "button",
+  "name": "Button",
+  "kind": "struct",
+  "declaration": "public struct Button<Label: View>: View",
+  "abstract": "Tappable control. The `label` produces the visual content; the active `ButtonStyle` (defaulting to `PrimaryButtonStyle`) decides how it is painted, padded, and decorated for each interaction state.",
+  "discussion": [
+   "Override the visual style for any subtree:\n```swift\nColumn {\n    Button(\"Save\") { … }\n    Button(\"Discard\", role: .destructive) { … }\n}.buttonStyle(.secondary)\n```"
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "role",
+    "kind": "let",
+    "declaration": "public let role: ButtonRole",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isLoading",
+    "kind": "let",
+    "declaration": "public let isLoading: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isSelected",
+    "kind": "let",
+    "declaration": "public let isSelected: Bool",
+    "abstract": "On/off state surfaced to the active style via `ButtonStyleConfiguration.isSelected` (used by `.toggle` and friends).",
+    "discussion": []
+   },
+   {
+    "name": "tooltip",
+    "kind": "let",
+    "declaration": "public let tooltip: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "action",
+    "kind": "let",
+    "declaration": "public let action: () -> Void",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "let",
+    "declaration": "public let label: Label",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Button",
+    "kind": "init",
+    "declaration": "public init(role: ButtonRole = .normal, isEnabled: Bool = true, isLoading: Bool = false, isSelected: Bool = false, tooltip: String? = nil, action: @escaping () -> Void, @ViewBuilder label: () -> Label)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Button",
+    "kind": "init",
+    "declaration": "init(_ title: String, role: ButtonRole = .normal, isEnabled: Bool = true, isLoading: Bool = false, isSelected: Bool = false, tooltip: String? = nil, action: @escaping () -> Void)",
+    "abstract": "Title-only convenience initializer.",
+    "discussion": []
+   },
+   {
+    "name": "Button",
+    "kind": "init",
+    "declaration": "init(_ key: LocalizedStringKey, role: ButtonRole = .normal, isEnabled: Bool = true, isLoading: Bool = false, isSelected: Bool = false, tooltip: String? = nil, action: @escaping () -> Void)",
+    "abstract": "Localized title convenience initializer.",
+    "discussion": []
+   },
+   {
+    "name": "Button",
+    "kind": "init",
+    "declaration": "init(icon source: ButtonIcon.Source, size: Float? = nil, role: ButtonRole = .normal, isEnabled: Bool = true, isLoading: Bool = false, isSelected: Bool = false, tooltip: String? = nil, tint: Color? = nil, action: @escaping () -> Void)",
+    "abstract": "Icon-only convenience initializer. Use the regular `Button` style pipeline; this only supplies a square image label.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Button.swift",
+  "line": 23,
+  "owner": "",
+  "overloads": [
+   "public struct Button<Label: View>: View"
+  ]
+ },
+ {
+  "id": "button-icon",
+  "name": "ButtonIcon",
+  "kind": "struct",
+  "declaration": "public struct ButtonIcon: View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "source",
+    "kind": "let",
+    "declaration": "public let source: Source",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "size",
+    "kind": "let",
+    "declaration": "public let size: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "tint",
+    "kind": "let",
+    "declaration": "public let tint: Color?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ButtonIcon",
+    "kind": "init",
+    "declaration": "public init(_ source: Source, size: Float? = nil, tint: Color? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Button.swift",
+  "line": 72,
+  "owner": "",
+  "overloads": [
+   "public struct ButtonIcon: View"
+  ]
+ },
+ {
+  "id": "calendar-granularity",
+  "name": "CalendarGranularity",
+  "kind": "enum",
+  "declaration": "public enum CalendarGranularity: Sendable, Hashable",
+  "abstract": "What one selection covers. The bound date is the period's first day, and any date inside the period shows as selected, so callers may store either.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Hashable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Calendar/Period.swift",
+  "line": 8,
+  "owner": "",
+  "overloads": [
+   "public enum CalendarGranularity: Sendable, Hashable"
+  ]
+ },
+ {
+  "id": "calendar-grid",
+  "name": "CalendarGrid",
+  "kind": "enum",
+  "declaration": "public enum CalendarGrid",
+  "abstract": "Date arithmetic uses calendar components, so a day is not assumed to be 24 hours.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "monthStart",
+    "kind": "func",
+    "declaration": "public static func monthStart(_ date: Date, calendar: Foundation.Calendar) -> Date",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "days",
+    "kind": "func",
+    "declaration": "public static func days(in month: Date, calendar: Foundation.Calendar) -> [Date]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "move",
+    "kind": "func",
+    "declaration": "public static func move(_ date: Date, days: Int, calendar: Foundation.Calendar, availability: DateAvailability) -> Date?",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/DateValues.swift",
+  "line": 17,
+  "owner": "",
+  "overloads": [
+   "public enum CalendarGrid"
+  ]
+ },
+ {
+  "id": "calendar-options",
+  "name": "CalendarOptions",
+  "kind": "struct",
+  "declaration": "public struct CalendarOptions",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "calendar",
+    "kind": "var",
+    "declaration": "public var calendar = Foundation.Calendar.current",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "locale",
+    "kind": "var",
+    "declaration": "public var locale = Locale.current",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "availability",
+    "kind": "var",
+    "declaration": "public var availability = DateAvailability()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "presentation",
+    "kind": "var",
+    "declaration": "public var presentation = CalendarPresentation()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "granularity",
+    "kind": "var",
+    "declaration": "public var granularity: CalendarGranularity = .day",
+    "abstract": "Whether a selection is a day, a week, a month or a year.",
+    "discussion": []
+   },
+   {
+    "name": "visibleMonth",
+    "kind": "var",
+    "declaration": "public var visibleMonth: Binding<Date>?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "today",
+    "kind": "var",
+    "declaration": "public var today = Date()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "CalendarOptions",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Calendar/Calendar.swift",
+  "line": 13,
+  "owner": "",
+  "overloads": [
+   "public struct CalendarOptions"
+  ]
+ },
+ {
+  "id": "calendar-presentation",
+  "name": "CalendarPresentation",
+  "kind": "struct",
+  "declaration": "public struct CalendarPresentation",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "cellSize",
+    "kind": "var",
+    "declaration": "public var cellSize: Float = 34",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "numberOfMonths",
+    "kind": "var",
+    "declaration": "public var numberOfMonths = 1",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "CalendarPresentation",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Calendar/Calendar.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct CalendarPresentation"
+  ]
+ },
+ {
+  "id": "calendar-view",
+  "name": "CalendarView",
+  "kind": "struct",
+  "declaration": "public struct CalendarView: View",
+  "abstract": "Caller-owned selection, with transient browsing and one focusable cell per grid. The title drills up from days to a year of months to twelve years; picking a cell drills back down to the selection granularity.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "selection",
+    "kind": "let",
+    "declaration": "public let selection: Binding<Date?>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "options",
+    "kind": "var",
+    "declaration": "public var options = CalendarOptions()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "CalendarView",
+    "kind": "init",
+    "declaration": "public init(selection: Binding<Date?>, configure: (inout CalendarOptions) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Calendar/Calendar.swift",
+  "line": 35,
+  "owner": "",
+  "overloads": [
+   "public struct CalendarView: View"
+  ]
+ },
+ {
+  "id": "checkbox",
+  "name": "Checkbox",
+  "kind": "struct",
+  "declaration": "public struct Checkbox: View",
+  "abstract": "Mixed state represents a partially selected collection. Activation selects it fully.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "state",
+    "kind": "let",
+    "declaration": "public let state: Binding<CheckboxState>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "let",
+    "declaration": "public let label: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Checkbox",
+    "kind": "init",
+    "declaration": "public init(state: Binding<CheckboxState>, isEnabled: Bool = true, label: String? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Checkbox",
+    "kind": "init",
+    "declaration": "public init(isOn: Binding<Bool>, isEnabled: Bool = true, label: String? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Checkbox",
+    "kind": "init",
+    "declaration": "public init(_ label: String, state: Binding<CheckboxState>, isEnabled: Bool = true)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Checkbox",
+    "kind": "init",
+    "declaration": "public init(_ label: String, isOn: Binding<Bool>, isEnabled: Bool = true)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Toggle.swift",
+  "line": 44,
+  "owner": "",
+  "overloads": [
+   "public struct Checkbox: View"
+  ]
+ },
+ {
+  "id": "checkbox-state",
+  "name": "CheckboxState",
+  "kind": "enum",
+  "declaration": "public enum CheckboxState: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Toggle.swift",
+  "line": 41,
+  "owner": "",
+  "overloads": [
+   "public enum CheckboxState: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "color-field",
+  "name": "ColorField",
+  "kind": "struct",
+  "declaration": "public struct ColorField: View",
+  "abstract": "Compact color picker: a colored swatch button that opens an RGBA channel editor popover. Suitable for inspector rows and tool palettes.",
+  "discussion": [
+   "```swift\n@State var tint = Color(r: 1, g: 0.5, b: 0, a: 1)\nColorField(color: $tint)\n```",
+   "The popover contains per-channel sliders (R / G / B / A) in the 0–1 range,\nmirrored integer fields (0–255), and a hex text field (`#RRGGBB` or\n`#RRGGBBAA` when `showAlpha` is true)."
+  ],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "color",
+    "kind": "let",
+    "declaration": "public let color: Binding<Color>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showAlpha",
+    "kind": "let",
+    "declaration": "public let showAlpha: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showsInlineValues",
+    "kind": "let",
+    "declaration": "public let showsInlineValues: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showsInlineChannels",
+    "kind": "let",
+    "declaration": "public let showsInlineChannels: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ColorField",
+    "kind": "init",
+    "declaration": "public init(color: Binding<Color>, isEnabled: Bool = true, showAlpha: Bool = true, showsInlineValues: Bool = false, showsInlineChannels: Bool = true)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/ColorField.swift",
+  "line": 19,
+  "owner": "",
+  "overloads": [
+   "public struct ColorField: View"
+  ]
+ },
+ {
+  "id": "column-visibility",
+  "name": "ColumnVisibility",
+  "kind": "enum",
+  "declaration": "public enum ColumnVisibility: Equatable, Sendable",
+  "abstract": "Required columns stay available. Equal priorities preserve authored order.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Columns/Priority.swift",
+  "line": 4,
+  "owner": "",
+  "overloads": [
+   "public enum ColumnVisibility: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "combobox",
+  "name": "Combobox",
+  "kind": "struct",
+  "declaration": "public struct Combobox<Value: Hashable>: View",
+  "abstract": "Searchable typed selection. Query, highlight and overlay state are transient and separate from the value. Options are either a fixed list filtered locally, or a `ComboboxSearch` whose results the component requests, debounces and cancels.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "selection",
+    "kind": "let",
+    "declaration": "public let selection: Binding<Value?>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "presentation",
+    "kind": "var",
+    "declaration": "public var presentation = ComboboxPresentation()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Combobox",
+    "kind": "init",
+    "declaration": "public init(selection: Binding<Value?>, options: [SelectOption<Value>], configure: (inout ComboboxPresentation) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Combobox",
+    "kind": "init",
+    "declaration": "public init(selection: Binding<Value?>, selectedLabel: String? = nil, search: ComboboxSearch<Value>, configure: (inout ComboboxPresentation) -> Void =",
+    "abstract": "Remote options. `selectedLabel` names the current value while it is not among the loaded results (for example before the first search).",
+    "discussion": []
+   },
+   {
+    "name": "matching",
+    "kind": "func",
+    "declaration": "public static func matching(_ options: [SelectOption<Value>], query: String) -> [SelectOption<Value>]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Combobox/Combobox.swift",
+  "line": 41,
+  "owner": "",
+  "overloads": [
+   "public struct Combobox<Value: Hashable>: View"
+  ]
+ },
+ {
+  "id": "combobox-presentation",
+  "name": "ComboboxPresentation",
+  "kind": "struct",
+  "declaration": "public struct ComboboxPresentation",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "placeholder",
+    "kind": "var",
+    "declaration": "public var placeholder = \"Select an option\" public var searchPlaceholder = \"Search…\" public var emptyText = \"No matching options\" public var width: Float = 280",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maxVisibleRows",
+    "kind": "var",
+    "declaration": "public var maxVisibleRows = 8",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isClearable",
+    "kind": "var",
+    "declaration": "public var isClearable = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ComboboxPresentation",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Combobox/Combobox.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct ComboboxPresentation"
+  ]
+ },
+ {
+  "id": "combobox-search",
+  "name": "ComboboxSearch",
+  "kind": "struct",
+  "declaration": "public struct ComboboxSearch<Value: Hashable>: @unchecked Sendable",
+  "abstract": "Remote results for a `Combobox`: the component debounces typing, cancels superseded requests, and shows loading, failure (with retry) and empty states. The caller's data layer only maps a query to options.",
+  "discussion": [
+   "```swift\nCombobox(selection: $userID, selectedLabel: user?.name,\n         search: ComboboxSearch { query in try await api.users(matching: query).map(\\.option) })\n```"
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "delay",
+    "kind": "var",
+    "declaration": "public var delay: Duration = .milliseconds(250)",
+    "abstract": "Quiet time after the last keystroke before a request starts. Opening the list requests immediately.",
+    "discussion": []
+   },
+   {
+    "name": "minimumQueryLength",
+    "kind": "var",
+    "declaration": "public var minimumQueryLength = 0",
+    "abstract": "Shorter queries show a prompt instead of requesting.",
+    "discussion": []
+   },
+   {
+    "name": "ComboboxSearch",
+    "kind": "init",
+    "declaration": "public init(results: @escaping @Sendable (String) async throws -> [SelectOption<Value>], configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Combobox/RemoteSearch.swift",
+  "line": 14,
+  "owner": "",
+  "overloads": [
+   "public struct ComboboxSearch<Value: Hashable>: @unchecked Sendable"
+  ]
+ },
+ {
+  "id": "completion-popover",
+  "name": "CompletionPopover",
+  "kind": "struct",
+  "declaration": "public struct CompletionPopover: View",
+  "abstract": "Nonmodal completion list. Keyboard focus stays in the editor, while its highlighted row and scroll window follow Up/Down, Return, Tab and Escape.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "items",
+    "kind": "let",
+    "declaration": "public let items: [TextCompletionItem]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "selectedIndex",
+    "kind": "let",
+    "declaration": "public let selectedIndex: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onAccept",
+    "kind": "let",
+    "declaration": "public let onAccept: (TextCompletionItem) -> Void",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "CompletionPopover",
+    "kind": "init",
+    "declaration": "public init(items: [TextCompletionItem], selectedIndex: Int, onAccept: @escaping (TextCompletionItem) -> Void)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/CompletionPopover.swift",
+  "line": 48,
+  "owner": "",
+  "overloads": [
+   "public struct CompletionPopover: View"
+  ]
+ },
+ {
+  "id": "date-availability",
+  "name": "DateAvailability",
+  "kind": "struct",
+  "declaration": "public struct DateAvailability",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "minimum",
+    "kind": "var",
+    "declaration": "public var minimum: Date?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maximum",
+    "kind": "var",
+    "declaration": "public var maximum: Date?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled: (Date) -> Bool =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "DateAvailability",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "contains",
+    "kind": "func",
+    "declaration": "public func contains(_ date: Date, calendar: Foundation.Calendar) -> Bool",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/DateValues.swift",
+  "line": 3,
+  "owner": "",
+  "overloads": [
+   "public struct DateAvailability"
+  ]
+ },
+ {
+  "id": "date-picker",
+  "name": "DatePicker",
+  "kind": "struct",
+  "declaration": "public struct DatePicker: View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "selection",
+    "kind": "let",
+    "declaration": "public let selection: Binding<Date?>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "options",
+    "kind": "var",
+    "declaration": "public var options = DatePickerOptions()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "DatePicker",
+    "kind": "init",
+    "declaration": "public init(selection: Binding<Date?>, configure: (inout DatePickerOptions) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/DatePicker.swift",
+  "line": 18,
+  "owner": "",
+  "overloads": [
+   "public struct DatePicker: View"
+  ]
+ },
+ {
+  "id": "date-picker-options",
+  "name": "DatePickerOptions",
+  "kind": "struct",
+  "declaration": "public struct DatePickerOptions",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "calendar",
+    "kind": "var",
+    "declaration": "public var calendar = CalendarOptions()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "presentation",
+    "kind": "var",
+    "declaration": "public var presentation = DatePickerPresentation()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "DatePickerOptions",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/DatePicker.swift",
+  "line": 13,
+  "owner": "",
+  "overloads": [
+   "public struct DatePickerOptions"
+  ]
+ },
+ {
+  "id": "date-picker-presentation",
+  "name": "DatePickerPresentation",
+  "kind": "struct",
+  "declaration": "public struct DatePickerPresentation",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "placeholder",
+    "kind": "var",
+    "declaration": "public var placeholder = \"Choose a date\" public var isClearable = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "width",
+    "kind": "var",
+    "declaration": "public var width: Float = 240",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "DatePickerPresentation",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/DatePicker.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct DatePickerPresentation"
+  ]
+ },
+ {
+  "id": "date-range-calendar",
+  "name": "DateRangeCalendar",
+  "kind": "struct",
+  "declaration": "public struct DateRangeCalendar: View",
+  "abstract": "Calendar with range highlighting and two-click range selection.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "selection",
+    "kind": "let",
+    "declaration": "public let selection: Binding<ClosedRange<Date>?>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "options",
+    "kind": "var",
+    "declaration": "public var options = CalendarOptions()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rules",
+    "kind": "var",
+    "declaration": "public var rules = DateRangeRules()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "DateRangeCalendar",
+    "kind": "init",
+    "declaration": "public init(selection: Binding<ClosedRange<Date>?>, rules: DateRangeRules = DateRangeRules(), configure: (inout CalendarOptions) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/DateRange/RangePicker.swift",
+  "line": 100,
+  "owner": "",
+  "overloads": [
+   "public struct DateRangeCalendar: View"
+  ]
+ },
+ {
+  "id": "date-range-picker",
+  "name": "DateRangePicker",
+  "kind": "struct",
+  "declaration": "public struct DateRangePicker: View",
+  "abstract": "Range picker backed by a real calendar. First click starts a range, second click completes it (the earlier day becomes the start when clicked second).",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "selection",
+    "kind": "let",
+    "declaration": "public let selection: Binding<ClosedRange<Date>?>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "options",
+    "kind": "var",
+    "declaration": "public var options = DateRangePickerOptions()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "DateRangePicker",
+    "kind": "init",
+    "declaration": "public init(selection: Binding<ClosedRange<Date>?>, configure: (inout DateRangePickerOptions) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/DateRange/RangePicker.swift",
+  "line": 23,
+  "owner": "",
+  "overloads": [
+   "public struct DateRangePicker: View"
+  ]
+ },
+ {
+  "id": "date-range-picker-options",
+  "name": "DateRangePickerOptions",
+  "kind": "struct",
+  "declaration": "public struct DateRangePickerOptions",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "calendar",
+    "kind": "var",
+    "declaration": "public var calendar = CalendarOptions()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "rules",
+    "kind": "var",
+    "declaration": "public var rules = DateRangeRules()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "presentation",
+    "kind": "var",
+    "declaration": "public var presentation = DateRangePickerPresentation()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "DateRangePickerOptions",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/DateRange/RangePicker.swift",
+  "line": 14,
+  "owner": "",
+  "overloads": [
+   "public struct DateRangePickerOptions"
+  ]
+ },
+ {
+  "id": "date-range-picker-presentation",
+  "name": "DateRangePickerPresentation",
+  "kind": "struct",
+  "declaration": "public struct DateRangePickerPresentation",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "placeholder",
+    "kind": "var",
+    "declaration": "public var placeholder = \"Choose dates\" public var isClearable = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "width",
+    "kind": "var",
+    "declaration": "public var width: Float = 260",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "DateRangePickerPresentation",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/DateRange/RangePicker.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct DateRangePickerPresentation"
+  ]
+ },
+ {
+  "id": "date-range-preset",
+  "name": "DateRangePreset",
+  "kind": "struct",
+  "declaration": "public struct DateRangePreset: Identifiable",
+  "abstract": "Shortcut that resolves to a closed day range relative to `today`. Built-in factories cover the common filters; custom presets supply their own resolver. Results are normalized to start-of-day bounds.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Identifiable"
+  ],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "title",
+    "kind": "var",
+    "declaration": "public var title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "DateRangePreset",
+    "kind": "init",
+    "declaration": "public init(id: String, title: String, resolve: @escaping (_ today: Date, _ calendar: Calendar) -> ClosedRange<Date>?)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "range",
+    "kind": "func",
+    "declaration": "public func range(today: Date, calendar: Calendar) -> ClosedRange<Date>?",
+    "abstract": "Normalized range for `today`, or `nil` when the resolver cannot answer.",
+    "discussion": []
+   },
+   {
+    "name": "today",
+    "kind": "func",
+    "declaration": "public static func today(_ title: String = \"Today\") -> Self",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "yesterday",
+    "kind": "func",
+    "declaration": "public static func yesterday(_ title: String = \"Yesterday\") -> Self",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "lastDays",
+    "kind": "func",
+    "declaration": "public static func lastDays(_ count: Int, title: String? = nil) -> Self",
+    "abstract": "The last `count` days including today.",
+    "discussion": []
+   },
+   {
+    "name": "thisMonth",
+    "kind": "func",
+    "declaration": "public static func thisMonth(_ title: String = \"This month\") -> Self",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "lastMonth",
+    "kind": "func",
+    "declaration": "public static func lastMonth(_ title: String = \"Last month\") -> Self",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/DateRange/Rules.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct DateRangePreset: Identifiable"
+  ]
+ },
+ {
+  "id": "date-range-rules",
+  "name": "DateRangeRules",
+  "kind": "struct",
+  "declaration": "public struct DateRangeRules",
+  "abstract": "Range-only rules layered on the shared calendar options: shortcut presets and an inclusive maximum length in days.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "presets",
+    "kind": "var",
+    "declaration": "public var presets: [DateRangePreset] = []",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maximumDays",
+    "kind": "var",
+    "declaration": "public var maximumDays: Int?",
+    "abstract": "Longest selectable range, counting both endpoints. `nil` is unlimited.",
+    "discussion": []
+   },
+   {
+    "name": "DateRangeRules",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/DateRange/Rules.swift",
+  "line": 61,
+  "owner": "",
+  "overloads": [
+   "public struct DateRangeRules"
+  ]
+ },
+ {
+  "id": "field-label",
+  "name": "FieldLabel",
+  "kind": "struct",
+  "declaration": "public struct FieldLabel: View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "title",
+    "kind": "let",
+    "declaration": "public let title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "options",
+    "kind": "var",
+    "declaration": "public var options = FieldLabelOptions()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "FieldLabel",
+    "kind": "init",
+    "declaration": "public init(_ title: String, configure: (inout FieldLabelOptions) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/FieldLabel.swift",
+  "line": 12,
+  "owner": "",
+  "overloads": [
+   "public struct FieldLabel: View"
+  ]
+ },
+ {
+  "id": "field-label-options",
+  "name": "FieldLabelOptions",
+  "kind": "struct",
+  "declaration": "public struct FieldLabelOptions",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "isRequired",
+    "kind": "var",
+    "declaration": "public var isRequired = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "help",
+    "kind": "var",
+    "declaration": "public var help = \"\" /// Matches within the nearest Form, or within this scene for standalone labels.",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "targetID",
+    "kind": "var",
+    "declaration": "public var targetID: String?",
+    "abstract": "Matches within the nearest Form, or within this scene for standalone labels.",
+    "discussion": []
+   },
+   {
+    "name": "FieldLabelOptions",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/FieldLabel.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct FieldLabelOptions"
+  ]
+ },
+ {
+  "id": "field-label-placement",
+  "name": "FieldLabelPlacement",
+  "kind": "enum",
+  "declaration": "public enum FieldLabelPlacement: Sendable, Equatable",
+  "abstract": "Label placement shared by forms and property grids. Adaptive placement uses the field's own allocated width, rather than the host window's width class.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Form/LabelPlacement.swift",
+  "line": 3,
+  "owner": "",
+  "overloads": [
+   "public enum FieldLabelPlacement: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "form",
+  "name": "Form",
+  "kind": "struct",
+  "declaration": "public struct Form<Footer: View>: View",
+  "abstract": "Layout and field descriptions; values, validation policy and submission remain application-owned.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "fields",
+    "kind": "let",
+    "declaration": "public let fields: [FormField]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "controller",
+    "kind": "let",
+    "declaration": "public let controller: FormController?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "layout",
+    "kind": "var",
+    "declaration": "public var layout = FormLayout()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Form",
+    "kind": "init",
+    "declaration": "public init( _ fields: [FormField], controller: FormController? = nil, configure: (inout FormLayout) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Form.swift",
+  "line": 48,
+  "owner": "",
+  "overloads": [
+   "public struct Form<Footer: View>: View"
+  ]
+ },
+ {
+  "id": "form-field",
+  "name": "FormField",
+  "kind": "struct",
+  "declaration": "public struct FormField: Identifiable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Identifiable"
+  ],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "let",
+    "declaration": "public let label: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "content",
+    "kind": "let",
+    "declaration": "public let content: AnyView",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "presentation",
+    "kind": "var",
+    "declaration": "public var presentation = FormFieldPresentation()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "FormField",
+    "kind": "init",
+    "declaration": "public init<C: View>( _ id: String, _ label: String, configure: (inout FormFieldPresentation) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Form.swift",
+  "line": 31,
+  "owner": "",
+  "overloads": [
+   "public struct FormField: Identifiable"
+  ]
+ },
+ {
+  "id": "form-field-presentation",
+  "name": "FormFieldPresentation",
+  "kind": "struct",
+  "declaration": "public struct FormFieldPresentation",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "isRequired",
+    "kind": "var",
+    "declaration": "public var isRequired = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "help",
+    "kind": "var",
+    "declaration": "public var help = \"\" public var error: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isVisible",
+    "kind": "var",
+    "declaration": "public var isVisible = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "FormFieldPresentation",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Form.swift",
+  "line": 23,
+  "owner": "",
+  "overloads": [
+   "public struct FormFieldPresentation"
+  ]
+ },
+ {
+  "id": "form-issue",
+  "name": "FormIssue",
+  "kind": "struct",
+  "declaration": "public struct FormIssue: Equatable, Sendable, Identifiable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable",
+   "Identifiable"
+  ],
+  "members": [
+   {
+    "name": "fieldID",
+    "kind": "let",
+    "declaration": "public let fieldID: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "let",
+    "declaration": "public let label: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "message",
+    "kind": "let",
+    "declaration": "public let message: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "id",
+    "kind": "var",
+    "declaration": "public var id: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "FormIssue",
+    "kind": "init",
+    "declaration": "public init(fieldID: String, label: String, message: String)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/FormValidation.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct FormIssue: Equatable, Sendable, Identifiable"
+  ]
+ },
+ {
+  "id": "form-layout",
+  "name": "FormLayout",
+  "kind": "struct",
+  "declaration": "public struct FormLayout",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "columns",
+    "kind": "var",
+    "declaration": "public var columns = 1",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "labelPlacement",
+    "kind": "var",
+    "declaration": "public var labelPlacement: FieldLabelPlacement = .adaptive",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "labelWidth",
+    "kind": "var",
+    "declaration": "public var labelWidth: Float = 120",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minValueWidth",
+    "kind": "var",
+    "declaration": "public var minValueWidth: Float = 220",
+    "abstract": "Preferred value-slot width used for column count and label reflow. Below this width a single stacked field fills the available width.",
+    "discussion": []
+   },
+   {
+    "name": "spacing",
+    "kind": "var",
+    "declaration": "public var spacing: Float = 18",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "FormLayout",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Form.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct FormLayout"
+  ]
+ },
+ {
+  "id": "form-rule",
+  "name": "FormRule",
+  "kind": "struct",
+  "declaration": "public struct FormRule",
+  "abstract": "Rules read application-owned values when validation runs, avoiding a parallel field-value model.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "fieldID",
+    "kind": "let",
+    "declaration": "public let fieldID: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "let",
+    "declaration": "public let label: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "validate",
+    "kind": "let",
+    "declaration": "public let validate: () -> String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "FormRule",
+    "kind": "init",
+    "declaration": "public init(_ fieldID: String, label: String, validate: @escaping () -> String?)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "required",
+    "kind": "func",
+    "declaration": "public static func required(_ fieldID: String, label: String, value: @escaping () -> String) -> Self",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/FormValidation.swift",
+  "line": 17,
+  "owner": "",
+  "overloads": [
+   "public struct FormRule"
+  ]
+ },
+ {
+  "id": "form-submission-state",
+  "name": "FormSubmissionState",
+  "kind": "enum",
+  "declaration": "public enum FormSubmissionState: Equatable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/FormValidation.swift",
+  "line": 29,
+  "owner": "",
+  "overloads": [
+   "public enum FormSubmissionState: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "json-field",
+  "name": "JsonField",
+  "kind": "struct",
+  "declaration": "public struct JsonField: View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "text",
+    "kind": "let",
+    "declaration": "public let text: Binding<TextBuffer>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "placeholder",
+    "kind": "let",
+    "declaration": "public let placeholder: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minHeight",
+    "kind": "let",
+    "declaration": "public let minHeight: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onCommit",
+    "kind": "let",
+    "declaration": "public let onCommit: ((TextBuffer) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "labels",
+    "kind": "let",
+    "declaration": "public let labels: JsonFieldLabels",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "JsonField",
+    "kind": "init",
+    "declaration": "public init(text: Binding<TextBuffer>, placeholder: String = \"",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "normalizedCommitText",
+    "kind": "func",
+    "declaration": "public static func normalizedCommitText(_ text: String) -> String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "validate",
+    "kind": "func",
+    "declaration": "public static func validate(_ text: String) -> JsonFieldValidation",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "prettyPrinted",
+    "kind": "func",
+    "declaration": "public static func prettyPrinted(_ text: String) -> String?",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/JsonField.swift",
+  "line": 46,
+  "owner": "",
+  "overloads": [
+   "public struct JsonField: View"
+  ]
+ },
+ {
+  "id": "json-field-labels",
+  "name": "JsonFieldLabels",
+  "kind": "struct",
+  "declaration": "public struct JsonFieldLabels: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "format",
+    "kind": "var",
+    "declaration": "public var format: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "revert",
+    "kind": "var",
+    "declaration": "public var revert: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "valid",
+    "kind": "var",
+    "declaration": "public var valid: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "empty",
+    "kind": "var",
+    "declaration": "public var empty: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "expand",
+    "kind": "var",
+    "declaration": "public var expand: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "var",
+    "declaration": "public var apply: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "cancel",
+    "kind": "var",
+    "declaration": "public var cancel: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "resize",
+    "kind": "var",
+    "declaration": "public var resize: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "JsonFieldLabels",
+    "kind": "init",
+    "declaration": "public init(format: String = \"Format\", revert: String = \"Revert\", valid: String = \"Valid JSON\", empty: String = \"Empty saves as",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/JsonField.swift",
+  "line": 21,
+  "owner": "",
+  "overloads": [
+   "public struct JsonFieldLabels: Sendable"
+  ]
+ },
+ {
+  "id": "json-field-validation",
+  "name": "JsonFieldValidation",
+  "kind": "enum",
+  "declaration": "public enum JsonFieldValidation: Equatable, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Equatable",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "isAcceptable",
+    "kind": "var",
+    "declaration": "public var isAcceptable: Bool",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/JsonField.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public enum JsonFieldValidation: Equatable, Sendable"
+  ]
+ },
+ {
+  "id": "keyboard-shortcut",
+  "name": "KeyboardShortcut",
+  "kind": "struct",
+  "declaration": "public struct KeyboardShortcut: Sendable, Equatable, Hashable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable",
+   "Hashable"
+  ],
+  "members": [
+   {
+    "name": "modifiers",
+    "kind": "var",
+    "declaration": "public var modifiers: [KeyboardShortcutModifier]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "key",
+    "kind": "var",
+    "declaration": "public var key: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "KeyboardShortcut",
+    "kind": "init",
+    "declaration": "public init(_ key: String, modifiers: [KeyboardShortcutModifier] = [])",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "primary",
+    "kind": "func",
+    "declaration": "public static func primary(_ key: String) -> KeyboardShortcut",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "primaryShift",
+    "kind": "func",
+    "declaration": "public static func primaryShift(_ key: String) -> KeyboardShortcut",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "displayString",
+    "kind": "var",
+    "declaration": "public var displayString: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "displayString",
+    "kind": "func",
+    "declaration": "public func displayString(platform: KeyboardShortcutPlatform) -> String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "caps",
+    "kind": "func",
+    "declaration": "public func caps(platform: KeyboardShortcutPlatform = .current) -> [String]",
+    "abstract": "The shortcut split into the individual glyphs a `KeyCap` draws. Modifiers come first in the platform's canonical order, then the key.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Select.swift",
+  "line": 34,
+  "owner": "",
+  "overloads": [
+   "public struct KeyboardShortcut: Sendable, Equatable, Hashable"
+  ]
+ },
+ {
+  "id": "keyboard-shortcut-modifier",
+  "name": "KeyboardShortcutModifier",
+  "kind": "enum",
+  "declaration": "public enum KeyboardShortcutModifier: Sendable, Equatable, Hashable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable",
+   "Hashable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Select.swift",
+  "line": 26,
+  "owner": "",
+  "overloads": [
+   "public enum KeyboardShortcutModifier: Sendable, Equatable, Hashable"
+  ]
+ },
+ {
+  "id": "keyboard-shortcut-platform",
+  "name": "KeyboardShortcutPlatform",
+  "kind": "enum",
+  "declaration": "public enum KeyboardShortcutPlatform: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "current",
+    "kind": "var",
+    "declaration": "public static var current: KeyboardShortcutPlatform",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Select.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public enum KeyboardShortcutPlatform: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "key-cap",
+  "name": "KeyCap",
+  "kind": "struct",
+  "declaration": "public struct KeyCap: View",
+  "abstract": "Keyboard hint drawn as one cap per key.",
+  "discussion": [
+   "Splitting a shortcut into caps — instead of printing `⌘⇧K` as a run of\ntext — is what lets the glyphs stay legible at caption size and keeps the\nhint recognisable when the locale changes modifier names.",
+   "```swift\nKeyCap(.primary(\"S\"))            // ⌘ S\nKeyCap(\"Esc\")\nKeyCap(.primaryShift(\"P\"), platform: .windows)   // Ctrl + Shift + P\n```"
+  ],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "keys",
+    "kind": "var",
+    "declaration": "public var keys: [String]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "platform",
+    "kind": "var",
+    "declaration": "public var platform: KeyboardShortcutPlatform",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "KeyCap",
+    "kind": "init",
+    "declaration": "public init(_ keys: [String], platform: KeyboardShortcutPlatform = .current, configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "KeyCap",
+    "kind": "init",
+    "declaration": "public init(_ title: String, configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "KeyCap",
+    "kind": "init",
+    "declaration": "public init(_ shortcut: KeyboardShortcut, platform: KeyboardShortcutPlatform = .current, configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/KeyCap.swift",
+  "line": 16,
+  "owner": "",
+  "overloads": [
+   "public struct KeyCap: View"
+  ]
+ },
+ {
+  "id": "link",
+  "name": "Link",
+  "kind": "struct",
+  "declaration": "public struct Link<Label: View>: View",
+  "abstract": "A navigation or command target rendered inside text.",
+  "discussion": [
+   "A link is not a button with a tint: it stays in the reading flow, so it\ninherits the surrounding type size, keeps no chrome of its own until the\npointer or focus arrives, and always announces itself as a link rather than\nas a button.",
+   "```swift\nRow {\n    Text(\"Licensed under \")\n    Link(\"Apache 2.0\", configure: { $0.isExternal = true }) { openLicense() }\n}",
+   "Link(\"Reset layout\", underline: .hover) { reset() }\n```"
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "label",
+    "kind": "let",
+    "declaration": "public let label: Label",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "action",
+    "kind": "let",
+    "declaration": "public let action: () -> Void",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isExternal",
+    "kind": "var",
+    "declaration": "public var isExternal = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "underline",
+    "kind": "var",
+    "declaration": "public var underline: LinkUnderline = .always",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "icon",
+    "kind": "var",
+    "declaration": "public var icon: BundleImageResource?",
+    "abstract": "Overrides the trailing glyph. `nil` falls back to the external-link arrow when `isExternal` is set.",
+    "discussion": []
+   },
+   {
+    "name": "tooltip",
+    "kind": "var",
+    "declaration": "public var tooltip: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Link",
+    "kind": "init",
+    "declaration": "public init(tooltip: String? = nil, action: @escaping () -> Void, configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Link",
+    "kind": "init",
+    "declaration": "init(_ title: String, isEnabled: Bool = true, tooltip: String? = nil, configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Link.swift",
+  "line": 35,
+  "owner": "",
+  "overloads": [
+   "public struct Link<Label: View>: View"
+  ]
+ },
+ {
+  "id": "link-underline",
+  "name": "LinkUnderline",
+  "kind": "enum",
+  "declaration": "public enum LinkUnderline: Sendable, Hashable",
+  "abstract": "When a link draws its underline.",
+  "discussion": [
+   "The choice is contextual rather than decorative: in body copy the link has\nto be identifiable before the pointer arrives, while in a dense tool panel\na permanent underline turns every row into visual noise."
+  ],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Hashable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Link.swift",
+  "line": 10,
+  "owner": "",
+  "overloads": [
+   "public enum LinkUnderline: Sendable, Hashable"
+  ]
+ },
+ {
+  "id": "menu-button",
+  "name": "MenuButton",
+  "kind": "struct",
+  "declaration": "public struct MenuButton<Label: View>: View",
+  "abstract": "A button that opens a menu anchored to itself. Uses the regular `Popover` trigger contract, so the menu escapes clipping, closes on Escape/outside click and exposes expanded state to accessibility.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "entries",
+    "kind": "let",
+    "declaration": "public let entries: [MenuEntry]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "width",
+    "kind": "let",
+    "declaration": "public let width: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "placement",
+    "kind": "let",
+    "declaration": "public let placement: PopoverPlacement",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "let",
+    "declaration": "public let label: Label",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "accessibilityLabel",
+    "kind": "let",
+    "declaration": "public let accessibilityLabel: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "tooltip",
+    "kind": "let",
+    "declaration": "public let tooltip: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "MenuButton",
+    "kind": "init",
+    "declaration": "public init(entries: [MenuEntry], isEnabled: Bool = true, width: Float? = nil, placement: PopoverPlacement = .bottomLeading, accessibilityLabel: String? = nil, tooltip: String? = nil, @ViewBuilder label: () -> Label)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "MenuButton",
+    "kind": "init",
+    "declaration": "init(_ title: String, entries: [MenuEntry], isEnabled: Bool = true, width: Float? = nil, placement: PopoverPlacement = .bottomLeading, tooltip: String? = nil)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/MenuButton.swift",
+  "line": 12,
+  "owner": "",
+  "overloads": [
+   "public struct MenuButton<Label: View>: View"
+  ]
+ },
+ {
+  "id": "number-field",
+  "name": "NumberField",
+  "kind": "struct",
+  "declaration": "public struct NumberField: View",
+  "abstract": "Numeric text field that keeps an editable draft and commits parsed floats on submit or blur.",
+  "discussion": [
+   "With a `prefix`, a leading label chip is drawn inside the field. Dragging\nthe chip horizontally scrubs the value (one step per 4pt; hold Shift when\nstarting for ×10, Option/Alt for ×0.1). With a `resetValue`, double-clicking\nthe chip restores it."
+  ],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "value",
+    "kind": "let",
+    "declaration": "public let value: Binding<Float>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "decimals",
+    "kind": "let",
+    "declaration": "public let decimals: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "size",
+    "kind": "let",
+    "declaration": "public let size: TextField.Size",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minValue",
+    "kind": "let",
+    "declaration": "public let minValue: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maxValue",
+    "kind": "let",
+    "declaration": "public let maxValue: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "step",
+    "kind": "let",
+    "declaration": "public let step: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showsStepper",
+    "kind": "let",
+    "declaration": "public let showsStepper: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "mixedValueLabel",
+    "kind": "let",
+    "declaration": "public let mixedValueLabel: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "prefix",
+    "kind": "let",
+    "declaration": "public let prefix: Prefix?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "resetValue",
+    "kind": "let",
+    "declaration": "public let resetValue: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "locale",
+    "kind": "let",
+    "declaration": "public let locale: Locale",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "NumberField",
+    "kind": "init",
+    "declaration": "public init(value: Binding<Float>, decimals: Int = 2, size: TextField.Size = .automatic, isEnabled: Bool = true, minValue: Float? = nil, maxValue: Float? = nil, step: Float? = nil, showsStepper: Bool = false, mixedValueLabel: String? = nil, prefix: Prefix? = nil, resetValue: Float? = nil, locale: Locale = .current)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Numeric/NumberField.swift",
+  "line": 13,
+  "owner": "",
+  "overloads": [
+   "public struct NumberField: View"
+  ]
+ },
+ {
+  "id": "radio-group",
+  "name": "RadioGroup",
+  "kind": "struct",
+  "declaration": "public struct RadioGroup<Value: Hashable>: View",
+  "abstract": "Controlled selection with one Tab stop and wrapping arrow-key navigation.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "selection",
+    "kind": "let",
+    "declaration": "public let selection: Binding<Value?>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "options",
+    "kind": "let",
+    "declaration": "public let options: [RadioOption<Value>]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isHorizontal",
+    "kind": "var",
+    "declaration": "public var isHorizontal = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "RadioGroup",
+    "kind": "init",
+    "declaration": "public init(selection: Binding<Value?>, options: [RadioOption<Value>], configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/RadioGroup.swift",
+  "line": 17,
+  "owner": "",
+  "overloads": [
+   "public struct RadioGroup<Value: Hashable>: View"
+  ]
+ },
+ {
+  "id": "radio-option",
+  "name": "RadioOption",
+  "kind": "struct",
+  "declaration": "public struct RadioOption<Value: Hashable>: Identifiable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "value",
+    "kind": "let",
+    "declaration": "public let value: Value",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "title",
+    "kind": "let",
+    "declaration": "public let title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "detail",
+    "kind": "var",
+    "declaration": "public var detail = \"\" public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "id",
+    "kind": "var",
+    "declaration": "public var id: Value",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "RadioOption",
+    "kind": "init",
+    "declaration": "public init(_ value: Value, _ title: String, configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/RadioGroup.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct RadioOption<Value: Hashable>: Identifiable"
+  ]
+ },
+ {
+  "id": "range-slider",
+  "name": "RangeSlider",
+  "kind": "struct",
+  "declaration": "public struct RangeSlider: View",
+  "abstract": "Two-thumb range control. The active thumb is chosen by pointer proximity, then moved with pointer drag, arrow keys, Home/End or accessibility increment/decrement. Values are clamped to `range` and kept at least `minimumSpan` apart.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "values",
+    "kind": "let",
+    "declaration": "public let values: Binding<ClosedRange<Double>>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "range",
+    "kind": "let",
+    "declaration": "public let range: ClosedRange<Double>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "step",
+    "kind": "let",
+    "declaration": "public let step: Double?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minimumSpan",
+    "kind": "let",
+    "declaration": "public let minimumSpan: Double",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onEditingChanged",
+    "kind": "let",
+    "declaration": "public let onEditingChanged: ((Bool) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "RangeSlider",
+    "kind": "init",
+    "declaration": "public init(values: Binding<ClosedRange<Double>>, in range: ClosedRange<Double> = 0...1, step: Double? = nil, minimumSpan: Double = 0, isEnabled: Bool = true, onEditingChanged: ((Bool) -> Void)? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/RangeSlider.swift",
+  "line": 13,
+  "owner": "",
+  "overloads": [
+   "public struct RangeSlider: View"
+  ]
+ },
+ {
+  "id": "rating",
+  "name": "Rating",
+  "kind": "struct",
+  "declaration": "public struct Rating: _PrimitiveView",
+  "abstract": "Controlled star rating with pointer preview, whole or fractional steps, custom symbols and one Tab stop.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "value",
+    "kind": "let",
+    "declaration": "public let value: Binding<Double>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "var",
+    "declaration": "public var label = \"Rating\" public var selection = RatingSelection()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "appearance",
+    "kind": "var",
+    "declaration": "public var appearance = RatingAppearance()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Rating",
+    "kind": "init",
+    "declaration": "public init(_ label: String = \"Rating\", value: Binding<Double>, configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Rating/Rating.swift",
+  "line": 65,
+  "owner": "",
+  "overloads": [
+   "public struct Rating: _PrimitiveView"
+  ]
+ },
+ {
+  "id": "rating-appearance",
+  "name": "RatingAppearance",
+  "kind": "struct",
+  "declaration": "public struct RatingAppearance",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "size",
+    "kind": "var",
+    "declaration": "public var size: ControlSize?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "starSize",
+    "kind": "var",
+    "declaration": "public var starSize: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "symbol",
+    "kind": "var",
+    "declaration": "public var symbol: RatingSymbol = .star",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "spacing",
+    "kind": "var",
+    "declaration": "public var spacing: Float = 4",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "filled",
+    "kind": "var",
+    "declaration": "public var filled: SemanticColorRef = .warning",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "empty",
+    "kind": "var",
+    "declaration": "public var empty: SemanticColorRef = .onSurfaceMuted",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "RatingAppearance",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Rating/Rating.swift",
+  "line": 50,
+  "owner": "",
+  "overloads": [
+   "public struct RatingAppearance"
+  ]
+ },
+ {
+  "id": "rating-precision",
+  "name": "RatingPrecision",
+  "kind": "struct",
+  "declaration": "public struct RatingPrecision: Sendable, Hashable",
+  "abstract": "How finely one symbol divides: whole, half, quarter, tenth, or any 1–20 equal parts. Values snap to exact fractions, so `0.3` stays `0.3`.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Hashable"
+  ],
+  "members": [
+   {
+    "name": "divisions",
+    "kind": "let",
+    "declaration": "public let divisions: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "divisions",
+    "kind": "func",
+    "declaration": "public static func divisions(_ count: Int) -> Self",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "whole",
+    "kind": "let",
+    "declaration": "public static let whole = divisions(1)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "half",
+    "kind": "let",
+    "declaration": "public static let half = divisions(2)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "quarter",
+    "kind": "let",
+    "declaration": "public static let quarter = divisions(4)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "tenth",
+    "kind": "let",
+    "declaration": "public static let tenth = divisions(10)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "increment",
+    "kind": "var",
+    "declaration": "public var increment: Double",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Rating/Rating.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public struct RatingPrecision: Sendable, Hashable"
+  ]
+ },
+ {
+  "id": "rating-selection",
+  "name": "RatingSelection",
+  "kind": "struct",
+  "declaration": "public struct RatingSelection: Sendable, Equatable",
+  "abstract": "Authored selection rules; hover/press state lives with the mounted node.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "maximum",
+    "kind": "var",
+    "declaration": "public var maximum = 5",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "precision",
+    "kind": "var",
+    "declaration": "public var precision: RatingPrecision = .whole",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "allowsClear",
+    "kind": "var",
+    "declaration": "public var allowsClear = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isReadOnly",
+    "kind": "var",
+    "declaration": "public var isReadOnly = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "RatingSelection",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Rating/Rating.swift",
+  "line": 35,
+  "owner": "",
+  "overloads": [
+   "public struct RatingSelection: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "rating-symbol",
+  "name": "RatingSymbol",
+  "kind": "struct",
+  "declaration": "public struct RatingSymbol: Sendable, Hashable",
+  "abstract": "The glyph pair a rating paints: an empty outline under a filled glyph clipped to the value. Both are tinted masks, so any monochrome icon works.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Hashable"
+  ],
+  "members": [
+   {
+    "name": "filled",
+    "kind": "var",
+    "declaration": "public var filled: BundleImageResource",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "empty",
+    "kind": "var",
+    "declaration": "public var empty: BundleImageResource",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "RatingSymbol",
+    "kind": "init",
+    "declaration": "public init(filled: BundleImageResource, empty: BundleImageResource)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "star",
+    "kind": "let",
+    "declaration": "public static let star = RatingSymbol(filled: UIIcons.Status.starFill, empty: UIIcons.Status.star)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "heart",
+    "kind": "let",
+    "declaration": "public static let heart = RatingSymbol(filled: UIIcons.Status.heartFill, empty: UIIcons.Status.heart)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Rating/Rating.swift",
+  "line": 26,
+  "owner": "",
+  "overloads": [
+   "public struct RatingSymbol: Sendable, Hashable"
+  ]
+ },
+ {
+  "id": "search-field",
+  "name": "SearchField",
+  "kind": "struct",
+  "declaration": "public struct SearchField: View",
+  "abstract": "Search input built on the regular `TextField` chrome: a decorative leading search icon, the field's clear affordance, submit and Escape handling, and an optional suggestion list that supports arrow keys, Return and pointer.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "text",
+    "kind": "let",
+    "declaration": "public let text: Binding<TextBuffer>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "placeholder",
+    "kind": "let",
+    "declaration": "public let placeholder: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "suggestions",
+    "kind": "let",
+    "declaration": "public let suggestions: [String]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "clearsOnEscape",
+    "kind": "let",
+    "declaration": "public let clearsOnEscape: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onSubmit",
+    "kind": "let",
+    "declaration": "public let onSubmit: ((String) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onSuggestionSelected",
+    "kind": "let",
+    "declaration": "public let onSuggestionSelected: ((String) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SearchField",
+    "kind": "init",
+    "declaration": "public init(text: Binding<TextBuffer>, placeholder: String = \"Search\", suggestions: [String] = [], isEnabled: Bool = true, clearsOnEscape: Bool = true, onSubmit: ((String) -> Void)? = nil, onSuggestionSelected: ((String) -> Void)? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/SearchField.swift",
+  "line": 9,
+  "owner": "",
+  "overloads": [
+   "public struct SearchField: View"
+  ]
+ },
+ {
+  "id": "select",
+  "name": "Select",
+  "kind": "struct",
+  "declaration": "public struct Select<Value: Hashable>: View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "selection",
+    "kind": "let",
+    "declaration": "public let selection: Binding<Value>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "options",
+    "kind": "let",
+    "declaration": "public let options: [SelectOption<Value>]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "width",
+    "kind": "let",
+    "declaration": "public let width: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maxVisibleRows",
+    "kind": "let",
+    "declaration": "public let maxVisibleRows: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "placeholder",
+    "kind": "let",
+    "declaration": "public let placeholder: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Select",
+    "kind": "init",
+    "declaration": "public init(selection: Binding<Value>, options: [SelectOption<Value>], isEnabled: Bool = true, width: Float? = nil, maxVisibleRows: Int = 8, placeholder: String = \"Select\")",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Select",
+    "kind": "init",
+    "declaration": "init(selection: Binding<Value>, isEnabled: Bool = true, width: Float? = nil, maxVisibleRows: Int = 8, placeholder: String = \"Select\", label: @escaping (Value) -> String =",
+    "abstract": "Every case of an enumeration, in declaration order.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Select.swift",
+  "line": 124,
+  "owner": "",
+  "overloads": [
+   "public struct Select<Value: Hashable>: View"
+  ]
+ },
+ {
+  "id": "select-option",
+  "name": "SelectOption",
+  "kind": "struct",
+  "declaration": "public struct SelectOption<Value: Hashable>: Identifiable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "value",
+    "kind": "let",
+    "declaration": "public let value: Value",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "let",
+    "declaration": "public let label: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "id",
+    "kind": "var",
+    "declaration": "public var id: AnyHashable",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SelectOption",
+    "kind": "init",
+    "declaration": "public init(value: Value, label: String, isEnabled: Bool = true)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Select.swift",
+  "line": 108,
+  "owner": "",
+  "overloads": [
+   "public struct SelectOption<Value: Hashable>: Identifiable"
+  ]
+ },
+ {
+  "id": "slider",
+  "name": "Slider",
+  "kind": "struct",
+  "declaration": "public struct Slider: View",
+  "abstract": "Continuous, single-thumb slider bound to a `Double` value within a range.",
+  "discussion": [
+   "```swift\n@State var volume: Double = 0.5\nSlider(value: $volume, range: 0...1)\n```",
+   "Mirrors the `Button` pattern: the public struct delegates to a stateful\ncomposite while the actual hit-testing and drawing live in a leaf\n`_PrimitiveView` (`SliderHost`)."
+  ],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "value",
+    "kind": "let",
+    "declaration": "public let value: Binding<Double>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "range",
+    "kind": "let",
+    "declaration": "public let range: ClosedRange<Double>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "step",
+    "kind": "let",
+    "declaration": "public let step: Double?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onEditingChanged",
+    "kind": "let",
+    "declaration": "public let onEditingChanged: ((Bool) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showsTicks",
+    "kind": "let",
+    "declaration": "public let showsTicks: Bool",
+    "abstract": "Draws a small tick at every discrete `step` position.",
+    "discussion": []
+   },
+   {
+    "name": "axis",
+    "kind": "let",
+    "declaration": "public let axis: Axis",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Slider",
+    "kind": "init",
+    "declaration": "public init(value: Binding<Double>, range: ClosedRange<Double> = 0...1, step: Double? = nil, isEnabled: Bool = true, onEditingChanged: ((Bool) -> Void)? = nil, showsTicks: Bool = false, axis: Axis = .horizontal)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Slider/Slider.swift",
+  "line": 17,
+  "owner": "",
+  "overloads": [
+   "public struct Slider: View"
+  ]
+ },
+ {
+  "id": "split-button",
+  "name": "SplitButton",
+  "kind": "struct",
+  "declaration": "public struct SplitButton<Label: View>: View",
+  "abstract": "Primary action plus an adjacent menu trigger. The primary button runs the default action; the arrow opens the same `MenuEntry` menu used by `MenuButton`.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "label",
+    "kind": "let",
+    "declaration": "public let label: Label",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "action",
+    "kind": "let",
+    "declaration": "public let action: () -> Void",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "entries",
+    "kind": "let",
+    "declaration": "public let entries: [MenuEntry]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "menuWidth",
+    "kind": "let",
+    "declaration": "public let menuWidth: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SplitButton",
+    "kind": "init",
+    "declaration": "public init(entries: [MenuEntry], isEnabled: Bool = true, menuWidth: Float? = nil, action: @escaping () -> Void, @ViewBuilder label: () -> Label)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SplitButton",
+    "kind": "init",
+    "declaration": "init(_ title: String, entries: [MenuEntry], isEnabled: Bool = true, menuWidth: Float? = nil, action: @escaping () -> Void)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/SplitButton.swift",
+  "line": 9,
+  "owner": "",
+  "overloads": [
+   "public struct SplitButton<Label: View>: View"
+  ]
+ },
+ {
+  "id": "tag",
+  "name": "Tag",
+  "kind": "struct",
+  "declaration": "public struct Tag: _PrimitiveView",
+  "abstract": "Compact labelled chip, optionally removable.",
+  "discussion": [
+   "`Tag` carries content (a filter, a category, an assignee); `Badge` carries\nstatus. They look similar on purpose but are separate types so a tag can own\na remove action and a badge can never be mistaken for one.",
+   "```swift\nTag(\"metal\") { $0.onRemove = { filters.remove(\"metal\") } }\nTag(\"renderer\") { $0.icon = UIIcons.Editor.box; $0.variant = .outline }\n```"
+  ],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "title",
+    "kind": "var",
+    "declaration": "public var title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "tone",
+    "kind": "var",
+    "declaration": "public var tone: StatusTone",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "variant",
+    "kind": "var",
+    "declaration": "public var variant: Variant",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "icon",
+    "kind": "var",
+    "declaration": "public var icon: BundleImageResource?",
+    "abstract": "Leading glyph. `nil` keeps the chip text-only.",
+    "discussion": []
+   },
+   {
+    "name": "showsDot",
+    "kind": "var",
+    "declaration": "public var showsDot: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onRemove",
+    "kind": "var",
+    "declaration": "public var onRemove: (() -> Void)?",
+    "abstract": "When set, a remove button is rendered in the trailing slot.",
+    "discussion": []
+   },
+   {
+    "name": "Tag",
+    "kind": "init",
+    "declaration": "public init(_ title: String, configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Tag.swift",
+  "line": 15,
+  "owner": "",
+  "overloads": [
+   "public struct Tag: _PrimitiveView"
+  ]
+ },
+ {
+  "id": "text-completion-edit",
+  "name": "TextCompletionEdit",
+  "kind": "struct",
+  "declaration": "public struct TextCompletionEdit: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "range",
+    "kind": "let",
+    "declaration": "public let range: Range<Int>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "text",
+    "kind": "let",
+    "declaration": "public let text: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextCompletionEdit",
+    "kind": "init",
+    "declaration": "public init(range: Range<Int>, text: String)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/CompletionPopover.swift",
+  "line": 37,
+  "owner": "",
+  "overloads": [
+   "public struct TextCompletionEdit: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "text-completion-item",
+  "name": "TextCompletionItem",
+  "kind": "struct",
+  "declaration": "public struct TextCompletionItem: Sendable, Equatable, Identifiable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable",
+   "Identifiable"
+  ],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "let",
+    "declaration": "public let label: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "detail",
+    "kind": "var",
+    "declaration": "public var detail: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "documentation",
+    "kind": "var",
+    "declaration": "public var documentation: String?",
+    "abstract": "Shown under the list while the item is highlighted.",
+    "discussion": []
+   },
+   {
+    "name": "insertText",
+    "kind": "var",
+    "declaration": "public var insertText: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "filterText",
+    "kind": "var",
+    "declaration": "public var filterText: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "replacement",
+    "kind": "var",
+    "declaration": "public var replacement: Range<Int>?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "additionalEdits",
+    "kind": "var",
+    "declaration": "public var additionalEdits: [TextCompletionEdit] = []",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "insertTextFormat",
+    "kind": "var",
+    "declaration": "public var insertTextFormat: TextInsertFormat = .plainText",
+    "abstract": "`.snippet` expands tab stops; Tab and Shift+Tab then visit them.",
+    "discussion": []
+   },
+   {
+    "name": "TextCompletionItem",
+    "kind": "init",
+    "declaration": "public init(id: String, label: String, insertText: String)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/CompletionPopover.swift",
+  "line": 21,
+  "owner": "",
+  "overloads": [
+   "public struct TextCompletionItem: Sendable, Equatable, Identifiable"
+  ]
+ },
+ {
+  "id": "text-completion-request",
+  "name": "TextCompletionRequest",
+  "kind": "struct",
+  "declaration": "public struct TextCompletionRequest: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "buffer",
+    "kind": "let",
+    "declaration": "public let buffer: TextBuffer",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "caretIndex",
+    "kind": "let",
+    "declaration": "public let caretIndex: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "prefix",
+    "kind": "let",
+    "declaration": "public let prefix: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "prefixRange",
+    "kind": "let",
+    "declaration": "public let prefixRange: Range<Int>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "utf8Offset",
+    "kind": "var",
+    "declaration": "public var utf8Offset: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TextCompletionRequest",
+    "kind": "init",
+    "declaration": "public init(buffer: TextBuffer, caretIndex: Int)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/CompletionPopover.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct TextCompletionRequest: Sendable"
+  ]
+ },
+ {
+  "id": "time-field",
+  "name": "TimeField",
+  "kind": "struct",
+  "declaration": "public struct TimeField: View",
+  "abstract": "An editable draft commits on Return/blur. Invalid text never overwrites the bound time.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "value",
+    "kind": "let",
+    "declaration": "public let value: Binding<TimeOfDay?>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "options",
+    "kind": "var",
+    "declaration": "public var options = TimeFieldOptions()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TimeField",
+    "kind": "init",
+    "declaration": "public init(value: Binding<TimeOfDay?>, configure: (inout TimeFieldOptions) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/TimeField.swift",
+  "line": 18,
+  "owner": "",
+  "overloads": [
+   "public struct TimeField: View"
+  ]
+ },
+ {
+  "id": "time-field-options",
+  "name": "TimeFieldOptions",
+  "kind": "struct",
+  "declaration": "public struct TimeFieldOptions",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "showSeconds",
+    "kind": "var",
+    "declaration": "public var showSeconds = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minuteStep",
+    "kind": "var",
+    "declaration": "public var minuteStep = 1",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minimum",
+    "kind": "var",
+    "declaration": "public var minimum = TimeOfDay()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maximum",
+    "kind": "var",
+    "declaration": "public var maximum = TimeOfDay(hour: 23, minute: 59, second: 59)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TimeFieldOptions",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/TimeField.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct TimeFieldOptions"
+  ]
+ },
+ {
+  "id": "time-hour-cycle",
+  "name": "TimeHourCycle",
+  "kind": "enum",
+  "declaration": "public enum TimeHourCycle: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/TimePicker.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public enum TimeHourCycle: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "time-input",
+  "name": "TimeInput",
+  "kind": "struct",
+  "declaration": "public struct TimeInput: View",
+  "abstract": "A segmented time field, like AppKit's date picker: hours, minutes and (in a 12-hour cycle) AM/PM each take the focus. Up/Down step the focused segment, digits set it and advance to the next, Left/Right move between segments, and the first letter of AM/PM chooses the half of the day.",
+  "discussion": [
+   "```swift\nTimeInput(selection: $time, hourCycle: .twelve)\n```"
+  ],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "selection",
+    "kind": "let",
+    "declaration": "public let selection: Binding<TimeOfDay?>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "hourCycle",
+    "kind": "let",
+    "declaration": "public let hourCycle: TimeInputHourCycle",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "accessibilityLabel",
+    "kind": "let",
+    "declaration": "public let accessibilityLabel: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TimeInput",
+    "kind": "init",
+    "declaration": "public init(selection: Binding<TimeOfDay?>, hourCycle: TimeInputHourCycle = .twentyFour, isEnabled: Bool = true, accessibilityLabel: String? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/TimeInput.swift",
+  "line": 17,
+  "owner": "",
+  "overloads": [
+   "public struct TimeInput: View"
+  ]
+ },
+ {
+  "id": "time-input-hour-cycle",
+  "name": "TimeInputHourCycle",
+  "kind": "enum",
+  "declaration": "public enum TimeInputHourCycle: Sendable, Equatable",
+  "abstract": "The hour cycle a `TimeInput` displays.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/TimeInput.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public enum TimeInputHourCycle: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "time-of-day",
+  "name": "TimeOfDay",
+  "kind": "struct",
+  "declaration": "public struct TimeOfDay: Sendable, Hashable, Comparable, Codable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Hashable",
+   "Comparable",
+   "Codable"
+  ],
+  "members": [
+   {
+    "name": "hour",
+    "kind": "let",
+    "declaration": "public let hour: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minute",
+    "kind": "let",
+    "declaration": "public let minute: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "second",
+    "kind": "let",
+    "declaration": "public let second: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TimeOfDay",
+    "kind": "init",
+    "declaration": "public init(hour: Int = 0, minute: Int = 0, second: Int = 0)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "seconds",
+    "kind": "var",
+    "declaration": "public var seconds: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "",
+    "kind": "func",
+    "declaration": "public static func < (lhs: Self, rhs: Self) -> Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "formatted",
+    "kind": "func",
+    "declaration": "public func formatted(showSeconds: Bool = false) -> String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "parse",
+    "kind": "func",
+    "declaration": "public static func parse(_ text: String, showSeconds: Bool = false) -> Self?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TimeOfDay",
+    "kind": "init",
+    "declaration": "public init(from decoder: Decoder) throws",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/DateValues.swift",
+  "line": 42,
+  "owner": "",
+  "overloads": [
+   "public struct TimeOfDay: Sendable, Hashable, Comparable, Codable"
+  ]
+ },
+ {
+  "id": "time-picker",
+  "name": "TimePicker",
+  "kind": "struct",
+  "declaration": "public struct TimePicker: View",
+  "abstract": "Inline wheel time editor. The host supplies the field chrome or a popover; this view owns only the wheel columns and the committed `TimeOfDay`.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "selection",
+    "kind": "let",
+    "declaration": "public let selection: Binding<TimeOfDay?>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "options",
+    "kind": "var",
+    "declaration": "public var options = TimePickerOptions()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onChange",
+    "kind": "var",
+    "declaration": "public var onChange: ((TimeOfDay) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "TimePicker",
+    "kind": "init",
+    "declaration": "public init(selection: Binding<TimeOfDay?>, configure: (inout TimePickerOptions) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/TimePicker.swift",
+  "line": 28,
+  "owner": "",
+  "overloads": [
+   "public struct TimePicker: View"
+  ]
+ },
+ {
+  "id": "time-picker-options",
+  "name": "TimePickerOptions",
+  "kind": "struct",
+  "declaration": "public struct TimePickerOptions",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "hourCycle",
+    "kind": "var",
+    "declaration": "public var hourCycle: TimeHourCycle = .twentyFour",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minuteStep",
+    "kind": "var",
+    "declaration": "public var minuteStep = 5",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showsSeconds",
+    "kind": "var",
+    "declaration": "public var showsSeconds = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minimum",
+    "kind": "var",
+    "declaration": "public var minimum = TimeOfDay()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maximum",
+    "kind": "var",
+    "declaration": "public var maximum = TimeOfDay(hour: 23, minute: 59, second: 59)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "var",
+    "declaration": "public var label = \"Time\" public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/TimePicker.swift",
+  "line": 10,
+  "owner": "",
+  "overloads": [
+   "public struct TimePickerOptions"
+  ]
+ },
+ {
+  "id": "toggle",
+  "name": "Toggle",
+  "kind": "struct",
+  "declaration": "public struct Toggle: View",
+  "abstract": "Boolean on/off control rendered as a switch track with a movable thumb.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "isOn",
+    "kind": "let",
+    "declaration": "public let isOn: Binding<Bool>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "let",
+    "declaration": "public let label: String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Toggle",
+    "kind": "init",
+    "declaration": "public init(isOn: Binding<Bool>, isEnabled: Bool = true, label: String? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Toggle",
+    "kind": "init",
+    "declaration": "public init(_ label: String, isOn: Binding<Bool>, isEnabled: Bool = true)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Toggle.swift",
+  "line": 10,
+  "owner": "",
+  "overloads": [
+   "public struct Toggle: View"
+  ]
+ },
+ {
+  "id": "toolbar",
+  "name": "Toolbar",
+  "kind": "struct",
+  "declaration": "public struct Toolbar<Content: View>: View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "options",
+    "kind": "var",
+    "declaration": "public var options = ToolbarOptions()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "content",
+    "kind": "let",
+    "declaration": "public let content: Content",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Toolbar",
+    "kind": "init",
+    "declaration": "public init(configure: (inout ToolbarOptions) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Toolbar",
+    "kind": "init",
+    "declaration": "init(items: [ToolbarItem], configure: (inout ToolbarOptions) -> Void =",
+    "abstract": "Measure commands at their natural size, then move lower priority commands into a menu. Icon commands retain their full title as help and semantics.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Toolbar.swift",
+  "line": 37,
+  "owner": "",
+  "overloads": [
+   "public struct Toolbar<Content: View>: View"
+  ]
+ },
+ {
+  "id": "toolbar-axis",
+  "name": "ToolbarAxis",
+  "kind": "enum",
+  "declaration": "public enum ToolbarAxis: Sendable, Hashable",
+  "abstract": "Main axis of a toolbar. Vertical toolbars stack commands top to bottom, navigate with Up/Down and open overflow beside the bar.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Hashable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Toolbar.swift",
+  "line": 18,
+  "owner": "",
+  "overloads": [
+   "public enum ToolbarAxis: Sendable, Hashable"
+  ]
+ },
+ {
+  "id": "toolbar-divider-edge",
+  "name": "ToolbarDividerEdge",
+  "kind": "enum",
+  "declaration": "public enum ToolbarDividerEdge: Sendable, Hashable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Hashable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Toolbar.swift",
+  "line": 11,
+  "owner": "",
+  "overloads": [
+   "public enum ToolbarDividerEdge: Sendable, Hashable"
+  ]
+ },
+ {
+  "id": "toolbar-group",
+  "name": "ToolbarGroup",
+  "kind": "struct",
+  "declaration": "public struct ToolbarGroup<Content: View>: View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "isBordered",
+    "kind": "var",
+    "declaration": "public var isBordered = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "var",
+    "declaration": "public var label = \"\" public let content: Content",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ToolbarGroup",
+    "kind": "init",
+    "declaration": "public init(isBordered: Bool = false, label: String = \"\", @ViewBuilder content: () -> Content)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Toolbar.swift",
+  "line": 118,
+  "owner": "",
+  "overloads": [
+   "public struct ToolbarGroup<Content: View>: View"
+  ]
+ },
+ {
+  "id": "toolbar-item",
+  "name": "ToolbarItem",
+  "kind": "struct",
+  "declaration": "public struct ToolbarItem",
+  "abstract": "One command shared by the bar and its overflow menu. Actions and enabled, selected and destructive semantics come from the same MenuItem value.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "command",
+    "kind": "let",
+    "declaration": "public let command: MenuItem",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "icon",
+    "kind": "var",
+    "declaration": "public var icon: ButtonIcon.Source?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "placement",
+    "kind": "var",
+    "declaration": "public var placement: Placement = .automatic()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ToolbarItem",
+    "kind": "init",
+    "declaration": "public init(_ command: MenuItem, icon: ButtonIcon.Source? = nil, placement: Placement = .automatic())",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Toolbar/Commands.swift",
+  "line": 8,
+  "owner": "",
+  "overloads": [
+   "public struct ToolbarItem"
+  ]
+ },
+ {
+  "id": "toolbar-metrics",
+  "name": "ToolbarMetrics",
+  "kind": "enum",
+  "declaration": "public enum ToolbarMetrics",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "height",
+    "kind": "var",
+    "declaration": "public static var height: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "controlHeight",
+    "kind": "var",
+    "declaration": "public static var controlHeight: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "height",
+    "kind": "func",
+    "declaration": "public static func height(for size: ControlSize) -> Float",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Toolbar.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public enum ToolbarMetrics"
+  ]
+ },
+ {
+  "id": "toolbar-options",
+  "name": "ToolbarOptions",
+  "kind": "struct",
+  "declaration": "public struct ToolbarOptions",
+  "abstract": "Groups controls with shared density and arrow-key navigation along the axis. Child inputs get first refusal for caret movement. Disabling the toolbar blocks all hosted input and removes its descendants from focus traversal.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "divider",
+    "kind": "var",
+    "declaration": "public var divider: ToolbarDividerEdge = .bottom",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "var",
+    "declaration": "public var label = \"Toolbar\" public var axis: ToolbarAxis = .horizontal",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ToolbarOptions",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Toolbar.swift",
+  "line": 29,
+  "owner": "",
+  "overloads": [
+   "public struct ToolbarOptions"
+  ]
+ },
+ {
+  "id": "toolbar-separator",
+  "name": "ToolbarSeparator",
+  "kind": "struct",
+  "declaration": "public struct ToolbarSeparator: _PrimitiveView",
+  "abstract": "Thin rule between toolbar groups, drawn across the toolbar axis.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "ToolbarSeparator",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Toolbar.swift",
+  "line": 150,
+  "owner": "",
+  "overloads": [
+   "public struct ToolbarSeparator: _PrimitiveView"
+  ]
+ },
+ {
+  "id": "vec3-field",
+  "name": "Vec3Field",
+  "kind": "struct",
+  "declaration": "public struct Vec3Field: View",
+  "abstract": "Three caller-owned numeric values with a shared format and constraints.",
+  "discussion": [
+   "Each axis is a `NumberField` led by its colored axis chip: drag a chip to\nscrub that axis, double-click it to reset the axis to `resetValue`. The\nrow's context menu copies the vector, pastes one (`1, 2, 3`, `(1 2 3)` and\n`Vector3(1, 2, 3)` all parse) and resets every axis."
+  ],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "x",
+    "kind": "let",
+    "declaration": "public let x: Binding<Float>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "y",
+    "kind": "let",
+    "declaration": "public let y: Binding<Float>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "z",
+    "kind": "let",
+    "declaration": "public let z: Binding<Float>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "decimals",
+    "kind": "let",
+    "declaration": "public let decimals: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "size",
+    "kind": "let",
+    "declaration": "public let size: TextField.Size",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minValue",
+    "kind": "let",
+    "declaration": "public let minValue: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maxValue",
+    "kind": "let",
+    "declaration": "public let maxValue: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "step",
+    "kind": "let",
+    "declaration": "public let step: Float?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "mixedAxes",
+    "kind": "let",
+    "declaration": "public let mixedAxes: Set<String>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "mixedValueLabel",
+    "kind": "let",
+    "declaration": "public let mixedValueLabel: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "resetValue",
+    "kind": "let",
+    "declaration": "public let resetValue: SIMD3<Float>?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "locale",
+    "kind": "let",
+    "declaration": "public let locale: Locale",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minimumAxisWidth",
+    "kind": "var",
+    "declaration": "public var minimumAxisWidth: Float = 88",
+    "abstract": "Dense pointer workbenches can use narrower axes; stacking still keeps all three values visible when the available width is insufficient.",
+    "discussion": []
+   },
+   {
+    "name": "Vec3Field",
+    "kind": "init",
+    "declaration": "public init(x: Binding<Float>, y: Binding<Float>, z: Binding<Float>, decimals: Int = 2, size: TextField.Size = .small, isEnabled: Bool = true, minValue: Float? = nil, maxValue: Float? = nil, step: Float? = nil, mixedAxes: Set<String> = [], mixedValueLabel: String = \"Mixed value\", resetValue: SIMD3<Float>? = nil, locale: Locale = .current)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Numeric/Vec3Field.swift",
+  "line": 12,
+  "owner": "",
+  "overloads": [
+   "public struct Vec3Field: View"
+  ]
+ },
+ {
+  "id": "wheel-picker",
+  "name": "WheelPicker",
+  "kind": "struct",
+  "declaration": "public struct WheelPicker<Value: Hashable>: View",
+  "abstract": "A five-row wheel. Pointer drags follow the finger, wheel and arrow keys move one option, and the selection lands only on enabled options.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "selection",
+    "kind": "let",
+    "declaration": "public let selection: Binding<Value>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "options",
+    "kind": "let",
+    "declaration": "public let options: [WheelPickerOption<Value>]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "visibleRows",
+    "kind": "var",
+    "declaration": "public var visibleRows: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "var",
+    "declaration": "public var label: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "onChange",
+    "kind": "var",
+    "declaration": "public var onChange: ((Value) -> Void)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "WheelPicker",
+    "kind": "init",
+    "declaration": "public init(selection: Binding<Value>, options: [WheelPickerOption<Value>], isEnabled: Bool = true, visibleRows: Int = 5, label: String = \"Wheel picker\", onChange: ((Value) -> Void)? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/WheelPicker.swift",
+  "line": 22,
+  "owner": "",
+  "overloads": [
+   "public struct WheelPicker<Value: Hashable>: View"
+  ]
+ },
+ {
+  "id": "wheel-picker-option",
+  "name": "WheelPickerOption",
+  "kind": "struct",
+  "declaration": "public struct WheelPickerOption<Value: Hashable>: Identifiable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "value",
+    "kind": "let",
+    "declaration": "public let value: Value",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "let",
+    "declaration": "public let label: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "let",
+    "declaration": "public let isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "id",
+    "kind": "var",
+    "declaration": "public var id: AnyHashable",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "WheelPickerOption",
+    "kind": "init",
+    "declaration": "public init(_ value: Value, _ label: String, isEnabled: Bool = true)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/WheelPicker.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct WheelPickerOption<Value: Hashable>: Identifiable"
+  ]
+ },
+ {
+  "id": "form-controller",
+  "name": "FormController",
+  "kind": "class",
+  "declaration": "public final class FormController",
+  "abstract": "Transient validation/submission state. Authored values and persistence stay in the application.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "FormController",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "issues",
+    "kind": "var",
+    "declaration": "public var issues: [FormIssue]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "submission",
+    "kind": "var",
+    "declaration": "public var submission: FormSubmissionState",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "submitCount",
+    "kind": "var",
+    "declaration": "public var submitCount: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isSubmitting",
+    "kind": "var",
+    "declaration": "public var isSubmitting: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "error",
+    "kind": "func",
+    "declaration": "public func error(for fieldID: String) -> String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "validate",
+    "kind": "func",
+    "declaration": "public func validate(_ rules: [FormRule]) -> Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "beginSubmit",
+    "kind": "func",
+    "declaration": "public func beginSubmit(_ rules: [FormRule]) -> Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "finishSubmit",
+    "kind": "func",
+    "declaration": "public func finishSubmit(error: String? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "reset",
+    "kind": "func",
+    "declaration": "public func reset()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "controls",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Controls/FormValidation.swift",
+  "line": 40,
+  "owner": "",
+  "overloads": [
+   "public final class FormController"
+  ]
+ }
+]

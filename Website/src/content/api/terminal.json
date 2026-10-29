@@ -1,0 +1,224 @@
+[
+ {
+  "id": "terminal-command",
+  "name": "TerminalCommand",
+  "kind": "struct",
+  "declaration": "public struct TerminalCommand: Sendable, Equatable",
+  "abstract": "The program a `TerminalSession` runs on its pseudo terminal.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "executable",
+    "kind": "var",
+    "declaration": "public var executable: String",
+    "abstract": "Absolute path, or a name resolved through `PATH`.",
+    "discussion": []
+   },
+   {
+    "name": "arguments",
+    "kind": "var",
+    "declaration": "public var arguments: [String] = []",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "environment",
+    "kind": "var",
+    "declaration": "public var environment: [String: String] = [:]",
+    "abstract": "Entries layered over the inherited environment. `TERM` and `COLORTERM` describe the emulator and are set unless overridden here.",
+    "discussion": []
+   },
+   {
+    "name": "workingDirectory",
+    "kind": "var",
+    "declaration": "public var workingDirectory: URL?",
+    "abstract": "`nil` inherits the host process's working directory.",
+    "discussion": []
+   },
+   {
+    "name": "TerminalCommand",
+    "kind": "init",
+    "declaration": "public init(executable: String, arguments: [String] = [], workingDirectory: URL? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "loginShell",
+    "kind": "var",
+    "declaration": "public static var loginShell: TerminalCommand",
+    "abstract": "The user's login shell (`$SHELL -l`, falling back to `/bin/sh`); Windows PowerShell on Windows.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUITerminal",
+  "category": "terminal",
+  "file": "Terminal/Sources/CoveUITerminal/Process/Command.swift",
+  "line": 4,
+  "owner": "",
+  "overloads": [
+   "public struct TerminalCommand: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "terminal-error",
+  "name": "TerminalError",
+  "kind": "enum",
+  "declaration": "public enum TerminalError: Error, Equatable, CustomStringConvertible",
+  "abstract": "Errors raised while starting a terminal program.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Error",
+   "Equatable",
+   "CustomStringConvertible"
+  ],
+  "members": [
+   {
+    "name": "description",
+    "kind": "var",
+    "declaration": "public var description: String",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUITerminal",
+  "category": "terminal",
+  "file": "Terminal/Sources/CoveUITerminal/Process/PseudoTerminal.swift",
+  "line": 4,
+  "owner": "",
+  "overloads": [
+   "public enum TerminalError: Error, Equatable, CustomStringConvertible"
+  ]
+ },
+ {
+  "id": "terminal-view",
+  "name": "TerminalView",
+  "kind": "struct",
+  "declaration": "public struct TerminalView: View",
+  "abstract": "Shows a `TerminalSession`, starting it if it is still idle. The grid fills the space the view is given; the program is told the new size whenever layout changes.",
+  "discussion": [
+   "- Keyboard and IME text go to the program; ⌘C copies the selection and ⌘V\n  pastes. Other ⌘ shortcuts stay with the host.\n- Drag selects (double-click a word, triple-click a line). Programs that\n  ask for mouse reports receive the pointer instead; hold Shift to select.\n- ⌘-click opens OSC 8 hyperlinks with `onOpenLink`, by default the system.\n- Kitty graphics images are drawn in place; the cursor blinks while focused.",
+   "Default colors follow the theme's surface colors; programs can still set\ntheir own palette."
+  ],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "TerminalView",
+    "kind": "init",
+    "declaration": "public init(session: TerminalSession, fontSize: Float = 13, onOpenLink: ((URL) -> Void)? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUITerminal",
+  "category": "terminal",
+  "file": "Terminal/Sources/CoveUITerminal/View/TerminalView.swift",
+  "line": 18,
+  "owner": "",
+  "overloads": [
+   "public struct TerminalView: View"
+  ]
+ },
+ {
+  "id": "terminal-session",
+  "name": "TerminalSession",
+  "kind": "class",
+  "declaration": "public final class TerminalSession",
+  "abstract": "A terminal emulator bound to one program.",
+  "discussion": [
+   "Create it once (for example in `@State`) and show it with `TerminalView`,\nwhich starts the program when it first appears. The session outlives view\nupdates, so recomposition never restarts the program. Like every CoveUI\nmodel it is used from the UI thread; program output is read in the\nbackground and applied there.",
+   "```swift\n@State private var shell = TerminalSession()",
+   "TerminalView(session: shell)\n    .frame(height: 320)\n```"
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "command",
+    "kind": "let",
+    "declaration": "public let command: TerminalCommand?",
+    "abstract": "The program it runs; nil for a session that shows output it is handed.",
+    "discussion": []
+   },
+   {
+    "name": "onEvent",
+    "kind": "var",
+    "declaration": "public var onEvent: ((Event) -> Void)?",
+    "abstract": "Called on the UI thread.",
+    "discussion": []
+   },
+   {
+    "name": "display",
+    "kind": "func",
+    "declaration": "public static func display(scrollbackLines: Int = 10_000) -> TerminalSession",
+    "abstract": "A session that shows output it is handed instead of running a program, such as a build another process runs. Text a pipe produced, where a line ends in a bare newline, starts each line at the left margin as a terminal would.",
+    "discussion": []
+   },
+   {
+    "name": "show",
+    "kind": "func",
+    "declaration": "public func show(_ bytes: [UInt8])",
+    "abstract": "Shows program output in a display session.",
+    "discussion": []
+   },
+   {
+    "name": "showExit",
+    "kind": "func",
+    "declaration": "public func showExit(code: Int32)",
+    "abstract": "Ends a display session with the program's exit status.",
+    "discussion": []
+   },
+   {
+    "name": "start",
+    "kind": "func",
+    "declaration": "public func start() throws",
+    "abstract": "Launches the program. `TerminalView` calls this when it first shows an idle session. A session runs one program once; create a new session to run again. Failures are also shown in the terminal itself.",
+    "discussion": []
+   },
+   {
+    "name": "send",
+    "kind": "func",
+    "declaration": "public func send(_ text: String)",
+    "abstract": "Sends text as if typed, e.g. `send(\"ls\\r\")`.",
+    "discussion": []
+   },
+   {
+    "name": "paste",
+    "kind": "func",
+    "declaration": "public func paste(_ text: String)",
+    "abstract": "Pastes text using the program's bracketed-paste mode when enabled.",
+    "discussion": []
+   },
+   {
+    "name": "terminate",
+    "kind": "func",
+    "declaration": "public func terminate()",
+    "abstract": "Hangs up the program (SIGHUP). `status` becomes `.exited` once it quits.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUITerminal",
+  "category": "terminal",
+  "file": "Terminal/Sources/CoveUITerminal/Session.swift",
+  "line": 18,
+  "owner": "",
+  "overloads": [
+   "public final class TerminalSession"
+  ]
+ }
+]

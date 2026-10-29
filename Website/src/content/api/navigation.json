@@ -1,0 +1,335 @@
+[
+ {
+  "id": "navigation-stack",
+  "name": "NavigationStack",
+  "kind": "struct",
+  "declaration": "public struct NavigationStack<Route: Hashable, Root: View, Destination: View>: View",
+  "abstract": "Session-owned page stack. The caller owns `path`; pushing appends a route, popping removes the last one, and a non-empty initial path restores a deep link on the first frame.",
+  "discussion": [
+   "The root and every route page stay mounted while they are in the path, so a\npush keeps the root's drafts, scroll and local state. Only the top page is\ninteractive and painted; the incoming page slides from the trailing edge\nwith a fade, and the outgoing page slides to the leading edge. Popping\nreveals the retained previous page with the reverse motion. Reduced motion\nis handled by `AnimatedVisibility`.",
+   "On touch surfaces a drag from the leading edge pulls the top page aside over\nthe previous one and pops it when released past a third of the width or\nflicked. Android back is a host concern: the host should remove the last\nroute. The component deliberately does not consume Escape; overlays keep\npriority over page navigation."
+  ],
+  "availability": [],
+  "conforms": [
+   "Hashable"
+  ],
+  "members": [
+   {
+    "name": "path",
+    "kind": "let",
+    "declaration": "public let path: Binding<[Route]>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "transitionDistance",
+    "kind": "let",
+    "declaration": "public let transitionDistance: Float",
+    "abstract": "Horizontal travel of the page transition in logical points.",
+    "discussion": []
+   },
+   {
+    "name": "NavigationStack",
+    "kind": "init",
+    "declaration": "public init(path: Binding<[Route]>, transitionDistance: Float = 32, @ViewBuilder root: @escaping () -> Root, @ViewBuilder destination: @escaping (Route) -> Destination)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "navigation",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Navigation/NavigationStack.swift",
+  "line": 22,
+  "owner": "",
+  "overloads": [
+   "public struct NavigationStack<Route: Hashable, Root: View, Destination: View>: View"
+  ]
+ },
+ {
+  "id": "route-outlet",
+  "name": "RouteOutlet",
+  "kind": "struct",
+  "declaration": "public struct RouteOutlet<Route: Hashable, Content: View>: View",
+  "abstract": "An active-route composition boundary. Only the selected destination is constructed; changing its key releases the previous page's local state. Keep the application shell outside this outlet and read selection here.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Hashable"
+  ],
+  "members": [
+   {
+    "name": "selection",
+    "kind": "let",
+    "declaration": "public let selection: Binding<Route>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "RouteOutlet",
+    "kind": "init",
+    "declaration": "public init(selection: Binding<Route>, @ViewBuilder destination: @escaping (Route) -> Content)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "navigation",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Navigation/RouteOutlet.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct RouteOutlet<Route: Hashable, Content: View>: View"
+  ]
+ },
+ {
+  "id": "stepper",
+  "name": "Stepper",
+  "kind": "struct",
+  "declaration": "public struct Stepper<ID: Hashable>: View",
+  "abstract": "A controlled workflow navigator. The caller owns selection, outcomes and availability. Lock future steps with `StepperItem.isEnabled`; completing or selecting a step never changes another step's status.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "items",
+    "kind": "let",
+    "declaration": "public let items: [StepperItem<ID>]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "selection",
+    "kind": "let",
+    "declaration": "public let selection: Binding<ID?>",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "options",
+    "kind": "var",
+    "declaration": "public var options = StepperOptions()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Stepper",
+    "kind": "init",
+    "declaration": "public init(_ items: [StepperItem<ID>], selection: Binding<ID?>, configure: (inout StepperOptions) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "navigation",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Navigation/Stepper/Stepper.swift",
+  "line": 9,
+  "owner": "",
+  "overloads": [
+   "public struct Stepper<ID: Hashable>: View"
+  ]
+ },
+ {
+  "id": "stepper-axis",
+  "name": "StepperAxis",
+  "kind": "enum",
+  "declaration": "public enum StepperAxis: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "navigation",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Navigation/Stepper/Values.swift",
+  "line": 38,
+  "owner": "",
+  "overloads": [
+   "public enum StepperAxis: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "stepper-item",
+  "name": "StepperItem",
+  "kind": "struct",
+  "declaration": "public struct StepperItem<ID: Hashable>: Identifiable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: ID",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "title",
+    "kind": "let",
+    "declaration": "public let title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "detail",
+    "kind": "var",
+    "declaration": "public var detail = \"\" public var status: StepStatus = .pending",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "StepperItem",
+    "kind": "init",
+    "declaration": "public init(_ id: ID, _ title: String, configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "navigation",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Navigation/Stepper/Values.swift",
+  "line": 27,
+  "owner": "",
+  "overloads": [
+   "public struct StepperItem<ID: Hashable>: Identifiable"
+  ]
+ },
+ {
+  "id": "stepper-options",
+  "name": "StepperOptions",
+  "kind": "struct",
+  "declaration": "public struct StepperOptions",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "axis",
+    "kind": "var",
+    "declaration": "public var axis: StepperAxis = .horizontal",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "allowsWrap",
+    "kind": "var",
+    "declaration": "public var allowsWrap = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "label",
+    "kind": "var",
+    "declaration": "public var label = \"Steps\" /// Width budget one horizontal step needs before the component switches to",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minimumHorizontalStepWidth",
+    "kind": "var",
+    "declaration": "public var minimumHorizontalStepWidth: Float = 148",
+    "abstract": "Width budget one horizontal step needs before the component switches to its vertical presentation. Titles longer than the budget should raise this instead of letting the step compress.",
+    "discussion": []
+   },
+   {
+    "name": "StepperOptions",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "navigation",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Navigation/Stepper/Values.swift",
+  "line": 40,
+  "owner": "",
+  "overloads": [
+   "public struct StepperOptions"
+  ]
+ },
+ {
+  "id": "step-status",
+  "name": "StepStatus",
+  "kind": "enum",
+  "declaration": "public enum StepStatus: String, Sendable, Codable, CaseIterable",
+  "abstract": "Authored workflow outcomes are independent from the current destination. Going back to an earlier step never silently rewrites a later outcome.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "String",
+   "Sendable",
+   "Codable",
+   "CaseIterable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "navigation",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Navigation/Stepper/Values.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public enum StepStatus: String, Sendable, Codable, CaseIterable"
+  ]
+ },
+ {
+  "id": "modifier-navigation-title",
+  "name": "navigationTitle",
+  "kind": "modifier",
+  "declaration": "func navigationTitle(_ title: String) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "navigation",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Navigation/NavigationStack.swift",
+  "line": 258,
+  "owner": "View",
+  "overloads": [
+   "func navigationTitle(_ title: String) -> some View"
+  ]
+ }
+]

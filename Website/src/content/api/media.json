@@ -1,0 +1,722 @@
+[
+ {
+  "id": "async-image",
+  "name": "AsyncImage",
+  "kind": "struct",
+  "declaration": "public struct AsyncImage<Content: View>: View",
+  "abstract": "File or HTTP image with explicit loading/failure content. Decode is off the UI loop; registration and publication use the captured host scheduler. The node owns cancellation, so an old request cannot replace a newer source.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "url",
+    "kind": "let",
+    "declaration": "public let url: URL?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "width",
+    "kind": "let",
+    "declaration": "public let width: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "height",
+    "kind": "let",
+    "declaration": "public let height: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "contentMode",
+    "kind": "let",
+    "declaration": "public let contentMode: Image.ContentMode",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "retryID",
+    "kind": "let",
+    "declaration": "public let retryID: Int",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "policy",
+    "kind": "var",
+    "declaration": "public var policy = ImageLoadingPolicy()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AsyncImage",
+    "kind": "init",
+    "declaration": "public init(url: URL?, width: Float, height: Float, contentMode: Image.ContentMode = .fit, retryID: Int = 0, configure: (inout ImageLoadingPolicy) -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AsyncImage",
+    "kind": "init",
+    "declaration": "init<Placeholder: View>(url: URL?, width: Float, height: Float, contentMode: Image.ContentMode = .fit, @ViewBuilder placeholder: @escaping () -> Placeholder)",
+    "abstract": "Shows the loaded image, or `placeholder` at the same size while it is empty, loading or failed.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "media",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Media/AsyncImage.swift",
+  "line": 46,
+  "owner": "",
+  "overloads": [
+   "public struct AsyncImage<Content: View>: View"
+  ]
+ },
+ {
+  "id": "async-image-error",
+  "name": "AsyncImageError",
+  "kind": "enum",
+  "declaration": "public enum AsyncImageError: Error, Sendable, Equatable, CustomStringConvertible",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Error",
+   "Sendable",
+   "Equatable",
+   "CustomStringConvertible"
+  ],
+  "members": [
+   {
+    "name": "description",
+    "kind": "var",
+    "declaration": "public var description: String",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "media",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Media/AsyncImage.swift",
+  "line": 18,
+  "owner": "",
+  "overloads": [
+   "public enum AsyncImageError: Error, Sendable, Equatable, CustomStringConvertible"
+  ]
+ },
+ {
+  "id": "async-image-phase",
+  "name": "AsyncImagePhase",
+  "kind": "enum",
+  "declaration": "public enum AsyncImagePhase",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "media",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Media/AsyncImage.swift",
+  "line": 36,
+  "owner": "",
+  "overloads": [
+   "public enum AsyncImagePhase"
+  ]
+ },
+ {
+  "id": "icon",
+  "name": "Icon",
+  "kind": "struct",
+  "declaration": "public struct Icon: View",
+  "abstract": "Themed square SVG icon: the asset's alpha channel is used as coverage and the foreground color as fill (`renderingMode: .alphaMask`), so icons follow theme tokens instead of their source colors. Replaces the repeated `Image(resource:width:height:tint:contentMode:renderingMode:)` incantation.",
+  "discussion": [
+   "```swift\nIcon(UIIcons.Navigation.chevronDown, size: 8, color: .onSurfaceMuted)\nIcon(WorkspaceIcons.pinDot, size: 6, color: titleColor)\n```"
+  ],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "Icon",
+    "kind": "init",
+    "declaration": "public init(_ resource: BundleImageResource, size: Float, color: SemanticColorRef? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Icon",
+    "kind": "init",
+    "declaration": "public init(_ resource: BundleImageResource, size: Float, color: Color)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Icon",
+    "kind": "init",
+    "declaration": "public init(_ resource: BundleImageResource, size: SemanticIconSize = .medium, color: SemanticColorRef? = nil)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Icon",
+    "kind": "init",
+    "declaration": "public init(_ resource: BundleImageResource, size: SemanticIconSize, color: Color)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "media",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Media/Icon.swift",
+  "line": 14,
+  "owner": "",
+  "overloads": [
+   "public struct Icon: View"
+  ]
+ },
+ {
+  "id": "image",
+  "name": "Image",
+  "kind": "struct",
+  "declaration": "public struct Image: _PrimitiveView",
+  "abstract": "Bitmap image primitive backed by an owned CPU asset or a registered GPU texture.",
+  "discussion": [
+   "File images retain their decoded asset with the draw list. NativeRHI\nrenderers upload it on first use. Hosts can also supply a manually registered\n`TextureID`. Layout uses the explicit logical `width` and `height`.",
+   "`tint` multiplies the sampled RGBA. Pass `.white` (default) for an\nuntouched bitmap, or any other color to recolour an opaque shape (acts as\na multiplicative tint, matching the shader's `color * texture` path)."
+  ],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "source",
+    "kind": "let",
+    "declaration": "public let source: Source",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "width",
+    "kind": "let",
+    "declaration": "public let width: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "height",
+    "kind": "let",
+    "declaration": "public let height: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "tint",
+    "kind": "let",
+    "declaration": "public let tint: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "contentMode",
+    "kind": "let",
+    "declaration": "public let contentMode: ContentMode",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "renderingMode",
+    "kind": "let",
+    "declaration": "public let renderingMode: RenderingMode",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Image",
+    "kind": "init",
+    "declaration": "public init(textureID: TextureID, width: Float, height: Float, tint: Color = Color.white, sourcePixelSize: (width: Float, height: Float)? = nil, contentMode: ContentMode = .stretch, renderingMode: RenderingMode = .color)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Image",
+    "kind": "init",
+    "declaration": "public init(source: Source, width: Float, height: Float, tint: Color = .white, contentMode: ContentMode = .stretch, renderingMode: RenderingMode = .color)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Image",
+    "kind": "init",
+    "declaration": "init(file path: String, width: Float, height: Float, tint: Color = .white, contentMode: ContentMode = .stretch, renderingMode: RenderingMode = .color)",
+    "abstract": "Convenience initializer that loads `path` through the registry in `ImageAssetRegistryHolder.current`, then renders the resulting `TextureID` at the requested size.",
+    "discussion": [
+     "First call decodes and retains CPU pixels; GPU upload belongs to the\nconsuming renderer. Subsequent calls hit the in-memory\ncache. Vector formats (SVG/PDF) are rasterised at the requested\npixel dimensions so passing different sizes produces different\ncrisp textures.",
+     "A registry provides shared caching; decoding works without one.\nIf decoding fails, the primitive degrades to\n`TextureID.none` (a tinted blank quad of the requested size)."
+    ]
+   },
+   {
+    "name": "Image",
+    "kind": "init",
+    "declaration": "init(resource: BundleImageResource, width: Float, height: Float, tint: Color = .white, contentMode: ContentMode = .stretch, renderingMode: RenderingMode = .color)",
+    "abstract": "Bundle-resource form of `init(file:width:height:tint:)`. This keeps SwiftPM bundle layout details out of view code.",
+    "discussion": []
+   },
+   {
+    "name": "Image",
+    "kind": "init",
+    "declaration": "init(url: URL, width: Float, height: Float, tint: Color = .white, contentMode: ContentMode = .stretch, renderingMode: RenderingMode = .color)",
+    "abstract": "URL form of `init(file:width:height:tint:)`.",
+    "discussion": []
+   },
+   {
+    "name": "resolve",
+    "kind": "func",
+    "declaration": "static func resolve(path: String, width: Float, height: Float) -> Source",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "media",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Media/Image.swift",
+  "line": 18,
+  "owner": "",
+  "overloads": [
+   "public struct Image: _PrimitiveView"
+  ]
+ },
+ {
+  "id": "image-load-diagnostic",
+  "name": "ImageLoadDiagnostic",
+  "kind": "struct",
+  "declaration": "public struct ImageLoadDiagnostic: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "path",
+    "kind": "let",
+    "declaration": "public let path: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "reason",
+    "kind": "let",
+    "declaration": "public let reason: ImageLoadFailureReason",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "details",
+    "kind": "let",
+    "declaration": "public let details: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ImageLoadDiagnostic",
+    "kind": "init",
+    "declaration": "public init(path: String, reason: ImageLoadFailureReason, details: String)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "media",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Media/Image+File.swift",
+  "line": 12,
+  "owner": "",
+  "overloads": [
+   "public struct ImageLoadDiagnostic: Sendable"
+  ]
+ },
+ {
+  "id": "image-load-diagnostics",
+  "name": "ImageLoadDiagnostics",
+  "kind": "enum",
+  "declaration": "public enum ImageLoadDiagnostics",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "media",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Media/Image+File.swift",
+  "line": 24,
+  "owner": "",
+  "overloads": [
+   "public enum ImageLoadDiagnostics"
+  ]
+ },
+ {
+  "id": "image-load-failure-reason",
+  "name": "ImageLoadFailureReason",
+  "kind": "enum",
+  "declaration": "public enum ImageLoadFailureReason: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "media",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Media/Image+File.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public enum ImageLoadFailureReason: Sendable"
+  ]
+ },
+ {
+  "id": "image-loading-policy",
+  "name": "ImageLoadingPolicy",
+  "kind": "struct",
+  "declaration": "public struct ImageLoadingPolicy: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "timeout",
+    "kind": "var",
+    "declaration": "public var timeout: Double = 15",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maximumDownloadBytes",
+    "kind": "var",
+    "declaration": "public var maximumDownloadBytes = 20 * 1_024 * 1_024",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maximumSourcePixels",
+    "kind": "var",
+    "declaration": "public var maximumSourcePixels = 32_000_000",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ImageLoadingPolicy",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "media",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Media/AsyncImage.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public struct ImageLoadingPolicy: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "skeleton",
+  "name": "Skeleton",
+  "kind": "struct",
+  "declaration": "public struct Skeleton: _PrimitiveView",
+  "abstract": "A decorative placeholder with intrinsic height, shaped painting and a node-owned pulse. The surrounding application owns loading/data/error state.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "appearance",
+    "kind": "var",
+    "declaration": "public var appearance = SkeletonAppearance()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "motion",
+    "kind": "var",
+    "declaration": "public var motion = SkeletonMotion()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "Skeleton",
+    "kind": "init",
+    "declaration": "public init(configure: (inout Self) -> Void =",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "media",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Media/Skeleton.swift",
+  "line": 43,
+  "owner": "",
+  "overloads": [
+   "public struct Skeleton: _PrimitiveView"
+  ]
+ },
+ {
+  "id": "skeleton-appearance",
+  "name": "SkeletonAppearance",
+  "kind": "struct",
+  "declaration": "public struct SkeletonAppearance",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "shape",
+    "kind": "var",
+    "declaration": "public var shape: SkeletonShape = .rectangle()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "height",
+    "kind": "var",
+    "declaration": "public var height: Float = 16",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "color",
+    "kind": "var",
+    "declaration": "public var color: SemanticColorRef = .onSurfaceMuted.opacity(0.24)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isSecondary",
+    "kind": "var",
+    "declaration": "public var isSecondary = false",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SkeletonAppearance",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "media",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Media/Skeleton.swift",
+  "line": 12,
+  "owner": "",
+  "overloads": [
+   "public struct SkeletonAppearance"
+  ]
+ },
+ {
+  "id": "skeleton-motion",
+  "name": "SkeletonMotion",
+  "kind": "struct",
+  "declaration": "public struct SkeletonMotion: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "isAnimated",
+    "kind": "var",
+    "declaration": "public var isAnimated = true",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "duration",
+    "kind": "var",
+    "declaration": "public var duration = 2.0",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minimumOpacity",
+    "kind": "var",
+    "declaration": "public var minimumOpacity: Float = 0.5",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "SkeletonMotion",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "media",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Media/Skeleton.swift",
+  "line": 26,
+  "owner": "",
+  "overloads": [
+   "public struct SkeletonMotion: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "skeleton-shape",
+  "name": "SkeletonShape",
+  "kind": "enum",
+  "declaration": "public enum SkeletonShape: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "media",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Media/Skeleton.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public enum SkeletonShape: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "ui-icon-entry",
+  "name": "UIIconEntry",
+  "kind": "struct",
+  "declaration": "public struct UIIconEntry: Sendable, Identifiable",
+  "abstract": "A browsable catalog entry. Used by tooling and the gallery to list every bundled icon with its category for search and preview.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Identifiable"
+  ],
+  "members": [
+   {
+    "name": "id",
+    "kind": "let",
+    "declaration": "public let id: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "name",
+    "kind": "let",
+    "declaration": "public let name: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "category",
+    "kind": "let",
+    "declaration": "public let category: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "resource",
+    "kind": "let",
+    "declaration": "public let resource: BundleImageResource",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "UIIconEntry",
+    "kind": "init",
+    "declaration": "public init(id: String, name: String, category: String, resource: BundleImageResource)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "media",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Media/UIIconCatalog.swift",
+  "line": 292,
+  "owner": "",
+  "overloads": [
+   "public struct UIIconEntry: Sendable, Identifiable"
+  ]
+ },
+ {
+  "id": "ui-icons",
+  "name": "UIIcons",
+  "kind": "enum",
+  "declaration": "public enum UIIcons",
+  "abstract": "The bundled icon set.",
+  "discussion": [
+   "Every asset is authored on a 24x24 grid and drawn through\n`renderingMode: .alphaMask`, so the alpha channel becomes coverage and\nthe foreground color becomes the fill. Icons therefore follow theme\ntokens instead of their authored colors, and one asset serves every\ndensity.",
+   "Glyphs that are routinely drawn at 8-14px (`chevron-*`, `check`, `x`,\n`plus`, `minus`) are authored with a heavier stroke so they stay\nlegible when scaled down; everything else uses the 2.0 default.",
+   "```swift\nIcon(UIIcons.Navigation.chevronDown, size: 12, color: .onSurfaceMuted)\nIcon(UIIcons.Status.starFill, size: 16, color: .warning)\n```"
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "all",
+    "kind": "let",
+    "declaration": "static let all: [UIIconEntry] = [",
+    "abstract": "Every bundled icon, grouped in catalog order.",
+    "discussion": []
+   },
+   {
+    "name": "search",
+    "kind": "func",
+    "declaration": "static func search(_ query: String) -> [UIIconEntry]",
+    "abstract": "Case-insensitive search across icon name and category.",
+    "discussion": []
+   },
+   {
+    "name": "categories",
+    "kind": "var",
+    "declaration": "static var categories: [String]",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "media",
+  "file": "Compose/Sources/CoveUICompose/Primitives/Media/UIIconCatalog.swift",
+  "line": 21,
+  "owner": "",
+  "overloads": [
+   "public enum UIIcons"
+  ]
+ }
+]

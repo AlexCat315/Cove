@@ -10,6 +10,7 @@ const links = [
   { to: '/', label: '首页' },
   { to: '/showcase', label: '展示' },
   { to: '/docs', label: '文档' },
+  { to: '/documentation/coveui', label: '参考' },
   { to: '/download', label: '下载' },
 ]
 
@@ -57,7 +58,12 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
           :key="l.to"
           :to="l.to"
           class="nav-link"
-          :class="{ active: route.path === l.to || (l.to === '/docs' && route.path.startsWith('/docs')) }"
+          :class="{
+            active:
+              route.path === l.to ||
+              (l.to === '/docs' && route.path.startsWith('/docs')) ||
+              (l.to === '/documentation/coveui' && route.path.startsWith('/documentation')),
+          }"
           @click="closeMenu"
         >
           {{ l.label }}

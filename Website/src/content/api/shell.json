@@ -1,0 +1,2022 @@
+[
+ {
+  "id": "app-display-handle-holder",
+  "name": "AppDisplayHandleHolder",
+  "kind": "enum",
+  "declaration": "public enum AppDisplayHandleHolder",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUI",
+  "category": "shell",
+  "file": "Hosts/Desktop/Sources/CoveUI/Window/WindowChrome.swift",
+  "line": 7,
+  "owner": "",
+  "overloads": [
+   "public enum AppDisplayHandleHolder"
+  ]
+ },
+ {
+  "id": "app-window-chrome-context",
+  "name": "AppWindowChromeContext",
+  "kind": "struct",
+  "declaration": "public struct AppWindowChromeContext: Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "windowID",
+    "kind": "var",
+    "declaration": "public var windowID: WindowID",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AppWindowChromeContext",
+    "kind": "init",
+    "declaration": "public init(windowID: WindowID)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUI",
+  "category": "shell",
+  "file": "Hosts/Desktop/Sources/CoveUI/Window/WindowChrome.swift",
+  "line": 15,
+  "owner": "",
+  "overloads": [
+   "public struct AppWindowChromeContext: Sendable"
+  ]
+ },
+ {
+  "id": "app-window-chrome-context-holder",
+  "name": "AppWindowChromeContextHolder",
+  "kind": "enum",
+  "declaration": "public enum AppWindowChromeContextHolder",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUI",
+  "category": "shell",
+  "file": "Hosts/Desktop/Sources/CoveUI/Window/WindowChrome.swift",
+  "line": 11,
+  "owner": "",
+  "overloads": [
+   "public enum AppWindowChromeContextHolder"
+  ]
+ },
+ {
+  "id": "display-refresh-tick",
+  "name": "DisplayRefreshTick",
+  "kind": "struct",
+  "declaration": "public struct DisplayRefreshTick: Sendable, Equatable",
+  "abstract": "A native display callback, in monotonic host-clock seconds. The target is the display's predicted presentation time, rather than a synthesized timer.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "timestamp",
+    "kind": "let",
+    "declaration": "public let timestamp: Double",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "targetTimestamp",
+    "kind": "let",
+    "declaration": "public let targetTimestamp: Double",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "DisplayRefreshTick",
+    "kind": "init",
+    "declaration": "public init(timestamp: Double, targetTimestamp: Double)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIShell",
+  "category": "shell",
+  "file": "Shell/Sources/PlatformShell/DisplayRefresh/Signal.swift",
+  "line": 5,
+  "owner": "",
+  "overloads": [
+   "public struct DisplayRefreshTick: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "file-dialog-filter",
+  "name": "FileDialogFilter",
+  "kind": "struct",
+  "declaration": "public struct FileDialogFilter: Sendable, Equatable",
+  "abstract": "One entry in a file-open dialog's type filter. Mirrors SDL's `SDL_DialogFileFilter`: `name` is a human label (\"3D Models\") and `extensions` is the bare extension list (no dots), e.g. `[\"glb\", \"gltf\"]`.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "name",
+    "kind": "let",
+    "declaration": "public let name: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "extensions",
+    "kind": "let",
+    "declaration": "public let extensions: [String]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "FileDialogFilter",
+    "kind": "init",
+    "declaration": "public init(name: String, extensions: [String])",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "pattern",
+    "kind": "var",
+    "declaration": "public var pattern: String",
+    "abstract": "SDL's semicolon-separated pattern form (\"glb;gltf;obj\").",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIShell",
+  "category": "shell",
+  "file": "Shell/Sources/PlatformShell/PlatformShell.swift",
+  "line": 104,
+  "owner": "",
+  "overloads": [
+   "public struct FileDialogFilter: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "immersive-window-control-style",
+  "name": "ImmersiveWindowControlStyle",
+  "kind": "enum",
+  "declaration": "public enum ImmersiveWindowControlStyle: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUI",
+  "category": "shell",
+  "file": "Hosts/Desktop/Sources/CoveUI/Window/WindowChrome.swift",
+  "line": 23,
+  "owner": "",
+  "overloads": [
+   "public enum ImmersiveWindowControlStyle: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "immersive-window-title-bar",
+  "name": "ImmersiveWindowTitleBar",
+  "kind": "struct",
+  "declaration": "public struct ImmersiveWindowTitleBar<Leading: View>: View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "height",
+    "kind": "let",
+    "declaration": "public let height: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "resizeBorderWidth",
+    "kind": "let",
+    "declaration": "public let resizeBorderWidth: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "controlStyle",
+    "kind": "let",
+    "declaration": "public let controlStyle: ImmersiveWindowControlStyle",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "nativeControlsLeadingInset",
+    "kind": "let",
+    "declaration": "public let nativeControlsLeadingInset: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "leading",
+    "kind": "let",
+    "declaration": "public let leading: Leading",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ImmersiveWindowTitleBar",
+    "kind": "init",
+    "declaration": "public init(height: Float = 34, resizeBorderWidth: Float = 6, controlStyle: ImmersiveWindowControlStyle = .automatic, nativeControlsLeadingInset: Float = 76, @ViewBuilder leading: () -> Leading)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "body",
+    "kind": "var",
+    "declaration": "public var body: some View",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUI",
+  "category": "shell",
+  "file": "Hosts/Desktop/Sources/CoveUI/Window/WindowChrome.swift",
+  "line": 30,
+  "owner": "",
+  "overloads": [
+   "public struct ImmersiveWindowTitleBar<Leading: View>: View"
+  ]
+ },
+ {
+  "id": "native-application-menu-titles",
+  "name": "NativeApplicationMenuTitles",
+  "kind": "struct",
+  "declaration": "public struct NativeApplicationMenuTitles: Sendable, Equatable",
+  "abstract": "Labels for the entries the platform owns in the application menu.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "hide",
+    "kind": "var",
+    "declaration": "public var hide: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "hideOthers",
+    "kind": "var",
+    "declaration": "public var hideOthers: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showAll",
+    "kind": "var",
+    "declaration": "public var showAll: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "quit",
+    "kind": "var",
+    "declaration": "public var quit: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "NativeApplicationMenuTitles",
+    "kind": "init",
+    "declaration": "public init(appName: String)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "NativeApplicationMenuTitles",
+    "kind": "init",
+    "declaration": "public init(hide: String, hideOthers: String, showAll: String, quit: String)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUI",
+  "category": "shell",
+  "file": "Hosts/Desktop/Sources/CoveUI/Window/NativeMenu.swift",
+  "line": 24,
+  "owner": "",
+  "overloads": [
+   "public struct NativeApplicationMenuTitles: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "native-menu",
+  "name": "NativeMenu",
+  "kind": "struct",
+  "declaration": "public struct NativeMenu",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "title",
+    "kind": "var",
+    "declaration": "public var title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "items",
+    "kind": "var",
+    "declaration": "public var items: [NativeMenuItem]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "NativeMenu",
+    "kind": "init",
+    "declaration": "public init(title: String, items: [NativeMenuItem])",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUI",
+  "category": "shell",
+  "file": "Hosts/Desktop/Sources/CoveUI/Window/NativeMenu.swift",
+  "line": 45,
+  "owner": "",
+  "overloads": [
+   "public struct NativeMenu"
+  ]
+ },
+ {
+  "id": "native-menu-action",
+  "name": "NativeMenuAction",
+  "kind": "struct",
+  "declaration": "public struct NativeMenuAction",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "title",
+    "kind": "var",
+    "declaration": "public var title: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "keyEquivalent",
+    "kind": "var",
+    "declaration": "public var keyEquivalent: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "keyModifiers",
+    "kind": "var",
+    "declaration": "public var keyModifiers: NativeMenuKeyModifiers",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabled",
+    "kind": "var",
+    "declaration": "public var isEnabled: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isSelected",
+    "kind": "var",
+    "declaration": "public var isSelected: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isEnabledProvider",
+    "kind": "var",
+    "declaration": "public var isEnabledProvider: (@MainActor () -> Bool)?",
+    "abstract": "Re-evaluated when the native menu opens or a key equivalent runs.",
+    "discussion": []
+   },
+   {
+    "name": "action",
+    "kind": "var",
+    "declaration": "public var action: @MainActor () -> Void",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "NativeMenuAction",
+    "kind": "init",
+    "declaration": "public init(title: String, keyEquivalent: String = \"\", keyModifiers: NativeMenuKeyModifiers = [.primary], isEnabled: Bool = true, isSelected: Bool = false, isEnabledProvider: (@MainActor () -> Bool)? = nil, action: @escaping @MainActor () -> Void)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "resolvedIsEnabled",
+    "kind": "var",
+    "declaration": "}",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUI",
+  "category": "shell",
+  "file": "Hosts/Desktop/Sources/CoveUI/Window/NativeMenu.swift",
+  "line": 61,
+  "owner": "",
+  "overloads": [
+   "public struct NativeMenuAction"
+  ]
+ },
+ {
+  "id": "native-menu-bar",
+  "name": "NativeMenuBar",
+  "kind": "struct",
+  "declaration": "public struct NativeMenuBar",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "appName",
+    "kind": "var",
+    "declaration": "public var appName: String",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "applicationItems",
+    "kind": "var",
+    "declaration": "public var applicationItems: [NativeMenuItem]",
+    "abstract": "Leading entries of the application menu, such as About and Settings. The platform appends its own window-management and quit entries.",
+    "discussion": []
+   },
+   {
+    "name": "applicationTitles",
+    "kind": "var",
+    "declaration": "public var applicationTitles: NativeApplicationMenuTitles",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "menus",
+    "kind": "var",
+    "declaration": "public var menus: [NativeMenu]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "NativeMenuBar",
+    "kind": "init",
+    "declaration": "public init(appName: String, applicationItems: [NativeMenuItem] = [], applicationTitles: NativeApplicationMenuTitles? = nil, menus: [NativeMenu])",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUI",
+  "category": "shell",
+  "file": "Hosts/Desktop/Sources/CoveUI/Window/NativeMenu.swift",
+  "line": 4,
+  "owner": "",
+  "overloads": [
+   "public struct NativeMenuBar"
+  ]
+ },
+ {
+  "id": "native-menu-item",
+  "name": "NativeMenuItem",
+  "kind": "enum",
+  "declaration": "public enum NativeMenuItem",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUI",
+  "category": "shell",
+  "file": "Hosts/Desktop/Sources/CoveUI/Window/NativeMenu.swift",
+  "line": 55,
+  "owner": "",
+  "overloads": [
+   "public enum NativeMenuItem"
+  ]
+ },
+ {
+  "id": "native-menu-key-modifiers",
+  "name": "NativeMenuKeyModifiers",
+  "kind": "struct",
+  "declaration": "public struct NativeMenuKeyModifiers: OptionSet, Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "OptionSet",
+   "Sendable"
+  ],
+  "members": [
+   {
+    "name": "rawValue",
+    "kind": "let",
+    "declaration": "public let rawValue: UInt8",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "NativeMenuKeyModifiers",
+    "kind": "init",
+    "declaration": "public init(rawValue: UInt8)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "command",
+    "kind": "let",
+    "declaration": "public static let command = NativeMenuKeyModifiers(rawValue: 1 << 0)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "shift",
+    "kind": "let",
+    "declaration": "public static let shift = NativeMenuKeyModifiers(rawValue: 1 << 1)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "option",
+    "kind": "let",
+    "declaration": "public static let option = NativeMenuKeyModifiers(rawValue: 1 << 2)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "control",
+    "kind": "let",
+    "declaration": "public static let control = NativeMenuKeyModifiers(rawValue: 1 << 3)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "primary",
+    "kind": "let",
+    "declaration": "public static let primary: NativeMenuKeyModifiers = .command",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "primary",
+    "kind": "let",
+    "declaration": "public static let primary: NativeMenuKeyModifiers = .control",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUI",
+  "category": "shell",
+  "file": "Hosts/Desktop/Sources/CoveUI/Window/NativeMenu.swift",
+  "line": 90,
+  "owner": "",
+  "overloads": [
+   "public struct NativeMenuKeyModifiers: OptionSet, Sendable"
+  ]
+ },
+ {
+  "id": "native-menu-popover",
+  "name": "NativeMenuPopover",
+  "kind": "enum",
+  "declaration": "public enum NativeMenuPopover",
+  "abstract": "Builds and pops up a native (AppKit) context menu from a platform-neutral snapshot. The popup runs a modal session and returns the id of the chosen item, or `nil` if the menu was dismissed without a choice.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "popUp",
+    "kind": "func",
+    "declaration": "public static func popUp(_ snapshot: NativeMenuSnapshot, at point: CGPoint, window: NSWindow? = nil) -> Int?",
+    "abstract": "- Parameters: - snapshot: the menu tree to show. - point: anchor point in window logical coordinates (DIPs), top-left origin. - window: the window the point belongs to; the key window is used when `nil`. - Returns: the id of the chosen item, or `nil`.",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIShell",
+  "category": "shell",
+  "file": "Shell/Sources/PlatformShell/NativeMenuPopover.swift",
+  "line": 11,
+  "owner": "",
+  "overloads": [
+   "public enum NativeMenuPopover"
+  ]
+ },
+ {
+  "id": "native-render-surface",
+  "name": "NativeRenderSurface",
+  "kind": "enum",
+  "declaration": "public enum NativeRenderSurface: @unchecked Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUIShell",
+  "category": "shell",
+  "file": "Shell/Sources/PlatformShell/PlatformShell.swift",
+  "line": 10,
+  "owner": "",
+  "overloads": [
+   "public enum NativeRenderSurface: @unchecked Sendable"
+  ]
+ },
+ {
+  "id": "native-window-reference",
+  "name": "NativeWindowReference",
+  "kind": "enum",
+  "declaration": "public enum NativeWindowReference: @unchecked Sendable",
+  "abstract": "Native window identity for platform services such as accessibility.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUIShell",
+  "category": "shell",
+  "file": "Shell/Sources/PlatformShell/PlatformShell.swift",
+  "line": 118,
+  "owner": "",
+  "overloads": [
+   "public enum NativeWindowReference: @unchecked Sendable"
+  ]
+ },
+ {
+  "id": "platform-application",
+  "name": "PlatformApplication",
+  "kind": "enum",
+  "declaration": "public enum PlatformApplication",
+  "abstract": "Installs the platform application lifecycle before constructing windows.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "run",
+    "kind": "func",
+    "declaration": "public static func run<Result>(_ body: @escaping @MainActor () throws -> Result) throws",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIShell",
+  "category": "shell",
+  "file": "Shell/Sources/PlatformShell/ApplicationEntry.swift",
+  "line": 6,
+  "owner": "",
+  "overloads": [
+   "public enum PlatformApplication"
+  ]
+ },
+ {
+  "id": "sdl3-clipboard",
+  "name": "SDL3Clipboard",
+  "kind": "enum",
+  "declaration": "public enum SDL3Clipboard",
+  "abstract": "Thin Swift wrapper around SDL3 clipboard text APIs.",
+  "discussion": [
+   "SDL3 returns clipboard text as a freshly-allocated UTF-8 string that the\ncaller must release via `SDL_free`; both the empty-string (\"no clipboard\ncontent\") and `nil` (\"error\") cases are normalised to `nil` here."
+  ],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "read",
+    "kind": "func",
+    "declaration": "public static func read() -> String?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "write",
+    "kind": "func",
+    "declaration": "public static func write(_ text: String) -> Bool",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIShell",
+  "category": "shell",
+  "file": "Shell/Sources/PlatformShell/SDL3Clipboard.swift",
+  "line": 9,
+  "owner": "",
+  "overloads": [
+   "public enum SDL3Clipboard"
+  ]
+ },
+ {
+  "id": "shell",
+  "name": "Shell",
+  "kind": "protocol",
+  "declaration": "public protocol Shell: AnyObject",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "AnyObject"
+  ],
+  "members": [
+   {
+    "name": "mainWindowID",
+    "kind": "var",
+    "declaration": "var mainWindowID: WindowID?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "windowIDs",
+    "kind": "var",
+    "declaration": "var windowIDs: [WindowID]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "logicalSize",
+    "kind": "var",
+    "declaration": "var logicalSize: (width: UInt32, height: UInt32)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isRunning",
+    "kind": "var",
+    "declaration": "var isRunning: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "renderSurface",
+    "kind": "var",
+    "declaration": "var renderSurface: NativeRenderSurface?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "drawableSize",
+    "kind": "var",
+    "declaration": "var drawableSize: (width: UInt32, height: UInt32)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isFocused",
+    "kind": "var",
+    "declaration": "var isFocused: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isMinimized",
+    "kind": "var",
+    "declaration": "var isMinimized: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isOccluded",
+    "kind": "var",
+    "declaration": "var isOccluded: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "initializeWindow",
+    "kind": "func",
+    "declaration": "func initializeWindow(title: String) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "pollEvents",
+    "kind": "func",
+    "declaration": "func pollEvents() -> [InputEvent]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "waitForEvents",
+    "kind": "func",
+    "declaration": "func waitForEvents(timeout: TimeInterval) -> Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "wakeEventLoop",
+    "kind": "func",
+    "declaration": "nonisolated func wakeEventLoop()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setTextInputArea",
+    "kind": "func",
+    "declaration": "func setTextInputArea(_ area: TextInputArea?)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setCursor",
+    "kind": "func",
+    "declaration": "func setCursor(_ cursor: SystemCursor)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "globalPointerPosition",
+    "kind": "func",
+    "declaration": "func globalPointerPosition() -> (x: Float, y: Float)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "windowPosition",
+    "kind": "func",
+    "declaration": "func windowPosition(_ windowID: WindowID) -> (x: Float, y: Float)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setWindowPosition",
+    "kind": "func",
+    "declaration": "func setWindowPosition(_ windowID: WindowID, x: Float, y: Float)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setWindowSize",
+    "kind": "func",
+    "declaration": "func setWindowSize(_ windowID: WindowID, width: Float, height: Float)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "raiseWindow",
+    "kind": "func",
+    "declaration": "func raiseWindow(_ windowID: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minimizeWindow",
+    "kind": "func",
+    "declaration": "func minimizeWindow(_ windowID: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maximizeWindow",
+    "kind": "func",
+    "declaration": "func maximizeWindow(_ windowID: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "restoreWindow",
+    "kind": "func",
+    "declaration": "func restoreWindow(_ windowID: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "hideWindow",
+    "kind": "func",
+    "declaration": "func hideWindow(_ windowID: WindowID)",
+    "abstract": "默认降级成最小化：没有原生隐藏能力的 shell 至少也能把窗口收起来， 不至于让调用方的隐藏请求整个落空。",
+    "discussion": []
+   },
+   {
+    "name": "showWindow",
+    "kind": "func",
+    "declaration": "func showWindow(_ windowID: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isWindowMaximized",
+    "kind": "func",
+    "declaration": "func isWindowMaximized(_ windowID: WindowID) -> Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showWindowSystemMenu",
+    "kind": "func",
+    "declaration": "func showWindowSystemMenu(_ windowID: WindowID, x: Float, y: Float)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setWindowChromeHitTest",
+    "kind": "func",
+    "declaration": "func setWindowChromeHitTest(_ windowID: WindowID, _ hitTest: WindowChromeHitTest?)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showOpenFolderDialog",
+    "kind": "func",
+    "declaration": "func showOpenFolderDialog(windowID: WindowID?, defaultPath: String?, accept: @escaping (String?) -> Void)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showOpenFileDialog",
+    "kind": "func",
+    "declaration": "func showOpenFileDialog(windowID: WindowID?, defaultPath: String?, filters: [FileDialogFilter], allowsMultiple: Bool, accept: @escaping ([String]) -> Void)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "displayRefreshRate",
+    "kind": "func",
+    "declaration": "func displayRefreshRate(windowID: WindowID? = nil) -> Double?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setDisplayRefreshEnabled",
+    "kind": "func",
+    "declaration": "func setDisplayRefreshEnabled(_ enabled: Bool, windowID: WindowID) -> Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "takeDisplayRefresh",
+    "kind": "func",
+    "declaration": "func takeDisplayRefresh(windowID: WindowID) -> DisplayRefreshTick?",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIShell",
+  "category": "shell",
+  "file": "Shell/Sources/PlatformShell/PlatformShell.swift",
+  "line": 159,
+  "owner": "",
+  "overloads": [
+   "public protocol Shell: AnyObject"
+  ]
+ },
+ {
+  "id": "shell-error",
+  "name": "ShellError",
+  "kind": "enum",
+  "declaration": "public enum ShellError: Error, CustomStringConvertible",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Error",
+   "CustomStringConvertible"
+  ],
+  "members": [
+   {
+    "name": "description",
+    "kind": "var",
+    "declaration": "public var description: String",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIShell",
+  "category": "shell",
+  "file": "Shell/Sources/PlatformShell/PlatformShell.swift",
+  "line": 87,
+  "owner": "",
+  "overloads": [
+   "public enum ShellError: Error, CustomStringConvertible"
+  ]
+ },
+ {
+  "id": "window-chrome-hit-test",
+  "name": "WindowChromeHitTest",
+  "kind": "struct",
+  "declaration": "public struct WindowChromeHitTest: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "titleBarHeight",
+    "kind": "var",
+    "declaration": "public var titleBarHeight: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "draggableLeadingInset",
+    "kind": "var",
+    "declaration": "public var draggableLeadingInset: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "draggableTrailingInset",
+    "kind": "var",
+    "declaration": "public var draggableTrailingInset: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "resizeBorderWidth",
+    "kind": "var",
+    "declaration": "public var resizeBorderWidth: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "draggableRects",
+    "kind": "var",
+    "declaration": "public var draggableRects: [Rect]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "nonDraggableRects",
+    "kind": "var",
+    "declaration": "public var nonDraggableRects: [Rect]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "usesExplicitDragRects",
+    "kind": "var",
+    "declaration": "public var usesExplicitDragRects: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "WindowChromeHitTest",
+    "kind": "init",
+    "declaration": "public init(titleBarHeight: Float, draggableLeadingInset: Float = 0, draggableTrailingInset: Float = 0, resizeBorderWidth: Float = 6, draggableRects: [Rect] = [], nonDraggableRects: [Rect] = [], usesExplicitDragRects: Bool = false)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIShell",
+  "category": "shell",
+  "file": "Shell/Sources/PlatformShell/PlatformShell.swift",
+  "line": 22,
+  "owner": "",
+  "overloads": [
+   "public struct WindowChromeHitTest: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "window-drag-region",
+  "name": "WindowDragRegion",
+  "kind": "struct",
+  "declaration": "public struct WindowDragRegion: _PrimitiveView",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "View"
+  ],
+  "members": [
+   {
+    "name": "minLength",
+    "kind": "let",
+    "declaration": "public let minLength: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "WindowDragRegion",
+    "kind": "init",
+    "declaration": "public init(minLength: Float = 0)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUI",
+  "category": "shell",
+  "file": "Hosts/Desktop/Sources/CoveUI/Window/WindowChrome.swift",
+  "line": 130,
+  "owner": "",
+  "overloads": [
+   "public struct WindowDragRegion: _PrimitiveView"
+  ]
+ },
+ {
+  "id": "window-handle",
+  "name": "WindowHandle",
+  "kind": "protocol",
+  "declaration": "public protocol WindowHandle: AnyObject",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "AnyObject"
+  ],
+  "members": [
+   {
+    "name": "isVisible",
+    "kind": "var",
+    "declaration": "var isVisible: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "safeArea",
+    "kind": "var",
+    "declaration": "var safeArea: WindowSafeArea",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "nativeWindowReference",
+    "kind": "var",
+    "declaration": "var nativeWindowReference: NativeWindowReference?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "contentScaleFactor",
+    "kind": "var",
+    "declaration": "var contentScaleFactor: Float",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIShell",
+  "category": "shell",
+  "file": "Shell/Sources/PlatformShell/PlatformShell.swift",
+  "line": 132,
+  "owner": "",
+  "overloads": [
+   "public protocol WindowHandle: AnyObject"
+  ]
+ },
+ {
+  "id": "window-options",
+  "name": "WindowOptions",
+  "kind": "struct",
+  "declaration": "public struct WindowOptions: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "width",
+    "kind": "var",
+    "declaration": "public var width: Int32",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "height",
+    "kind": "var",
+    "declaration": "public var height: Int32",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "titleBarStyle",
+    "kind": "var",
+    "declaration": "public var titleBarStyle: WindowTitleBarStyle",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showsDockIcon",
+    "kind": "var",
+    "declaration": "public var showsDockIcon: Bool",
+    "abstract": "是否在 Dock / 任务栏显示应用图标。",
+    "discussion": [
+     "常驻型应用（只有状态栏或托盘图标）要设 `false`：进程从建窗口那一刻起\n就是 accessory，Dock 图标不会先冒出来再消失。"
+    ]
+   },
+   {
+    "name": "WindowOptions",
+    "kind": "init",
+    "declaration": "public init(width: Int32 = 1280, height: Int32 = 720, titleBarStyle: WindowTitleBarStyle = .standard, showsDockIcon: Bool = true)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIShell",
+  "category": "shell",
+  "file": "Shell/Sources/PlatformShell/PlatformShell.swift",
+  "line": 66,
+  "owner": "",
+  "overloads": [
+   "public struct WindowOptions: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "window-safe-area",
+  "name": "WindowSafeArea",
+  "kind": "struct",
+  "declaration": "public struct WindowSafeArea: Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [
+   {
+    "name": "top",
+    "kind": "var",
+    "declaration": "public var top: Float = 0",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "bottom",
+    "kind": "var",
+    "declaration": "public var bottom: Float = 0",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "leading",
+    "kind": "var",
+    "declaration": "public var leading: Float = 0",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "trailing",
+    "kind": "var",
+    "declaration": "public var trailing: Float = 0",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "WindowSafeArea",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIShell",
+  "category": "shell",
+  "file": "Shell/Sources/PlatformShell/PlatformShell.swift",
+  "line": 123,
+  "owner": "",
+  "overloads": [
+   "public struct WindowSafeArea: Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "window-title-bar-style",
+  "name": "WindowTitleBarStyle",
+  "kind": "enum",
+  "declaration": "public enum WindowTitleBarStyle: String, Sendable, Equatable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "String",
+   "Sendable",
+   "Equatable"
+  ],
+  "members": [],
+  "module": "CoveUIShell",
+  "category": "shell",
+  "file": "Shell/Sources/PlatformShell/PlatformShell.swift",
+  "line": 17,
+  "owner": "",
+  "overloads": [
+   "public enum WindowTitleBarStyle: String, Sendable, Equatable"
+  ]
+ },
+ {
+  "id": "app-display-handle",
+  "name": "AppDisplayHandle",
+  "kind": "class",
+  "declaration": "public final class AppDisplayHandle: @unchecked Sendable",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [
+   {
+    "name": "memorySnapshot",
+    "kind": "func",
+    "declaration": "",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AppDisplayHandle",
+    "kind": "init",
+    "declaration": "public init(wakeEventLoop: @escaping @Sendable () -> Void =",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "requestDisplay",
+    "kind": "func",
+    "declaration": "public nonisolated func requestDisplay()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setTargetFrameRate",
+    "kind": "func",
+    "declaration": "public func setTargetFrameRate(_ framesPerSecond: Double?)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setFrameRateMode",
+    "kind": "func",
+    "declaration": "public func setFrameRateMode(_ mode: PlatformFrameRateMode)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setVSyncEnabled",
+    "kind": "func",
+    "declaration": "public func setVSyncEnabled(_ enabled: Bool)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "currentDisplayRefreshRate",
+    "kind": "func",
+    "declaration": "public func currentDisplayRefreshRate() -> Double?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "installNativeMenuBar",
+    "kind": "func",
+    "declaration": "public func installNativeMenuBar(_ menuBar: NativeMenuBar)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minimizeWindow",
+    "kind": "func",
+    "declaration": "public func minimizeWindow()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minimizeWindow",
+    "kind": "func",
+    "declaration": "public func minimizeWindow(_ windowID: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maximizeWindow",
+    "kind": "func",
+    "declaration": "public func maximizeWindow()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maximizeWindow",
+    "kind": "func",
+    "declaration": "public func maximizeWindow(_ windowID: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "restoreWindow",
+    "kind": "func",
+    "declaration": "public func restoreWindow()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "hideWindow",
+    "kind": "func",
+    "declaration": "public func hideWindow()",
+    "abstract": "把主窗口完全收起——不是最小化。",
+    "discussion": [
+     "最小化会在 Dock 里留一个入口，隐藏不会。只有状态栏/托盘图标的常驻型\n应用关掉窗口时应该用这个，否则窗口会赖在 Dock 里。"
+    ]
+   },
+   {
+    "name": "showWindow",
+    "kind": "func",
+    "declaration": "public func showWindow()",
+    "abstract": "重新显示被 `hideWindow()` 收起的主窗口。",
+    "discussion": []
+   },
+   {
+    "name": "restoreWindow",
+    "kind": "func",
+    "declaration": "public func restoreWindow(_ windowID: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "toggleMaximizeWindow",
+    "kind": "func",
+    "declaration": "public func toggleMaximizeWindow()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "toggleMaximizeWindow",
+    "kind": "func",
+    "declaration": "public func toggleMaximizeWindow(_ windowID: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "closeMainWindow",
+    "kind": "func",
+    "declaration": "public func closeMainWindow()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isWindowMaximized",
+    "kind": "func",
+    "declaration": "public func isWindowMaximized() -> Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isWindowMaximized",
+    "kind": "func",
+    "declaration": "public func isWindowMaximized(_ windowID: WindowID) -> Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showWindowSystemMenu",
+    "kind": "func",
+    "declaration": "public func showWindowSystemMenu(_ windowID: WindowID, x: Float = 0, y: Float = 0)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setWindowChromeHitTest",
+    "kind": "func",
+    "declaration": "public func setWindowChromeHitTest(_ hitTest: WindowChromeHitTest?)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "requestOpenFolder",
+    "kind": "func",
+    "declaration": "public func requestOpenFolder(defaultPath: String? = nil, accept: @escaping (String?) -> Void)",
+    "abstract": "Present the native \"choose a folder\" dialog. `accept` receives the chosen directory path, or `nil` if the user cancelled (or no platform dialog is available). Delivered on the main thread.",
+    "discussion": []
+   },
+   {
+    "name": "requestOpenFile",
+    "kind": "func",
+    "declaration": "public func requestOpenFile(filters: [(name: String, extensions: [String])] = [], allowsMultiple: Bool = false, defaultPath: String? = nil, accept: @escaping ([String]) -> Void)",
+    "abstract": "Present the native \"choose file(s)\" dialog. `filters` restricts the selectable types — each entry pairs a human label with bare extensions (no dots), e.g. `(name: \"3D Models\", extensions: [\"glb\", \"gltf\", \"obj\"])`. `accept` receives the chosen absolute paths (empty when the user cancelled or no platform dialog is available), delivered on the main thread.",
+    "discussion": []
+   },
+   {
+    "name": "openWindow",
+    "kind": "func",
+    "declaration": "public func openWindow<Root: View>(title: String, width: Int32 = 480, height: Int32 = 360, rendering: AppWindowRendering = AppWindowRendering(), @ViewBuilder rootView: () -> Root) -> WindowID?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "closeWindow",
+    "kind": "func",
+    "declaration": "public func closeWindow(_ windowID: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isWindowOpen",
+    "kind": "func",
+    "declaration": "public func isWindowOpen(_ windowID: WindowID) -> Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setWindowCloseInterceptor",
+    "kind": "func",
+    "declaration": "public func setWindowCloseInterceptor(_ handler: ((WindowID?) -> Bool)?)",
+    "abstract": "Veto OS-initiated window closes / app quit (`nil` window = quit). Programmatic `closeWindow` / `quit()` bypass the interceptor, so a confirmation flow can re-issue the close it previously vetoed.",
+    "discussion": []
+   },
+   {
+    "name": "quit",
+    "kind": "func",
+    "declaration": "public func quit()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "mainWindowID",
+    "kind": "var",
+    "declaration": "public var mainWindowID: WindowID?",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUI",
+  "category": "shell",
+  "file": "Hosts/Desktop/Sources/CoveUI/Display/Handle.swift",
+  "line": 15,
+  "owner": "",
+  "overloads": [
+   "public final class AppDisplayHandle: @unchecked Sendable"
+  ]
+ },
+ {
+  "id": "app-kit-shell",
+  "name": "AppKitShell",
+  "kind": "class",
+  "declaration": "public final class AppKitShell: Shell",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Shell"
+  ],
+  "members": [
+   {
+    "name": "closeInterceptor",
+    "kind": "var",
+    "declaration": "public var closeInterceptor: ((WindowID?) -> Bool)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "AppKitShell",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "renderSurface",
+    "kind": "var",
+    "declaration": "public var renderSurface: NativeRenderSurface?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "drawableSize",
+    "kind": "var",
+    "declaration": "public var drawableSize: (width: UInt32, height: UInt32)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "logicalSize",
+    "kind": "var",
+    "declaration": "public var logicalSize: (width: UInt32, height: UInt32)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "mainWindowID",
+    "kind": "var",
+    "declaration": "public var mainWindowID: WindowID?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "windowIDs",
+    "kind": "var",
+    "declaration": "public var windowIDs: [WindowID]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "createWindow",
+    "kind": "func",
+    "declaration": "public func createWindow(title: String, options: WindowOptions) throws -> any WindowHandle",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "window",
+    "kind": "func",
+    "declaration": "public func window(for id: WindowID) -> (any WindowHandle)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroyWindow",
+    "kind": "func",
+    "declaration": "public func destroyWindow(_ id: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "initializeWindow",
+    "kind": "func",
+    "declaration": "public func initializeWindow(title: String) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "pollEvents",
+    "kind": "func",
+    "declaration": "public func pollEvents() -> [InputEvent]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "pollWindowEvents",
+    "kind": "func",
+    "declaration": "public func pollWindowEvents() -> [WindowInputEvent]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setTextInputArea",
+    "kind": "func",
+    "declaration": "public func setTextInputArea(windowID: WindowID, _ area: TextInputArea?)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setCursor",
+    "kind": "func",
+    "declaration": "public func setCursor(windowID: WindowID, _ cursor: SystemCursor)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minimizeWindow",
+    "kind": "func",
+    "declaration": "public func minimizeWindow(_ windowID: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "hideWindow",
+    "kind": "func",
+    "declaration": "public func hideWindow(_ windowID: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showWindow",
+    "kind": "func",
+    "declaration": "public func showWindow(_ windowID: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maximizeWindow",
+    "kind": "func",
+    "declaration": "public func maximizeWindow(_ windowID: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "restoreWindow",
+    "kind": "func",
+    "declaration": "public func restoreWindow(_ windowID: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isWindowMaximized",
+    "kind": "func",
+    "declaration": "public func isWindowMaximized(_ windowID: WindowID) -> Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "shutdown",
+    "kind": "func",
+    "declaration": "public func shutdown()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIShell",
+  "category": "shell",
+  "file": "Shell/Sources/PlatformShell/PlatformShell.swift",
+  "line": 367,
+  "owner": "",
+  "overloads": [
+   "public final class AppKitShell: Shell"
+  ]
+ },
+ {
+  "id": "make-default-shell",
+  "name": "makeDefaultShell",
+  "kind": "func",
+  "declaration": "public func makeDefaultShell() throws -> any Shell",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUIShell",
+  "category": "shell",
+  "file": "Shell/Sources/PlatformShell/PlatformShell.swift",
+  "line": 357,
+  "owner": "",
+  "overloads": [
+   "public func makeDefaultShell() throws -> any Shell"
+  ]
+ },
+ {
+  "id": "sdl3-shell",
+  "name": "SDL3Shell",
+  "kind": "class",
+  "declaration": "public final class SDL3Shell: Shell",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "Shell"
+  ],
+  "members": [
+   {
+    "name": "closeInterceptor",
+    "kind": "var",
+    "declaration": "public var closeInterceptor: ((WindowID?) -> Bool)?",
+    "abstract": "Consulted before honouring a window-close request or an app quit (Cmd+Q / last window). Return `false` to veto — the host keeps running and the app can show an \"unsaved changes\" flow before re-issuing the close. `nil` window means the whole app is quitting. Destroyed-window notifications are not vetoable.",
+    "discussion": []
+   },
+   {
+    "name": "SDL3Shell",
+    "kind": "init",
+    "declaration": "public init(width: Int32 = 1280, height: Int32 = 720) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isRunning",
+    "kind": "var",
+    "declaration": "public var isRunning: Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "mainWindowID",
+    "kind": "var",
+    "declaration": "public var mainWindowID: WindowID?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "windowIDs",
+    "kind": "var",
+    "declaration": "public var windowIDs: [WindowID]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "createWindow",
+    "kind": "func",
+    "declaration": "public func createWindow(title: String, options: WindowOptions) throws -> any WindowHandle",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "window",
+    "kind": "func",
+    "declaration": "public func window(for id: WindowID) -> (any WindowHandle)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "destroyWindow",
+    "kind": "func",
+    "declaration": "public func destroyWindow(_ id: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "initializeWindow",
+    "kind": "func",
+    "declaration": "public func initializeWindow(title: String) throws",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "pollEvents",
+    "kind": "func",
+    "declaration": "public func pollEvents() -> [InputEvent]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "pollWindowEvents",
+    "kind": "func",
+    "declaration": "public func pollWindowEvents() -> [WindowInputEvent]",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "waitForEvents",
+    "kind": "func",
+    "declaration": "public func waitForEvents(timeout: TimeInterval) -> Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setTextInputArea",
+    "kind": "func",
+    "declaration": "public func setTextInputArea(_ area: TextInputArea?)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setTextInputArea",
+    "kind": "func",
+    "declaration": "public func setTextInputArea(windowID: WindowID, _ area: TextInputArea?)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setCursor",
+    "kind": "func",
+    "declaration": "public func setCursor(_ cursor: SystemCursor)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setCursor",
+    "kind": "func",
+    "declaration": "public func setCursor(windowID: WindowID, _ cursor: SystemCursor)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "globalPointerPosition",
+    "kind": "func",
+    "declaration": "public func globalPointerPosition() -> (x: Float, y: Float)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "windowPosition",
+    "kind": "func",
+    "declaration": "public func windowPosition(_ windowID: WindowID) -> (x: Float, y: Float)?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setWindowPosition",
+    "kind": "func",
+    "declaration": "public func setWindowPosition(_ windowID: WindowID, x: Float, y: Float)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setWindowSize",
+    "kind": "func",
+    "declaration": "public func setWindowSize(_ windowID: WindowID, width: Float, height: Float)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "raiseWindow",
+    "kind": "func",
+    "declaration": "public func raiseWindow(_ windowID: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "minimizeWindow",
+    "kind": "func",
+    "declaration": "public func minimizeWindow(_ windowID: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "maximizeWindow",
+    "kind": "func",
+    "declaration": "public func maximizeWindow(_ windowID: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "restoreWindow",
+    "kind": "func",
+    "declaration": "public func restoreWindow(_ windowID: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "hideWindow",
+    "kind": "func",
+    "declaration": "public func hideWindow(_ windowID: WindowID)",
+    "abstract": "完全收起窗口（进程继续跑）。macOS 上走 AppKit， 这样窗口是真的从屏幕上移除，而不是在 Dock 里留一个最小化入口。",
+    "discussion": []
+   },
+   {
+    "name": "showWindow",
+    "kind": "func",
+    "declaration": "public func showWindow(_ windowID: WindowID)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "isWindowMaximized",
+    "kind": "func",
+    "declaration": "public func isWindowMaximized(_ windowID: WindowID) -> Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showWindowSystemMenu",
+    "kind": "func",
+    "declaration": "public func showWindowSystemMenu(_ windowID: WindowID, x: Float, y: Float)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setWindowChromeHitTest",
+    "kind": "func",
+    "declaration": "public func setWindowChromeHitTest(_ windowID: WindowID, _ hitTest: WindowChromeHitTest?)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showOpenFolderDialog",
+    "kind": "func",
+    "declaration": "public func showOpenFolderDialog(windowID: WindowID?, defaultPath: String?, accept: @escaping (String?) -> Void)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "showOpenFileDialog",
+    "kind": "func",
+    "declaration": "public func showOpenFileDialog(windowID: WindowID?, defaultPath: String?, filters: [FileDialogFilter], allowsMultiple: Bool, accept: @escaping ([String]) -> Void)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "displayRefreshRate",
+    "kind": "func",
+    "declaration": "public func displayRefreshRate(windowID: WindowID? = nil) -> Double?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "setDisplayRefreshEnabled",
+    "kind": "func",
+    "declaration": "public func setDisplayRefreshEnabled(_ enabled: Bool, windowID: WindowID) -> Bool",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "takeDisplayRefresh",
+    "kind": "func",
+    "declaration": "public func takeDisplayRefresh(windowID: WindowID) -> DisplayRefreshTick?",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "shutdown",
+    "kind": "func",
+    "declaration": "public func shutdown()",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUIShell",
+  "category": "shell",
+  "file": "Shell/Sources/PlatformShell/SDL3Shell.swift",
+  "line": 14,
+  "owner": "",
+  "overloads": [
+   "public final class SDL3Shell: Shell"
+  ]
+ }
+]

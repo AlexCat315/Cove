@@ -1,0 +1,868 @@
+[
+ {
+  "id": "background-gradient-modifier",
+  "name": "BackgroundGradientModifier",
+  "kind": "struct",
+  "declaration": "public struct BackgroundGradientModifier: ViewModifier",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "gradient",
+    "kind": "let",
+    "declaration": "public let gradient: UILinearGradient",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "BackgroundGradientModifier",
+    "kind": "init",
+    "declaration": "public init(_ gradient: UILinearGradient)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/StyleModifiers.swift",
+  "line": 65,
+  "owner": "",
+  "overloads": [
+   "public struct BackgroundGradientModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "background-modifier",
+  "name": "BackgroundModifier",
+  "kind": "struct",
+  "declaration": "public struct BackgroundModifier: ViewModifier",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "color",
+    "kind": "let",
+    "declaration": "public let color: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "BackgroundModifier",
+    "kind": "init",
+    "declaration": "public init(_ color: Color)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/StyleModifiers.swift",
+  "line": 56,
+  "owner": "",
+  "overloads": [
+   "public struct BackgroundModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "border-modifier",
+  "name": "BorderModifier",
+  "kind": "struct",
+  "declaration": "public struct BorderModifier: ViewModifier",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "color",
+    "kind": "let",
+    "declaration": "public let color: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "width",
+    "kind": "let",
+    "declaration": "public let width: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "BorderModifier",
+    "kind": "init",
+    "declaration": "public init(_ color: Color, width: Float)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/StyleModifiers.swift",
+  "line": 119,
+  "owner": "",
+  "overloads": [
+   "public struct BorderModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "clip-modifier",
+  "name": "ClipModifier",
+  "kind": "struct",
+  "declaration": "public struct ClipModifier: ViewModifier",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "ClipModifier",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/StyleModifiers.swift",
+  "line": 103,
+  "owner": "",
+  "overloads": [
+   "public struct ClipModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "corner-radius-modifier",
+  "name": "CornerRadiusModifier",
+  "kind": "struct",
+  "declaration": "public struct CornerRadiusModifier: ViewModifier",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "radius",
+    "kind": "let",
+    "declaration": "public let radius: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "CornerRadiusModifier",
+    "kind": "init",
+    "declaration": "public init(_ radius: Float)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/StyleModifiers.swift",
+  "line": 110,
+  "owner": "",
+  "overloads": [
+   "public struct CornerRadiusModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "floating-surface-elevation",
+  "name": "FloatingSurfaceElevation",
+  "kind": "enum",
+  "declaration": "public enum FloatingSurfaceElevation: Sendable",
+  "abstract": "A solid panel floating over content — menus, popovers, tooltips, popup editors: opaque fill, a crisp hairline and the two-layer lift that says it is above the chrome.",
+  "discussion": [
+   "Solid on purpose. Labels on a floating panel have to stay legible over\nanything, and a live backdrop blur samples whatever happens to be behind\nthe panel, which reads as noise on fine content; the edge and the shadow\ncarry the depth instead.\nThe depth of a floating panel."
+  ],
+  "availability": [],
+  "conforms": [
+   "Sendable"
+  ],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/SurfaceFinishModifier.swift",
+  "line": 34,
+  "owner": "",
+  "overloads": [
+   "public enum FloatingSurfaceElevation: Sendable"
+  ]
+ },
+ {
+  "id": "floating-surface-modifier",
+  "name": "FloatingSurfaceModifier",
+  "kind": "struct",
+  "declaration": "public struct FloatingSurfaceModifier: ViewModifier",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "cornerRadius",
+    "kind": "let",
+    "declaration": "public let cornerRadius: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "elevation",
+    "kind": "let",
+    "declaration": "public let elevation: FloatingSurfaceElevation",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "FloatingSurfaceModifier",
+    "kind": "init",
+    "declaration": "public init(cornerRadius: Float, elevation: FloatingSurfaceElevation = .modal)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/SurfaceFinishModifier.swift",
+  "line": 41,
+  "owner": "",
+  "overloads": [
+   "public struct FloatingSurfaceModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "font-modifier",
+  "name": "FontModifier",
+  "kind": "struct",
+  "declaration": "public struct FontModifier: ViewModifier",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "font",
+    "kind": "let",
+    "declaration": "public let font: Font",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "FontModifier",
+    "kind": "init",
+    "declaration": "public init(_ font: Font)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/StyleModifiers.swift",
+  "line": 154,
+  "owner": "",
+  "overloads": [
+   "public struct FontModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "foreground-color-modifier",
+  "name": "ForegroundColorModifier",
+  "kind": "struct",
+  "declaration": "public struct ForegroundColorModifier: ViewModifier",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "color",
+    "kind": "let",
+    "declaration": "public let color: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ForegroundColorModifier",
+    "kind": "init",
+    "declaration": "public init(_ color: Color)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/StyleModifiers.swift",
+  "line": 74,
+  "owner": "",
+  "overloads": [
+   "public struct ForegroundColorModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "line-height-modifier",
+  "name": "LineHeightModifier",
+  "kind": "struct",
+  "declaration": "public struct LineHeightModifier: ViewModifier",
+  "abstract": "Per-node line-height override consumed by `Text` (and `TextField`) at draw time via `Node.attachments[\"__line_height\"]`.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "lineHeight",
+    "kind": "let",
+    "declaration": "public let lineHeight: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "LineHeightModifier",
+    "kind": "init",
+    "declaration": "public init(_ lineHeight: Float)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(layout: LayoutNode)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/StyleModifiers.swift",
+  "line": 172,
+  "owner": "",
+  "overloads": [
+   "public struct LineHeightModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "opacity-modifier",
+  "name": "OpacityModifier",
+  "kind": "struct",
+  "declaration": "public struct OpacityModifier: ViewModifier",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "opacity",
+    "kind": "let",
+    "declaration": "public let opacity: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "OpacityModifier",
+    "kind": "init",
+    "declaration": "public init(_ opacity: Float)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/StyleModifiers.swift",
+  "line": 83,
+  "owner": "",
+  "overloads": [
+   "public struct OpacityModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "shadow-modifier",
+  "name": "ShadowModifier",
+  "kind": "struct",
+  "declaration": "public struct ShadowModifier: ViewModifier",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "color",
+    "kind": "let",
+    "declaration": "public let color: Color",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "offsetX",
+    "kind": "let",
+    "declaration": "public let offsetX: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "offsetY",
+    "kind": "let",
+    "declaration": "public let offsetY: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "blur",
+    "kind": "let",
+    "declaration": "public let blur: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ShadowModifier",
+    "kind": "init",
+    "declaration": "public init(color: Color, offsetX: Float, offsetY: Float, blur: Float)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/StyleModifiers.swift",
+  "line": 133,
+  "owner": "",
+  "overloads": [
+   "public struct ShadowModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "surface-finish-modifier",
+  "name": "SurfaceFinishModifier",
+  "kind": "struct",
+  "declaration": "public struct SurfaceFinishModifier: ViewModifier",
+  "abstract": "A faint upper edge and a shallow shadow: material without glass or gradients.",
+  "discussion": [
+   "For surfaces that sit *in* the chrome — a panel edge, a sidebar. Surfaces\nthat float above it want `floatingSurface()` instead."
+  ],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "SurfaceFinishModifier",
+    "kind": "init",
+    "declaration": "public init()",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/SurfaceFinishModifier.swift",
+  "line": 9,
+  "owner": "",
+  "overloads": [
+   "public struct SurfaceFinishModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "z-index-modifier",
+  "name": "ZIndexModifier",
+  "kind": "struct",
+  "declaration": "public struct ZIndexModifier: ViewModifier",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [
+   "ViewModifier"
+  ],
+  "members": [
+   {
+    "name": "value",
+    "kind": "let",
+    "declaration": "public let value: Float",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "ZIndexModifier",
+    "kind": "init",
+    "declaration": "public init(_ value: Float)",
+    "abstract": "",
+    "discussion": []
+   },
+   {
+    "name": "apply",
+    "kind": "func",
+    "declaration": "public func apply(node: Node)",
+    "abstract": "",
+    "discussion": []
+   }
+  ],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/StyleModifiers.swift",
+  "line": 94,
+  "owner": "",
+  "overloads": [
+   "public struct ZIndexModifier: ViewModifier"
+  ]
+ },
+ {
+  "id": "modifier-background",
+  "name": "background",
+  "kind": "modifier",
+  "declaration": "func background(_ color: Color) -> some View",
+  "abstract": "A two-stop linear gradient fill that follows `cornerRadius` like a color.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/StyleModifiers.swift",
+  "line": 193,
+  "owner": "View",
+  "overloads": [
+   "func background(_ color: Color) -> some View",
+   "func background(_ gradient: UILinearGradient) -> some View",
+   "func background(_ ref: SemanticColorRef) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-border",
+  "name": "border",
+  "kind": "modifier",
+  "declaration": "func border(_ color: Color, width: Float = 1) -> some View",
+  "abstract": "Set the border stroke from a semantic color slot. Resolves against the node's active `Theme`.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/StyleModifiers.swift",
+  "line": 222,
+  "owner": "View",
+  "overloads": [
+   "func border(_ color: Color, width: Float = 1) -> some View",
+   "func border(_ ref: SemanticColorRef, width: Float = 1) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-clipped",
+  "name": "clipped",
+  "kind": "modifier",
+  "declaration": "func clipped() -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/StyleModifiers.swift",
+  "line": 214,
+  "owner": "View",
+  "overloads": [
+   "func clipped() -> some View"
+  ]
+ },
+ {
+  "id": "modifier-corner-radius",
+  "name": "cornerRadius",
+  "kind": "modifier",
+  "declaration": "func cornerRadius(_ radius: Float) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/StyleModifiers.swift",
+  "line": 218,
+  "owner": "View",
+  "overloads": [
+   "func cornerRadius(_ radius: Float) -> some View",
+   "func cornerRadius(_ token: ThemeMetric) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-floating-surface",
+  "name": "floatingSurface",
+  "kind": "modifier",
+  "declaration": "func floatingSurface(_ cornerRadius: Float, elevation: FloatingSurfaceElevation = .modal) -> some View",
+  "abstract": "Raise this surface above the chrome as a floating panel.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/SurfaceFinishModifier.swift",
+  "line": 72,
+  "owner": "View",
+  "overloads": [
+   "func floatingSurface(_ cornerRadius: Float, elevation: FloatingSurfaceElevation = .modal) -> some View",
+   "func floatingSurface(_ cornerRadius: ThemeMetric, elevation: FloatingSurfaceElevation = .modal) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-font",
+  "name": "font",
+  "kind": "modifier",
+  "declaration": "func font(_ font: Font) -> some View",
+  "abstract": "Set both font and line-height from a semantic typography slot.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/StyleModifiers.swift",
+  "line": 236,
+  "owner": "View",
+  "overloads": [
+   "func font(_ font: Font) -> some View",
+   "func font(_ ref: SemanticFontRef) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-foreground-color",
+  "name": "foregroundColor",
+  "kind": "modifier",
+  "declaration": "func foregroundColor(_ color: Color) -> some View",
+  "abstract": "Set the foreground tint from a semantic color slot. Resolves against the node's active `Theme`.",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/StyleModifiers.swift",
+  "line": 202,
+  "owner": "View",
+  "overloads": [
+   "func foregroundColor(_ color: Color) -> some View",
+   "func foregroundColor(_ ref: SemanticColorRef) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-letter-spacing",
+  "name": "letterSpacing",
+  "kind": "modifier",
+  "declaration": "func letterSpacing(_ value: Float) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/StyleModifiers.swift",
+  "line": 240,
+  "owner": "View",
+  "overloads": [
+   "func letterSpacing(_ value: Float) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-line-height",
+  "name": "lineHeight",
+  "kind": "modifier",
+  "declaration": "func lineHeight(_ value: Float) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/StyleModifiers.swift",
+  "line": 244,
+  "owner": "View",
+  "overloads": [
+   "func lineHeight(_ value: Float) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-opacity",
+  "name": "opacity",
+  "kind": "modifier",
+  "declaration": "func opacity(_ value: Float) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/StyleModifiers.swift",
+  "line": 206,
+  "owner": "View",
+  "overloads": [
+   "func opacity(_ value: Float) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-shadow",
+  "name": "shadow",
+  "kind": "modifier",
+  "declaration": "func shadow(color: Color, offsetX: Float = 0, offsetY: Float = 0, blur: Float = 0) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/StyleModifiers.swift",
+  "line": 226,
+  "owner": "View",
+  "overloads": [
+   "func shadow(color: Color, offsetX: Float = 0, offsetY: Float = 0, blur: Float = 0) -> some View"
+  ]
+ },
+ {
+  "id": "modifier-surface-finish",
+  "name": "surfaceFinish",
+  "kind": "modifier",
+  "declaration": "func surfaceFinish() -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/SurfaceFinishModifier.swift",
+  "line": 69,
+  "owner": "View",
+  "overloads": [
+   "func surfaceFinish() -> some View"
+  ]
+ },
+ {
+  "id": "modifier-z-index",
+  "name": "zIndex",
+  "kind": "modifier",
+  "declaration": "func zIndex(_ value: Float) -> some View",
+  "abstract": "",
+  "discussion": [],
+  "availability": [],
+  "conforms": [],
+  "members": [],
+  "module": "CoveUICompose",
+  "category": "style",
+  "file": "Compose/Sources/CoveUICompose/Modifiers/Style/StyleModifiers.swift",
+  "line": 210,
+  "owner": "View",
+  "overloads": [
+   "func zIndex(_ value: Float) -> some View"
+  ]
+ }
+]
