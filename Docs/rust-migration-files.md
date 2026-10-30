@@ -13,7 +13,7 @@
 
 | 范围 | 文件数 | 已写入 | 进行中 | 未开始 |
 | --- | ---: | ---: | ---: | ---: |
-| 生产源码 | 984 | 983 | 0 | 1 |
+| 生产源码 | 984 | 984 | 0 | 0 |
 | 测试源码 | 424 | 56 | 0 | 368 |
 | SwiftPM 清单 | 25 | 19 | 0 | 6 |
 | 项目模板 | 5 | 0 | 0 | 5 |
@@ -738,7 +738,7 @@
 
 ### Examples
 
-共 61 个文件：已写入 60，进行中 0，未开始 1。
+共 61 个文件：已写入 61，进行中 0，未开始 0。
 
 | 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
 | --- | ---: | --- | --- | --- |
@@ -775,7 +775,7 @@
 | `Examples/Sources/GalleryContent/Stories/Feedback/RatingSample.swift` | 48 | 已写入（未验证） | `Examples/rust/gallery_content/stories/media_stories.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Feedback/RatingStory.swift` | 77 | 已写入（未验证） | `Examples/rust/gallery_content/stories/media_stories.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Feedback/SkeletonStory.swift` | 43 | 已写入（未验证） | `Examples/rust/gallery_content/stories/media_stories.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Foundation/AdaptiveExamples.swift` | 551 | 未开始 | — | 等待实现 |
+| `Examples/Sources/GalleryContent/Stories/Foundation/AdaptiveExamples.swift` | 551 | 已写入（未验证） | `Examples/rust/gallery_content/stories/adaptive_examples.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Foundation/AnimationCurves.swift` | 51 | 已写入（未验证） | `Examples/rust/gallery_content/stories/animation_curves.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Foundation/AnimationSystem.swift` | 81 | 已写入（未验证） | `Examples/rust/gallery_content/stories/animation_system.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Foundation/IntrinsicFitting.swift` | 35 | 已写入（未验证） | `Examples/rust/gallery_content/stories/intrinsic_fitting.rs` | 未编译、未行为对照 |

@@ -7489,11 +7489,14 @@
       "source": "Examples/Sources/GalleryContent/Stories/Foundation/AdaptiveExamples.swift",
       "source_sha256": "f7d257c30812ec86572cdc839badf2ef42512baa5049367ab4a958e6bfa87b0a",
       "source_lines": 551,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Examples/rust/gallery_content/stories/adaptive_examples.rs"
+      ],
       "module": "Examples",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Examples/Sources/GalleryContent/Stories/Foundation/AnimationCurves.swift",
