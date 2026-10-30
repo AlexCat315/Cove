@@ -13,7 +13,7 @@
 
 | 范围 | 文件数 | 已写入 | 进行中 | 未开始 |
 | --- | ---: | ---: | ---: | ---: |
-| 生产源码 | 984 | 456 | 47 | 481 |
+| 生产源码 | 984 | 460 | 47 | 477 |
 | 测试源码 | 424 | 0 | 0 | 424 |
 | SwiftPM 清单 | 25 | 19 | 0 | 6 |
 | 项目模板 | 5 | 0 | 0 | 5 |
@@ -223,7 +223,7 @@
 
 ### Graphics
 
-共 107 个文件：已写入 54，进行中 0，未开始 53。
+共 107 个文件：已写入 58，进行中 0，未开始 49。
 
 | 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
 | --- | ---: | --- | --- | --- |
@@ -258,19 +258,19 @@
 | `Graphics/Sources/NativeRHI/Device/Queue.swift` | 24 | 已写入（未验证） | `Graphics/rust/rhi/queue.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Device/ResourcePreparation.swift` | 120 | 已写入（未验证） | `Graphics/rust/rhi/resource_preparation.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Metal/Bindings/MetalBindingRegistry.swift` | 33 | 未开始 | — | 依赖 RHI 前端；原生 GPU 后端（Metal/Vulkan/DX12） |
-| `Graphics/Sources/NativeRHI/Metal/Bindings/MetalLibraryCache.swift` | 62 | 未开始 | — | 依赖 RHI 前端；原生 GPU 后端（Metal/Vulkan/DX12） |
+| `Graphics/Sources/NativeRHI/Metal/Bindings/MetalLibraryCache.swift` | 62 | 已写入（未验证） | `Graphics/rust/metal/library_cache.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Metal/Bindings/MetalRegistries.swift` | 129 | 未开始 | — | 依赖 RHI 前端；原生 GPU 后端（Metal/Vulkan/DX12） |
-| `Graphics/Sources/NativeRHI/Metal/Bindings/MetalRenderBindings.swift` | 46 | 未开始 | — | 依赖 RHI 前端；原生 GPU 后端（Metal/Vulkan/DX12） |
+| `Graphics/Sources/NativeRHI/Metal/Bindings/MetalRenderBindings.swift` | 46 | 已写入（未验证） | `Graphics/rust/metal/render_bindings.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Metal/Device/MetalCompilation.swift` | 12 | 未开始 | — | 依赖 RHI 前端；原生 GPU 后端（Metal/Vulkan/DX12） |
 | `Graphics/Sources/NativeRHI/Metal/Device/MetalDeviceResources.swift` | 275 | 未开始 | — | 依赖 RHI 前端；原生 GPU 后端（Metal/Vulkan/DX12） |
 | `Graphics/Sources/NativeRHI/Metal/Device/MetalDeviceTransfer.swift` | 299 | 未开始 | — | 依赖 RHI 前端；原生 GPU 后端（Metal/Vulkan/DX12） |
-| `Graphics/Sources/NativeRHI/Metal/Device/MetalUploadRing.swift` | 55 | 未开始 | — | 依赖 RHI 前端；原生 GPU 后端（Metal/Vulkan/DX12） |
+| `Graphics/Sources/NativeRHI/Metal/Device/MetalUploadRing.swift` | 55 | 已写入（未验证） | `Graphics/rust/metal/upload_ring.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Metal/MetalAccelerationStructure.swift` | 97 | 未开始 | — | 依赖 RHI 前端；原生 GPU 后端（Metal/Vulkan/DX12） |
 | `Graphics/Sources/NativeRHI/Metal/MetalBackend.swift` | 16 | 未开始 | — | 依赖 RHI 前端；原生 GPU 后端（Metal/Vulkan/DX12） |
 | `Graphics/Sources/NativeRHI/Metal/MetalDevice.swift` | 208 | 未开始 | — | 依赖 RHI 前端；原生 GPU 后端（Metal/Vulkan/DX12） |
 | `Graphics/Sources/NativeRHI/Metal/MetalFormats.swift` | 232 | 已写入（未验证） | `Graphics/rust/metal/formats.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Metal/Pipelines/MetalMeshPipeline.swift` | 86 | 未开始 | — | 依赖 RHI 前端；原生 GPU 后端（Metal/Vulkan/DX12） |
-| `Graphics/Sources/NativeRHI/Metal/Pipelines/MetalSubmissionStatus.swift` | 20 | 未开始 | — | 依赖 RHI 前端；原生 GPU 后端（Metal/Vulkan/DX12） |
+| `Graphics/Sources/NativeRHI/Metal/Pipelines/MetalSubmissionStatus.swift` | 20 | 已写入（未验证） | `Graphics/rust/metal/submission_status.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Metal/Pipelines/MetalSubmitEncoder.swift` | 610 | 未开始 | — | 依赖 RHI 前端；原生 GPU 后端（Metal/Vulkan/DX12） |
 | `Graphics/Sources/NativeRHI/NativeRHI.swift` | 61 | 已写入（未验证） | `Graphics/rust/rhi/mod.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/RHIBackend.swift` | 133 | 已写入（未验证） | `Graphics/rust/rhi/backend.rs` | 未编译、未行为对照 |

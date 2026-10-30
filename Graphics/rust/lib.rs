@@ -8,5 +8,9 @@ pub mod rhi;
 
 pub use rhi::*;
 
+/// The Metal backend only exists where the Metal framework does.
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+pub mod metal;
+
 pub mod ui;
 pub use ui::*;

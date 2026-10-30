@@ -8072,8 +8072,10 @@
       "source": "Graphics/Sources/NativeRHI/Metal/Bindings/MetalLibraryCache.swift",
       "source_sha256": "ba634e870875803902d99572720804bd61e8908307d6ef0e7662a6e85b5e2f55",
       "source_lines": 62,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/metal/library_cache.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
       "planned": false
@@ -8092,8 +8094,10 @@
       "source": "Graphics/Sources/NativeRHI/Metal/Bindings/MetalRenderBindings.swift",
       "source_sha256": "33b85c5bb4f3551cec65725f3f7352491fbbe940761018ce9633e5172899db32",
       "source_lines": 46,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/metal/render_bindings.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
       "planned": false
@@ -8132,8 +8136,10 @@
       "source": "Graphics/Sources/NativeRHI/Metal/Device/MetalUploadRing.swift",
       "source_sha256": "98bf0c7c18d71819db4cb7dcbf9b1a76ebb08780ea0de4838d19a4f8c58f9853",
       "source_lines": 55,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/metal/upload_ring.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
       "planned": false
@@ -8194,8 +8200,10 @@
       "source": "Graphics/Sources/NativeRHI/Metal/Pipelines/MetalSubmissionStatus.swift",
       "source_sha256": "3d05637b3d3e8642a5ffe4212be2970de3f1910f55d707fe60dc0f328bb6e2f2",
       "source_lines": 20,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/metal/submission_status.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
       "planned": false

@@ -20,7 +20,7 @@
 
 | 范围 | 文件数 | 已写入 | 进行中 | 未开始 |
 | --- | ---: | ---: | ---: | ---: |
-| 生产源码 | 984 | 456 | 47 | 481 |
+| 生产源码 | 984 | 460 | 47 | 477 |
 | 测试源码 | 424 | 0 | 0 | 424 |
 | SwiftPM 清单 | 25 | 19（Cargo 清单） | 0 | 6 |
 | CLI 项目模板 | 5 | 0 | 0 | 5 |
@@ -45,7 +45,7 @@
 | Logging | 15 | 705 | 15 | 0 | 0 | 16 |
 | Text | 14 | 2,576 | 14 | 0 | 0 | 16 |
 | Imaging | 9 | 696 | 9 | 0 | 0 | 11 |
-| Graphics | 107 | 14,534 | 54 | 0 | 53 | 51 |
+| Graphics | 107 | 14,534 | 58 | 0 | 49 | 56 |
 | Shell | 13 | 2,529 | 13 | 0 | 0 | 14 |
 | Runtime | 11 | 1,485 | 11 | 0 | 0 | 12 |
 | Compose（含 Composition、宏） | 414 | 52,554 | 191 | 6 | 217 | 202 |
@@ -90,7 +90,7 @@ System、Logging、Tools/Support、Graphics RHI 前端、DevTools Protocol、Hos
 
 ### 批次 2：Graphics 原生后端（三个可并行子批次）
 
-- Metal：14 个文件（`Metal/Bindings`、`Metal/Device`、`Metal/Pipelines`、`Metal/Metal{BACKEND,Device,AccelerationStructure}`）。
+- Metal：14 个文件（`Metal/Bindings`、`Metal/Device`、`Metal/Pipelines`、`Metal/Metal{BACKEND,Device,AccelerationStructure}`）。已翻译 4 个：`MetalSubmissionStatus`、`MetalLibraryCache`、`MetalRenderBindings`、`MetalUploadRing`；剩余 `MetalBackend`、`MetalCompilation`、`MetalBindingRegistry`、`MetalRegistries`、`MetalAccelerationStructure`、`MetalMeshPipeline`、`MetalDevice`、`MetalDeviceResources`、`MetalDeviceTransfer`、`MetalSubmitEncoder`。
 - Vulkan：31 个文件（Backend/Presentation/Resources/Setup/Submission 与顶层模块）。
 - DX12：8 个文件（Backend/Device/Formats/Resources/Submission）。
 - 另 1 个 Graphics 文件（`Metal/MetalFormats.swift`）已在批次 1 映射。
