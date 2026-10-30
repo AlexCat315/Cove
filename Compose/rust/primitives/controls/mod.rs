@@ -9,6 +9,7 @@ pub mod field_label;
 pub mod fields;
 pub mod form;
 pub mod form_validation;
+pub mod inline_label_layout;
 pub mod key_cap;
 pub mod link;
 pub mod rating;

@@ -4,6 +4,22 @@
 
 ## Unreleased
 
+- 新增 `DataTableEditingState`（11 项测试，已运行通过）：草稿生命周期与 Tab 遍历。被拒绝的提交**保持草稿打开并记录错误**（不丢弃用户输入），因此切换到另一单元格时会先中止而非吞掉非法值；行/列消失时草稿直接丢弃；Tab 跳过不可编辑列，走到末尾即结束。行身份用 id 而非索引，因为显示顺序可能在编辑期间改变。
+
+- 新增 `TimeInputState`（14 项测试，已运行通过）：12/24 小时制显示、分段步进（12 小时制内步进不跨半天，与 Swift 一致）、数字缓冲（高位数字立即完成并进段、低位等待第二位）、AM/PM 首字母仅在异于当前半天时翻转、失焦清空该段缓冲。**移植中两处测试预期先写错后按 Swift 语义修正**：`set` 对时/分各自独立取模因而分钟越过 59 只回绕不向小时进位；分钟缓冲在单数字完成后仍保留，故紧随的下一数字构成超范围值并被忽略。行为与 Swift 一致，是预期错误而非实现错误。
+
+- 新增 `DataTableRowMetrics` 与 `DataTableSortRequest`（9 项测试，已运行通过）：固定行高走算术、可变行高走前缀和索引，视图窗口/滚动范围/定位共用同一真源；排序在**两个方向**都以源索引兜底相等比较，因此降序不会反转并列项——这是"稳定"与"仅确定性"的区别；过期投影按模型修订号与排序命令双重拒绝。
+
+- 补充 Compose 控件模型（含单元测试，均已实际运行通过）：`ViewThatFits`（阈值/intrinsic 双模式）、`LayerRoot`+`PortalHost`+`LayerRoot` portal 层、`DataTableColumnOrder`（8 项测试）、`ReorderableList` 拖拽模型（13 项测试）、`SearchFieldState`（8 项测试）、`DateRangePreset`/`DateRangeRules`（12 项测试，覆盖闰年、跨年、反向区间归一化、含端点的天数计算与 `can_complete` 双向校验）。`DateRangePreset::range` 的反向区间归一化在首次实现中写错（先重赋值 `lower` 再比较），由测试发现并修正。
+
+- 生产源码迁移达 935/984（95%），**15 个模块全部完成**：Graphics、Core、Tools、DevTools、Hosts、Terminal、Sources、System、Logging、Text、Shell、Runtime、Imaging、PlatformCore、Browser。剩余为 Compose 18 个与 Examples 31 个；后者的 31 个 Gallery 故事页依赖前者尚未落地的控件。
+
+- 补齐本轮 Compose 缺口：`ViewThatFits`（阈值与 intrinsic 两种选择模式，非活动分支保持挂载但不占位/不绘制/不接收输入，并在隐藏时释放焦点与指针捕获）、`LayerRoot`（portal 层 z-index 30000，高于标题栏上限 20000）、`PortalHost`（按首帧解析并保留窗口 store 归属，不在每次更新时重新解析，避免跨窗口迁移观察者）、`DataTableColumnOrder`（顺序应用/移动/拖拽目标计算）、`ReorderableList` 模型（拖拽会话、放置边界与去移除后的目标索引、键盘步进夹取、保留挂载行）。
+
+- 修复 `PlatformEventBridge` 克隆语义：此前 `Clone` 会复制订阅表，导致克隆体收不到经原件发布的事件；改为共享 `Arc` 存储，与 Swift 的引用类型语义一致。
+
+- 迁移清单工具修正可达性判定：`mod` 声明必须位于该文件的**同级模块**（`agent/skills.rs` 由 `agent/mod.rs` 的 `mod skills;` 引入），且 crate 根包含 `main.rs`（`Tools/Cove` 是二进制 crate）。此前判定过宽（把 `date_values.rs` 误认为可达）与过窄（把 `Tools` 30 条误降级）并存。另引入 `verified_by: "operator"` 标记人工按符号核对的映射，脚本不再覆盖。
+
 - 修复 `cove_ui_compose` 未导出 `modifiers` 模块导致的可见性缺口：`FrameDimension` 等修饰器类型此前无法从 crate 外部引用（`pub use modifiers::layout::FrameDimension;` 已补，纯增量）。同时纠正一处流传的误判——**`ModifiedContent` 实现了 `View`，所有 `*Ext` trait 均为 blanket 实现，修饰器可自由串联**，无需在每组之间插入 `AnyView::new(...)`；已用编译探针验证并写入迁移文档。"no method named X" 的真实成因是缺 trait import、参数不符/字段私有、或值本身无 `View` 实现，三者已分列记录。
 
 - 补齐 Gallery 侧视图缺失的控件：`Toolbar` 溢出布局接通（`LayoutContainer` + `impl Layout` + `AppBar` 供给可用宽度，并有断言优先级顺序与 `Always` 保证的测试）、`AppBar`、`ButtonGroup`、`Table`/`TableColumn`、`Calendar`/`DatePicker`、`Rating`、`Breadcrumb`、`Pagination`。`PaginationModel::items` 的 `start == 3` / `end == total-2` 邻页特例已按原实现移植并单测。

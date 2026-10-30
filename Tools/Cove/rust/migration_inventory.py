@@ -124,6 +124,11 @@ def derive(entries: list[dict], rust: list[str]) -> None:
     for entry in entries:
         if entry["kind"] != "production":
             continue
+        # `verified_by: "operator"` marks a row a human checked by symbol. The
+        # matcher cannot infer every mapping (Swift `Skill.swift` is Rust
+        # `AgentSkill`), so those decisions are authoritative and never re-derived.
+        if entry.get("verified_by") == "operator":
+            continue
         if entry.get("status") == "pending" and not entry.get("rust"):
             # An explicitly cleared entry is an operator correction (the previous
             # target was a wrong mapping); leave it pending.
@@ -393,14 +398,37 @@ def declared_modules() -> set[str]:
 
 
 def is_reachable(path: str, declared: set[str]) -> bool:
-    """Whether a Rust file is named by some `mod` statement, or is a crate entry."""
+    """Whether a Rust file is named by a `mod` statement in its own directory.
+
+    The declaration must live in the parent module: `agent/skills.rs` is reached
+    by `mod skills;` inside `agent/mod.rs`, not by a same-named `mod` anywhere in
+    the tree. Checking the directory keeps the answer honest — a file declared
+    only in an unrelated crate's sibling is still dead.
+    """
     stem = os.path.basename(path)[:-3]
     if stem in ("lib", "main", "build", "mod"):
         return True
-    if stem in declared:
-        return True
-    # `mod foo;` may live in `foo/mod.rs`, and a directory module is declared by
-    # its parent `mod foo;` — already covered above — so nothing else is needed.
+    directory = os.path.dirname(path)
+    for candidate in (
+        os.path.join(directory, "mod.rs"),
+        os.path.join(directory, "lib.rs"),
+        # A binary crate's root is `main.rs`; `Tools/Cove` is one.
+        os.path.join(directory, "main.rs"),
+        os.path.join(os.path.dirname(directory), os.path.basename(directory) + ".rs"),
+    ):
+        full = os.path.join(ROOT, candidate)
+        if not os.path.exists(full):
+            continue
+        try:
+            text = open(full, encoding="utf-8", errors="ignore").read()
+        except OSError:
+            continue
+        if re.search(
+            r"^\s*(?:pub(?:\([^)]*\))?\s+)?mod\s+" + re.escape(stem) + r"\s*;",
+            text,
+            re.M,
+        ):
+            return True
     return False
 
 
@@ -452,6 +480,30 @@ def main() -> int:
                 entry["status"] = "written_unverified"
                 entry["planned"] = False
                 continue
+        # A Swift file whose primary type is defined under a different Rust name
+        # (Swift `Skill.swift` -> Rust `AgentSkill`) is still covered. Match on the
+        # *declared type prefix*: the Swift stem must be a suffix of a public type
+        # name in the Swift file's own crate.
+        collapsed_stem = re.sub(r"[^a-z0-9]", "", stem.lower())
+        declared_types = {
+            name
+            for name in types
+            if name.lower().endswith(collapsed_stem) and name.lower() != collapsed_stem
+        }
+        if declared_types:
+            swift_crate = crate_root(entry["source"])
+            usable = sorted({
+                path
+                for name in declared_types
+                for path in types[name]
+                if swift_crate and crate_root(path) == swift_crate
+            })
+            if usable:
+                entry["rust"] = usable[:3]
+                entry["status"] = "written_unverified"
+                entry["planned"] = False
+                continue
+
         # Consolidated modules document the Swift files they replace in their
         # header (e.g. "Translation of .../ResourcesSupport/Bundle.swift and
         # .../Lookup.swift"), so a filename mention there is coverage evidence.

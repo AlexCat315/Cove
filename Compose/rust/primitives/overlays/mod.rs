@@ -2,12 +2,17 @@
 pub mod anchored;
 pub mod support;
 pub mod popover;
+pub mod popconfirm;
+pub mod hover_card;
+pub mod asset_drop_target;
 pub mod portal;
 pub mod focus_scope;
 pub mod selection_key_host;
 pub mod menu;
 pub mod modal;
 pub mod roving_focus;
+pub mod toast;
+pub mod tooltip;
 
 pub use focus_scope::FocusScope;
 pub use selection_key_host::SelectionKeyHost;

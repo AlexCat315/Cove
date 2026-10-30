@@ -1142,11 +1142,14 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/DateRange/Rules.swift",
       "source_sha256": "e43298df56fe9f3cb27bae5d32771a3624c20781b8ce93e44f663bb3b167afe0",
       "source_lines": 84,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/controls/fields/date_range_rules.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/JSON/ExpandedEditor.swift",
@@ -1268,11 +1271,14 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/SearchField.swift",
       "source_sha256": "095a28d2f52bf5fad9a39f77e8d28ce1f78000606f833c09fb509c0b123fc6b0",
       "source_lines": 154,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/controls/fields/search_field_model.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Select.swift",
@@ -1339,21 +1345,27 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/TimeField.swift",
       "source_sha256": "eeac8bf4fd3caf5e5c2996102754373c2aed4ddb9b4eae2fbd86a3fbb8cce09b",
       "source_lines": 60,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/controls/fields/time_input_model.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/TimeInput.swift",
       "source_sha256": "afd4c51826b47eb2c22fd5d5af6fdbc9dab19ccfda35c65333ef555bd55e0f14",
       "source_lines": 320,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/controls/fields/time_input_model.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Form.swift",
@@ -1407,11 +1419,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/InlineLabelLayout.swift",
       "source_sha256": "6edff03f6bf4ae15f65154a41be1e81b784e08fb7a2524d219f64144bddfb640",
       "source_lines": 46,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/controls/inline_label_layout.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/KeyCap.swift",
@@ -1889,21 +1903,26 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/Columns/Visibility.swift",
       "source_sha256": "bbd55e4a3f124f8208d86fed04ca23942c5b36f7853e4095d87fa6ab05a5903c",
       "source_lines": 25,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/data/lists/table.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/DataTable/ColumnOrder.swift",
       "source_sha256": "2a2f03a0bc573fa7ced9db39b7d6c9de76c579a254bbc6a3e183ad342ac81394",
       "source_lines": 141,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/data/data_table/column_order.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTable.swift",
@@ -1921,11 +1940,14 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableEditing.swift",
       "source_sha256": "dcd414eb94fb913b54e0570aa1ff4ed1803783358d5a043f813a3f8d5b42214f",
       "source_lines": 66,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/data/data_table/editing_model.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableGeometry.swift",
@@ -1977,11 +1999,14 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableSortWorker.swift",
       "source_sha256": "8662f097b958f8a5723a558995bf63a1fe2a59e05b4e350c92aafae4dea32527",
       "source_lines": 45,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/data/data_table/row_metrics.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/DataTable/EditorPresence.swift",
@@ -1997,11 +2022,14 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/DataTable/VariableRows.swift",
       "source_sha256": "f810ea2a59d91418287b63032c5b721bbadf55aeca6b2fa251bf150382709bc1",
       "source_lines": 60,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/data/data_table/row_metrics.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/InsetGroup.swift",
@@ -2055,21 +2083,27 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/Reorder/Preview.swift",
       "source_sha256": "766d029059605bc2c5efc338a7dd8b00ee3cf98429d146111234b36ee145ff9c",
       "source_lines": 62,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/data/lists/reorder_model.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/Reorder/Reorderable.swift",
       "source_sha256": "ed6695e8f2a301bc7ef21ad826621cb55a37d762b2549f7fc8fe8da665b01299",
       "source_lines": 268,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/data/lists/reorder_model.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/Row.swift",
@@ -2138,8 +2172,7 @@
       "status": "written_unverified",
       "rust": [
         "Compose/Composition/rust/layout_tree.rs",
-        "Compose/Composition/rust/view_graph.rs",
-        "Compose/rust/tests/row_slot.rs"
+        "Compose/Composition/rust/view_graph.rs"
       ],
       "module": "Compose",
       "kind": "production",
@@ -2161,11 +2194,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/TreeOptions.swift",
       "source_sha256": "0161c01e2260201ce1098299eaccbfd33853012c400c7b9338f27257b225f18a",
       "source_lines": 86,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/data/lists/tree/options.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/PropertyGrid.swift",
@@ -2387,31 +2422,37 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Carousel/Autoplay.swift",
       "source_sha256": "1768529678ae8a305fdec39cd7ba58e9da8d798f61960998c1a2d681e20a441e",
       "source_lines": 132,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/layout/carousel/autoplay.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Carousel/Carousel.swift",
       "source_sha256": "84e651083eb340462c782b6ca639d49885e7f0ca8e7eaff22caf89a031cf0bcf",
       "source_lines": 215,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/layout/carousel/mod.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Carousel/Indicator.swift",
       "source_sha256": "74ed53fec80946820f0d141d36f4dd8ca73c02528e2eeef43e286d8bdefe585f",
       "source_lines": 44,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/layout/carousel/indicator.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Direction/Resolved.swift",
@@ -2621,11 +2662,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/ResizableTextArea.swift",
       "source_sha256": "88bf5685d0bc153b9472e035aae85cb679be320139f6c7f6cbae7627a7148f8c",
       "source_lines": 56,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/layout/resizable_text_area.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Resize/HeightHandle.swift",
@@ -2691,11 +2734,14 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Responsive/ViewThatFits.swift",
       "source_sha256": "7de4f181f53754876155508dee6c252f5356a0c41a6a14d962ec41287b487fea",
       "source_lines": 118,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/layout/responsive/view_that_fits.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/RowSlot.swift",
@@ -2737,11 +2783,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Scrolling/KeyboardFocus.swift",
       "source_sha256": "0d7bd255ecfc11e7d921f87e375f69bfddb70bcff551b02b8ab7fc4530e1e800",
       "source_lines": 49,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/layout/scroll_view.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/AdaptiveHosts.swift",
@@ -2939,11 +2987,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Split/Compact.swift",
       "source_sha256": "b62c5107b38439393e67260b7289fb98a8384ad1acffb93795da8c7b4dff2dac",
       "source_lines": 67,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/layout/split_compact.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Split/Constraints.swift",
@@ -2985,11 +3035,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/StatusBar.swift",
       "source_sha256": "134f0acf0900cb9f7e4a8b2d2a191ce248baf0a91c196ae96ab41ba81dc84e98",
       "source_lines": 184,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/layout/status_bar.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/TabView.swift",
@@ -3007,21 +3059,25 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Tabs/MenuStrip.swift",
       "source_sha256": "13ee1da75beda03684561a062fbc7d750ca34d291129bac98b7fb5e3122b83df",
       "source_lines": 61,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/layout/tab_overflow.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Tabs/MobileBar.swift",
       "source_sha256": "08b820155a498a065af938b9ab86ebea08c01ad22718d9d3eb2b2d9bd1ed2070",
       "source_lines": 94,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/layout/mobile_tab_bar.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Tabs/StripLayout.swift",
@@ -3375,21 +3431,25 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/AssetDropTarget.swift",
       "source_sha256": "30a1f3cf74605cacf35eb1c90ebf11f964be339aaa1cecc7237870dc7efef576",
       "source_lines": 212,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/overlays/asset_drop_target.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/Command/Search.swift",
       "source_sha256": "54bd95e7d9cdb69a4782a05600945d0c4c56d39a41c604baf7cf93064f782506",
       "source_lines": 89,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/data/lists/tree/options.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/CommandPalette.swift",
@@ -3417,11 +3477,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/HoverCard.swift",
       "source_sha256": "2d835fa369a6ca149674d10f870943c49a83cd91290d0979edf8a8560b01c004",
       "source_lines": 183,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/overlays/hover_card.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/ContextMenu.swift",
@@ -3607,11 +3669,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/Popconfirm/Popconfirm.swift",
       "source_sha256": "f88a5cdb47804b289e8a36ab77d744c19cbd03cacaaeabfe57c27dd12b3a51f5",
       "source_lines": 71,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/overlays/popconfirm.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/Popover.swift",
@@ -3641,11 +3705,14 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/LayerRoot.swift",
       "source_sha256": "62aabd1dd0e001e2f17f43a5aca265c6e7f32890921b5c5555c74e09f9809bcf",
       "source_lines": 95,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/overlays/portal/layer_root.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/OverlayPlacement.swift",
@@ -3665,11 +3732,12 @@
       "source_lines": 218,
       "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/controls/fields/slider/host.rs"
+        "Compose/rust/primitives/overlays/portal/portal_host.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": false
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/PortalPlacement.swift",
@@ -3771,11 +3839,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/Tooltip.swift",
       "source_sha256": "ba243754fdf9035d003f3c5e6228daeb2a7a6a62091741e52faf11c481a6906a",
       "source_lines": 412,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/overlays/tooltip.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Text/Code/FoldingOptions.swift",
@@ -6257,31 +6327,40 @@
       "source": "DevTools/Inspection/Sources/CoveUIAgentCore/Session/Conversation.swift",
       "source_sha256": "ba2aff196d565f3dc59ea4e49e63fbe13eaebf2ea7b36d596f684252e0075635",
       "source_lines": 86,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "DevTools/rust/agent/tool.rs"
+      ],
       "module": "DevTools",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "DevTools/Inspection/Sources/CoveUIAgentCore/Skills/Directory.swift",
       "source_sha256": "6b3a3e3ea25f84cb3b4203c1b32f73eb6f6c2a78b3545b5bef4287d111b06e01",
       "source_lines": 49,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "DevTools/rust/agent/skills.rs"
+      ],
       "module": "DevTools",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "DevTools/Inspection/Sources/CoveUIAgentCore/Skills/Skill.swift",
       "source_sha256": "234a11c0c9b9b42c29b7ac18345a29b1227901862b12f3e6e8db83d3c5edf7f1",
       "source_lines": 42,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "DevTools/rust/agent/skills.rs"
+      ],
       "module": "DevTools",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "DevTools/Inspection/Sources/CoveUIAgentCore/Tools/Diagnostics.swift",
@@ -6299,11 +6378,14 @@
       "source": "DevTools/Inspection/Sources/CoveUIAgentCore/Tools/Toolbox.swift",
       "source_sha256": "92ac96bdd25ae27148fbd036c3426aa436dfbd2f5cabc6900a791371999b96ac",
       "source_lines": 44,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "DevTools/rust/agent/tool.rs"
+      ],
       "module": "DevTools",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Actions.swift",
@@ -6357,21 +6439,27 @@
       "source": "DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Queries.swift",
       "source_sha256": "41979b0ec3bfbfcc4004a918ff907a2eaaaa4c308b79d2e74aaa1c38febc5388",
       "source_lines": 200,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "DevTools/rust/inspection/diagnostics.rs"
+      ],
       "module": "DevTools",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Requests.swift",
       "source_sha256": "fbf7819528797943880abb892ff6293172c6ff2879719bc652598047b825bf83",
       "source_lines": 50,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "DevTools/rust/server/mod.rs"
+      ],
       "module": "DevTools",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Tools.swift",
@@ -6497,11 +6585,12 @@
       "source_lines": 22,
       "status": "written_unverified",
       "rust": [
-        "DevTools/Protocol/rust/lib.rs"
+        "DevTools/rust/devtools/mod.rs"
       ],
       "module": "DevTools",
       "kind": "production",
-      "planned": false
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "DevTools/Protocol/Sources/CoveUIDevToolsProtocol/Exports.swift",
@@ -6579,11 +6668,14 @@
       "source": "DevTools/Sources/CoveUIAgentTransport/LocalServer.swift",
       "source_sha256": "964373b72d2dd8fdf8c9a7531d4bca16f0bfb4e94567bb0aaedf59788b0ee068",
       "source_lines": 110,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "DevTools/rust/agent_transport.rs"
+      ],
       "module": "DevTools",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "DevTools/Sources/CoveUIDevTools/Integration/Exports.swift",
@@ -6625,11 +6717,14 @@
       "source": "DevTools/Sources/CoveUIDevTools/Session/Discovery.swift",
       "source_sha256": "6b2512ad9da9d2e82783534d57a09edb246cdceffc65b057fd611d0d35123400",
       "source_lines": 19,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "DevTools/rust/devtools/mod.rs"
+      ],
       "module": "DevTools",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "DevTools/Sources/CoveUIDevTools/Taps/FrameTap.swift",
@@ -6804,11 +6899,14 @@
       "source": "DevTools/Sources/CoveUIDevToolsServer/Streams/Logs.swift",
       "source_sha256": "421e1f89607374006a640127692e18f3021f4fe9235f28e7d1713009a21bbfa4",
       "source_lines": 55,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "DevTools/rust/server/mod.rs"
+      ],
       "module": "DevTools",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "DevTools/Sources/CoveUIDevToolsServer/Transport/DevToolsTransport.swift",
@@ -6838,11 +6936,14 @@
       "source": "DevTools/Sources/CoveUIDevToolsServer/Tree/TreeEncodingWorker.swift",
       "source_sha256": "9f77f653c53f41e26817adff1cb3227771534eafcd0ef814b662892a1bb12414",
       "source_lines": 60,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "DevTools/rust/server/mod.rs"
+      ],
       "module": "DevTools",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "DevTools/Tests/CoveUIAgentTransportTests/TransportTests.swift",
@@ -6971,11 +7072,14 @@
       "source": "Examples/Mobile/Sources/AppContent/Projects.swift",
       "source_sha256": "af9114023a62d957e1760f74358a55b2dcfc307400ae881e59d2b4a86711a8fe",
       "source_lines": 57,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Examples/rust/mobile/model.rs",
+        "Examples/rust/mobile/today.rs"
+      ],
       "module": "Examples",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Examples/Mobile/Sources/AppContent/Settings.swift",
@@ -8195,11 +8299,13 @@
       "source": "Graphics/Sources/NativeRHI/Metal/Device/MetalCompilation.swift",
       "source_sha256": "68cbd8c9eb39406cd6a1c120d728d16b0b062fbb203eabdffe699fe0fabb06b5",
       "source_lines": 12,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/metal/backend.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Graphics/Sources/NativeRHI/Metal/Device/MetalDeviceResources.swift",
@@ -8784,11 +8890,13 @@
       "source": "Graphics/Sources/NativeRHI/Vulkan/Backend/VulkanCompilation.swift",
       "source_sha256": "3af944728bf4fa00935976d5f2a224d8dd5303b577bb3cd8a3aacc0d48529cda",
       "source_lines": 12,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/vulkan/backend.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Graphics/Sources/NativeRHI/Vulkan/Presentation/PresentMode.swift",
@@ -8938,11 +9046,14 @@
       "source": "Graphics/Sources/NativeRHI/Vulkan/Submission/VulkanCleanup.swift",
       "source_sha256": "d891d4470d47c83e00c8feddbfbfc14ef2647d0a780bda36f49abd8ce6dbcace",
       "source_lines": 32,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/vulkan/setup.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Graphics/Sources/NativeRHI/Vulkan/Submission/VulkanScratch.swift",
@@ -8984,11 +9095,13 @@
       "source": "Graphics/Sources/NativeRHI/Vulkan/VulkanAdvanced.swift",
       "source_sha256": "5a28645c05892cd6135a08e6fea633087deda7935f12dcaff211f9f38c5ee46b",
       "source_lines": 37,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/vulkan/sys.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Graphics/Sources/NativeRHI/Vulkan/VulkanAuxiliary.swift",
@@ -9030,11 +9143,13 @@
       "source": "Graphics/Sources/NativeRHI/Vulkan/VulkanFunctions.swift",
       "source_sha256": "59ca50e53a78385d0f4d70b4cc195e624642dc29e8fb906ff19c5270c5951caa",
       "source_lines": 687,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/vulkan/sys.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Graphics/Sources/NativeRHI/Vulkan/VulkanRendering.swift",
@@ -9792,11 +9907,14 @@
       "source": "Hosts/Desktop/Sources/CoveUI/Application/Callbacks.swift",
       "source_sha256": "482e5d424121fe9d070c7e2cffdbd27900cea957dd7df68c8878ebefcd13b945",
       "source_lines": 10,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Hosts/rust/desktop/application/runtime.rs"
+      ],
       "module": "Hosts",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Hosts/Desktop/Sources/CoveUI/Application/Composition.swift",
@@ -10954,11 +11072,13 @@
       "source": "Sources/CoveUIWorkspace/Layout/Split.swift",
       "source_sha256": "175f5d9201a981d70d034df71a813d8fd0b553d0531ed6b02b6d895c39c10554",
       "source_lines": 32,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Sources/rust/workspace/model.rs"
+      ],
       "module": "Sources",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Sources/CoveUIWorkspace/Layout/Tree.swift",
@@ -10967,8 +11087,7 @@
       "status": "written_unverified",
       "rust": [
         "Compose/Composition/rust/layout_tree.rs",
-        "Compose/Composition/rust/view_graph.rs",
-        "Compose/rust/tests/row_slot.rs"
+        "Compose/Composition/rust/view_graph.rs"
       ],
       "module": "Sources",
       "kind": "production",
@@ -11523,11 +11642,13 @@
       "source": "Terminal/Sources/CoveUITerminal/Engine/Sized.swift",
       "source_sha256": "fa1f71d776efe9eea16e554ffe23f70f267a915188c13db9603b075c209a8d21",
       "source_lines": 7,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Terminal/rust/engine/sized.rs"
+      ],
       "module": "Terminal",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Terminal/Sources/CoveUITerminal/Process/Command.swift",
@@ -12702,8 +12823,10 @@
       "source": "Tests/CoveUIComposeTests/DateRangeRulesTests.swift",
       "source_sha256": "cf2175451c2014fb7414c7f35aa5e3184d95fc9a8301c7e106471a361855c5bb",
       "source_lines": 91,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "date_range_rules"
+      ],
       "module": "Tests",
       "kind": "test",
       "planned": false
@@ -15376,7 +15499,8 @@
       "source_lines": 21,
       "status": "written_unverified",
       "rust": [
-        "Tools/Cove/rust/support.rs"
+        "DevTools/rust/inspection/diagnostics.rs",
+        "Tools/Cove/rust/cli.rs"
       ],
       "module": "Tools",
       "kind": "production",
@@ -15472,7 +15596,8 @@
       "source_lines": 52,
       "status": "written_unverified",
       "rust": [
-        "Tools/Cove/rust/installation.rs"
+        "Tools/Cove/rust/installation.rs",
+        "Tools/Cove/rust/project_sdk.rs"
       ],
       "module": "Tools",
       "kind": "production",
@@ -15508,7 +15633,8 @@
       "source_lines": 47,
       "status": "written_unverified",
       "rust": [
-        "Tools/Cove/rust/installation.rs"
+        "Tools/Cove/rust/installation.rs",
+        "Tools/Cove/rust/project_sdk.rs"
       ],
       "module": "Tools",
       "kind": "production",
@@ -15641,8 +15767,7 @@
       "status": "written_unverified",
       "rust": [
         "Graphics/rust/rhi/shader_artifact.rs",
-        "Graphics/rust/rhi/shader_artifact_loading.rs",
-        "Tools/Cove/rust/project_sdk.rs"
+        "Graphics/rust/rhi/shader_artifact_loading.rs"
       ],
       "module": "Tools",
       "kind": "production",
@@ -15778,7 +15903,9 @@
       "source_lines": 131,
       "status": "written_unverified",
       "rust": [
-        "Tools/Cove/rust/project.rs"
+        "Tools/Cove/rust/cli.rs",
+        "Tools/Cove/rust/project.rs",
+        "Tools/Cove/rust/project_tasks.rs"
       ],
       "module": "Tools",
       "kind": "production",
@@ -15814,6 +15941,7 @@
       "source_lines": 82,
       "status": "written_unverified",
       "rust": [
+        "Tools/Cove/rust/platforms_android/mod.rs",
         "Tools/Cove/rust/project_sdk.rs"
       ],
       "module": "Tools",
@@ -15850,7 +15978,7 @@
       "source_lines": 74,
       "status": "written_unverified",
       "rust": [
-        "Tools/Cove/rust/project_sdk.rs"
+        "Logging/rust/record.rs"
       ],
       "module": "Tools",
       "kind": "production",
@@ -15886,6 +16014,7 @@
       "source_lines": 51,
       "status": "written_unverified",
       "rust": [
+        "Tools/Cove/rust/platforms_android/mod.rs",
         "Tools/Cove/rust/project_tasks.rs"
       ],
       "module": "Tools",
@@ -15934,7 +16063,7 @@
       "source_lines": 59,
       "status": "written_unverified",
       "rust": [
-        "Tools/Cove/rust/project_tasks.rs"
+        "Tools/Cove/rust/project.rs"
       ],
       "module": "Tools",
       "kind": "production",
@@ -15946,7 +16075,8 @@
       "source_lines": 20,
       "status": "written_unverified",
       "rust": [
-        "Tools/Cove/rust/project.rs"
+        "Tools/Cove/rust/project.rs",
+        "Tools/Cove/rust/project_sdk.rs"
       ],
       "module": "Tools",
       "kind": "production",
@@ -15970,7 +16100,7 @@
       "source_lines": 70,
       "status": "written_unverified",
       "rust": [
-        "Tools/Cove/rust/support.rs"
+        "Tools/Support/rust/files.rs"
       ],
       "module": "Tools",
       "kind": "production",
@@ -15982,7 +16112,7 @@
       "source_lines": 76,
       "status": "written_unverified",
       "rust": [
-        "Tools/Cove/rust/support.rs"
+        "Logging/rust/record.rs"
       ],
       "module": "Tools",
       "kind": "production",
@@ -16056,7 +16186,7 @@
       "source_lines": 29,
       "status": "written_unverified",
       "rust": [
-        "Tools/Cove/rust/installation.rs"
+        "Tools/Cove/rust/project.rs"
       ],
       "module": "Tools",
       "kind": "production",
@@ -16068,7 +16198,7 @@
       "source_lines": 45,
       "status": "written_unverified",
       "rust": [
-        "Tools/Cove/rust/installation.rs"
+        "Tools/Cove/rust/toolchains.rs"
       ],
       "module": "Tools",
       "kind": "production",
@@ -16080,7 +16210,7 @@
       "source_lines": 50,
       "status": "written_unverified",
       "rust": [
-        "Tools/Cove/rust/installation.rs"
+        "Tools/Cove/rust/toolchains.rs"
       ],
       "module": "Tools",
       "kind": "production",
@@ -16092,7 +16222,7 @@
       "source_lines": 30,
       "status": "written_unverified",
       "rust": [
-        "Tools/Cove/rust/installation.rs"
+        "Tools/Cove/rust/toolchains.rs"
       ],
       "module": "Tools",
       "kind": "production",

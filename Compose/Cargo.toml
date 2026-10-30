@@ -112,3 +112,31 @@ path = "rust/tests/view_builder.rs"
 [[test]]
 name = "zstack"
 path = "rust/tests/zstack.rs"
+
+[[test]]
+name = "data_table_column_order"
+path = "rust/tests/data_table_column_order.rs"
+
+[[test]]
+name = "reorder_model"
+path = "rust/tests/reorder_model.rs"
+
+[[test]]
+name = "search_field_model"
+path = "rust/tests/search_field_model.rs"
+
+[[test]]
+name = "date_range_rules"
+path = "rust/tests/date_range_rules.rs"
+
+[[test]]
+name = "data_table_row_metrics"
+path = "rust/tests/data_table_row_metrics.rs"
+
+[[test]]
+name = "time_input_model"
+path = "rust/tests/time_input_model.rs"
+
+[[test]]
+name = "data_table_editing"
+path = "rust/tests/data_table_editing.rs"

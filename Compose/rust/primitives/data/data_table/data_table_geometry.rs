@@ -20,6 +20,11 @@ impl DataTableColumnGeometry {
         Self { widths, starts, frozen_count, total_width }
     }
 
+    /// Left edge of every column, in header coordinates.
+    pub fn starts(&self) -> &[f32] {
+        &self.starts
+    }
+
     pub fn frozen_width(&self) -> f32 {
         self.starts.get(self.frozen_count).copied().unwrap_or(self.total_width)
     }

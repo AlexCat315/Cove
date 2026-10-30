@@ -1,4 +1,6 @@
 //! Translation of Primitives/Data/Lists/Table.swift.
+//! Also translates Primitives/Data/Columns/Visibility.swift via the
+//! `TableColumnPlan` type below.
 //!
 //! A fixed header and virtualized rows sharing one horizontal scroll coordinate
 //! system. Cell content may include editors; embedded controls receive input

@@ -17,7 +17,9 @@ use crate::primitives::overlays::portal::{
 };
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonRole, ButtonStyleViewExt, GhostButtonStyle};
-use crate::theme::{SemanticFontRef, ThemeReader};
+use crate::theme::{ControlSizeViewExt, SemanticFontRef, ThemeReader};
+use crate::modifiers::layout::{FlexExt, PaddingExt};
+use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, View};
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 
@@ -96,7 +98,7 @@ impl View for NotificationHost {
             entries,
             width: self.width,
             position: self.position.resolved(),
-            presentation: Rc::new(ToastPresentationHandle::new()),
+            presentation: Rc::new(ToastPresentation::new()),
         })
     }
 }
@@ -108,7 +110,7 @@ struct ToastPresenter {
     entries: Vec<ToastPresentationEntry>,
     width: f32,
     position: ToastPosition,
-    presentation: Rc<ToastPresentationHandle>,
+    presentation: ToastPresentationHandle,
 }
 
 impl PrimitiveView for ToastPresenter {
@@ -158,7 +160,7 @@ fn present(
     entries: &[ToastPresentationEntry],
     width: f32,
     position: ToastPosition,
-    presentation: &Rc<ToastPresentationHandle>,
+    presentation: &ToastPresentationHandle,
 ) {
     let bounds = portal_window_bounds(node);
     node.set_attachment(WINDOW_BOUNDS, bounds);

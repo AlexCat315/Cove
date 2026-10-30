@@ -437,13 +437,26 @@ impl PrimitiveView for TabStrip {
 crate::impl_primitive_view!(TabStrip);
 
 /// One tab in the strip: icon, label, badge and optional close control.
-struct TabStripItem<Id: PartialEq + Clone + 'static> {
+pub(crate) struct TabStripItem<Id: PartialEq + Clone + 'static> {
     tab: TabItem<Id>,
     selection: Binding<Id>,
     is_enabled: bool,
     variant: TabVariant,
     indicator: IndicatorPlacement,
     is_selected: bool,
+}
+
+impl<Id: PartialEq + Clone + std::hash::Hash + 'static> TabStripItem<Id> {
+    pub(crate) fn new(
+        tab: TabItem<Id>,
+        selection: Binding<Id>,
+        is_enabled: bool,
+        variant: TabVariant,
+        indicator: IndicatorPlacement,
+        is_selected: bool,
+    ) -> Self {
+        Self { tab, selection, is_enabled, variant, indicator, is_selected }
+    }
 }
 
 impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for TabStripItem<Id> {

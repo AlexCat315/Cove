@@ -1,4 +1,6 @@
 //! Translation of Primitives/Layout/ScrollView.swift.
+//! Also translates Primitives/Layout/Scrolling/KeyboardFocus.swift via the
+//! `ScrollKeyboardFocus` helper below.
 //!
 //! Clipped scrolling with optional offset binding and viewport observations.
 //! Content must retain its natural extent on the scrolling axis. Large

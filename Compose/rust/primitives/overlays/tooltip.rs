@@ -9,8 +9,8 @@ use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
 
 use cove_core::scene::{
-    EventResult, HoverPhase, InputHandlerRoute, InteractionRegistryHolder, LayoutNode, Node,
-    NodeResource, PointerPhase,
+    Align, AnimatorScheduler, EventResult, FlexDirection, HoverPhase, InputHandlerRoute,
+    InteractionRegistryHolder, LayoutNode, Node, NodeResource, PointerPhase, Wrap,
 };
 use cove_core::{Point, Rect, Size};
 use cove_composition::{AnyView, PrimitiveView, View};
@@ -21,7 +21,7 @@ use crate::primitives::overlays::portal::{
 };
 use crate::primitives::text::Text;
 use crate::theme::{theme_for_node, SemanticColorRef};
-use crate::{impl_primitive_view, BoxView, FlexDirection, Align, Wrap};
+use crate::{impl_primitive_view, BoxView};
 
 /// How long the pointer must rest before a tip appears.
 pub const DEFAULT_DELAY: f64 = 0.6;
@@ -356,7 +356,7 @@ impl TooltipSession {
             self.show();
         } else {
             self.is_finished.set(false);
-            crate::AnimatorScheduler::register(Rc::new(ClockRef { session: self.me_weak() }));
+            AnimatorScheduler::current().register(Rc::new(ClockRef { session: self.me_weak() }));
         }
     }
 
@@ -420,11 +420,12 @@ impl TooltipSession {
         let sized_content = AnyView::new(ContentBox {
             content: AnyView::new(content.frame(None, None, None, None, Some(options.max_width), None)),
         });
-        let position_for_size = Rc::new(move |size: Size| resting_spot(size, anchor, gap, window));
+        let position_for_size =
+            Rc::new(move |size: Size| Self::resting_spot(size, anchor, gap, window));
         if let Some(resource) = portal_resource(&node) {
             resource.present(
-                PortalStoreHolder::current(),
-                resting_spot(Size::default(), anchor, gap, window),
+                Some(PortalStoreHolder::current()),
+                Self::resting_spot(Size::default(), anchor, gap, window),
                 None,
                 sized_content,
                 false,

@@ -15,3 +15,9 @@ pub use select::{
     KeyboardShortcut, KeyboardShortcutModifier, KeyboardShortcutPlatform, Select, SelectOption,
 };
 pub use slider::{Slider, SliderAxis, SliderGeometry, SliderHost};
+pub mod search_field_model;
+pub use search_field_model::{SearchAction, SearchFieldState, SearchKey, SearchKeyOutcome};
+pub mod date_range_rules;
+pub use date_range_rules::{DateRangePreset, DateRangeRules};
+pub mod time_input_model;
+pub use time_input_model::{TimeInputHourCycle, TimeInputState, TimeSegment};
