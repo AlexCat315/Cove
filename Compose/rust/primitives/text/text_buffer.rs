@@ -8,7 +8,7 @@ use super::rope::rope_editing;
 use super::rope::rope_lookup::lower_bound;
 use super::rope::rope_storage::{empty_node, RopeChunk, RopeHandle, RopeLeaf, RopeNode};
 use std::ops::Range;
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[derive(Clone)]
 struct BufferEdit {
@@ -28,7 +28,7 @@ impl PartialEq for TextBuffer {
     /// distinct revisions even when their serialized strings have identical
     /// contents.
     fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.root, &other.root)
+        Arc::ptr_eq(&self.root, &other.root)
     }
 }
 
@@ -99,7 +99,7 @@ impl TextBuffer {
     /// edit/save boundaries and cache the result; independently loaded text
     /// may cost O(n).
     pub fn has_same_contents(&self, other: &TextBuffer) -> bool {
-        if Rc::ptr_eq(&self.root, &other.root) {
+        if Arc::ptr_eq(&self.root, &other.root) {
             return true;
         }
         if self.utf8_length() != other.utf8_length() {
@@ -110,7 +110,7 @@ impl TextBuffer {
     }
 
     pub fn identity(&self) -> usize {
-        Rc::as_ptr(&self.root) as usize
+        Arc::as_ptr(&self.root) as usize
     }
 
     pub fn substring(&self, character_range: Range<usize>) -> String {
@@ -173,11 +173,11 @@ impl TextBuffer {
     /// find the changed extent by skipping shared subtrees, without a full
     /// diff.
     pub fn edit_delta(&self, previous: &TextBuffer) -> Option<TextEditDelta> {
-        if Rc::ptr_eq(&self.root, &previous.root) {
+        if Arc::ptr_eq(&self.root, &previous.root) {
             return None;
         }
         if let Some(last_edit) = &self.last_edit {
-            if Rc::ptr_eq(&last_edit.previous_root, &previous.root) {
+            if Arc::ptr_eq(&last_edit.previous_root, &previous.root) {
                 return Some(last_edit.delta.clone());
             }
         }
@@ -327,7 +327,7 @@ impl TextBuffer {
     }
 
     /// Overlapping immutable leaves, including partially covered edge leaves.
-    pub fn visible_chunks(&self, range: Range<usize>) -> Vec<Rc<RopeLeaf>> {
+    pub fn visible_chunks(&self, range: Range<usize>) -> Vec<Arc<RopeLeaf>> {
         self.root
             .leaves_in(self.bounded(range, self.utf8_length()))
     }

@@ -7,7 +7,9 @@ impl Default for TextCacheLimits { fn default() -> Self { Self { maximum_entries
 pub struct TextCacheSnapshot { pub entries: usize, pub estimated_bytes: usize }
 struct Entry<V> { value: V, bytes: usize, used: u64 }
 struct Storage<K, V> { entries: HashMap<K, Entry<V>>, bytes: usize, clock: u64, generation: u64 }
-pub(crate) struct TextCache<K, V> { limits: TextCacheLimits, storage: Mutex<Storage<K, V>> }
+/// Bounded LRU cache. Public so callers and tests can assert eviction order,
+/// oversize handling and trim ordering directly, which is where drift hides.
+pub struct TextCache<K, V> { limits: TextCacheLimits, storage: Mutex<Storage<K, V>> }
 impl<K: Clone + Eq + Hash, V: Clone> TextCache<K, V> {
     pub fn new(limits: TextCacheLimits) -> Self { Self { limits, storage: Mutex::new(Storage { entries: HashMap::new(), bytes: 0, clock: 0, generation: 0 }) } }
     pub fn snapshot(&self) -> TextCacheSnapshot { let s = self.storage.lock().unwrap_or_else(|e| e.into_inner()); TextCacheSnapshot { entries: s.entries.len(), estimated_bytes: s.bytes } }

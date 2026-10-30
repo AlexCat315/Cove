@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+- `TextBuffer` 恢复 `Send + Sync`（对齐 Swift 的 `Sendable`）：rope 由 `Rc` 改为 `Arc`，共享空叶子从 `thread_local!` 提升为 `OnceLock` 静态量，`TextBuffer::eq` 改用 `Arc::ptr_eq`。此前 `TextField::new(placeholder, Binding<TextBuffer>)` 的签名不可满足——`Binding` 要求闭包 `Send + Sync`，而 `TextBuffer` 基于 `Rc`——**全仓库零调用点**证明该控件从未可构造。修复后 `TextField` 可用，未使用任何 `unsafe impl`，`Send`/`Sync` 由数据结构本身满足（已用编译期断言验证后删除该断言）。`SharedRope` 保持 `Rc<RefCell<_>>`：实时编辑会话本就是 UI 线程状态，只有缓冲区**值**需要可共享。
+
+- 修复 LSP snippet 展开的多处结构缺陷（`Compose/rust/primitives/text/text_field/snippet.rs`）：`${N|a,b|}` 现扫描整个候选列表并在首个逗号处记住首选，随后跳过 `|}`，转义按对消费；`$N` 在检查 `{` **之前**读取，修正纯 `$1`/`$2` 制表位的顺序（此即最常见路径）；`${VARIABLE}` 无默认值时不再可能输出多余 `$`；`$` 后非数字/`{`/标识符时按字面 `$` 输出。此前版本在单候选与多候选下都会错位跳过字符。
+
 - 修复跨越多个团队的同一类缺陷（`.modifier()` 陷阱）于源头：`ModifiedContent` 的私有字段 `modifier` 遮蔽了 `ViewExt::modifier(self, m)`，报错形如 "private field, not a method"，本会话内至少 12 次误修。字段改名为 `applied`；新增 `AnyView::with_modifier(self, m)` 与 `IdentifiedView::with_modifier(self, m)`，使已擦除的值可直接链式附加修饰器。约定：具体 `View` 用 `ViewExt::modifier`，已擦除值用 `with_modifier`，禁止用 `AnyView::new(modified_content)` 掩盖类型错误（会经 downcast 快路径静默丢弃修饰器）。
 
 - 删除 `Compose/tests/` 目录下 4 个陈旧测试文件（`theme.rs`、`theme_environment.rs`、`composition_local.rs`、`semantic_motion.rs`）。它们由 Cargo 默认自动发现路径编译，但写于早期接口（`Rect.origin` 作为字段、`ViewGraph(tree:recomposer:)` 元组构造），从未通过编译，且使 `--all-targets` 每次必然失败，污染全部验证。

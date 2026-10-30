@@ -7,8 +7,15 @@
 //! classifications already exist as pure functions on `cove_core::Viewport`, so
 //! this module ports the reporting logic and keeps the view a thin wrapper.
 
+use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{Environment, Idiom, Orientation, SizeClass};
 use cove_core::TextScale;
+use cove_ui_compose::adaptive::SurfaceReader;
+use cove_ui_compose::primitives::text::Text;
+use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
+use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View, ViewExt};
+
+use crate::gallery_content::stories::StorySection;
 
 /// The four viewport lines the story renders, in order.
 #[derive(Clone, Debug, PartialEq)]
@@ -104,6 +111,63 @@ impl ViewportTraits {
             self.text_scale_percent,
             if self.keyboard_visible { "visible" } else { "hidden" }
         )
+    }
+}
+
+/// The `viewportTraits` story: reports the live surface traits.
+pub struct ViewportTraitsStory;
+
+impl ViewportTraitsStory {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Default for ViewportTraitsStory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl View for ViewportTraitsStory {
+    fn body(&self) -> AnyView {
+        AnyView::new(SurfaceReader::new(|surface: &Environment| {
+            let traits = ViewportTraits::new(surface);
+            let line = |text: String, name: &'static str| {
+                AnyView::new(
+                    Text::new(text)
+                        .semantic_foreground(SemanticColorRef::on_surface_muted())
+                        .debug_name(name),
+                )
+            };
+            AnyView::new(StorySection::new(
+                "Viewport traits",
+                "Current host surface.",
+                AnyView::new(BoxView::new(
+                    FlexDirection::Column,
+                    Align::FlexStart,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    10.0,
+                    AnyView::new(TupleView::new(vec![
+                        line(traits.viewport_line(), ViewportDebugName::SIZE),
+                        AnyView::new(Text::new(traits.width_class_line()).debug_name(
+                            ViewportDebugName::WIDTH_CLASS,
+                        )),
+                        AnyView::new(Text::new(traits.height_class_line()).debug_name(
+                            ViewportDebugName::HEIGHT_CLASS,
+                        )),
+                        AnyView::new(Text::new(traits.orientation_line()).debug_name(
+                            ViewportDebugName::ORIENTATION,
+                        )),
+                        AnyView::new(Text::new(traits.idiom_line()).debug_name(ViewportDebugName::IDIOM)),
+                        line(traits.safe_area_line(), ViewportDebugName::SAFE_AREA),
+                        line(traits.text_scale_line(), ViewportDebugName::TEXT_SCALE),
+                        line(THRESHOLD_CAPTION.to_string(), "viewport-thresholds"),
+                    ])),
+                )),
+            ))
+        }))
     }
 }
 

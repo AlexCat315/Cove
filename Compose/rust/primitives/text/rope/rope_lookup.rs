@@ -1,7 +1,7 @@
 //! Index conversions and range materialization for the rope.
 
 use super::rope_storage::{RopeChunk, RopeHandle, RopeLeaf, RopeNode, RopeStorage};
-use std::rc::Rc;
+use std::sync::Arc;
 
 impl RopeNode {
     pub fn utf8_offset_for_character_index(&self, index: usize) -> usize {
@@ -175,7 +175,7 @@ impl RopeNode {
         }
     }
 
-    pub fn leaves_in(&self, range: std::ops::Range<usize>) -> Vec<Rc<RopeLeaf>> {
+    pub fn leaves_in(&self, range: std::ops::Range<usize>) -> Vec<Arc<RopeLeaf>> {
         if range.is_empty() {
             return Vec::new();
         }
@@ -183,7 +183,7 @@ impl RopeNode {
             RopeStorage::Leaf(leaf) => vec![leaf.clone()],
             RopeStorage::Branch(branch) => {
                 let split = branch.left.metrics.utf8_length;
-                let mut result: Vec<Rc<RopeLeaf>> = Vec::new();
+                let mut result: Vec<Arc<RopeLeaf>> = Vec::new();
                 if range.start < split {
                     result.extend(
                         branch
@@ -277,6 +277,6 @@ pub fn lower_bound(array: &[usize], target: usize) -> usize {
 }
 
 /// Convenience for callers that hold a handle.
-pub fn leaves_in(root: &RopeHandle, range: std::ops::Range<usize>) -> Vec<Rc<RopeLeaf>> {
+pub fn leaves_in(root: &RopeHandle, range: std::ops::Range<usize>) -> Vec<Arc<RopeLeaf>> {
     root.leaves_in(range)
 }

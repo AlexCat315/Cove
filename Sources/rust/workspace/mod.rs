@@ -10,6 +10,7 @@ pub mod ids;
 mod icons;
 mod model;
 mod sizing;
+mod tab_style;
 mod theme;
 mod view;
 
@@ -17,6 +18,7 @@ pub use controller::{
     SubscriptionToken, WorkspaceCommand, WorkspaceController, WorkspaceHitTarget, WorkspaceTarget,
     WorkspaceTransactionResult,
 };
+pub use tab_style::WorkspaceTabStyle;
 pub use drag::{
     drag_overlay, first_node, resolve_drag, set_drag_overlay, tab_band, tab_frames, workspace_root,
     WorkspaceDragResolution, WorkspaceDropPreview, WorkspaceReorderPreview, WorkspaceTabDragOverlayState,

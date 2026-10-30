@@ -227,3 +227,16 @@ pub fn deepest_node(root: &Node) -> Node {
     }
     cursor
 }
+
+/// Finds a node by its layout debug name below `root`.
+pub fn find_named(root: &Node, name: &str) -> Option<Node> {
+    if debug_name(root).as_deref() == Some(name) {
+        return Some(root.clone());
+    }
+    for child in root.children() {
+        if let Some(found) = find_named(&child, name) {
+            return Some(found);
+        }
+    }
+    None
+}

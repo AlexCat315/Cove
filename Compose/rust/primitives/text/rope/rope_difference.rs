@@ -3,7 +3,7 @@
 //! changed leaves and non-shared input text.
 
 use super::rope_storage::{RopeHandle, RopeStorage};
-use std::rc::Rc;
+use std::sync::Arc;
 
 struct Cursor {
     nodes: Vec<RopeHandle>,
@@ -63,7 +63,7 @@ pub fn common_bytes(
         let (Some(left), Some(right)) = (a.nodes.last().cloned(), b.nodes.last().cloned()) else {
             break;
         };
-        if Rc::ptr_eq(&left, &right) && a.byte_offset == 0 && b.byte_offset == 0 {
+        if Arc::ptr_eq(&left, &right) && a.byte_offset == 0 && b.byte_offset == 0 {
             let count = left.metrics.utf8_length.min(limit - matched);
             a.consume(count);
             b.consume(count);

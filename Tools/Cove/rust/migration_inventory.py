@@ -137,6 +137,30 @@ def derive(entries: list[dict], rust: list[str]) -> None:
             entry["planned"] = True
 
 
+_HEADER_CACHE: dict[str, str] = {}
+
+
+def source_header(path: str) -> str:
+    """The leading `//!` doc block of a Rust file, cached."""
+    cached = _HEADER_CACHE.get(path)
+    if cached is not None:
+        return cached
+    lines: list[str] = []
+    try:
+        with open(os.path.join(ROOT, path), encoding="utf-8", errors="ignore") as handle:
+            for line in handle:
+                stripped = line.strip()
+                if stripped.startswith("//!") or stripped.startswith("//"):
+                    lines.append(stripped)
+                elif stripped:
+                    break
+    except OSError:
+        pass
+    header = "\n".join(lines)
+    _HEADER_CACHE[path] = header
+    return header
+
+
 def type_index() -> dict[str, list[str]]:
     """Public type/function name -> Rust files that define it.
 
@@ -256,6 +280,12 @@ def manifest_paths() -> list[str]:
     return sorted(found)
 
 
+def collapse_test_name(name: str) -> str:
+    """`ZStackTests` / `z_stack_tests` / `zstack` all collapse to `zstack`."""
+    lowered = re.sub(r"[^a-z0-9]", "", name.lower())
+    return re.sub(r"tests$", "", lowered)
+
+
 def test_target_names() -> list[str]:
     """Names of every declared Cargo test target.
 
@@ -302,8 +332,12 @@ def main() -> int:
             continue
         stem = os.path.splitext(os.path.basename(entry["source"]))[0]
         if entry["kind"] == "test":
-            snake_stem = snake(stem)
-            matches = [target for target in declared_tests if snake(target) == snake_stem]
+            # Swift suites are named `<Name>Tests`; the Rust target drops the
+            # suffix and sometimes the word boundaries (`ZStackTests` ->
+            # `zstack`). Compare on collapsed alphanumerics with the suffix
+            # removed, so both spellings match.
+            matches = [target for target in declared_tests
+                       if collapse_test_name(target) == collapse_test_name(stem)]
             if matches:
                 entry["rust"] = matches
                 entry["status"] = "written_unverified"
@@ -312,6 +346,20 @@ def main() -> int:
         if entry["kind"] != "production":
             continue
         if types.get(stem):
+            entry["rust"] = sorted(set(types[stem]))[:3]
+            entry["status"] = "written_unverified"
+            entry["planned"] = False
+            continue
+        # Consolidated modules document the Swift files they replace in their
+        # header (e.g. "Translation of .../ResourcesSupport/Bundle.swift and
+        # .../Lookup.swift"), so a filename mention there is coverage evidence.
+        mentioned = [path for path in rust if stem in source_header(path)]
+        if mentioned:
+            entry["rust"] = sorted(set(mentioned))[:3]
+            entry["status"] = "written_unverified"
+            entry["planned"] = False
+            continue
+        if False:
             entry["rust"] = sorted(set(types[stem]))[:3]
             entry["status"] = "written_unverified"
             entry["planned"] = False

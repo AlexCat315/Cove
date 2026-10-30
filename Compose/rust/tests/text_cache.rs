@@ -1,23 +1,102 @@
 //! Translation of `Tests/CoveUIComposeTests/TextCacheTests.swift`.
 //!
 //! Behaviour checklist:
-//! - a long run of dynamic text and width changes stays within the default
-//!   entry and byte bounds
-//! - `trim_text_caches` empties both caches and the environment keeps working
+//! - reading an existing key refreshes its LRU position, so the *least recently
+//!   read* entry is the one evicted when the entry bound is reached
+//! - a result larger than the byte bound, or a cache with a zero entry bound,
+//!   returns the value without retaining it
+//! - a build that trims the cache does not have its older result retained
 //!   afterwards
-//!
-//! The three `TextCache`-direct cases in the Swift file (LRU eviction,
-//! oversized/disabled retention, and trim-vs-build ordering) cannot be migrated
-//! as written: `TextCache` is `pub(crate)` to `cove-text` and only
-//! `TextCacheLimits`/`TextCacheSnapshot` are exported. Those behaviours are
-//! covered here indirectly through the environment's bounded caches, which is
-//! the layer Compose actually owns.
+//! - a long run of dynamic text and width changes keeps the environment's own
+//!   caches within their default bounds, and trimming leaves them usable
 
 mod support;
 
-use cove_text::TextEnvironment;
+use cove_text::{TextCache, TextCacheLimits, TextEnvironment};
 
 use support::GlobalTestLock;
+
+#[test]
+fn evicts_least_recently_read_entry() {
+    let cache: TextCache<String, i32> =
+        TextCache::new(TextCacheLimits { maximum_entries: 2, maximum_bytes: 10 });
+
+    let read = |key: &str, value: i32| -> i32 {
+        cache.value(key.to_string(), |_| 4, || value)
+    };
+
+    assert_eq!(read("a", 1), 1, "the first read builds and stores");
+    assert_eq!(read("b", 2), 2, "the second read fills the entry bound");
+    assert_eq!(
+        read("a", 9),
+        1,
+        "re-reading `a` returns the cached value, not the new build"
+    );
+    assert_eq!(
+        read("c", 3),
+        3,
+        "`c` is stored, evicting the least recently read entry"
+    );
+    assert_eq!(read("a", 9), 1, "`a` survived the eviction");
+    assert_eq!(
+        read("b", 9),
+        9,
+        "`b` was the least recently read entry, so it rebuilds"
+    );
+
+    let snapshot = cache.snapshot();
+    assert_eq!(snapshot.entries, 2, "the entry bound is respected");
+    assert_eq!(
+        snapshot.estimated_bytes, 8,
+        "two entries at 4 bytes each account for exactly 8 bytes"
+    );
+}
+
+#[test]
+fn oversized_results_and_disabled_caches_are_not_retained() {
+    // A zero entry bound disables retention entirely.
+    let disabled =
+        TextCache::<i32, i32>::new(TextCacheLimits { maximum_entries: 0, maximum_bytes: 8 * 1024 * 1024 });
+    assert_eq!(
+        disabled.value(1, |_| 4, || 42),
+        42,
+        "the value is still returned"
+    );
+    assert_eq!(
+        disabled.snapshot().entries,
+        0,
+        "a zero entry bound retains nothing"
+    );
+
+    // A result costing more than the byte bound is returned but not stored.
+    let tiny = TextCache::<i32, i32>::new(TextCacheLimits { maximum_entries: 512, maximum_bytes: 3 });
+    assert_eq!(tiny.value(1, |_| 4, || 42), 42, "the value is still returned");
+    assert_eq!(
+        tiny.snapshot().entries,
+        0,
+        "a result over the byte bound is never retained"
+    );
+}
+
+#[test]
+fn trim_does_not_retain_an_older_build() {
+    let cache: TextCache<i32, i32> = TextCache::new(TextCacheLimits::default());
+    let value = cache.value(
+        1,
+        |_| 4,
+        || {
+            // Trimming while the build runs invalidates this generation.
+            cache.clear();
+            42
+        },
+    );
+    assert_eq!(value, 42, "the built value is still returned");
+    assert_eq!(
+        cache.snapshot().entries,
+        0,
+        "a build that saw a trim is not inserted afterwards"
+    );
+}
 
 #[test]
 fn dynamic_text_and_width_changes_remain_bounded() {

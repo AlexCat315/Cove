@@ -20,8 +20,8 @@
 
 | 范围 | 文件数 | 已写入 | 进行中 | 未开始 |
 | --- | ---: | ---: | ---: | ---: |
-| 生产源码 | 984 | 822 | 0 | 162 |
-| 测试源码 | 424 | 30 | 0 | 394 |
+| 生产源码 | 984 | 878 | 0 | 106 |
+| 测试源码 | 424 | 50 | 0 | 374 |
 | SwiftPM 清单 | 25 | 19（Cargo 清单） | 0 | 6 |
 | CLI 项目模板 | 5 | 0 | 0 | 5 |
 | 合计 | 1,438 | — | — | — |
@@ -50,15 +50,15 @@ System 16 个、Logging 15 个、Tools/Cove 8 个、Tools/Support 12 个、Compo
 
 | 模块 | Swift 文件 | Swift 行 | 已写入 | 未开始 |
 | --- | ---: | ---: | ---: | ---: |
-| Compose | 414 | 52,554 | 346 | 68 |
-| Graphics | 107 | 14,534 | 93 | 14 |
+| Compose | 414 | 52,554 | 367 | 47 |
+| Graphics | 107 | 14,534 | 102 | 5 |
 | Core | 97 | 12,299 | 97 | 0 |
-| Tools | 69 | 3,901 | 61 | 8 |
-| Examples | 61 | 7,135 | 15 | 46 |
-| DevTools | 51 | 5,183 | 37 | 14 |
-| Hosts | 51 | 4,254 | 46 | 5 |
-| Terminal | 29 | 3,088 | 26 | 3 |
-| Sources | 19 | 4,861 | 15 | 4 |
+| Tools | 69 | 3,901 | 69 | 0 |
+| Examples | 61 | 7,135 | 20 | 41 |
+| DevTools | 51 | 5,183 | 41 | 10 |
+| Hosts | 51 | 4,254 | 50 | 1 |
+| Terminal | 29 | 3,088 | 28 | 1 |
+| Sources | 19 | 4,861 | 18 | 1 |
 | System | 17 | 1,004 | 17 | 0 |
 | Logging | 15 | 705 | 15 | 0 |
 | Text | 14 | 2,576 | 14 | 0 |
@@ -67,7 +67,7 @@ System 16 个、Logging 15 个、Tools/Cove 8 个、Tools/Support 12 个、Compo
 | Imaging | 9 | 696 | 9 | 0 |
 | PlatformCore | 6 | 540 | 6 | 0 |
 | Browser | 1 | 400 | 1 | 0 |
-| 合计 | 984 | 117,744 | 822 | 162 |
+| 合计 | 984 | 117,744 | 878 | 106 |
 
 Rust 文件数列为磁盘快照，不等于逐 Swift 文件一一对应；多个 Swift 文件可能映射到一个 Rust 模块，也可能一个 Swift 文件拆到多个 Rust/C 文件。逐文件关系在清单中。
 
@@ -173,6 +173,31 @@ Compose 各子树共享 `Compose/rust/lib.rs`、`primitives/mod.rs`、`theme/mod
 5. **Wasm 宿主**：`cove-hosts` 不是 `cove-browser` 的依赖，两者独立；Wasm 上 `platform_transport()` 返回 `None`，http/https 图片返回 `HostUnavailable`，需要 Wasm 专用 fetch/XHR transport。
 6. **Apple 图片 MIME 与 macOS 内存压力**：前者用 URL 扩展名回退（NSData 无 MIME），后者读取已发布级别而非自持 `dispatch_source`。两者都需要手写 ObjC block ABI，为可靠性做了取舍。
 
+## 逐模块保真度（本轮核对）
+
+每个 Compose 家族迁移后按三档标注：`exact`（行为与 Swift 一致）、
+`equivalent-with-named-difference`（行为等价，差异已具名）、
+`compromise-with-follow-up`（有已知缺口，已登记跟进项）。
+**未做行为对照测试**（按要求推迟到全量完成后统一验证），此表是基于逐文件阅读与实现的判断，
+不是验收结论。
+
+| 家族 | 判定 | 说明 |
+| --- | --- | --- |
+| Feedback（Badge、EmptyState、Progress、ProgressCircle、Alert） | exact | |
+| Media（Icon、Skeleton、AsyncImage、ImageDataDownload、ImageLoadServices） | equivalent-with-named-difference | 无 socket transport；`ImageDownloadTransport` 由宿主安装，`file://` 完整可用 |
+| Layout（ScrollView、Sidebar 17 个、Virtualization、Insets、Responsive、Panel、Accordion、BoundedScrollView） | exact | Sidebar 的选择滚动揭示（`SelectionRevealHost`）已按签名/几何缓存/pending 标志完整实现 |
+| Overlays（Menu 家族、Modal、Toast、Popover、Anchored、RovingFocus） | exact | |
+| Text：TextField（含 IME） | equivalent-with-named-difference | 通过 `TextInputClient` 接入 IME（组合区间、选区移动、删除周边）；无可选中文本的装饰层 |
+| Text：Markdown（6 个） | equivalent-with-named-difference | `pulldown-cmark` 方言等价；`SymbolLink`（DocC 专有）刻意省略；表格单元格/段落/标题的富文本扁平化已退役 |
+| Text：RichText / Paragraph / LinkAnchor | exact（一处具名边界） | `RichTextFlow::span()` 以字节偏移取索引，若某字形簇跨越两个不同链接的 span，字形着色取第一个；命中测试走 `fragment.span` 始终正确 |
+| Text：RichTextSurface 文本选择 | compromise-with-follow-up | 绘制与命中已移植，但未注册 `TextSelectionScope`：跨富文本段的拖选未接通。渲染无错误，只是无法跨段选择 |
+| Controls（Toggle/Checkbox、Slider、RadioGroup、Select） | exact | Toggle 36pt / Checkbox 16pt 与原实现一致 |
+| Data：List 家族 | exact | |
+| Styles：10 个组件样式 | exact | |
+
+已退役的四处扁平化：`MarkdownTableView` 单元格、`MarkdownBlocks` 段落、`MarkdownBlocks` 标题、
+菜单富标题——现在均渲染真实 `RichText`，标题还恢复了 `Heading` 角色与 `level N` 值。
+
 ## 平台边界
 
 | 平台 | 已写入 | 尚缺 | 验证 |
@@ -188,21 +213,50 @@ Compose 各子树共享 `Compose/rust/lib.rs`、`primitives/mod.rs`、`theme/mod
 
 ## 当前验证状态
 
-本次盘点与迁移没有运行 `./cove fmt`、`./cove clippy`、`./cove test`、`./cove build`、`./cove migration status`。为恢复工作区可编译性做了局部 `cargo check -p cove-ui-compose`（不是验收结论）：
+**本会话结束时 `cargo check --workspace --all-targets` 通过（0 errors）**，覆盖全部 18 个 crate
+与 54 个已声明的 `[[test]]` 目标。这是可编译性检查，**不是验收**：按项目要求，测试执行、
+格式化、Clippy、跨平台验收与 GUI 冒烟全部推迟到全量迁移完成后统一进行。
+本会话**没有运行** `./cove fmt`、`./cove clippy`、`./cove test`、`./cove build`、`./cove migration status`。
 
-- 已修复：`Compose/CompositionMacros/Cargo.toml` 缺 `path` 导致工作区无法加载；`cove-composition` 的 26 个类型/导出错误（`ModifierReplay` 导出、`cove_core::scene` 几何与颜色导出、`DynamicField: Clone`、`slot_tag` 返回值包装、`AnyView` 与 `dyn View` 混用、`ViewScope::uninstall` 签名等）；`Graphics/rust/ui/draw_geometry.rs` 语句位 `unsafe` 块接二元运算符的语法错误。
-- 现状：`cove-composition` 可编译；顶层 `cove-ui-compose` 仍有 68 个类型错误（37 个文件），集中在 crate 根部未再导出 Composition 的 `Layout*`、`theme::tokens` 未导出 `Theme`/`ThemeReader`、`modifiers::style` 未导出 `SemanticStyleViewExt`、`controls/form.rs` 与 `controls/form/mod.rs` 同名模块冲突、`chart/plot.rs` 与 `avatar/avatar.rs` 的导入与结构错误。这些属于批次 4 的 Compose 收口范围，尚未修复。
-- `Cargo.lock` 与清单不同步，需要联网解析后 `--locked` 才能通过。
+### 本会话修复的可编译性问题（属缺陷，不是进度）
 
-统一验证放在全部生产与测试文件迁移之后：
+| 问题 | 范围 | 处理 |
+| --- | --- | --- |
+| 写而未编译：Rust 文件从未被 `mod` 声明 | System 16、Logging 15、Tools/Cove 8、Tools/Support 12、Compose 2 | 全部接入；删除重复单体实现 |
+| 测试文件对 Cargo 不可见 | `Core/rust/tests/` 6、`Graphics/rust/tests/` 7、`Tests/*.rs` 6 | 补 `[[test]]` 声明 |
+| `Compose/tests/` 陈旧目录污染每次 `--all-targets` | 4 个文件 | 删除（备份于 `/tmp/cove-stale-tests`） |
+| `ModifiedContent` 私有字段 `modifier` 遮蔽 `ViewExt::modifier` | 全 Compose | 字段改名 `applied`；新增 `AnyView::with_modifier` |
+| `TextField::new` 签名不可满足（`Binding<TextBuffer>` 但 `TextBuffer` 非 `Send`） | Compose 文本栈 | rope 改 `Arc`，恢复 Swift 的 `Sendable` 契约 |
+| LSP snippet 展开多处结构错误 | `text_field/snippet.rs` | 重写 `${N|a,b|}`、`$N` 顺序、`${VARIABLE}`、字面 `$` |
+| 跨 crate 共享 API 缺口 | Core/PlatformCore/Text/Composition | `Rect::size/origin`、`KeyModifiers::is_empty`、`ScrollConsumePolicy: Default`、`ObservableStateRegistrar: Clone`、`TextCache` 与 `FreeTypeColorGlyphFace` 导出等 |
 
-```sh
-./cove fmt .
-./cove clippy . --all-targets --locked
-./cove test . --locked --no-parallel
-./cove build .
-./cove migration status
-```
+### "视图缺失"类缺口（本轮新识别）
+
+盘点发现一类此前被误判为"已完成"的缺口：**模型与样式已写入，但没有可渲染的视图组件**。
+判定方法不是比对名字——`Rating` 在 Swift 与 Rust 可能不同名——而是构建
+"实际拥有 `impl View` / `impl PrimitiveView` / `impl_primitive_view!` 的类型集合"
+（当前 242 个可渲染组件），再逐个确认 Swift 视图名到 Rust 组件的映射。
+按声明名匹配会给出假阳性。
+
+以下 19 个组件属于此类：样式/几何/模型齐备，但无视图：
+
+`Toolbar`、`ToolbarItem`、`Rating`、`Table`+`TableColumn`、`DataTable`、`CalendarView`、
+`DatePicker`、`ButtonGroup`+`ButtonGroupItem`、`Tree`/`TreeTable`、`TabView`、`SplitView`、
+`PropertyGrid`+`Row`+`Section`、`AppBar`、`Carousel`、`Pagination`、`Breadcrumb`+
+`BreadcrumbItem`、`CommandPalette`、`Tooltip`
+
+例：`ToolbarToggleButtonStyle` 存在但无 `Toolbar`；`TableGeometry`/`TableCard`/`TableTextCell`
+存在但无列表格的 `Table`；`CalendarGrid` 存在但无 `CalendarView`。样式不是控件。
+
+影响：Gallery 98 页中 26 页因此无法渲染（其余 72 页可移植）。本轮按解锁页数排序补齐，
+`ButtonGroup`（4 页）优先，其后 `Toolbar`／`Table`／`DatePicker`（各 3 页）。
+
+### 已知缺口（功能层面，已在实现中具名记录）
+
+见上文「逐模块保真度」与「原生后端与宿主状态」两节。摘要：
+Linux `https://`、macOS 菜单栏、Wasm 图片 transport 与 iOS Rust 入口、
+DX12 描述符表逐 draw 绑定与加速结构、Apple 图片 MIME 与 macOS 内存压力回退、
+`RichTextSurface` 跨段文本选择、`Minimap` 未接入 `TextField`。
 
 ## 最终统一验收
 

@@ -401,13 +401,11 @@ impl PrimitiveView for MenuItemRowHost {
                     .foreground_color(title_color),
             ));
         } else {
-            // Rich titles are styled spans whose links are ignored: the row is
-            // the only hit target, so the runs flatten to their text.
-            let rendered: String = self.item.content.rich_title.iter().map(|run| run.text.as_str()).collect();
+            // Styled spans render as real runs, display-only: the row is the only
+            // hit target, so links inside a title must not take focus.
             labels.push(AnyView::new(
-                Text::new(rendered)
-                    .semantic_font(SemanticFontRef::body())
-                    .foreground_color(title_color),
+                crate::primitives::text::rich::RichText::new(self.item.content.rich_title.clone())
+                    .display_only(true),
             ));
         }
         if let Some(detail) = self.item.content.detail.clone() {

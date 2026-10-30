@@ -185,3 +185,115 @@ mod checks {
         );
     }
 }
+
+impl cove_ui_compose::View for AnimationCurveExamples {
+    fn body(&self) -> cove_ui_compose::AnyView {
+        use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
+        use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
+        use cove_ui_compose::modifiers::style::AppearanceExt;
+        use cove_ui_compose::primitives::controls::Button;
+        use cove_ui_compose::primitives::text::Text;
+        use cove_ui_compose::theme::styles::buttons::button_style::ButtonStyleViewExt;
+        use cove_ui_compose::theme::styles::buttons::{SecondaryButtonStyle, ToggleButtonStyle};
+        use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
+        use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView};
+
+        use crate::gallery_content::stories::StorySection;
+
+        let enabled = self.is_enabled;
+        let choice = self.choice.get();
+
+        // One toggle per curve, the active one selected.
+        let choices = AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::Wrap,
+            8.0,
+            AnyView::new(TupleView::new(
+                CurveChoice::ALL
+                    .iter()
+                    .map(|candidate| {
+                        let state = self.choice.clone();
+                        let value = *candidate;
+                        AnyView::new(
+                            Button::title(value.title(), move || state.set(value))
+                                .enabled(enabled)
+                                .selected(choice == value)
+                                .button_style(ToggleButtonStyle::default())
+                                .debug_name(&Self::toggle_debug_name(value)),
+                        )
+                    })
+                    .collect(),
+            )),
+        ));
+
+        let play = {
+            let expanded = self.expanded.clone();
+            AnyView::new(
+                Button::title("Play motion", move || {
+                    expanded.update(|value| *value = !*value)
+                })
+                .enabled(enabled)
+                .button_style(SecondaryButtonStyle)
+                .debug_name("animation-curve-play"),
+            )
+        };
+
+        // The animated bar: 80pt collapsed, 200pt expanded.
+        let bar = AnyView::new(
+            BoxView::new(
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
+                AnyView::new(
+                    BoxView::new(
+                        FlexDirection::Column,
+                        Align::Stretch,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        0.0,
+                        AnyView::new(Text::new("")),
+                    )
+                    .frame_size(self.target_width(), 28.0)
+                    .semantic_background(SemanticColorRef::accent())
+                    .corner_radius(7.0)
+                    .debug_name("animation-curve-bar"),
+                ),
+            )
+            .frame_height(64.0)
+            .semantic_background(SemanticColorRef::surface_sunken())
+            .corner_radius(8.0),
+        );
+
+        AnyView::new(StorySection::new(
+            "Timing curves",
+            "Choose a curve and play in either direction. Steps move in intervals; linear points can plateau and overshoot; bounce and elastic settle after oscillating.",
+            AnyView::new(BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                12.0,
+                AnyView::new(TupleView::new(vec![
+                    choices,
+                    play,
+                    bar,
+                    AnyView::new(
+                        Text::new(self.caption())
+                            .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                    ),
+                ])),
+            )),
+        ))
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_ui_compose::DynamicField> {
+        vec![
+            cove_ui_compose::DynamicField::state("choice", &self.choice),
+            cove_ui_compose::DynamicField::state("expanded", &self.expanded),
+        ]
+    }
+}

@@ -11,6 +11,9 @@ path = "rust/lib.rs"
 
 [dependencies]
 cove-composition.workspace = true
+# `CoveUIWorkspace` imports `CoveUICompose` in Swift; the workspace tab style and
+# panel chrome are authored against the Compose button-style contract.
+cove-ui-compose = { path = "../Compose" }
 cove-core.workspace = true
 cove-platform.workspace = true
 serde.workspace = true

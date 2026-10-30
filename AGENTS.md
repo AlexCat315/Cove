@@ -4,7 +4,6 @@ Use Rust 2024 for all new implementations. Migrate existing Swift capabilities t
 
 Avoid unnecessary supporting text, descriptive copy, and redundant UI microcopy.
 
-Please use the `cove cli` command to run the program; do not use the `swift` command.
 
 Please refer to this for UI design agent/skills/
 

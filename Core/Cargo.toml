@@ -19,6 +19,9 @@ cove-platform.workspace = true
 [build-dependencies]
 cc.workspace = true
 
+[dev-dependencies]
+tempfile.workspace = true
+
 [lints]
 workspace = true
 
@@ -89,3 +92,11 @@ path = "rust/tests/accessibility_geometry.rs"
 [[test]]
 name = "animation_value"
 path = "rust/tests/animation_value.rs"
+
+[[test]]
+name = "focus_chain"
+path = "rust/tests/focus_chain.rs"
+
+[[test]]
+name = "hit_tester"
+path = "rust/tests/hit_tester.rs"

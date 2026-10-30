@@ -5,6 +5,7 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 
 /// Returns whether the character is newline according to the Unicode
 /// `White_Space`-adjacent definition used by Swift's `Character.isNewline`.
@@ -63,7 +64,7 @@ impl RopeLeaf {
 
 /// A parser can read from the requested byte without materializing the document.
 pub struct RopeChunk {
-    pub leaf: Rc<RopeLeaf>,
+    pub leaf: Arc<RopeLeaf>,
     pub utf8_offset: usize,
     pub start_index: usize,
 }
@@ -90,7 +91,7 @@ pub struct RopeBranch {
 }
 
 pub enum RopeStorage {
-    Leaf(Rc<RopeLeaf>),
+    Leaf(Arc<RopeLeaf>),
     Branch(RopeBranch),
 }
 
@@ -101,20 +102,22 @@ pub struct RopeNode {
     pub metrics: RopeMetrics,
 }
 
-pub type RopeHandle = Rc<RopeNode>;
+pub type RopeHandle = Arc<RopeNode>;
 
-thread_local! {
-    static EMPTY_NODE: RopeHandle = Rc::new(RopeNode::with_leaf(Rc::new(RopeLeaf::new(""))));
-}
+/// The shared empty leaf. `Arc` lets this be a plain process-wide static; the
+/// rope is immutable, so one instance is valid for every document.
+static EMPTY_NODE: std::sync::OnceLock<RopeHandle> = std::sync::OnceLock::new();
 
 pub fn empty_node() -> RopeHandle {
-    EMPTY_NODE.with(|node| node.clone())
+    EMPTY_NODE
+        .get_or_init(|| Arc::new(RopeNode::with_leaf(Arc::new(RopeLeaf::new("")))))
+        .clone()
 }
 
 impl RopeNode {
     pub const MAX_LEAF_BYTES: usize = 1024;
 
-    pub fn with_leaf(leaf: Rc<RopeLeaf>) -> Self {
+    pub fn with_leaf(leaf: Arc<RopeLeaf>) -> Self {
         let height = if leaf.bytes.is_empty() { 0 } else { 1 };
         let metrics = RopeMetrics {
             utf8_length: leaf.bytes.len(),
@@ -145,14 +148,14 @@ impl RopeNode {
         }
     }
 
-    pub fn first_leaf(&self) -> Rc<RopeLeaf> {
+    pub fn first_leaf(&self) -> Arc<RopeLeaf> {
         match &self.storage {
             RopeStorage::Leaf(leaf) => leaf.clone(),
             RopeStorage::Branch(branch) => branch.left.first_leaf(),
         }
     }
 
-    pub fn last_leaf(&self) -> Rc<RopeLeaf> {
+    pub fn last_leaf(&self) -> Arc<RopeLeaf> {
         match &self.storage {
             RopeStorage::Leaf(leaf) => leaf.clone(),
             RopeStorage::Branch(branch) => branch.right.last_leaf(),
@@ -166,7 +169,7 @@ impl RopeNode {
         for character in string.chars() {
             let size = character.len_utf8();
             if byte_count > 0 && byte_count + size > Self::MAX_LEAF_BYTES {
-                leaves.push(Rc::new(RopeNode::with_leaf(Rc::new(RopeLeaf::new(
+                leaves.push(Arc::new(RopeNode::with_leaf(Arc::new(RopeLeaf::new(
                     std::mem::take(&mut text),
                 )))));
                 byte_count = 0;
@@ -175,7 +178,7 @@ impl RopeNode {
             byte_count += size;
         }
         if !text.is_empty() {
-            leaves.push(Rc::new(RopeNode::with_leaf(Rc::new(RopeLeaf::new(text)))));
+            leaves.push(Arc::new(RopeNode::with_leaf(Arc::new(RopeLeaf::new(text)))));
         }
         Self::balanced(&leaves)
     }
@@ -188,7 +191,7 @@ impl RopeNode {
             return leaves[0].clone();
         }
         let middle = leaves.len() / 2;
-        Rc::new(RopeNode::new(
+        Arc::new(RopeNode::new(
             Self::balanced(&leaves[..middle]),
             Self::balanced(&leaves[middle..]),
         ))
@@ -196,6 +199,8 @@ impl RopeNode {
 }
 
 /// A mutable handle used by editing sessions that need to swap roots cheaply.
+/// `RefCell` keeps this UI-thread-only; the *buffer value* it produces is
+/// shareable, but the live editing session is not.
 pub type SharedRope = Rc<RefCell<RopeHandle>>;
 
 pub fn shared(root: RopeHandle) -> SharedRope {

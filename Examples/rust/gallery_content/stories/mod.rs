@@ -8,11 +8,17 @@
 pub mod animation;
 pub mod animation_curves;
 pub mod animation_system;
+pub mod controls;
+pub mod feedback;
+pub mod layout;
 pub mod overview;
 pub mod viewport_traits;
 
 pub use animation::AnimationStory;
 pub use animation_curves::{AnimationCurveExamples, CurveChoice};
 pub use animation_system::{AnimationSystemExamples, DemoPhase};
+pub use controls::{ButtonStory, CheckboxStory, ToggleStory};
+pub use layout::{LayoutGridStory, LazyGridStory, MasonrySample, MasonryStory};
+pub use feedback::{AlertStory, BadgeStory, EmptyStory, ProgressStory, StorySection};
 pub use overview::{DashboardCard, IntroductionStory, MetricCard};
-pub use viewport_traits::{ViewportDebugName, ViewportTraits};
+pub use viewport_traits::{ViewportDebugName, ViewportTraits, ViewportTraitsStory};

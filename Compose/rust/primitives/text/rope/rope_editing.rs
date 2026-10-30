@@ -1,7 +1,7 @@
 //! Persistent AVL join/split with grapheme-stable seams.
 
 use super::rope_storage::{empty_node, RopeHandle, RopeLeaf, RopeNode, RopeStorage};
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// Height-aware AVL join visits only the taller tree's boundary path.
 pub fn join(left: RopeHandle, right: RopeHandle) -> RopeHandle {
@@ -13,7 +13,7 @@ pub fn join(left: RopeHandle, right: RopeHandle) -> RopeHandle {
     }
     if left.metrics.height > right.metrics.height + 1 {
         if let RopeStorage::Branch(branch) = &left.storage {
-            return Rc::new(balance(
+            return Arc::new(balance(
                 branch.left.clone(),
                 join(branch.right.clone(), right),
             ));
@@ -21,7 +21,7 @@ pub fn join(left: RopeHandle, right: RopeHandle) -> RopeHandle {
     }
     if right.metrics.height > left.metrics.height + 1 {
         if let RopeStorage::Branch(branch) = &right.storage {
-            return Rc::new(balance(
+            return Arc::new(balance(
                 join(left, branch.left.clone()),
                 branch.right.clone(),
             ));
@@ -31,10 +31,10 @@ pub fn join(left: RopeHandle, right: RopeHandle) -> RopeHandle {
         if a.bytes.len() + b.bytes.len() <= RopeNode::MAX_LEAF_BYTES {
             let mut text = a.text.clone();
             text.push_str(&b.text);
-            return Rc::new(RopeNode::with_leaf(Rc::new(RopeLeaf::new(text))));
+            return Arc::new(RopeNode::with_leaf(Arc::new(RopeLeaf::new(text))));
         }
     }
-    Rc::new(RopeNode::new(left, right))
+    Arc::new(RopeNode::new(left, right))
 }
 
 fn balance(left: RopeHandle, right: RopeHandle) -> RopeNode {
@@ -43,13 +43,13 @@ fn balance(left: RopeHandle, right: RopeHandle) -> RopeNode {
             if a.left.metrics.height >= a.right.metrics.height {
                 return RopeNode::new(
                     a.left.clone(),
-                    Rc::new(RopeNode::new(a.right.clone(), right)),
+                    Arc::new(RopeNode::new(a.right.clone(), right)),
                 );
             }
             if let RopeStorage::Branch(b) = &a.right.storage {
                 return RopeNode::new(
-                    Rc::new(RopeNode::new(a.left.clone(), b.left.clone())),
-                    Rc::new(RopeNode::new(b.right.clone(), right)),
+                    Arc::new(RopeNode::new(a.left.clone(), b.left.clone())),
+                    Arc::new(RopeNode::new(b.right.clone(), right)),
                 );
             }
         }
@@ -58,14 +58,14 @@ fn balance(left: RopeHandle, right: RopeHandle) -> RopeNode {
         if let RopeStorage::Branch(a) = &right.storage {
             if a.right.metrics.height >= a.left.metrics.height {
                 return RopeNode::new(
-                    Rc::new(RopeNode::new(left, a.left.clone())),
+                    Arc::new(RopeNode::new(left, a.left.clone())),
                     a.right.clone(),
                 );
             }
             if let RopeStorage::Branch(b) = &a.left.storage {
                 return RopeNode::new(
-                    Rc::new(RopeNode::new(left, b.left.clone())),
-                    Rc::new(RopeNode::new(b.right.clone(), a.right.clone())),
+                    Arc::new(RopeNode::new(left, b.left.clone())),
+                    Arc::new(RopeNode::new(b.right.clone(), a.right.clone())),
                 );
             }
         }
@@ -139,8 +139,8 @@ pub fn split(node: RopeHandle, index: usize) -> (RopeHandle, RopeHandle) {
                 .expect("rope leaf suffix is valid UTF-8")
                 .to_owned();
             (
-                Rc::new(RopeNode::with_leaf(Rc::new(RopeLeaf::new(left_text)))),
-                Rc::new(RopeNode::with_leaf(Rc::new(RopeLeaf::new(right_text)))),
+                Arc::new(RopeNode::with_leaf(Arc::new(RopeLeaf::new(left_text)))),
+                Arc::new(RopeNode::with_leaf(Arc::new(RopeLeaf::new(right_text)))),
             )
         }
         RopeStorage::Branch(branch) => {

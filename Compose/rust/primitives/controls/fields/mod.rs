@@ -1,8 +1,13 @@
 //! Form fields: selects, sliders and radio groups.
+pub mod numeric;
 pub mod radio_group;
 pub mod select;
 pub mod slider;
 
+pub use numeric::{
+    NumberField, NumberFieldPrefix, NumericPrefixFieldStyle, NumericScrub, NumericScrubHandle,
+    NumericTextFormat,
+};
 pub use radio_group::{RadioGroup, RadioOption};
 pub use select::{
     KeyboardShortcut, KeyboardShortcutModifier, KeyboardShortcutPlatform, Select, SelectOption,

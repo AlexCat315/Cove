@@ -67,6 +67,70 @@ impl AnimationStory {
     }
 }
 
+impl cove_ui_compose::View for AnimationStory {
+    fn body(&self) -> cove_ui_compose::AnyView {
+        use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
+        use cove_ui_compose::modifiers::layout::FlexExt;
+        use cove_ui_compose::primitives::feedback::Alert;
+        use cove_ui_compose::primitives::text::Text;
+        use cove_ui_compose::theme::styles::buttons::button_style::ButtonStyleViewExt;
+        use cove_ui_compose::theme::styles::buttons::SecondaryButtonStyle;
+        use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView};
+
+        use crate::gallery_content::stories::StorySection;
+
+        let enabled = self.options.is_enabled;
+        let toggle_label = self.toggle_label();
+        let visible = self.visible.clone();
+        let toggle = cove_ui_compose::primitives::controls::Button::title(toggle_label, move || {
+            visible.update(|value| *value = !*value);
+        })
+        .enabled(enabled)
+        .button_style(SecondaryButtonStyle);
+
+        // The retained subtree survives its exit animation.
+        let animated = self.content();
+        let section = StorySection::new(
+            "Animated visibility",
+            "The component retains the subtree through its exit animation and cleans up after settling.",
+            AnyView::new(BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                12.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(toggle),
+                    AnyView::new(animated),
+                    AnyView::new(
+                        Alert::new("Animated content")
+                            .message("Try toggling repeatedly during the transition.")
+                            .tone(cove_ui_compose::primitives::feedback::StatusTone::Success),
+                    ),
+                    AnyView::new(Text::new("Timing curves and the animation system are exercised by the sections below.")),
+                ])),
+            )),
+        );
+
+        AnyView::new(
+            BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                24.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(section),
+                    AnyView::new(crate::gallery_content::stories::AnimationCurveExamples::new(enabled)),
+                    AnyView::new(crate::gallery_content::stories::AnimationSystemExamples::new(enabled)),
+                ])),
+            )
+            .flex(0.0)
+            .debug_name("animation-story"),
+        )
+    }
+}
+
 /// Stands in for the Swift `Alert("Animated content", …)` inside the animated
 /// subtree; the alert widget is ported, the story only needs a body.
 struct AnimationDemoNote;

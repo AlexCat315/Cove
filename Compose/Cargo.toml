@@ -38,12 +38,24 @@ name = "adaptive_environment"
 path = "rust/tests/adaptive_environment.rs"
 
 [[test]]
+name = "adaptive_compact_label"
+path = "rust/tests/adaptive_compact_label.rs"
+
+[[test]]
+name = "adaptive_surface_root"
+path = "rust/tests/adaptive_surface_root.rs"
+
+[[test]]
 name = "appearance"
 path = "rust/tests/appearance.rs"
 
 [[test]]
 name = "bool_control_label"
 path = "rust/tests/bool_control_label.rs"
+
+[[test]]
+name = "bracket_matching"
+path = "rust/tests/bracket_matching.rs"
 
 [[test]]
 name = "color_glyph_resample"
@@ -62,12 +74,32 @@ name = "package_resource_bundle"
 path = "rust/tests/package_resource_bundle.rs"
 
 [[test]]
+name = "progress_animation"
+path = "rust/tests/progress_animation.rs"
+
+[[test]]
+name = "row_slot"
+path = "rust/tests/row_slot.rs"
+
+[[test]]
 name = "text_cache"
 path = "rust/tests/text_cache.rs"
 
 [[test]]
+name = "text_indent_guides"
+path = "rust/tests/text_indent_guides.rs"
+
+[[test]]
 name = "text_visual_line_index"
 path = "rust/tests/text_visual_line_index.rs"
+
+[[test]]
+name = "text_measure_slot"
+path = "rust/tests/text_measure_slot.rs"
+
+[[test]]
+name = "theme_paint_invalidation"
+path = "rust/tests/theme_paint_invalidation.rs"
 
 [[test]]
 name = "value_subtree"
