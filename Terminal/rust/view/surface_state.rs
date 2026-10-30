@@ -16,12 +16,12 @@ use cove_platform::TextInputArea;
 use std::{
     any::Any,
     cell::RefCell,
-    rc::{Rc, Weak},
+    rc::Rc,
 };
 
 pub struct SurfaceState {
     session: RefCell<Option<Rc<TerminalSession>>>,
-    node: RefCell<Weak<Node>>,
+    node: RefCell<cove_core::scene::NodeWeak>,
     /// Cell size of the last paint; input waits for it.
     metrics: RefCell<Option<CellMetrics>>,
     /// IME composition shown at the cursor until committed.
@@ -40,7 +40,7 @@ impl SurfaceState {
     pub fn new() -> Rc<Self> {
         Rc::new(Self {
             session: RefCell::new(None),
-            node: RefCell::new(Weak::new()),
+            node: RefCell::new(cove_core::scene::NodeWeak::new()),
             metrics: RefCell::new(None),
             preedit: RefCell::new(String::new()),
             hovered_link: RefCell::new(None),
@@ -58,7 +58,7 @@ impl SurfaceState {
     }
 
     pub fn node(&self) -> Option<Node> {
-        self.node.borrow().upgrade()
+        Node::upgrade(&self.node.borrow())
     }
 
     pub fn metrics(&self) -> Option<CellMetrics> {
@@ -103,7 +103,7 @@ impl SurfaceState {
         open(link);
     }
 
-    pub fn bind(&self, session: Rc<TerminalSession>) {
+    pub fn bind(self: &Rc<Self>, session: Rc<TerminalSession>) {
         if let Some(current) = self.session.borrow().as_ref()
             && Rc::ptr_eq(current, &session)
         {
@@ -199,7 +199,7 @@ impl Default for SurfaceState {
         // Only used through `new`, which returns the `Rc` the node needs.
         Self {
             session: RefCell::new(None),
-            node: RefCell::new(Weak::new()),
+            node: RefCell::new(cove_core::scene::NodeWeak::new()),
             metrics: RefCell::new(None),
             preedit: RefCell::new(String::new()),
             hovered_link: RefCell::new(None),
@@ -218,16 +218,18 @@ impl NodeResource for SurfaceState {
         *self.node.borrow_mut() = node.downgrade();
         self.blink.attach(AnimatorScheduler::current());
         self.text_blink.attach(AnimatorScheduler::current());
-        let redraw = Rc::downgrade(self);
+        // Blink toggles only need to invalidate the node they are mounted on, so
+        // they capture the node's weak link rather than the resource's identity.
+        let blink_node = node.downgrade();
         self.blink.set_on_toggle(Some(Rc::new(move || {
-            if let Some(state) = redraw.upgrade() {
-                state.redraw();
+            if let Some(node) = Node::upgrade(&blink_node) {
+                node.mark_render_dirty(InvalidationSource::style_set("terminal.blink"));
             }
         })));
-        let redraw = Rc::downgrade(self);
+        let text_node = node.downgrade();
         self.text_blink.set_on_toggle(Some(Rc::new(move || {
-            if let Some(state) = redraw.upgrade() {
-                state.redraw();
+            if let Some(node) = Node::upgrade(&text_node) {
+                node.mark_render_dirty(InvalidationSource::style_set("terminal.textBlink"));
             }
         })));
         self.redraw();
@@ -238,7 +240,7 @@ impl NodeResource for SurfaceState {
         self.blink.detach();
         self.text_blink.detach();
         self.textures.borrow_mut().remove_all();
-        *self.node.borrow_mut() = Weak::new();
+        *self.node.borrow_mut() = cove_core::scene::NodeWeak::new();
     }
 
     fn as_any_rc(self: Rc<Self>) -> Rc<dyn Any> {

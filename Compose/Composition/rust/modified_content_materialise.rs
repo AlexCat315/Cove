@@ -79,7 +79,7 @@ impl ModifiedContent {
 
 impl AnyModifiedContent for ModifiedContent {
     fn inherited_slot_key(&self) -> Option<NodeKey> {
-        if self.modifier().is_scope_applying() || self.modifier().is_around_applying() || has_structural_content(self.content_view()) {
+        if self.modifier_ref().is_scope_applying() || self.modifier_ref().is_around_applying() || has_structural_content(self.content_view()) {
             return None;
         }
         crate::view_graph::slot_key(self.content_view())
@@ -90,17 +90,17 @@ impl AnyModifiedContent for ModifiedContent {
         // during materialisation, not after, so descendants resolve against the
         // provided theme on first install. Wrap the content in a synthetic,
         // layout-transparent anchor and push the value onto it before recursing.
-        if self.modifier().is_scope_applying() {
+        if self.modifier_ref().is_scope_applying() {
             let anchor = Node::new();
             anchor.set_is_hit_testable(false);
             anchor.set_view_tag(Some(crate::view_graph::slot_tag(self)));
             parent.add_child(&anchor);
-            self.modifier().scope_apply(&anchor);
+            self.modifier_ref().scope_apply(&anchor);
             let _ = graph.materialise(self.content(), &anchor, layout_parent);
             return vec![anchor];
         }
 
-        if self.modifier().is_around_applying() {
+        if self.modifier_ref().is_around_applying() {
             let anchor = Node::new();
             anchor.set_is_hit_testable(false);
             anchor.set_view_tag(Some(crate::view_graph::slot_tag(self)));
@@ -110,7 +110,7 @@ impl AnyModifiedContent for ModifiedContent {
             let mut perform = move || {
                 let _ = graph.materialise(&content, &anchor_for_content, layout_parent);
             };
-            self.modifier().around_apply(&anchor, &mut perform);
+            self.modifier_ref().around_apply(&anchor, &mut perform);
             return vec![anchor];
         }
 
@@ -123,7 +123,7 @@ impl AnyModifiedContent for ModifiedContent {
             anchor.set_view_tag(Some(crate::view_graph::slot_tag(self)));
             parent.add_child(&anchor);
             let _ = graph.materialise(self.content(), &anchor, layout_parent);
-            apply_modifier(self.modifier(), &anchor, graph);
+            apply_modifier(self.modifier_ref(), &anchor, graph);
             return vec![anchor];
         }
 
@@ -133,7 +133,7 @@ impl AnyModifiedContent for ModifiedContent {
             // reconciler knows this slot carries a particular modifier
             // combination.
             node.set_view_tag(Some(crate::view_graph::slot_tag(self)));
-            apply_modifier(self.modifier(), node, graph);
+            apply_modifier(self.modifier_ref(), node, graph);
         }
         nodes
     }
@@ -141,7 +141,7 @@ impl AnyModifiedContent for ModifiedContent {
     fn update_in_place(&self, node: &Node, layout_parent: Option<&LayoutNode>, graph: &Rc<ViewGraph>) {
         // Mirror the materialise-time wrapping: scope-applying modifiers own a
         // synthetic anchor whose single child carries the wrapped content.
-        if self.modifier().is_scope_applying() {
+        if self.modifier_ref().is_scope_applying() {
             node.set_view_tag(Some(crate::view_graph::slot_tag(self)));
             ModifierReplay::reset(node);
             // The content must reconcile even when the provided value is
@@ -149,7 +149,7 @@ impl AnyModifiedContent for ModifiedContent {
             // closures and bindings into the owning scope's current state
             // storage). Skipping the recursion strands descendants on captures
             // of storage that `ViewScope::replace_view` has already swapped out.
-            let changed = self.modifier().scope_apply(node).unwrap_or(false);
+            let changed = self.modifier_ref().scope_apply(node).unwrap_or(false);
             let previous = graph.environment_reasons();
             if changed {
                 let mut reason = cove_core::scene::RecompositionReason::new("environment").with_detail("CompositionLocal");
@@ -165,7 +165,7 @@ impl AnyModifiedContent for ModifiedContent {
             return;
         }
 
-        if self.modifier().is_around_applying() {
+        if self.modifier_ref().is_around_applying() {
             node.set_view_tag(Some(crate::view_graph::slot_tag(self)));
             ModifierReplay::reset(node);
             let content = self.content().clone();
@@ -173,7 +173,7 @@ impl AnyModifiedContent for ModifiedContent {
             let mut perform = move || {
                 graph.reconcile_children(&parent, layout_parent, std::slice::from_ref(&content));
             };
-            self.modifier().around_apply(node, &mut perform);
+            self.modifier_ref().around_apply(node, &mut perform);
             return;
         }
 
@@ -181,7 +181,7 @@ impl AnyModifiedContent for ModifiedContent {
             ModifierReplay::reset(node);
             graph.reconcile_children(node, layout_parent, std::slice::from_ref(self.content()));
             node.set_view_tag(Some(crate::view_graph::slot_tag(self)));
-            apply_modifier(self.modifier(), node, graph);
+            apply_modifier(self.modifier_ref(), node, graph);
             return;
         }
 
@@ -189,6 +189,6 @@ impl AnyModifiedContent for ModifiedContent {
         // `update_node` runs and any deeper reconciliation happens.
         graph.update_in_place(node, self.content(), layout_parent);
         node.set_view_tag(Some(crate::view_graph::slot_tag(self)));
-        apply_modifier(self.modifier(), node, graph);
+        apply_modifier(self.modifier_ref(), node, graph);
     }
 }

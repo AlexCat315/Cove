@@ -9,7 +9,7 @@ use cove_core::Color;
 use crate::modifiers::layout::{FlexExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::theme::SemanticColorRef;
-use crate::{AnyView, Row, Spacer, TupleView, VerticalAlignment, View};
+use crate::{AnyView, Row, Spacer, TupleView, VerticalAlignment, View, ViewExt};
 
 use super::tree_row_style::{TreeRowStyle, TreeRowStyleConfiguration};
 

@@ -7,9 +7,8 @@
 //! limit is what actually applies.
 
 use cove_platform::WindowId;
-use cove_runtime::Sdl3PlatformHost;
 use cove_text::TextCacheSnapshot;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -78,7 +77,7 @@ pub struct AppMemorySnapshot {
     pub shaping: Option<TextCacheSnapshot>,
     pub text_layout: Option<TextCacheSnapshot>,
     pub cached_image_bytes: usize,
-    pub windows: BTreeMap<WindowId, AppWindowMemorySnapshot>,
+    pub windows: HashMap<WindowId, AppWindowMemorySnapshot>,
 }
 
 /// Per-platform low-memory predicates.
@@ -255,38 +254,48 @@ impl MemoryPressureProbe {
     }
 }
 
-/// Polls pressure off the UI thread and enqueues a trim on the main thread.
+/// Polls pressure off the UI thread and signals the run loop on a transition.
 ///
-/// Only a transition to low memory enqueues work, so an already-trimmed process
-/// does not thrash. Every platform uses the same sampler; the difference is what
-/// [`platform_pressure::is_low`] reads.
+/// The shell host is confined to the application thread, so the sampler cannot
+/// hold it. The sampler only flips a shared flag; the host's own frame loop
+/// drains that flag with [`ApplicationMemoryPressure::take_pending_trim`] and
+/// runs the trim on the UI thread.
+///
+/// Only a transition to low memory raises the flag, so an already-trimmed
+/// process does not thrash. Every platform uses the same sampler; the difference
+/// is what [`platform_pressure::is_low`] reads.
 pub struct ApplicationMemoryPressure {
     stop: Arc<AtomicBool>,
+    pending: Arc<AtomicBool>,
     thread: Option<std::thread::JoinHandle<()>>,
 }
 
 impl ApplicationMemoryPressure {
-    pub fn new(host: Sdl3PlatformHost, trim: impl Fn() + Send + 'static) -> Self {
+    pub fn new() -> Self {
         platform_pressure::subscribe();
         let stop = Arc::new(AtomicBool::new(false));
+        let pending = Arc::new(AtomicBool::new(false));
         let thread_stop = stop.clone();
-        let trim = Arc::new(trim);
+        let thread_pending = pending.clone();
         let thread = std::thread::Builder::new()
             .name("cove-memory-pressure".to_owned())
             .spawn(move || {
                 let mut probe = MemoryPressureProbe::new();
                 while !thread_stop.load(Ordering::Relaxed) {
                     if probe.changed_to_low_memory() {
-                        let host = host.clone();
-                        let trim = trim.clone();
-                        host.enqueue_main_thread_work(move || trim());
+                        thread_pending.store(true, Ordering::Relaxed);
                     }
                     std::thread::sleep(std::time::Duration::from_secs(2));
                 }
                 probe.close();
             })
             .ok();
-        Self { stop, thread }
+        Self { stop, pending, thread }
+    }
+
+    /// Consumes a raised pressure flag. The caller runs the trim on the UI thread.
+    pub fn take_pending_trim(&self) -> bool {
+        self.pending.swap(false, Ordering::Relaxed)
     }
 
     pub fn stop(&mut self) {
@@ -295,6 +304,12 @@ impl ApplicationMemoryPressure {
             let _ = thread.join();
         }
         platform_pressure::unsubscribe();
+    }
+}
+
+impl Default for ApplicationMemoryPressure {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

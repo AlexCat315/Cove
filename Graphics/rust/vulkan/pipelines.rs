@@ -393,299 +393,210 @@ pub fn unregister_binding_set(
     };
 }
 
-// MARK: - Shader stages
+// MARK: - Specialization storage
 
-/// Builds one pipeline shader stage, including its specialization map.
-fn shader_stage(
-    registries: &VulkanRegistries,
-    module_handle: crate::rhi::ShaderModule,
-    entry_point_storage: &mut Vec<core::ffi::CString>,
-) -> RhiResult<(sys::VkPipelineShaderStageCreateInfo, Option<sys::VkSpecializationInfo>, Vec<u32>)> {
-    let module = registries
-        .shader_modules
-        .get(&module_handle.id())
-        .ok_or_else(|| RhiError::invalid_argument("unknown shader module"))?;
-    let entry_point = core::ffi::CString::new(module.entry_point.as_str())
-        .map_err(|_| RhiError::invalid_argument("shader entry point contains a NUL byte"))?;
-    let mut stage = sys::VkPipelineShaderStageCreateInfo {
-        sType: sys::VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-        pNext: core::ptr::null(),
-        flags: 0,
-        stage: formats::vk_stage_flags(module.stage),
-        module: module.module,
-        pName: entry_point.as_ptr(),
-        pSpecializationInfo: core::ptr::null(),
-    };
-    entry_point_storage.push(entry_point);
-
-    if module.specialization_constants.is_empty() {
-        return Ok((stage, None, Vec::new()));
-    }
-    // The map entries and the packed data must both outlive pipeline creation, so
-    // they are returned to the caller instead of pointing into temporaries here.
-    let bits: Vec<u32> =
-        module.specialization_constants.iter().map(|constant| constant.value.bits()).collect();
-    let _ = &mut stage;
-    Ok((stage, None, bits))
-}
-
-/// Owns the specialization storage a pipeline creation needs.
+/// Owns the specialization map a pipeline stage points at. The vectors must not
+/// move after `info` captures their addresses, so this value is created once and
+/// kept alive next to the stage that references it.
 struct SpecializationStorage {
     entries: Vec<sys::VkSpecializationMapEntry>,
     data: Vec<u32>,
     info: sys::VkSpecializationInfo,
 }
 
-fn specialization_storage(registries: &VulkanRegistries, module_handle: crate::rhi::ShaderModule) -> Option<SpecializationStorage> {
-    let module = registries.shader_modules.get(&module_handle.id())?;
-    if module.specialization_constants.is_empty() {
-        return None;
-    }
-    let entries: Vec<sys::VkSpecializationMapEntry> = module
-        .specialization_constants
-        .iter()
-        .enumerate()
-        .map(|(index, constant)| sys::VkSpecializationMapEntry {
-            constantID: constant.id,
-            offset: (index * 4) as u32,
-            size: 4,
-        })
-        .collect();
-    let data: Vec<u32> =
-        module.specialization_constants.iter().map(|constant| constant.value.bits()).collect();
-    let info = sys::VkSpecializationInfo {
-        mapEntryCount: entries.len() as u32,
-        pMapEntries: entries.as_ptr(),
-        dataSize: data.len() * 4,
-        pData: data.as_ptr().cast(),
-    };
-    Some(SpecializationStorage { entries, data, info })
-}
-
-// MARK: - Compute pipelines
-
-pub fn create_compute_pipeline(
-    context: &VulkanContext,
-    registries: &Arc<Mutex<VulkanRegistries>>,
-    handle: ComputePipeline,
-    descriptor: ComputePipelineDescriptor,
-) -> RhiResult<()> {
-    prepare_compute_compilation(context, registries, handle, descriptor)?.run_and_install()
-}
-
-pub fn prepare_compute_compilation(
-    context: &VulkanContext,
-    registries: &Arc<Mutex<VulkanRegistries>>,
-    handle: ComputePipeline,
-    descriptor: ComputePipelineDescriptor,
-) -> RhiResult<RhiCompilationWork> {
-    let (stage, layout_native, spec) = {
-        let registries = lock(registries);
-        let module = registries
-            .shader_modules
-            .get(&descriptor.shader.id())
-            .filter(|module| module.stage == crate::rhi::ShaderStage::Compute)
-            .ok_or_else(|| {
-                RhiError::invalid_argument("unknown compute shader or pipeline layout")
-            })?;
-        let layout = registries
-            .pipeline_layouts
-            .get(&descriptor.layout.id())
-            .ok_or_else(|| RhiError::invalid_argument("unknown compute shader or pipeline layout"))?;
-        let mut entry_storage = Vec::new();
-        let (mut stage, _, _) = shader_stage(&registries, descriptor.shader, &mut entry_storage)?;
-        let spec = specialization_storage(&registries, descriptor.shader);
-        if let Some(spec) = &spec {
-            stage.pSpecializationInfo = &spec.info;
+impl SpecializationStorage {
+    fn build(registries: &VulkanRegistries, handle: crate::rhi::ShaderModule) -> Option<Self> {
+        let record = registries.shader_modules.get(&handle.id())?;
+        if record.specialization_constants.is_empty() {
+            return None;
         }
-        // The entry point string must stay alive until creation; `entry_storage`
-        // is dropped at the end of this block, so the name is leaked into a
-        // `CString` owned by the compilation instead.
-        let entry_name = core::ffi::CString::new(
-            module.entry_point.as_str(),
-        )
-        .map_err(|_| RhiError::invalid_argument("shader entry point contains a NUL byte"))?;
-        let _ = entry_storage;
-        (stage, layout.native, (spec, entry_name))
-    };
-    let (spec, entry_name) = spec;
-    let mut stage = stage;
-    stage.pName = entry_name.as_ptr();
-    if let Some(spec) = &spec {
-        stage.pSpecializationInfo = &spec.info;
-    }
-
-    let create_info = sys::VkComputePipelineCreateInfo {
-        sType: sys::VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-        pNext: core::ptr::null(),
-        flags: 0,
-        stage,
-        layout: layout_native,
-        basePipelineHandle: sys::VK_NULL_HANDLE,
-        basePipelineIndex: -1,
-    };
-
-    // Move everything the closure needs so the pointer targets outlive it.
-    let device = context.device;
-    let create = context.resources.create_compute_pipelines;
-    let destroy = context.resources.destroy_pipeline;
-    let shared = Arc::clone(registries);
-    let id = handle.id();
-    Ok(RhiCompilationWork::new(move || {
-        let mut pipeline: sys::VkPipeline = sys::VK_NULL_HANDLE;
-        // SAFETY: `create_info` and the entry-point/specialization storage it
-        // points at are moved into this closure, so they are live for the call.
-        let status = unsafe {
-            (create)(device, sys::VK_NULL_HANDLE, 1, &create_info, core::ptr::null(), &mut pipeline)
+        let entries: Vec<sys::VkSpecializationMapEntry> = record
+            .specialization_constants
+            .iter()
+            .enumerate()
+            .map(|(index, constant)| sys::VkSpecializationMapEntry {
+                constantID: constant.id,
+                offset: (index * 4) as u32,
+                size: 4,
+            })
+            .collect();
+        let data: Vec<u32> =
+            record.specialization_constants.iter().map(|constant| constant.value.bits()).collect();
+        let info = sys::VkSpecializationInfo {
+            mapEntryCount: entries.len() as u32,
+            pMapEntries: entries.as_ptr(),
+            dataSize: data.len() * 4,
+            pData: data.as_ptr().cast(),
         };
-        if status != sys::VK_SUCCESS || pipeline == sys::VK_NULL_HANDLE {
-            return Err(RhiError::invalid_argument("Vulkan compute pipeline failed"));
-        }
-        let shared_publish = Arc::clone(&shared);
-        Ok(RhiCompiledObject::new(
-            move || {
-                lock(&shared_publish).compute_pipelines.insert(
-                    id,
-                    VulkanComputePipelineRecord { pipeline, descriptor },
-                );
-            },
-            // SAFETY: the pipeline was created above and is only destroyed when
-            // this object is dropped without being installed.
-            move || unsafe { (destroy)(device, pipeline, core::ptr::null()) },
-        ))
-    }))
-}
-
-pub fn destroy_compute_pipeline(
-    context: &VulkanContext,
-    registries: &Arc<Mutex<VulkanRegistries>>,
-    handle: ComputePipeline,
-) {
-    let Some(record) = lock(registries).compute_pipelines.remove(&handle.id()) else { return };
-    // SAFETY: the frame ring waited for every submission that could use it.
-    unsafe {
-        (context.resources.destroy_pipeline)(context.device, record.pipeline, core::ptr::null());
+        Some(Self { entries, data, info })
     }
 }
 
-// MARK: - Graphics pipelines
-
-pub fn create_graphics_pipeline(
-    context: &VulkanContext,
-    registries: &Arc<Mutex<VulkanRegistries>>,
-    handle: GraphicsPipeline,
-    descriptor: GraphicsPipelineDescriptor,
-) -> RhiResult<()> {
-    prepare_graphics_compilation(context, registries, handle, descriptor)?.run_and_install()
+/// A pipeline's stage list together with the strings and constant storage the
+/// stages point at, so the whole group can be moved into a compilation closure.
+struct StageGroup {
+    stages: Vec<sys::VkPipelineShaderStageCreateInfo>,
+    entry_points: Vec<std::ffi::CString>,
+    specializations: Vec<Option<SpecializationStorage>>,
 }
 
-pub fn prepare_graphics_compilation(
-    context: &VulkanContext,
-    registries: &Arc<Mutex<VulkanRegistries>>,
-    handle: GraphicsPipeline,
-    descriptor: GraphicsPipelineDescriptor,
-) -> RhiResult<RhiCompilationWork> {
-    rhi_require(
-        descriptor.color_attachments.len() <= 8,
-        "at most eight color attachments are supported",
-    )?;
-    rhi_require(
-        !(descriptor.rasterization.fill_mode == crate::rhi::FillMode::Lines
-            && !context.features.non_solid_fill),
-        "Vulkan non-solid fill is unsupported",
-    )?;
-
-    // Snapshot every input the closure needs; nothing here holds the lock.
-    let (layout_native, stages, spec_storage, entry_names) = {
-        let registries = lock(registries);
-        let layout = registries
-            .pipeline_layouts
-            .get(&descriptor.layout.id())
-            .ok_or_else(|| RhiError::invalid_argument("unknown graphics shader or pipeline layout"))?;
-        registries
-            .shader_modules
-            .get(&descriptor.vertex.id())
-            .filter(|module| module.stage == crate::rhi::ShaderStage::Vertex)
-            .ok_or_else(|| {
-                RhiError::invalid_argument("unknown graphics shader or pipeline layout")
-            })?;
-
-        let mut stages = Vec::new();
-        let mut names = Vec::new();
-        let mut specs = Vec::new();
-        for module_handle in [Some(descriptor.vertex), descriptor.fragment].into_iter().flatten() {
-            let module = registries.shader_modules.get(&module_handle.id()).ok_or_else(|| {
-                RhiError::invalid_argument("unknown graphics shader or pipeline layout")
-            })?;
-            let name = core::ffi::CString::new(module.entry_point.as_str())
+impl StageGroup {
+    fn build(
+        registries: &VulkanRegistries,
+        modules: &[(crate::rhi::ShaderModule, crate::rhi::ShaderStage)],
+    ) -> RhiResult<Self> {
+        let mut group = Self {
+            stages: Vec::with_capacity(modules.len()),
+            entry_points: Vec::with_capacity(modules.len()),
+            specializations: Vec::with_capacity(modules.len()),
+        };
+        for (handle, expected) in modules {
+            let record = registries
+                .shader_modules
+                .get(&handle.id())
+                .filter(|record| record.stage == *expected)
+                .ok_or_else(|| RhiError::invalid_argument("unknown shader module for its stage"))?;
+            let entry_point = std::ffi::CString::new(record.entry_point.as_str())
                 .map_err(|_| RhiError::invalid_argument("shader entry point contains a NUL byte"))?;
             let stage = sys::VkPipelineShaderStageCreateInfo {
                 sType: sys::VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
                 pNext: core::ptr::null(),
                 flags: 0,
-                stage: formats::vk_stage_flags(module.stage),
-                module: module.module,
-                pName: name.as_ptr(),
+                stage: formats::vk_stage_flags(record.stage),
+                module: record.module,
+                // Filled by `refresh` once the storage is in its final place.
+                pName: core::ptr::null(),
                 pSpecializationInfo: core::ptr::null(),
             };
-            names.push(name);
-            specs.push(specialization_storage(&registries, module_handle));
-            stages.push(stage);
+            group.entry_points.push(entry_point);
+            group.specializations.push(SpecializationStorage::build(registries, *handle));
+            group.stages.push(stage);
         }
-        (layout.native, stages, specs, names)
-    };
-    // Re-point the stage names/specialization at the storage that the closure now
-    // owns, so the pointers stay valid after the registry lock is released.
-    let mut stages = stages;
-    for (index, stage) in stages.iter_mut().enumerate() {
-        stage.pName = entry_names[index].as_ptr();
-        if let Some(spec) = &spec_storage[index] {
-            stage.pSpecializationInfo = &spec.info;
-        }
+        group.refresh();
+        Ok(group)
     }
-    let entry_names = entry_names;
-    let spec_storage = spec_storage;
 
-    // Vertex input.
-    let mut vertex_bindings: Vec<sys::VkVertexInputBindingDescription> = Vec::new();
-    let mut vertex_attributes: Vec<sys::VkVertexInputAttributeDescription> = Vec::new();
-    if let Some(layout) = &descriptor.vertex_layout {
-        rhi_require(
-            layout.attributes.len() <= 32 && layout.buffer_layouts.len() <= 8,
-            "vertex input capacity exceeded",
-        )?;
-        for (index, buffer_layout) in layout.buffer_layouts.iter().enumerate() {
-            rhi_require(buffer_layout.stride > 0, "vertex strides must be positive")?;
-            vertex_bindings.push(sys::VkVertexInputBindingDescription {
-                binding: index as u32,
-                stride: buffer_layout.stride as u32,
-                inputRate: match buffer_layout.step_rate {
-                    crate::rhi::VertexInputRate::PerInstance => sys::VK_VERTEX_INPUT_RATE_INSTANCE,
-                    crate::rhi::VertexInputRate::PerVertex => sys::VK_VERTEX_INPUT_RATE_VERTEX,
-                },
-            });
-        }
-        for attribute in &layout.attributes {
-            rhi_require(
-                (attribute.buffer_index as usize) < layout.buffer_layouts.len(),
-                "vertex attribute references an invalid buffer or offset",
-            )?;
-            vertex_attributes.push(sys::VkVertexInputAttributeDescription {
-                location: attribute.location,
-                binding: attribute.buffer_index,
-                format: formats::vk_vertex_format(attribute.format),
-                offset: attribute.offset as u32,
-            });
+    /// Re-points every stage at this group's own storage. Called after construction
+    /// and again after the group is moved into a closure.
+    fn refresh(&mut self) {
+        for (index, stage) in self.stages.iter_mut().enumerate() {
+            stage.pName = self.entry_points[index].as_ptr();
+            stage.pSpecializationInfo = match &self.specializations[index] {
+                Some(spec) => &spec.info,
+                None => core::ptr::null(),
+            };
         }
     }
+
+    fn contains_mesh_stage(&self) -> bool {
+        self.stages.iter().any(|stage| stage.stage == sys::VK_SHADER_STAGE_MESH_BIT_EXT)
+    }
+}
+
+/// Every fixed-function state block, held together with the arrays they point at
+/// so one owner keeps all the pointers valid.
+struct FixedFunctionState {
+    vertex_bindings: Vec<sys::VkVertexInputBindingDescription>,
+    vertex_attributes: Vec<sys::VkVertexInputAttributeDescription>,
+    blend_attachments: Vec<sys::VkPipelineColorBlendAttachmentState>,
+    dynamic_states: [u32; 2],
+}
+
+impl FixedFunctionState {
+    fn build(descriptor: &GraphicsPipelineDescriptor) -> RhiResult<Self> {
+        let mut vertex_bindings = Vec::new();
+        let mut vertex_attributes = Vec::new();
+        if let Some(layout) = &descriptor.vertex_layout {
+            rhi_require(
+                layout.attributes.len() <= 32 && layout.buffer_layouts.len() <= 8,
+                "vertex input capacity exceeded",
+            )?;
+            for (index, buffer_layout) in layout.buffer_layouts.iter().enumerate() {
+                rhi_require(buffer_layout.stride > 0, "vertex strides must be positive")?;
+                vertex_bindings.push(sys::VkVertexInputBindingDescription {
+                    binding: index as u32,
+                    stride: buffer_layout.stride as u32,
+                    inputRate: match buffer_layout.step_rate {
+                        crate::rhi::VertexInputRate::PerInstance => sys::VK_VERTEX_INPUT_RATE_INSTANCE,
+                        crate::rhi::VertexInputRate::PerVertex => sys::VK_VERTEX_INPUT_RATE_VERTEX,
+                    },
+                });
+            }
+            for attribute in &layout.attributes {
+                rhi_require(
+                    (attribute.buffer_index as usize) < layout.buffer_layouts.len(),
+                    "vertex attribute references an invalid buffer or offset",
+                )?;
+                vertex_attributes.push(sys::VkVertexInputAttributeDescription {
+                    location: attribute.location,
+                    binding: attribute.buffer_index,
+                    format: formats::vk_vertex_format(attribute.format),
+                    offset: attribute.offset as u32,
+                });
+            }
+        }
+        let blend_attachments = descriptor
+            .color_attachments
+            .iter()
+            .map(|attachment| sys::VkPipelineColorBlendAttachmentState {
+                blendEnable: u32::from(attachment.blend.enabled),
+                srcColorBlendFactor: formats::vk_blend_factor(
+                    attachment.blend.source_color_blend_factor,
+                ),
+                dstColorBlendFactor: formats::vk_blend_factor(
+                    attachment.blend.destination_color_blend_factor,
+                ),
+                colorBlendOp: formats::vk_blend_op(attachment.blend.color_blend_operation),
+                srcAlphaBlendFactor: formats::vk_blend_factor(
+                    attachment.blend.source_alpha_blend_factor,
+                ),
+                dstAlphaBlendFactor: formats::vk_blend_factor(
+                    attachment.blend.destination_alpha_blend_factor,
+                ),
+                alphaBlendOp: formats::vk_blend_op(attachment.blend.alpha_blend_operation),
+                colorWriteMask: sys::VK_COLOR_COMPONENT_ALL,
+            })
+            .collect();
+        Ok(Self {
+            vertex_bindings,
+            vertex_attributes,
+            blend_attachments,
+            dynamic_states: [sys::VK_DYNAMIC_STATE_VIEWPORT, sys::VK_DYNAMIC_STATE_SCISSOR],
+        })
+    }
+}
+
+/// Creates one graphics pipeline. All state lives in this function's frame, which
+/// is exactly the lifetime Vulkan requires: it copies the create-info before
+/// returning.
+fn create_graphics_pipeline_native(
+    device: sys::VkDevice,
+    create_graphics_pipelines: sys::PFN_vkCreateGraphicsPipelines,
+    rendering: super::rendering::RenderingHandles,
+    descriptor: &GraphicsPipelineDescriptor,
+    stages: &StageGroup,
+    layout: sys::VkPipelineLayout,
+) -> RhiResult<(sys::VkPipeline, super::rendering::RenderPassObjects)> {
+    let state = FixedFunctionState::build(descriptor)?;
+    let mut render_objects = super::rendering::RenderPassObjects::new(rendering);
+    let render_pass = render_objects.pipeline_pass(descriptor)?;
+
+    let raw_stages: Vec<sys::VkPipelineShaderStageCreateInfo> = stages
+        .stages
+        .iter()
+        // Copied by value: the stage already points at `stages`'s own storage,
+        // which outlives this call.
+        .copied()
+        .collect();
+
     let vertex_input = sys::VkVertexInputStateCreateInfo {
         sType: sys::VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
         pNext: core::ptr::null(),
         flags: 0,
-        vertexBindingDescriptionCount: vertex_bindings.len() as u32,
-        pVertexBindingDescriptions: vertex_bindings.as_ptr(),
-        vertexAttributeDescriptionCount: vertex_attributes.len() as u32,
-        pVertexAttributeDescriptions: vertex_attributes.as_ptr(),
+        vertexBindingDescriptionCount: state.vertex_bindings.len() as u32,
+        pVertexBindingDescriptions: state.vertex_bindings.as_ptr(),
+        vertexAttributeDescriptionCount: state.vertex_attributes.len() as u32,
+        pVertexAttributeDescriptions: state.vertex_attributes.as_ptr(),
     };
     let assembly = sys::VkInputAssemblyStateCreateInfo {
         sType: sys::VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
@@ -734,144 +645,243 @@ pub fn prepare_graphics_compilation(
         alphaToCoverageEnable: sys::VK_FALSE,
         alphaToOneEnable: sys::VK_FALSE,
     };
-    let depth = match (descriptor.depth_stencil, descriptor.depth_format) {
-        (Some(state), Some(_)) => sys::VkPipelineDepthStencilStateCreateInfo {
-            sType: sys::VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-            pNext: core::ptr::null(),
-            flags: 0,
-            depthTestEnable: sys::VK_TRUE,
-            depthWriteEnable: u32::from(state.depth_write_enabled),
-            depthCompareOp: formats::vk_compare_op(state.depth_compare),
-            depthBoundsTestEnable: sys::VK_FALSE,
-            stencilTestEnable: sys::VK_FALSE,
-            front: sys::VkStencilOpState::default(),
-            back: sys::VkStencilOpState::default(),
-            minDepthBounds: 0.0,
-            maxDepthBounds: 1.0,
-        },
-        _ => sys::VkPipelineDepthStencilStateCreateInfo {
-            sType: sys::VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-            pNext: core::ptr::null(),
-            flags: 0,
-            depthTestEnable: sys::VK_FALSE,
-            depthWriteEnable: sys::VK_FALSE,
-            depthCompareOp: sys::VK_COMPARE_OP_ALWAYS,
-            depthBoundsTestEnable: sys::VK_FALSE,
-            stencilTestEnable: sys::VK_FALSE,
-            front: sys::VkStencilOpState::default(),
-            back: sys::VkStencilOpState::default(),
-            minDepthBounds: 0.0,
-            maxDepthBounds: 1.0,
-        },
+    let mut depth = sys::VkPipelineDepthStencilStateCreateInfo {
+        sType: sys::VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+        pNext: core::ptr::null(),
+        flags: 0,
+        depthTestEnable: sys::VK_FALSE,
+        depthWriteEnable: sys::VK_FALSE,
+        depthCompareOp: sys::VK_COMPARE_OP_ALWAYS,
+        depthBoundsTestEnable: sys::VK_FALSE,
+        stencilTestEnable: sys::VK_FALSE,
+        front: sys::VkStencilOpState::default(),
+        back: sys::VkStencilOpState::default(),
+        minDepthBounds: 0.0,
+        maxDepthBounds: 1.0,
     };
-    let blend_attachments: Vec<sys::VkPipelineColorBlendAttachmentState> = descriptor
-        .color_attachments
-        .iter()
-        .map(|attachment| sys::VkPipelineColorBlendAttachmentState {
-            blendEnable: u32::from(attachment.blend.enabled),
-            srcColorBlendFactor: formats::vk_blend_factor(attachment.blend.source_color_blend_factor),
-            dstColorBlendFactor: formats::vk_blend_factor(
-                attachment.blend.destination_color_blend_factor,
-            ),
-            colorBlendOp: formats::vk_blend_op(attachment.blend.color_blend_operation),
-            srcAlphaBlendFactor: formats::vk_blend_factor(attachment.blend.source_alpha_blend_factor),
-            dstAlphaBlendFactor: formats::vk_blend_factor(
-                attachment.blend.destination_alpha_blend_factor,
-            ),
-            alphaBlendOp: formats::vk_blend_op(attachment.blend.alpha_blend_operation),
-            colorWriteMask: sys::VK_COLOR_COMPONENT_ALL,
-        })
-        .collect();
+    if let (Some(state), true) = (descriptor.depth_stencil, descriptor.depth_format.is_some()) {
+        depth.depthTestEnable = sys::VK_TRUE;
+        depth.depthWriteEnable = u32::from(state.depth_write_enabled);
+        depth.depthCompareOp = formats::vk_compare_op(state.depth_compare);
+    }
     let blend = sys::VkPipelineColorBlendStateCreateInfo {
         sType: sys::VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
         pNext: core::ptr::null(),
         flags: 0,
         logicOpEnable: sys::VK_FALSE,
         logicOp: 0,
-        attachmentCount: blend_attachments.len() as u32,
-        pAttachments: blend_attachments.as_ptr(),
+        attachmentCount: state.blend_attachments.len() as u32,
+        pAttachments: state.blend_attachments.as_ptr(),
         blendConstants: [0.0; 4],
     };
-    let dynamic_states = [sys::VK_DYNAMIC_STATE_VIEWPORT, sys::VK_DYNAMIC_STATE_SCISSOR];
     let dynamic = sys::VkPipelineDynamicStateCreateInfo {
         sType: sys::VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
         pNext: core::ptr::null(),
         flags: 0,
-        dynamicStateCount: dynamic_states.len() as u32,
-        pDynamicStates: dynamic_states.as_ptr(),
+        dynamicStateCount: state.dynamic_states.len() as u32,
+        pDynamicStates: state.dynamic_states.as_ptr(),
     };
 
-    // The pipeline is created off the render lock, but the render pass it targets
-    // must be created first, so both travel together.
+    // A mesh pipeline has no vertex input or input assembly state.
+    let is_mesh = stages.contains_mesh_stage();
+    let create_info = sys::VkGraphicsPipelineCreateInfo {
+        sType: sys::VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+        pNext: core::ptr::null(),
+        flags: 0,
+        stageCount: raw_stages.len() as u32,
+        pStages: raw_stages.as_ptr(),
+        pVertexInputState: if is_mesh { core::ptr::null() } else { &vertex_input },
+        pInputAssemblyState: if is_mesh { core::ptr::null() } else { &assembly },
+        pTessellationState: core::ptr::null(),
+        pViewportState: &viewport,
+        pRasterizationState: &raster,
+        pMultisampleState: &samples,
+        pDepthStencilState: &depth,
+        pColorBlendState: &blend,
+        pDynamicState: &dynamic,
+        layout,
+        renderPass: render_pass,
+        subpass: 0,
+        basePipelineHandle: sys::VK_NULL_HANDLE,
+        basePipelineIndex: -1,
+    };
+
+    let mut pipeline: sys::VkPipeline = sys::VK_NULL_HANDLE;
+    // SAFETY: every pointer in `create_info` refers to storage owned by this
+    // function's frame (or by `stages`, which outlives the call), and
+    // `render_pass` is alive until `render_objects` is returned.
+    let status = unsafe {
+        (create_graphics_pipelines)(
+            device,
+            sys::VK_NULL_HANDLE,
+            1,
+            &create_info,
+            core::ptr::null(),
+            &mut pipeline,
+        )
+    };
+    if status != sys::VK_SUCCESS || pipeline == sys::VK_NULL_HANDLE {
+        return Err(RhiError::invalid_argument("Vulkan graphics pipeline failed"));
+    }
+    // The pipeline keeps its own reference to the render pass, so the pass objects
+    // are released here; the driver's pipeline object no longer needs them.
+    Ok((pipeline, render_objects))
+}
+
+// MARK: - Compute pipelines
+
+pub fn create_compute_pipeline(
+    context: &VulkanContext,
+    registries: &Arc<Mutex<VulkanRegistries>>,
+    handle: ComputePipeline,
+    descriptor: ComputePipelineDescriptor,
+) -> RhiResult<()> {
+    prepare_compute_compilation(context, registries, handle, descriptor)?.run_and_install()
+}
+
+pub fn prepare_compute_compilation(
+    context: &VulkanContext,
+    registries: &Arc<Mutex<VulkanRegistries>>,
+    handle: ComputePipeline,
+    descriptor: ComputePipelineDescriptor,
+) -> RhiResult<RhiCompilationWork> {
+    let (group, layout_native) = {
+        let registries = lock(registries);
+        let layout = registries
+            .pipeline_layouts
+            .get(&descriptor.layout.id())
+            .ok_or_else(|| RhiError::invalid_argument("unknown compute shader or pipeline layout"))?;
+        let group = StageGroup::build(
+            &registries,
+            &[(descriptor.shader, crate::rhi::ShaderStage::Compute)],
+        )?;
+        (group, layout.native)
+    };
+
     let device = context.device;
-    let create = context.resources.create_graphics_pipelines;
+    let create = context.resources.create_compute_pipelines;
     let destroy = context.resources.destroy_pipeline;
     let shared = Arc::clone(registries);
     let id = handle.id();
-    let context_handles = (
-        context.instance_commands,
-        context.device,
-        context.physical_device,
-        context.resources,
-        context.rendering_handles(),
-    );
     Ok(RhiCompilationWork::new(move || {
-        let render_objects = super::rendering::RenderPassObjects::new(context_handles);
-        let render_pass = render_objects.pipeline_pass(&descriptor)?;
-
-        // Stage names and specialization pointers refer to the moved vectors
-        // below, so re-point them here, inside the closure that owns them.
-        let mut stages = stages;
-        for (index, stage) in stages.iter_mut().enumerate() {
-            stage.pName = entry_names[index].as_ptr();
-            if let Some(spec) = &spec_storage[index] {
-                stage.pSpecializationInfo = &spec.info;
-            }
-        }
-
-        let is_mesh = stages
-            .iter()
-            .any(|stage| stage.stage == sys::VK_SHADER_STAGE_MESH_BIT_EXT);
-        let create_info = sys::VkGraphicsPipelineCreateInfo {
-            sType: sys::VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+        let mut group = group;
+        // Re-point the stage at the storage this closure now owns.
+        group.refresh();
+        let create_info = sys::VkComputePipelineCreateInfo {
+            sType: sys::VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
             pNext: core::ptr::null(),
             flags: 0,
-            stageCount: stages.len() as u32,
-            pStages: stages.as_ptr(),
-            // A mesh pipeline has no vertex input or input assembly state.
-            pVertexInputState: if is_mesh { core::ptr::null() } else { &vertex_input },
-            pInputAssemblyState: if is_mesh { core::ptr::null() } else { &assembly },
-            pTessellationState: core::ptr::null(),
-            pViewportState: &viewport,
-            pRasterizationState: &raster,
-            pMultisampleState: &samples,
-            pDepthStencilState: &depth,
-            pColorBlendState: &blend,
-            pDynamicState: &dynamic,
+            stage: group.stages[0],
             layout: layout_native,
-            renderPass: render_pass,
-            subpass: 0,
             basePipelineHandle: sys::VK_NULL_HANDLE,
             basePipelineIndex: -1,
         };
-
         let mut pipeline: sys::VkPipeline = sys::VK_NULL_HANDLE;
-        // SAFETY: every pointer in `create_info` refers to a local or a moved
-        // vector that lives until the end of this closure, and `render_pass` is
-        // alive for the whole call.
+        // SAFETY: `create_info` and the stage storage it points at live in this
+        // closure's frame for the whole call.
         let status = unsafe {
-            (create)(device, sys::VK_NULL_HANDLE, 1, &create_info, core::ptr::null(), &mut pipeline)
+            (create)(
+                device,
+                sys::VK_NULL_HANDLE,
+                1,
+                &create_info,
+                core::ptr::null(),
+                &mut pipeline,
+            )
         };
         if status != sys::VK_SUCCESS || pipeline == sys::VK_NULL_HANDLE {
-            return Err(RhiError::invalid_argument("Vulkan graphics pipeline failed"));
+            return Err(RhiError::invalid_argument("Vulkan compute pipeline failed"));
         }
         let shared_publish = Arc::clone(&shared);
         Ok(RhiCompiledObject::new(
             move || {
-                lock(&shared_publish).graphics_pipelines.insert(
-                    id,
-                    VulkanGraphicsPipelineRecord { pipeline, descriptor },
-                );
+                lock(&shared_publish)
+                    .compute_pipelines
+                    .insert(id, VulkanComputePipelineRecord { pipeline, descriptor });
+            },
+            // SAFETY: the pipeline was created above and is only destroyed when
+            // this object is dropped without being installed.
+            move || unsafe { (destroy)(device, pipeline, core::ptr::null()) },
+        ))
+    }))
+}
+
+pub fn destroy_compute_pipeline(
+    context: &VulkanContext,
+    registries: &Arc<Mutex<VulkanRegistries>>,
+    handle: ComputePipeline,
+) {
+    let Some(record) = lock(registries).compute_pipelines.remove(&handle.id()) else { return };
+    // SAFETY: the frame ring waited for every submission that could use it.
+    unsafe {
+        (context.resources.destroy_pipeline)(context.device, record.pipeline, core::ptr::null());
+    }
+}
+
+// MARK: - Graphics pipelines
+
+pub fn create_graphics_pipeline(
+    context: &VulkanContext,
+    registries: &Arc<Mutex<VulkanRegistries>>,
+    handle: GraphicsPipeline,
+    descriptor: GraphicsPipelineDescriptor,
+) -> RhiResult<()> {
+    prepare_graphics_compilation(context, registries, handle, descriptor)?.run_and_install()
+}
+
+pub fn prepare_graphics_compilation(
+    context: &VulkanContext,
+    registries: &Arc<Mutex<VulkanRegistries>>,
+    handle: GraphicsPipeline,
+    descriptor: GraphicsPipelineDescriptor,
+) -> RhiResult<RhiCompilationWork> {
+    rhi_require(
+        descriptor.color_attachments.len() <= 8,
+        "at most eight color attachments are supported",
+    )?;
+    rhi_require(
+        !(descriptor.rasterization.fill_mode == crate::rhi::FillMode::Lines
+            && !context.features.non_solid_fill),
+        "Vulkan non-solid fill is unsupported",
+    )?;
+
+    let (group, layout_native) = {
+        let registries = lock(registries);
+        let layout = registries.pipeline_layouts.get(&descriptor.layout.id()).ok_or_else(|| {
+            RhiError::invalid_argument("unknown graphics shader or pipeline layout")
+        })?;
+        let mut modules = vec![(descriptor.vertex, crate::rhi::ShaderStage::Vertex)];
+        if let Some(fragment) = descriptor.fragment {
+            modules.push((fragment, crate::rhi::ShaderStage::Fragment));
+        }
+        let group = StageGroup::build(&registries, &modules)?;
+        (group, layout.native)
+    };
+
+    let shared = Arc::clone(registries);
+    let id = handle.id();
+    let device = context.device;
+    let create = context.resources.create_graphics_pipelines;
+    let destroy = context.resources.destroy_pipeline;
+    let rendering = context.rendering_handles();
+    Ok(RhiCompilationWork::new(move || {
+        let mut group = group;
+        group.refresh();
+        let (pipeline, render_objects) = create_graphics_pipeline_native(
+            device,
+            create,
+            rendering,
+            &descriptor,
+            &group,
+            layout_native,
+        )?;
+        drop(render_objects);
+        let shared_publish = Arc::clone(&shared);
+        Ok(RhiCompiledObject::new(
+            move || {
+                lock(&shared_publish)
+                    .graphics_pipelines
+                    .insert(id, VulkanGraphicsPipelineRecord { pipeline, descriptor });
             },
             // SAFETY: the pipeline was created above and is only destroyed when
             // this object is dropped without being installed.
@@ -909,29 +919,61 @@ pub fn prepare_mesh_compilation(
     handle: MeshPipeline,
     descriptor: MeshPipelineDescriptor,
 ) -> RhiResult<RhiCompilationWork> {
-    rhi_require(context.features.mesh, "Vulkan mesh shader unavailable or invalid layout")?;
-    let graphics_descriptor = mesh_graphics_descriptor(&descriptor);
-    prepare_graphics_compilation(context, registries, GraphicsPipeline::new(0), graphics_descriptor.clone())
-        .map_err(|error| match error {
-            RhiError::InvalidArgument(detail) if detail.contains("unknown graphics shader") => {
-                RhiError::unsupported_feature("Vulkan mesh shader unavailable or invalid layout")
-            }
-            other => other,
-        })
-        .and_then(|work| {
-            // Reuse the graphics path, but publish into the mesh registry.
-            let _ = (&work, handle);
-            Err(RhiError::unsupported_feature(
-                "mesh pipeline publication follows the graphics path",
-            ))
-        })
+    rhi_require(context.features.mesh, "Vulkan mesh shader unavailable")?;
+    rhi_require(
+        descriptor.task.is_none() || context.features.task,
+        "Vulkan task shader unavailable",
+    )?;
+
+    let (group, layout_native) = {
+        let registries = lock(registries);
+        let layout = registries.pipeline_layouts.get(&descriptor.layout.id()).ok_or_else(|| {
+            RhiError::unsupported_feature("Vulkan mesh shader unavailable or invalid layout")
+        })?;
+        let mut modules = vec![(descriptor.mesh, crate::rhi::ShaderStage::Mesh)];
+        if let Some(task) = descriptor.task {
+            modules.push((task, crate::rhi::ShaderStage::Task));
+        }
+        if let Some(fragment) = descriptor.fragment {
+            modules.push((fragment, crate::rhi::ShaderStage::Fragment));
+        }
+        let group = StageGroup::build(&registries, &modules)?;
+        (group, layout.native)
+    };
+
+    let graphics = mesh_graphics_descriptor(&descriptor);
+    let shared = Arc::clone(registries);
+    let id = handle.id();
+    let device = context.device;
+    let create = context.resources.create_graphics_pipelines;
+    let destroy = context.resources.destroy_pipeline;
+    let rendering = context.rendering_handles();
+    Ok(RhiCompilationWork::new(move || {
+        let mut group = group;
+        group.refresh();
+        let (pipeline, render_objects) =
+            create_graphics_pipeline_native(device, create, rendering, &graphics, &group, layout_native)?;
+        drop(render_objects);
+        let shared_publish = Arc::clone(&shared);
+        Ok(RhiCompiledObject::new(
+            move || {
+                lock(&shared_publish)
+                    .mesh_pipelines
+                    .insert(id, VulkanMeshPipelineRecord { pipeline, descriptor });
+            },
+            // SAFETY: the pipeline was created above and is only destroyed when
+            // this object is dropped without being installed.
+            move || unsafe { (destroy)(device, pipeline, core::ptr::null()) },
+        ))
+    }))
 }
 
 /// Projects a mesh descriptor onto the graphics shape the shared pipeline builder
-/// takes. The vertex module handle is a placeholder (`0`) because a mesh pipeline
-/// has no vertex stage.
+/// takes, so one creation path serves both. The vertex module handle is a
+/// placeholder because a mesh pipeline has no vertex stage.
 pub fn mesh_graphics_descriptor(descriptor: &MeshPipelineDescriptor) -> GraphicsPipelineDescriptor {
-    let mut graphics = GraphicsPipelineDescriptor::new(descriptor.layout, crate::rhi::ShaderModule::new(0));
+    let mut graphics =
+        GraphicsPipelineDescriptor::new(descriptor.layout, crate::rhi::ShaderModule::new(0));
     graphics.fragment = descriptor.fragment;
     graphics.color_attachments = descriptor.color_attachments.clone();
     graphics.depth_format = descriptor.depth_format;
@@ -961,13 +1003,16 @@ pub fn dynamic_slot_positions(layout_entries: &[BindingLayoutEntry]) -> Vec<(u32
     dynamic.into_iter().enumerate().map(|(index, entry)| (entry.slot, index as u32)).collect()
 }
 
-/// Rejects layouts whose sets/descriptors the device cannot represent.
-pub fn validate_binding_layout(entries: &[BindingLayoutEntry], max_sets: u32) -> RhiResult<()> {
+/// Rejects layouts whose slots collide or exceed the device's descriptor budget.
+pub fn validate_binding_layout(entries: &[BindingLayoutEntry], max_descriptors: u32) -> RhiResult<()> {
     let mut seen: HashSet<u32> = HashSet::new();
     for entry in entries {
         rhi_require(seen.insert(entry.slot), "binding slots must be unique within a layout")?;
     }
-    rhi_require(entries.len() as u32 <= max_sets, "binding layout declares too many descriptors")
+    rhi_require(
+        entries.len() as u32 <= max_descriptors,
+        "binding layout declares too many descriptors",
+    )
 }
 
 #[cfg(test)]
@@ -1006,5 +1051,17 @@ mod tests {
         assert_eq!(graphics.layout, layout);
         assert_eq!(graphics.vertex, crate::rhi::ShaderModule::new(0));
         assert!(graphics.vertex_layout.is_none());
+    }
+
+    #[test]
+    fn fixed_function_state_carries_dynamic_viewport_and_scissor() {
+        let descriptor = GraphicsPipelineDescriptor::new(
+            crate::rhi::PipelineLayout::new(1),
+            crate::rhi::ShaderModule::new(2),
+        );
+        let state = FixedFunctionState::build(&descriptor).expect("builds");
+        assert_eq!(state.dynamic_states, [sys::VK_DYNAMIC_STATE_VIEWPORT, sys::VK_DYNAMIC_STATE_SCISSOR]);
+        assert!(state.vertex_bindings.is_empty());
+        assert!(state.blend_attachments.is_empty());
     }
 }

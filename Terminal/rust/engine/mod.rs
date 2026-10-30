@@ -2,8 +2,8 @@
 //!
 //! Ghostty types never cross this module boundary; callers see `TerminalFrame`
 //! snapshots and byte arrays. libghostty callbacks run synchronously inside
-//! `feed`, so they can reach the engine through the userdata pointer cached in
-//! `TerminalEngine::from_userdata`.
+//! `feed`, so they reach the engine through `ACTIVE_ENGINE`, which `feed`
+//! publishes for the duration of the call.
 
 use crate::engine::ffi::GhosttyTerminal;
 use crate::engine::frame_reader::{FrameScratch, RenderState};
@@ -30,6 +30,34 @@ pub use key_encoder::{KeyModifiers, TerminalKey};
 pub use mouse::{MouseAction, MouseButton, TerminalMouseEvent};
 pub use placeholders::{PlaceholderCell, PlaceholderRun, PLACEHOLDER_CODEPOINT};
 pub use selection::{SelectionPhase, TerminalPointer};
+
+thread_local! {
+    /// The engine libghostty callbacks should reach, published for the duration
+    /// of a call that can invoke one.
+    ///
+    /// Callbacks run synchronously inside `feed`, and the engine is owned by a
+    /// `RefCell` whose address changes until it is installed, so a pointer stored
+    /// at construction would go stale. Publishing per call keeps the callback
+    /// exact without constraining how the engine is owned.
+    static ACTIVE_ENGINE: std::cell::Cell<*const TerminalEngine> =
+        const { std::cell::Cell::new(std::ptr::null()) };
+}
+
+/// Publishes `engine` as the callback target until the guard drops.
+struct ActiveEngineGuard(*const TerminalEngine);
+
+impl ActiveEngineGuard {
+    fn new(engine: *const TerminalEngine) -> Self {
+        let previous = ACTIVE_ENGINE.with(|slot| slot.replace(engine));
+        Self(previous)
+    }
+}
+
+impl Drop for ActiveEngineGuard {
+    fn drop(&mut self) {
+        ACTIVE_ENGINE.with(|slot| slot.set(self.0));
+    }
+}
 
 /// The terminal's own answers to queries (DSR, DA, mode reports).
 pub type ReplyHandler = Rc<dyn Fn(&[u8])>;
@@ -87,6 +115,18 @@ impl TerminalEngine {
             engine.enable_images();
             engine.set_scrollback_lines(scrollback_lines);
             engine.set_default_cursor_blink(true);
+            // Kitty placement geometry is measured in the pixel cell size the
+            // library was told, and a cell size of zero suppresses every
+            // placement, so establish the default before any output arrives.
+            // This goes straight to the library: `resize` treats the unchanged
+            // dimensions as a no-op and would leave the size unset.
+            ffi::ghostty_terminal_resize(
+                engine.terminal,
+                columns as u16,
+                rows as u16,
+                engine.cell.0 as u32,
+                engine.cell.1 as u32,
+            );
             engine
         }
     }
@@ -98,6 +138,8 @@ impl TerminalEngine {
         if bytes.is_empty() {
             return;
         }
+        // Callbacks run synchronously inside this call and need to reach us.
+        let _active = ActiveEngineGuard::new(self as *const Self);
         // SAFETY: the terminal is live and `bytes` is readable for `bytes.len()`.
         unsafe { ffi::ghostty_terminal_vt_write(self.terminal, bytes.as_ptr(), bytes.len()) };
     }
@@ -314,12 +356,10 @@ impl TerminalEngine {
     }
 
     fn install_callbacks(&self) {
-        let userdata = self as *const Self as *mut std::ffi::c_void;
-        // SAFETY: the userdata pointer is this engine; every callback below
-        // recovers it and only runs for the lifetime of this engine, which
-        // clears the callbacks before freeing the terminal.
+        // SAFETY: every callback below reaches the engine through `ACTIVE_ENGINE`,
+        // which `feed` publishes, and they are cleared before the terminal is
+        // freed.
         unsafe {
-            ffi::ghostty_terminal_set(self.terminal, ffi::OPT_USERDATA, userdata);
             let reply: ffi::WritePtyFn = reply_callback;
             let bell: ffi::BellFn = bell_callback;
             let title: ffi::TitleChangedFn = title_callback;
@@ -337,14 +377,16 @@ impl TerminalEngine {
         }
     }
 
-    /// Recovers the engine from a callback's userdata pointer.
+    /// The engine libghostty should report to, published by the call in progress.
     ///
     /// # Safety
-    /// `userdata` must be the pointer this engine installed in
-    /// `install_callbacks`, which is only true while the engine is alive.
-    unsafe fn from_userdata<'a>(userdata: *mut std::ffi::c_void) -> Option<&'a Self> {
-        // SAFETY: the caller guarantees the pointer is this engine's `self`.
-        unsafe { (userdata as *const Self).as_ref() }
+    /// The returned reference is only valid for the duration of the call that
+    /// published it, which is exactly the callback's own lifetime.
+    unsafe fn active<'a>() -> Option<&'a Self> {
+        let pointer = ACTIVE_ENGINE.with(std::cell::Cell::get);
+        // SAFETY: only a live engine is published, and the guard that published
+        // it outlives the callback.
+        unsafe { pointer.as_ref() }
     }
 }
 
@@ -357,7 +399,6 @@ impl Drop for TerminalEngine {
             ffi::ghostty_terminal_set(self.terminal, ffi::OPT_WRITE_PTY, ptr::null());
             ffi::ghostty_terminal_set(self.terminal, ffi::OPT_BELL, ptr::null());
             ffi::ghostty_terminal_set(self.terminal, ffi::OPT_TITLE_CHANGED, ptr::null());
-            ffi::ghostty_terminal_set(self.terminal, ffi::OPT_USERDATA, ptr::null());
             self.selection.free(self.terminal);
             ffi::ghostty_terminal_free(self.terminal);
         }
@@ -370,12 +411,13 @@ unsafe extern "C" fn reply_callback(
     data: *const u8,
     length: usize,
 ) {
+    let _ = userdata;
     if data.is_null() || length == 0 {
         return;
     }
-    // SAFETY: the userdata pointer is the engine that installed this callback,
-    // which outlives the call, and `data` is readable for `length` bytes.
-    let Some(engine) = (unsafe { TerminalEngine::from_userdata(userdata) }) else {
+    // SAFETY: the feed that triggered this callback published the engine for its
+    // duration, and `data` is readable for `length` bytes.
+    let Some(engine) = (unsafe { TerminalEngine::active() }) else {
         return;
     };
     let bytes = unsafe { std::slice::from_raw_parts(data, length) };
@@ -386,8 +428,9 @@ unsafe extern "C" fn reply_callback(
 }
 
 unsafe extern "C" fn bell_callback(_terminal: GhosttyTerminal, userdata: *mut std::ffi::c_void) {
+    let _ = userdata;
     // SAFETY: as in `reply_callback`.
-    let Some(engine) = (unsafe { TerminalEngine::from_userdata(userdata) }) else {
+    let Some(engine) = (unsafe { TerminalEngine::active() }) else {
         return;
     };
     if let Some(handler) = engine.on_bell.take() {
@@ -397,8 +440,9 @@ unsafe extern "C" fn bell_callback(_terminal: GhosttyTerminal, userdata: *mut st
 }
 
 unsafe extern "C" fn title_callback(_terminal: GhosttyTerminal, userdata: *mut std::ffi::c_void) {
+    let _ = userdata;
     // SAFETY: as in `reply_callback`.
-    let Some(engine) = (unsafe { TerminalEngine::from_userdata(userdata) }) else {
+    let Some(engine) = (unsafe { TerminalEngine::active() }) else {
         return;
     };
     if let Some(handler) = engine.on_title_change.take() {

@@ -3,7 +3,8 @@
 
 use cove_core::scene::Node;
 use cove_core::{Environment, State};
-use cove_composition::{AnyView, PrimitiveView, SurfaceEnvironmentExt, View, ViewKind};
+use cove_composition::adaptive::SurfaceEnvironmentExt;
+use cove_composition::{AnyView, PrimitiveView, View, ViewKind};
 use cove_text::FontAtlas;
 use std::rc::Rc;
 
@@ -47,12 +48,14 @@ impl PrimitiveView for AdaptiveApplicationContent {
 
     fn update_node(&self, _node: &Node) {}
 
-    fn make_layout_node(&self) -> Option<cove_composition::LayoutNode> {
+    fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
         None
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         let environment = self.environment.get();
+        // `surface_environment` is a `View` extension, so the modifier is applied
+        // to the erased view and the result re-erased once more.
         vec![AnyView::new(self.content.clone().surface_environment(environment))]
     }
 }

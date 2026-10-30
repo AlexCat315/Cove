@@ -3,12 +3,15 @@
 //! The transport owns sockets; the host owns UI-thread scheduling. Protocol
 //! state is confined to one thread by construction: the accept loop feeds a
 //! channel and `pump` consumes it, so no lock guards a subscription.
-use crate::server::config::{
-    hello_envelope, DevToolsConfig, DevToolsHost, DevToolsLogFeed,
-};
-use crate::server::transport::{
+pub mod config;
+pub mod transport;
+
+pub use config::{DevToolsConfig, DevToolsHost, DevToolsLogFeed};
+pub use transport::{
     DevToolsConnection, DevToolsTransport, DevToolsTransportEvent, StdDevToolsTransport,
 };
+
+use crate::server::config::hello_envelope;
 use cove_devtools_protocol::{
     decode_payload, state as decode_state_map, Envelope, InputRecording, MirrorFrame, MirrorStopped, Session,
     StateDifference, StateObservation, StateWatch, Subscription, TimelineSnapshot, TimingFrame, TreeSnapshot,
@@ -56,7 +59,7 @@ pub struct DevServer {
     tree_broadcast_pending: bool,
     next_lease: u64,
     /// Transport events awaiting dispatch on the host's UI thread.
-    inbox: Option<crate::server::transport::Receiver>,
+    inbox: Option<crate::server::transport::EventReceiver>,
     /// Broadcasts queued by host sinks. Shared so a sink closure can hold it
     /// without borrowing the server.
     outbound: crate::devtools::mirror::OutboundQueue,
@@ -187,13 +190,16 @@ impl DevServer {
                 Outbound::TreeChanged => self.broadcast_tree_delta(),
             }
         }
-        if let Some(inbox) = self.inbox.take() {
-            let mut leftover = Vec::new();
+        // `try_recv` needs `&Receiver`; the server keeps ownership so the
+        // transport can be restarted without rebuilding it.
+        let mut events = Vec::new();
+        if let Some(inbox) = &self.inbox {
             while let Ok(event) = inbox.try_recv() {
-                self.handle_event(event);
+                events.push(event);
             }
-            self.inbox = Some(inbox);
-            leftover.clear();
+        }
+        for event in events {
+            self.handle_event(event);
         }
         self.flush_logs();
     }
@@ -392,7 +398,7 @@ impl DevServer {
     fn dispatch_observation(&mut self, envelope: Envelope, connection: &Arc<dyn DevToolsConnection>, key: usize) {
         match envelope.r#type.as_str() {
             "state.list" | "state.subscribe" => {
-                let Some(state) = &self.host.observation.state else {
+                let Some(state) = self.host.observation.state.clone() else {
                     self.send_error(connection, &envelope, "unsupported", "Host has no state registry");
                     return;
                 };
@@ -702,7 +708,7 @@ impl DevServer {
         if self.tree_broadcast_pending {
             return;
         }
-        let Some(snapshot) = &self.host.scene.snapshot else { return };
+        let Some(snapshot) = self.host.scene.snapshot.clone() else { return };
         let snapshot = snapshot();
         self.tree_broadcast_pending = true;
         self.broadcast_tree(&snapshot, "tree.delta", None);
@@ -801,7 +807,7 @@ impl DevServer {
             .map(|(key, client)| (*key, client.session.watched_state_ids.clone()))
             .collect();
         for (key, ids) in watchers {
-            let Some(state) = &self.host.observation.state else { continue };
+            let Some(state) = self.host.observation.state.clone() else { continue };
             let observation = state(&ids);
             let should_send = self.clients.get(&key).is_some_and(|client| {
                 client.session.subscriptions.contains(&Subscription::State)

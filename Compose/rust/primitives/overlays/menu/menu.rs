@@ -6,13 +6,14 @@ use std::rc::Rc;
 
 use cove_core::scene::{LayoutNode, Node};
 use cove_imaging::BundleImageResource;
+use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::controls::KeyboardShortcut;
 use crate::{AnyView, PrimitiveView, View};
 
 use super::menu_descriptor::{MenuDescriptor, MenuItemDescriptor};
-use super::menu_item_row::{MenuItemRowHost, MenuRowEvents};
+use super::menu_item_row::MenuItemRowHost;
 use super::menu_navigation::{
-    MenuRowPresentation, MenuSession, MENU_ITEM_ID, MENU_SCROLL_MARKER,
+    MenuRowEvents, MenuRowPresentation, MenuSession, MENU_ITEM_ID, MENU_SCROLL_MARKER,
 };
 use super::row_content::MenuItemContent;
 
@@ -24,6 +25,7 @@ pub enum MenuItemRole {
 }
 
 /// One actionable menu command.
+#[derive(Clone)]
 pub struct MenuItem {
     pub id: u64,
     pub title: String,
@@ -77,6 +79,7 @@ impl MenuItem {
 
 /// A branch has children rather than a command. Its authored settings do not
 /// contain the hovered row, focus, timers or portal identifiers.
+#[derive(Clone)]
 pub struct MenuSubmenu {
     pub id: u64,
     pub title: String,
@@ -108,6 +111,7 @@ impl MenuSubmenu {
 }
 
 /// One entry in a menu level.
+#[derive(Clone)]
 pub enum MenuEntry {
     Item(MenuItem),
     Submenu(MenuSubmenu),
@@ -305,7 +309,7 @@ impl PrimitiveView for MenuPresentationHost {
     fn update_node(&self, _node: &Node) {}
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
-        vec![AnyView::new(MenuLevel { configuration: self.configuration.clone() })]
+        vec![AnyView::new(MenuLevel::new(self.configuration.clone()))]
     }
 }
 crate::impl_primitive_view!(MenuPresentationHost);
@@ -319,6 +323,10 @@ pub struct MenuLevel {
 impl MenuLevel {
     pub fn new(configuration: MenuLevelConfiguration) -> Self {
         Self { configuration, session: MenuSession::new() }
+    }
+
+    fn with_session(configuration: MenuLevelConfiguration, session: Rc<MenuSession>) -> Self {
+        Self { configuration, session }
     }
 
     fn enabled(&self) -> Vec<u64> {
@@ -372,7 +380,11 @@ impl MenuLevel {
                                 .semantic_font(crate::theme::SemanticFontRef::caption())
                                 .semantic_foreground(crate::theme::SemanticColorRef::on_surface_muted()),
                         ),
-                        _ => AnyView::new(crate::primitives::layout::Divider::new()),
+                        _ => AnyView::new(crate::primitives::text::Divider::new(
+                            None,
+                            1.0,
+                            crate::primitives::text::DividerAxis::Horizontal,
+                        )),
                     };
                 };
                 let session = self.session.clone();
@@ -380,14 +392,15 @@ impl MenuLevel {
                 let entry_clone = entry.clone_for_events();
                 let activate_entry = entry_clone.clone();
                 let hover_entry = entry_clone.clone();
+                let activate_session = session.clone();
+                let activate_configuration = configuration.clone();
+                let hover_session = session.clone();
                 let events = MenuRowEvents {
                     activate: Rc::new(move |node: &Node| {
-                        let session = session.clone();
-                        let configuration = configuration.clone();
-                        activate_entry.activate(&session, &configuration, node);
+                        activate_entry.activate(&activate_session, &activate_configuration, node);
                     }),
                     hover: Rc::new(move |node: &Node, inside: bool| {
-                        hover_entry.hover(&session, inside, node);
+                        hover_entry.hover(&hover_session, inside, node);
                     }),
                     focus: Rc::new({
                         let session = self.session.clone();
@@ -418,7 +431,7 @@ impl MenuLevel {
                 };
                 let submenu = match entry {
                     MenuEntry::Submenu(branch) if self.session.navigation().opened == Some(branch.id) => {
-                        Some(AnyView::new(MenuLevel::new(MenuLevelConfiguration {
+                        Some(AnyView::new(MenuLevel::with_session(MenuLevelConfiguration {
                             entries: branch.entries.clone(),
                             width: Some(branch.width),
                             max_visible_rows: 12,
@@ -451,7 +464,7 @@ impl MenuLevel {
                                 }
                             })),
                             on_frame: None,
-                        })))
+                        }, self.session.clone())))
                     }
                     _ => None,
                 };
@@ -503,7 +516,7 @@ impl MenuEntryRef {
         if self.is_submenu {
             if let Some(chain) = cove_core::scene::FocusChainHolder::current() {
                 let visible = chain.is_focus_visible();
-                chain.focus(Some(node.clone()), visible);
+                chain.focus(Some(node), visible);
             }
             let mut state = session.navigation();
             state.opened = Some(self.id);
@@ -530,7 +543,7 @@ impl MenuEntryRef {
             state.highlighted = Some(self.id);
             session.set_navigation(state);
             if let Some(chain) = cove_core::scene::FocusChainHolder::current() {
-                chain.focus(Some(node.clone()), false);
+                chain.focus(Some(node), false);
             }
         }
         let opened = session.navigation().opened;
@@ -681,7 +694,7 @@ impl MenuLevel {
         self.session.set_navigation(state);
         if let Some(row) = super::menu_navigation::menu_row(id, root) {
             if let Some(chain) = cove_core::scene::FocusChainHolder::current() {
-                chain.focus(Some(row.clone()), true);
+                chain.focus(Some(&row), true);
             }
             reveal_row(&self.session, &row);
         }

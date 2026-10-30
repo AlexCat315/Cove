@@ -9,9 +9,9 @@ use cove_core::scene::{
     Wrap,
 };
 use cove_core::Point;
-use crate::modifiers::layout::PaddingExt;
+use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{FloatingSurfaceElevation, SurfaceStyleExt};
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, View};
+use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, View, ViewExt};
 
 use super::menu_navigation::{MenuSession, MENU_LEVEL_MARKER, MENU_SCROLL_INSET, MENU_SCROLL_MARKER};
 
@@ -86,20 +86,20 @@ impl PrimitiveView for MenuLevelHost {
         )
         .scrollbar_gutter(crate::primitives::layout::ScrollbarGutter::Overlay)
         .consume_policy(cove_core::scene::ScrollConsumePolicy::Always);
-        let panel = AnyView::new(scroller)
+        let marked = scroller
             .modifier(MenuScrollMarker { inset: PANEL_INSET })
             .modifier(MenuWindowBounds { max_visible_rows: self.max_visible_rows });
         let panel = match self.width {
-            Some(width) => AnyView::new(panel.frame_width(width.max(80.0))),
-            None => panel,
+            Some(width) => AnyView::new(marked.frame_width(width.max(80.0))),
+            None => AnyView::new(marked),
         };
         // The dropdown shares the chrome's shadow, but its corners match the
         // tighter popup radius rather than the wider panel tier, so it reads as
         // a menu, not a floating window.
-        vec![AnyView::new(panel.floating_surface_with_elevation(
+        vec![panel.floating_surface_metric_with_elevation(
             crate::theme::ThemeMetric::group_radius(),
             FloatingSurfaceElevation::Panel,
-        ))]
+        )]
     }
 }
 impl_primitive_view!(MenuLevelHost);

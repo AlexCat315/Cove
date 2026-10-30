@@ -1,6 +1,7 @@
 //! Editable text field: layout indexing, options, editing and navigation.
 pub mod bracket_matching;
 pub mod indent_guides;
+pub mod text_field;
 pub mod text_field_code_editing;
 pub mod text_field_layout_engine;
 pub mod text_field_horizontal_scroll;
@@ -11,6 +12,7 @@ pub mod text_visual_line_index;
 
 pub use bracket_matching::{BracketPair, TextBracketMatching};
 pub use indent_guides::{IndentGuideSegment, TextIndentGuides};
+pub use text_field::{FieldState, TextField, TextFieldEvents};
 pub use text_field_code_editing::{indent_lines, indented_newline, IndentResult, TextEditKind};
 pub use text_field_horizontal_scroll::HorizontalScrollState;
 pub use text_field_layout_engine::{

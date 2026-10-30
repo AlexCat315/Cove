@@ -6,7 +6,7 @@ use cove_core::scene::AccessibilityTree;
 use cove_core::Rect;
 use std::collections::HashMap;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)]
 pub struct Inspection {
     pub controls: HashMap<String, Rect>,
     pub semantics: Vec<cove_core::scene::AccessibilityElement>,

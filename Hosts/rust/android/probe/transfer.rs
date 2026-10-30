@@ -62,19 +62,19 @@ impl ProbeContext {
         let artifact = self.shader("compute")?;
         let module = self
             .device
-            .make_shader_module(&artifact.module_descriptor(&[]).map_err(fail)?)
+            .make_shader_module(artifact.module_descriptor(&[]).map_err(fail)?)
             .map_err(fail)?;
         let binding = self
             .device
-            .make_binding_layout(&artifact.binding_layout_descriptor(0).map_err(fail)?)
+            .make_binding_layout(artifact.binding_layout_descriptor(0).map_err(fail)?)
             .map_err(fail)?;
         let layout = self
             .device
-            .make_pipeline_layout(&PipelineLayoutDescriptor::new(vec![binding]))
+            .make_pipeline_layout(PipelineLayoutDescriptor::new(vec![binding]))
             .map_err(fail)?;
         let pipeline = self
             .device
-            .make_compute_pipeline(&ComputePipelineDescriptor::new(layout, module))
+            .make_compute_pipeline(ComputePipelineDescriptor::new(layout, module))
             .map_err(fail)?;
         let buffer = self
             .device
@@ -107,7 +107,7 @@ impl ProbeContext {
             .device
             .make_binding_set(
                 binding,
-                &BindingSetDescriptor::new(vec![BindingSetEntry::new(
+                BindingSetDescriptor::new(vec![BindingSetEntry::new(
                     0,
                     BindingResource::storage_buffer(buffer),
                 )]),

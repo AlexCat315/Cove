@@ -4,7 +4,8 @@ use super::content::scene::HostedScene;
 use super::frame::runtime_options::RuntimeOptions;
 use crate::android::contract::launch::SceneLaunch;
 use crate::desktop::diagnostics::integration::DevToolsConfiguration;
-use cove_graphics::rhi::{Device, DeviceConfig, NativeDrawListRenderer, TextureFormat};
+use cove_graphics::rhi::{Device, DeviceConfig, TextureFormat};
+use cove_graphics::ui::NativeDrawListRenderer;
 use cove_logging::{Level, LogEvent, LogSystem};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -31,7 +32,7 @@ impl AndroidApplication {
             Device::make(DeviceConfig { enable_validation: false, ..DeviceConfig::default() })
                 .map_err(|error| error.to_string())?,
         );
-        let renderer = {
+        let mut renderer = {
             let device = device.clone();
             device
                 .with_frame_session(|| NativeDrawListRenderer::new(device.clone()))
@@ -57,7 +58,12 @@ impl AndroidApplication {
             let configuration = DevToolsConfiguration {
                 port: 0,
                 app_title: launch.app_title.clone(),
-                launch: Some(serde_json::to_value(&launch).unwrap_or(serde_json::Value::Null)),
+                launch: Some(serde_json::json!({
+                    "id": launch.id,
+                    "token": launch.token,
+                    "descriptorPath": launch.descriptor_path,
+                    "appTitle": launch.app_title,
+                })),
             };
             let weak = Rc::downgrade(&application);
             let schedule: Rc<dyn Fn()> = Rc::new(move || {

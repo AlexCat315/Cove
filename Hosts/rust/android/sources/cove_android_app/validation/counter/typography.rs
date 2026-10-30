@@ -48,12 +48,10 @@ impl CounterTypography {
                 SYSTEM_FACES.join(", ")
             ));
         }
+        let font_count = fonts.font_count();
         Ok(Self {
             fonts,
-            statistics: TypographyStatistics {
-                fonts: fonts.font_count(),
-                ..TypographyStatistics::default()
-            },
+            statistics: TypographyStatistics { fonts: font_count, ..TypographyStatistics::default() },
         })
     }
 

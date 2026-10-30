@@ -7,10 +7,8 @@
 //! presentation target.
 
 use super::composition::{AppDisplayHandleHolder, AssetDropRegistryHolder, MainComposition};
-use super::configuration::{
-    AppFrameDrivePolicy, AppWindowRendering, AppWindowTitleBarStyle, ApplicationConfiguration,
-};
-use super::memory::{AppMemorySnapshot, ApplicationMemoryPressure, AppWindowMemorySnapshot};
+use super::configuration::{AppFrameDrivePolicy, ApplicationConfiguration};
+use super::memory::{AppMemorySnapshot, ApplicationMemoryPressure};
 use super::services::ApplicationServices;
 use super::typography::{AdaptiveApplicationContent, ApplicationTypography};
 use crate::desktop::diagnostics::checkpoint::ApplicationCheckpoint;
@@ -29,28 +27,22 @@ use crate::desktop::window::native_renderer::{AppWindowRenderer, AppWindowRender
 use crate::desktop::window::state::MainWindowState;
 use cove_composition::AnyView;
 use cove_core::scene::{
-    ClipboardHolder, FocusChainHolder, InteractionRegistryHolder, Node, PointerCaptureHolder,
-    TextInputAttachmentKey, UIWorkSchedulerHolder,
+    ClipboardHolder, FocusChainHolder, InteractionRegistryHolder, PointerCaptureHolder,
+    UIWorkSchedulerHolder,
 };
-use cove_core::{
-    set_content_scale, DrawList, Environment, Font, FontWeight, GeometryAntialiasing,
-    InputCapabilities, Insets, Keyboard, State, TextScale,
-};
+use cove_core::{set_content_scale, Environment, Font, FontWeight, InputCapabilities, Insets, State};
 use cove_graphics::rhi::Device;
 use cove_imaging::ImageAssetRegistryHolder;
 use cove_logging::{Level, LogEvent, LogSystem};
-use cove_platform::{InputEvent, WindowId};
-use cove_runtime::{
-    NativeAccessibility, PlatformFrameRateMode, PlatformHost, PlatformWindowSession,
-    Sdl3PlatformHost,
-};
-use cove_shell::{NativeRenderSurface, WindowChromeHitTest, WindowOptions, WindowTitleBarStyle};
+use cove_platform::WindowId;
+use cove_runtime::{NativeAccessibility, PlatformFrameRateMode, PlatformHost, Sdl3PlatformHost};
+use cove_shell::{NativeRenderSurface, WindowChromeHitTest, WindowOptions};
 use cove_text::{TextBootstrapOptions, TextEnvironment, TextEnvironmentHolder};
 use cove_ui_compose::primitives::overlays::portal::portal_registry::{
-    PortalStore, PortalStoreEnvironment,
+    PortalStore, PortalStoreAmbient,
 };
-use std::cell::{Cell, RefCell};
-use std::collections::BTreeMap;
+use std::cell::RefCell;
+use std::collections::{BTreeMap, HashMap};
 use std::rc::{Rc, Weak};
 use std::sync::Arc;
 use std::time::Instant;
@@ -98,7 +90,7 @@ struct ApplicationState {
     window_renderer: RefCell<Option<Box<dyn AppWindowRenderer>>>,
     main_window: RefCell<MainWindowState>,
     typography: RefCell<ApplicationTypography>,
-    auxiliary_windows: RefCell<BTreeMap<WindowId, AuxiliaryAppWindow>>,
+    auxiliary_windows: RefCell<HashMap<WindowId, AuxiliaryAppWindow>>,
     metrics: RefCell<FrameMetrics>,
     performance_hud: RefCell<PerformanceHud>,
     run_loop_error: RefCell<Option<String>>,
@@ -193,7 +185,7 @@ impl Application {
             window_renderer: RefCell::new(None),
             main_window: RefCell::new(MainWindowState::new(is_vsync)),
             typography: RefCell::new(ApplicationTypography::default()),
-            auxiliary_windows: RefCell::new(BTreeMap::new()),
+            auxiliary_windows: RefCell::new(HashMap::new()),
             metrics: RefCell::new(FrameMetrics::default()),
             performance_hud: RefCell::new(PerformanceHud::default()),
             run_loop_error: RefCell::new(None),
@@ -294,22 +286,10 @@ impl Application {
             .borrow_mut()
             .install(state.checkpoint.as_ref(), state.recorder.clone());
 
-        {
-            let composition = state.composition.clone();
-            let auxiliary = state.auxiliary_windows.clone();
-            *state.memory_pressure.borrow_mut() = Some(ApplicationMemoryPressure::new(
-                host.clone(),
-                move || {
-                    composition.trim_memory();
-                    for window in auxiliary.borrow().values() {
-                        window.trim_memory();
-                    }
-                },
-            ));
-        }
+        *state.memory_pressure.borrow_mut() = Some(ApplicationMemoryPressure::new());
 
         let run_result = host.run(composition.tree.clone());
-        if let Some(pressure) = state.memory_pressure.borrow_mut().take() {
+        if let Some(mut pressure) = state.memory_pressure.borrow_mut().take() {
             pressure.stop();
         }
         self.teardown();
@@ -579,14 +559,14 @@ impl Application {
             *callbacks.on_teardown.borrow_mut() = Some(Rc::new(move || {
                 let application = Application { state: state.clone() };
                 application.release_all_gpu_surfaces();
-                application.diagnostics.borrow_mut().stop();
+                application.state.diagnostics.borrow_mut().stop();
             }));
         }
     }
 
     fn teardown(&self) {
         let state = &self.state;
-        if let Some(pressure) = state.memory_pressure.borrow_mut().take() {
+        if let Some(mut pressure) = state.memory_pressure.borrow_mut().take() {
             pressure.stop();
         }
         if let Some(ready) = state.callbacks.diagnostics_ready.clone() {
@@ -732,13 +712,21 @@ impl Application {
                     (main.logical_w as f32, main.logical_h as f32)
                 };
                 chrome::with_window_chrome_context(window_id, || {
-                    use cove_composition::ViewExt;
                     use cove_ui_compose::theme::tokens::TextScalerViewExt;
+                    // The portal store is scoped per window by the input context
+                    // ambient below, which is what `PortalStoreHolder::current()`
+                    // actually reads; the composition-local copy would need
+                    // `PortalStore: PartialEq`, which the registry does not provide.
                     let content = AdaptiveApplicationContent::new(root_view, environment)
-                        .text_scaler(scaler)
-                        .composition_local(PortalStoreEnvironment::key(), Some(portal_store));
+                        .text_scaler(scaler);
                     composition.install_view(AnyView::new(content), logical.0, logical.1);
                 });
+                // Scope this window's overlay store for every consumer that reads
+                // the process ambient (menus, popovers, tooltips).
+                state
+                    .host
+                    .input_context()
+                    .add_scoped_ambient(Rc::new(PortalStoreAmbient::new(composition.portal_store.clone())));
                 self.sync_main_window_chrome_hit_test();
                 state.main_window.borrow_mut().did_install_root = true;
             }
@@ -825,6 +813,16 @@ impl Application {
 
     fn handle_frame_preparation(&self, delta_time: f64) {
         let state = &self.state;
+        // Platform pressure is sampled off the UI thread; the trim itself must run
+        // here, where every cache it touches is single-threaded.
+        if state
+            .memory_pressure
+            .borrow()
+            .as_ref()
+            .is_some_and(ApplicationMemoryPressure::take_pending_trim)
+        {
+            self.trim_memory();
+        }
         state.performance_hud.borrow_mut().tick();
         let delta = delta_time.max(0.0);
         state.main_window.borrow_mut().last_frame_time = Some(Instant::now());
@@ -984,9 +982,6 @@ impl Application {
                 self.fail_run_loop(&error.to_string(), "window presentation transition");
                 return;
             }
-            if let Some(events) = state.callbacks.events.clone() {
-                let _ = events;
-            }
             // When the window goes off-screen the swapchain / MSAA / framebuffer
             // are already released. Also drop the heavy CPU caches (glyph atlas,
             // image assets, render tree) so backgrounding actually reclaims
@@ -1005,7 +1000,7 @@ impl Application {
 
     pub fn memory_snapshot(&self) -> AppMemorySnapshot {
         let state = &self.state;
-        let mut windows = BTreeMap::new();
+        let mut windows = HashMap::new();
         for (id, window) in state.auxiliary_windows.borrow().iter() {
             if let Some(snapshot) = window.memory_snapshot() {
                 windows.insert(*id, snapshot);

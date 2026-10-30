@@ -24,7 +24,4 @@ pub mod system;
 
 pub use logging_exports::*;
 
-/// The authoring name is `LoggingConfiguration`; `Configuration` is kept as an
-/// alias because the aggregated surface used it before the modular split.
 pub use configuration::LoggingConfiguration;
-pub use configuration::LoggingConfiguration as Configuration;

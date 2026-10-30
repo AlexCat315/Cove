@@ -64,7 +64,7 @@ struct State<E> {
 
 /// Bounded, single-consumer queue whose reader threads and deadline signal the
 /// same condition.
-pub struct ProcessEventBuffer<E = ProcessEvent> {
+pub struct ProcessEventBuffer<E = crate::process::ProcessEvent> {
     maximum_bytes: usize,
     state: Mutex<State<E>>,
     signal: Condvar,

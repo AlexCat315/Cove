@@ -9,10 +9,10 @@ use super::super::application::memory::{
 };
 use cove_core::DrawList;
 use cove_graphics::rhi::{
-    CommandBuffer, Device, NativeDrawListRenderer, RenderColorTarget, RhiResult, Swapchain,
-    TextureDescriptor, TextureFormat, TextureResource, TextureUsage,
+    CommandBuffer, Device, RenderColorTarget, RhiResult, Swapchain, TextureDescriptor,
+    TextureFormat, TextureResource, TextureUsage,
 };
-use cove_graphics::ui::NativeUIViewport;
+use cove_graphics::ui::{NativeDrawListRenderer, NativeUIViewport};
 use cove_runtime::SurfaceFactory;
 use cove_shell::NativeRenderSurface;
 use std::sync::Arc;

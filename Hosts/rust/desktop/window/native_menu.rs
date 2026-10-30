@@ -231,10 +231,10 @@ pub mod installer {
     /// action table and the shell installs the `NSMenuItem` targets.
     pub fn install(menu_bar: &NativeMenuBar) {
         let (snapshot, actions) = menu_bar.snapshot();
-        crate::desktop::window::native_menu_bridge::set_actions(actions);
-        cove_shell::NativeMenuPresenter::set_present(Some(std::rc::Rc::new(
+        native_menu_bridge::set_actions(actions);
+        cove_core::scene::NativeMenuPresenter::set_present(Some(std::rc::Rc::new(
             move |menu: &cove_platform::NativeMenuSnapshot, point: cove_core::Point| {
-                cove_shell::NativeMenuPopover::pop_up(menu, point.x, point.y, None)
+                cove_shell::native_menu_popover::NativeMenuPopover::pop_up(menu, point.x, point.y, None)
                     .ok()
                     .flatten()
             },

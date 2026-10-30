@@ -1,5 +1,5 @@
 //! Compose's structured logging channel.
-use cove_logging::{Configuration, Level, Location, LogRuntime};
+use cove_logging::{Level, Location, LogRuntime};
 use std::sync::{Arc, OnceLock};
 
 #[derive(Clone, Debug)]
@@ -29,7 +29,7 @@ impl Logger {
     }
 }
 
-fn runtime() -> &'static LogRuntime {
-    static RUNTIME: OnceLock<LogRuntime> = OnceLock::new();
-    RUNTIME.get_or_init(|| LogRuntime::new(Configuration::default()).expect("default logging configuration is valid"))
+fn runtime() -> &'static Arc<LogRuntime> {
+    static RUNTIME: OnceLock<Arc<LogRuntime>> = OnceLock::new();
+    RUNTIME.get_or_init(|| LogRuntime::new("cove.ui.compose"))
 }

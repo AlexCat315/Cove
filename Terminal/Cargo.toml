@@ -15,11 +15,8 @@ path = "rust/lib.rs"
 cove-composition.workspace = true
 cove-core.workspace = true
 cove-platform.workspace = true
-cove-graphics.workspace = true
 cove-text.workspace = true
 cove-imaging.workspace = true
-cove-system.workspace = true
-cove-logging.workspace = true
 libc.workspace = true
 serde.workspace = true
 

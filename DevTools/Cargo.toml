@@ -14,7 +14,6 @@ cove-devtools-protocol.workspace = true
 cove-composition.workspace = true
 cove-core.workspace = true
 cove-platform.workspace = true
-cove-graphics.workspace = true
 cove-system.workspace = true
 cove-logging.workspace = true
 serde.workspace = true

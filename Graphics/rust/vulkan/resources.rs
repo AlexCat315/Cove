@@ -453,7 +453,7 @@ pub fn texture_allocation(
     registries: &VulkanRegistries,
     texture: Texture,
 ) -> Option<TextureAllocation> {
-    let allocation = lock(registries).textures.get(&texture.id())?.allocation?;
+    let allocation = registries.textures.get(&texture.id())?.allocation?;
     // Reserved resource bytes, including lazy allocations. Lazy memory may commit
     // zero bytes on a tile GPU, but that is not a portable guarantee.
     Some(TextureAllocation::new(allocation.size as i64, false))
@@ -505,7 +505,11 @@ pub fn create_sampler(
     Ok(())
 }
 
-pub fn destroy_sampler(context: &VulkanContext, registries: &mut VulkanRegistries, handle: Sampler) {
+pub fn destroy_sampler(
+    context: &VulkanContext,
+    registries: &Arc<Mutex<VulkanRegistries>>,
+    handle: Sampler,
+) {
     let Some(record) = lock(registries).samplers.remove(&handle.id()) else { return };
     // SAFETY: the frame ring waited for every submission that could use it.
     unsafe {

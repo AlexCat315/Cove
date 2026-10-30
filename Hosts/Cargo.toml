@@ -11,6 +11,7 @@ path = "rust/lib.rs"
 
 [dependencies]
 cove-runtime.workspace = true
+cove-shell.workspace = true
 cove-composition.workspace = true
 cove-ui-compose = { path = "../Compose" }
 cove-core.workspace = true

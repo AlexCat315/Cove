@@ -5,13 +5,12 @@
 //! the contract is the same — every method must run on the UI thread — and the
 //! shared ownership simply makes that explicit.
 use cove_core::scene::{
-    Display, InvalidationLog, InvalidationPhase, InvalidationSource, LayoutInsets, Node, NodeTree, RenderTree,
+    InvalidationLog, InvalidationPhase, InvalidationSource, LayoutInsets, Node, NodeTree, RenderTree,
 };
-use cove_core::{Color, DrawList, Point, Rect};
+use cove_core::Rect;
 use cove_devtools_protocol::{
-    InspectionInsets, InspectionState, InvalidationRecord, InputInventory, NodeFlags, NodeFrame, NodeLayoutInfo,
-    NodePoint, NodeStyleInfo, NodeSummary, Recomposition, RecompositionReason, RenderInventory, SourceLocation,
-    TreeSnapshot,
+    InspectionInsets, InvalidationRecord, InputInventory, NodeFlags, NodeFrame, NodeLayoutInfo, NodePoint,
+    NodeStyleInfo, NodeSummary, Recomposition, RecompositionReason, RenderInventory, SourceLocation, TreeSnapshot,
 };
 use crate::inspection::editor::SceneEditor;
 use std::cell::RefCell;

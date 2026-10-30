@@ -278,21 +278,21 @@ impl<Id: PartialEq + Clone + 'static> PrimitiveView for RovingFocusHost<Id> {
 impl<Id: PartialEq + Clone + 'static> View for RovingFocusHost<Id> {}
 
 /// Applies the roving Tab-stop policy to one item.
-pub struct RovingItem<'a, Id: PartialEq + Clone + 'static> {
-    pub id: &'a Id,
+pub struct RovingItem<Id: PartialEq + Clone + 'static> {
+    pub id: Id,
     pub is_tab_stop: bool,
     pub identity: Rc<dyn Fn(&Id) -> u64>,
 }
 
-impl<'a, Id: PartialEq + Clone + 'static> RovingItem<'a, Id> {
-    pub fn new(id: &'a Id, is_tab_stop: bool, identity: Rc<dyn Fn(&Id) -> u64>) -> Self {
+impl<Id: PartialEq + Clone + 'static> RovingItem<Id> {
+    pub fn new(id: Id, is_tab_stop: bool, identity: Rc<dyn Fn(&Id) -> u64>) -> Self {
         Self { id, is_tab_stop, identity }
     }
 }
 
-impl<'a, Id: PartialEq + Clone + 'static> cove_composition::ViewModifier for RovingItem<'a, Id> {
+impl<Id: PartialEq + Clone + 'static> cove_composition::ViewModifier for RovingItem<Id> {
     fn apply_node(&self, node: &Node) {
-        let token = (self.identity)(self.id);
+        let token = (self.identity)(&self.id);
         node.set_attachment(ROVING_ITEM, token);
         // A caller modifier can replay after the button updates locally.
         // Resolve the current group selection instead of restoring its old

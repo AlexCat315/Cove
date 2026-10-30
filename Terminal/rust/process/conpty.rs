@@ -16,8 +16,29 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-type Handle = *mut c_void;
 type Hpcon = *mut c_void;
+
+/// An owned Windows handle.
+///
+/// Windows handles are process-wide kernel references, not raw memory, so moving
+/// one to the thread that reads or writes it is sound. The wrapper exists to say
+/// that explicitly instead of scattering `unsafe impl Send` on the whole backend.
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug)]
+struct Handle(*mut c_void);
+
+// SAFETY: a handle identifies a kernel object; only its value is moved, and each
+// handle here has exactly one owning thread.
+unsafe impl Send for Handle {}
+unsafe impl Sync for Handle {}
+
+impl Handle {
+    const NULL: Self = Self(std::ptr::null_mut());
+
+    fn is_null(self) -> bool {
+        self.0.is_null()
+    }
+}
 
 const S_OK: i32 = 0;
 const STARTF_USESTDHANDLES: u32 = 0x0000_0100;
@@ -45,9 +66,9 @@ struct StartupInfo {
     show_window: u16,
     reserved2_size: u16,
     reserved2: *mut u8,
-    std_in: Handle,
-    std_out: Handle,
-    std_err: Handle,
+    std_in: *mut c_void,
+    std_out: *mut c_void,
+    std_err: *mut c_void,
 }
 
 #[repr(C)]
@@ -142,10 +163,10 @@ impl ConPty {
         // SAFETY: every handle produced here is either closed before return or
         // stored in the returned value, and every pointer argument is live.
         unsafe {
-            let mut input_read: Handle = ptr::null_mut();
-            let mut input_write: Handle = ptr::null_mut();
-            let mut output_read: Handle = ptr::null_mut();
-            let mut output_write: Handle = ptr::null_mut();
+            let mut input_read = Handle::NULL;
+            let mut input_write = Handle::NULL;
+            let mut output_read = Handle::NULL;
+            let mut output_write = Handle::NULL;
             if CreatePipe(&mut input_read, &mut input_write, ptr::null_mut(), 0) == 0
                 || CreatePipe(&mut output_read, &mut output_write, ptr::null_mut(), 0) == 0
             {

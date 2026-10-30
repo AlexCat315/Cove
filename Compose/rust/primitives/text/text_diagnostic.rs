@@ -66,6 +66,12 @@ impl PartialEq for TextDiagnostics {
 
 impl Eq for TextDiagnostics {}
 
+impl Default for TextDiagnostics {
+    fn default() -> Self {
+        Self::empty()
+    }
+}
+
 impl TextDiagnostics {
     pub fn empty() -> Self {
         Self::new(&[])

@@ -4,7 +4,7 @@
 //! cannot erase them or freeze the restoration value. Mutable state lives in
 //! `RefCell`s because a snapshot must be readable through `&self` while the
 //! server still holds exclusive access for command handling.
-use crate::inspection::inspector::{find_in, DebugAttachmentKey, SceneInspector};
+use crate::inspection::inspector::SceneInspector;
 use cove_core::scene::{Display, InvalidationSource, LayoutInsets, Node, NodeTree};
 use cove_core::{Color, DrawList, Point, Rect};
 use cove_devtools_protocol::{Envelope, InspectionState};
@@ -113,7 +113,7 @@ impl SceneEditor {
             .filter(|node| node.parent().is_some() || self.tree.borrow().root().as_ref() == Some(node))
     }
 
-    pub fn select(&mut self, id: Option<&str>) {
+    pub fn select(&self, id: Option<&str>) {
         let node = id.and_then(|id| self.find(id));
         *self.selected.borrow_mut() = node;
         *self.hovered.borrow_mut() = None;
@@ -173,7 +173,7 @@ impl SceneEditor {
 
     /// Disconnect/stop discards temporary styles and history. An outstanding
     /// picker mouse-up is still consumed to avoid leaking half a gesture.
-    pub fn reset(&mut self) {
+    pub fn reset(&self) {
         self.apply(BTreeMap::new());
         self.undo.borrow_mut().clear();
         self.redo.borrow_mut().clear();
@@ -243,7 +243,7 @@ impl SceneEditor {
 
     /// Handle one `inspect.*` command. Validation already ran in
     /// `Session::validate`, so this only enforces scene-dependent limits.
-    pub fn handle(&mut self, request: &Envelope) -> Envelope {
+    pub fn handle(&self, request: &Envelope) -> Envelope {
         self.prune();
         let payload = request.payload.as_ref().and_then(|value| value.as_object());
         match request.r#type.as_str() {
@@ -422,7 +422,7 @@ impl SceneEditor {
 
     /// Consume pointer input while picking. Returns `true` when the event was
     /// handled and the host must not forward it to the scene.
-    pub fn intercept(&mut self, event: &cove_platform::InputEvent) -> bool {
+    pub fn intercept(&self, event: &cove_platform::InputEvent) -> bool {
         use cove_platform::InputEvent;
         if let InputEvent::MouseButtonUp(button) = event
             && let Some(position) = self

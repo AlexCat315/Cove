@@ -17,5 +17,9 @@ pub mod metal;
 /// that ship a Vulkan driver.
 pub mod vulkan;
 
+/// The DX12 backend reaches the driver through COM vtable dispatch, so it is
+/// compiled on every host; only its registration is limited to Windows.
+pub mod dx12;
+
 pub mod ui;
 pub use ui::*;

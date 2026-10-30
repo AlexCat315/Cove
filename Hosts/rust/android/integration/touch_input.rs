@@ -47,7 +47,7 @@ impl TouchInput {
         };
         let down = self.down;
         let wheel = move |delta: Point, phase: ScrollPhase| {
-            dispatcher.dispatch(InputEvent::MouseWheel(MouseWheelEvent {
+            dispatcher.dispatch(&InputEvent::MouseWheel(MouseWheelEvent {
                 x: delta.x,
                 y: delta.y,
                 mouse_x: Some(down.x),
@@ -66,7 +66,7 @@ impl TouchInput {
                 self.down = point;
                 self.previous = point;
                 self.scrolling = false;
-                dispatcher.dispatch(InputEvent::MouseButtonDown(button));
+                dispatcher.dispatch(&InputEvent::MouseButtonDown(button));
             }
             2 => {
                 let delta = Point::new(point.x - self.previous.x, point.y - self.previous.y);
@@ -105,7 +105,7 @@ impl TouchInput {
                     wheel(delta, ScrollPhase::Changed);
                 }
                 if !self.scrolling {
-                    dispatcher.dispatch(InputEvent::MouseMotion(MouseMotionEvent {
+                    dispatcher.dispatch(&InputEvent::MouseMotion(MouseMotionEvent {
                         x: point.x,
                         y: point.y,
                         delta_x: delta.x,
@@ -119,7 +119,7 @@ impl TouchInput {
                 if self.scrolling {
                     wheel(Point::default(), ScrollPhase::Ended);
                 } else {
-                    dispatcher.dispatch(InputEvent::MouseButtonUp(button));
+                    dispatcher.dispatch(&InputEvent::MouseButtonUp(button));
                 }
                 self.scrolling = false;
             }

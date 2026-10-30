@@ -11,9 +11,7 @@ use crate::desktop::application::configuration::{
 use crate::desktop::application::memory::AppWindowMemorySnapshot;
 use crate::desktop::application::typography::AdaptiveApplicationContent;
 use crate::desktop::rendering::context::AppRenderingContext;
-use crate::desktop::window::chrome::{
-    self, AppWindowChromeContextHolder, WindowChromeHitTestCollector,
-};
+use crate::desktop::window::chrome::{self, AppWindowChromeContextHolder, WindowChromeHitTestCollector};
 use crate::desktop::window::native_renderer::AppWindowRenderer;
 use cove_composition::{AnyView, ViewGraph};
 use cove_core::scene::{LayerAwareNodeRenderer, NodeRenderer, NodeTree, Recomposer};
@@ -21,7 +19,7 @@ use cove_core::{DrawList, Environment, State};
 use cove_platform::WindowId;
 use cove_runtime::{NativeAccessibility, PlatformWindowSession, Sdl3PlatformHost};
 use cove_shell::{NativeRenderSurface, WindowChromeHitTest};
-use cove_ui_compose::primitives::overlays::portal::portal_registry::{PortalStore, PortalStoreEnvironment};
+use cove_ui_compose::primitives::overlays::portal::portal_registry::{PortalStore, PortalStoreAmbient};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -140,12 +138,10 @@ impl AuxiliaryAppWindow {
             configure_text_environment(self.session.content_scale_factor());
             if !did_install_root {
                 chrome::with_window_chrome_context(Some(window_id), || {
-                    use cove_composition::ViewExt;
-                    let content = AdaptiveApplicationContent::new(root_view, environment)
-                        .composition_local(PortalStoreEnvironment::key(), Some(portal_store.clone()));
+                    let content = AdaptiveApplicationContent::new(root_view, environment);
                     graph.install_view(
                         AnyView::new(content),
-                        cove_composition::ComponentSourceLocation::new(
+                        cove_core::scene::ComponentSourceLocation::new(
                             "cove-ui",
                             "Hosts/rust/desktop/window/auxiliary.rs",
                             0,

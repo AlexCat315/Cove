@@ -1,7 +1,7 @@
 //! DevTools server: configuration, host adapters and protocol dispatch.
 use cove_devtools_protocol::{
-    Envelope, HelloHostInfo, HelloPayload, InputRecording, MirrorActivate, MirrorFrame, MirrorInput, MirrorStart,
-    StateObservation, TimelineSnapshot, TreeSnapshot, WindowResize, PROTOCOL_VERSION,
+    Envelope, HelloHostInfo, HelloPayload, InputRecording, MirrorActivate, MirrorInput, MirrorStart, StateObservation,
+    TimelineSnapshot, TreeSnapshot, WindowResize,
 };
 use cove_logging::{Level, LogQuery, LogRecord, LogSystem};
 
@@ -253,7 +253,7 @@ mod tests {
         let envelope = hello_envelope(&config, &["tree".into(), "select".into()]);
         assert_eq!(envelope.r#type, "hello");
         let payload: HelloPayload = serde_json::from_value(envelope.payload.unwrap()).unwrap();
-        assert_eq!(payload.protocol, PROTOCOL_VERSION);
+        assert_eq!(payload.protocol, cove_devtools_protocol::PROTOCOL_VERSION);
         assert_eq!(payload.host.app_title, "Test");
         assert_eq!(payload.capabilities, vec!["tree", "select"]);
     }

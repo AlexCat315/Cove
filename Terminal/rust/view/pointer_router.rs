@@ -39,14 +39,18 @@ pub struct PointerGeometry {
 }
 
 pub struct PointerRouter {
-    gesture: Gesture,
-    wheel_rows: f32,
-    hovered: Option<UrlMatch>,
+    gesture: std::cell::Cell<Gesture>,
+    wheel_rows: std::cell::Cell<f32>,
+    hovered: std::cell::RefCell<Option<UrlMatch>>,
 }
 
 impl Default for PointerRouter {
     fn default() -> Self {
-        Self { gesture: Gesture::None, wheel_rows: 0.0, hovered: None }
+        Self {
+            gesture: std::cell::Cell::new(Gesture::None),
+            wheel_rows: std::cell::Cell::new(0.0),
+            hovered: std::cell::RefCell::new(None),
+        }
     }
 }
 
@@ -55,14 +59,14 @@ impl PointerRouter {
         Self::default()
     }
 
-    pub fn reset(&mut self) {
-        self.gesture = Gesture::None;
-        self.wheel_rows = 0.0;
-        self.hovered = None;
+    pub fn reset(&self) {
+        self.gesture.set(Gesture::None);
+        self.wheel_rows.set(0.0);
+        *self.hovered.borrow_mut() = None;
     }
 
-    pub fn hovered_link(&self) -> Option<&UrlMatch> {
-        self.hovered.as_ref()
+    pub fn hovered_link(&self) -> Option<UrlMatch> {
+        self.hovered.borrow().clone()
     }
 
     /// Grid position under a window-space point, clamped to the grid.
@@ -84,7 +88,7 @@ impl PointerRouter {
 
     /// A press. Returns whether the terminal handled it.
     pub fn down(
-        &mut self,
+        &self,
         event: &MouseButtonEvent,
         session: &TerminalSession,
         geometry: &PointerGeometry,
@@ -97,7 +101,7 @@ impl PointerRouter {
             && !event.modifiers.has_shift()
             && let Some(button) = button(event.button)
         {
-            self.gesture = Gesture::Reporting(button);
+            self.gesture.set(Gesture::Reporting(button));
             let report = TerminalMouseEvent {
                 action: MouseAction::Press,
                 button: Some(button),
@@ -111,14 +115,14 @@ impl PointerRouter {
         if event.button != PlatformButton::Left {
             return true;
         }
-        self.gesture = Gesture::Selecting { rectangle: event.modifiers.has_alt() };
+        self.gesture.set(Gesture::Selecting { rectangle: event.modifiers.has_alt() });
         session.select(SelectionPhase::Press, &pointer, event.modifiers.has_alt());
         true
     }
 
     /// Pointer motion. Returns whether the terminal handled it.
     pub fn motion(
-        &mut self,
+        &self,
         event: &MouseMotionEvent,
         session: &TerminalSession,
         geometry: &PointerGeometry,
@@ -126,7 +130,7 @@ impl PointerRouter {
         let Some(pointer) = self.pointer(geometry, event.x, event.y, now_nanos()) else {
             return false;
         };
-        match self.gesture {
+        match self.gesture.get() {
             Gesture::Selecting { rectangle } => {
                 // Dragging past the top or bottom edge scrolls the history.
                 let edge = event.y;
@@ -150,7 +154,7 @@ impl PointerRouter {
                     let marked = frame
                         .cell(pointer.row.min(frame.rows.saturating_sub(1)), pointer.column.min(frame.columns.saturating_sub(1)))
                         .is_hyperlink;
-                    self.hovered = if marked {
+                    *self.hovered.borrow_mut() = if marked {
                         None
                     } else {
                         url_detector::find(&frame, pointer.row, pointer.column)
@@ -162,8 +166,8 @@ impl PointerRouter {
     }
 
     /// A release. Returns whether the terminal handled it.
-    pub fn up(&mut self, event: &MouseButtonEvent, session: &TerminalSession, geometry: &PointerGeometry) -> bool {
-        let gesture = std::mem::replace(&mut self.gesture, Gesture::None);
+    pub fn up(&self, event: &MouseButtonEvent, session: &TerminalSession, geometry: &PointerGeometry) -> bool {
+        let gesture = self.gesture.replace(Gesture::None);
         let Some(pointer) = self.pointer(geometry, event.x, event.y, now_nanos()) else {
             return false;
         };
@@ -181,17 +185,17 @@ impl PointerRouter {
     }
 
     /// Wheel input. Returns whether the terminal handled it.
-    pub fn wheel(&mut self, event: &MouseWheelEvent, session: &TerminalSession, line_step: f32) -> bool {
+    pub fn wheel(&self, event: &MouseWheelEvent, session: &TerminalSession, line_step: f32) -> bool {
         if line_step <= 0.0 {
             return false;
         }
         let (_, dy) = event.displacement(line_step, 0.0, 0.0);
-        self.wheel_rows += dy / line_step;
-        let rows = self.wheel_rows.trunc();
+        self.wheel_rows.set(self.wheel_rows.get() + dy / line_step);
+        let rows = self.wheel_rows.get().trunc();
         if rows == 0.0 {
             return true;
         }
-        self.wheel_rows -= rows;
+        self.wheel_rows.set(self.wheel_rows.get() - rows);
         let rows = rows as i32;
         let steps = rows.unsigned_abs().min(50);
         if session.is_mouse_tracking() {

@@ -17,6 +17,18 @@ pub struct HorizontalScrollState {
     pub leading_inset: f32,
 }
 
+impl PartialEq for HorizontalScrollState {
+    /// The cached buffer and line geometry are inputs, not values to compare;
+    /// two states are equal when they scroll to the same place with the same
+    /// extents.
+    fn eq(&self, other: &Self) -> bool {
+        self.offset == other.offset
+            && self.viewport_width == other.viewport_width
+            && self.content_width == other.content_width
+            && self.leading_inset == other.leading_inset
+    }
+}
+
 impl HorizontalScrollState {
     pub fn new() -> Self {
         Self::default()

@@ -5,7 +5,8 @@ use crate::desktop::window::native_renderer::{
     AppWindowRenderSettings, AppWindowRenderer, NativeAppWindowRenderer,
 };
 use cove_core::{GeometryAntialiasing, TextureId};
-use cove_graphics::rhi::{Device, NativeDrawListRenderer, RhiResult, TextureFormat};
+use cove_graphics::rhi::{Device, RhiResult, TextureFormat};
+use cove_graphics::ui::NativeDrawListRenderer;
 use cove_text::FontAtlas;
 use std::sync::Arc;
 

@@ -119,7 +119,11 @@ impl RegistrarInner {
 
 /// Per-owner dependency table: `access` records that the current scope read a
 /// key, `invalidate` wakes every scope that read it.
-#[derive(Default)]
+///
+/// Cloning shares the dependency table and keeps the same owner identity: a
+/// clone observes the same reads and wakes the same scopes, which is what a
+/// value-semantics handle over one registrar means.
+#[derive(Clone, Default)]
 pub struct ObservableStateRegistrar {
     inner: Arc<RegistrarInner>,
     identity: u64,

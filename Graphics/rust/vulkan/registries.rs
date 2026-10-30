@@ -8,8 +8,8 @@ use std::collections::HashMap;
 
 use crate::rhi::{
     Buffer, BufferUsage, ComputePipelineDescriptor, GraphicsPipelineDescriptor, MeshPipelineDescriptor,
-    PushConstantRange, ShaderSpecializationConstant, ShaderStage, Texture, TextureDimension,
-    TextureFormat, TextureUsage,
+    PushConstantRange, ShaderSpecializationConstant, ShaderStage, TextureDimension, TextureFormat,
+    TextureUsage,
 };
 
 use super::memory::VulkanMemoryAllocation;

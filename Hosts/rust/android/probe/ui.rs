@@ -3,9 +3,10 @@
 use super::runner::{require, ProbeContext, ProbeFailure};
 use cove_core::{Color, DrawList, Rect, TextureId};
 use cove_graphics::rhi::{
-    CommandBuffer, NativeDrawListRenderer, QueueClass, RenderColorTarget, TextureDescriptor,
-    TextureFormat, TextureUsage,
+    CommandBuffer, QueueClass, RenderColorTarget, TextureDescriptor, TextureFormat,
+    TextureUploadRegion, TextureUsage,
 };
+use cove_graphics::ui::NativeDrawListRenderer;
 use cove_graphics::ui::NativeUIViewport;
 
 /// A one-pixel magenta texture retained by the probe draw list.
@@ -33,13 +34,13 @@ impl ProbeContext {
             Rect::new(8.0, 8.0, 48.0, 24.0),
             Color { r: 0.0, g: 0.5, b: 1.0, a: 1.0 },
         )
-        .map_err(fail)?;
+        .map_err(|error: cove_core::DrawError| ProbeFailure::new(error.to_string()))?;
         list.push_clip_rect(Rect::new(20.0, 40.0, 24.0, 16.0));
         list.add_rect(
             Rect::new(0.0, 36.0, 64.0, 24.0),
             Color { r: 1.0, g: 0.5, b: 0.0, a: 1.0 },
         )
-        .map_err(fail)?;
+        .map_err(|error: cove_core::DrawError| ProbeFailure::new(error.to_string()))?;
         list.pop_clip_rect();
         let image = ProbeImage::new();
         renderer
@@ -47,10 +48,10 @@ impl ProbeContext {
                 image.texture_id,
                 image.pixels.clone(),
                 [1, 1],
-                cove_graphics::rhi::TextureUploadRegion::new(1, 1),
+                TextureUploadRegion::new(1, 1),
                 TextureFormat::Rgba8Unorm,
             )
-            .map_err(fail)?;
+            .map_err(|error: cove_core::DrawError| ProbeFailure::new(error.to_string()))?;
         list.add_image_quad(
             Rect::new(48.0, 40.0, 8.0, 16.0),
             image.texture_id,
@@ -58,7 +59,7 @@ impl ProbeContext {
             cove_core::Point { x: 0.0, y: 0.0 },
             cove_core::Point { x: 1.0, y: 1.0 },
         )
-        .map_err(fail)?;
+        .map_err(|error: cove_core::DrawError| ProbeFailure::new(error.to_string()))?;
 
         let target = self
             .device
@@ -68,7 +69,7 @@ impl ProbeContext {
                 TextureFormat::Rgba8Unorm,
                 TextureUsage::COLOR_TARGET | TextureUsage::TRANSFER_SOURCE,
             ))
-            .map_err(fail)?;
+            .map_err(|error: cove_core::DrawError| ProbeFailure::new(error.to_string()))?;
         let (color, extra_color) = if samples == 1 {
             (target, None)
         } else {
@@ -78,7 +79,7 @@ impl ProbeContext {
                     TextureDescriptor::new(64, 64, TextureFormat::Rgba8Unorm, TextureUsage::COLOR_TARGET)
                         .with_sample_count(samples),
                 )
-                .map_err(fail)?;
+                .map_err(|error: cove_core::DrawError| ProbeFailure::new(error.to_string()))?;
             (color, Some(color))
         };
 

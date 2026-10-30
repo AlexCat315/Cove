@@ -12,7 +12,7 @@ use cove_platform::WindowId;
 use cove_runtime::PlatformFrameRateMode;
 use cove_shell::{FileDialogFilter, WindowChromeHitTest};
 use std::cell::{Cell, RefCell};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 
 /// A request to open one auxiliary window.
@@ -74,11 +74,17 @@ pub struct DisplayBindings {
 ///
 /// Cloning shares the same bindings, matching how application content held the
 /// Swift reference type.
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct AppDisplayHandle {
     bindings: Rc<RefCell<DisplayBindings>>,
     signal: Rc<DisplaySignal>,
     wake_event_loop: Rc<dyn Fn()>,
+}
+
+impl Default for AppDisplayHandle {
+    fn default() -> Self {
+        Self::new(|| {})
+    }
 }
 
 impl AppDisplayHandle {

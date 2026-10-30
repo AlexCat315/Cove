@@ -55,7 +55,9 @@ impl ModifiedContent {
     pub fn content(&self) -> &AnyView {
         &self.content
     }
-    pub fn modifier(&self) -> &Rc<dyn ViewModifier> {
+    /// The applied modifier. Named `modifier_ref` so it does not shadow
+    /// `ViewExt::modifier(self, modifier)`, which stacks another modifier.
+    pub fn modifier_ref(&self) -> &Rc<dyn ViewModifier> {
         &self.modifier
     }
 }

@@ -328,7 +328,7 @@ pub unsafe extern "C" fn cove_android_destroy_application(pointer: ApplicationPo
 ///
 /// # Safety
 /// `pointer` must be null or a live application pointer.
-unsafe fn application(pointer: ApplicationPointer) -> Option<&'static AndroidApplication> {
+unsafe fn borrow_application(pointer: ApplicationPointer) -> Option<&'static AndroidApplication> {
     if pointer.is_null() {
         return None;
     }
@@ -375,10 +375,10 @@ pub unsafe extern "C" fn cove_android_open(
         (Some(ndk_width), Some(ndk_height)) => (ndk_width as usize, ndk_height as usize),
     };
     // SAFETY: forwarded application pointer contract from the caller.
-    let Some(application) = (unsafe { application(application) }) else {
+    let Some(retained) = (unsafe { borrow_application(application) }) else {
         return std::ptr::null_mut();
     };
-    match SurfaceSession::new(application, window as usize, width_px, height_px) {
+    match SurfaceSession::new(retained, window as usize, width_px, height_px) {
         Ok(session) => Box::into_raw(Box::new(SessionHandle { session })).cast(),
         Err(error) => {
             log(
@@ -622,7 +622,7 @@ pub unsafe extern "C" fn cove_android_close(pointer: SessionPointer) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cove_android_pump_diagnostics(pointer: ApplicationPointer) {
     // SAFETY: forwarded application pointer contract from the caller.
-    if let Some(application) = unsafe { application(pointer) } {
+    if let Some(application) = unsafe { borrow_application(pointer) } {
         application.scene().borrow().content().pump_diagnostics();
     }
 }
@@ -634,7 +634,7 @@ pub unsafe extern "C" fn cove_android_pump_diagnostics(pointer: ApplicationPoint
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cove_android_memory_pressure(pointer: ApplicationPointer) {
     // SAFETY: forwarded application pointer contract from the caller.
-    if let Some(application) = (unsafe { application(pointer) }) {
+    if let Some(application) = (unsafe { borrow_application(pointer) }) {
         application.trim_memory();
     }
 }

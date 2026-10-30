@@ -24,7 +24,7 @@ use crate::primitives::media::ui_icon_catalog;
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
 use crate::theme::ControlSizeViewExt;
-use crate::theme::{node_text_scaler, theme_for_node, ControlSize, SemanticColorRef, SemanticFontRef, Theme};
+use crate::theme::{node_text_scaler, theme_for_node, ControlSize, SemanticFontRef, Theme};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
 
 /// How the block relates to the surface behind it.

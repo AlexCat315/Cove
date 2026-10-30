@@ -52,9 +52,20 @@ pub struct VulkanContext {
     pub core_1_2: bool,
     /// Whether the API is at least 1.3.
     pub core_1_3: bool,
+    /// The block allocator immediate transfers stage through. Separate from the
+    /// resource allocator so a transfer can map and release storage without
+    /// touching the resource blocks.
+    pub staging_allocator: std::sync::Arc<std::sync::Mutex<super::memory::VulkanMemoryAllocator>>,
+    /// The one-shot command pool and fence immediate transfers reuse.
+    pub scratch: std::sync::Arc<std::sync::Mutex<super::submission::ScratchResources>>,
 }
 
 impl VulkanContext {
+    /// The render-pass handles this context's device can create passes with.
+    pub fn rendering_handles(&self) -> super::rendering::RenderingHandles {
+        super::rendering::RenderingHandles::new(self)
+    }
+
     /// Destroys the logical device and instance. Callers must have released every
     /// child object first (see `release_native_objects`).
     pub fn destroy(self) {
@@ -291,6 +302,7 @@ fn build_context(
     instance_commands: &sys::InstanceCommands,
     owned_device: &mut sys::VkDevice,
 ) -> RhiResult<VulkanContext> {
+    let mut memory_properties = sys::VkPhysicalDeviceMemoryProperties::default();
     let physical_device = select_physical_device(instance_commands, instance)?.ok_or_else(|| {
         RhiError::unsupported_backend("no Vulkan physical device (ICD) found")
     })?;
@@ -298,6 +310,11 @@ fn build_context(
     let mut properties = sys::VkPhysicalDeviceProperties::default();
     // SAFETY: the physical device is live and the out-parameter is a live local.
     unsafe { (instance_commands.get_physical_device_properties)(physical_device, &mut properties) };
+    // The memory-type table is what the block allocator searches.
+    // SAFETY: as above.
+    unsafe {
+        (instance_commands.get_physical_device_memory_properties)(physical_device, &mut memory_properties)
+    };
     rhi_require(properties.apiVersion >= sys::api_version(1, 1), "NativeRHI requires Vulkan 1.1")?;
     let device_name = properties.device_name();
 
@@ -408,6 +425,20 @@ fn build_context(
         extensions,
         core_1_2,
         core_1_3,
+        // The staging allocator only needs the device, its entry points and the
+        // granularity the driver reports, so it is built from those directly.
+        staging_allocator: std::sync::Arc::new(std::sync::Mutex::new(
+            super::memory::VulkanMemoryAllocator::from_parts(
+                device,
+                core,
+                properties.limits.bufferImageGranularity.max(1),
+                memory_properties,
+                features.acceleration_structures,
+            ),
+        )),
+        scratch: std::sync::Arc::new(std::sync::Mutex::new(
+            super::submission::ScratchResources::new(),
+        )),
     })
 }
 

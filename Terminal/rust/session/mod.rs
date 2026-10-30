@@ -418,7 +418,10 @@ impl TerminalSession {
     }
 
     /// Registers an observer and returns the token that removes it again.
-    pub fn observe(self: &Rc<Self>, on_change: impl Fn() + 'static) -> usize {
+    ///
+    /// The callback must not capture the session strongly; the surface binds a
+    /// weak link so a session that outlives its view does not keep it alive.
+    pub fn observe(&self, on_change: impl Fn() + 'static) -> usize {
         let token = self.inner.next_observer.get() + 1;
         self.inner.next_observer.set(token);
         self.inner.observers.borrow_mut().insert(token, Rc::new(on_change));

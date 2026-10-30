@@ -70,7 +70,7 @@ pub struct MainComposition {
     pub environment: State<Environment>,
     pub portal_store: Rc<PortalStore>,
     pub graph: Rc<ViewGraph>,
-    pub image_assets: Rc<ImageAssetRegistry>,
+    pub image_assets: std::sync::Arc<ImageAssetRegistry>,
     pub asset_drop_registry: Rc<AssetDropRegistry>,
     pub draw_list: RefCell<DrawList>,
     pub layer_renderer: RefCell<LayerAwareNodeRenderer>,
@@ -90,7 +90,7 @@ impl MainComposition {
             environment: State::new(Environment::default()),
             portal_store,
             graph,
-            image_assets: Rc::new(ImageAssetRegistry::default()),
+            image_assets: std::sync::Arc::new(ImageAssetRegistry::default()),
             asset_drop_registry: Rc::new(AssetDropRegistry::new()),
             draw_list: RefCell::new(DrawList::default()),
             layer_renderer: RefCell::new(LayerAwareNodeRenderer::new()),
@@ -107,7 +107,7 @@ impl MainComposition {
 
     /// Installs the root view and gives it one layout pass.
     pub fn install_root(&self, view: impl cove_composition::View + 'static, width: f32, height: f32) {
-        self.graph.install(view, cove_composition::ComponentSourceLocation::new(
+        self.graph.install(view, cove_core::scene::ComponentSourceLocation::new(
             "cove-ui",
             "Hosts/rust/desktop/application/composition.rs",
             0,
@@ -119,7 +119,7 @@ impl MainComposition {
     pub fn install_view(&self, view: AnyView, width: f32, height: f32) {
         self.graph.install_view(
             view,
-            cove_composition::ComponentSourceLocation::new(
+            cove_core::scene::ComponentSourceLocation::new(
                 "cove-ui",
                 "Hosts/rust/desktop/application/composition.rs",
                 0,

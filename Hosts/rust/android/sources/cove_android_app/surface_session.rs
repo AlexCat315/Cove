@@ -7,9 +7,10 @@ use super::AndroidApplication;
 use crate::android::contract::frame_clock::DisplayFrameClock;
 use cove_core::DrawList;
 use cove_graphics::rhi::{
-    CommandBuffer, Device, NativeDrawListRenderer, QueueClass, RhiResult, SurfaceDescriptor,
-    Swapchain, TextureDescriptor, TextureFormat, TextureResource, TextureUsage,
+    CommandBuffer, Device, QueueClass, RenderColorTarget, RhiResult, SurfaceDescriptor, Swapchain,
+    TextureDescriptor, TextureFormat, TextureResource, TextureUsage,
 };
+use cove_graphics::ui::NativeDrawListRenderer;
 use cove_graphics::ui::NativeUIViewport;
 use cove_logging::{Level, LogEvent, LogSystem};
 use std::cell::{Ref, RefCell, RefMut};
@@ -111,7 +112,7 @@ impl SurfaceSession {
         {
             let mut scene = self.application.scene().borrow_mut();
             self.timings.measure(Phase::ScenePrepare, || {
-                scene.prepare((pixels.0 as i32, pixels.1 as i32), scale, delta_time);
+                scene.prepare(pixels, scale, delta_time);
             });
         }
         let device = self.application.device();
@@ -183,8 +184,8 @@ impl SurfaceSession {
             let mut renderer = renderer.borrow_mut();
             let frame = renderer.record(
                 &list,
-                &commands,
-                cove_graphics::rhi::RenderColorTarget::clearing(
+                &mut commands,
+                RenderColorTarget::clearing(
                     target_texture,
                     [0.025, 0.035, 0.06, 1.0],
                 ),
@@ -195,7 +196,7 @@ impl SurfaceSession {
                 renderer.record_blit(
                     target_texture,
                     &mut commands,
-                    cove_graphics::rhi::RenderColorTarget::new(image.texture),
+                    RenderColorTarget::new(image.texture),
                     [image.width, image.height],
                 )?;
             }

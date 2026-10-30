@@ -8,7 +8,7 @@ use cove_core::{Color, InputCapabilities, Rect};
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::modifiers::interaction::AccessibilityExt;
-use crate::{AnyView, Row, VerticalAlignment, View};
+use crate::{AnyView, Row, VerticalAlignment, View, ViewExt};
 
 use super::list_row_style::{ListRowStyle, ListRowStyleConfiguration};
 

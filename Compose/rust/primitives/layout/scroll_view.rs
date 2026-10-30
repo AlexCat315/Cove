@@ -21,6 +21,7 @@ use cove_composition::LayoutDebugExt;
 use crate::primitives::layout::horizontal_scroll_origin::HorizontalScrollOrigin;
 use crate::LayoutContainer;
 use crate::scrolling::ScrollPhysicsEnvironment;
+use crate::theme::theme_for_node;
 use crate::{impl_primitive_view, AnyView, PrimitiveView, View};
 
 const DRAG_STATE: &str = "__scrollview_scrollbar_drag_state";
@@ -397,9 +398,7 @@ fn is_layout_suppressed(node: &Node) -> bool {
 }
 
 fn resolved_physics(node: &Node) -> ScrollPhysics {
-    let mut physics = node
-        .composition_value(&ScrollPhysicsEnvironment::key())
-        .unwrap_or(ScrollPhysics::DEFAULT);
+    let mut physics: ScrollPhysics = node.composition_value(&ScrollPhysicsEnvironment::key());
     if node.prefers_reduced_motion() {
         physics.momentum.is_enabled = false;
         physics.rubber_band.is_enabled = false;
@@ -430,7 +429,7 @@ fn publish_scroll_range(motion: &ScrollAnimator, node: &Node) -> bool {
     if is_layout_suppressed(node) || frame.width <= 0.0 || frame.height <= 0.0 {
         return false;
     }
-    let viewport = visible_viewport_rect(node);
+    let viewport = size_of(visible_viewport_rect(node));
     let content = cached_scrollable_content_size(node);
     if content.width <= 0.0 && content.height <= 0.0 {
         return false;
@@ -754,7 +753,7 @@ fn update_accessibility(node: &Node, view: &ScrollViewObservers) {
         node.set_accessibility(None);
         return;
     }
-    let size = visible_viewport_rect(node);
+    let size = size_of(visible_viewport_rect(node));
     let content = cached_scrollable_content_size(node);
     let max_x = (content.width - size.width).max(0.0);
     let max_y = (content.height - size.height).max(0.0);
@@ -793,7 +792,7 @@ fn page_scroll(node: &Node, axes: ScrollAxis, forward: bool) {
 }
 
 fn report(node: &Node, view: &ScrollViewObservers) {
-    let size = visible_viewport_rect(node);
+    let size = size_of(visible_viewport_rect(node));
     let offset = node.content_offset();
     if let Some(binding) = view.scroll_offset.as_ref()
         && binding.get() != offset
@@ -872,7 +871,7 @@ fn install_interaction(node: &Node, view: &ScrollViewObservers, wheel_step: f32,
         if motion.maximum_offset() == Point::default() && (request.offset.x != 0.0 || request.offset.y != 0.0) {
             // Content is not measured yet; keep the request for the first
             // layout pass instead of clamping it to zero.
-            node.mark_dirty();
+            node.mark_dirty(cove_core::scene::InvalidationSource::style_set("scrollView.request"));
         } else {
             node.remove_attachment(TIMED_REQUEST);
             scroll_to_request(node, &motion, &request, axes);
@@ -1292,12 +1291,13 @@ fn install_interaction(node: &Node, view: &ScrollViewObservers, wheel_step: f32,
         move |list, origin| {
             let Some(owner) = Node::upgrade(&paint_node) else { return };
             let viewport = visible_viewport_rect(&owner);
+            let viewport_size = size_of(viewport);
             let content = cached_scrollable_content_size(&owner);
             if content.width <= 0.0 && content.height <= 0.0 {
                 return;
             }
-            let max_x = (content.width - viewport.width).max(0.0);
-            let max_y = (content.height - viewport.height).max(0.0);
+            let max_x = (content.width - viewport_size.width).max(0.0);
+            let max_y = (content.height - viewport_size.height).max(0.0);
             if let Some(motion) = owner.attachment::<Rc<ScrollAnimator>>(MOTION) {
                 motion.update(Point::new(max_x, max_y), size_of(viewport));
             } else {

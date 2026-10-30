@@ -3,7 +3,7 @@
 //! Stdio, sockets and embedded hosts pass JSON bytes in and receive response
 //! bytes out; the server owns no globals and no process, so several can coexist.
 use crate::agent::skills::AgentSkillLibrary;
-use crate::agent::tool::{AgentError, AgentTool, AgentToolResult, AgentToolbox};
+use crate::agent::tool::{AgentTool, AgentToolbox};
 use serde_json::{Value, json};
 
 pub const MAX_REQUEST_BYTES: usize = 1_048_576;
@@ -122,10 +122,7 @@ impl McpServer {
                         response(id, payload)
                     }
                     Err(error) => {
-                        let message = match &error {
-                            AgentError::InvalidConfiguration(message) => message.clone(),
-                            other => other.message(),
-                        };
+                        let message = error.to_string();
                         response(id, json!({
                             "content": [{ "type": "text", "text": truncate(&message) }],
                             "isError": true
@@ -152,7 +149,7 @@ impl McpServer {
                             "content": { "type": "text", "text": skill.instructions }
                         }]
                     })),
-                    Err(error) => error(id, -32602, &error.message()),
+                    Err(failure) => error(id, -32602, &failure.to_string()),
                 }
             }
             other => error(id, -32601, &format!("Method not found: {other}")),
@@ -185,15 +182,11 @@ fn encode(value: Value) -> Vec<u8> {
     serde_json::to_vec(&value).unwrap_or_else(|_| b"{}".to_vec())
 }
 
-/// Helper for hosts that want the text content of a tool result.
-pub fn text_content(result: &AgentToolResult) -> String {
-    String::from_utf8_lossy(&result.json).to_string()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::agent::schema::JsonSchema;
+    use crate::agent::tool::AgentToolResult;
     use std::rc::Rc;
 
     fn server() -> McpServer {

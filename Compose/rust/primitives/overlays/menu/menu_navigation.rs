@@ -273,7 +273,7 @@ pub fn menu_row(id: u64, node: &Node) -> Option<Node> {
         return Some(node.clone());
     }
     for child in node.children() {
-        if let Some(row) = menu_row(id, child) {
+        if let Some(row) = menu_row(id, &child) {
             return Some(row);
         }
     }

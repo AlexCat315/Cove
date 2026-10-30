@@ -20,19 +20,19 @@ impl ProbeContext {
         entries.extend(fragment.binding_layout_descriptor(0).map_err(fail)?.entries);
         let binding = self
             .device
-            .make_binding_layout(&cove_graphics::rhi::BindingLayoutDescriptor::new(entries))
+            .make_binding_layout(cove_graphics::rhi::BindingLayoutDescriptor::new(entries))
             .map_err(fail)?;
         let layout = self
             .device
-            .make_pipeline_layout(&PipelineLayoutDescriptor::new(vec![binding]))
+            .make_pipeline_layout(PipelineLayoutDescriptor::new(vec![binding]))
             .map_err(fail)?;
         let vs = self
             .device
-            .make_shader_module(&vertex.module_descriptor(&[]).map_err(fail)?)
+            .make_shader_module(vertex.module_descriptor(&[]).map_err(fail)?)
             .map_err(fail)?;
         let fs = self
             .device
-            .make_shader_module(&fragment.module_descriptor(&[]).map_err(fail)?)
+            .make_shader_module(fragment.module_descriptor(&[]).map_err(fail)?)
             .map_err(fail)?;
         let raster = RasterizationState { cull_mode: cove_graphics::rhi::CullMode::None, ..RasterizationState::default() };
         let mut descriptor = GraphicsPipelineDescriptor::new(layout, vs);
@@ -43,7 +43,7 @@ impl ProbeContext {
         descriptor.rasterization = raster;
         descriptor.depth_stencil = Some(DepthStencilState::default());
         descriptor.sample_count = samples;
-        let pipeline = self.device.make_graphics_pipeline(&descriptor).map_err(fail)?;
+        let pipeline = self.device.make_graphics_pipeline(descriptor).map_err(fail)?;
 
         let buffer = self
             .device
@@ -73,7 +73,7 @@ impl ProbeContext {
             .device
             .make_binding_set(
                 binding,
-                &BindingSetDescriptor::new(vec![BindingSetEntry::new(
+                BindingSetDescriptor::new(vec![BindingSetEntry::new(
                     0,
                     BindingResource::uniform_buffer(buffer),
                 )]),

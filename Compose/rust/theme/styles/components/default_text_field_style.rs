@@ -6,7 +6,7 @@
 use cove_core::scene::Node;
 use cove_core::Color;
 use crate::modifiers::style::AppearanceExt;
-use crate::{AnyView, View};
+use crate::{AnyView, View, ViewExt};
 
 use super::text_field_style::{TextFieldStyle, TextFieldStyleConfiguration};
 

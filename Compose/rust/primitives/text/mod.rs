@@ -13,4 +13,5 @@ pub mod text_field;
 pub mod text;
 
 pub use text::{Divider, DividerAxis, Text};
+pub use text_field::{FieldState, TextField, TextFieldEvents};
 pub use cove_core::TextAlignment;

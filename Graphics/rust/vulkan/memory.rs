@@ -68,6 +68,26 @@ pub struct VulkanMemoryAllocator {
 }
 
 impl VulkanMemoryAllocator {
+    /// Builds an allocator from the pieces it actually uses, so a context can own
+    /// one without borrowing itself.
+    pub fn from_parts(
+        device: sys::VkDevice,
+        core: sys::CoreCommands,
+        buffer_image_granularity: sys::VkDeviceSize,
+        memory_properties: sys::VkPhysicalDeviceMemoryProperties,
+        acceleration_structures_enabled: bool,
+    ) -> Self {
+        Self {
+            device,
+            core,
+            memory_properties,
+            buffer_image_granularity,
+            blocks: Vec::new(),
+            block_size: DEFAULT_BLOCK_SIZE,
+            acceleration_structures_enabled,
+        }
+    }
+
     pub fn new(context: &VulkanContext, memory_properties: sys::VkPhysicalDeviceMemoryProperties) -> Self {
         Self {
             device: context.device,

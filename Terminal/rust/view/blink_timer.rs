@@ -86,7 +86,6 @@ impl BlinkTimer {
     fn start(&self) {
         self.stop_controller_only();
         self.is_visible.set(true);
-        let timer = self.clone_handle();
         // Two half-periods make one full cycle, so a linear 1.2 s repeat gives a
         // 600 ms on / 600 ms off phase.
         let animation = Animation::new(INTERVAL_SECONDS * 2.0, cove_core::scene::AnimationCurve::Linear)
@@ -102,7 +101,6 @@ impl BlinkTimer {
             if let Some(handler) = toggle.borrow().as_ref() {
                 handler();
             }
-            let _ = &timer;
         });
         let controller: Rc<dyn AnyAnimationController> = controller;
         if let Some(scheduler) = self.scheduler.borrow().as_ref() {
@@ -118,21 +116,6 @@ impl BlinkTimer {
             controller.cancel();
             scheduler.unregister(&controller);
         }
-    }
-
-    /// A handle the phase callback can hold without keeping the timer alive.
-    fn clone_handle(self: &Rc<Self>) -> BlinkHandle {
-        BlinkHandle(Rc::downgrade(self))
-    }
-}
-
-/// Weak handle used inside the phase callback so the animation never owns the
-/// timer.
-pub struct BlinkHandle(std::rc::Weak<BlinkTimer>);
-
-impl BlinkHandle {
-    pub fn upgrade(&self) -> Option<Rc<BlinkTimer>> {
-        self.0.upgrade()
     }
 }
 

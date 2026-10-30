@@ -9,7 +9,7 @@
 use std::io::{self, Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{Receiver, Sender, channel};
+use std::sync::mpsc::{Sender, channel};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -20,7 +20,7 @@ pub trait DevToolsConnection: Send + Sync {
     fn close(&self);
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum DevToolsTransportEvent {
     Connected(Arc<dyn DevToolsConnection>),
     Text(Arc<dyn DevToolsConnection>, Vec<u8>),
@@ -101,10 +101,10 @@ impl DevToolsTransport for StdDevToolsTransport {
         state.shutdown.store(false, Ordering::SeqCst);
         let shutdown = state.shutdown.clone();
         state.port = Some(bound);
-        state.listener = Some(listener);
-        // The accept loop owns the listener; `stop` flips the flag and connects
-        // to itself to break the blocking accept.
+        // The accept loop owns a clone; `stop` drops the original handle, flips
+        // the flag and connects to itself to break the blocking accept.
         let accept_listener = listener.try_clone()?;
+        state.listener = Some(listener);
         let connections = Arc::new(Mutex::new(Vec::<Arc<StdConnection>>::new()));
         let registry = connections.clone();
         let thread = std::thread::Builder::new()
@@ -519,16 +519,16 @@ fn base64(bytes: &[u8]) -> String {
 }
 
 /// Inbox the server drains each frame.
-pub type Receiver = std::sync::mpsc::Receiver<DevToolsTransportEvent>;
+pub type EventReceiver = std::sync::mpsc::Receiver<DevToolsTransportEvent>;
 
 /// Blocking event pump for a synchronous host. `None` when the transport
 /// stopped or no event arrived within `timeout`.
-pub fn recv_timeout(events: &Receiver<DevToolsTransportEvent>, timeout: Duration) -> Option<DevToolsTransportEvent> {
+pub fn recv_timeout(events: &EventReceiver, timeout: Duration) -> Option<DevToolsTransportEvent> {
     events.recv_timeout(timeout).ok()
 }
 
 /// Create the channel pair the server uses to consume transport events.
-pub fn event_channel() -> (Sender<DevToolsTransportEvent>, Receiver<DevToolsTransportEvent>) {
+pub fn event_channel() -> (Sender<DevToolsTransportEvent>, EventReceiver) {
     channel()
 }
 
@@ -559,8 +559,18 @@ mod tests {
 
     #[test]
     fn unsupported_hosts_are_rejected() {
-        assert_eq!(resolve_bind_address("localhost"), Ok("127.0.0.1"));
-        assert_eq!(resolve_bind_address("*"), Ok("0.0.0.0"));
+        assert_eq!(resolve_bind_address("localhost").ok(), Some("127.0.0.1"));
+        assert_eq!(resolve_bind_address("*").ok(), Some("0.0.0.0"));
         assert!(resolve_bind_address("example.com").is_err());
+    }
+}
+
+impl std::fmt::Debug for DevToolsTransportEvent {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Connected(_) => formatter.write_str("Connected"),
+            Self::Text(_, data) => write!(formatter, "Text({} bytes)", data.len()),
+            Self::Disconnected(_) => formatter.write_str("Disconnected"),
+        }
     }
 }

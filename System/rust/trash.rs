@@ -1,9 +1,14 @@
 //! Translation of `System/Sources/CoveFileSystem/Trash.swift`.
-use super::paths::PathIdentity;
-use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+
+#[cfg(not(target_os = "macos"))]
+use super::paths::PathIdentity;
+#[cfg(not(target_os = "macos"))]
+use std::fs;
+#[cfg(not(target_os = "macos"))]
 use std::sync::atomic::{AtomicU64, Ordering};
+#[cfg(not(target_os = "macos"))]
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub enum FileTrash {}
@@ -39,6 +44,7 @@ impl FileTrash {
     }
 }
 
+#[cfg(not(target_os = "macos"))]
 fn unique_identifier() -> String {
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     let nanos = SystemTime::now()

@@ -87,7 +87,7 @@ impl TerminalEngine {
             }
             let mut y = 0usize;
             while y < frame.rows && ffi::ghostty_render_state_row_iterator_next(state.row_iterator) {
-                Self::read_row(state.row_iterator, &mut frame, y, scratch);
+                Self::read_row(state.row_iterator, state.row_cells, &mut frame, y, scratch);
                 y += 1;
             }
             // Mark the dirty state consumed, exactly as the Swift reader does.
@@ -99,13 +99,15 @@ impl TerminalEngine {
 
     unsafe fn read_row(
         iterator: GhosttyRenderStateRowIterator,
+        rows_cells: GhosttyRenderStateRowCells,
         frame: &mut TerminalFrame,
         y: usize,
         scratch: &mut Vec<u8>,
     ) {
-        // SAFETY: caller guarantees a live iterator positioned on row `y`.
+        // SAFETY: caller guarantees a live iterator positioned on row `y` and a
+        // reusable row-cells handle that outlives the read.
         unsafe {
-            let mut cells: GhosttyRenderStateRowCells = ptr::null_mut();
+            let mut cells = rows_cells;
             if ffi::ghostty_render_state_row_get(iterator, ffi::RENDER_STATE_ROW_DATA_CELLS, ptr::addr_of_mut!(cells).cast())
                 != ffi::GHOSTTY_SUCCESS
             {

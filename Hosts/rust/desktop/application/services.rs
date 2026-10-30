@@ -20,7 +20,7 @@ pub struct ApplicationServices {
     capture: Option<Rc<PointerCapture>>,
     clipboard_read: Option<Rc<dyn Fn() -> Option<String>>>,
     clipboard_write: Option<Rc<dyn Fn(&str)>>,
-    images: Option<Rc<ImageAssetRegistry>>,
+    images: Option<std::sync::Arc<ImageAssetRegistry>>,
     drops: Option<Rc<AssetDropRegistry>>,
     work: Option<Rc<dyn Fn(Rc<dyn Fn()>)>>,
     display: Option<crate::desktop::display::AppDisplayHandle>,

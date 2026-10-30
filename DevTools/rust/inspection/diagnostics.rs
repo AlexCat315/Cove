@@ -4,10 +4,7 @@
 //! every query projects into a bounded, serialisable record so a model cannot
 //! hold scene state across a step.
 use crate::inspection::inspector::{DebugAttachmentKey, SceneInspector};
-use cove_core::scene::{
-    AccessibilityRole, AccessibilitySemantics, Node, NodeTree, PerformanceTimeline, StateDescriptor, StateRegistry,
-    StateValue,
-};
+use cove_core::scene::{AccessibilitySemantics, Node, NodeTree, StateDescriptor, StateRegistry, StateValue};
 use cove_core::Rect;
 use cove_devtools_protocol::{
     Envelope, NodeFrame, NodeSummary, SourceLocation, StateObservation, StateWatch,
@@ -305,7 +302,7 @@ impl Diagnostics {
                     semantics: meanings.get(&summary.id).cloned(),
                     node: summary.clone(),
                     parent_id: parent.clone(),
-                    presentation: *entry,
+                    presentation: entry.clone(),
                 });
             }
             let id = summary.id.clone();
@@ -755,7 +752,7 @@ impl Diagnostics {
     /// geometry, pointing at the layout summary instead.
     fn validate_geometry(&self, page: &DiagnosticPage<DiagnosticNode>) -> Result<(), DiagnosticError> {
         let invalid = page.items.iter().find_map(|item| {
-            let frame = item.node.frame;
+            let frame = item.node.frame.clone();
             let invalid: Vec<String> = [("x", frame.x), ("y", frame.y), ("width", frame.w), ("height", frame.h)]
                 .into_iter()
                 .filter(|(name, value)| !value.is_finite() || (matches!(*name, "width" | "height") && *value < 0.0))

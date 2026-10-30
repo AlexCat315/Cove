@@ -100,16 +100,16 @@ impl RecordingControl {
         recorder: Rc<std::cell::RefCell<InputRecorder>>,
     ) {
         let Some(checkpoint) = checkpoint.cloned() else { return };
-        let capture = checkpoint.clone();
-        self.capture = Some(Rc::new(move || capture.capture()));
-        let restore = checkpoint;
-        self.restore = Some(Rc::new(move |state| restore.restore(state)));
+        let capture_checkpoint = checkpoint.clone();
+        self.capture = Some(Rc::new(move || capture_checkpoint.capture()));
+        let restore_checkpoint = checkpoint.clone();
+        self.restore = Some(Rc::new(move |state| restore_checkpoint.restore(state)));
 
-        let start_checkpoint = recorder.clone();
-        let start_instance = start_checkpoint.clone();
+        let start_recorder = recorder.clone();
+        let start_checkpoint = checkpoint.clone();
         self.start = Some(Rc::new(move || {
-            let state = start_instance.capture();
-            start_checkpoint.borrow_mut().start(state, None)
+            let state = start_checkpoint.capture();
+            start_recorder.borrow_mut().start(state, None)
         }));
         let stop_instance = recorder.clone();
         self.stop = Some(Rc::new(move || {

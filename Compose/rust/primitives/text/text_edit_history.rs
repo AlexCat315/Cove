@@ -44,6 +44,17 @@ pub struct TextEditHistory {
     current_buffer: Option<TextBuffer>,
 }
 
+impl Clone for TextEditHistory {
+    fn clone(&self) -> Self {
+        Self {
+            registrar: self.registrar.clone(),
+            undo_stack: self.undo_stack.clone(),
+            redo_stack: self.redo_stack.clone(),
+            current_buffer: self.current_buffer.clone(),
+        }
+    }
+}
+
 impl Default for TextEditHistory {
     fn default() -> Self {
         Self::new()

@@ -5,9 +5,10 @@ use super::environment::SceneEnvironment;
 use super::surface::SurfaceState;
 use super::touch_input::TouchInput;
 use crate::desktop::diagnostics::integration::{DevToolsConfiguration, DiagnosticMemorySnapshot};
+use cove_composition::adaptive::SurfaceEnvironmentExt;
+use cove_core::scene::ComponentSourceLocation;
 use cove_composition::{
-    AnyView, ComponentSourceLocation, LayoutDebugAttachmentKey, PrimitiveView, SurfaceEnvironmentExt,
-    View, ViewGraph, ViewKind,
+    AnyView, LayoutDebugAttachmentKey, PrimitiveView, View, ViewGraph, ViewKind,
 };
 use cove_core::scene::{
     AccessibilityTree, AnimatorScheduler, EventDispatcher, FocusChain, NodeRenderer, NodeTree,
@@ -41,13 +42,13 @@ impl PrimitiveView for AndroidAdaptiveSurface {
 
     fn update_node(&self, _node: &cove_core::scene::Node) {}
 
-    fn make_layout_node(&self) -> Option<cove_composition::LayoutNode> {
+    fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
         None
     }
 
     fn children(&self, _node: &cove_core::scene::Node) -> Vec<AnyView> {
         let environment = self.environment.get();
-        vec![AnyView::new(self.content.clone().surface_environment(environment))]
+        vec![AnyView::new(cove_composition::AnyView::new(self.content.clone()).surface_environment(environment))]
     }
 }
 
@@ -196,13 +197,13 @@ impl AndroidContentSession {
             let layout = environment.text().map(|text| text.layout_cache_snapshot());
             Rc::new(move || DiagnosticMemorySnapshot {
                 counters: [
-                    ("shapingEntries", shaping.map_or(0, |cache| cache.entries as u64)),
-                    ("shapingBytes", shaping.map_or(0, |cache| cache.estimated_bytes as u64)),
-                    ("layoutEntries", layout.map_or(0, |cache| cache.entries as u64)),
-                    ("layoutBytes", layout.map_or(0, |cache| cache.estimated_bytes as u64)),
-                    ("imageEntries", environment.images().cached_count() as u64),
-                    ("imageBytes", environment.images().cached_bytes() as u64),
-                    ("skippedParentUpdates", graph.skipped_parent_updates() as u64),
+                    ("shapingEntries".to_owned(), shaping.map_or(0, |cache| cache.entries as u64)),
+                    ("shapingBytes".to_owned(), shaping.map_or(0, |cache| cache.estimated_bytes as u64)),
+                    ("layoutEntries".to_owned(), layout.map_or(0, |cache| cache.entries as u64)),
+                    ("layoutBytes".to_owned(), layout.map_or(0, |cache| cache.estimated_bytes as u64)),
+                    ("imageEntries".to_owned(), environment.images().cached_count() as u64),
+                    ("imageBytes".to_owned(), environment.images().cached_bytes() as u64),
+                    ("skippedParentUpdates".to_owned(), graph.skipped_parent_updates() as u64),
                 ]
                 .into_iter()
                 .collect(),
@@ -213,7 +214,7 @@ impl AndroidContentSession {
             let tree = self.tree.clone();
             Rc::new(move || {
                 if let Some(root) = tree.borrow().root() {
-                    root.mark_render_dirty();
+                    root.mark_render_dirty(cove_core::scene::InvalidationSource::Unknown);
                 }
             })
         };
@@ -466,10 +467,10 @@ impl AndroidContentSession {
                     clicks: 1,
                     ..MouseButtonEvent::default()
                 };
-                dispatcher.dispatch(InputEvent::MouseButtonDown(button.clone()));
-                dispatcher.dispatch(InputEvent::MouseButtonUp(button));
+                dispatcher.dispatch(&InputEvent::MouseButtonDown(button.clone()));
+                dispatcher.dispatch(&InputEvent::MouseButtonUp(button));
             } else if kind == 5 {
-                dispatcher.dispatch(InputEvent::MouseMotion(MouseMotionEvent {
+                dispatcher.dispatch(&InputEvent::MouseMotion(MouseMotionEvent {
                     x: point.x,
                     y: point.y,
                     ..MouseMotionEvent::default()
@@ -494,13 +495,13 @@ impl AndroidContentSession {
         let dispatcher = self.dispatcher();
         self.with_current(|| {
             if composing {
-                dispatcher.dispatch(InputEvent::TextEditing(TextEditingEvent {
+                dispatcher.dispatch(&InputEvent::TextEditing(TextEditingEvent {
                     text: string.to_owned(),
                     start: 0,
                     length: string.encode_utf16().count() as i32,
                 }));
             } else {
-                dispatcher.dispatch(InputEvent::TextInput(string.to_owned()));
+                dispatcher.dispatch(&InputEvent::TextInput(string.to_owned()));
             }
         });
         self.needs_update.set(true);
@@ -515,8 +516,8 @@ impl AndroidContentSession {
                 modifiers,
                 is_repeat: false,
             };
-            dispatcher.dispatch(InputEvent::KeyDown(event.clone()));
-            dispatcher.dispatch(InputEvent::KeyUp(event));
+            dispatcher.dispatch(&InputEvent::KeyDown(event.clone()));
+            dispatcher.dispatch(&InputEvent::KeyUp(event));
         });
         self.needs_update.set(true);
     }
@@ -553,8 +554,8 @@ impl AndroidContentSession {
                         modifiers: KeyModifiers::default(),
                         is_repeat: false,
                     };
-                    dispatcher.dispatch(InputEvent::KeyDown(event.clone()));
-                    dispatcher.dispatch(InputEvent::KeyUp(event));
+                    dispatcher.dispatch(&InputEvent::KeyDown(event.clone()));
+                    dispatcher.dispatch(&InputEvent::KeyUp(event));
                 }
             }
         });
@@ -568,7 +569,7 @@ impl AndroidContentSession {
         let scale = self.surface.scale();
         let dispatcher = self.dispatcher();
         self.with_current(|| {
-            dispatcher.dispatch(InputEvent::MouseWheel(MouseWheelEvent {
+            dispatcher.dispatch(&InputEvent::MouseWheel(MouseWheelEvent {
                 x: delta_x,
                 y: delta_y,
                 mouse_x: Some(x / scale),

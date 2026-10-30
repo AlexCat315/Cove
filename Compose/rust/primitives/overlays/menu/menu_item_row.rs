@@ -13,7 +13,7 @@ use cove_core::Color;
 use cove_platform::{MouseButton, SystemCursor};
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::interaction::CursorExt;
-use crate::modifiers::style::AppearanceExt;
+use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{ButtonIcon, ButtonIconSource};
 use crate::primitives::text::Text;
 use crate::theme::{theme_for_node, SemanticFontRef};
