@@ -125,16 +125,16 @@ impl TextSelectionScope {
         }
     }
 
-    pub fn key() -> Rc<CompositionLocal<Option<Rc<RefCell<TextSelectionScope>>>>> {
+    pub fn key() -> Rc<CompositionLocal<Option<TextSelectionHandle>>> {
         thread_local! {
-            static KEY: Rc<CompositionLocal<Option<Rc<RefCell<TextSelectionScope>>>>> =
+            static KEY: Rc<CompositionLocal<Option<TextSelectionHandle>>> =
                 Rc::new(CompositionLocal::constant(None));
         }
         KEY.with(|key| key.clone())
     }
 
     pub fn register(
-        self: &Rc<RefCell<Self>>,
+        scope: &SharedTextSelectionScope,
         node: &Node,
         text: Rc<dyn Fn() -> String>,
         offset_at: Rc<dyn Fn(Point) -> usize>,
@@ -152,14 +152,14 @@ impl TextSelectionScope {
             .scope
             .borrow()
             .upgrade()
-            .is_some_and(|scope| Rc::ptr_eq(&scope, self));
+            .is_some_and(|existing| Rc::ptr_eq(&existing, scope));
         if !same_scope {
             Self::unregister(node);
-            *registration.scope.borrow_mut() = Rc::downgrade(self);
+            *registration.scope.borrow_mut() = Rc::downgrade(scope);
         }
         let id = node.id().0;
         {
-            let mut scope = self.borrow_mut();
+            let mut scope = scope.borrow_mut();
             let replaced = scope
                 .members
                 .get(&id)
@@ -700,6 +700,17 @@ impl TextSelectionScope {
 
 pub type SharedTextSelectionScope = Rc<RefCell<TextSelectionScope>>;
 
+/// Composition-local wrapper. The ambient value is compared by identity — the
+/// scope itself mutates as members register and the selection moves, which is
+/// not a change of the environment.
+#[derive(Clone)]
+pub struct TextSelectionHandle(pub SharedTextSelectionScope);
+impl PartialEq for TextSelectionHandle {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+}
+
 /// One endpoint of a plain-text selection.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TextSelectionEndpoint {
@@ -937,7 +948,7 @@ impl cove_composition::PrimitiveView for TextSelectionRoot {
         vec![cove_composition::AnyView::new(
             self.content
                 .clone()
-                .composition_local(TextSelectionScope::key(), Some(self.scope.clone())),
+                .composition_local(TextSelectionScope::key(), Some(TextSelectionHandle(self.scope.clone()))),
         )]
     }
 }
@@ -962,13 +973,15 @@ impl cove_composition::PrimitiveView for TextSelectionActions {
     }
     fn children(&self, node: &Node) -> Vec<cove_composition::AnyView> {
         if let Some(scope) = node.composition_value(&TextSelectionScope::key()) {
-            let mut scope = scope.borrow_mut();
+            let mut scope = scope.0.borrow_mut();
             scope.lookup = self.lookup.clone();
             scope.share = self.share.clone();
         }
         vec![self.content.clone()]
     }
 }
+cove_composition::impl_primitive_view!(TextSelectionRoot);
+cove_composition::impl_primitive_view!(TextSelectionActions);
 
 /// `.textSelection(_:)` and `.textSelectionActions(lookup:share:)` for the
 /// composition layer.
@@ -981,7 +994,7 @@ pub trait TextSelectionViewExt: cove_composition::View + Sized + 'static {
             ))
         } else {
             cove_composition::AnyView::new(
-                self.composition_local(TextSelectionScope::key(), None),
+                self.composition_local(TextSelectionScope::key(), None::<TextSelectionHandle>),
             )
         }
     }

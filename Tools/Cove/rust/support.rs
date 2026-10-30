@@ -335,7 +335,7 @@ impl Shell {
         // The Swift budget disables the lifetime limit; a century is the
         // closest non-zero value the shared session accepts.
         limits.timeout = Duration::from_secs(60 * 60 * 24 * 365 * 100);
-        let mut session = ProcessSession::spawn(&request, limits)?;
+        let mut session = ProcessSession::spawn(&request, limits).map_err(io_error)?;
         session.close_input();
         let mut output_stream = ProcessStream::new(command, "stdout", if capture { None } else { Some(stdout) }, capture);
         let mut error_stream = ProcessStream::new(command, "stderr", Some(StdoutTarget::StandardError), false);
@@ -392,7 +392,7 @@ impl Shell {
         let mut limits = ProcessLimits::default();
         limits.output_bytes = 33_554_432;
         limits.timeout = timeout.unwrap_or(Duration::from_secs(60 * 60 * 24 * 365 * 100));
-        let mut session = ProcessSession::spawn(&request, limits)?;
+        let mut session = ProcessSession::spawn(&request, limits).map_err(io_error)?;
         session.close_input();
         let mut output_stream = ProcessStream::new(
             command,

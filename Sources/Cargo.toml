@@ -10,14 +10,17 @@ description = "WebView and workspace add-on modules"
 path = "rust/lib.rs"
 
 [dependencies]
-cove-ui-compose = { path = "../Compose" }
 cove-composition.workspace = true
-cove-runtime.workspace = true
 cove-core.workspace = true
 cove-platform.workspace = true
-cove-graphics.workspace = true
-cove-logging.workspace = true
 serde.workspace = true
+
+[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = "0.3"
+objc2-core-foundation = "0.3"
+objc2-foundation = "0.3"
+objc2-web-kit = "0.3"
 
 [lints]
 workspace = true

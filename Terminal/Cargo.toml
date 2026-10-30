@@ -5,6 +5,8 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 description = "Terminal engine and terminal view"
+build = "rust/build.rs"
+links = "ghostty_vt"
 
 [lib]
 path = "rust/lib.rs"
@@ -15,10 +17,14 @@ cove-core.workspace = true
 cove-platform.workspace = true
 cove-graphics.workspace = true
 cove-text.workspace = true
+cove-imaging.workspace = true
 cove-system.workspace = true
 cove-logging.workspace = true
 libc.workspace = true
 serde.workspace = true
+
+[build-dependencies]
+cc.workspace = true
 
 [lints]
 workspace = true

@@ -59,6 +59,23 @@ impl FrameTimings {
         value
     }
 
+    /// Fallible twin of [`Self::measure`]: a failed operation still charges its
+    /// elapsed time to the phase, matching the Swift `measure(_:_:)` that
+    /// records in `defer`.
+    pub fn measure_result<T, E>(
+        &mut self,
+        phase: Phase,
+        operation: impl FnOnce() -> Result<T, E>,
+    ) -> Result<T, E> {
+        if !self.is_sampling() {
+            return operation();
+        }
+        let before = Instant::now();
+        let value = operation();
+        *self.phases.entry(phase).or_insert(0) += before.elapsed().as_nanos() as u64;
+        value
+    }
+
     pub fn finish(&mut self, timestamp: u64, vertices: usize, indices: usize) {
         if !self.is_sampling() {
             return;

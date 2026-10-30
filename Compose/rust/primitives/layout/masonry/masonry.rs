@@ -73,12 +73,12 @@ impl MasonryLayout {
         let (column_width, sizes) = if let Some(available_width) = available_width {
             let column_width = ((available_width - self.column_spacing * (column_count - 1) as f32)
                 / column_count as f32).max(0.0);
-            (column_width, subviews.iter().map(|subview| self.measured(subview, Some(column_width))).collect())
+            (column_width, subviews.iter().map(|subview| self.measured(subview, Some(column_width))).collect::<Vec<_>>())
         } else {
             let intrinsic: Vec<f32> = subviews.iter()
                 .map(|subview| self.measured(subview, None).width).collect();
             let column_width = intrinsic.iter().copied().fold(0.0f32, f32::max);
-            (column_width, subviews.iter().map(|subview| self.measured(subview, Some(column_width))).collect())
+            (column_width, subviews.iter().map(|subview| self.measured(subview, Some(column_width))).collect::<Vec<_>>())
         };
         let mut heights = vec![0.0f32; column_count];
         let mut offsets = vec![0.0f32; subviews.len()];

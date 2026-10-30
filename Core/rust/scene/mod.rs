@@ -67,3 +67,8 @@ pub use local_invalidation::*;
 /// Geometry is defined next to the draw layer but is the vocabulary scene
 /// nodes, layout and composition use, so expose it from this module too.
 pub use crate::{Point, Rect, Size};
+/// Draw-layer vocabulary that scene nodes, custom layouts and theme styles
+/// consume without reaching back into the crate root.
+pub use crate::{
+    color_glyph_atlas_id, Color, DrawList, LayeredShadow, SurfaceShadow, TextureId,
+};

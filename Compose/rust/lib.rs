@@ -15,6 +15,15 @@ pub mod scrolling;
 pub mod theme;
 
 pub use cove_composition::*;
+pub use cove_composition::layout::*;
+pub use observed::Observed;
 pub use cove_core as scene_core;
 pub use cove_core::scene::{with_animation, with_animation_completion, AnimationCompletionCriteria};
+/// Observable state and scene vocabulary that widgets reference through the
+/// crate root, matching the Swift module's flat namespace.
+pub use cove_core::State;
+pub use cove_core::scene::{LayoutNode, Node};
+pub use primitives::layout::scroll_view::{
+    ScrollAxis, ScrollGeometry, ScrollRequest, ScrollView, ScrollViewport, ScrollbarGutter,
+};
 pub use resource_bundle::CoveUIComposeResourceBundle;

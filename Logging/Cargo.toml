@@ -19,3 +19,8 @@ tempfile.workspace = true
 
 [lints]
 workspace = true
+
+# Registered once the per-Swift-file modules replace the monolithic lib.rs.
+# [[test]]
+# name = "pipeline"
+# path = "rust/tests/pipeline.rs"

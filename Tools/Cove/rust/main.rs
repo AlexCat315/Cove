@@ -1,488 +1,351 @@
-use clap::{Args, Parser, Subcommand};
-use serde::Serialize;
-use std::{
-    env,
-    ffi::OsString,
-    fs,
-    io::{self, BufRead},
-    path::{Path, PathBuf},
-    process::{Command, ExitCode},
-};
+//! `cove` — create, build and run cross-platform Cove applications.
+//!
+//! Swift source: `Entry.swift`. Every dispatch case, printed message and exit
+//! status matches the original: a `ToolError` prints one line to stderr and
+//! exits `1`; a failing child process propagates its own status.
+//!
+//! The Swift entry also drove logging (`CoveLogging`) and the SDK re-exec
+//! bootstrap (`SDKCommand`); both still run here, with the SDK dispatch first so
+//! a newer installed SDK owns flag grammar it introduced.
 
-#[derive(Parser)]
-#[command(name = "cove", version, about = "Cove Rust build and migration tools")]
-struct Cli {
-    #[command(subcommand)]
-    command: Operation,
-}
+mod cli;
+mod development;
+mod download;
+mod installation;
+mod platforms_android;
+mod platforms_desktop;
+mod platforms_ios;
+mod project;
+mod project_sdk;
+mod project_tasks;
+mod sha256;
+mod support;
+mod toolchains;
 
-#[derive(Subcommand)]
-enum Operation {
-    /// Build Rust crates. Native UI migration is still in progress.
-    Build(BuildOptions),
-    /// Run a Rust binary.
-    Run(RunOptions),
-    /// Run Rust tests.
-    Test(TestOptions),
-    /// Type-check Rust crates.
-    Check(BuildOptions),
-    /// Check formatting.
-    Fmt {
-        #[arg(default_value = ".")]
-        directory: PathBuf,
-        #[arg(long)]
-        fix: bool,
-    },
-    /// Run Rust lints, denying warnings.
-    Clippy(BuildOptions),
-    /// Remove Cargo-generated output.
-    Clean {
-        #[arg(default_value = ".")]
-        directory: PathBuf,
-    },
-    /// Inspect the Rust and C toolchain.
-    Doctor,
-    /// Install Rust formatter/lints and optionally a compilation target.
-    Setup {
-        #[arg(long)]
-        target: Option<String>,
-    },
-    /// Inspect the remaining Swift migration work.
-    Migration {
-        #[command(subcommand)]
-        command: MigrationCommand,
-    },
-}
+use cli::{AppPlatform, Arguments, Operation, OptionKey};
+use development::Inspector;
+use platforms_android::{apk::BuildAndroidApplication, AndroidArtifact};
+use platforms_desktop::{DesktopBuild, SwiftPackage};
+use platforms_ios::IOSBuild;
+use project::{AppProject, CreateApplication, PackageTests};
+use project_sdk::{CoveSDK, SDKRelease, SDKStore};
+use project_tasks::{ProjectTaskRunner, ProjectWorkspace, WorkspaceDependencies};
+use std::process::ExitCode;
+use support::{Files, Shell, ToolError};
 
-#[derive(Args)]
-struct BuildOptions {
-    #[arg(default_value = ".")]
-    directory: PathBuf,
-    #[arg(long)]
-    release: bool,
-    #[arg(long)]
-    target: Option<String>,
-    #[arg(long)]
-    package: Option<String>,
-    #[arg(long)]
-    all_targets: bool,
-    #[arg(long)]
-    locked: bool,
-    #[arg(long)]
-    offline: bool,
-}
-#[derive(Args)]
-struct RunOptions {
-    #[command(flatten)]
-    build: BuildOptions,
-    #[arg(long)]
-    bin: Option<String>,
-    #[arg(last = true)]
-    arguments: Vec<OsString>,
-}
-#[derive(Args)]
-struct TestOptions {
-    #[command(flatten)]
-    build: BuildOptions,
-    #[arg(long)]
-    filter: Option<String>,
-    #[arg(long)]
-    build_only: bool,
-    #[arg(long)]
-    no_parallel: bool,
-    #[arg(last = true)]
-    arguments: Vec<OsString>,
-}
-#[derive(Subcommand)]
-enum MigrationCommand {
-    Status {
-        #[arg(long)]
-        json: bool,
-        #[arg(long)]
-        require_complete: bool,
-        #[arg(long)]
-        root: Option<PathBuf>,
-    },
-}
-
-fn sdk_root() -> PathBuf {
-    env::var_os("COVE_SDK_ROOT")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            Path::new(env!("CARGO_MANIFEST_DIR"))
-                .ancestors()
-                .nth(2)
-                .unwrap()
-                .to_owned()
-        })
-}
-
-fn cargo() -> Command {
-    Command::new(
-        env::var_os("COVE_CARGO_EXECUTABLE")
-            .or_else(|| env::var_os("CARGO"))
-            .unwrap_or_else(|| "cargo".into()),
-    )
-}
-
-fn manifest(directory: &Path) -> io::Result<PathBuf> {
-    let directory = directory.canonicalize()?;
-    let path = directory.join("Cargo.toml");
-    if !path.is_file() {
-        let message = if directory.join("Package.swift").is_file() {
-            format!(
-                "{} has not been migrated to Rust; see Docs/rust-migration.md",
-                directory.display()
-            )
-        } else {
-            format!("{} does not contain Cargo.toml", directory.display())
-        };
-        return Err(io::Error::new(io::ErrorKind::NotFound, message));
-    }
-    Ok(path)
-}
-fn cargo_command(operation: &str, options: &BuildOptions) -> io::Result<Command> {
-    let manifest = manifest(&options.directory)?;
-    let mut command = cargo();
-    command.arg(operation).arg("--manifest-path").arg(&manifest);
-    if operation != "run"
-        && manifest == sdk_root().canonicalize()?.join("Cargo.toml")
-        && options.package.is_none()
-    {
-        command.arg("--workspace");
-    }
-    if options.release {
-        command.arg("--release");
-    }
-    if let Some(target) = &options.target {
-        command.arg("--target").arg(target);
-    }
-    if let Some(package) = &options.package {
-        command.arg("--package").arg(package);
-    }
-    if options.all_targets {
-        command.arg("--all-targets");
-    }
-    if options.locked {
-        command.arg("--locked");
-    }
-    if options.offline {
-        command.arg("--offline");
-    }
-    Ok(command)
-}
-fn execute(command: &mut Command) -> io::Result<u8> {
-    let status = command.status()?;
-    Ok(status
-        .code()
-        .and_then(|s| u8::try_from(s).ok())
-        .unwrap_or(1))
-}
-
-#[derive(Serialize)]
-struct MigrationStatus {
-    complete: bool,
-    swift_files: usize,
-    swift_lines: usize,
-    rust_files: usize,
-    modules: Vec<ModuleStatus>,
-}
-#[derive(Serialize)]
-struct ModuleStatus {
-    name: String,
-    swift_files: usize,
-    rust_files: usize,
-}
-fn inventory(root: &Path) -> io::Result<MigrationStatus> {
-    let mut modules = std::collections::BTreeMap::<String, ModuleStatus>::new();
-    let mut status = MigrationStatus {
-        complete: false,
-        swift_files: 0,
-        swift_lines: 0,
-        rust_files: 0,
-        modules: vec![],
-    };
-    let mut pending = vec![root.to_path_buf()];
-    while let Some(directory) = pending.pop() {
-        for entry in fs::read_dir(&directory)? {
-            let entry = entry?;
-            let kind = entry.file_type()?;
-            let path = entry.path();
-            if kind.is_symlink() {
-                continue;
-            }
-            if kind.is_dir() {
-                if [
-                    ".git",
-                    ".build",
-                    ".swiftpm",
-                    "target",
-                    "third-party",
-                    "vendor",
-                    "node_modules",
-                    "build",
-                    "dist",
-                    ".cache",
-                    ".compare",
-                    ".workbuddy-ai",
-                ]
-                .iter()
-                .any(|name| entry.file_name() == *name)
-                {
-                    continue;
-                }
-                pending.push(path);
-                continue;
-            }
-            let swift = path.extension().is_some_and(|e| e == "swift")
-                || path.file_name().is_some_and(|n| n == "Package.swift.in");
-            let rust = path.extension().is_some_and(|e| e == "rs");
-            if !swift && !rust {
-                continue;
-            }
-            let relative = path.strip_prefix(root).unwrap();
-            let name = relative
-                .components()
-                .next()
-                .unwrap()
-                .as_os_str()
-                .to_string_lossy()
-                .into_owned();
-            let module = modules.entry(name.clone()).or_insert(ModuleStatus {
-                name,
-                swift_files: 0,
-                rust_files: 0,
-            });
-            if swift {
-                module.swift_files += 1;
-                status.swift_files += 1;
-                for line in io::BufReader::new(fs::File::open(&path)?).lines() {
-                    line?;
-                    status.swift_lines += 1;
-                }
-            }
-            if rust {
-                module.rust_files += 1;
-                status.rust_files += 1;
-            }
-        }
-    }
-    status.modules = modules.into_values().collect();
-    status.complete = status.swift_files == 0;
-    Ok(status)
-}
-fn run(cli: Cli) -> io::Result<u8> {
-    match cli.command {
-        Operation::Build(options) => execute(&mut cargo_command("build", &options)?),
-        Operation::Check(options) => execute(&mut cargo_command("check", &options)?),
-        Operation::Run(options) => {
-            let mut command = cargo_command("run", &options.build)?;
-            if let Some(bin) = options.bin {
-                command.arg("--bin").arg(bin);
-            }
-            command.arg("--").args(options.arguments);
-            execute(&mut command)
-        }
-        Operation::Test(options) => {
-            let mut command = cargo_command("test", &options.build)?;
-            if options.build_only {
-                command.arg("--no-run");
-            }
-            if let Some(filter) = options.filter {
-                command.arg(filter);
-            }
-            if options.no_parallel || !options.arguments.is_empty() {
-                command.arg("--");
-            }
-            if options.no_parallel {
-                command.arg("--test-threads=1");
-            }
-            command.args(options.arguments);
-            execute(&mut command)
-        }
-        Operation::Clippy(options) => {
-            let mut command = cargo_command("clippy", &options)?;
-            command.args(["--", "-D", "warnings"]);
-            execute(&mut command)
-        }
-        Operation::Fmt { directory, fix } => {
-            let mut command = cargo();
-            command
-                .arg("fmt")
-                .arg("--manifest-path")
-                .arg(manifest(&directory)?)
-                .arg("--all");
-            if !fix {
-                command.args(["--", "--check"]);
-            }
-            execute(&mut command)
-        }
-        Operation::Clean { directory } => {
-            let mut command = cargo();
-            command
-                .arg("clean")
-                .arg("--manifest-path")
-                .arg(manifest(&directory)?);
-            execute(&mut command)
-        }
-        Operation::Doctor => {
-            let mut failed = false;
-            for (tool, arguments) in [
-                ("rustc", vec!["--version"]),
-                ("cargo", vec!["--version"]),
-                (
-                    if cfg!(windows) { "cl" } else { "cc" },
-                    if cfg!(windows) {
-                        vec!["/?"]
-                    } else {
-                        vec!["--version"]
-                    },
-                ),
-            ] {
-                let mut command = if tool == "cargo" {
-                    cargo()
-                } else {
-                    Command::new(tool)
-                };
-                match command.args(arguments).output() {
-                    Ok(output) if output.status.success() => {
-                        let text = if output.stdout.is_empty() {
-                            &output.stderr
-                        } else {
-                            &output.stdout
-                        };
-                        println!(
-                            "{}",
-                            String::from_utf8_lossy(text).lines().next().unwrap_or(tool)
-                        );
-                    }
-                    _ => {
-                        eprintln!("missing tool: {tool}");
-                        failed = true;
-                    }
-                }
-            }
-            Ok(u8::from(failed))
-        }
-        Operation::Setup { target } => {
-            let code =
-                execute(Command::new("rustup").args(["component", "add", "rustfmt", "clippy"]))?;
-            if code != 0 {
-                return Ok(code);
-            }
-            if let Some(target) = target {
-                return execute(Command::new("rustup").args(["target", "add", &target]));
-            }
-            Ok(0)
-        }
-        Operation::Migration {
-            command:
-                MigrationCommand::Status {
-                    json,
-                    require_complete,
-                    root,
-                },
-        } => {
-            let status = inventory(&root.unwrap_or_else(sdk_root).canonicalize()?)?;
-            if json {
-                println!("{}", serde_json::to_string_pretty(&status)?);
-            } else {
-                println!(
-                    "Swift: {} files / {} lines; Rust: {} files",
-                    status.swift_files, status.swift_lines, status.rust_files
-                );
-                println!("{:<18} {:>8} {:>8}", "Module", "Swift", "Rust");
-                for module in &status.modules {
-                    println!(
-                        "{:<18} {:>8} {:>8}",
-                        module.name, module.swift_files, module.rust_files
-                    );
-                }
-                println!(
-                    "{}",
-                    if status.complete {
-                        "Swift source removal complete; platform acceptance is tracked separately."
-                    } else {
-                        "Migration incomplete. See Docs/rust-migration.md."
-                    }
-                );
-            }
-            Ok(if require_complete && !status.complete {
-                2
-            } else {
-                0
-            })
-        }
-    }
-}
 fn main() -> ExitCode {
-    match run(Cli::parse()) {
+    let raw: Vec<String> = std::env::args().skip(1).collect();
+    match run(&raw) {
         Ok(code) => ExitCode::from(code),
         Err(error) => {
-            eprintln!("cove: {error}");
+            eprintln!("{error}");
             ExitCode::FAILURE
         }
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn parses_without_passing_test_flags_to_cargo_build() {
-        let cli = Cli::try_parse_from([
-            "cove",
-            "test",
-            "System",
-            "--no-parallel",
-            "--filter",
-            "timeout",
-            "--",
-            "--nocapture",
-        ])
-        .unwrap();
-        let Operation::Test(options) = cli.command else {
-            panic!()
-        };
-        assert!(options.no_parallel);
-        assert_eq!(options.filter.as_deref(), Some("timeout"));
-        assert_eq!(options.arguments, [OsString::from("--nocapture")]);
-        assert!(Cli::try_parse_from(["cove", "build", "--no-parallel"]).is_err());
+fn run(raw: &[String]) -> Result<u8, ToolError> {
+    if raw == ["--version"] {
+        println!("cove {}", SDKRelease::current()?.version);
+        return Ok(0);
     }
-    #[test]
-    fn audit_excludes_dependencies_and_counts_swift_templates() {
-        let root = tempfile::tempdir().unwrap();
-        for path in [
-            "Core/a.swift",
-            "Core/rust/lib.rs",
-            "Tools/Package.swift.in",
-            "third-party/b.swift",
-            "target/c.swift",
-        ] {
-            let path = root.path().join(path);
-            fs::create_dir_all(path.parent().unwrap()).unwrap();
-            fs::write(path, "first\nsecond\n").unwrap();
+    // The installed SDK selected by cove.json or --sdk-root re-executes the
+    // command so a newer toolchain owns its own flags.
+    SDKCommandBootstrap::bootstrap(raw)?;
+    if raw.is_empty()
+        || raw
+            .iter()
+            .take_while(|token| token.as_str() != "--")
+            .any(|token| token == "--help")
+    {
+        println!("{}", usage());
+        return Ok(0);
+    }
+    let arguments = Arguments::parse(raw)?;
+    SDKCommandBootstrap::forward(&arguments, raw)?;
+    execute(&arguments)
+}
+
+fn execute(arguments: &Arguments) -> Result<u8, ToolError> {
+    match arguments.operation {
+        Operation::Task => {
+            let root = CoveSDK::locate(arguments, None, &support::environment())?;
+            ProjectTaskRunner::new(arguments, &root).run()?;
+            Ok(0)
         }
-        let status = inventory(root.path()).unwrap();
-        assert_eq!(
-            (
-                status.swift_files,
-                status.swift_lines,
-                status.rust_files,
-                status.complete
-            ),
-            (2, 4, 1, false)
-        );
+        Operation::SelfUpdate => {
+            installation::CLIUpdate::run(arguments.subject.as_deref())?;
+            Ok(0)
+        }
+        Operation::InstallCli => {
+            installation::CLIInstaller::install(
+                &installation::InstallationReceipt::executable_directory(),
+                &arguments.directory(),
+                std::path::Path::new(arguments.required(OptionKey::BinDirectory)?),
+            )?;
+            Ok(0)
+        }
+        Operation::PackageCli => {
+            installation::CLIArchive::create(
+                &CoveSDK::locate(arguments, None, &support::environment())?,
+                &arguments
+                    .url(OptionKey::Output)
+                    .unwrap_or_else(|| arguments.directory().join("dist")),
+            )?;
+            Ok(0)
+        }
+        Operation::PackageNative => {
+            installation::NativeArchive::create(
+                &CoveSDK::locate(arguments, None, &support::environment())?,
+                &arguments
+                    .url(OptionKey::Output)
+                    .unwrap_or_else(|| arguments.directory().join("dist")),
+                arguments,
+            )?;
+            Ok(0)
+        }
+        Operation::PackageBuild => {
+            let root = CoveSDK::locate(arguments, None, &support::environment())?;
+            let mut command = SwiftPackage::command(
+                &arguments.directory(),
+                arguments.configuration,
+                "build",
+                arguments.url(OptionKey::ScratchPath).as_deref(),
+            );
+            if let Some(product) = arguments.value(OptionKey::Product) {
+                command.push("--product".into());
+                command.push(product.into());
+            }
+            if let Some(target) = arguments.value(OptionKey::Target) {
+                command.push("--target".into());
+                command.push(target.into());
+            }
+            if let Some(triple) = arguments.value(OptionKey::Triple) {
+                command.push("--triple".into());
+                command.push(triple.into());
+            }
+            if let Some(sdk) = arguments.value(OptionKey::Sdk) {
+                command.push("--sdk".into());
+                command.push(sdk.into());
+            }
+            if arguments.flags.contains(&cli::Flag::BuildTests) {
+                command.push("--build-tests".into());
+            }
+            let build_environment = SwiftPackage::environment(&root)?;
+            Shell::run(
+                &command,
+                None,
+                &build_environment,
+                false,
+                false,
+                support::StdoutTarget::StandardOutput,
+            )?;
+            if let Some(result) = arguments.url(OptionKey::ResultFile) {
+                let mut paths = command;
+                paths.push("--show-bin-path".into());
+                let products = Shell::run(
+                    &paths,
+                    None,
+                    &build_environment,
+                    true,
+                    false,
+                    support::StdoutTarget::StandardOutput,
+                )?;
+                #[derive(serde::Serialize)]
+                struct Products {
+                    products: String,
+                }
+                Files::json(&Products { products }, &result)?;
+            }
+            Ok(0)
+        }
+        Operation::Create => {
+            CreateApplication::run(arguments, &CoveSDK::locate(arguments, None, &support::environment())?)?;
+            Ok(0)
+        }
+        Operation::Clean => {
+            let project = AppProject::new(&arguments.directory())?;
+            project.clean()?;
+            println!("Cleaned {}", project.build_directory().display());
+            Ok(0)
+        }
+        Operation::Test => {
+            PackageTests::new(arguments)?.run()?;
+            Ok(0)
+        }
+        Operation::Build | Operation::Run => {
+            let project = AppProject::new(&arguments.directory())?;
+            let root = CoveSDK::locate(arguments, Some(&project), &support::environment())?;
+            project.require(arguments.platform)?;
+            if let Some(workspace) = ProjectWorkspace::find(&project.directory)? {
+                WorkspaceDependencies::refresh(&workspace, &root, &support::environment())?;
+                ProjectTaskRunner::new(arguments, &root).run_before_build(&workspace)?;
+            }
+            if arguments.platform == AppPlatform::Android {
+                BuildAndroidApplication::run(arguments, &root, Some(&project))?;
+            } else if arguments.platform == AppPlatform::Ios {
+                IOSBuild::new(project, &root, arguments).run()?;
+            } else {
+                DesktopBuild::new(project, &root, arguments).run()?;
+            }
+            Ok(0)
+        }
+        Operation::Devtools => {
+            let project = AppProject::new(&arguments.directory())?;
+            let root = CoveSDK::locate(arguments, Some(&project), &support::environment())?;
+            Inspector::attach(arguments, &project, &root)?;
+            Ok(0)
+        }
+        Operation::AndroidPrepare => {
+            let project = AppProject::new(&arguments.directory())?;
+            let root = CoveSDK::locate(arguments, Some(&project), &support::environment())?;
+            BuildAndroidApplication::prepare(arguments, &root, &project)?;
+            Ok(0)
+        }
+        Operation::SdkInstall => {
+            let subject = arguments
+                .subject
+                .clone()
+                .ok_or_else(|| ToolError::invalid("Supply a project directory"))?;
+            SDKStore::new(None).install(&subject)?;
+            Ok(0)
+        }
+        Operation::SdkUse => {
+            let store = SDKStore::new(None);
+            let subject = arguments
+                .subject
+                .clone()
+                .ok_or_else(|| ToolError::invalid("Supply a project directory"))?;
+            let root = if SDKRelease::is_version(&subject) {
+                store.installed(&subject)
+            } else {
+                arguments.directory()
+            };
+            if SDKRelease::is_version(&subject) {
+                let commands = installation::InstallationReceipt::read(&store.directory)
+                    .map(|receipt| receipt.commands)
+                    .unwrap_or_else(|_| installation::Installation::commands());
+                installation::CLIInstaller::install(&root, &store.directory, &commands)?;
+            } else {
+                store.select(&root)?;
+            }
+            let cwd = std::env::current_dir().unwrap_or_else(|_| ".".into());
+            if let Ok(project) = AppProject::new(&cwd) {
+                project.pin(&SDKRelease::read(&root)?.version)?;
+            }
+            Ok(0)
+        }
+        Operation::SdkList => {
+            SDKStore::new(None).list()?;
+            Ok(0)
+        }
+        Operation::Setup => {
+            toolchains::ToolchainSetup::run(
+                arguments,
+                &CoveSDK::locate(arguments, None, &support::environment())?,
+            )?;
+            Ok(0)
+        }
+        Operation::Doctor => {
+            cli::Diagnostics::doctor(
+                arguments,
+                &CoveSDK::locate(arguments, None, &support::environment())?,
+            )?;
+            Ok(0)
+        }
+        Operation::Devices => {
+            cli::Diagnostics::devices(arguments)?;
+            Ok(0)
+        }
+        Operation::Showcase => {
+            platforms_android::apk::showcase(
+                arguments,
+                &CoveSDK::locate(arguments, None, &support::environment())?,
+            )?;
+            Ok(0)
+        }
+        Operation::AndroidExport => {
+            AndroidArtifact::export(
+                arguments,
+                &CoveSDK::locate(arguments, None, &support::environment())?,
+            )?;
+            Ok(0)
+        }
+        Operation::AndroidCompile => {
+            platforms_android::compile(
+                arguments,
+                &CoveSDK::locate(arguments, None, &support::environment())?,
+            )?;
+            Ok(0)
+        }
     }
-    #[test]
-    fn swift_only_package_is_rejected_without_compiler_fallback() {
-        let root = tempfile::tempdir().unwrap();
-        fs::write(root.path().join("Package.swift"), "").unwrap();
-        assert!(
-            manifest(root.path())
-                .unwrap_err()
-                .to_string()
-                .contains("has not been migrated")
-        );
+}
+
+/// Re-executes the command with the SDK the project selects.
+struct SDKCommandBootstrap;
+
+impl SDKCommandBootstrap {
+    fn bootstrap(raw: &[String]) -> Result<(), ToolError> {
+        let Some(verb) = raw.first() else {
+            return Ok(());
+        };
+        if ["self", "sdk", "internal"].contains(&verb.as_str()) {
+            return Ok(());
+        }
+        let store = SDKStore::new(None);
+        if let Some(root) = project_sdk::SDKCommand::selected_sdk(raw, &store, &support::environment())?
+        {
+            project_sdk::SDKCommand::invoke(&root, raw)?;
+        }
+        Ok(())
     }
+
+    fn forward(arguments: &Arguments, raw: &[String]) -> Result<(), ToolError> {
+        project_sdk::SDKCommand::forward(arguments, raw)
+    }
+}
+
+/// `cove --help`, matching the Swift usage string verbatim.
+fn usage() -> &'static str {
+    "Cove — create, build and run cross-platform Swift applications
+
+  cove create app <directory> [--id com.example.app] [--name 'My App']
+  cove build [directory] [--mac|--win|--linux|--android|--ios|--web] [--debug|--profile|--release]
+  cove run   [directory] [--mac|--win|--linux|--android|--ios|--web] [--debug|--profile|--release]
+  cove test  [directory] [--debug|--profile|--release] [--filter TEST] [--no-parallel]
+              [--build-only|--skip-build] [--testing-library xctest|swift-testing]
+              [--timeout SECONDS] [--event-output FILE] [--scratch-path DIRECTORY]
+  cove clean [directory]
+  cove task [NAME] [directory] [--sdk-root PATH] [-- task arguments]
+  cove self update [VERSION]
+  cove sdk install VERSION|latest
+  cove sdk use VERSION|PATH | cove sdk list
+  cove setup [--mac|--win|--linux|--android|--ios]
+  cove doctor [--mac|--win|--linux|--android|--ios]
+  cove devices [--android|--ios]
+  cove devtools [directory] [--session ID] [--no-open]
+  cove devtools [directory] [--session ID] list | query [TOOL] [JSON|@FILE]
+                         | click NODE_ID [--capture OUT.jpg] | activate NODE_ID [increment|decrement] | reveal NODE_ID
+                         | input JSON|@FILE [--capture OUT.jpg]
+                         | capture OUT.jpg [--settle-ms N] [--scale 1-3] [--node NODE_ID | --region X,Y,W,H] | resize W H [--capture OUT.jpg] | timings OUT.json FRAMES WARMUP
+
+Directory defaults to the current project; platform defaults to the host; configuration defaults to debug.
+One cove.json owns application identity, SDK location and targets; UI lives in Sources/AppContent.
+Test accepts application projects and plain Swift packages; plain packages keep their native .build cache.
+Desktop builds run on their matching host. Android uses Swift 6.4.1 + Android SDK, NDK r30 and JDK 21.
+iOS uses Xcode, SDL/UIKit and Metal; Web has a portable rendering prototype.
+
+SDK selection: --sdk-root PATH, COVE_SDK_ROOT, cove.json's toolchain.sdkVersion, or the installed SDK selection.
+Run: --devtools [--no-open] opens the Inspector; --profile enables optimized diagnostics.
+Run: arguments after -- go to the desktop application, e.g. cove run CoveUI/Examples -- --component list --width 390.
+DevTools actions resolve the live session; query with a bare JSON object runs query_ui_nodes.
+Create: --platforms mac,android,ios selects native project templates.
+Build/run: --output PATH; Android: --android-sdk PATH --ndk PATH --device SERIAL
+iOS: --simulator UDID (default: booted); physical device: --device ID --team TEAM_ID
+Android signing: --keystore FILE --key-alias ALIAS --store-password-env NAME --key-password-env NAME
+Release APKs use a development key unless custom signing is provided.
+Plugin: compiles Sources/ with CovePluginKit into an Embedded Swift WebAssembly Component.
+
+Framework development:
+  cove showcase [gallery|counter] --android [--component NAME] [--release]"
 }

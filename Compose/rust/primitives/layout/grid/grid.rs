@@ -68,9 +68,9 @@ impl GridLayout {
         let visible_columns: Vec<GridColumn> = plan.as_ref()
             .map(|plan| plan.indices.iter().map(|&index| self.columns[index].clone()).collect())
             .unwrap_or_else(|| self.columns.clone());
-        let mut intrinsic_widths = Vec::new();
+        let mut intrinsic_widths: Vec<f32> = Vec::new();
         if proposal.width.is_none() {
-            intrinsic_widths = vec![0.0; visible_columns.len()];
+            intrinsic_widths = vec![0.0_f32; visible_columns.len()];
             for index in 0..subviews.len() {
                 let column = index % self.columns.len();
                 if let Some(presented) = presented_column(column) {
@@ -125,7 +125,7 @@ impl GridLayout {
         let mut intrinsic = Vec::new();
         if proposal.width.is_none() {
             let draft = GridSpanPlacement::new(spans, self.columns.len());
-            intrinsic = vec![0.0; self.columns.len()];
+            intrinsic = vec![0.0_f32; self.columns.len()];
             for (index, cell) in draft.cells.iter().enumerate() {
                 if cell.span.columns == 1 {
                     intrinsic[cell.column] = intrinsic[cell.column]

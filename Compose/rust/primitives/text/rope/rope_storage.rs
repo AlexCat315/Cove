@@ -85,8 +85,8 @@ pub struct RopeMetrics {
 }
 
 pub struct RopeBranch {
-    pub left: RopeNode,
-    pub right: RopeNode,
+    pub left: RopeHandle,
+    pub right: RopeHandle,
 }
 
 pub enum RopeStorage {

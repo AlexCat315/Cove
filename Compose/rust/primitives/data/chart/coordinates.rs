@@ -106,7 +106,7 @@ impl ChartGeometry {
                     Self::numeric_slot(series, &shown, scale, plot, orientation, window.as_ref())
                 })
             })
-            .unwrap_or_else(|| orientation.breadth(plot) / sample_count.max(1) as f32);
+            .unwrap_or_else(|| orientation.breadth(plot) / slot_count.max(1) as f32);
 
         let category_gap = bar_spacing.max((slot * 0.25).min(24.0));
         let inner_gap = if groups > 1 { 2.0 } else { 0.0 };

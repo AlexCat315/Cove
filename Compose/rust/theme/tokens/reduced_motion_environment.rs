@@ -1,6 +1,6 @@
 //! Translation of Theme/Tokens/ReducedMotionEnvironment.swift.
 use cove_core::scene::ReducedMotionEnvironment;
-use crate::{ProvideCompositionLocalModifier, View};
+use crate::{ProvideCompositionLocalModifier, View, ViewExt};
 
 pub trait ReducedMotionViewExt: View + Sized + 'static {
     /// Marks the subtree as preferring reduced motion.

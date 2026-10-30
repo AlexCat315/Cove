@@ -176,6 +176,26 @@ pub struct LazyGridView<T> {
     visible_columns: State<Range<usize>>,
 }
 impl<T: Clone + 'static> LazyGridView<T> {
+    /// Re-applies a text-scale factor to the row metrics. The view may have
+    /// been built at factor 1, so the base metrics are still unscaled.
+    fn scaled_grid(&self, factor: f32) -> LazyGridView<T> {
+        LazyGridView {
+            data: self.data.clone(),
+            id: self.id.clone(),
+            columns: self.columns,
+            row_heights: self.row_heights.scaled(factor),
+            column_spacing: self.column_spacing,
+            row_spacing: self.row_spacing * factor,
+            overscan: self.overscan,
+            scroll_offset: self.scroll_offset.clone(),
+            column_width: self.column_width,
+            column_span: self.column_span.clone(),
+            content: self.content.clone(),
+            visible_rows: self.visible_rows.clone(),
+            visible_columns: self.visible_columns.clone(),
+        }
+    }
+
     fn rows(&self) -> LazyGridRows {
         let spans: Option<Vec<usize>> = self.column_span.as_ref()
             .map(|span| self.data.iter().map(|item| (span)(item)).collect());
@@ -220,7 +240,12 @@ impl<T: Clone + 'static> View for LazyGridView<T> {
         let mut scroll = crate::ScrollView::new(axis, AnyView::new(content))
             .scrollbar_gutter(crate::ScrollbarGutter::Stable);
         if let Some(offset) = &self.scroll_offset {
-            scroll = scroll.scroll_offset(offset.clone());
+            let state = offset.clone();
+            let reader = state.clone();
+            scroll = scroll.scroll_offset(cove_core::Binding::new(
+                move || reader.get(),
+                move |value| state.set(value),
+            ));
         }
         let visible_rows = self.visible_rows.clone();
         let visible_columns = self.visible_columns.clone();
@@ -230,7 +255,7 @@ impl<T: Clone + 'static> View for LazyGridView<T> {
         let columns = self.columns;
         let column_width = self.column_width;
         let column_spacing = self.column_spacing;
-        scroll = scroll.on_geometry_change(Rc::new(move |geometry: &crate::ScrollGeometry| {
+        scroll = scroll.on_geometry_change(move |geometry: crate::ScrollGeometry| {
             let next = row_heights.visible_rows(row_count, geometry.offset.y,
                 geometry.viewport_size.height, row_spacing, overscan);
             if visible_rows.get() != next {
@@ -243,7 +268,7 @@ impl<T: Clone + 'static> View for LazyGridView<T> {
                     visible_columns.set(next_columns);
                 }
             }
-        }));
+        });
         AnyView::new(scroll)
     }
     fn tag(&self) -> &'static str {

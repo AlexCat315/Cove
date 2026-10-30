@@ -10,8 +10,8 @@ enum VisualLineStorage {
         rows_per_line: usize,
     },
     Branch {
-        left: VisualLineNode,
-        right: VisualLineNode,
+        left: Rc<VisualLineNode>,
+        right: Rc<VisualLineNode>,
     },
 }
 
@@ -41,7 +41,7 @@ impl VisualLineNode {
         }
     }
 
-    fn branch(left: VisualLineNode, right: VisualLineNode) -> Self {
+    fn branch(left: Rc<VisualLineNode>, right: Rc<VisualLineNode>) -> Self {
         Self {
             lines: left.lines + right.lines,
             rows: left.rows + right.rows,
@@ -109,13 +109,10 @@ pub fn join(left: Rc<VisualLineNode>, right: Rc<VisualLineNode>) -> Rc<VisualLin
             return balanced(join(left, a.clone()), b.clone());
         }
     }
-    Rc::new(VisualLineNode::branch(
-        Rc::unwrap_or_clone(left),
-        Rc::unwrap_or_clone(right),
-    ))
+    Rc::new(VisualLineNode::branch(left, right))
 }
 
-fn branch_parts(node: &VisualLineNode) -> Option<(VisualLineNode, VisualLineNode)> {
+fn branch_parts(node: &VisualLineNode) -> Option<(Rc<VisualLineNode>, Rc<VisualLineNode>)> {
     match &node.storage {
         VisualLineStorage::Branch { left, right } => Some((left.clone(), right.clone())),
         VisualLineStorage::Run { .. } => None,
@@ -155,10 +152,7 @@ fn balanced(left: Rc<VisualLineNode>, right: Rc<VisualLineNode>) -> Rc<VisualLin
             }
         }
     }
-    Rc::new(VisualLineNode::branch(
-        Rc::unwrap_or_clone(left),
-        Rc::unwrap_or_clone(right),
-    ))
+    Rc::new(VisualLineNode::branch(left, right))
 }
 
 fn split_handle(

@@ -168,7 +168,7 @@ pub struct GridTracksGroup {
 }
 impl GridTracks {
     pub fn new(groups: Vec<GridTracksGroup>, spacing: f32) -> Self {
-        let count = groups.iter().map(|group| group.count).sum();
+        let count: usize = groups.iter().map(|group| group.count).sum();
         let total_width = groups.iter().map(|group| group.width * group.count as f32).sum::<f32>()
             + spacing * count.saturating_sub(1) as f32;
         Self { groups, count, total_width, spacing }

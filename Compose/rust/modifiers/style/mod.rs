@@ -4,3 +4,4 @@ pub mod surface;
 pub use style_attachment_key::*;
 pub use style_modifiers::*;
 pub use surface::*;
+pub use crate::theme::tokens::semantic_modifiers::SemanticStyleViewExt;

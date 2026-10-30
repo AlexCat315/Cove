@@ -25,6 +25,8 @@ pub enum AppPlatform {
 }
 
 impl AppPlatform {
+    /// Every platform spelling accepted on the command line.
+    #[allow(dead_code)]
     pub const ALL: [Self; 6] = [
         Self::Mac,
         Self::Win,
@@ -951,7 +953,7 @@ impl Diagnostics {
                 &crate::support::environment(),
                 false,
                 false,
-                None,
+                crate::support::StdoutTarget::StandardOutput,
             )?;
             crate::support::Shell::run(
                 &[
@@ -964,7 +966,7 @@ impl Diagnostics {
                 &crate::support::environment(),
                 false,
                 false,
-                None,
+                crate::support::StdoutTarget::StandardOutput,
             )?;
             return Ok(());
         }
@@ -983,7 +985,7 @@ impl Diagnostics {
             &crate::support::environment(),
             false,
             false,
-            None,
+            crate::support::StdoutTarget::StandardOutput,
         )?;
         Ok(())
     }

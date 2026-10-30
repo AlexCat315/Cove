@@ -124,6 +124,7 @@ pub struct ChartOverlaySlot {
 
 /// Places every overlay item against its anchor, keeps it inside the chart,
 /// flips it when it does not fit and hides dropped labels.
+#[derive(Clone)]
 pub struct ChartOverlayLayout {
     pub plot: ChartPlot,
     pub theme: Theme,

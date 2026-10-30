@@ -83,13 +83,14 @@ pub struct AndroidContentSession {
     surface: SurfaceState,
 }
 
-impl AndroidContentSession {
-    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    pub enum Rendering {
-        Layers,
-        Direct,
-    }
+/// How the content session turns the node tree into a draw list.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Rendering {
+    Layers,
+    Direct,
+}
 
+impl AndroidContentSession {
     pub fn new(scale: f32, rendering: Rendering, content: AnyView) -> Self {
         let tree = Rc::new(RefCell::new(NodeTree::new()));
         let recomposer = Rc::new(Recomposer::new());
@@ -581,8 +582,7 @@ impl AndroidContentSession {
         });
         self.needs_update.set(true);
     }
-
-    /// Explicit diagnostic work; input delivery never traverses this snapshot.
-    /// Implemented in `inspection.rs`, mirroring the Swift extension.
+    // `inspect()` — the explicit diagnostic snapshot — lives in `inspection.rs`,
+    // mirroring the Swift extension on `HostedScene`.
 }
 

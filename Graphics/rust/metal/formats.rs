@@ -211,8 +211,8 @@ pub fn triangle_fill_mode(mode: FillMode) -> MTLTriangleFillMode {
 
 pub fn index_type(index_type: IndexType) -> MTLIndexType {
     match index_type {
-        IndexType::UInt16 => MTLIndexType::UInt16,
-        IndexType::UInt32 => MTLIndexType::UInt32,
+        IndexType::Uint16 => MTLIndexType::UInt16,
+        IndexType::Uint32 => MTLIndexType::UInt32,
     }
 }
 

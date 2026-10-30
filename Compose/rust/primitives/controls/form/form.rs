@@ -122,7 +122,7 @@ impl View for Form {
                     stack.push(AnyView::new(
                         crate::primitives::feedback::Alert::new("Please check the form")
                             .message(message)
-                            .tone(crate::primitives::feedback::AlertTone::Danger),
+                            .tone(crate::primitives::feedback::StatusTone::Danger),
                     ));
                 }
             }
@@ -130,7 +130,7 @@ impl View for Form {
             for field in &visible {
                 let field_id = field.id.clone();
                 let error = controller.as_ref().and_then(|controller| controller.error(&field_id)).or_else(|| field.presentation.error.clone());
-                cells.push(AnyView::new(FormFieldView { field: field.clone(), layout: layout.clone(), error }).id(field_id));
+                cells.push(AnyView::new(AnyView::new(FormFieldView { field: field.clone(), layout: layout.clone(), error }).id(field_id)));
             }
             stack.push(AnyView::new(Grid::new(
                 vec![GridColumn::flexible(0.0, f32::INFINITY); columns],
@@ -188,19 +188,20 @@ impl View for FormFieldView {
                         options.target_id = Some(field.id.clone());
                         options.help = field.presentation.help.clone();
                     });
-                let label = (if leading { AnyView::new(label.frame_width(label_width)) } else { AnyView::new(label) })
-                    .flex(0.0)
-                    .shrink(0.0);
-                let mut value_stack: Vec<AnyView> = vec![AnyView::new(field.content.clone().accessibility(AccessibilitySemantics {
-                    label: field.label.clone(),
-                    identifier: field.id.clone(),
-                    help: error.clone().unwrap_or_else(|| field.presentation.help.clone()),
-                    state: AccessibilityState {
+                let label = if leading {
+                    AnyView::new(AnyView::new(label.frame_width(label_width)).flex(0.0).shrink(0.0))
+                } else {
+                    AnyView::new(AnyView::new(label).flex(0.0).shrink(0.0))
+                };
+                let mut value_stack: Vec<AnyView> = vec![AnyView::new(field.content.clone().accessibility(move |semantics| {
+                    semantics.label = field.label.clone();
+                    semantics.identifier = field.id.clone();
+                    semantics.help = error.clone().unwrap_or_else(|| field.presentation.help.clone());
+                    semantics.state = AccessibilityState {
                         is_required: field.presentation.is_required,
                         is_invalid: error.is_some(),
                         ..Default::default()
-                    },
-                    ..Default::default()
+                    };
                 }))];
                 if let Some(error) = &error {
                     value_stack.push(AnyView::new(
@@ -215,17 +216,19 @@ impl View for FormFieldView {
                             .semantic_foreground(SemanticColorRef::on_surface_muted()),
                     ));
                 }
-                let values = BoxView::new(
-                    FlexDirection::Column,
-                    Align::Stretch,
-                    Justify::FlexStart,
-                    Wrap::NoWrap,
-                    5.0,
-                    AnyView::new(TupleView::new(value_stack)),
-                )
-                .flex(if leading { 1.0 } else { 0.0 })
-                .shrink(1.0)
-                .flex_basis(if leading { Some(0.0) } else { None });
+                let values = AnyView::new(
+                    BoxView::new(
+                        FlexDirection::Column,
+                        Align::Stretch,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        5.0,
+                        AnyView::new(TupleView::new(value_stack)),
+                    )
+                    .flex(if leading { 1.0 } else { 0.0 })
+                    .shrink(1.0)
+                    .flex_basis(if leading { Some(0.0) } else { None }),
+                );
                 AnyView::new(
                     BoxView::new(
                         if leading { FlexDirection::Row } else { FlexDirection::Column },

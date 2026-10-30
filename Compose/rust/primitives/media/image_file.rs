@@ -12,7 +12,9 @@ use cove_imaging::{
     PixelSize,
 };
 
-use super::image::{Image, ImageContentMode, ImageRenderingMode, ImageSource};
+use super::image::Image;
+use super::image_geometry::{ImageContentMode, ImageRenderingMode};
+use super::image::ImageSource;
 use super::vector_image_raster::VectorImageRaster;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

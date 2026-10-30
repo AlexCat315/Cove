@@ -22,3 +22,27 @@ cc.workspace = true
 
 [lints]
 workspace = true
+
+[[test]]
+name = "file_lock"
+path = "rust/tests/file_lock.rs"
+
+[[test]]
+name = "files"
+path = "rust/tests/files.rs"
+
+[[test]]
+name = "paths"
+path = "rust/tests/paths.rs"
+
+[[test]]
+name = "buffer"
+path = "rust/tests/buffer.rs"
+
+[[test]]
+name = "contracts"
+path = "rust/tests/contracts.rs"
+
+[[test]]
+name = "process"
+path = "rust/tests/process.rs"

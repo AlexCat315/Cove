@@ -1,7 +1,8 @@
 //! Translation of Theme/ThemeEnvironment.swift.
 use cove_core::scene::{CompositionLocal, Node};
 use std::rc::Rc;
-use super::tokens::{TextStyleToken, Theme};
+use super::tokens::TextStyleToken;
+use super::theme::Theme;
 use crate::{ModifiedContent, View, ViewExt};
 
 /// `CompositionLocal` key carrying the active `Theme` down the composition

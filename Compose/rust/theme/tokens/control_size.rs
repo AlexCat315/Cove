@@ -1,7 +1,7 @@
 //! Translation of Theme/Tokens/ControlSize.swift.
 use cove_core::scene::CompositionLocal;
 use std::rc::Rc;
-use crate::{AnyView, ProvideCompositionLocalModifier, View};
+use crate::{AnyView, ProvideCompositionLocalModifier, View, ViewExt};
 
 /// Shared control density.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]

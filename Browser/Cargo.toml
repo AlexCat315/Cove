@@ -15,7 +15,12 @@ cove-core.workspace = true
 cove-platform.workspace = true
 cove-graphics.workspace = true
 cove-logging.workspace = true
+cove-examples = { path = "../Examples" }
+cove-devtools = { path = "../DevTools" }
+cove-devtools-protocol.workspace = true
+cove-text.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true

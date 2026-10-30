@@ -204,28 +204,28 @@ fn resolve(path: &Path) -> Result<PathBuf, ToolError> {
 /// SwiftPM owns resolution and lockfiles; only declared branches are refreshed.
 pub struct WorkspaceDependencies;
 
+#[derive(Deserialize)]
+struct Lockfile {
+    #[serde(default)]
+    pins: Vec<Pin>,
+}
+
+#[derive(Deserialize)]
+struct Pin {
+    identity: String,
+    location: String,
+    state: PinState,
+}
+
+#[derive(Deserialize)]
+struct PinState {
+    #[serde(default)]
+    branch: Option<String>,
+    #[serde(default)]
+    revision: Option<String>,
+}
+
 impl WorkspaceDependencies {
-    #[derive(Deserialize)]
-    struct Lockfile {
-        #[serde(default)]
-        pins: Vec<Pin>,
-    }
-
-    #[derive(Deserialize)]
-    struct Pin {
-        identity: String,
-        location: String,
-        state: State,
-    }
-
-    #[derive(Deserialize)]
-    struct State {
-        #[serde(default)]
-        branch: Option<String>,
-        #[serde(default)]
-        revision: Option<String>,
-    }
-
     pub fn refresh(
         workspace: &ProjectWorkspace,
         sdk: &Path,
@@ -334,8 +334,6 @@ impl WorkspaceDependencies {
         Ok(())
     }
 }
-
-use crate::project_sdk::CoveSDK;
 
 pub struct ProjectTaskRunner {
     pub arguments: Arguments,

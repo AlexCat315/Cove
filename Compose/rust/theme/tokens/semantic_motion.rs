@@ -1,7 +1,8 @@
 //! Translation of Theme/Tokens/SemanticMotion.swift.
 use cove_core::scene::{Animation, AnimationCurve};
 use std::sync::Arc;
-use super::{Easing, Theme};
+use super::Easing;
+use crate::theme::Theme;
 
 /// Late-bound animation reference resolved against the active `Theme`.
 #[derive(Clone)]

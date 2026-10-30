@@ -359,7 +359,7 @@ impl ChartPoint {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct ChartCalloutRow {
     pub title: String,
     pub value: String,
@@ -401,7 +401,7 @@ impl Default for ChartConfiguration {
             selection: Selection::default(),
             legend: Legend::default(),
             axis: Axis::default(),
-            data_labels: DataLabels,
+            data_labels: DataLabels::default(),
             pie: Pie::default(),
             accessibility: Accessibility::default(),
             viewport: Viewport::default(),

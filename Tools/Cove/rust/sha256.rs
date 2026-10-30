@@ -133,6 +133,7 @@ impl Default for Sha256State {
 }
 
 /// Hex digest of an in-memory buffer.
+#[allow(dead_code)]
 pub fn digest(data: &[u8]) -> [u8; 32] {
     let mut state = Sha256State::new();
     state.update(data);
@@ -140,6 +141,7 @@ pub fn digest(data: &[u8]) -> [u8; 32] {
 }
 
 /// Lowercase hexadecimal rendering.
+#[allow(dead_code)]
 pub fn hex(data: &[u8]) -> String {
     let mut out = String::with_capacity(data.len() * 2);
     for byte in data {
@@ -164,8 +166,10 @@ pub fn hex_file(url: &Path) -> io::Result<String> {
 }
 
 /// Convenience namespace mirroring Swift's `SHA256` enum.
+#[allow(dead_code)]
 pub struct Sha256;
 
+#[allow(dead_code)]
 impl Sha256 {
     pub fn hex(data: &[u8]) -> String {
         hex(data)

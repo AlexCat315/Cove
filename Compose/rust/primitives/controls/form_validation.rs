@@ -78,17 +78,17 @@ impl FormController {
     }
 
     pub fn issues(&self) -> Vec<FormIssue> {
-        self.registrar.access(&StateAccessKey::text("form"));
+        self.registrar.access(StateAccessKey::text("form"));
         self.session.borrow().issues.clone()
     }
 
     pub fn submission(&self) -> FormSubmissionState {
-        self.registrar.access(&StateAccessKey::text("form"));
+        self.registrar.access(StateAccessKey::text("form"));
         self.session.borrow().submission.clone()
     }
 
     pub fn submit_count(&self) -> u32 {
-        self.registrar.access(&StateAccessKey::text("form"));
+        self.registrar.access(StateAccessKey::text("form"));
         self.session.borrow().submit_count
     }
 

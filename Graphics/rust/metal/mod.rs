@@ -13,12 +13,16 @@
 //! are translated, so no placeholder module is declared here.
 pub mod formats;
 
+mod acceleration;
+mod backend;
+mod device;
 mod library_cache;
+mod registries;
+mod resources;
 mod render_bindings;
 mod submission_status;
+mod submit;
+mod transfer;
 mod upload_ring;
 
-pub(crate) use library_cache::MetalLibraryCache;
-pub(crate) use render_bindings::MetalRenderBindings;
-pub(crate) use submission_status::MetalSubmissionStatus;
-pub(crate) use upload_ring::{MetalFrameUploader, MetalUploadChunk};
+pub use backend::{MetalBackend, make_backend};

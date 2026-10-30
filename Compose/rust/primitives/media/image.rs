@@ -181,6 +181,7 @@ impl PrimitiveView for Image {
             tint: self.tint,
             content_mode: self.content_mode,
             rendering_mode: self.rendering_mode,
+            foreground: self.foreground,
             vector_source_url: self.vector_source_url.clone(),
         };
         node.update_draw(identity, move |list, origin| {

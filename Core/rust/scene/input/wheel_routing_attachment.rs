@@ -25,6 +25,13 @@ pub enum ScrollConsumePolicy {
     /// Never consume. Useful for diagnostics or explicit pass-through.
     Never,
 }
+impl Default for ScrollConsumePolicy {
+    /// `ScrollView` defaults to `whenScrollable`, so an overflowing axis
+    /// consumes the wheel event including at its boundary.
+    fn default() -> Self {
+        Self::WhenScrollable
+    }
+}
 impl ScrollConsumePolicy {
     pub fn result(self, did_scroll: bool, can_scroll: bool) -> EventResult {
         match self {

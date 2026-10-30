@@ -34,3 +34,7 @@ pub use spacing_scale::*;
 pub use text_emphasis::*;
 pub use text_scaler::*;
 pub use typography::*;
+
+/// `Theme` lives one level up but token helpers are its primary consumer, so
+/// re-export it here as well as from `theme`.
+pub use crate::theme::{Theme, ThemeReader};

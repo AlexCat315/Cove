@@ -13,7 +13,7 @@ fn first_requirement_emits_barrier_from_empty_state() {
     let barriers = tracker.commit_barriers();
 
     assert_eq!(barriers.len(), 1);
-    assert_eq!(barriers[0].before, ResourceState::none());
+    assert_eq!(barriers[0].before, ResourceState::EMPTY);
     assert_eq!(barriers[0].after, ResourceState::RENDER_TARGET);
 }
 
@@ -47,7 +47,7 @@ fn repeated_transitions_of_same_resource_merge_into_one_barrier() {
     // Two transitions merge into a single barrier whose destination is the
     // union of the requested states.
     assert_eq!(barriers.len(), 1);
-    assert_eq!(barriers[0].before, ResourceState::none());
+    assert_eq!(barriers[0].before, ResourceState::EMPTY);
     assert_eq!(
         barriers[0].after,
         ResourceState::SHADER_RESOURCE | ResourceState::RENDER_TARGET
@@ -79,5 +79,5 @@ fn remove_resource_stops_tracking() {
     // After removal the resource is unknown again, so the barrier starts
     // from the empty state rather than the old renderTarget state.
     let barriers = tracker.commit_barriers();
-    assert_eq!(barriers[0].before, ResourceState::none());
+    assert_eq!(barriers[0].before, ResourceState::EMPTY);
 }

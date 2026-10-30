@@ -5,7 +5,7 @@ use crate::theme::tokens::{TextScaler, TextStyleToken};
 use crate::{ModifiedContent, View, ViewExt, ViewModifier};
 use super::style_attachment_key::{FONT, LETTER_SPACING, LINE_HEIGHT};
 
-fn invalidate_text_measurements(layout: &LayoutNode) {
+pub fn invalidate_text_measurements(layout: &LayoutNode) {
     if layout.has_measure_func() { layout.mark_dirty(); }
     for child in layout.children() { invalidate_text_measurements(&child); }
 }
@@ -91,7 +91,10 @@ impl ViewModifier for ShadowModifier {
 pub struct FontModifier(pub Font);
 impl ViewModifier for FontModifier {
     fn apply_node(&self, node: &Node) {
-        let font = self.0.resolving_family(crate::theme::theme_for_node(node).typography.family.as_deref());
+        let font = crate::theme::tokens::typography::resolving_font_family(
+            &self.0,
+            crate::theme::theme_for_node(node).typography.family.as_deref(),
+        );
         let changed = node.attachment::<Font>(FONT).as_ref() != Some(&font);
         node.set_attachment(FONT, font.clone());
         if let Some(layout) = node.layout_node() {
@@ -242,7 +245,7 @@ pub fn layout_text_style_line_height(layout: &LayoutNode) -> Option<f32> {
     let mut cursor = Some(layout.clone());
     while let Some(current) = cursor {
         if let Some(value) = current.attachment::<f32>(LINE_HEIGHT) {
-            return Some(raw_scaler(current).scale(value));
+            return Some(raw_scaler(&current).scale(value));
         }
         cursor = current.parent();
     }

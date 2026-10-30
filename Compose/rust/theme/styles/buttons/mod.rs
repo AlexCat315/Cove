@@ -13,6 +13,7 @@ pub mod toggle_button_style;
 pub mod toolbar_toggle_button_style;
 
 pub use button_style::*;
+pub use builtin_button_chrome::*;
 pub use destructive_button_style::*;
 pub use ghost_button_style::*;
 pub use plain_button_style::*;

@@ -37,3 +37,31 @@ dispatch2 = "0.3"
 
 [lints]
 workspace = true
+
+[[test]]
+name = "access_tracker"
+path = "rust/tests/access_tracker.rs"
+
+[[test]]
+name = "caches"
+path = "rust/tests/caches.rs"
+
+[[test]]
+name = "chunk_upload_allocator"
+path = "rust/tests/chunk_upload_allocator.rs"
+
+[[test]]
+name = "frame_ring"
+path = "rust/tests/frame_ring.rs"
+
+[[test]]
+name = "gpu_timestamp_profile"
+path = "rust/tests/gpu_timestamp_profile.rs"
+
+[[test]]
+name = "lru_map"
+path = "rust/tests/lru_map.rs"
+
+[[test]]
+name = "state_tracker"
+path = "rust/tests/state_tracker.rs"

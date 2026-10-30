@@ -81,13 +81,11 @@ impl PrimitiveView for FieldLabelHost {
             {
                 chain.focus(Some(&target), true);
             }
-            let _ = (&label, &help);
         })
         .button_style(FieldLabelStyle)
-        .accessibility(AccessibilitySemantics {
-            label,
-            help,
-            ..AccessibilitySemantics::default()
+        .accessibility(move |semantics| {
+            semantics.label = label.clone();
+            semantics.help = help.clone();
         });
         vec![AnyView::new(button)]
     }
@@ -116,10 +114,8 @@ impl ButtonStyle for FieldLabelStyle {
                 cove_core::scene::Justify::FlexStart,
                 cove_core::scene::Wrap::NoWrap,
                 0.0,
-                label,
+                AnyView::new(label.flex(1.0).shrink(1.0).frame_min_width(0.0)),
             )
-            .flex(1.0)
-            .shrink(1.0)
             .frame_min_width(0.0)
             .border_color(border, if configuration.is_focused { 1.0 } else { 0.0 }),
         )

@@ -32,6 +32,7 @@ impl PrimitiveView for ChartLegend {
         node.set_is_hit_testable(false);
         node
     }
+    fn update_node(&self, _node: &Node) {}
     fn make_layout_node(&self) -> Option<LayoutNode> {
         Some(LayoutNode::new())
     }

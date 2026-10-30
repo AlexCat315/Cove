@@ -9,7 +9,7 @@
 //! module installs its constructor through [`register_backend`] from
 //! `install_backends`, and a platform that never installs one reports
 //! "not built for this platform".
-use std::sync::Mutex;
+use std::sync::{Mutex, Once};
 
 use super::{DeviceConfig, GraphicsApi, RhiBackend, RhiError, RhiResult};
 
@@ -31,15 +31,41 @@ pub fn register_backend(api: GraphicsApi, constructor: BackendConstructor) {
 
 /// Whether a constructor for `api` is part of this build.
 pub fn is_backend_registered(api: GraphicsApi) -> bool {
+    install_backends();
     let constructors = CONSTRUCTORS.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     constructors.iter().any(|(registered, _)| *registered == api)
 }
 
-/// Constructs the backend for `api`.
+/// Installs every backend this build can construct. Each module is referenced
+/// only under the `cfg` of the platform whose framework it needs, so a host
+/// never links a backend it cannot run.
+///
+/// Calling this more than once is harmless: [`register_backend`] replaces any
+/// existing constructor for the same API.
+pub fn install_backends() {
+    static INSTALL: Once = Once::new();
+    INSTALL.call_once(|| {
+        #[cfg(any(target_os = "macos", target_os = "ios"))]
+        {
+            register_backend(GraphicsApi::Metal, crate::metal::make_backend);
+        }
+        #[cfg(any(target_os = "windows", target_os = "linux", target_os = "android"))]
+        {
+            register_backend(GraphicsApi::Vulkan, crate::vulkan::make_backend);
+        }
+        #[cfg(target_os = "windows")]
+        {
+            register_backend(GraphicsApi::Dx12, crate::dx12::make_backend);
+        }
+    });
+}
+
+/// Constructs the backend for `api`, installing the build's backends first.
 pub fn make_backend(
     api: GraphicsApi,
     config: &DeviceConfig,
 ) -> RhiResult<Box<dyn RhiBackend>> {
+    install_backends();
     let constructor = {
         let constructors = CONSTRUCTORS.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         constructors

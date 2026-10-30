@@ -2,7 +2,7 @@
 use cove_core::Color;
 use std::rc::Rc;
 use std::sync::Arc;
-use super::Theme;
+use crate::theme::Theme;
 
 /// Late-bound color reference resolved against the active `Theme`.
 #[derive(Clone)]

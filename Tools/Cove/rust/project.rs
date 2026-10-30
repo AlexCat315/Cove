@@ -277,6 +277,7 @@ impl ProjectConfiguration {
 }
 
 /// An application directory: `cove.json` plus a Swift package.
+#[derive(Debug, Clone)]
 pub struct AppProject {
     pub directory: PathBuf,
     pub configuration: ProjectConfiguration,

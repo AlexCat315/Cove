@@ -101,7 +101,7 @@ pub fn sync_text_style_environment(node: &Node) {
     layout.set_attachment(TEXT_SCALER_ATTACHMENT, scaler);
     layout.set_attachment(crate::theme::ThemeEnvironment::BODY_STYLE_ATTACHMENT, body);
     if changed {
-        layout.invalidate();
+        crate::modifiers::style::invalidate_text_measurements(&layout);
     }
 }
 

@@ -1,7 +1,8 @@
 //! Full-scene assembly for content and its software-pet overlay.
 use super::{pet_anchor::provide_pet_world, PetOverlay, PetWorld};
 use crate::{AnyView, TupleView, View};
-use crate::primitives::layout::{Alignment, ZStack};
+use crate::primitives::layout::ZStack;
+use crate::Alignment;
 use std::rc::Rc;
 
 pub struct PetScene {

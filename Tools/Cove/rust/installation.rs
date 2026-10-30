@@ -7,7 +7,6 @@
 //! `Installation/Update.swift`.
 
 use crate::cli::{standardized, AppPlatform, Arguments, OptionKey};
-use crate::download::Download;
 use crate::platforms_android::{
     AndroidToolchain, NativeDependencies,
 };
@@ -375,18 +374,15 @@ impl NativeArchive {
                 {
                     return Err(ToolError::invalid("Invalid iOS native target"));
                 }
-                Some(NativeSDK::AppleTarget {
-                    sdk,
-                    architecture,
-                })
+                Some(crate::toolchains::AppleTarget { sdk, architecture })
             } else {
                 None
             };
             target = apple
                 .as_ref()
-                .map(NativeSDK::AppleTarget::variant)
+                .map(crate::toolchains::AppleTarget::variant)
                 .unwrap_or_else(CLIUpdate::platform);
-            NativeSDK::prepare(root, apple, true)?;
+            NativeSDK::prepare(root, apple.as_ref(), true)?;
             let base = NativeArtifacts::directory(root, &target);
             runtime = base.join("Native/vendor");
             text = base.join("vendor");

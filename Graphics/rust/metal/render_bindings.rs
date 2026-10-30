@@ -17,10 +17,13 @@ const CACHED_SLOT_LIMIT: u32 = 32;
 
 /// Identity comparison for retained Objective-C objects. Swift compares the
 /// references (`===`); Objective-C pointer equality is the same relation.
-fn same_object<T: objc2::Message + ?Sized>(
+fn same_object<T: ?Sized>(
     left: &Retained<ProtocolObject<T>>,
     right: &Retained<ProtocolObject<T>>,
-) -> bool {
+) -> bool
+where
+    ProtocolObject<T>: objc2::Message,
+{
     std::ptr::eq(Retained::as_ptr(left), Retained::as_ptr(right))
 }
 

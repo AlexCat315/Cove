@@ -9,7 +9,7 @@ use crate::theme::{Theme, ThemeViewExt, TextScalerViewExt, IconScalingViewExt, R
 use crate::{AnyView, ViewExt};
 use super::portal_placement::{portal_window_bounds, PortalPlacementMode, PortalPlacement};
 use super::fit_constraints::PortalFitConstraints;
-use crate::adaptive::surface::{SurfaceEnvironment, SurfaceEnvironmentExt};
+use crate::adaptive::{SurfaceEnvironment, SurfaceEnvironmentExt};
 
 // MARK: - Entry
 

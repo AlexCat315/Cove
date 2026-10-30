@@ -106,7 +106,9 @@ pub fn run(
             return Err(ProcessError::InvalidBudget);
         }
     }
-    let resolved = shell::require(executable, environment)?;
+    let resolved = shell::require(executable, environment).map_err(|error| {
+        ProcessError::Io(io::Error::new(io::ErrorKind::NotFound, error.to_string()))
+    })?;
     let directory = options
         .directory
         .map(Path::to_path_buf)

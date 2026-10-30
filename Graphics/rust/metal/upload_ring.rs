@@ -32,6 +32,11 @@ impl MetalUploadChunk {
         self.buffer_handle
     }
 }
+// SAFETY: Metal resources are documented as safe to use from multiple threads;
+// `MTLBuffer` retains its own atomic reference count and the allocator only
+// hands out non-overlapping suballocations for one frame slot at a time.
+unsafe impl Send for MetalUploadChunk {}
+
 impl UploadRingChunk for MetalUploadChunk {
     fn capacity(&self) -> usize {
         self.capacity
@@ -40,7 +45,7 @@ impl UploadRingChunk for MetalUploadChunk {
     unsafe fn cpu_pointer(&self) -> *mut u8 {
         // SAFETY: a shared-storage buffer exposes a CPU mapping valid for
         // `length()` bytes for as long as the chunk (which retains it) is alive.
-        unsafe { self.buffer.contents().as_ptr().cast() }
+        self.buffer.contents().as_ptr().cast()
     }
 }
 

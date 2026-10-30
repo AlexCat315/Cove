@@ -79,13 +79,13 @@ impl KeyCap {
 impl View for KeyCap {
     fn body(&self) -> AnyView {
         let caps: Vec<AnyView> = self.keys.iter().map(|key| self.cap(key)).collect();
+        let spoken = self.spoken_form();
         AnyView::new(
             BoxView::new(FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::Wrap, 2.0, AnyView::new(TupleView::new(caps)))
-                .accessibility(cove_core::scene::AccessibilitySemantics {
-                    role: AccessibilityRole::StaticText,
-                    label: self.spoken_form(),
-                    combines_children: true,
-                    ..Default::default()
+                .accessibility(move |semantics| {
+                    semantics.role = AccessibilityRole::StaticText;
+                    semantics.label = spoken.clone();
+                    semantics.combines_children = true;
                 }),
         )
     }

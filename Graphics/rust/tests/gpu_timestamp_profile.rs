@@ -65,8 +65,8 @@ fn concurrent_appends_are_serialised() {
     for handle in handles {
         handle.join().unwrap();
     }
-    assert_eq!(profile.sample_count(), writers * per_writer);
-    assert_eq!(profile.recorded_markers().len(), writers * per_writer);
+    assert_eq!(profile.sample_count(), (writers * per_writer) as usize);
+    assert_eq!(profile.recorded_markers().len(), (writers * per_writer) as usize);
 }
 
 #[test]

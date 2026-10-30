@@ -1,7 +1,8 @@
 //! Translation of Theme/Tokens/SemanticModifiers.swift.
 use cove_core::scene::Node;
 use crate::{AnyView, ModifiedContent, View, ViewExt, ViewModifier};
-use super::{SemanticColorRef, SemanticFontRef, ThemeMetric, ThemeReader};
+use super::{SemanticColorRef, SemanticFontRef, ThemeMetric};
+use crate::theme::{Theme, ThemeReader};
 
 /// Resolves a `SemanticColorRef` against the target node's active theme and
 /// writes the result into `node.background_color`.

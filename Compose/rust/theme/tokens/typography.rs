@@ -26,7 +26,7 @@ impl TextStyleToken {
     }
 }
 
-fn resolving_font_family(font: &Font, family: Option<&str>) -> Font {
+pub fn resolving_font_family(font: &Font, family: Option<&str>) -> Font {
     let Some(family) = family else { return font.clone() };
     if font.family().is_some() || font.design() != FontDesign::Standard {
         return font.clone();

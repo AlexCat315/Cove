@@ -9,7 +9,7 @@ pub fn install_sdl_logging(){
             let message=if message.is_null(){String::new()}else{ // SAFETY: SDL passes a NUL terminated message valid for this callback.
                 unsafe{CStr::from_ptr(message)}.to_string_lossy().into_owned()};
             let level=match priority{1|2=>Level::Trace,3=>Level::Debug,5=>Level::Warning,6=>Level::Error,7=>Level::Critical,_=>Level::Info};
-            let _=runtime.log(level,"com.cove.engine.sdl",&message,BTreeMap::from([("category".into(),LogValue::from(category.to_string()))]),Location::default());
+            let _=runtime.log(level,"com.cove.engine.sdl",&message,BTreeMap::from([("category".into(),LogValue::String(category.to_string()))]),Location::default());
         });
     }
     // SAFETY: static function pointer outlives SDL, contains panics and accesses synchronized state only.

@@ -18,6 +18,14 @@ use super::model::{
 };
 use super::viewport::ChartWindow;
 
+/// One sampled point of a filled area: the curve value and the baseline it
+/// fills down to.
+#[derive(Clone, Copy)]
+struct FillPoint {
+    value: Point,
+    base: Point,
+}
+
 pub struct ChartPaint<'a> {
     pub theme: &'a Theme,
     pub style: &'a ChartStyle,
@@ -328,12 +336,6 @@ impl<'a> ChartPaint<'a> {
             );
             self.stroke(&points, color, width, &series_style.dash, list);
         }
-    }
-
-    #[derive(Clone, Copy)]
-    struct FillPoint {
-        value: Point,
-        base: Point,
     }
 
     fn area(&self, marks: &[Mark], color: Color, series_style: &ChartSeriesStyle, geometry: &ChartGeometry, list: &mut DrawList) {

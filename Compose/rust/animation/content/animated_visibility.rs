@@ -1,5 +1,6 @@
 //! Retained insertion/removal lifecycle from Animation/AnimatedVisibility.swift.
-use super::super::{Transition, TransitionEffect};
+use crate::animation::transition::TransitionEffect;
+use super::super::Transition;
 use cove_core::scene::{
     Animation, AnimationController, AnimatorScheduler, AnyAnimationController, Display, FocusChainHolder,
     LayoutNode, LayoutUpdateHook, Node, NodeResource, PointerCaptureHolder,

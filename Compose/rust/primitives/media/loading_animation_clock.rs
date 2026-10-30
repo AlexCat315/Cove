@@ -16,7 +16,7 @@ use cove_core::scene::{
 /// leaves the tree, so a loader in a conditionally-rendered branch never keeps
 /// a clock running in the background.
 pub struct LoadingAnimationClock {
-    node: RefCell<Weak<Node>>,
+    node: RefCell<cove_core::scene::NodeWeak>,
     scheduler: RefCell<Option<AnimatorScheduler>>,
     duration: Cell<f64>,
     controller: RefCell<Option<Rc<dyn AnyAnimationController>>>,
@@ -61,7 +61,7 @@ impl LoadingAnimationClock {
         }
         self.stop();
         self.duration.set(duration);
-        let Some(node) = self.node.borrow().upgrade() else {
+        let Some(node) = Node::upgrade(&self.node.borrow()) else {
             return;
         };
         let weak_node = node.downgrade();
@@ -93,7 +93,7 @@ impl LoadingAnimationClock {
             }
         }
         self.phase.set(0.0);
-        if let Some(node) = self.node.borrow().upgrade() {
+        if let Some(node) = Node::upgrade(&self.node.borrow()) {
             node.mark_render_dirty(InvalidationSource::style_set("loading.phase"));
         }
     }

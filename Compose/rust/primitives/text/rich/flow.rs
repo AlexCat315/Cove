@@ -13,7 +13,7 @@ use std::hash::{Hash, Hasher};
 use std::ops::Range;
 use std::rc::Rc;
 
-#[derive(Clone, Debug, PartialEq, Hash)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct RichParagraphSpan {
     pub text: String,
     pub font: Font,
@@ -21,6 +21,15 @@ pub struct RichParagraphSpan {
     pub traits: RichTextTraits,
     /// Index into the paragraph's link destinations.
     pub link: Option<usize>,
+}
+impl std::hash::Hash for RichParagraphSpan {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.text.hash(state);
+        self.font.hash(state);
+        float_bits(self.line_height).hash(state);
+        self.traits.hash(state);
+        self.link.hash(state);
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Hash)]

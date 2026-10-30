@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use cove_core::scene::{
     AccessibilityActions, AccessibilityRole, AccessibilitySemantics, Animation, Color, FocusChainHolder,
-    LayoutNode, Node, NodeResource, Point, Rect, Size, Weak,
+    LayoutNode, Node, NodeResource, PointerCaptureHolder, Point, Rect, Size,
 };
 
 use crate::theme::Theme;
@@ -136,7 +136,7 @@ impl ChartPlot {
         self.input.is_enabled
     }
 
-    fn theme(&self, node: &Node) -> Theme {
+    pub(crate) fn theme(&self, node: &Node) -> Theme {
         self.theme.clone().unwrap_or_else(|| crate::theme::theme_for_node(node))
     }
 }
@@ -203,7 +203,7 @@ impl PrimitiveView for ChartPlot {
             let Some(node) = Node::upgrade(&weak_node) else { return };
             snapshot.draw(&node, origin, list, &cache);
         });
-        super::interaction::install_input(self, node, &session);
+        self.install_input(node, &session);
     }
 
     fn children(&self, node: &Node) -> Vec<AnyView> {
@@ -236,6 +236,7 @@ impl PrimitiveView for ChartOverlayHost {
         node.set_is_hit_testable(false);
         node
     }
+    fn update_node(&self, _node: &Node) {}
     fn make_layout_node(&self) -> Option<LayoutNode> {
         let layout = LayoutNode::new();
         layout.set_position_type(cove_core::scene::PositionType::Absolute);
@@ -247,7 +248,7 @@ impl PrimitiveView for ChartOverlayHost {
     }
     fn update_layout(&self, layout: &LayoutNode) {
         let algorithm = ChartOverlayLayout { plot: self.plot.clone(), theme: self.theme.clone(), cache: self.cache.clone() };
-        let measure = algorithm.clone_algorithm();
+        let measure = algorithm.clone();
         let place = algorithm;
         layout.set_custom_layout(
             Rc::new(move |width, height, children| {
@@ -595,9 +596,10 @@ impl ChartPlot {
     pub fn hit(&self, x: f32, y: f32, node: &Node) -> Option<ChartPoint> {
         let text = ChartText::new(&self.theme(node));
         let session = node.attachment::<Rc<ChartSession>>(ChartSession::KEY);
+        let frame = node.frame();
         let resolution = self.resolve(
-            node.frame().into(),
-            node.frame_point(),
+            Size { width: frame.width, height: frame.height },
+            node.absolute_origin(),
             &text,
             session.map(|session| session.cache.clone()),
         );
@@ -867,6 +869,25 @@ impl ChartSession {
         })
     }
 }
+impl ChartSession {
+    /// Claims pointer capture so a drag survives recomposition.
+    pub fn press(&self, node: &Node) {
+        self.is_pressed.set(true);
+        if let Some(capture) = PointerCaptureHolder::current() {
+            capture.acquire(node, false);
+        }
+    }
+
+    pub fn release(&self, node: &Node) {
+        self.is_pressed.set(false);
+        if let Some(capture) = PointerCaptureHolder::current()
+            && capture.target().is_some_and(|target| target == *node)
+        {
+            capture.release();
+        }
+    }
+}
+
 impl NodeResource for ChartSession {
     fn mount(&self, _node: &Node) {}
     fn unmount(&self, node: &Node) {
@@ -956,7 +977,8 @@ impl ChartGeometrySignature {
             },
             u32::from(plot.style.orientation == ChartOrientation::Horizontal),
             plot.viewport.minimum_fraction.to_bits(),
-        ];
+        ]
+        .to_vec();
         let axis = vec![
             plot.axis.y.title.clone(),
             plot.axis.x.title.clone(),

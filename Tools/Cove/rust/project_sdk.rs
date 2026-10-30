@@ -8,8 +8,8 @@
 //! checked-in `SDK.json` from `COVE_SDK_ROOT` or the nearest enclosing
 //! checkout.
 
-use crate::cli::{standardized, AppPlatform, Arguments, Operation, OptionKey};
-use crate::download::Download;
+use crate::cli::{standardized, Arguments, Operation, OptionKey};
+use crate::download;
 use crate::installation::{
     CLIUpdate, Installation, InstallationReceipt, SDKPayload, TarArchive,
 };
@@ -124,7 +124,7 @@ impl SDKRelease {
     /// from /releases/latest to /releases/tag/vX.Y.Z.
     pub fn latest_version(repository: &str) -> Result<String, ToolError> {
         let base = repository.replace(".git", "");
-        let resolved = Download::redirected_url(&format!("{base}/releases/latest"))?;
+        let resolved = download::redirected_url(&format!("{base}/releases/latest"))?;
         let tag = resolved
             .trim_end_matches('/')
             .rsplit('/')
@@ -242,7 +242,7 @@ impl NativeArtifacts {
             .join("cache/native")
             .join(&archive.sha256);
         let tar = cache.join("native.tar.gz");
-        Download::file(&archive.url, &tar, &archive.sha256)?;
+        download::file(&archive.url, &tar, &archive.sha256)?;
         let staging = cache.join(unique_token());
         let _ = Files::remove(&staging);
         let result = (|| {
@@ -312,12 +312,12 @@ impl SDKDownload {
         let name = format!("cove-{}.tar.gz", CLIUpdate::platform());
         Files::directory(staging)?;
         let sums = staging.join("SHA256SUMS");
-        Download::metadata(&format!("{base}SHA256SUMS"), &sums)?;
+        download::metadata(&format!("{base}SHA256SUMS"), &sums)?;
         let contents = std::fs::read_to_string(&sums)
             .map_err(|error| ToolError::invalid(format!("{}: {error}", sums.display())))?;
         let digest = CLIUpdate::checksum(&name, &contents)?;
         let archive = staging.join(&name);
-        Download::file(&format!("{base}{name}"), &archive, &digest)?;
+        download::file(&format!("{base}{name}"), &archive, &digest)?;
         let expanded = staging.join("expanded");
         TarArchive::extract(&archive, &expanded)?;
         let payload = expanded.join("cove");
@@ -367,7 +367,7 @@ impl CoveSDK {
         let development = std::env::current_exe()
             .ok()
             .and_then(|executable| Self::checkout_containing(&executable));
-        let mut root: Option<PathBuf> = None;
+        let mut root: Option<PathBuf>;
         if required.as_deref() == Some(SDKRelease::LATEST_TAG) {
             // "latest" floats to the newest installed SDK; the explicit
             // override always wins.
@@ -607,6 +607,7 @@ pub struct SDKCommand;
 impl SDKCommand {
     /// Select the project's tool before interpreting flags introduced by a
     /// newer SDK.
+    #[allow(dead_code)]
     pub fn bootstrap(raw: &[String]) -> Result<(), ToolError> {
         let Some(verb) = raw.first() else {
             return Ok(());
@@ -716,8 +717,9 @@ impl SDKCommand {
         Self::invoke(&root, raw)
     }
 
-    fn invoke(root: &Path, raw: &[String]) -> Result<(), ToolError> {
+    pub fn invoke(root: &Path, raw: &[String]) -> Result<(), ToolError> {
         let release = SDKRelease::read(root)?;
+        #[cfg_attr(not(windows), allow(unused_mut))]
         let mut binary = SDKPayload::executable(root);
         #[cfg(windows)]
         {
@@ -731,7 +733,7 @@ impl SDKCommand {
                 .canonicalize()
                 .unwrap_or_else(|_| current.clone())
                 != root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
-        let self_version = SDKRelease::current().map(|release| release.version);
+        let self_version = SDKRelease::current().ok().map(|release| release.version);
         if self_version.as_deref() == Some(release.version.as_str()) && !different_checkout {
             return Ok(());
         }

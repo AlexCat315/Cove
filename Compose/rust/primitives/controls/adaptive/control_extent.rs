@@ -2,7 +2,7 @@
 use cove_core::InputCapabilities;
 use cove_core::Size;
 use cove_core::scene::Node;
-use crate::SurfaceEnvironment;
+use crate::adaptive::SurfaceEnvironment;
 
 /// Whether the surrounding surface can deliver hover transitions.
 pub fn supports_control_hover(node: &Node) -> bool {

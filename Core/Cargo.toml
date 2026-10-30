@@ -21,3 +21,27 @@ cc.workspace = true
 
 [lints]
 workspace = true
+
+[[test]]
+name = "adaptive_environment"
+path = "rust/tests/adaptive_environment.rs"
+
+[[test]]
+name = "draw_list_resources"
+path = "rust/tests/draw_list_resources.rs"
+
+[[test]]
+name = "geometry_kernel"
+path = "rust/tests/geometry_kernel.rs"
+
+[[test]]
+name = "mipmap"
+path = "rust/tests/mipmap.rs"
+
+[[test]]
+name = "portable_core"
+path = "rust/tests/portable_core.rs"
+
+[[test]]
+name = "text_scale"
+path = "rust/tests/text_scale.rs"

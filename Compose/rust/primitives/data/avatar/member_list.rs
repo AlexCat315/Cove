@@ -28,6 +28,16 @@ pub struct AvatarMemberList {
     pub scope: AvatarMemberListScope,
     pub on_select: Option<Rc<dyn Fn(&Avatar)>>,
 }
+impl std::fmt::Debug for AvatarMemberList {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("AvatarMemberList")
+            .field("title", &self.title)
+            .field("scope", &self.scope)
+            .field("on_select", &self.on_select.is_some())
+            .finish()
+    }
+}
 impl Default for AvatarMemberList {
     fn default() -> Self {
         Self {

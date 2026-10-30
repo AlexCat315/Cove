@@ -23,6 +23,7 @@ cove-imaging.workspace = true
 cove-text.workspace = true
 cove-logging.workspace = true
 serde.workspace = true
+unicode-segmentation.workspace = true
 
 [lints]
 workspace = true

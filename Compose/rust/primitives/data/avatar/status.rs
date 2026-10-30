@@ -163,7 +163,7 @@ impl_primitive_view!(AvatarStatusIndicator);
 
 /// Paint identity used by the Swift cache. Kept public for callers that need
 /// to compare indicator drawings without rebuilding the hook.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct AvatarStatusPaint {
     pub ring: Color,
     pub ink: Color,

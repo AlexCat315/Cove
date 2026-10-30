@@ -1,6 +1,6 @@
 //! Translation of Theme/Tokens/Metrics.swift.
 use std::sync::Arc;
-use super::Theme;
+use crate::theme::Theme;
 
 /// An open, late-bound numeric token. Application roles can read their own
 /// `ThemeExtension` without adding cases to a framework enum.

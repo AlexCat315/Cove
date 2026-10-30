@@ -111,7 +111,7 @@ impl PrimitiveView for AvatarGroup {
     fn update_node(&self, node: &Node) {
         let geometry = self.geometry(node);
         if let Some(layout) = node.layout_node() {
-            layout.set_width(Some(geometry.width));
+            layout.set_width(Some(geometry.width()));
             layout.set_height(Some(if geometry.item_count() == 0 {
                 0.0
             } else {
@@ -186,11 +186,11 @@ impl PrimitiveView for AvatarGroup {
                 } else {
                     self.avatars.iter().skip(visible).cloned().collect()
                 };
-                AnyView::new(AvatarMemberListTrigger {
+                AnyView::new(AvatarMemberListTrigger::new(
                     marker,
                     members,
-                    list: list.clone(),
-                })
+                    list.clone(),
+                ))
             } else {
                 AnyView::new(marker)
             };

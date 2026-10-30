@@ -5,9 +5,10 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
 use crate::{AnyView, PrimitiveView, View, ViewKind};
-use super::{TextScaler, Theme};
+use super::TextScaler;
+use crate::theme::Theme;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct IconTheme {
     pub small: f32,
     pub medium: f32,
