@@ -2,8 +2,9 @@
 use cove_core::scene::{AccessibilitySemantics, AccessibilityState, Align, FlexDirection, Justify, Wrap};
 use crate::{AnyView, BoxView, TupleView, View, ViewExt};
 use crate::adaptive::ContainerSizeReader;
-use crate::modifiers::layout::LayoutFrameExt;
-use crate::modifiers::style::{AccessibilityExt, SemanticStyleViewExt};
+use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
+use crate::modifiers::interaction::AccessibilityExt;
+use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::controls::field_label::FieldLabel;
 use crate::primitives::controls::form::label_placement::FieldLabelPlacement;
 use crate::primitives::controls::form::label_scope::FormLabelScope;
@@ -186,8 +187,8 @@ impl View for FormFieldView {
                         options.is_required = field.presentation.is_required;
                         options.target_id = Some(field.id.clone());
                         options.help = field.presentation.help.clone();
-                    })
-                    .frame_width(if leading { Some(label_width) } else { None })
+                    });
+                let label = (if leading { AnyView::new(label.frame_width(label_width)) } else { AnyView::new(label) })
                     .flex(0.0)
                     .shrink(0.0);
                 let mut value_stack: Vec<AnyView> = vec![AnyView::new(field.content.clone().accessibility(AccessibilitySemantics {

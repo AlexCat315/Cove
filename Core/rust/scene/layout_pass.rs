@@ -16,6 +16,12 @@ impl LayoutPass {
 
 fn apply(layout_node: &LayoutNode, node: &Node) {
     node.set_frame(layout_node.frame());
+    // Layout observers must run for every pass, including when the resolved
+    // frame is unchanged. Frame capture, anchor tracking, and other node-owned
+    // resources use this hook to refresh derived geometry.
+    if let Some(on_layout_update) = node.layout_did_update() {
+        on_layout_update(node);
+    }
     let layout_children = layout_node.children();
     let node_children = node.children();
     for (layout_child, node_child) in layout_children.iter().zip(node_children.iter()) {

@@ -1,6 +1,10 @@
 //! Translation of Primitives/Controls/FieldLabel.swift.
 use cove_core::scene::{AccessibilitySemantics, FocusChainHolder, LayoutNode, Node};
 use crate::{AnyView, PrimitiveView, View, ViewKind};
+use crate::modifiers::interaction::AccessibilityExt;
+use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
+use crate::modifiers::style::AppearanceExt;
+use crate::theme::styles::buttons::{ButtonStyle, ButtonStyleConfiguration, ButtonStyleViewExt};
 
 #[derive(Clone, Debug, Default)]
 pub struct FieldLabelOptions {
@@ -101,10 +105,9 @@ impl View for FieldLabelHost {
 #[derive(Clone, Copy)]
 struct FieldLabelStyle;
 
-impl crate::modifiers::style::ButtonStyle for FieldLabelStyle {
-    fn make_body(&self, configuration: crate::modifiers::style::ButtonStyleConfiguration, content: AnyView) -> AnyView {
-        use crate::modifiers::layout::LayoutFrameExt;
-        let label = content.flex(0.0).shrink(1.0).frame_min_width(0.0);
+impl ButtonStyle for FieldLabelStyle {
+    fn make_body(&self, configuration: ButtonStyleConfiguration) -> AnyView {
+        let label = configuration.label.flex(0.0).shrink(1.0).frame_min_width(0.0);
         let border = if configuration.is_focused { configuration.theme.colors.focus_ring } else { cove_core::Color::CLEAR };
         AnyView::new(
             crate::BoxView::new(
@@ -118,7 +121,7 @@ impl crate::modifiers::style::ButtonStyle for FieldLabelStyle {
             .flex(1.0)
             .shrink(1.0)
             .frame_min_width(0.0)
-            .border(border, if configuration.is_focused { 1.0 } else { 0.0 }),
+            .border_color(border, if configuration.is_focused { 1.0 } else { 0.0 }),
         )
     }
 }

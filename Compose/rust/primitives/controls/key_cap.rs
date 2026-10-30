@@ -1,11 +1,12 @@
 //! Translation of Primitives/Controls/KeyCap.swift.
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use crate::{AnyView, BoxView, TupleView, View};
-use crate::modifiers::layout::PaddingExt;
-use crate::modifiers::style::{AccessibilityExt, AppearanceExt, SemanticStyleViewExt};
+use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
+use crate::modifiers::interaction::AccessibilityExt;
+use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::fields::select::{KeyboardShortcut, KeyboardShortcutPlatform};
 use crate::primitives::text::Text;
-use crate::theme::{RadiusToken, SemanticColorRef, SemanticFontRef};
+use crate::theme::{SemanticColorRef, SemanticFontRef, ThemeMetric};
 use cove_core::scene::AccessibilityRole;
 
 /// Keyboard hint drawn as one cap per key.
@@ -46,7 +47,7 @@ impl KeyCap {
                 .semantic_foreground(ink)
                 .padding_edges(6.0, 2.0)
                 .semantic_background(SemanticColorRef::surface_variant())
-                .corner_radius_token(RadiusToken::Row)
+                .corner_radius_metric(ThemeMetric::row_radius())
                 .semantic_border(SemanticColorRef::border(), 1.0)
                 .opacity(if self.is_enabled { 1.0 } else { 0.55 })
                 .flex(0.0)

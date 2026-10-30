@@ -1,7 +1,7 @@
 //! Translation of Theme/Tokens/SemanticModifiers.swift.
 use cove_core::scene::Node;
-use crate::{ModifiedContent, View, ViewExt, ViewModifier};
-use super::{SemanticColorRef, SemanticFontRef};
+use crate::{AnyView, ModifiedContent, View, ViewExt, ViewModifier};
+use super::{SemanticColorRef, SemanticFontRef, ThemeMetric, ThemeReader};
 
 /// Resolves a `SemanticColorRef` against the target node's active theme and
 /// writes the result into `node.background_color`.
@@ -123,6 +123,15 @@ pub trait SemanticStyleViewExt: View + Sized + 'static {
     /// Set both font and line-height from a semantic typography slot.
     fn semantic_font(self, reference: SemanticFontRef) -> ModifiedContent {
         self.modifier(SemanticFontModifier::new(reference))
+    }
+
+    /// Resolve a theme radius metric at the nearest theme boundary.
+    fn corner_radius_metric(self, metric: ThemeMetric) -> AnyView {
+        let content = AnyView::new(self);
+        AnyView::new(ThemeReader::new(move |theme| {
+            use crate::modifiers::style::AppearanceExt;
+            content.clone().corner_radius(metric.resolve(theme))
+        }))
     }
 }
 impl<T: View + Sized + 'static> SemanticStyleViewExt for T {}

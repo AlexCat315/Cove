@@ -11,6 +11,20 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = ROOT / "Docs/rust-migration-files.json"
 PARTIAL_SOURCES = {
+    # The core interaction/style host and loading indicator are present; the
+    # transient tooltip overlay and Escape-to-dismiss flow remain to be ported.
+    "Compose/Sources/CoveUICompose/Primitives/Controls/Button.swift",
+    # Link is wired through Button but still lacks tooltip presentation and
+    # interaction animation; Tag is wired, but its remove tooltip needs Button's
+    # unported tooltip presentation.
+    "Compose/Sources/CoveUICompose/Primitives/Controls/Link.swift",
+    "Compose/Sources/CoveUICompose/Primitives/Controls/Tag.swift",
+    # Keyboard shortcuts and option values are ported; the Select trigger and
+    # popup/menu interaction still need their dedicated Rust implementation.
+    "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Select.swift",
+    # Visibility policy is implemented; the picker still needs the adaptive
+    # menu and overlay host.
+    "Compose/Sources/CoveUICompose/Primitives/Columns/Picker.swift",
     # Plain rendering/layout is present; tooltip, interactive truncation state,
     # and the selectable-label bridge still need to be ported.
     "Compose/Sources/CoveUICompose/Primitives/Text/Text.swift",
@@ -82,6 +96,46 @@ def mapped_paths(source: str) -> tuple[str, list[str]]:
         return "written_unverified", ["Compose/CompositionMacros/rust/lib.rs"]
     if source.startswith("Compose/Sources/CoveUICompose/"):
         relative = source.removeprefix("Compose/Sources/CoveUICompose/").removesuffix(".swift")
+        if relative == "Primitives/Controls/Button/Chrome":
+            return "written_unverified", ["Compose/rust/theme/styles/buttons/builtin_button_chrome.rs"]
+        if relative == "Modifiers/Layout/LetterSpacingModifier":
+            return "written_unverified", ["Compose/rust/modifiers/style/style_modifiers.rs"]
+        interaction_modifiers = {
+            "Modifiers/Interaction/AccessibilityModifier",
+            "Modifiers/Interaction/CursorModifier",
+            "Modifiers/Interaction/FocusRequestModifier",
+            "Modifiers/Interaction/HitTestingModifier",
+            "Modifiers/Interaction/HoverModifier",
+        }
+        if relative in interaction_modifiers:
+            return "written_unverified", ["Compose/rust/modifiers/interaction/mod.rs"]
+        layout_modifiers = {
+            "Modifiers/Layout/AbsolutePositionModifier",
+            "Modifiers/Layout/FlexModifier",
+            "Modifiers/Layout/FrameModifier",
+            "Modifiers/Layout/PaddingModifier",
+            "Modifiers/Layout/PaddingSugar",
+        }
+        if relative in layout_modifiers:
+            return "written_unverified", ["Compose/rust/modifiers/layout/mod.rs"]
+        if relative == "Primitives/Feedback/StatusTone":
+            return "written_unverified", ["Compose/rust/primitives/feedback/status_tone.rs"]
+        if relative == "Modifiers/Layout/FrameCaptureModifier":
+            return "written_unverified", ["Compose/rust/modifiers/layout/frame_capture.rs"]
+        if relative == "Modifiers/Style/SurfaceFinishModifier":
+            return "written_unverified", ["Compose/rust/modifiers/style/surface.rs"]
+        if relative == "Animation/AnimationValueModifier":
+            return "written_unverified", ["Compose/rust/modifiers/animation_value.rs"]
+        if relative == "Animation/EdgeInsets+Interpolatable":
+            return "written_unverified", ["Compose/rust/modifiers/layout/mod.rs"]
+        if relative == "Animation/WithAnimation":
+            return "written_unverified", ["Compose/rust/lib.rs", "Core/rust/scene/animation/context.rs"]
+        if relative == "CoveUIComposeResourceBundle":
+            return "written_unverified", ["Compose/rust/resource_bundle.rs", "PlatformCore/rust/resources.rs"]
+        if relative == "Primitives/Columns/Priority":
+            return "written_unverified", ["Compose/rust/primitives/columns/mod.rs"]
+        if relative == "Primitives/Columns/Picker":
+            return "partial", ["Compose/rust/primitives/columns/picker.rs"]
         target = "lib.rs" if relative in {"Exports", "CoveUICompose"} else "/".join(snake(part) for part in relative.split("/")) + ".rs"
         return "written_unverified", ["Compose/rust/" + target]
     if source.startswith("Graphics/Sources/CoveUIGraphics/"):

@@ -192,11 +192,12 @@ impl View for BuiltinButtonChrome {
     }
 }
 
-/// Recursively re-applies chrome after an interaction change. The host calls
-/// this from its focus-change handler so a focus ring can appear without a
-/// full recomposition.
+/// Recursively re-applies chrome after an interaction change. This keeps the
+/// built-in styles on their node-driven fast path while still updating colors,
+/// focus rings, and press transforms immediately.
 pub fn update_builtin_button_chrome_descendants(button_node: &Node) {
     for child in button_node.children() {
+        apply_builtin_button_chrome(&child);
         update_builtin_button_chrome_descendants(&child);
     }
 }
