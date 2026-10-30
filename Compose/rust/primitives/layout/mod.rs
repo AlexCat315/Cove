@@ -1,5 +1,8 @@
 //! Layout primitives.
 pub mod horizontal_scroll_origin;
+pub mod direction;
+pub mod grid;
+pub mod masonry;
 pub mod overlay;
 pub mod row_slot;
 pub mod scroll_reveal;

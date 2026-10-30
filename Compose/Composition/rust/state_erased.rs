@@ -5,7 +5,7 @@
 //! wrapper keeps the state handle and its invalidation subscription together so
 //! dropping the wrapper releases the observer.
 use cove_core::state::LocalSubscription;
-use cove_core::{ReadScopeId, State};
+use cove_core::{ReadScope, State};
 use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -18,7 +18,14 @@ pub struct DynamicField {
 }
 impl DynamicField {
     pub fn state<T: Clone + Send + 'static>(name: impl Into<String>, state: &State<T>) -> Self {
-        Self { name: name.into(), inner: Rc::new(StateField { state: state.clone(), subscription: RefCell::new(None) }) }
+        Self {
+            name: name.into(),
+            inner: Rc::new(StateField {
+                state: state.clone(),
+                subscription: RefCell::new(None),
+                tracking_owner: RefCell::new(None),
+            }),
+        }
     }
     pub fn name(&self) -> &str {
         &self.name
@@ -34,10 +41,10 @@ impl DynamicField {
     }
     /// Route writes into `invalidate`. The subscription lives in the field, so
     /// the caller must retain the field for as long as the view is installed.
-    pub fn wire(&self, invalidate: Rc<dyn Fn()>) {
-        self.inner.wire(invalidate);
+    pub fn wire(&self, invalidate: Rc<dyn Fn()>, precise: bool) {
+        self.inner.wire(invalidate, precise);
     }
-    pub fn wire_read_tracking(&self, scope: ReadScopeId, precise: bool) {
+    pub fn wire_read_tracking(&self, scope: ReadScope, precise: bool) {
         self.inner.wire_read_tracking(scope, precise);
     }
     pub fn unwire(&self) {
@@ -53,8 +60,8 @@ trait ErasedState {
     fn diagnostic_kind(&self) -> &'static str;
     fn dev_tools_value_type(&self) -> String;
     fn dev_tools_read(&self) -> Option<Rc<dyn Fn() -> String>>;
-    fn wire(&self, invalidate: Rc<dyn Fn()>);
-    fn wire_read_tracking(&self, scope: ReadScopeId, precise: bool);
+    fn wire(&self, invalidate: Rc<dyn Fn()>, precise: bool);
+    fn wire_read_tracking(&self, scope: ReadScope, precise: bool);
     fn unwire(&self);
     fn copy_value_from(&self, other: &dyn ErasedState);
     fn as_any(&self) -> &dyn Any;
@@ -63,6 +70,7 @@ trait ErasedState {
 struct StateField<T> {
     state: State<T>,
     subscription: RefCell<Option<LocalSubscription>>,
+    tracking_owner: RefCell<Option<cove_core::ReadScopeId>>,
 }
 impl<T: Clone + Send + 'static> ErasedState for StateField<T> {
     fn diagnostic_kind(&self) -> &'static str {
@@ -76,21 +84,35 @@ impl<T: Clone + Send + 'static> ErasedState for StateField<T> {
         state.inspection_summary()?;
         Some(Rc::new(move || state.inspection_summary().unwrap_or_default()))
     }
-    fn wire(&self, invalidate: Rc<dyn Fn()>) {
+    fn wire(&self, invalidate: Rc<dyn Fn()>, precise: bool) {
+        if precise {
+            self.subscription.borrow_mut().take();
+            return;
+        }
         let mut slot = self.subscription.borrow_mut();
         if slot.is_some() {
             return;
         }
         *slot = Some(self.state.subscribe_local(move |_revision| invalidate()));
     }
-    fn wire_read_tracking(&self, _scope: ReadScopeId, _precise: bool) {
-        // Invalidation is driven by `wire` for every state member. The core
-        // read-tracking registry requires `Send` invalidators, which an
-        // `Rc`-owned composition scope cannot provide; precise field filtering
-        // is therefore deferred until a local read-scope variant exists.
+    fn wire_read_tracking(&self, scope: ReadScope, precise: bool) {
+        if precise {
+            let previous = self.tracking_owner.borrow_mut().replace(scope.id);
+            if let Some(previous) = previous.filter(|previous| *previous != scope.id) {
+                self.state.clear_read_tracking_owner(previous);
+            }
+            self.state.set_read_tracking_owner(scope, true);
+        } else {
+            if let Some(previous) = self.tracking_owner.borrow_mut().take() {
+                self.state.clear_read_tracking_owner(previous);
+            }
+        }
     }
     fn unwire(&self) {
         self.subscription.borrow_mut().take();
+        if let Some(scope) = self.tracking_owner.borrow_mut().take() {
+            self.state.clear_read_tracking_owner(scope);
+        }
     }
     fn copy_value_from(&self, other: &dyn ErasedState) {
         let Some(other) = other.as_any().downcast_ref::<Self>() else { return };

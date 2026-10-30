@@ -2,7 +2,7 @@
 
 目标语言为 Rust 2024（`rust-version = 1.90`），性能关键内核可保留 C。当前工作区版本 `0.3.0-dev`。
 
-最后更新：2026-10-29。
+最后更新：2026-10-30。
 
 ## 记录口径与当前工作
 
@@ -12,42 +12,43 @@
 
 逐文件清单保存在 [rust-migration-files.json](rust-migration-files.json)，记录原始路径、源码 SHA-256、对应 Rust/C 路径及状态。状态含义：`pending` 尚未建立实现映射；`partial` 对应实现仍有缺项；`written_unverified` 已写入、未验证；`manifest_written` 已建立 Cargo 清单。清单仍在补充，不用文件名对应代替行为审阅。
 
-当前顺序：迁移记录 → Text/Imaging 生产源码（已写入）→ Shell/Runtime 与 Graphics 各原生后端、UI 渲染 → Compose/各宿主、工具和示例 → 全部测试迁移与最终统一验证。所有原有平台都保留在迁移范围内。
+当前顺序：迁移记录 → Text/Imaging 生产源码（已写入）→ Shell/Runtime 与 Graphics UI 渲染（已写入，原生 GPU 后端继续迁移）→ Compose 基础层与上层控件 → Terminal、Hosts、Browser、Tools、DevTools、Sources、Examples → 测试源码迁移 → 全部实现完成后统一验证。所有原有平台都保留在迁移范围内。
 
 ## 总量
 
 | 指标 | 数值 |
 | --- | --- |
-| 仍保留的 Swift 文件（历史快照） | 1,436 |
-| 仍保留的 Swift 行数（历史快照） | 183,294 |
-| 已写入 Rust 文件（持续变化，见逐文件清单） | 159 |
-| 已写入 Rust 行数 | 25,686 |
-| 已迁移 crate | `cove-core`、`cove-graphics`（RHI 前端）、`cove-platform`、`cove-system`、`cove-logging`、`cove-devtools-protocol`、`cove-cli`、`cove-ui`、`cove-rust-counter` |
+| Swift 源文件（含测试、模板；逐文件清单快照） | 1,438 项 |
+| Swift 源码行数（同一快照） | 183,470 |
+| 逐文件清单：已写入、未验证 | 311 项 |
+| 逐文件清单：有缺项 | 1 项 |
+| 逐文件清单：待迁移或待建立映射 | 1,107 项 |
+| Cargo 清单映射 | 19 项 |
+| Rust 文件与行数（已跟踪文件快照，含测试源码） | 468 个 / 66,138 行 |
+| 已接入 Cargo 工作区的能力 | Core、PlatformCore、System、Logging、Graphics、Text、Imaging、Shell、Runtime、Compose、Terminal、Hosts、DevTools、Sources、Tools、Browser、Examples |
 
-## 逐模块进度
+清单状态只表示目标路径已存在，不等于行为完整或平台可用。Compose 的映射覆盖仍在扩展；剩余项包含大量上层 UI、平台宿主、工具和测试源码。
 
-`rust` 列统计 `*/rust/**/*.rs`，不含构建脚本。
+## 逐模块进度快照
+
+下表统计生产源码目录，不含测试源码；Rust 文件数来自磁盘快照。逐文件映射状态见 JSON 清单。
 
 | 模块 | Swift 文件 | Swift 行 | Rust 文件 | Rust 行 | 状态 |
-| --- | --- | --- | --- | --- | --- |
-| Core | 104 | 12,548 | 92 | 12,696 | 已写入，未统一验证 |
-| PlatformCore | 8 | 581 | 2 | 425 | 已写入，未统一验证 |
-| System | 24 | 1,452 | 5 | 1,154 | 已写入，待逐文件行为对照 |
-| Logging | 19 | 906 | 1 | 511 | 基础管线已写入；上下文与异步行为待对照 |
-| Graphics | 144 | 18,365 | 见下述快照 | — | RHI 前端及 UI 渲染对应源码已写入；原生后端仍待完成 |
-| Text | 17 | 2,803 | 16 | 1,002 | 生产源码已写入；未编译/测试 |
-| Imaging | 10 | 718 | 11 | 415 | 生产源码已写入；未编译/测试 |
-| Compose | 416 | 52,590 | — | — | 未开始 |
-| Runtime | 12 | 1,501 | 见下述快照 | — | 多窗口/调度/宿主桥接已写入；未验证 |
-| Shell | 14 | 2,584 | 14 | 472 | SDL 窗口/输入/对话框与 Apple 桥接已写入；未验证 |
-| Terminal | 38 | 4,030 | — | — | 未开始 |
-| Hosts | 55 | 4,349 | — | — | 未开始 |
-| Browser | 2 | 419 | — | — | 未开始 |
-| Sources | 19 | 4,861 | — | — | 未开始 |
-| Tools | 88 | 4,800 | — | — | 未开始 |
-| DevTools | 57 | 5,910 | — | — | 未开始 |
-| Examples | 84 | 9,723 | — | — | 未开始 |
-| Tests | 325 | 55,154 | — | — | 未开始 |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Core | 97 | 12,301 | 93 | 12,807 | 对应实现已写入；本次补齐局部失效桥；未验证 |
+| PlatformCore | 6 | 541 | 2 | 425 | 实现已写入；未验证 |
+| System | 17 | 1,004 | 21 | 2,956 | 文件映射和实现待逐项复核 |
+| Logging | 15 | 705 | 16 | 2,701 | 文件映射和异步行为待复核 |
+| Graphics | 107 | 14,534 | 44 | 10,644 | RHI 前端与 UI 渲染已写入；原生 GPU 后端待迁移 |
+| Text | 14 | 2,576 | 16 | 1,002 | 生产源码已写入；未验证 |
+| Imaging | 9 | 697 | 11 | 415 | 生产源码已写入；未验证 |
+| Compose | 383 | 49,814 | 202 | 24,619 | Composition 基础层、静态文字绘制、部分控件与宠物场景已写入；大量控件待迁移 |
+| Runtime | 11 | 1,485 | 12 | 328 | 多窗口/调度/宿主桥接已写入；未验证 |
+| Shell | 13 | 2,529 | 14 | 483 | SDL 与 Apple 桥接已写入；未验证 |
+| Terminal | 29 | 3,088 | 1 | 6 | 待迁移 |
+| Browser | 1 | 400 | 1 | 2 | 待迁移 |
+| Tools | 73 | 3,951 | — | — | 待迁移 |
+| DevTools | 32 | 3,069 | 1 | 8 | 待迁移 |
 
 ## 已写入的 crate
 
@@ -90,7 +91,7 @@ PlatformShell、SDL3Shell、ApplicationEntry、Cursor、SDL3Clipboard、日志�
 
 macOS/iOS 使用原生 CAMetalLayer；Windows、X11、Wayland 和 Android 原生窗口引用已实现。AppKit 菜单仍遵循原版 macOS 能力边界；其他平台的 Compose 菜单呈现器待上层迁移。显示刷新在无原生回调的 SDL 平台上显式报告不可用，Runtime 必须保留原有截止时间回退。
 
-Shell 代码尚未编译/测试；SDL 链接、各平台宿主生命周期、菜单与窗口集成仍在最终对照范围内。接下来继续 Graphics 的 UI 纹理、资源驻留与绘制路径。
+Shell 代码尚未编译/测试；SDL 链接、各平台宿主生命周期、菜单与窗口集成仍在最终对照范围内。接下来继续迁移上层 Compose 控件及原生图形后端。
 
 ## 本次继续迁移的最新快照
 
@@ -103,12 +104,13 @@ Shell 代码尚未编译/测试；SDL 链接、各平台宿主生命周期、菜
 | Shell | 14 | 483 | 窗口/输入/原生桥接已写入；未验证 |
 | Graphics | 44 | 10,644 | 前端与 UI 层已写入；原生 GPU 后端未完成 |
 | Runtime | 12 | 328 | 会话/帧调度/Apple 无障碍桥接已写入；未验证 |
+| Compose（UI + Composition + 宏） | 202 | 24,619 | 基础层、静态文字绘制、部分控件和宠物场景已写入；上层控件待迁移 |
 
 Graphics 新增 UI 视口、几何缓存验证、着色器资源载入、纹理所有权/弱驻留、带边缘填充的图片图集、失败录制重试上传、背景模糊、揭幕及有限预算的分条 MSAA。几何扫描、UV 重映射和图集填充使用 C。RHI 的帧回收改为 GPU 回调只更新完成状态，设备 API 线程执行销毁回调，并补充空闲等待的通知。
 
 Runtime 新增多窗口会话、原生/注入输入仲裁、对话框回调回到主线程、事件驱动/显示刷新/固定帧率、绝对截止时间回退、光标刷新、隐藏窗口释放通知、iOS CADisplayLink 生命周期，以及 macOS/iOS 无障碍树和动作桥接。同步补回 Core 的 WindowRevealContext 接口。新实现全部尚未验证。
 
-接下来继续 Compose/Composition 的 View、构建器、修饰器、组合作用域、布局树和状态订阅。全量项目尚未完成，Swift 源码继续作为行为对照保留。
+Compose/Composition 的 ViewGraph、视图包装、修饰器、组合作用域、布局树和状态订阅已写入。新增 Rust 属性宏 `#[track_state_reads(field, ...)]`，在视图 `body` 中把 `self.state.get().field` 改写为字段读取追踪，并将 `DynamicField` 注册接入失效队列；普通视图仍通过本地订阅失效。另写入文件存储、可观察值包装、字符串目录解析、离屏快照和宠物运动、精灵绘制、锚点及场景组合。为媒体、头像、图表、文本辅助、布局与主题中已有的 Rust 文件补上模块入口。纯文字和分隔线已写入基础 Rust 实现；选择交互、完整截断提示及部分样式细节仍缺，因此该源文件标记为 `partial`。Compose 清单中仍有 265 项待映射和 1 项有缺项，其中包含待迁移实现和测试。全量项目尚未完成，Swift 源码继续作为行为对照保留。
 
 ## 迁移约定
 
@@ -134,7 +136,7 @@ Runtime 新增多窗口会话、原生/注入输入仲裁、对话框回调回�
 - **Graphics 平台后端**：`Metal`（15 文件 / 2,712 行）、`Vulkan`（31 / 6,010）、`DX12`（8 / 500）；`CoveUIGraphics` 的 12 个生产文件已写入 `Graphics/rust/ui/`，待接入实际 GPU 后统一验证。
 - **Text**：生产源码已逐文件写入。剩余项为测试迁移、原生依赖跨平台构建接入与最终行为对照；上层 Compose 文本选择仍待迁移。
 - **Imaging**：生产源码已逐文件写入。剩余项为图形纹理上传接入与最终行为对照。
-- **Compose**：视图图、控件、主题、组合与重组（416 文件，最大单块）。
+- **Compose**：视图图、控件、主题、组合与重组（383 文件，最大单块）。
 - **Runtime / Shell / Terminal**：应用运行时、SDL 窗口与事件循环、Ghostty 引擎与 PTY/ConPTY。
 - **Hosts / Browser**：桌面、Android、iOS 宿主与 WebGPU/Canvas 宿主。
 - **Tools / DevTools / Sources / Examples**：CLI 之外的工具、Inspection/Agent/Server/Inspector、SDK 安装器、示例应用。

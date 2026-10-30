@@ -1,17 +1,9 @@
 //! Translation of CoveUIComposeCore/TrackStateReads.swift.
 //!
-//! Swift synthesizes `_coveTrackedBody` with a member macro so dependencies can
-//! be inferred from a view body at compile time. Rust has no attached macros on
-//! stable toolchains, so a view opts in by implementing [`StateReadTrackedView`]
-//! directly. The runtime boundary is identical: recomposition reads the tracked
-//! body and `View::precise_state_reads` reports `true` for the scope.
-use crate::{AnyView, View};
+//! `#[track_state_reads(field, ...)]` on an `impl View` rewrites direct
+//! `self.field.get().member` reads to `State::read_field`, exposes those state
+//! members to the composition scope, and opts the view into precise tracking.
+use crate::View;
 
-/// Runtime entry point corresponding to the macro-synthesized protocol.
-///
-/// Implementors also override `View::precise_state_reads` to return `true`,
-/// mirroring the Swift conformance check.
-pub trait StateReadTrackedView: View {
-    /// The body expression whose state reads are tracked per field.
-    fn cove_tracked_body(&self) -> AnyView;
-}
+/// Marker emitted by [`crate::track_state_reads`] for an instrumented view.
+pub trait StateReadTrackedView: View {}

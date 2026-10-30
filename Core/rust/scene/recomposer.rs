@@ -52,12 +52,16 @@ struct Queue {
 #[derive(Default)]
 pub struct Recomposer {
     queue: RefCell<Queue>,
-    pub timeline: Option<Rc<RefCell<PerformanceTimeline>>>,
+    timeline: RefCell<Option<Rc<RefCell<PerformanceTimeline>>>>,
 }
 
 impl Recomposer {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn set_timeline(&self, timeline: Option<Rc<RefCell<PerformanceTimeline>>>) {
+        *self.timeline.borrow_mut() = timeline;
     }
 
     // MARK: - Invalidation
@@ -127,7 +131,8 @@ impl Recomposer {
     /// the current frame so parent-driven environment changes settle before
     /// layout/draw.
     pub fn commit_all(&self) -> bool {
-        let trace = self.timeline.as_ref().and_then(|timeline| timeline.borrow().begin());
+        let timeline = self.timeline.borrow().clone();
+        let trace = timeline.as_ref().and_then(|timeline| timeline.borrow().begin());
         let mut committed: HashSet<ScopeId> = HashSet::new();
         let mut did_commit = false;
 
@@ -162,9 +167,7 @@ impl Recomposer {
         }
 
         self.compact_pending_queue();
-        if did_commit
-            && let Some(timeline) = &self.timeline
-        {
+        if did_commit && let Some(timeline) = timeline {
             timeline.borrow_mut().end(trace, "recomposition", "Commit pending scopes", None, &[]);
         }
         did_commit

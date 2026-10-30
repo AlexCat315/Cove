@@ -62,6 +62,14 @@ impl<T: Send + 'static> State<T> {
     pub fn set_read_tracking_owner(&self, scope: ReadScope, precise: bool) {
         let mut tracking = self.0.tracking.lock().unwrap_or_else(|e| e.into_inner()); tracking.owner = Some(scope); tracking.precise = precise;
     }
+    pub fn clear_read_tracking_owner(&self, scope: ReadScopeId) {
+        let mut tracking = self.0.tracking.lock().unwrap_or_else(|e| e.into_inner());
+        if tracking.owner.as_ref().is_some_and(|owner| owner.id == scope) {
+            tracking.owner = None;
+            tracking.precise = false;
+        }
+        tracking.readers.remove(&scope);
+    }
     fn track(&self, key: Option<ReadKey>, field: Option<FieldRead<T>>) {
         let (scope, first) = {
             let mut tracking = self.0.tracking.lock().unwrap_or_else(|e| e.into_inner());
@@ -118,7 +126,7 @@ impl<T: Send + 'static> State<T> {
                 if reader.whole { pending.push((reader.invalidate.clone(), None)); }
                 else if let Some(field) = reader.fields.values().find(|field| !(field.unchanged)(&value.0)) { pending.push((reader.invalidate.clone(), Some(field.name.clone()))); }
             }
-            if (!tracking.precise || tracking.readers.is_empty() || tracking.owner.as_ref().is_none_or(|owner| !is_read_scope_installed(owner.id))) && let Some(owner) = &tracking.owner {
+            if (!tracking.precise || tracking.owner.as_ref().is_none_or(|owner| !is_read_scope_installed(owner.id))) && let Some(owner) = &tracking.owner {
                 pending.push((owner.invalidate.clone(), None));
             }
             (value.1, pending)

@@ -13,6 +13,7 @@ use cove_core::scene::{
     DirtyReason, ElementId, InvalidationLog, InvalidationLogHolder, InvalidationPhase,
     InvalidationSource, LayoutNode, Node, NodeKey, NodeTree, ObservableStateTracking,
     RecompositionReason, RenderTree, StateRegistry, TextInputAttachmentKey, TextInputAreaResolver,
+    LocalInvalidationHandle,
 };
 use cove_core::{with_deferred_evaluation, Point, Rect};
 use cove_platform::TextInputArea;
@@ -53,6 +54,7 @@ pub struct ViewGraph {
 
 impl ViewGraph {
     pub fn new(tree: Rc<RefCell<NodeTree>>, recomposer: Rc<cove_core::scene::Recomposer>) -> Self {
+        recomposer.set_timeline(Some(tree.borrow().timeline.clone()));
         Self {
             tree,
             recomposer,
@@ -71,6 +73,10 @@ impl ViewGraph {
 
     pub fn layout_root(&self) -> LayoutNode {
         self.layout_tree.root.clone()
+    }
+
+    pub fn render_tree(&self) -> &RenderTree {
+        &self.render_tree
     }
 
     pub fn skipped_parent_updates(&self) -> usize {
@@ -750,6 +756,7 @@ pub(crate) struct ViewScope {
     installed: bool,
     fields: Vec<DynamicField>,
     state_registrations: Vec<String>,
+    read_invalidation: Option<LocalInvalidationHandle>,
 }
 
 impl ViewScope {
@@ -763,6 +770,7 @@ impl ViewScope {
             installed: false,
             fields: Vec::new(),
             state_registrations: Vec::new(),
+            read_invalidation: None,
         }
     }
 
@@ -786,6 +794,7 @@ impl ViewScope {
             }
             scope.anchor.id()
         };
+        scope.borrow_mut().read_invalidation.take();
         ObservableStateTracking::remove_scope(cove_core::ReadScopeId(anchor_id.0));
     }
 
@@ -800,11 +809,25 @@ impl ViewScope {
             let mut scope = scope.borrow_mut();
             std::mem::take(&mut scope.fields)
         };
+        let previous_read_scope = scope.borrow_mut().read_invalidation.take();
+        drop(previous_read_scope);
         for field in &previous {
             field.unwire();
         }
         let mut registrations = Vec::new();
         let precise = view.storage.precise_state_reads();
+        let weak_scope = Rc::downgrade(scope);
+        let weak_graph = Rc::downgrade(graph);
+        let read_invalidation = LocalInvalidationHandle::with_id(
+            cove_core::ReadScopeId(anchor_id.0),
+            move |reason| {
+                let (Some(scope), Some(graph)) = (weak_scope.upgrade(), weak_graph.upgrade()) else {
+                    return;
+                };
+                Self::schedule(&scope, &graph, reason);
+            },
+        );
+        let read_scope = read_invalidation.read_scope();
         for field in &fields {
             let weak_scope = Rc::downgrade(scope);
             let weak_graph = Rc::downgrade(graph);
@@ -815,8 +838,8 @@ impl ViewScope {
                     return;
                 };
                 Self::schedule(&scope, &graph, RecompositionReason::new(kind.clone()).with_detail(name.clone()));
-            }));
-            field.wire_read_tracking(cove_core::ReadScopeId(anchor_id.0), precise);
+            }), precise);
+            field.wire_read_tracking(read_scope.clone(), precise);
             if let Some(read) = field.dev_tools_read() {
                 let stable = format!("{}:{}", anchor_id.0, field.name());
                 let value_type = field.dev_tools_value_type();
@@ -828,6 +851,7 @@ impl ViewScope {
         let mut scope = scope.borrow_mut();
         scope.fields = fields;
         scope.state_registrations = registrations;
+        scope.read_invalidation = Some(read_invalidation);
     }
 
     /// Re-evaluate body and reconcile against the existing anchor children.
@@ -907,12 +931,29 @@ impl ViewScope {
     }
 
     fn body(scope: &Rc<RefCell<Self>>) -> AnyView {
-        let scope = scope.borrow();
-        if Self::is_materialised_directly(scope.view.storage.as_ref()) {
-            scope.view.clone()
-        } else {
-            scope.view.body()
-        }
+        let (view, scope_id, invalidate, invalidate_tracked) = {
+            let scope = scope.borrow();
+            let Some(read_invalidation) = scope.read_invalidation.as_ref() else {
+                return if Self::is_materialised_directly(scope.view.storage.as_ref()) {
+                    scope.view.clone()
+                } else {
+                    scope.view.body()
+                };
+            };
+            (
+                scope.view.clone(),
+                cove_core::ReadScopeId(scope.anchor.id().0),
+                read_invalidation.invalidator(),
+                Some(read_invalidation.tracked()),
+            )
+        };
+        ObservableStateTracking::with_scope(scope_id, invalidate, invalidate_tracked, || {
+            if Self::is_materialised_directly(view.storage.as_ref()) {
+                view
+            } else {
+                view.body()
+            }
+        })
     }
 
     /// Defensive guard for bodyless view forms. These normally get handled by

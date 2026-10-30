@@ -10,6 +10,11 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = ROOT / "Docs/rust-migration-files.json"
+PARTIAL_SOURCES = {
+    # Plain rendering/layout is present; tooltip, interactive truncation state,
+    # and the selectable-label bridge still need to be ported.
+    "Compose/Sources/CoveUICompose/Primitives/Text/Text.swift",
+}
 
 CORE_VALUES = {
     "AnalyticClipper": ["analytic_clipper.rs"], "AnalyticStroke": ["analytic_stroke.rs", "shape_kernels.c"],
@@ -61,6 +66,24 @@ def mapped_paths(source: str) -> tuple[str, list[str]]:
         targets = {"CoveUIRuntime": ["lib.rs"], "Exports": ["lib.rs"], "DisplayDriver": ["ios/mod.rs", "lifecycle.m"],
             "NativeAccessibility": ["native_accessibility.rs", "accessibility.m"]}
         return "written_unverified", ["Runtime/rust/" + target for target in targets.get(path.stem, [snake(path.stem) + ".rs"])]
+    if source.startswith("Compose/Composition/Sources/CoveUIComposeCore/"):
+        relative = source.removeprefix("Compose/Composition/Sources/CoveUIComposeCore/").removesuffix(".swift")
+        targets = {
+            "Exports": "lib.rs",
+            "Box": "box_view.rs",
+            "ModifiedContent+Materialise": "modified_content_materialise.rs",
+            "Layout/Layout": "layout/mod.rs",
+            "Layout/LayoutValue": "layout/value.rs",
+            "TrackStateReads": "track_state_reads.rs",
+        }
+        target = targets.get(relative, "/".join(snake(part) for part in relative.split("/")) + ".rs")
+        return "written_unverified", ["Compose/Composition/rust/" + target]
+    if source.startswith("Compose/Composition/Sources/CoveUIReadMacros/"):
+        return "written_unverified", ["Compose/CompositionMacros/rust/lib.rs"]
+    if source.startswith("Compose/Sources/CoveUICompose/"):
+        relative = source.removeprefix("Compose/Sources/CoveUICompose/").removesuffix(".swift")
+        target = "lib.rs" if relative in {"Exports", "CoveUICompose"} else "/".join(snake(part) for part in relative.split("/")) + ".rs"
+        return "written_unverified", ["Compose/rust/" + target]
     if source.startswith("Graphics/Sources/CoveUIGraphics/"):
         targets = {"Exports": "mod", "UIAssetResidency": "asset_residency", "NativeUIViewport": "viewport",
             "DrawGeometry": "draw_geometry", "Resources": "resources", "NativeUIShaderResources": "shader_resources",
@@ -99,6 +122,8 @@ def inventory() -> dict:
             state = "partial" if existing else "pending"
         if not targets:
             state = "pending"
+        elif source in PARTIAL_SOURCES and state == "written_unverified":
+            state = "partial"
         data = (ROOT / source).read_bytes()
         entries.append({"source": source, "source_sha256": hashlib.sha256(data).hexdigest(),
                         "source_lines": len(data.splitlines()), "status": state, "rust": targets})

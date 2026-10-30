@@ -9,5 +9,6 @@ path = "rust/lib.rs"
 [dependencies]
 cove-core.workspace = true
 cove-platform.workspace = true
+cove-composition-macros.workspace = true
 [lints]
 workspace = true

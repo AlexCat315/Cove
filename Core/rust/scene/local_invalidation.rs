@@ -16,9 +16,15 @@ pub fn drain_scene_invalidations(){let pending=INBOX.with(|inbox|std::mem::take(
 pub struct LocalInvalidationHandle{scope:ReadScope,tracked:Arc<dyn Fn(RecompositionReason)+Send+Sync>,_thread:ThreadId,_not_send:std::marker::PhantomData<Rc<()>>}
 impl LocalInvalidationHandle{
     pub fn new(invalidate:impl Fn(RecompositionReason)+'static)->Self{
-        let thread=std::thread::current().id();let inbox=INBOX.with(Clone::clone);let identity=Arc::new(AtomicU64::new(0));let key=identity.clone();
-        let tracked:Arc<dyn Fn(RecompositionReason)+Send+Sync>=Arc::new(move|reason|{let id=ReadScopeId(key.load(Ordering::Relaxed));if std::thread::current().id()==thread{deliver(id,reason);}else{inbox.pending.lock().unwrap_or_else(|e|e.into_inner()).push((id,reason));let wake=wake_slot().lock().unwrap_or_else(|e|e.into_inner()).clone();if let Some(wake)=wake{wake();}}});
-        let callback=tracked.clone();let scope=ReadScope::new(move|field|callback(RecompositionReason::new("state").with_detail(field.unwrap_or_default())));identity.store(scope.id.0,Ordering::Relaxed);HANDLERS.with(|handlers|handlers.borrow_mut().insert(scope.id,Rc::new(invalidate)));Self{scope,tracked,_thread:thread,_not_send:std::marker::PhantomData}
+        static NEXT:AtomicU64=AtomicU64::new(1);
+        Self::with_id(ReadScopeId(NEXT.fetch_add(1,Ordering::Relaxed)),invalidate)
+    }
+    /// Create a local invalidation bridge using a caller-owned stable scope ID.
+    /// The ID must be unique among concurrently installed scene read scopes.
+    pub fn with_id(id:ReadScopeId,invalidate:impl Fn(RecompositionReason)+'static)->Self{
+        let thread=std::thread::current().id();let inbox=INBOX.with(Clone::clone);
+        let tracked:Arc<dyn Fn(RecompositionReason)+Send+Sync>=Arc::new(move|reason|{if std::thread::current().id()==thread{deliver(id,reason);}else{inbox.pending.lock().unwrap_or_else(|e|e.into_inner()).push((id,reason));let wake=wake_slot().lock().unwrap_or_else(|e|e.into_inner()).clone();if let Some(wake)=wake{wake();}}});
+        let callback=tracked.clone();let scope=ReadScope::with_id(id,move|field|callback(RecompositionReason::new("state").with_detail(field.unwrap_or_default())));HANDLERS.with(|handlers|handlers.borrow_mut().insert(scope.id,Rc::new(invalidate)));Self{scope,tracked,_thread:thread,_not_send:std::marker::PhantomData}
     }
     pub fn read_scope(&self)->ReadScope{self.scope.clone()}
     pub fn tracked(&self)->Arc<dyn Fn(RecompositionReason)+Send+Sync>{self.tracked.clone()}

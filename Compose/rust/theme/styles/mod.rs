@@ -1,5 +1,8 @@
 //! Component styles.
 pub mod components;
+pub mod appearance_modifier;
+pub mod buttons;
+pub mod circular_appearance;
 pub mod default_dark_theme;
 pub mod default_light_theme;
 pub use components::*;

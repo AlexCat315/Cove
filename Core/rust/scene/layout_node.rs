@@ -319,8 +319,13 @@ impl LayoutNode {
     pub(crate) fn from_cell(cell: Rc<RefCell<LayoutNodeData>>) -> Self {
         Self(cell)
     }
-    pub(crate) fn downgrade(&self) -> LayoutNodeWeak {
+    pub fn downgrade(&self) -> LayoutNodeWeak {
         Rc::downgrade(&self.0)
+    }
+
+    /// Upgrade a weak layout-node handle used by retained measure callbacks.
+    pub fn upgrade(weak: &LayoutNodeWeak) -> Option<Self> {
+        weak.upgrade().map(Self)
     }
     pub(crate) fn cell(&self) -> &Rc<RefCell<LayoutNodeData>> {
         &self.0

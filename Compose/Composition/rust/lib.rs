@@ -1,4 +1,5 @@
 //! Declarative view materialization and retained composition scopes.
+extern crate self as cove_composition;
 mod view;
 mod any_view;
 mod view_builder;
@@ -42,6 +43,7 @@ pub use state_erased::*;
 pub use scancode::*;
 pub use layout_debug_modifier::*;
 pub use track_state_reads::*;
+pub use cove_composition_macros::track_state_reads;
 pub use box_view::*;
 pub use cove_core as core;
 pub use cove_core::scene;
