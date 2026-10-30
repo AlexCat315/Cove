@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- 新增移动端 `SettingsScreen`（9 项测试，已运行通过）：三个分组（General 两个开关 + 外观折行；Accessibility 一个开关；无标题的 Sign out 破坏性行）、开关写回 `MobileModel`、外观选择仅接受 System/Light/Dark 三项且选择后关闭弹层、未提供的外观值被拒绝且不改动模型。
+
 - 新增 `ImageStory`（12 项测试，已运行通过）：四种图片来源（bundled/remote/missing/empty）各自的 URL 解析与 URL 去空白、`empty` 不可重试且请求号不变、三种加载相位到占位面的映射——`Empty` 与 `Failure` 共用布局但文案不同（`No image` + 引导 vs `Image unavailable` + 错误描述）。已接入 `StoryDispatch`。生产源码达 974/984（99.0%）。
 
 - 新增 `PlacementExample`（11 项测试，已运行通过）：12 种摆放与 `PopoverPlacement::ALL` 一一对应、紧凑镜像三向分支（leading 贴右、trailing 贴左、居中折半，且触发器超宽时夹到边缘不出现负坐标）、上/侧/下三档垂直位置、触发器宽度受视口上限约束。该组件是 Popconfirm 页的子组件而非独立页，故不接入 `StoryDispatch`。生产源码达 973/984（98.9%）。

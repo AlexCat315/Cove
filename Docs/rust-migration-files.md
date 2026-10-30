@@ -13,7 +13,7 @@
 
 | 范围 | 文件数 | 已写入 | 进行中 | 未开始 |
 | --- | ---: | ---: | ---: | ---: |
-| 生产源码 | 984 | 974 | 0 | 10 |
+| 生产源码 | 984 | 975 | 0 | 9 |
 | 测试源码 | 424 | 56 | 0 | 368 |
 | SwiftPM 清单 | 25 | 19 | 0 | 6 |
 | 项目模板 | 5 | 0 | 0 | 5 |
@@ -738,7 +738,7 @@
 
 ### Examples
 
-共 61 个文件：已写入 51，进行中 0，未开始 10。
+共 61 个文件：已写入 52，进行中 0，未开始 9。
 
 | 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
 | --- | ---: | --- | --- | --- |
@@ -747,7 +747,7 @@
 | `Examples/Mobile/Sources/AppContent/App.swift` | 33 | 已写入（未验证） | `Compose/Composition/rust/around_applying_modifier.rs`<br>`Compose/Composition/rust/view_modifier.rs` | 未编译、未行为对照 |
 | `Examples/Mobile/Sources/AppContent/Model.swift` | 30 | 已写入（未验证） | `Compose/rust/primitives/data/chart/model.rs` | 未编译、未行为对照 |
 | `Examples/Mobile/Sources/AppContent/Projects.swift` | 57 | 已写入（未验证） | `Examples/rust/mobile/model.rs`<br>`Examples/rust/mobile/today.rs` | 未编译、未行为对照 |
-| `Examples/Mobile/Sources/AppContent/Settings.swift` | 50 | 未开始 | — | 等待实现 |
+| `Examples/Mobile/Sources/AppContent/Settings.swift` | 50 | 已写入（未验证） | `Examples/rust/mobile/settings.rs` | 未编译、未行为对照 |
 | `Examples/Mobile/Sources/AppContent/Today.swift` | 49 | 已写入（未验证） | `Examples/rust/mobile/today.rs` | 未编译、未行为对照 |
 | `Examples/Platforms/iOS/main.swift` | 10 | 已写入（未验证） | `Examples/RustCounter/src/main.rs` | 未编译、未行为对照 |
 | `Examples/Sources/CoveUIDemo/Launch.swift` | 79 | 已写入（未验证） | `Hosts/rust/android/contract/launch.rs` | 未编译、未行为对照 |

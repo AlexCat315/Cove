@@ -87,3 +87,7 @@ path = "rust/tests/placement_example.rs"
 [[test]]
 name = "image_story"
 path = "rust/tests/image_story.rs"
+
+[[test]]
+name = "settings_screen"
+path = "rust/tests/settings_screen.rs"
