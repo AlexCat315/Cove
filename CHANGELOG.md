@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+- 修复 Rust 工作区可编译性：为 `Compose/CompositionMacros` 补上 proc-macro 的 `path`，修正 `cove-composition` 的导出与类型错误（`ModifierReplay` 导出、场景几何重导出、`DynamicField: Clone`、slot tag 包装、`&dyn View`/`&AnyView` 混用、`ViewScope::uninstall` 签名），并为 `Graphics/rust/ui/draw_geometry.rs` 的语句位 `unsafe` 块加括号。仅为局部 `cargo check`，不构成验收。
+
+- 迁移盘点改为逐文件映射：新增 `Docs/rust-migration-files.md`（1,438 行）并升级 `Docs/rust-migration-files.json` 为 schema 2。补回 System、Logging、Tools/Support、Graphics RHI 前端、Hosts Android 契约/集成、DevTools Protocol 的既有 Rust 映射，纠正 Android `APK/Package.swift` 的清单误分类，并确认 ZStack 与 ChartOverlay 已实现。盘点未编译、未测试。
+
 - 继续逐文件迁移 Compose：加入触发式/重复关键帧轨道、离散阶段序列、数字文本插值、可动画缩放/偏移变换和进度值动画资源，保留阶段动画、最终无障碍值、减弱动态效果和节点卸载清理。本批尚未编译或测试。
 
 - 继续迁移 Compose 基础控件：加入 Portal 宽高约束与放置算法、模态焦点作用域、活动路由出口、虚拟列表窗口状态、数据表列几何、集合控件键盘边界和编辑器高度约束。本批尚未编译或测试。

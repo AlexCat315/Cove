@@ -10,7 +10,8 @@ impl NativeUIGeometry{
         for batch in list.batches(){let start=batch.index_offset as usize;let count=batch.index_count as usize;if start>list.indices().len()||count>list.indices().len()-start||count%3!=0{return Err(RhiError::invalid_argument("UI batch index range exceeds the draw list"));}
             let relies=if let Some(rect)=batch.scissor {
                 // SAFETY: all indices and this exact range were validated above; C borrows read-only storage.
-                unsafe{cove_ui_relies_on_clip(list.vertices().as_ptr(),list.indices()[start..start+count].as_ptr(),count,rect.x-0.01,rect.y-0.01,rect.max_x()+0.01,rect.max_y()+0.01)}!=0
+                // Parenthesised: a block-like expression in statement position cannot take a binary operator.
+                (unsafe{cove_ui_relies_on_clip(list.vertices().as_ptr(),list.indices()[start..start+count].as_ptr(),count,rect.x-0.01,rect.y-0.01,rect.max_x()+0.01,rect.max_y()+0.01)})!=0
             }else{false};relies_on_clip.push(relies);}
 
         let mut snapshot=list.clone();snapshot.resources.reset();Ok(Self{snapshot,relies_on_clip})

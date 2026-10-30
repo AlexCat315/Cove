@@ -1,184 +1,202 @@
 # Rust 迁移状态
 
-目标语言为 Rust 2024（`rust-version = 1.90`），性能关键内核可保留 C。当前工作区版本 `0.3.0-dev`。
+仓库根目录：`/Users/cyke666/dev/Cove`。本文路径均相对该目录。
 
-最后更新：2026-10-30。
+目标语言为 Rust 2024（`rust-version = 1.90`），性能关键路径保留 C。当前工作区版本 `0.3.0-dev`。最后更新：2026-10-30。
 
-## 记录口径与当前工作
+逐文件清单：`Docs/rust-migration-files.json`（机器可读，schema 2）与 `Docs/rust-migration-files.md`（逐文件表格）。每个 Swift 文件一行，记录源路径、源码 SHA-256、行数、模块、类型（生产/测试/清单/模板）、状态、Rust/C 目标与是否只是计划路径。**本文与清单不一致时以清单为准，并应先修清单。**
 
-按最新要求：**实施过程中不运行测试，全部文件转换结束后再统一测试。** 本次继续迁移不会运行 `cargo test`、编译测试程序、跨平台验收或 GUI 冒烟测试。历史编译记录只说明当时的工作区状态，不能作为后续修改或其他平台的验证结论。
+## 记录口径
 
-文中“已写入”只表示有对应 Rust/C 实现，**不表示通过编译、行为覆盖或平台验收**。Swift 文件暂留作逐文件对照，因此其数量是“仍保留的源文件”，不能直接作为尚未翻译文件的数量。旧表格中的“完成”按这一口径理解，最终完成还需逐文件对照和统一验收。
+- 生产源码：排除测试目录、SwiftPM 清单、CLI 项目模板与构建/依赖产物。
+- 排除路径：`**/.build/**`、`third-party/**`、`vendor/**`、`target/**`、`dist/**`、`Artifacts/**`、`build/**`、`node_modules/**`、`.git/**`。
+- `Tests/**` 与 `**/Tests/**` 归为测试源码；`Package.swift` 归为 SwiftPM 清单；`**/Templates/**` 归为 CLI 项目模板。`Sources/.../Package.swift` 是生产源码（Android APK 打包），不按清单处理。
+- 状态：`pending`（未开始）、`partial`（有实现但仍有缺项）、`written_unverified`（已写入、未编译未行为对照）、`manifest_written`（仅 Cargo 清单建立）。**不写“已完成”**；完成需要逐文件行为对照、编译与平台验收。
+- 状态 `pending` 的 `rust` 数组若标 `planned: true`，表示登记的目标路径，文件尚不存在。
 
-逐文件清单保存在 [rust-migration-files.json](rust-migration-files.json)，记录原始路径、源码 SHA-256、对应 Rust/C 路径及状态。状态含义：`pending` 尚未建立实现映射；`partial` 对应实现仍有缺项；`written_unverified` 已写入、未验证；`manifest_written` 已建立 Cargo 清单。清单仍在补充，不用文件名对应代替行为审阅。
+按最新要求：**实施过程中不运行测试，全部文件转换结束后再统一验证。** 本次盘点没有运行 `cargo test`、跨平台验收或 GUI 冒烟测试；仅为修复工作区可编译性做了局部 `cargo check`，不构成验收结论。
 
-当前顺序：迁移记录 → Text/Imaging 生产源码（已写入）→ Shell/Runtime 与 Graphics UI 渲染（已写入，原生 GPU 后端继续迁移）→ Compose 基础层与上层控件 → Terminal、Hosts、Browser、Tools、DevTools、Sources、Examples → 测试源码迁移 → 全部实现完成后统一验证。所有原有平台都保留在迁移范围内。
+## 总量（2026-10-30 盘点）
 
-## 总量
+| 范围 | 文件数 | 已写入 | 进行中 | 未开始 |
+| --- | ---: | ---: | ---: | ---: |
+| 生产源码 | 984 | 456 | 47 | 481 |
+| 测试源码 | 424 | 0 | 0 | 424 |
+| SwiftPM 清单 | 25 | 19（Cargo 清单） | 0 | 6 |
+| CLI 项目模板 | 5 | 0 | 0 | 5 |
+| 合计 | 1,438 | — | — | — |
 
-| 指标 | 数值 |
+本次盘点修正了两类历史失真：
+
+1. `Docs/rust-migration-files.json` 中有 1,063 个文件曾被标为 `pending`，其中 System 16、Logging 15、Tools/Support 12、Graphics RHI 前端 40+、Hosts Android 10、DevTools Protocol 8 实际已有 Rust 实现，只是没有逐文件映射。已补上目标路径并改为 `written_unverified`；`GridInteractionGate` 已存在于 `Compose/rust/primitives/layout/grid/grid.rs`，不再重复新建。
+2. `Tools/Cove/Sources/CoveCLI/Platforms/Android/APK/Package.swift` 是 Swift 生产源码，不是 SwiftPM 清单；已重新归类。
+
+218 条 `pending` 记录带有计划路径，但对应 `.rs` 文件不存在，仍按未开始处理，不得计入完成。
+
+另有 13 个已写入的 Rust 测试文件（`Core/rust/tests/` 6 个、`Graphics/rust/tests/` 7 个）尚未声明为 Cargo 测试目标，因此对应 Swift 测试仍记 `pending`，也不能声称测试已迁移。接入测试目标属于批次 7。
+
+## 逐模块进度（生产源码）
+
+| 模块 | Swift 文件 | Swift 行 | 已写入 | 进行中 | 未开始 | Rust 文件（快照） |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Core | 97 | 12,299 | 97 | 0 | 0 | 99 |
+| PlatformCore | 6 | 540 | 6 | 0 | 0 | 2 |
+| System | 17 | 1,004 | 16 | 0 | 1 | 21 |
+| Logging | 15 | 705 | 15 | 0 | 0 | 16 |
+| Text | 14 | 2,576 | 14 | 0 | 0 | 16 |
+| Imaging | 9 | 696 | 9 | 0 | 0 | 11 |
+| Graphics | 107 | 14,534 | 54 | 0 | 53 | 51 |
+| Shell | 13 | 2,529 | 13 | 0 | 0 | 14 |
+| Runtime | 11 | 1,485 | 11 | 0 | 0 | 12 |
+| Compose（含 Composition、宏） | 414 | 52,554 | 191 | 6 | 217 | 202 |
+| Terminal | 29 | 3,088 | 0 | 0 | 29 | 1（仅骨架） |
+| Hosts | 51 | 4,254 | 10 | 0 | 41 | 16 |
+| DevTools（含 Protocol） | 51 | 5,183 | 8 | 0 | 43 | 4 |
+| Sources（Workspace/WebView） | 19 | 4,861 | 0 | 0 | 19 | 1（仅骨架） |
+| Browser | 1 | 400 | 0 | 0 | 1 | 1（仅骨架） |
+| Tools（CLI/Support） | 69 | 3,901 | 12 | 41 | 16 | 22 |
+| Examples | 61 | 7,135 | 0 | 0 | 61 | 1（仅骨架） |
+
+Rust 文件数列为磁盘快照，不等于逐 Swift 文件一一对应；多个 Swift 文件可能映射到一个 Rust 模块，也可能一个 Swift 文件拆到多个 Rust/C 文件。逐文件关系在清单中。
+
+## 已写入实现的能力边界
+
+| 能力 | 现状 |
 | --- | --- |
-| Swift 源文件（含测试、模板；逐文件清单快照） | 1,438 项 |
-| Swift 源码行数（同一快照） | 183,470 |
-| 逐文件清单：已写入、未验证 | 350 项 |
-| 逐文件清单：有缺项 | 6 项 |
-| 逐文件清单：待迁移或待建立映射 | 1,063 项 |
-| Cargo 清单映射 | 19 项 |
-| Rust 文件与行数（工作区快照，含测试源码） | 544 个 / 73,380 行 |
-| 已接入 Cargo 工作区的能力 | Core、PlatformCore、System、Logging、Graphics、Text、Imaging、Shell、Runtime、Compose、Terminal、Hosts、DevTools、Sources、Tools、Browser、Examples |
+| Core | `CoveUICore`/`CoveUIScene` 生产源码均有 Rust/C 对应：几何/颜色/绘制缓冲区、场景树与布局、输入与滚动、动画、渲染器、无障碍、位图与 mipmap。未验证。 |
+| PlatformCore | 窗口 ID、键盘/鼠标/触摸/手柄事件、滚动单位、菜单数据、资源查找。未验证。 |
+| System | 文件替换/权限/身份/锁/恢复目录/回收站、进程流/限额/超时/取消、POSIX 进程组、Windows Job Object。仅剩 `CoveProcessFixture/main.swift`（测试辅助进程）未重建。未验证。 |
+| Logging | 过滤、递归脱敏、UTF-8 截断、有界历史、JSONL 轮转。未验证。 |
+| Text | FontFace/FontAtlas/FontProvider/FontCollection/TextStyle/TextShaper/TextCache/TextEnvironment；FreeType/HarfBuzz 为 C，Apple 彩色字形为 Objective-C/C。未验证。 |
+| Imaging | 解码/动画/方向/栅格化/渐进/纹理/资源缓存；stb_image/lunasvg/libwebp 复用，Apple PDF/ImageIO 用 Objective-C/C。未验证。 |
+| Graphics | RHI 前端 41 个 Swift 文件已映射到 `Graphics/rust/rhi/`；UI 渲染 12 个文件在 `Graphics/rust/ui/`；Metal 格式表在 `Graphics/rust/metal/formats.rs`。未验证。 |
+| Shell | SDL3 窗口/输入/剪贴板/对话框、C 事件桥接、macOS/iOS 窗口与显示刷新、AppKit 输入/菜单浮层。未验证。 |
+| Runtime | 多窗口会话、输入仲裁、帧调度、Apple 无障碍桥接、iOS CADisplayLink。未验证。 |
+| Compose Composition | `ViewGraph`、修饰器、组合作用域、布局树、状态订阅、属性宏、文件存储、离屏快照。未验证。 |
+| Compose UI | 191 个文件已写入：动画/过渡/关键帧/阶段、Portal/菜单/焦点、虚拟列表/数据表几何/响应式、主题与样式、按钮/链接/标签/文本/表单等。6 个文件有缺项（Button、Link、Tag、Text、Select、Columns Picker）。大量控件未开始。 |
+| Hosts | Android 契约（FrameClock/Launch）与集成层（Environment/Scene/Diagnostics/Inspection/Surface/TouchInput/帧计时）已写入。桌面宿主未开始。 |
+| DevTools Protocol | 协议 0.2、输入录制 3、会话与镜像动作已写入。客户端/服务端/Agent/Inspector 未开始。 |
+| Tools/Support | 12 个 Swift 文件全部有 Rust 对应。CLI 的 9 个 Rust 模块覆盖部分命令，41 个 Swift 文件为 `partial`，平台构建命令未开始。 |
 
-清单状态只表示目标路径已存在，不等于行为完整或平台可用。Compose 的映射覆盖仍在扩展；剩余项包含大量上层 UI、平台宿主、工具和测试源码。
+以上全部未编译、未行为对照、未平台验收。
 
-## 逐模块进度快照
+## 迁移顺序计划
 
-下表统计生产源码目录，不含测试源码；Rust 文件数来自磁盘快照。逐文件映射状态见 JSON 清单。
+依赖边来自各 `Cargo.toml`：`cove-core → cove-platform`；`cove-logging → cove-system`；Graphics/Text/Imaging 依赖 Core；Shell 依赖 Platform/Logging；Runtime 依赖 Core/Platform/Text/Imaging/Graphics/Shell/Logging；Composition 依赖 Core/Platform；Compose 依赖 Composition 及下层全部基础 crate；Terminal/Hosts/DevTools/Sources/Browser 依赖 Compose；Examples 依赖全部下层；Tools 独立于 UI 栈。
 
-| 模块 | Swift 文件 | Swift 行 | Rust 文件 | Rust 行 | 状态 |
-| --- | ---: | ---: | ---: | ---: | --- |
-| Core | 97 | 12,301 | 99 | 13,248 | 对应实现已写入；本次补齐局部失效桥；未验证 |
-| PlatformCore | 6 | 541 | 2 | 425 | 实现已写入；未验证 |
-| System | 17 | 1,004 | 21 | 2,956 | 文件映射和实现待逐项复核 |
-| Logging | 15 | 705 | 16 | 2,701 | 文件映射和异步行为待复核 |
-| Graphics | 107 | 14,534 | 52 | 11,487 | RHI 前端与 UI 渲染已写入；原生 GPU 后端待迁移 |
-| Text | 14 | 2,576 | 16 | 1,002 | 生产源码已写入；未验证 |
-| Imaging | 9 | 697 | 11 | 415 | 生产源码已写入；未验证 |
-| Compose | 383 | 49,814 | 237 | 28,507 | Composition 基础层、修饰器、过渡/关键帧/阶段/数字文本动画、缩放偏移、进度动画状态、弹层放置、焦点作用域、活动路由、菜单描述符、虚拟列表窗口、数据表列几何、键盘边界、响应式布局选择和编辑器高度约束等已写入；大量控件待迁移 |
-| Runtime | 11 | 1,485 | 12 | 328 | 多窗口/调度/宿主桥接已写入；未验证 |
-| Shell | 13 | 2,529 | 14 | 483 | SDL 与 Apple 桥接已写入；未验证 |
-| Terminal | 29 | 3,088 | 2 | 144 | 待迁移 |
-| Browser | 1 | 400 | 1 | 2 | 待迁移 |
-| Tools | 73 | 3,951 | 22 | 6,887 | CLI 与迁移工具已有 Rust；其余工具待迁移 |
-| DevTools | 32 | 3,069 | 6 | 927 | 协议有 Rust 实现；客户端和服务端待迁移 |
+### 批次 1：已写入但未验证的基础层（串行核对）
 
-## 已写入的 crate
+System、Logging、Tools/Support、Graphics RHI 前端、DevTools Protocol、Hosts Android 契约/集成、Compose Composition。共 456 个生产文件。逐文件行为对照并补缺，不新建重复模块。
 
-### `cove-core`（对应实现已写入，待统一验证）
+### 批次 2：Graphics 原生后端（三个可并行子批次）
 
-`CoveUICore` 与 `CoveUIScene` 的全部内容：几何/颜色/仿射变换、共享绘制缓冲区与 C 内核、位图与 mipmap、状态订阅与读取追踪、场景树与布局引擎（含 Flexbox 与自定义布局桥接）、渲染树镜像、无障碍树、命中测试与输入（指针捕获、焦点链、文本输入、滚轮手势、事件分发）、滚动（物理、回弹、弹簧、速度追踪、揭示）、动画（插值、曲线、可动画属性、写入）、重组器、四类渲染器（`NodeRenderer`、`LayerAwareNodeRenderer`、`RenderCulling`、`SurfacePainting`）、`Recomposer`、`Exports`。
+- Metal：14 个文件（`Metal/Bindings`、`Metal/Device`、`Metal/Pipelines`、`Metal/Metal{BACKEND,Device,AccelerationStructure}`）。
+- Vulkan：31 个文件（Backend/Presentation/Resources/Setup/Submission 与顶层模块）。
+- DX12：8 个文件（Backend/Device/Formats/Resources/Submission）。
+- 另 1 个 Graphics 文件（`Metal/MetalFormats.swift`）已在批次 1 映射。
 
-### `cove-graphics`（NativeRHI 前端）
+三个后端只共享 `Graphics/rust/rhi/` 只读接口，可并行；若需改共享 RHI 接口则改为串行。新增后端注册只在 `Graphics/rust/rhi/backend_factory.rs` 内，不改根 `Cargo.toml`。
 
-`Graphics/rust/rhi/` 下的模块：
+### 批次 3：Terminal 与 Hosts（可并行）
 
-| 文件 | 对应 Swift |
-| --- | --- |
-| `error.rs` `handles.rs` `types.rs` `module.rs` | `RHIError` `Device/Handles` `RHITypes` `NativeRHI` |
-| `descriptors.rs` `commands.rs` | `Device/Descriptors`、`Resources/MeshPipeline`、`Resources/TextureBufferUpload`、`Device/Commands` |
-| `capabilities.rs` `visibility.rs` `specialization.rs` `presentation.rs` `pipeline_interface.rs` `queue.rs` `resources.rs` | `Device/Capabilities`、`Resources/*`、`Device/Queue` |
-| `state_tracker.rs` `access_tracker.rs` `validation.rs` `caches.rs` `shader_artifact.rs` `pipeline_validation.rs` | `Validation/*` |
-| `submission.rs` `submission_planner.rs` `pipeline_cache.rs` `resource_preparation.rs` | `Submission/*`、`Device/PipelineCache`、`Device/ResourcePreparation` |
-| `device.rs` `resource_ownership.rs` `backend.rs` `backend_factory.rs` | `Device/Device`、`Resources/{Swapchain,Texture}Resource`、`RHIBackend`、`BackendFactory` |
-| `testing.rs` | 测试用空后端（Swift 无对应文件） |
+- Terminal：29 个文件（Engine 11、Process 5、Session、View 11、Demo）。Ghostty 引擎与 PTY/ConPTY，IPC/PTY 性能关键路径优先 C。
+- Hosts：41 个文件（Android 15：App/Bridge/Content/Frame/SurfaceSession/Probe；Desktop 26：Application/Diagnostics/Display/Rendering/ResourcesSupport/Window）。
+- 两者都依赖 Runtime/Compose/Graphics；若同时改 `Hosts/Cargo.toml` 或共享宿主接口则串行。
 
-`Graphics/rust/lib.rs` 同时导出 `rhi` 和 `ui`；平台后端仍在迁移范围内。
+### 批次 4：Compose 剩余（按子树并行）
 
-### 其余基础 crate
+| 子批次 | 未开始 | 内容 |
+| --- | ---: | --- |
+| 4a 布局 | 49 | Grid 剩余、Sidebar、Split、Tabs、Carousel、Virtualization、Scrolling、ScrollView、ResizableEditor 等 |
+| 4b 控件 | 44 | AppBar、Calendar、Fields（Combobox/Date/JSON/Numeric/Slider）、Completion、Toolbar 等 |
+| 4c 数据 | 33 | DataTable、Columns、Chart、Avatar |
+| 4d 浮层 | 33 | Menu、Modal、Toast、Popover、Portal、Command Palette 等 |
+| 4e 文本 | 31 | TextField/TextArea、Rich、Rope、Markdown、Code、Completion |
+| 4f 主题 | 10 | 默认面板样式、组件样式、按钮样式剩余 |
+| 4g 反馈/媒体/交互/导航/动画 | 18 | Feedback 5、Media 5、Interaction 4、Navigation 3、动画 2 |
+| 4h 缺项修复 | 6 | Button、Link、Tag、Text、Select、Columns Picker 的 `partial` 收口 |
 
-`cove-platform`（键盘/IME/指针/滚动/游戏手柄/窗口事件/菜单/资源目录）、`cove-system`（权限与身份、锁、同卷原子替换、恢复目录、回收站、进程环境、双流读取、限额/超时/取消、POSIX 进程组与 Windows Job Object）、`cove-logging`（级别过滤、递归脱敏、UTF-8 限长、有界历史、JSONL 轮转）、`cove-devtools-protocol`（树/布局/状态/时间线协议、订阅会话、状态差异、输入录制）、`cove-cli`（build/run/test/check/fmt/clippy/clean、doctor/setup、迁移盘点）。
+Compose 各子树共享 `Compose/rust/lib.rs`、`primitives/mod.rs`、`theme/mod.rs` 等模块入口；模块入口变更串行，文件实现可并行。**不得**为绕过共享入口而新建并行导出层。
 
+### 批次 5：Sources、Browser、DevTools（可并行）
 
-### `cove-text` 与 `cove-imaging`（本次继续转换）
+- Sources：19 个文件（Workspace 13、WebView 6）。
+- Browser：1 个文件（Wasm 原型宿主），需建立 Wasm 构建链。
+- DevTools：43 个文件（Sources 24、Inspection 21；Protocol 8 已在批次 1）。
+- 三者依赖 Compose；Browser 另需 Wasm 目标与 JS 桥接。
 
-Text 的 FontFace、FontAtlas、FontProvider、FontCollection、TextStyle、TextShaper、TextCache、TextEnvironment、DrawList+Text、彩色字形源和图集都有 Rust 对应文件。FreeType/HarfBuzz 调用、位图复制/缩放为 C；macOS/iOS 的 CoreText 功能使用 Objective-C/C 桥接，没有新增 Swift。字体数据和原生句柄绑定生命周期，图集缓存按字体/字号/密度区分。
+### 批次 6：Tools 平台命令与模板
 
-Imaging 的 ImageDecoder、Animation、Orientation、Rasterization、Progressive、TextureImage、BundleImageResource、ImageAssetRegistry 和 Exports 已写入。复用原有 stb_image/lunasvg/libwebp 解码，方向重排使用 C，macOS/iOS 的 PDF/ImageIO 路径使用 Objective-C/C。加入动画帧预算、源像素预算、缓存 LRU、共享 mipmap 与全进程纹理 ID。其他平台保留可移植解码路径；原有 Apple 专用格式能力边界没有冒充全平台支持。
+- Tools 未开始 16 个文件：Android（APK/Compilation 12，含 `APK/Package.swift`）、Desktop 4、iOS 1。
+- CLI 41 个 `partial` 文件随实现收口；5 个项目模板在 SDK 模板定稿后替换。
+- Tools 与 UI 栈无依赖，可与批次 2–5 并行，但 CLI 参数/退出码行为需与 Swift 原实现一致。
 
-以上均未编译和测试；Cargo.lock、原生库交叉链接、宿主集成及统一验收尚未完成。Browser/Wasm 的 C 运行时与宿主接入仍待实现，不能把桌面原生桥接记作浏览器完成。
+### 批次 7：Examples 与测试（最后串行）
 
-### `cove-shell`（继续转换中）
+- Examples 61 个文件：依赖全部下层 crate，最后迁移以覆盖公开 API。
+- Tests 424 个文件：按 Swift 测试逐项迁移为行为清单，不用空测试替代。依赖对应生产 crate 完成。
 
-PlatformShell、SDL3Shell、ApplicationEntry、Cursor、SDL3Clipboard、日志接入、NativeMenuPopover、显示刷新 inbox/Apple 驱动、AppKitInput 已写入 Rust/C/Objective-C 对应实现。SDL 事件转换保留窗口路由、关闭拦截、IME、触摸、游戏手柄、滚轮单位/阶段，文件对话框结果通过队列回到应用线程。窗口关闭后使保留的句柄失效，防止访问已销毁原生窗口。
+### 必须串行的共享文件
 
-macOS/iOS 使用原生 CAMetalLayer；Windows、X11、Wayland 和 Android 原生窗口引用已实现。AppKit 菜单仍遵循原版 macOS 能力边界；其他平台的 Compose 菜单呈现器待上层迁移。显示刷新在无原生回调的 SDL 平台上显式报告不可用，Runtime 必须保留原有截止时间回退。
-
-Shell 代码尚未编译/测试；SDL 链接、各平台宿主生命周期、菜单与窗口集成仍在最终对照范围内。接下来继续迁移上层 Compose 控件及原生图形后端。
-
-## 本次继续迁移的最新快照
-
-以下统计只计算自有 Rust 源码，含新写入文件与构建脚本，不代表功能覆盖率：
-
-| 范围 | Rust 文件 | Rust 行数 | 当前边界 |
-| --- | --- | --- | --- |
-| Text | 16 | 1,002 | 生产源码已写入；未验证 |
-| Imaging | 11 | 415 | 生产源码已写入；未验证 |
-| Shell | 14 | 483 | 窗口/输入/原生桥接已写入；未验证 |
-| Graphics | 52 | 11,487 | 前端与 UI 层已写入；原生 GPU 后端未完成 |
-| Runtime | 12 | 328 | 会话/帧调度/Apple 无障碍桥接已写入；未验证 |
-| Compose（UI + Composition + 宏） | 237 | 28,507 | 基础层、修饰器、过渡/关键帧/阶段/数字文本动画、缩放偏移、进度动画状态、弹层放置、焦点作用域、活动路由、菜单描述符、虚拟列表窗口、数据表列几何、键盘边界、响应式布局选择和编辑器高度约束、静态文字绘制、按钮和加载指示器、列可见性规划、表单与快捷键控件底层、部分控件和宠物场景已写入；上层控件待迁移 |
-
-Graphics 新增 UI 视口、几何缓存验证、着色器资源载入、纹理所有权/弱驻留、带边缘填充的图片图集、失败录制重试上传、背景模糊、揭幕及有限预算的分条 MSAA。几何扫描、UV 重映射和图集填充使用 C。RHI 的帧回收改为 GPU 回调只更新完成状态，设备 API 线程执行销毁回调，并补充空闲等待的通知。
-
-Runtime 新增多窗口会话、原生/注入输入仲裁、对话框回调回到主线程、事件驱动/显示刷新/固定帧率、绝对截止时间回退、光标刷新、隐藏窗口释放通知、iOS CADisplayLink 生命周期，以及 macOS/iOS 无障碍树和动作桥接。同步补回 Core 的 WindowRevealContext 接口。新实现全部尚未验证。
-
-Compose/Composition 的 ViewGraph、视图包装、修饰器、组合作用域、布局树和状态订阅已写入。新增 Rust 属性宏 `#[track_state_reads(field, ...)]`，在视图 `body` 中把 `self.state.get().field` 改写为字段读取追踪，并将 `DynamicField` 注册接入失效队列；普通视图仍通过本地订阅失效。另写入文件存储、可观察值包装、字符串目录解析、离屏快照和宠物运动、精灵绘制、锚点及场景组合。为媒体、头像、图表、文本辅助、布局与主题中已有的 Rust 文件补上模块入口；通用外观修饰器现已补入 Rust，仍留待统一验证。Accessibility、Cursor、FocusRequest、HitTesting 和 Hover 五类交互修饰器，以及 Padding、Flex、Frame、AbsolutePosition、FrameCapture、SurfaceFinish、AnimationValue 和 StatusTone 已加入逐文件映射。ViewGraph 布局回写在每次布局后触发节点回调，供帧捕获与锚点资源更新；Compose 也已导出动画上下文并加入资源包定位。`Transition`、`AnimatedVisibility` 与 `TransitionView` 已写入 Rust 并接入 Portal，支持退出保留、快速反转、布局折叠、减少动态效果及分组延迟；关键帧轨道现支持触发和重复播放，阶段动画支持按 phase 动画、触发重播与循环；数字文本插值保留无障碍最终值，缩放和偏移支持动画，进度值资源已写入以驱动绘制失效。Portal 相关文件现包含宽高约束、窗口内放置和视口夹取；新增模态焦点作用域、仅组合所选路由的 `RouteOutlet`、数据菜单描述符、虚拟列表回填窗口、数据表列几何、集合控件键盘边界、首个可用尺寸布局选择和窄宽度下堆叠的响应式动作组，以及编辑器高度限值。列可见性优先级与宽度规划已写入 Rust；列选择器的菜单/浮层 UI 仍缺。Text 的基础绘制/测量已写入，但选择交互、完整截断提示与部分样式细节仍缺。Button 已接入交互、无障碍语义、样式管线及随节点生命周期运行的加载指示器；提示浮层和 Escape 关闭仍缺。Link 已接入 Button 样式与链接无障碍语义，但交互动画和提示呈现仍缺；Tag 已接入公开控件模块，但移除按钮提示仍依赖尚未移植的 Button 提示呈现。表单、字段标签、验证控制器和键帽已接入 Rust 模块；Select 目前只有快捷键与选项值模型，触发器/弹出菜单仍缺。Button、Link、Tag、Text、Select、Columns Picker 六个 Swift 源文件标记为 `partial`。Compose 主模块清单中 221 项仍待映射，6 项有缺项，包含待迁移实现与测试。全量项目尚未完成，Swift 源码继续作为行为对照保留。
-
-## 迁移约定
-
-这些是移植过程中确定的规则，后续文件应保持一致。
-
-- **引用语义**：Swift `class` → `Rc<RefCell<T>>` 句柄；反向指针用 `Weak`。
-- **属性观察**：Swift `didSet` → 显式失效 setter，统一汇入 `invalidate_geometry` / `mark_render_dirty`。
-- **每窗口环境值**：`AmbientSlot` 静态量需要 `Sync`，改为 `thread_local!` + `RefCell` 持有者。
-- **嵌套模块导入**：`scene/input`、`scene/scrolling`、`scene/animation` 下必须写 `crate::scene::…`，写 `super::…` 会解析到自身。
-- **`impl` 内不能放静态量**：提升到模块级 `static` / `thread_local!`。
-- **`OptionSet`**：`rhi_option_set!` 宏生成裸位新类型；**不透明句柄**：`handle!` 宏生成 `u32` 新类型。
-- **`NSLock`**：前端状态用 `Mutex`，整帧会话用第二个 `Mutex`；后端放在 `Arc<Mutex<Box<dyn RhiBackend + Send>>>` 中，让 GPU 完成线程上的延迟销毁回调可以取得它。
-- **`NSCondition`**：`FrameRing` = `Mutex` + `Condvar`；retirement 动作在释放环锁之后执行，避免销毁回调与环锁互锁。
-- **借用与回调**：`RefCell` 借用必须在执行用户回调前释放（dispatcher、recomposer、animator、`FocusChain::focus`）。
-- **`DispatchQueue` / async 准备**：改为线程局部 `ResourcePreparationContext` + 同步 `run`；异步包装留给尚未迁移的 Runtime crate。
-- **`#if canImport`**：`BackendFactory` 改为构造器注册表（`register_backend`）。未注册时返回 "not built for this platform"，不引用不存在的符号。
-- **`Duration`**：统一传纳秒 `u64`。
-- **原生句柄**：`SurfaceDescriptor` 用 `usize` 地址（0 表示无），避免 `unsafe impl Send`。
-- **原生字体依赖**：FreeType/HarfBuzz 复用 vendored 源码；Unicode 字素和类别由 `unicode-segmentation` / `unicode-general-category` 提供。
-
-## 尚未迁移
-
-- **Graphics 平台后端**：`Metal`（15 文件 / 2,712 行）、`Vulkan`（31 / 6,010）、`DX12`（8 / 500）；`CoveUIGraphics` 的 12 个生产文件已写入 `Graphics/rust/ui/`，待接入实际 GPU 后统一验证。
-- **Text**：生产源码已逐文件写入。剩余项为测试迁移、原生依赖跨平台构建接入与最终行为对照；上层 Compose 文本选择仍待迁移。
-- **Imaging**：生产源码已逐文件写入。剩余项为图形纹理上传接入与最终行为对照。
-- **Compose**：视图图、控件、主题、组合与重组（383 文件，最大单块）。
-- **Runtime / Shell / Terminal**：应用运行时、SDL 窗口与事件循环、Ghostty 引擎与 PTY/ConPTY。
-- **Hosts / Browser**：桌面、Android、iOS 宿主与 WebGPU/Canvas 宿主。
-- **Tools / DevTools / Sources / Examples**：CLI 之外的工具、Inspection/Agent/Server/Inspector、SDK 安装器、示例应用。
-- **Tests**：325 文件，作为行为清单迁移。
-
-Swift 源码没有被删除，也没有用空 Rust 模块替代。新 CLI 不会调用 Swift 编译器；对尚无 `Cargo.toml` 的目录会直接说明未迁移。
+根 `Cargo.toml`（新增/调整 crate）、`Docs/rust-migration.md`、`Docs/rust-migration-files.json`、`Docs/rust-migration-files.md`、`CHANGELOG.md`、`README.md`。修改这些文件的批次不得与其他批次并行。每个文件迁移完成即更新清单中该行状态与目标路径。
 
 ## 平台边界
 
 | 平台 | 已写入 | 尚缺 | 验证 |
 | --- | --- | --- | --- |
-| macOS | 共享 Rust/C、POSIX、权限/锁/身份、回收站桥接、RHI 前端 | Metal 后端、原生窗口、宿主、应用包与签名 | 最新实现未验证 |
-| Windows | 共享 Rust/C、UTF-16 进程参数、继承句柄白名单、Job Object、ACL、文件替换重试、RHI 前端 | DX12 后端、原生窗口、ConPTY UI、应用打包 | 最新实现未验证 |
-| Linux | 共享 Rust/C、POSIX、权限/锁/身份、恢复目录、RHI 前端 | Vulkan 后端、原生窗口、系统集成、应用打包 | 最新实现未验证 |
-| iOS | 共享 Rust/C、文件/资源/协议；进程 API 由系统能力决定 | 触摸/IME/生命周期宿主、Metal、Xcode 打包签名 | 最新实现未验证 |
-| Android | 共享 Rust/C、NDK 配置、文件/资源/协议、POSIX 进程调用 | Activity/JNI、触摸/IME/生命周期、Vulkan、APK 签名部署 | 最新实现未验证 |
-| Browser/Wasm | 平台数据类型 | 字体、图形、资源、浏览器事件循环与宿主 | 未建立构建链 |
+| macOS | 共享 Rust/C、POSIX、文件/进程/权限、回收站桥接、RHI 前端、UI 渲染、SDL/AppKit 窗口、Apple 无障碍 | Metal 后端、桌面宿主收口、应用包/签名 | 未验证 |
+| Windows | 共享 Rust/C、UTF-16 进程参数、继承句柄白名单、Job Object、ACL、文件替换重试、RHI 前端 | DX12 后端、ConPTY 终端、桌面宿主、CLI Desktop/Android 构建、应用打包 | 未验证 |
+| Linux | 共享 Rust/C、POSIX、权限/身份/恢复目录、RHI 前端 | Vulkan 后端、桌面宿主、系统集成、应用打包 | 未验证 |
+| iOS | 共享 Rust/C、文件/资源/协议、Apple 字体/图片桥接、Runtime 显示循环 | 触摸/IME/生命周期宿主收口、Metal、Xcode 打包签名、CLI iOS 构建 | 未验证 |
+| Android | 共享 Rust/C、NDK 配置、POSIX 进程、Android 契约/集成层 | Activity/JNI 宿主、触摸/IME/生命周期收口、Vulkan、APK 打包/签名/部署、CLI Android 构建 | 未验证 |
+| Browser/Wasm | 平台数据类型 | 字体、图形、资源、浏览器事件循环、宿主与构建链 | 未建立构建链 |
 
-不能因为本机无法运行其他平台而删除其实现。
+不能因为本机无法运行其他平台而删除其实现；发现平台缺口必须记录并补齐。
 
 ## 当前验证状态
 
-以下为先前文档保留的历史记录，本次继续迁移没有重新运行；它不代表所有目标平台已经检查，也不能保证后续实现的编译或行为正确：
+本次盘点与迁移没有运行 `./cove fmt`、`./cove clippy`、`./cove test`、`./cove build`、`./cove migration status`。为恢复工作区可编译性做了局部 `cargo check -p cove-ui-compose`（不是验收结论）：
 
+- 已修复：`Compose/CompositionMacros/Cargo.toml` 缺 `path` 导致工作区无法加载；`cove-composition` 的 26 个类型/导出错误（`ModifierReplay` 导出、`cove_core::scene` 几何与颜色导出、`DynamicField: Clone`、`slot_tag` 返回值包装、`AnyView` 与 `dyn View` 混用、`ViewScope::uninstall` 签名等）；`Graphics/rust/ui/draw_geometry.rs` 语句位 `unsafe` 块接二元运算符的语法错误。
+- 现状：`cove-composition` 可编译；顶层 `cove-ui-compose` 仍有 68 个类型错误（37 个文件），集中在 crate 根部未再导出 Composition 的 `Layout*`、`theme::tokens` 未导出 `Theme`/`ThemeReader`、`modifiers::style` 未导出 `SemanticStyleViewExt`、`controls/form.rs` 与 `controls/form/mod.rs` 同名模块冲突、`chart/plot.rs` 与 `avatar/avatar.rs` 的导入与结构错误。这些属于批次 4 的 Compose 收口范围，尚未修复。
+- `Cargo.lock` 与清单不同步，需要联网解析后 `--locked` 才能通过。
+
+统一验证放在全部生产与测试文件迁移之后：
+
+```sh
+./cove fmt .
+./cove clippy . --all-targets --locked
+./cove test . --locked --no-parallel
+./cove build .
+./cove migration status
 ```
-cargo check --workspace --tests   # 通过（仅剩若干 dead_code / deprecated 警告）
-```
-
-尚未运行 `cargo test`、`cargo fmt --check`、`cargo clippy`。
-
-后续统一验证放在全量翻译完成之后，实施阶段不通过分批测试扩大这里的通过范围。
 
 ## 最终统一验收
 
-以下要求适用于全部实现结束之后，不是当前已通过的检查。
-
-1. Rust 工作区构建、格式化、Clippy 与完整单元/集成测试；以原有 Swift 测试为行为清单迁移，不用空测试或只验证实现细节的测试代替。
+1. Rust 工作区构建、格式化、Clippy 与完整单元/集成测试；以 Swift 测试为行为清单迁移。
 2. macOS/Windows/Linux 的真实 Gallery、窗口/菜单/剪贴板、字体、GPU、PTY/ConPTY、DevTools 与 SDK 安装/更新验收。
 3. iOS 模拟器/真机与 Android 真机/模拟器的生命周期、输入、IME、渲染、包/签名/部署验收。
 4. Browser/Wasm 的构建、字体、WebGPU/Canvas、输入与资源加载验收。
-5. 对齐所有公开产品与示例后删除自有 Swift 源码、SwiftPM 清单、旧脚本与旧 CI；保留第三方依赖原有语言不影响 Rust 主项目目标。
-6. `./cove migration status --require-complete` 通过；该检查仅说明源码清理，不替代功能和平台验收。
+5. 对齐公开产品与示例后删除自有 Swift 源码、SwiftPM 清单、旧脚本与旧 CI；第三方依赖不受影响。
+6. `./cove migration status --require-complete` 通过；该检查仅说明源码清理，不替代功能与平台验收。
 7. 更新正式版本、安装器、SDK 元数据、所有示例与 CHANGELOG，再启用 Rust SDK 发布。
 
-旧 Swift CI 保存在 [legacy/ci-swift.yml](legacy/ci-swift.yml)，用于追踪原生依赖、测试包、发布安装与平台验收范围。
+旧 Swift CI 保存在 `Docs/legacy/ci-swift.yml`，用于追踪原生依赖、测试包、发布安装与平台验收范围。
+
+## 迁移约定
+
+- **引用语义**：Swift `class` → `Rc<RefCell<T>>` 句柄；反向指针用 `Weak`。
+- **属性观察**：Swift `didSet` → 显式失效 setter，统一汇入 `invalidate_geometry` / `mark_render_dirty`。
+- **每窗口环境值**：`AmbientSlot` 静态量需要 `Sync`，改为 `thread_local!` + `RefCell` 持有者。
+- **嵌套模块导入**：`scene/input`、`scene/scrolling`、`scene/animation` 下写 `crate::scene::…`，写 `super::…` 会解析到自身。
+- **`impl` 内不能放静态量**：提升到模块级 `static` / `thread_local!`。
+- **`OptionSet`**：`rhi_option_set!` 宏生成裸位新类型；**不透明句柄**：`handle!` 宏生成 `u32` 新类型。
+- **`NSLock`**：前端状态用 `Mutex`，整帧会话用第二个 `Mutex`；后端放在 `Arc<Mutex<Box<dyn RhiBackend + Send>>>`。
+- **`NSCondition`**：`FrameRing` = `Mutex` + `Condvar`；retirement 动作在释放环锁之后执行。
+- **借用与回调**：`RefCell` 借用必须在执行用户回调前释放。
+- **`DispatchQueue` / async 准备**：线程局部 `ResourcePreparationContext` + 同步 `run`；异步包装由 Runtime 提供。
+- **`#if canImport`**：`BackendFactory` 用构造器注册表 `register_backend`，未注册时返回 "not built for this platform"。
+- **`Duration`**：统一传纳秒 `u64`。
+- **原生句柄**：`SurfaceDescriptor` 用 `usize` 地址（0 表示无），避免 `unsafe impl Send`。
+- **原生字体依赖**：FreeType/HarfBuzz 复用 vendored 源码；Unicode 字素/类别由 `unicode-segmentation` / `unicode-general-category` 提供。
+- **避免反模式**：不做重复封装、并行字段列表、转发属性；沿用现有 crate 分层与导出风格。

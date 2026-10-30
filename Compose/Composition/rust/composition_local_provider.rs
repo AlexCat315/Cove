@@ -57,6 +57,6 @@ impl<Value: Clone + PartialEq + 'static> crate::ViewModifier for ProvideComposit
 }
 impl<Value: Clone + PartialEq + 'static> ScopeApplyingModifier for ProvideCompositionLocalModifier<Value> {
     fn _apply_scope(&self, node: &Node) -> bool {
-        self.scope_apply(node).unwrap_or(false)
+        crate::ViewModifier::scope_apply(self, node).unwrap_or(false)
     }
 }

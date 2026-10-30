@@ -23,7 +23,7 @@ use std::rc::{Rc, Weak};
 
 use crate::layout_debug_modifier::LayoutDebugAttachmentKey;
 use crate::{
-    AnyModifiedContent, AnyView, DynamicField, EmptyView, IdentifiedView, LayoutTree, ModifierReplay,
+    AnyModifiedContent, AnyView, AsAny, DynamicField, EmptyView, IdentifiedView, LayoutTree, ModifierReplay,
     PrimitiveView, SourceLocatedView, View, ViewKind, ViewModifier,
 };
 
@@ -781,7 +781,7 @@ impl ViewScope {
         Self::materialise_body(scope, graph);
     }
 
-    fn uninstall(scope: &Rc<RefCell<Self>>, graph: &Rc<ViewGraph>) {
+    fn uninstall(scope: &Rc<RefCell<Self>>, graph: &ViewGraph) {
         let anchor_id = {
             let mut scope = scope.borrow_mut();
             scope.installed = false;

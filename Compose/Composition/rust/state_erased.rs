@@ -4,14 +4,14 @@
 //! view lists its observable members from `View::dynamic_properties`. The
 //! wrapper keeps the state handle and its invalidation subscription together so
 //! dropping the wrapper releases the observer.
-use cove_core::state::LocalSubscription;
-use cove_core::{ReadScope, State};
+use cove_core::{LocalSubscription, ReadScope, State};
 use std::any::Any;
 use std::cell::RefCell;
 use std::rc::Rc;
 
 /// A state member exposed to composition for invalidation, devtools and value
 /// transfer between successive view values (`ViewScope::replace_view`).
+#[derive(Clone)]
 pub struct DynamicField {
     name: String,
     inner: Rc<dyn ErasedState>,

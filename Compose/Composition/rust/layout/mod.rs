@@ -41,7 +41,7 @@ impl LayoutSubview {
         Self { node: node.clone(), layout_direction }
     }
     /// The value the child declared with `.layout_value(...)`.
-    pub fn value<K: LayoutValueKey>(&self) -> K::Value {
+    pub fn value<K: LayoutValueKey + 'static>(&self) -> K::Value {
         self.node.attachment::<K::Value>(&LayoutValueStorage::key::<K>()).unwrap_or_else(K::default_value)
     }
     pub fn size_that_fits(&self, proposal: ProposedViewSize) -> Size {
@@ -67,7 +67,7 @@ pub struct LayoutContainer<Algorithm: Layout, Content: View> {
     content: AnyView,
     _content: PhantomData<fn() -> Content>,
 }
-impl<Algorithm: Layout, Content: View> LayoutContainer<Algorithm, Content> {
+impl<Algorithm: Layout + 'static, Content: View + 'static> LayoutContainer<Algorithm, Content> {
     pub fn new(algorithm: Algorithm, content: Content) -> Self {
         Self { algorithm: Rc::new(algorithm), content: AnyView::new(content), _content: PhantomData }
     }

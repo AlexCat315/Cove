@@ -63,3 +63,7 @@ pub use scrolling::*;
 
 mod local_invalidation;
 pub use local_invalidation::*;
+
+/// Geometry is defined next to the draw layer but is the vocabulary scene
+/// nodes, layout and composition use, so expose it from this module too.
+pub use crate::{Point, Rect, Size};

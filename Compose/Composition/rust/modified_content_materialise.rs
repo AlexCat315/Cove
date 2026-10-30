@@ -59,12 +59,15 @@ fn retain_modifier(modifier: &Rc<dyn crate::ViewModifier>, node: &Node, graph: &
     if graph.layout_node(node).is_some() || node.children().is_empty() {
         return;
     }
-    let node = node.clone();
+    // The replay list lives on the node itself; keep a separate handle for the
+    // callback so the borrow needed by `install` ends before the move.
+    let target = node.clone();
+    let replay_target = node.clone();
     let graph = Rc::downgrade(graph);
     let modifier = modifier.clone();
-    ModifierReplay::install(node.clone(), Rc::new(move || {
+    ModifierReplay::install(&target, Rc::new(move || {
         let Some(graph) = graph.upgrade() else { return };
-        apply_modifier(&modifier, &node, &graph);
+        apply_modifier(&modifier, &replay_target, &graph);
     }));
 }
 
@@ -90,22 +93,22 @@ impl AnyModifiedContent for ModifiedContent {
         if self.modifier().is_scope_applying() {
             let anchor = Node::new();
             anchor.set_is_hit_testable(false);
-            anchor.set_view_tag(crate::view_graph::slot_tag(self));
+            anchor.set_view_tag(Some(crate::view_graph::slot_tag(self)));
             parent.add_child(&anchor);
             self.modifier().scope_apply(&anchor);
-            let _ = graph.materialise(self.content_view(), &anchor, layout_parent);
+            let _ = graph.materialise(self.content(), &anchor, layout_parent);
             return vec![anchor];
         }
 
         if self.modifier().is_around_applying() {
             let anchor = Node::new();
             anchor.set_is_hit_testable(false);
-            anchor.set_view_tag(crate::view_graph::slot_tag(self));
+            anchor.set_view_tag(Some(crate::view_graph::slot_tag(self)));
             parent.add_child(&anchor);
             let content = self.content().clone();
             let anchor_for_content = anchor.clone();
             let mut perform = move || {
-                let _ = graph.materialise(content.storage.as_ref(), &anchor_for_content, layout_parent);
+                let _ = graph.materialise(&content, &anchor_for_content, layout_parent);
             };
             self.modifier().around_apply(&anchor, &mut perform);
             return vec![anchor];
@@ -117,19 +120,19 @@ impl AnyModifiedContent for ModifiedContent {
             // user scope with the structural value on the next update.
             let anchor = Node::new();
             anchor.set_is_hit_testable(false);
-            anchor.set_view_tag(crate::view_graph::slot_tag(self));
+            anchor.set_view_tag(Some(crate::view_graph::slot_tag(self)));
             parent.add_child(&anchor);
-            let _ = graph.materialise(self.content_view(), &anchor, layout_parent);
+            let _ = graph.materialise(self.content(), &anchor, layout_parent);
             apply_modifier(self.modifier(), &anchor, graph);
             return vec![anchor];
         }
 
-        let nodes = graph.materialise(self.content_view(), parent, layout_parent);
+        let nodes = graph.materialise(self.content(), parent, layout_parent);
         for node in &nodes {
             // Override the inner content's tag with the wrapper's tag so the
             // reconciler knows this slot carries a particular modifier
             // combination.
-            node.set_view_tag(crate::view_graph::slot_tag(self));
+            node.set_view_tag(Some(crate::view_graph::slot_tag(self)));
             apply_modifier(self.modifier(), node, graph);
         }
         nodes
@@ -139,7 +142,7 @@ impl AnyModifiedContent for ModifiedContent {
         // Mirror the materialise-time wrapping: scope-applying modifiers own a
         // synthetic anchor whose single child carries the wrapped content.
         if self.modifier().is_scope_applying() {
-            node.set_view_tag(crate::view_graph::slot_tag(self));
+            node.set_view_tag(Some(crate::view_graph::slot_tag(self)));
             ModifierReplay::reset(node);
             // The content must reconcile even when the provided value is
             // unchanged: this slot was handed a NEW content value (fresh
@@ -163,7 +166,7 @@ impl AnyModifiedContent for ModifiedContent {
         }
 
         if self.modifier().is_around_applying() {
-            node.set_view_tag(crate::view_graph::slot_tag(self));
+            node.set_view_tag(Some(crate::view_graph::slot_tag(self)));
             ModifierReplay::reset(node);
             let content = self.content().clone();
             let parent = node.clone();
@@ -177,15 +180,15 @@ impl AnyModifiedContent for ModifiedContent {
         if has_structural_content(self.content_view()) {
             ModifierReplay::reset(node);
             graph.reconcile_children(node, layout_parent, std::slice::from_ref(self.content()));
-            node.set_view_tag(crate::view_graph::slot_tag(self));
+            node.set_view_tag(Some(crate::view_graph::slot_tag(self)));
             apply_modifier(self.modifier(), node, graph);
             return;
         }
 
         // Recurse into the wrapped content first so its primitive's
         // `update_node` runs and any deeper reconciliation happens.
-        graph.update_in_place(node, self.content_view(), layout_parent);
-        node.set_view_tag(crate::view_graph::slot_tag(self));
+        graph.update_in_place(node, self.content(), layout_parent);
+        node.set_view_tag(Some(crate::view_graph::slot_tag(self)));
         apply_modifier(self.modifier(), node, graph);
     }
 }

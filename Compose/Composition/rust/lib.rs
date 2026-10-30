@@ -37,6 +37,7 @@ pub use view_modifier::*;
 pub use modified_content_materialise::*;
 pub use around_applying_modifier::*;
 pub use composition_local_provider::*;
+pub use modifier_replay::*;
 pub use layout_tree::*;
 pub use view_graph::*;
 pub use state_erased::*;

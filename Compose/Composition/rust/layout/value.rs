@@ -37,10 +37,10 @@ impl<K: LayoutValueKey> ViewModifier for LayoutValueModifier<K> {
 }
 
 pub trait LayoutValueExt: View + Sized + 'static {
-    fn layout_value<K: LayoutValueKey>(self, value: K::Value) -> ModifiedContent;
+    fn layout_value<K: LayoutValueKey + 'static>(self, value: K::Value) -> ModifiedContent;
 }
 impl<T: View + Sized + 'static> LayoutValueExt for T {
-    fn layout_value<K: LayoutValueKey>(self, value: K::Value) -> ModifiedContent {
+    fn layout_value<K: LayoutValueKey + 'static>(self, value: K::Value) -> ModifiedContent {
         self.modifier(LayoutValueModifier::<K> { value })
     }
 }
