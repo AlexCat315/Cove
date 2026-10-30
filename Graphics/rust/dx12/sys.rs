@@ -212,6 +212,11 @@ pub const D3D12_DESCRIPTOR_HEAP_TYPE_RTV: u32 = 2;
 pub const D3D12_DESCRIPTOR_HEAP_TYPE_DSV: u32 = 3;
 pub const D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE: u32 = 0x1;
 
+pub const D3D12_FILTER_MIN_MAG_MIP_POINT: u32 = 0;
+pub const D3D12_FILTER_MIN_MAG_MIP_LINEAR: u32 = 0x15;
+pub const D3D12_FILTER_ANISOTROPIC: u32 = 0x55;
+pub const D3D12_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR: u32 = 0x95;
+
 pub const D3D12_FENCE_FLAG_NONE: u32 = 0;
 pub const D3D12_FENCE_FLAG_SHARED: u32 = 0x2;
 
@@ -566,6 +571,31 @@ impl Default for D3D12_COMPUTE_PIPELINE_STATE_DESC {
     }
 }
 
+/// `D3D12_SAMPLER_DESC`.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct D3D12_SAMPLER_DESC {
+    pub Filter: u32,
+    pub AddressU: u32,
+    pub AddressV: u32,
+    pub AddressW: u32,
+    pub MipLODBias: f32,
+    pub MaxAnisotropy: u32,
+    pub ComparisonFunc: u32,
+    pub BorderColor: [f32; 4],
+    pub MinLOD: f32,
+    pub MaxLOD: f32,
+}
+
+impl Default for D3D12_SAMPLER_DESC {
+    fn default() -> Self {
+        // SAFETY: plain integers and floats; all-zero is a valid (if unusable)
+        // description that the caller overwrites.
+        unsafe { core::mem::zeroed() }
+    }
+}
+
+/// `D3D12_RANGE`.
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 pub struct D3D12_RANGE {
@@ -594,6 +624,34 @@ pub struct DXGI_SWAP_CHAIN_DESC1 {
     pub SwapEffect: u32,
     pub AlphaMode: u32,
     pub Flags: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct DXGI_RATIONAL {
+    pub Numerator: u32,
+    pub Denominator: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct DXGI_MODE_DESC1 {
+    pub Width: u32,
+    pub Height: u32,
+    pub RefreshRate: DXGI_RATIONAL,
+    pub Format: u32,
+    pub ScanlineOrdering: u32,
+    pub Scaling: u32,
+    pub Stereo: u32,
+}
+
+/// `DXGI_SWAP_CHAIN_FULLSCREEN_DESC`; a null pointer means "keep windowed".
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct DXGI_SWAP_CHAIN_FULLSCREEN_DESC {
+    pub RefreshRate: DXGI_RATIONAL,
+    pub ScanlineOrdering: u32,
+    pub Windowed: u32,
 }
 
 #[repr(C)]
@@ -735,7 +793,8 @@ pub struct ID3D12DeviceVtbl {
     pub CreateUnorderedAccessView: usize,
     pub CreateRenderTargetView: usize,
     pub CreateDepthStencilView: usize,
-    pub CreateSampler: usize,
+    pub CreateSampler:
+        unsafe extern "system" fn(*mut c_void, *const D3D12_SAMPLER_DESC, D3D12_CPU_DESCRIPTOR_HANDLE),
     pub CopyDescriptors: usize,
     pub CopyDescriptorsSimple: usize,
     /// `CreateFence`.

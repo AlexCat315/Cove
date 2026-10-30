@@ -10,7 +10,7 @@ pub mod link;
 pub mod tag;
 pub mod toggle;
 
-pub use button::{ActionControlAccessibility, Button, ButtonIcon, ButtonIconSource};
+pub use button::{ActionControlAccessibility, Button, ButtonIcon, ButtonIconSource, ButtonRole};
 pub use field_label::{FieldLabel, FieldLabelOptions};
 pub use fields::select::{KeyboardShortcut, KeyboardShortcutModifier, KeyboardShortcutPlatform, SelectOption};
 pub use form::{Form, FormField, FormFieldPresentation, FormLayout};

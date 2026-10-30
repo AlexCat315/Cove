@@ -47,6 +47,28 @@ use std::rc::{Rc, Weak};
 use std::sync::Arc;
 use std::time::Instant;
 
+/// Adapts `PortalStoreAmbient` to the runtime's scoped-ambient hook.
+///
+/// `PortalStoreAmbient` already exposes `activate`; the runtime trait needs that
+/// same closure boxed as `FnOnce`, so this host-side adapter supplies it without
+/// editing Compose.
+struct PortalStoreScope {
+    store: Rc<PortalStore>,
+}
+
+impl PortalStoreScope {
+    fn new(store: Rc<PortalStore>) -> Self {
+        Self { store }
+    }
+}
+
+impl cove_core::scene::ScopedAmbient for PortalStoreScope {
+    fn activate(&self) -> Box<dyn FnOnce()> {
+        let restore = PortalStoreAmbient::new(self.store.clone()).activate();
+        Box::new(move || restore())
+    }
+}
+
 /// Callbacks the caller supplies to a run.
 #[derive(Clone, Default)]
 pub struct ApplicationCallbacks {
@@ -247,15 +269,20 @@ impl Application {
 
         ImageAssetRegistryHolder::set_current(Some(composition.image_assets.clone()));
         AssetDropRegistryHolder::set_current(Some(composition.asset_drop_registry.clone()));
-        {
+        // Both registries need their own handle: `set_enqueue` and the restore
+        // registry outlive this scope independently.
+        fn enqueue_on(host: &Sdl3PlatformHost, work: Rc<dyn Fn()>) {
             let host = host.clone();
-            UIWorkSchedulerHolder::set_enqueue(Some(Rc::new(move |work: Rc<dyn Fn()>| {
-                host.enqueue_main_thread_work(move || work());
-            })));
-            super::services::work_scheduler::remember(Some(Rc::new(move |work: Rc<dyn Fn()>| {
-                host.enqueue_main_thread_work(move || work());
-            })));
+            host.enqueue_main_thread_work(move || work());
         }
+        let work_host = host.clone();
+        UIWorkSchedulerHolder::set_enqueue(Some(Rc::new(move |work: Rc<dyn Fn()>| {
+            enqueue_on(&work_host, work);
+        })));
+        let remember_host = host.clone();
+        super::services::work_scheduler::remember(Some(Rc::new(move |work: Rc<dyn Fn()>| {
+            enqueue_on(&remember_host, work);
+        })));
         let input = host.input_context();
         InteractionRegistryHolder::set_current(Some(input.interactions.clone()));
         FocusChainHolder::set_current(Some(input.focus_chain.clone()));
@@ -705,7 +732,6 @@ impl Application {
             if let Some(root_view) = root_view {
                 let composition = state.composition.clone();
                 let environment = state.environment.clone();
-                let portal_store = composition.portal_store.clone();
                 let scaler = state.config.typography.scaler.clone();
                 let logical = {
                     let main = state.main_window.borrow();
@@ -726,7 +752,9 @@ impl Application {
                 state
                     .host
                     .input_context()
-                    .add_scoped_ambient(Rc::new(PortalStoreAmbient::new(composition.portal_store.clone())));
+                    .add_scoped_ambient(Rc::new(PortalStoreScope::new(
+                        composition.portal_store.clone(),
+                    )));
                 self.sync_main_window_chrome_hit_test();
                 state.main_window.borrow_mut().did_install_root = true;
             }
@@ -1242,15 +1270,16 @@ impl Application {
             format!("auxiliary window {context} failed: {error}"),
         ));
         let state = self.state.clone();
-        state.host.enqueue_main_thread_work(move || {
+        let host = state.host.clone();
+        host.enqueue_main_thread_work(move || {
             Application { state }.close_auxiliary_window(window_id);
         });
     }
 
     pub fn is_auxiliary_window_open(&self, window_id: WindowId) -> bool {
         self.sync_auxiliary_windows();
-        self.state.auxiliary_windows.borrow().contains_key(&window_id)
-            && self.state.host.session(window_id).is_some()
+        let known = self.state.auxiliary_windows.borrow().contains_key(&window_id);
+        known && self.state.host.session(window_id).is_some()
     }
 
     fn sync_auxiliary_windows(&self) {

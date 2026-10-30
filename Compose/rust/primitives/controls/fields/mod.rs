@@ -1,6 +1,8 @@
-//! Field controls and the shared values used by their keyboard interface.
+//! Form fields: selects, sliders and radio groups.
+pub mod radio_group;
 pub mod select;
 pub mod slider;
 
+pub use radio_group::{RadioGroup, RadioOption};
 pub use select::{KeyboardShortcut, KeyboardShortcutModifier, KeyboardShortcutPlatform, SelectOption};
-pub use slider::{SliderAxis, SliderGeometry};
+pub use slider::{Slider, SliderAxis, SliderGeometry, SliderHost};

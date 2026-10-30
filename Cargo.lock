@@ -452,6 +452,7 @@ dependencies = [
  "cove-text",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror",
 ]
 

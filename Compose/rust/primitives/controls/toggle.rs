@@ -12,13 +12,14 @@ use cove_core::scene::{
 };
 use cove_core::{Binding, Color};
 use cove_platform::{MouseButton, SystemCursor};
-use crate::modifiers::interaction::CursorExt;
+use crate::foundation::ColorAdjustExt;
+use crate::modifiers::interaction::{AccessibilityExt, CursorExt};
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::adaptive::apply_touch_control_extent;
 use crate::primitives::text::Text;
 use crate::theme::{theme_for_node, SemanticFontRef};
-use crate::{impl_primitive_view, AnyView, PrimitiveView, Row, TupleView, VerticalAlignment, View};
+use crate::{impl_primitive_view, AnyView, PrimitiveView, Row, TupleView, VerticalAlignment, View, ViewExt};
 
 use super::button::ActionControlAccessibility;
 
@@ -176,6 +177,34 @@ impl View for Checkbox {
     }
 }
 
+/// Gives the control its accessible name without re-wrapping an `AnyView`
+/// (which would drop the provider modifier).
+struct BoolControlLabelled {
+    content: AnyView,
+    label: String,
+}
+
+impl PrimitiveView for BoolControlLabelled {
+    fn make_node(&self) -> Node {
+        let node = Node::new();
+        node.set_is_hit_testable(false);
+        node
+    }
+
+    fn make_layout_node(&self) -> Option<LayoutNode> {
+        None
+    }
+
+    fn update_node(&self, node: &Node) {
+        node.set_composition_value(&ActionControlAccessibility::label(), Some(self.label.clone()));
+    }
+
+    fn children(&self, _node: &Node) -> Vec<AnyView> {
+        vec![self.content.clone()]
+    }
+}
+impl_primitive_view!(BoolControlLabelled);
+
 /// Label beside a boolean control; the control owns the accessible name.
 struct BoolControlLabel;
 
@@ -187,10 +216,9 @@ impl BoolControlLabel {
                 VerticalAlignment::Center,
                 8.0,
                 AnyView::new(TupleView::new(vec![
-                    AnyView::new(control.composition_local(
-                        ActionControlAccessibility::label(),
-                        Some(accessible_label),
-                    )),
+                    AnyView::new(
+                        BoolControlLabelled { content: control, label: accessible_label },
+                    ),
                     AnyView::new(
                         Text::new(label)
                             .semantic_font(SemanticFontRef::body())
@@ -199,7 +227,9 @@ impl BoolControlLabel {
                             } else {
                                 crate::theme::SemanticColorRef::on_surface_muted()
                             })
-                            .accessibility_hidden(true),
+                            .modifier(crate::modifiers::interaction::AccessibilityModifier::new(
+                                |semantics| semantics.is_hidden = true,
+                            )),
                     ),
                 ])),
             )
@@ -221,6 +251,17 @@ fn interaction_pressed(node: &Node) -> bool {
 
 fn interaction_hovered(node: &Node) -> bool {
     node.attachment::<bool>(HOVERED) == Some(true)
+}
+
+/// Perceptually flat mix used for the neutral track's hover and press states.
+fn mix(base: Color, toward: Color, amount: f32) -> Color {
+    let amount = amount.clamp(0.0, 1.0);
+    Color {
+        r: base.r + (toward.r - base.r) * amount,
+        g: base.g + (toward.g - base.g) * amount,
+        b: base.b + (toward.b - base.b) * amount,
+        a: base.a + (toward.a - base.a) * amount,
+    }
 }
 
 /// Centered within a touch-sized target, leading-aligned when stretched wider.
@@ -246,8 +287,8 @@ fn update_appearance(node: &Node, is_on: bool, is_enabled: bool) {
         off_base
     };
     // An unchecked box keeps its fill; only the border reacts to hover.
-    let off_hover = if is_switch { colors.border_strong.mixed(colors.on_surface, 0.04) } else { colors.background };
-    let off_press = if is_switch { colors.border_strong.mixed(colors.on_surface, 0.08) } else { colors.background };
+    let off_hover = if is_switch { mix(colors.border_strong, colors.on_surface, 0.04) } else { colors.background };
+    let off_press = if is_switch { mix(colors.border_strong, colors.on_surface, 0.08) } else { colors.background };
     let fill = if !is_enabled {
         base
     } else if pressed {
@@ -549,9 +590,9 @@ fn fill_color(node: &Node, colors: &crate::theme::ColorScheme, is_on: bool, is_e
     // Off is a solid neutral track (border darkened toward text): a grey track
     // rather than a translucent wash.
     if pressed {
-        colors.border_strong.mixed(colors.on_surface, 0.08)
+        mix(colors.border_strong, colors.on_surface, 0.08)
     } else if hovered {
-        colors.border_strong.mixed(colors.on_surface, 0.04)
+        mix(colors.border_strong, colors.on_surface, 0.04)
     } else {
         colors.border_strong
     }

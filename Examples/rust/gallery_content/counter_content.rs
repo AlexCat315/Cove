@@ -53,7 +53,7 @@ fn paint_with_font_service(run: &CounterTextRun, list: &mut DrawList, origin: Po
     let Some(environment) = TextEnvironmentHolder::current() else {
         return;
     };
-    let font = cove_text::Font::system(run.size);
+    let font = cove_core::Font::system(run.size, cove_core::FontWeight::Regular);
     let layout = environment.cached_layout(
         &run.text,
         Some(&font),

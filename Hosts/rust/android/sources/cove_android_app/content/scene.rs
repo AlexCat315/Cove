@@ -17,7 +17,6 @@ use cove_text::FontAtlas;
 use serde::Serialize;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::rc::Rc;
 use std::sync::Arc;
 
 /// Screen-space bounds in the diagnostic snapshot format.

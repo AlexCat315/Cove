@@ -1,8 +1,9 @@
 //! Stateful action buttons and their style-driven presentation.
 use crate::primitives::media::{Image, ImageContentMode, ImageRenderingMode, ImageSource};
 use crate::primitives::text::Text;
+pub use crate::theme::styles::buttons::ButtonRole;
 use crate::theme::styles::buttons::{
-    AnyButtonStyle, ButtonRole, ButtonStyleConfiguration, ButtonStyleEnvironment,
+    AnyButtonStyle, ButtonStyleConfiguration, ButtonStyleEnvironment,
 };
 use crate::theme::{ControlSizeEnvironment, IconMetrics, IconMetricsReader, theme_for_node};
 use crate::{impl_primitive_view, AnyView, BoxView, DynamicField, PrimitiveView, TupleView, View};

@@ -13,7 +13,8 @@ use cove_core::scene::{
     AccessibilityActions, AccessibilityRole, AccessibilitySemantics, AccessibilityState,
     EventPhase, EventResult, FocusChainHolder, HoverPhase, InputHandlerRoute,
     InteractionRegistryHolder, LayoutNode, MeasureMode, Node, NodeResource, Overflow,
-    PointerCaptureHolder, PointerPhase, TextInputAttachmentKey,
+    PointerCaptureHolder, PointerPhase, TextInputAttachmentKey, TextInputClient,
+    TextInputSnapshot,
 };
 use cove_core::{Binding, Color, InputCapabilities, Point, Rect, Size, TextAlignment};
 use cove_platform::{MouseButton, MouseWheelEvent, SystemCursor};
@@ -399,7 +400,148 @@ impl PrimitiveView for TextFieldHost {
 }
 impl_primitive_view!(TextFieldHost);
 
+/// UTF-16 offset of a character index, which is what platform input methods
+/// address. Clamped so a stale index can never run past the buffer.
+fn utf16_offset(buffer: &TextBuffer, character: usize) -> i32 {
+    let clamped = character.min(buffer.character_count());
+    let slice = buffer.substring(0..clamped);
+    slice.encode_utf16().count() as i32
+}
+
+/// Character index for a UTF-16 offset. `round_up` places an offset inside a
+/// surrogate pair at the following grapheme, matching the platform contract.
+fn character_index(buffer: &TextBuffer, offset: i32, round_up: bool) -> usize {
+    let target = offset.max(0) as usize;
+    let mut units = 0usize;
+    for (index, character) in buffer.string_value().chars().enumerate() {
+        let next = units + character.len_utf16();
+        if target < next {
+            return if round_up && target > units { index + 1 } else { index };
+        }
+        units = next;
+    }
+    buffer.character_count()
+}
+
+/// Publishes the field's UTF-16 view so a platform input method can drive
+/// marked text. Without this attachment IME composition (CJK, dead keys) has no
+/// host; the snapshot reports the composition range while marked text is live.
+fn install_text_input_client(node: &Node, field: &TextField, state: &Rc<RefCell<FieldState>>) {
+    if field.behavior.disabled {
+        node.remove_attachment(TextInputAttachmentKey::CLIENT);
+        return;
+    }
+    let snapshot_state = state.clone();
+    let snapshot_behavior = field.behavior.clone();
+    let snapshot_vertical = field.layout.axis == TextFieldAxis::Vertical;
+    let select_state = state.clone();
+    let delete_state = state.clone();
+    let delete_behavior = field.behavior.clone();
+    node.set_attachment(
+        TextInputAttachmentKey::CLIENT,
+        TextInputClient::new(
+            move || {
+                let state = snapshot_state.borrow();
+                let buffer = &state.buffer;
+                let composition = state.composition.clone();
+                let (low, high) = state
+                    .selection_range()
+                    .unwrap_or((state.selection.cursor_index, state.selection.cursor_index));
+                let mut snapshot = TextInputSnapshot::new(
+                    buffer.string_value(),
+                    utf16_offset(buffer, low),
+                    utf16_offset(buffer, high),
+                );
+                snapshot.is_secure = snapshot_behavior.secure;
+                snapshot.is_read_only = snapshot_behavior.read_only;
+                snapshot.is_multiline = snapshot_vertical;
+                if composition.is_active() {
+                    // The preview replaces the selected range with the marked
+                    // text, so the platform sees what it is composing over.
+                    let preview = buffer.replace(low..high, &composition.text);
+                    let base = utf16_offset(buffer, low);
+                    snapshot.text = preview.string_value();
+                    let caret = base
+                        + composition
+                            .text
+                            .chars()
+                            .take(composition.start + composition.length)
+                            .map(char::len_utf16)
+                            .sum::<usize>() as i32;
+                    snapshot.selection_start = caret;
+                    snapshot.selection_end = caret;
+                    snapshot.composition_start = base;
+                    snapshot.composition_end = base + composition.text.encode_utf16().count() as i32;
+                }
+                snapshot
+            },
+            move |start: i32, end: i32| {
+                let mut state = select_state.borrow_mut();
+                if state.composition.is_active() {
+                    // A selection inside the marked range moves the composition
+                    // window instead of replacing the text, which is what IMEs
+                    // expect when they re-place the caret mid-composition.
+                    let buffer = state.buffer.clone();
+                    let (low, high) = state
+                        .selection_range()
+                        .unwrap_or((state.selection.cursor_index, state.selection.cursor_index));
+                    let base = utf16_offset(&buffer, low);
+                    let pending = state.composition.text.clone();
+                    let limit = base + pending.encode_utf16().count() as i32;
+                    if start >= base && end >= base && start <= limit && end <= limit {
+                        let position = |units: i32| -> usize {
+                            let mut consumed = 0i32;
+                            for (index, character) in pending.chars().enumerate() {
+                                consumed += character.len_utf16() as i32;
+                                if units < consumed {
+                                    return index;
+                                }
+                            }
+                            pending.chars().count()
+                        };
+                        let lower = position(start.min(end) - base);
+                        state.composition.start = lower;
+                        state.composition.length = position(start.max(end) - base) - lower;
+                        return;
+                    }
+                    // Outside the marked range the composition commits first.
+                    let pending = state.composition.text.clone();
+                    let buffer = state.buffer.clone();
+                    state.buffer = buffer.replace(low..high, &pending);
+                    state.clear_composition();
+                }
+                let buffer = state.buffer.clone();
+                let low = character_index(&buffer, start.max(0), false);
+                let high = character_index(&buffer, end.max(0), true);
+                state.selection.anchor = Some(low);
+                state.selection.cursor_index = high;
+                state.record_activity();
+            },
+            move |before: i32, after: i32| {
+                if delete_behavior.read_only || delete_behavior.disabled {
+                    return;
+                }
+                let mut state = delete_state.borrow_mut();
+                state.clear_composition();
+                let buffer = state.buffer.clone();
+                let (low, high) = state
+                    .selection_range()
+                    .unwrap_or((state.selection.cursor_index, state.selection.cursor_index));
+                let start_units = utf16_offset(&buffer, low) - before.max(0);
+                let end_units = utf16_offset(&buffer, high) + after.max(0);
+                let start = character_index(&buffer, start_units.max(0), false);
+                let end = character_index(&buffer, end_units, true).max(start);
+                state.buffer = buffer.delete(start..end);
+                state.selection.anchor = None;
+                state.selection.cursor_index = start;
+                state.record_activity();
+            },
+        ),
+    );
+}
+
 fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldState>>) {
+    install_text_input_client(node, field, &state);
     let Some(registry) = InteractionRegistryHolder::current() else { return };
     if field.behavior.disabled {
         registry.remove(node);
@@ -424,6 +566,38 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
     }));
 
     let pointer_node = node.downgrade();
+    // Composition state must reach the host so it can show marked text and
+    // defer commit-time side effects while an IME is live.
+    let editing_state = state.clone();
+    let reported_composing = Rc::new(std::cell::Cell::new(false));
+    let reported_for_editing = reported_composing.clone();
+    node.set_attachment(
+        TextInputAttachmentKey::EDITING_CHANGE_HANDLER,
+        Rc::new(move |is_composing: bool| {
+            let _ = &editing_state;
+            reported_for_editing.set(is_composing);
+        }) as cove_core::scene::TextInputEditingChangeHandler,
+    );
+    let report_node = node.downgrade();
+    let report_composing = reported_composing;
+    node.set_attachment(
+        TextInputAttachmentKey::FOCUS_CHANGE_HANDLER,
+        Rc::new(move |focused: bool| {
+            let Some(owner) = Node::upgrade(&report_node) else { return };
+            if !focused && report_composing.get() {
+                if let Some(handle) = owner.attachment::<Rc<RefCell<FieldState>>>(FIELD_STATE_KEY) {
+                    handle.borrow_mut().clear_composition();
+                }
+                report_composing.set(false);
+            }
+            if let Some(handler) = owner.attachment::<Rc<dyn Fn()>>(
+                if focused { "__textfield_focus" } else { "__textfield_blur" },
+            ) {
+                handler();
+            }
+        }) as cove_core::scene::TextInputFocusChangeHandler,
+    );
+
     let pointer_state = state.clone();
     let behavior = field.behavior.clone();
     registry.set_pointer(node, InputHandlerRoute::text_input(), Rc::new(move |event, phase, _event_phase| {

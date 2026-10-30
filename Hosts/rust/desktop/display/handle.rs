@@ -12,7 +12,7 @@ use cove_platform::WindowId;
 use cove_runtime::PlatformFrameRateMode;
 use cove_shell::{FileDialogFilter, WindowChromeHitTest};
 use std::cell::{Cell, RefCell};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::rc::Rc;
 
 /// A request to open one auxiliary window.

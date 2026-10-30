@@ -115,10 +115,4 @@ impl AndroidDiagnostics {
     }
 }
 
-impl DiagnosticsInbox {
-    fn drain(&self) {
-        for operation in self.take() {
-            operation();
-        }
-    }
-}
+

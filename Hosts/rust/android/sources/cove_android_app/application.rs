@@ -6,7 +6,7 @@ use crate::android::contract::launch::SceneLaunch;
 use crate::desktop::diagnostics::integration::DevToolsConfiguration;
 use cove_graphics::rhi::{Device, DeviceConfig, TextureFormat};
 use cove_graphics::ui::NativeDrawListRenderer;
-use cove_logging::{Level, LogEvent, LogSystem};
+use cove_logging::LogSystem;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::Arc;

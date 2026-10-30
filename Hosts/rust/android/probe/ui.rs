@@ -51,7 +51,7 @@ impl ProbeContext {
                 TextureUploadRegion::new(1, 1),
                 TextureFormat::Rgba8Unorm,
             )
-            .map_err(|error: cove_core::DrawError| ProbeFailure::new(error.to_string()))?;
+            .map_err(fail)?;
         list.add_image_quad(
             Rect::new(48.0, 40.0, 8.0, 16.0),
             image.texture_id,
@@ -69,7 +69,7 @@ impl ProbeContext {
                 TextureFormat::Rgba8Unorm,
                 TextureUsage::COLOR_TARGET | TextureUsage::TRANSFER_SOURCE,
             ))
-            .map_err(|error: cove_core::DrawError| ProbeFailure::new(error.to_string()))?;
+            .map_err(fail)?;
         let (color, extra_color) = if samples == 1 {
             (target, None)
         } else {
@@ -79,7 +79,7 @@ impl ProbeContext {
                     TextureDescriptor::new(64, 64, TextureFormat::Rgba8Unorm, TextureUsage::COLOR_TARGET)
                         .with_sample_count(samples),
                 )
-                .map_err(|error: cove_core::DrawError| ProbeFailure::new(error.to_string()))?;
+                .map_err(fail)?;
             (color, Some(color))
         };
 

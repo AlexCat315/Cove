@@ -45,3 +45,27 @@ path = "rust/tests/portable_core.rs"
 [[test]]
 name = "text_scale"
 path = "rust/tests/text_scale.rs"
+
+[[test]]
+name = "animation_curve_tests"
+path = "rust/tests/animation_curve_tests.rs"
+
+[[test]]
+name = "animation_playback_tests"
+path = "rust/tests/animation_playback_tests.rs"
+
+[[test]]
+name = "scroll_animator_tests"
+path = "rust/tests/scroll_animator_tests.rs"
+
+[[test]]
+name = "scroll_rubber_band_tests"
+path = "rust/tests/scroll_rubber_band_tests.rs"
+
+[[test]]
+name = "scroll_spring_tests"
+path = "rust/tests/scroll_spring_tests.rs"
+
+[[test]]
+name = "scroll_velocity_tracker_tests"
+path = "rust/tests/scroll_velocity_tracker_tests.rs"

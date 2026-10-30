@@ -80,9 +80,18 @@ pub struct ResponseHead {
 }
 
 /// Splits a header block from its body at the first blank line.
-fn split_head(bytes: &[u8]) -> Option<(&[u8], &[u8])> {
+///
+/// Used by [`parse_response`] and by transports that buffer a whole response.
+pub fn split_head(bytes: &[u8]) -> Option<(&[u8], &[u8])> {
     let position = bytes.windows(4).position(|window| window == b"\r\n\r\n")?;
     Some((&bytes[..position], &bytes[position + 4..]))
+}
+
+/// Splits a complete buffered response into its head and body, then parses the
+/// head. Transports that read a whole reply (rather than streaming) use this.
+pub fn parse_response(bytes: &[u8]) -> Result<(ResponseHead, &[u8]), AsyncImageError> {
+    let (head, body) = split_head(bytes).ok_or(AsyncImageError::InvalidResponse)?;
+    Ok((parse_head(head)?, body))
 }
 
 /// Parses a response head into status, framing and metadata.

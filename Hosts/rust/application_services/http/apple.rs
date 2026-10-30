@@ -63,8 +63,8 @@ mod runtime {
         fn objc_autoreleasePoolPop(pool: *mut c_void);
     }
 
-    /// `objc_msgSend` has one physical symbol and one signature per call site;
-    /// every call below transmutes it to the exact shape that site needs.
+    // `objc_msgSend` has one physical symbol and one signature per call site;
+    // every call below transmutes it to the exact shape that site needs.
     unsafe extern "C" {
         fn objc_msgSend();
     }
@@ -166,11 +166,10 @@ mod runtime {
         Ok((result, content_type(ns_url)))
     }
 
-    /// A best-effort format hint from the URL extension.
-    ///
-    /// `NSData` carries no MIME type; `DownloadedImage::new` falls back to the
-    /// path extension exactly as the Swift loader did when a response had no
-    /// `Content-Type`.
+    // `NSData` carries no MIME type, so the format hint stays absent and
+    // `DownloadedImage::new` falls back to the URL's path extension, exactly as
+    // the Swift loader did when a response carried no `Content-Type`.
+    #[allow(clippy::unnecessary_wraps, reason = "mirrors the transport contract that may return a MIME type")]
     fn content_type(_url: Id) -> Option<String> {
         None
     }

@@ -1,6 +1,10 @@
-//! Slider field chrome. Only the shared axis geometry is ported so far; the
-//! `Slider` control and its pointer host remain to be migrated.
-
+//! Slider control: axis geometry, stateful host and tick paint policy.
 pub mod geometry;
+pub mod host;
+pub mod paint;
+pub mod slider;
 
 pub use geometry::{SliderAxis, SliderGeometry};
+pub use host::SliderHost;
+pub use paint::{ticks, SliderTick};
+pub use slider::Slider;

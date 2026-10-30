@@ -21,7 +21,7 @@ use cove_core::{Idiom, Insets, Keyboard, TextScale, TextScaleSample};
 use cove_logging::{Level, LogEvent, LogSystem, LogValue};
 use cove_platform::KeyModifiers;
 use std::collections::BTreeMap;
-use std::ffi::{CStr, c_char, c_int, c_void};
+use std::ffi::{CStr, c_void};
 use std::rc::Rc;
 
 // MARK: - NDK symbol resolution
@@ -29,6 +29,7 @@ use std::rc::Rc;
 #[cfg(target_os = "android")]
 mod ndk {
     use super::*;
+    use std::ffi::{c_char, c_int};
 
     pub type LogWrite =
         unsafe extern "C" fn(c_int, *const c_char, *const c_char, *const c_char) -> c_int;
@@ -210,6 +211,17 @@ fn log(message: &str, level: Level, label: &str) {
     let mut metadata = BTreeMap::new();
     metadata.insert("origin".to_owned(), LogValue::String("java".to_owned()));
     LogSystem::logger(label).log(&LogEvent::new(level, message).with_metadata(metadata));
+    // Mirror into logcat so a native record is also visible to `adb logcat`,
+    // which is what the Java side reads. On other hosts the symbol is absent and
+    // this is a no-op.
+    forward_to_logcat(message);
+}
+
+/// Forwards one record to Android's log facility when `liblog` is available.
+fn forward_to_logcat(message: &str) {
+    let Ok(tag) = std::ffi::CString::new("CoveHost") else { return };
+    let Ok(text) = std::ffi::CString::new(message.replace('\0', "")) else { return };
+    ndk::log_write(&tag, &text);
 }
 
 /// `cove_android_log_java`
@@ -328,13 +340,17 @@ pub unsafe extern "C" fn cove_android_destroy_application(pointer: ApplicationPo
 ///
 /// # Safety
 /// `pointer` must be null or a live application pointer.
-unsafe fn borrow_application(pointer: ApplicationPointer) -> Option<&'static AndroidApplication> {
+unsafe fn borrow_application(pointer: ApplicationPointer) -> Option<Rc<AndroidApplication>> {
     if pointer.is_null() {
         return None;
     }
-    // SAFETY: the caller guarantees a live retained pointer that outlives this
-    // call; the reference is only used for the duration of the JNI entry point.
-    Some(unsafe { &*pointer.cast::<AndroidApplication>() })
+    // SAFETY: the caller guarantees a live retained pointer. Rebuilding the `Rc`
+    // and forgetting it clones the count without taking ownership, so the Java
+    // side keeps its own reference.
+    let retained = unsafe { Rc::from_raw(pointer.cast::<AndroidApplication>()) };
+    let cloned = retained.clone();
+    std::mem::forget(retained);
+    Some(cloned)
 }
 
 /// Borrows the session behind a Java-held pointer.
@@ -634,7 +650,7 @@ pub unsafe extern "C" fn cove_android_pump_diagnostics(pointer: ApplicationPoint
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cove_android_memory_pressure(pointer: ApplicationPointer) {
     // SAFETY: forwarded application pointer contract from the caller.
-    if let Some(application) = (unsafe { borrow_application(pointer) }) {
+    if let Some(application) = unsafe { borrow_application(pointer) } {
         application.trim_memory();
     }
 }

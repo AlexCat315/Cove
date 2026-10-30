@@ -74,3 +74,30 @@ impl SliderGeometry {
         }
     }
 }
+
+impl SliderGeometry {
+    /// Knob rectangle centred on `center` along the axis.
+    pub fn thumb_rect(
+        &self,
+        center: f32,
+        length: f32,
+        diameter: f32,
+        origin: Point,
+    ) -> Rect {
+        if self.axis.is_horizontal() {
+            Rect::new(
+                origin.x + center - length / 2.0,
+                origin.y + (self.breadth - diameter) / 2.0,
+                length,
+                diameter,
+            )
+        } else {
+            Rect::new(
+                origin.x + (self.breadth - diameter) / 2.0,
+                origin.y + center - length / 2.0,
+                diameter,
+                length,
+            )
+        }
+    }
+}

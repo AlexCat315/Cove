@@ -4,4 +4,16 @@
 //! the backend needs), so no `windows` crate is required. The module compiles on
 //! every host; only the loader and surface creation are Windows-gated, which keeps
 //! the crate type-checking on macOS while the real path stays Windows-only.
+pub(crate) mod backend;
+pub(crate) mod binding;
+pub(crate) mod buffer;
+pub(crate) mod command_list;
+pub(crate) mod device;
+pub(crate) mod formats;
+pub(crate) mod pipeline;
+pub(crate) mod resources;
+pub(crate) mod swapchain;
 pub(crate) mod sys;
+pub(crate) mod texture;
+
+pub use backend::{Dx12Backend, make_backend};

@@ -129,13 +129,20 @@ impl AuxiliaryAppWindow {
         let window_id = self.session.id;
         let graph = self.graph.clone();
         let root_view = self.root_view.clone();
-        let portal_store = self.portal_store.clone();
         let environment = self.environment.clone();
         let logical_w = self.logical_w;
         let logical_h = self.logical_h;
         let did_install_root = self.did_install_root;
-        self.session.with_current(|| {
-            configure_text_environment(self.session.content_scale_factor());
+        let session = self.session.clone();
+        // Scope this window's overlay store for every consumer that reads the
+        // process ambient, so one window's popover cannot paint into another's.
+        let ambient: Rc<dyn cove_core::scene::ScopedAmbient> =
+            Rc::new(PortalStoreScope::new(
+                self.portal_store.clone(),
+            ));
+        session.input_context.add_scoped_ambient(ambient);
+        session.with_current(|| {
+            configure_text_environment(session.content_scale_factor());
             if !did_install_root {
                 chrome::with_window_chrome_context(Some(window_id), || {
                     let content = AdaptiveApplicationContent::new(root_view, environment);
@@ -155,7 +162,7 @@ impl AuxiliaryAppWindow {
             let _ = upload_atlas_if_needed(false);
         });
 
-        self.session.request_display();
+        session.request_display();
         Ok(())
     }
 
@@ -198,8 +205,9 @@ impl AuxiliaryAppWindow {
                 .resize((width_px, height_px), self.is_vsync_enabled)
                 .map_err(|error| error.to_string())?;
         }
-        self.session.with_current(|| {
-            configure_text_environment(self.session.content_scale_factor());
+        let session = self.session.clone();
+        session.with_current(|| {
+            configure_text_environment(session.content_scale_factor());
             let _ = upload_atlas_if_needed(false);
         });
         Ok(())
@@ -289,6 +297,28 @@ impl AuxiliaryAppWindow {
             }
             Err(_) => false,
         }
+    }
+}
+
+/// Adapts `PortalStoreAmbient` to the runtime's scoped-ambient hook.
+///
+/// `PortalStoreAmbient` exposes `activate`; the runtime trait needs that closure
+/// boxed as `FnOnce`, so this host-side adapter supplies it without editing
+/// Compose.
+pub struct PortalStoreScope {
+    store: Rc<PortalStore>,
+}
+
+impl PortalStoreScope {
+    pub fn new(store: Rc<PortalStore>) -> Self {
+        Self { store }
+    }
+}
+
+impl cove_core::scene::ScopedAmbient for PortalStoreScope {
+    fn activate(&self) -> Box<dyn FnOnce()> {
+        let restore = PortalStoreAmbient::new(self.store.clone()).activate();
+        Box::new(move || restore())
     }
 }
 

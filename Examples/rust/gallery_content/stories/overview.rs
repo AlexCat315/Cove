@@ -18,9 +18,9 @@ use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
 use cove_ui_compose::theme::ThemeReader;
 use cove_ui_compose::{
-    AnyView, BoxView, DynamicField, FlexDirection, Align, Justify, LayoutDebugExt, TupleView, View,
-    ViewExt, ViewModifier, Wrap,
+    AnyView, BoxView, DynamicField, LayoutDebugExt, TupleView, View, ViewExt, ViewModifier,
 };
+use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::scene::{LayoutNode, Node};
 
 use crate::gallery_content::catalog::GalleryOptions;

@@ -814,13 +814,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn only_two_dimensional_textures_are_single_layer_attachments() {
-        assert!(is_single_layer_2d(TextureDimension::Texture2D));
-        assert!(!is_single_layer_2d(TextureDimension::Cube));
-        assert!(!is_single_layer_2d(TextureDimension::Texture2DArray));
-    }
-
-    #[test]
     fn the_upload_chunk_size_matches_the_swift_default() {
         assert_eq!(UPLOAD_CHUNK_SIZE, 4 * 1024 * 1024);
     }

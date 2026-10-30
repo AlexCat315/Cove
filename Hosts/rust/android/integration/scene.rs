@@ -11,13 +11,11 @@ use cove_composition::{
     AnyView, LayoutDebugAttachmentKey, PrimitiveView, View, ViewGraph, ViewKind,
 };
 use cove_core::scene::{
-    AccessibilityTree, AnimatorScheduler, EventDispatcher, FocusChain, NodeRenderer, NodeTree,
-    PlatformInputContext, Recomposer, RenderTree, TextEditActions, TextEditCommand,
-    TextInputAttachmentKey, TextInputClient, TextInputSnapshot,
+    AnimatorScheduler, EventDispatcher, NodeRenderer, NodeTree, PlatformInputContext, Recomposer,
+    RenderTree, TextEditActions, TextEditCommand, TextInputAttachmentKey, TextInputClient,
+    TextInputSnapshot,
 };
-use cove_core::{
-    DrawList, Environment, GeometryAntialiasing, Point, Rect, State,
-};
+use cove_core::{DrawList, Environment, GeometryAntialiasing, Point, State};
 use cove_platform::{
     InputEvent, KeyEvent, KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent,
     MouseWheelEvent, ScrollDevice, ScrollInput, ScrollUnit, TextEditingEvent,
@@ -190,19 +188,21 @@ impl AndroidContentSession {
             previous.stop();
         }
         let graph = self.graph.get().cloned().ok_or("scene graph is not installed")?;
-        let environment = &self.environment;
+        // The image registry is shared, so the closure can own it instead of
+        // borrowing the scene environment for its whole lifetime.
+        let images = self.environment.images().clone();
+        let shaping = self.environment.text().map(|text| text.shaping_cache_snapshot());
+        let layout = self.environment.text().map(|text| text.layout_cache_snapshot());
         let memory = {
             let graph = graph.clone();
-            let shaping = environment.text().map(|text| text.shaping_cache_snapshot());
-            let layout = environment.text().map(|text| text.layout_cache_snapshot());
             Rc::new(move || DiagnosticMemorySnapshot {
                 counters: [
                     ("shapingEntries".to_owned(), shaping.map_or(0, |cache| cache.entries as u64)),
                     ("shapingBytes".to_owned(), shaping.map_or(0, |cache| cache.estimated_bytes as u64)),
                     ("layoutEntries".to_owned(), layout.map_or(0, |cache| cache.entries as u64)),
                     ("layoutBytes".to_owned(), layout.map_or(0, |cache| cache.estimated_bytes as u64)),
-                    ("imageEntries".to_owned(), environment.images().cached_count() as u64),
-                    ("imageBytes".to_owned(), environment.images().cached_bytes() as u64),
+                    ("imageEntries".to_owned(), images.cached_count() as u64),
+                    ("imageBytes".to_owned(), images.cached_bytes() as u64),
                     ("skippedParentUpdates".to_owned(), graph.skipped_parent_updates() as u64),
                 ]
                 .into_iter()

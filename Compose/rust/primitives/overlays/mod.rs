@@ -1,5 +1,6 @@
 //! Overlay primitives.
 pub mod support;
+pub mod popover;
 pub mod portal;
 pub mod focus_scope;
 pub mod selection_key_host;
@@ -10,6 +11,9 @@ pub mod roving_focus;
 pub use focus_scope::FocusScope;
 pub use selection_key_host::SelectionKeyHost;
 pub use menu::{MenuDescriptor, MenuItemDescriptor};
+pub use popover::{
+    Popover, PopoverSizing, PopoverTriggerDescription,
+};
 pub use portal::OverlayPlacement;
 pub use modal::{
     uses_sheet, Modal, ModalBackdrop, ModalDismissal, ModalGeometry, ModalOptions, ModalPlacement,
