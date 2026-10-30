@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+- 新增 `ImageStory`（12 项测试，已运行通过）：四种图片来源（bundled/remote/missing/empty）各自的 URL 解析与 URL 去空白、`empty` 不可重试且请求号不变、三种加载相位到占位面的映射——`Empty` 与 `Failure` 共用布局但文案不同（`No image` + 引导 vs `Image unavailable` + 错误描述）。已接入 `StoryDispatch`。生产源码达 974/984（99.0%）。
+
 - 新增 `PlacementExample`（11 项测试，已运行通过）：12 种摆放与 `PopoverPlacement::ALL` 一一对应、紧凑镜像三向分支（leading 贴右、trailing 贴左、居中折半，且触发器超宽时夹到边缘不出现负坐标）、上/侧/下三档垂直位置、触发器宽度受视口上限约束。该组件是 Popconfirm 页的子组件而非独立页，故不接入 `StoryDispatch`。生产源码达 973/984（98.9%）。
 
 - 新增 `CommandStory`（11 项测试，已运行通过）：8 条命令分 4 组、仅 `Deploy to Device` 禁用；文档承诺的 `GO`/`go f`/`appearance` 三种查询均按真实排序模型命中；禁用命令不执行也不入最近列表；最近命令新前旧后并封顶 3 条、重复运行不产生重复项。**测试发现我的实现把 `showsRecent` 传反了**（应为查询为空时显示最近项），据 Swift 源码 `showsRecentCommands && trimmedQuery.isEmpty` 修正。生产源码达 972/984（98.8%）。

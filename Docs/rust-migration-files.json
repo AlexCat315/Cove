@@ -7581,11 +7581,14 @@
       "source": "Examples/Sources/GalleryContent/Stories/Layout/ImageStory.swift",
       "source_sha256": "ffb9ce431d8e4f2052ad67da02d5c80b197bab58e446936544153d1564480f58",
       "source_lines": 80,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Examples/rust/gallery_content/stories/image_story.rs"
+      ],
       "module": "Examples",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Examples/Sources/GalleryContent/Stories/Layout/LayoutStories.swift",
