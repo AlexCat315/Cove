@@ -6,6 +6,10 @@
 //! and the swapchains. Every trait method forwards to the module that implements
 //! it, which is how Swift split the same device across `Backend/`, `Resources/`
 //! and `Submission/` extensions.
+//!
+//! The `RHIBackgroundCompilation` conformance from
+//! `Vulkan/Backend/VulkanCompilation.swift` is the inherent `prepare_compilation`
+//! method in this module.
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -1428,6 +1432,204 @@ mod tests {
             frames_aspect(crate::rhi::TextureFormat::Depth32Float),
             sys::VK_IMAGE_ASPECT_DEPTH_BIT
         );
+    }
+}
+
+impl Drop for VulkanBackend {
+    fn drop(&mut self) {
+        self.release_native_objects();
+    }
+}
+
+impl VulkanBackend {
+    /// Translation of `Vulkan/Submission/VulkanCleanup.swift` (`deinit`
+    /// teardown). The device is idled first so every object destroyed below is
+    /// unreferenced by the GPU; the order mirrors the Swift implementation.
+    fn release_native_objects(&mut self) {
+        let context = &self.context;
+        // SAFETY: the idle wait is the precondition for every destroy below. Its
+        // result is ignored because a lost device still permits object teardown.
+        unsafe {
+            let _ = (context.instance_commands.device_wait_idle)(context.device);
+        }
+
+        // Window swapchains first.
+        let swapchains = std::mem::take(&mut self.swapchains);
+        for window in swapchains.into_values() {
+            // SAFETY: the device is idle, so no presentation references these.
+            unsafe {
+                for semaphore in window.acquire_semaphores.values() {
+                    (context.sync.destroy_semaphore)(context.device, *semaphore, core::ptr::null());
+                }
+                for semaphore in window.presentation.ready.values() {
+                    (context.sync.destroy_semaphore)(context.device, *semaphore, core::ptr::null());
+                }
+            }
+            window.chain.destroy(context, &self.registries);
+        }
+
+        // Registries, in the Swift order.
+        let acceleration_ids =
+            lock(&self.registries).acceleration_structures.keys().copied().collect::<Vec<_>>();
+        for id in acceleration_ids {
+            acceleration::destroy_acceleration_structure(
+                context,
+                &self.registries,
+                &mut self.allocator.lock().expect("allocator poisoned"),
+                AccelerationStructure::new(id),
+            );
+        }
+        let mesh_ids = lock(&self.registries).mesh_pipelines.keys().copied().collect::<Vec<_>>();
+        for id in mesh_ids {
+            pipelines::destroy_mesh_pipeline(context, &self.registries, MeshPipeline::new(id));
+        }
+        let graphics_ids =
+            lock(&self.registries).graphics_pipelines.keys().copied().collect::<Vec<_>>();
+        for id in graphics_ids {
+            pipelines::destroy_graphics_pipeline(context, &self.registries, GraphicsPipeline::new(id));
+        }
+        let compute_ids =
+            lock(&self.registries).compute_pipelines.keys().copied().collect::<Vec<_>>();
+        for id in compute_ids {
+            pipelines::destroy_compute_pipeline(context, &self.registries, ComputePipeline::new(id));
+        }
+
+        // SAFETY: the device is idle, so the pool is unreferenced.
+        unsafe {
+            (context.core.destroy_descriptor_pool)(context.device, self.descriptor_pool, core::ptr::null());
+        }
+
+        let layout_ids =
+            lock(&self.registries).pipeline_layouts.keys().copied().collect::<Vec<_>>();
+        for id in layout_ids {
+            let native = lock(&self.registries)
+                .pipeline_layouts
+                .remove(&id)
+                .map(|record| record.native);
+            // SAFETY: as above.
+            unsafe {
+                if let Some(native) = native {
+                    (context.resources.destroy_pipeline_layout)(
+                        context.device,
+                        native,
+                        core::ptr::null(),
+                    );
+                }
+            }
+        }
+        let binding_ids =
+            lock(&self.registries).binding_layouts.keys().copied().collect::<Vec<_>>();
+        for id in binding_ids {
+            let layout = lock(&self.registries).binding_layouts.remove(&id);
+            // SAFETY: as above.
+            unsafe {
+                if let Some(layout) = layout {
+                    (context.resources.destroy_descriptor_set_layout)(
+                        context.device,
+                        layout,
+                        core::ptr::null(),
+                    );
+                }
+            }
+        }
+
+        let module_ids = lock(&self.registries).shader_modules.keys().copied().collect::<Vec<_>>();
+        for id in module_ids {
+            resources::destroy_shader_module(context, &self.registries, ShaderModule::new(id));
+        }
+        let sampler_ids = lock(&self.registries).samplers.keys().copied().collect::<Vec<_>>();
+        for id in sampler_ids {
+            resources::destroy_sampler(context, &self.registries, Sampler::new(id));
+        }
+        let texture_ids = lock(&self.registries).textures.keys().copied().collect::<Vec<_>>();
+        for id in texture_ids {
+            resources::destroy_texture(
+                context,
+                &self.registries,
+                &mut self.allocator.lock().expect("allocator poisoned"),
+                Texture::new(id),
+            );
+        }
+        let buffer_ids = lock(&self.registries).buffers.keys().copied().collect::<Vec<_>>();
+        for id in buffer_ids {
+            resources::destroy_buffer(
+                context,
+                &self.registries,
+                &mut self.allocator.lock().expect("allocator poisoned"),
+                Buffer::new(id),
+            );
+        }
+
+        // Per-frame query pools and command pools.
+        for frame in &mut self.frames {
+            if let Some(pool) = frame.query_pool.take() {
+                // SAFETY: the device is idle.
+                unsafe {
+                    (context.resources.queries.destroy_query_pool)(
+                        context.device,
+                        pool,
+                        core::ptr::null(),
+                    );
+                }
+            }
+            let pool_ids = frame.command_pools.keys().copied().collect::<Vec<_>>();
+            for id in pool_ids {
+                let pool = frame.command_pools.remove(&id);
+                // SAFETY: as above.
+                unsafe {
+                    if let Some(pool) = pool {
+                        (context.resources.destroy_command_pool)(
+                            context.device,
+                            pool.handle,
+                            core::ptr::null(),
+                        );
+                    }
+                }
+            }
+        }
+
+        let timeline = std::mem::take(&mut self.timeline_semaphores);
+        for semaphore in timeline.into_values() {
+            // SAFETY: the frame ring has retired, so no submission waits on these.
+            unsafe {
+                (context.sync.destroy_semaphore)(context.device, semaphore, core::ptr::null());
+            }
+        }
+
+        // Scratch one-shot pool and fence.
+        {
+            let mut scratch = context.scratch.lock().expect("scratch poisoned");
+            if let Some(pool) = scratch.command_pool.take() {
+                // SAFETY: the device is idle.
+                unsafe {
+                    (context.resources.destroy_command_pool)(
+                        context.device,
+                        pool,
+                        core::ptr::null(),
+                    );
+                }
+            }
+            if let Some(fence) = scratch.fence.take() {
+                // SAFETY: as above.
+                unsafe {
+                    (context.sync.destroy_fence)(context.device, fence, core::ptr::null());
+                }
+            }
+        }
+
+        self.allocator.lock().expect("allocator poisoned").destroy_all();
+        context
+            .staging_allocator
+            .lock()
+            .expect("staging allocator poisoned")
+            .destroy_all();
+
+        // SAFETY: every child object has been released, so the device and
+        // instance can be destroyed.
+        unsafe {
+            (context.instance_commands.destroy_device)(context.device, core::ptr::null());
+            (context.instance_commands.destroy_instance)(context.instance, core::ptr::null());
+        }
     }
 }
 

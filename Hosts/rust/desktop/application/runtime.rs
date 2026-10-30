@@ -72,6 +72,9 @@ impl cove_core::scene::ScopedAmbient for PortalStoreScope {
 /// Callbacks the caller supplies to a run.
 #[derive(Clone, Default)]
 pub struct ApplicationCallbacks {
+    /// Subscribers observe every platform event the host pumps, plus the
+    /// window exposure transitions this application emits itself.
+    pub events: cove_runtime::PlatformEventBridge,
     pub tick: Option<Rc<dyn Fn(f64)>>,
     pub ready: Option<Rc<dyn Fn(&AppDisplayHandle)>>,
     pub diagnostics_ready: Option<Rc<dyn Fn(bool)>>,
@@ -558,6 +561,12 @@ impl Application {
         }
         {
             let state = state.clone();
+            *callbacks.on_event.borrow_mut() = Some(Rc::new(move |event: &cove_platform::InputEvent| {
+                state.callbacks.events.publish(event);
+            }));
+        }
+        {
+            let state = state.clone();
             let weak: Weak<ApplicationState> = Rc::downgrade(&state);
             *callbacks.on_before_commit.borrow_mut() =
                 Some(Rc::new(move |delta_time: f64| {
@@ -1020,6 +1029,11 @@ impl Application {
                 self.fail_run_loop(&error.to_string(), "window presentation transition");
                 return;
             }
+            state.callbacks.events.publish(&if active {
+                cove_platform::InputEvent::WindowExposed
+            } else {
+                cove_platform::InputEvent::WindowOccluded
+            });
             // When the window goes off-screen the swapchain / MSAA / framebuffer
             // are already released. Also drop the heavy CPU caches (glyph atlas,
             // image assets, render tree) so backgrounding actually reclaims

@@ -5,6 +5,10 @@
 //! the module that implements it, so the Swift extension split is preserved
 //! (`MetalDeviceResources`, `MetalDeviceTransfer`, `MetalSubmitEncoder`, ...).
 //! Nothing here may be compiled on a target without Metal.
+//!
+//! The `RHIBackgroundCompilation` conformance from
+//! `Metal/Device/MetalCompilation.swift` is the inherent `prepare_compilation`
+//! method in this module.
 use std::sync::Arc;
 
 use crate::rhi::{

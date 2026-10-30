@@ -800,11 +800,35 @@ unsafe extern "C" {
     pub fn ghostty_free(allocator: *const GhosttyAllocator, ptr: *mut u8, len: usize);
 }
 
+use super::sized::{sized, SizedAbi};
+
+macro_rules! impl_sized_abi {
+    ($($ty:ty),* $(,)?) => {$(
+        impl SizedAbi for $ty {
+            fn write_abi_size(&mut self, size: usize) {
+                self.size = size;
+            }
+        }
+    )*};
+}
+
+impl_sized_abi!(
+    GhosttyStyle,
+    GhosttyRenderStateColors,
+    GhosttyRenderStateCursor,
+    GhosttyRenderStateRowSelection,
+    GhosttyGridRef,
+    GhosttySelection,
+    GhosttyTerminalSelectionFormatOptions,
+    GhosttyMouseEncoderSize,
+    GhosttyKittyGraphicsPlacementRenderInfo,
+);
+
 /// Builds a `GhosttyStyle` with its `size` field set, as the sized-struct ABI
 /// requires. Every sized struct in this crate is produced through a helper like
 /// this one instead of `Default`, which would leave `size` at zero.
 pub fn sized_style() -> GhosttyStyle {
-    let mut value = GhosttyStyle {
+    let value = GhosttyStyle {
         size: 0,
         fg_color: GhosttyStyleColor { tag: 0, value: GhosttyStyleColorValue { bits: 0 } },
         bg_color: GhosttyStyleColor { tag: 0, value: GhosttyStyleColorValue { bits: 0 } },
@@ -819,12 +843,11 @@ pub fn sized_style() -> GhosttyStyle {
         overline: false,
         underline: 0,
     };
-    value.size = size_of_val(&value);
-    value
+    sized(value)
 }
 
 pub fn sized_colors() -> GhosttyRenderStateColors {
-    let mut value = GhosttyRenderStateColors {
+    let value = GhosttyRenderStateColors {
         size: 0,
         background: GhosttyColorRgb::default(),
         foreground: GhosttyColorRgb::default(),
@@ -832,12 +855,11 @@ pub fn sized_colors() -> GhosttyRenderStateColors {
         cursor_has_value: false,
         palette: [GhosttyColorRgb::default(); 256],
     };
-    value.size = size_of_val(&value);
-    value
+    sized(value)
 }
 
 pub fn sized_cursor() -> GhosttyRenderStateCursor {
-    let mut value = GhosttyRenderStateCursor {
+    let value = GhosttyRenderStateCursor {
         size: 0,
         viewport_has_value: false,
         _padding: 0,
@@ -850,35 +872,31 @@ pub fn sized_cursor() -> GhosttyRenderStateCursor {
         _padding2: [0; 2],
         visual_style: 0,
     };
-    value.size = size_of_val(&value);
-    value
+    sized(value)
 }
 
 pub fn sized_row_selection() -> GhosttyRenderStateRowSelection {
-    let mut value = GhosttyRenderStateRowSelection { size: 0, start_x: 0, end_x: 0 };
-    value.size = size_of_val(&value);
-    value
+    let value = GhosttyRenderStateRowSelection { size: 0, start_x: 0, end_x: 0 };
+    sized(value)
 }
 
 pub fn sized_grid_ref() -> GhosttyGridRef {
-    let mut value = GhosttyGridRef { size: 0, node: ptr::null_mut(), x: 0, y: 0 };
-    value.size = size_of_val(&value);
-    value
+    let value = GhosttyGridRef { size: 0, node: ptr::null_mut(), x: 0, y: 0 };
+    sized(value)
 }
 
 pub fn sized_selection() -> GhosttySelection {
-    let mut value = GhosttySelection {
+    let value = GhosttySelection {
         size: 0,
         start: sized_grid_ref(),
         end: sized_grid_ref(),
         rectangle: false,
     };
-    value.size = size_of_val(&value);
-    value
+    sized(value)
 }
 
 pub fn sized_format_options() -> GhosttyTerminalSelectionFormatOptions {
-    let mut value = GhosttyTerminalSelectionFormatOptions {
+    let value = GhosttyTerminalSelectionFormatOptions {
         size: 0,
         emit: 0,
         unwrap: false,
@@ -886,12 +904,11 @@ pub fn sized_format_options() -> GhosttyTerminalSelectionFormatOptions {
         _padding: [0; 2],
         selection: ptr::null(),
     };
-    value.size = size_of_val(&value);
-    value
+    sized(value)
 }
 
 pub fn sized_mouse_size() -> GhosttyMouseEncoderSize {
-    let mut value = GhosttyMouseEncoderSize {
+    let value = GhosttyMouseEncoderSize {
         size: 0,
         screen_width: 0,
         screen_height: 0,
@@ -902,12 +919,11 @@ pub fn sized_mouse_size() -> GhosttyMouseEncoderSize {
         padding_right: 0,
         padding_left: 0,
     };
-    value.size = size_of_val(&value);
-    value
+    sized(value)
 }
 
 pub fn sized_placement_render_info() -> GhosttyKittyGraphicsPlacementRenderInfo {
-    let mut value = GhosttyKittyGraphicsPlacementRenderInfo {
+    let value = GhosttyKittyGraphicsPlacementRenderInfo {
         size: 0,
         pixel_width: 0,
         pixel_height: 0,
@@ -922,12 +938,7 @@ pub fn sized_placement_render_info() -> GhosttyKittyGraphicsPlacementRenderInfo 
         source_width: 0,
         source_height: 0,
     };
-    value.size = size_of_val(&value);
-    value
-}
-
-fn size_of_val<T>(_value: &T) -> usize {
-    std::mem::size_of::<T>()
+    sized(value)
 }
 
 // The library reports these sizes through `ghostty_type_json()`. A mismatch

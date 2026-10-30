@@ -14,6 +14,7 @@ use std::{cell::Cell, ptr, rc::Rc};
 
 pub mod ffi;
 pub mod frame;
+mod sized;
 mod frame_reader;
 mod hyperlink;
 mod images;

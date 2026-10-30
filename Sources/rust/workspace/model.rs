@@ -2,6 +2,10 @@
 //!
 //! The document is pure data. Nothing here measures, and nothing caches a
 //! derived frame, so a decoded document behaves exactly like an authored one.
+//!
+//! Translation of `Sources/CoveUIWorkspace/Layout/Split.swift`: the
+//! `WorkspaceLayoutSplit` address and the `WorkspaceLayoutNode::resizing` walk
+//! live in this module.
 use super::ids::{
     WorkspaceEdge, WorkspaceFloatingWindowID, WorkspacePanelID, WorkspaceSlotID, WorkspaceSplitAxis,
     WorkspaceTabGroupID,

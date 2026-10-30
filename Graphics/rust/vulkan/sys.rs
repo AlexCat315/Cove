@@ -11,6 +11,14 @@
 //!
 //! Every struct below is `#[repr(C)]` and mirrors the Vulkan C declaration
 //! field-for-field, in order, because the driver reads them by layout.
+//!
+//! Translation of `Vulkan/VulkanFunctions.swift`: the pointer interop helpers
+//! (`vkNull`, `vkWithOutHandle`, `vkCString`, `vkExtName`), every PFN signature
+//! and the grouped command tables are the null-handle constants, `CStr`
+//! helpers, PFN types and command structs in this module.
+//!
+//! Translation of `Vulkan/VulkanAdvanced.swift`: the optional entry points and
+//! scratch alignment it resolves are [`AdvancedCommands`] in this module.
 #![allow(non_camel_case_types, non_snake_case, non_upper_case_globals)]
 
 use core::ffi::{c_char, c_void};
