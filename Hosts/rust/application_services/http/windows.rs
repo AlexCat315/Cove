@@ -6,7 +6,7 @@
 
 #![cfg(target_os = "windows")]
 
-use cove_ui_compose::primitives::media::image_data_download::{
+use cove_ui_compose::primitives::media::{
     AsyncImageError, ImageDownloadTransport,
 };
 use std::ffi::c_void;
@@ -174,7 +174,7 @@ mod runtime {
                 std::ptr::null(),
                 std::ptr::null(),
                 std::ptr::null(),
-                0 | if url.secure { FLAG_SECURE } else { 0 },
+                if url.secure { FLAG_SECURE } else { 0 },
             )
         };
         if request.is_null() {
@@ -288,8 +288,8 @@ mod runtime {
         if ok == 0 {
             return None;
         }
-        let units = length as usize / 2;
-        let text = String::from_utf16_lossy(&buffer[..units.min(buffer.len())]);
+        let units = (length as usize / 2).min(buffer.len());
+        let text = String::from_utf16_lossy(&buffer[..units]);
         Some(text.trim_end_matches('\0').to_owned())
     }
 }

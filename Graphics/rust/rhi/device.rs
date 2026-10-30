@@ -1373,7 +1373,7 @@ impl Device {
                 source: module_path!().to_owned(),
                 file: file!().to_owned(),
                 function: "Device".to_owned(),
-                line: line!(),
+                line: u64::from(line!()),
             },
         );
     }

@@ -193,13 +193,18 @@ impl View for FormFieldView {
                 } else {
                     AnyView::new(AnyView::new(label).flex(0.0).shrink(0.0))
                 };
+                let field_label = field.label.clone();
+                let field_id = field.id.clone();
+                let field_help = field.presentation.help.clone();
+                let field_required = field.presentation.is_required;
+                let field_error = error.clone();
                 let mut value_stack: Vec<AnyView> = vec![AnyView::new(field.content.clone().accessibility(move |semantics| {
-                    semantics.label = field.label.clone();
-                    semantics.identifier = field.id.clone();
-                    semantics.help = error.clone().unwrap_or_else(|| field.presentation.help.clone());
+                    semantics.label = field_label.clone();
+                    semantics.identifier = field_id.clone();
+                    semantics.help = field_error.clone().unwrap_or_else(|| field_help.clone());
                     semantics.state = AccessibilityState {
-                        is_required: field.presentation.is_required,
-                        is_invalid: error.is_some(),
+                        is_required: field_required,
+                        is_invalid: field_error.is_some(),
                         ..Default::default()
                     };
                 }))];

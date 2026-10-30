@@ -43,7 +43,7 @@ impl ApplicationServices {
         }
     }
 
-    /// Restores every captured service, in the reverse order of capture.
+    /// Restores every captured service to the value it held before the run.
     pub fn restore(self) {
         TextEnvironmentHolder::set_current(self.text);
         cove_core::set_content_scale(self.scale);

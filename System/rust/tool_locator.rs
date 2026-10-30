@@ -8,7 +8,7 @@ pub enum ProcessEnvironment {}
 impl ProcessEnvironment {
     pub fn setting(
         value: &str,
-        for name: &str,
+        name: &str,
         environment: &BTreeMap<String, String>,
     ) -> BTreeMap<String, String> {
         let mut result = environment.clone();

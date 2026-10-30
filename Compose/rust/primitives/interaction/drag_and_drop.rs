@@ -42,6 +42,14 @@ pub struct DragSession {
     on_change: RefCell<Option<Rc<dyn Fn()>>>,
 }
 
+impl PartialEq for DragSession {
+    /// Session identity, not state: the ambient value is the scope itself, and
+    /// a live drag mutates it without re-providing the environment.
+    fn eq(&self, other: &Self) -> bool {
+        std::ptr::eq(self, other)
+    }
+}
+
 impl DragSession {
     pub fn new() -> Rc<Self> {
         Rc::new(Self {
@@ -242,10 +250,10 @@ impl View for DragScope {
                     }),
                 ])),
             )
-            .modifier(cove_composition::ProvideCompositionLocalModifier::new(
+            .composition_local(
                 DragScopeEnvironment::key(),
                 Some(self.session.clone()),
-            )),
+            ),
         )
     }
 }

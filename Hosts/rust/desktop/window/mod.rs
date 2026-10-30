@@ -8,8 +8,8 @@ pub mod state;
 
 pub use auxiliary::AuxiliaryAppWindow;
 pub use chrome::{
-    AppDisplayHandleHolder, AppWindowChromeContext, AppWindowChromeContextHolder,
-    ImmersiveWindowControlStyle, WindowChromeHitTestCollector,
+    AppWindowChromeContext, AppWindowChromeContextHolder, ImmersiveWindowControlStyle,
+    WindowChromeHitTestCollector,
 };
 pub use native_menu::{
     NativeApplicationMenuTitles, NativeMenu, NativeMenuAction, NativeMenuBar, NativeMenuItem,

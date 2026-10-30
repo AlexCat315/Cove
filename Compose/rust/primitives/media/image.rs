@@ -184,7 +184,9 @@ impl PrimitiveView for Image {
             foreground: self.foreground,
             vector_source_url: self.vector_source_url.clone(),
         };
+        let draw_node = node.clone();
         node.update_draw(identity, move |list, origin| {
+            let node = &draw_node;
             let frame = node.frame();
             let draw_width = if frame.width > 0.0 { frame.width } else { snapshot.width };
             let draw_height = if frame.height > 0.0 { frame.height } else { snapshot.height };

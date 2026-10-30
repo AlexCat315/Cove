@@ -27,14 +27,14 @@ pub struct TerminalImagePlacement {
 }
 
 /// The image handle plus the metadata every caller needs.
-pub(super) struct KittyImage {
+pub(crate) struct KittyImage {
     pub width: u32,
     pub height: u32,
     pub generation: u64,
 }
 
 impl KittyImage {
-    pub(super) fn lookup(graphics: GhosttyKittyGraphics, image_id: u32) -> Option<Self> {
+    pub(crate) fn lookup(graphics: GhosttyKittyGraphics, image_id: u32) -> Option<Self> {
         // SAFETY: `graphics` is a live handle borrowed from the terminal and the
         // returned image pointer stays valid until the next mutating call, which
         // is not made here.
@@ -71,7 +71,7 @@ impl KittyImage {
 
 impl TerminalEngine {
     /// The terminal's Kitty graphics storage, if graphics are enabled.
-    pub(super) fn kitty_graphics(&self) -> Option<GhosttyKittyGraphics> {
+    pub(crate) fn kitty_graphics(&self) -> Option<GhosttyKittyGraphics> {
         let mut graphics: GhosttyKittyGraphics = ptr::null_mut();
         // SAFETY: the terminal handle is live and `graphics` points at a slot of
         // the documented type.
@@ -82,7 +82,7 @@ impl TerminalEngine {
     }
 
     /// Visible placements, in protocol z order.
-    pub(super) fn image_placements(&self) -> Vec<TerminalImagePlacement> {
+    pub(crate) fn image_placements(&self) -> Vec<TerminalImagePlacement> {
         let Some(graphics) = self.kitty_graphics() else {
             return Vec::new();
         };

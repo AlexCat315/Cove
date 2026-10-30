@@ -10,7 +10,7 @@ impl FileReplacement {
     /// destination. The native bridge performs `rename` on POSIX and
     /// `MoveFileExW(REPLACE_EXISTING | WRITE_THROUGH)` with bounded retries on
     /// Windows.
-    pub fn replace(destination: &Path, with staging: &Path) -> io::Result<()> {
+    pub fn replace(destination: &Path, staging: &Path) -> io::Result<()> {
         if standardized(staging) == standardized(destination) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,

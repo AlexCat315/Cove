@@ -176,11 +176,11 @@ impl SurfaceSession {
         let logical = self.application.scene().borrow().size();
         let viewport = NativeUIViewport::new([image.width, image.height], [logical.0, logical.1]);
         let mut commands = CommandBuffer::new();
-        let frame = self.timings.measure_result(Phase::CommandRecord, || {
+        let framebuffer_texture = self.framebuffer.as_ref().map(|buffer| buffer.texture());
+        let target_texture = framebuffer_texture.unwrap_or(image.texture);
+        let target = framebuffer_texture.is_some();
+        let record = self.timings.measure_result(Phase::CommandRecord, || -> RhiResult<_> {
             let mut renderer = renderer.borrow_mut();
-            let target_texture =
-                self.framebuffer.as_ref().map_or(image.texture, |buffer| buffer.texture());
-            let backdrop = self.framebuffer.as_ref().map(|buffer| buffer.texture());
             let frame = renderer.record(
                 &list,
                 &commands,
@@ -189,18 +189,19 @@ impl SurfaceSession {
                     [0.025, 0.035, 0.06, 1.0],
                 ),
                 viewport,
-                backdrop,
+                framebuffer_texture,
             )?;
-            if let Some(framebuffer) = &self.framebuffer {
+            if target {
                 renderer.record_blit(
-                    framebuffer.texture(),
+                    target_texture,
                     &mut commands,
                     cove_graphics::rhi::RenderColorTarget::new(image.texture),
                     [image.width, image.height],
                 )?;
             }
             Ok(frame)
-        })?;
+        });
+        let frame = record?;
         self.timings.measure_result(Phase::QueueSubmit, || {
             device.submit(&commands, QueueClass::Graphics, &[], &[], None)
         })?;

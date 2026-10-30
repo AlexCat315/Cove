@@ -34,13 +34,13 @@ pub enum SelectionPhase {
 }
 
 /// What the gesture produced.
-pub(super) enum SelectionOutcome {
+pub(crate) enum SelectionOutcome {
     Select(ffi::GhosttySelection),
     Clear,
 }
 
 /// Ghostty's selection gesture state machine.
-pub(super) struct SelectionGesture {
+pub(crate) struct SelectionGesture {
     gesture: GhosttySelectionGesture,
     press: GhosttySelectionGestureEvent,
     drag: GhosttySelectionGestureEvent,
@@ -48,7 +48,7 @@ pub(super) struct SelectionGesture {
 }
 
 impl SelectionGesture {
-    pub(super) fn new() -> Self {
+    pub(crate) fn new() -> Self {
         // SAFETY: every handle is allocated here and freed in `free`, which the
         // engine calls before the terminal it built them against.
         unsafe {
@@ -58,7 +58,7 @@ impl SelectionGesture {
             let drag = Self::event(ffi::SELECTION_GESTURE_EVENT_TYPE_DRAG);
             let release = Self::event(ffi::SELECTION_GESTURE_EVENT_TYPE_RELEASE);
             if !press.is_null() {
-                let mut interval: u64 = 500_000_000;
+                let interval: u64 = 500_000_000;
                 ffi::ghostty_selection_gesture_event_set(
                     press,
                     ffi::SELECTION_EVENT_OPT_REPEAT_INTERVAL_NS,
@@ -79,7 +79,7 @@ impl SelectionGesture {
     }
 
     /// The gesture borrows terminal state, so the engine frees it first.
-    pub(super) fn free(&self, terminal: ffi::GhosttyTerminal) {
+    pub(crate) fn free(&self, terminal: ffi::GhosttyTerminal) {
         if self.gesture.is_null() && self.press.is_null() {
             return;
         }
@@ -102,7 +102,7 @@ impl SelectionGesture {
     /// Returns the selection to install, `Clear` when the gesture removes it, or
     /// `None` when nothing changes. `rectangle` selects a block of columns
     /// instead of running text.
-    pub(super) fn apply(
+    pub(crate) fn apply(
         &self,
         phase: SelectionPhase,
         pointer: &TerminalPointer,
@@ -127,16 +127,16 @@ impl SelectionGesture {
             {
                 return None;
             }
-            let mut position = ffi::GhosttySurfacePosition { x: pointer.x, y: pointer.y };
+            let position = ffi::GhosttySurfacePosition { x: pointer.x, y: pointer.y };
             let event = match phase {
                 SelectionPhase::Press => {
-                    let mut time = pointer.nanoseconds;
+                    let time = pointer.nanoseconds;
                     ffi::ghostty_selection_gesture_event_set(
                         self.press,
                         ffi::SELECTION_EVENT_OPT_TIME_NS,
                         ptr::addr_of!(time).cast(),
                     );
-                    let mut distance = cell_width.max(cell_height) as f64;
+                    let distance = cell_width.max(cell_height) as f64;
                     ffi::ghostty_selection_gesture_event_set(
                         self.press,
                         ffi::SELECTION_EVENT_OPT_REPEAT_DISTANCE,
@@ -145,7 +145,7 @@ impl SelectionGesture {
                     self.press
                 }
                 SelectionPhase::Drag => {
-                    let mut geometry = ffi::GhosttySelectionGestureGeometry {
+                    let geometry = ffi::GhosttySelectionGestureGeometry {
                         columns: columns as u32,
                         cell_width: cell_width as u32,
                         padding_left: 0,
@@ -156,7 +156,7 @@ impl SelectionGesture {
                         ffi::SELECTION_EVENT_OPT_GEOMETRY,
                         ptr::addr_of!(geometry).cast(),
                     );
-                    let mut block = rectangle;
+                    let block = rectangle;
                     ffi::ghostty_selection_gesture_event_set(
                         self.drag,
                         ffi::SELECTION_EVENT_OPT_RECTANGLE,

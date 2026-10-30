@@ -4,3 +4,5 @@
 //! libghostty-vt; this crate owns the process, the render-ready snapshot and the
 //! Compose-side surface.
 pub mod engine;
+pub mod process;
+pub mod session;

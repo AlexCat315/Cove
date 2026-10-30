@@ -322,26 +322,32 @@ pub unsafe extern "C" fn cove_android_destroy_application(pointer: ApplicationPo
 
 /// Borrows the application behind a Java-held pointer.
 ///
+/// `Rc::from_raw` + `mem::forget` would briefly build a second owner of the same
+/// allocation. Borrowing the pointee as a plain reference is both simpler and
+/// exact: JNI guarantees the pointer stays retained for the whole call.
+///
 /// # Safety
-/// `pointer` must be a live application pointer.
-unsafe fn application(pointer: ApplicationPointer) -> Option<Rc<AndroidApplication>> {
+/// `pointer` must be null or a live application pointer.
+unsafe fn application(pointer: ApplicationPointer) -> Option<&'static AndroidApplication> {
     if pointer.is_null() {
         return None;
     }
-    // SAFETY: the caller guarantees a live retained pointer; incrementing keeps
-    // it alive across the call without taking ownership.
-    let application = unsafe { Rc::from_raw(pointer.cast::<AndroidApplication>()) };
-    let cloned = application.clone();
-    std::mem::forget(application);
-    Some(cloned)
+    // SAFETY: the caller guarantees a live retained pointer that outlives this
+    // call; the reference is only used for the duration of the JNI entry point.
+    Some(unsafe { &*pointer.cast::<AndroidApplication>() })
 }
 
 /// Borrows the session behind a Java-held pointer.
 ///
 /// # Safety
 /// `pointer` must be a live session pointer.
-unsafe fn session(pointer: SessionPointer) -> Option<*mut SessionHandle> {
-    if pointer.is_null() { None } else { Some(pointer.cast::<SessionHandle>()) }
+unsafe fn session(pointer: SessionPointer) -> Option<&'static mut SessionHandle> {
+    if pointer.is_null() {
+        return None;
+    }
+    // SAFETY: the caller guarantees a live session pointer and JNI serializes
+    // every call to it on the UI thread, so exclusive access holds.
+    Some(unsafe { &mut *pointer.cast::<SessionHandle>() })
 }
 
 /// `cove_android_open`
@@ -392,8 +398,6 @@ pub unsafe extern "C" fn cove_android_open(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cove_android_frame(pointer: SessionPointer, timestamp: u64) -> i32 {
     let Some(handle) = (unsafe { session(pointer) }) else { return 0 };
-    // SAFETY: the handle is live for the duration of this call.
-    let handle = unsafe { &mut *handle };
     match handle.session_mut().frame(timestamp) {
         Ok(presented) => i32::from(presented),
         Err(error) => {
@@ -415,8 +419,7 @@ pub unsafe extern "C" fn cove_android_pointer(
     y: f32,
 ) {
     let Some(handle) = (unsafe { session(pointer) }) else { return };
-    // SAFETY: the handle is live for the duration of this call.
-    unsafe { &*handle }.session().scene().pointer(kind, x, y);
+    handle.session().scene().pointer(kind, x, y);
 }
 
 /// `cove_android_text`
@@ -435,7 +438,7 @@ pub unsafe extern "C" fn cove_android_text(
     // SAFETY: forwarded pointer/count contract from the caller.
     let text = unsafe { utf16_string(text, count) };
     // SAFETY: the handle is live for the duration of this call.
-    unsafe { &*handle }.session().scene().text(&text, composing != 0);
+    handle.session().scene().text(&text, composing != 0);
 }
 
 /// `cove_android_key`
@@ -449,8 +452,7 @@ pub unsafe extern "C" fn cove_android_key(
     modifiers: u16,
 ) {
     let Some(handle) = (unsafe { session(pointer) }) else { return };
-    // SAFETY: the handle is live for the duration of this call.
-    unsafe { &*handle }.session().scene().key(scancode, KeyModifiers(modifiers));
+    handle.session().scene().key(scancode, KeyModifiers(modifiers));
 }
 
 /// `cove_android_scroll`
@@ -466,8 +468,7 @@ pub unsafe extern "C" fn cove_android_scroll(
     delta_y: f32,
 ) {
     let Some(handle) = (unsafe { session(pointer) }) else { return };
-    // SAFETY: the handle is live for the duration of this call.
-    unsafe { &*handle }.session().scene().scroll(x, y, delta_x, delta_y);
+    handle.session().scene().scroll(x, y, delta_x, delta_y);
 }
 
 /// `cove_android_surface`
@@ -502,7 +503,6 @@ pub unsafe extern "C" fn cove_android_surface(
             .chunks_exact(2)
             .map(|pair| TextScaleSample { size: pair[0], scaled_size: pair[1] }),
     );
-    let handle = unsafe { &*handle };
     handle.session().application().update_scale(density);
     let safe_area = Insets { top, bottom, leading, trailing };
     let idiom = match idiom {
@@ -526,7 +526,7 @@ pub unsafe extern "C" fn cove_android_surface(
 pub unsafe extern "C" fn cove_android_system_bar_icons(pointer: SessionPointer) -> i32 {
     let Some(handle) = (unsafe { session(pointer) }) else { return -1 };
     // SAFETY: the handle is live for the duration of this call.
-    unsafe { &*handle }.session().scene().content().system_bar_icon_style()
+    handle.session().scene().content().system_bar_icon_style()
 }
 
 /// `cove_android_key_state`
@@ -542,7 +542,7 @@ pub unsafe extern "C" fn cove_android_key_state(
     let Some(handle) = (unsafe { session(pointer) }) else { return };
     if down != 0 {
         // SAFETY: the handle is live for the duration of this call.
-        unsafe { &*handle }.session().scene().key(scancode, KeyModifiers::default());
+        handle.session().scene().key(scancode, KeyModifiers::default());
     }
 }
 
@@ -559,7 +559,7 @@ pub unsafe extern "C" fn cove_android_snapshot(
 ) -> i32 {
     let Some(handle) = (unsafe { session(pointer) }) else { return 0 };
     // SAFETY: the handle is live for the duration of this call.
-    let text = unsafe { &*handle }.session().scene().snapshot();
+    let text = handle.session().scene().snapshot();
     // SAFETY: forwarded output contract from the caller.
     unsafe { copy_text(&text, output, capacity) }
 }
@@ -577,7 +577,7 @@ pub unsafe extern "C" fn cove_android_input_snapshot(
 ) -> i32 {
     let Some(handle) = (unsafe { session(pointer) }) else { return 0 };
     // SAFETY: the handle is live for the duration of this call.
-    let text = unsafe { &*handle }.session().scene().input_snapshot();
+    let text = handle.session().scene().input_snapshot();
     // SAFETY: forwarded output contract from the caller.
     unsafe { copy_text(&text, output, capacity) }
 }
@@ -594,8 +594,7 @@ pub unsafe extern "C" fn cove_android_edit(
     end: i32,
 ) {
     let Some(handle) = (unsafe { session(pointer) }) else { return };
-    // SAFETY: the handle is live for the duration of this call.
-    unsafe { &*handle }.session().scene().edit(kind, start, end);
+    handle.session().scene().edit(kind, start, end);
 }
 
 /// `cove_android_close`

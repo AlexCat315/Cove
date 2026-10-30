@@ -17,6 +17,7 @@ use cove_core::scene::{
 use cove_core::{Binding, Color, Point, Rect, Size};
 use cove_platform::{KeyEvent, MouseButton, MouseWheelEvent};
 use crate::modifiers::layout::{FrameDimension, LayoutFrameExt};
+use cove_composition::LayoutDebugExt;
 use crate::primitives::layout::horizontal_scroll_origin::HorizontalScrollOrigin;
 use crate::LayoutContainer;
 use crate::scrolling::ScrollPhysicsEnvironment;
@@ -367,7 +368,7 @@ fn refresh_scrollable_content_size(node: &Node) -> Size {
         CONTENT_SIZE,
         ContentSizeCache { size: next, structure_version: node.subtree_structure_version() },
     );
-    let viewport = visible_viewport_rect(node);
+    let viewport = size_of(visible_viewport_rect(node));
     let max_x = (next.width - viewport.width).max(0.0);
     let max_y = (next.height - viewport.height).max(0.0);
     if let Some(motion) = node.attachment::<Rc<ScrollAnimator>>(MOTION) {
@@ -1298,7 +1299,7 @@ fn install_interaction(node: &Node, view: &ScrollViewObservers, wheel_step: f32,
             let max_x = (content.width - viewport.width).max(0.0);
             let max_y = (content.height - viewport.height).max(0.0);
             if let Some(motion) = owner.attachment::<Rc<ScrollAnimator>>(MOTION) {
-                motion.update(Point::new(max_x, max_y), viewport);
+                motion.update(Point::new(max_x, max_y), size_of(viewport));
             } else {
                 let offset = owner.content_offset();
                 if offset.x > max_x || offset.y > max_y {
@@ -1481,6 +1482,8 @@ impl PrimitiveView for ScrollView {
 
         let increment_node = node.downgrade();
         let increment_observers = observers.clone_for_report();
+        let decrement_node = node.downgrade();
+        let decrement_observers = observers.clone_for_report();
         let axes = self.axes;
         node.set_accessibility_actions(AccessibilityActions {
             increment: Some(Rc::new(move || {
@@ -1490,9 +1493,9 @@ impl PrimitiveView for ScrollView {
                 }
             })),
             decrement: Some(Rc::new(move || {
-                if let Some(owner) = Node::upgrade(&increment_node) {
+                if let Some(owner) = Node::upgrade(&decrement_node) {
                     page_scroll(&owner, axes, false);
-                    report(&owner, &increment_observers);
+                    report(&owner, &decrement_observers);
                 }
             })),
             ..Default::default()
@@ -1537,12 +1540,14 @@ impl PrimitiveView for ScrollView {
         // Yoga right-aligns an oversized RTL child at a negative x. Scrolling
         // uses physical offsets starting at zero, so normalize that origin
         // while retaining the content's inherited logical direction.
-        vec![AnyView::new(LayoutContainer::<HorizontalScrollOrigin, AnyView>::with_erased_content(
+        let container = AnyView::new(LayoutContainer::<HorizontalScrollOrigin, AnyView>::with_erased_content(
             HorizontalScrollOrigin,
             self.content.clone(),
-        ))
-        .frame(Some(FrameDimension::Percent(100.0)), None, None, None, None, None)
-        .layout_role(HORIZONTAL_ORIGIN_ROLE)]
+        ));
+        let sized = AnyView::new(container.frame(
+            Some(FrameDimension::Percent(100.0)), None, None, None, None, None,
+        ));
+        vec![AnyView::new(sized.layout_role(HORIZONTAL_ORIGIN_ROLE))]
     }
 }
 impl_primitive_view!(ScrollView);

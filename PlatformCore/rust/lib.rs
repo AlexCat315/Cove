@@ -33,6 +33,10 @@ impl KeyModifiers {
     pub fn has_gui(self) -> bool {
         self.0 & 192 != 0
     }
+    /// No modifier is held.
+    pub fn is_empty(self) -> bool {
+        self.0 == 0
+    }
 }
 impl std::ops::BitOr for KeyModifiers {
     type Output = Self;

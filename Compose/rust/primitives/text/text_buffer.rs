@@ -32,6 +32,18 @@ impl PartialEq for TextBuffer {
     }
 }
 
+impl std::fmt::Debug for TextBuffer {
+    /// Revision identity plus length; the rope contents are not walked, which
+    /// keeps debug formatting from materializing the document.
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("TextBuffer")
+            .field("version", &self.version)
+            .field("utf8_length", &self.root.metrics.utf8_length)
+            .finish()
+    }
+}
+
 impl TextBuffer {
     pub fn empty() -> Self {
         Self {

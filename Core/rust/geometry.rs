@@ -35,6 +35,10 @@ impl Rect {
             height,
         }
     }
+    /// `CGRect.size` — the extent without the origin.
+    pub const fn size(&self) -> Size {
+        Size { width: self.width, height: self.height }
+    }
     pub fn max_x(self) -> f32 {
         self.x + self.width
     }

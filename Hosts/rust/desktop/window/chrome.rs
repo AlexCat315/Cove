@@ -76,23 +76,8 @@ impl AppWindowChromeContext {
 }
 
 thread_local! {
-    static CURRENT_DISPLAY_HANDLE: RefCell<Option<crate::desktop::display::AppDisplayHandle>> =
-        const { RefCell::new(None) };
     static CURRENT_CHROME_CONTEXT: RefCell<Option<AppWindowChromeContext>> =
         const { RefCell::new(None) };
-}
-
-/// Holds the display handle application content drives its window through.
-pub struct AppDisplayHandleHolder;
-
-impl AppDisplayHandleHolder {
-    pub fn current() -> Option<crate::desktop::display::AppDisplayHandle> {
-        CURRENT_DISPLAY_HANDLE.with(|slot| slot.borrow().clone())
-    }
-
-    pub fn set_current(handle: Option<crate::desktop::display::AppDisplayHandle>) {
-        CURRENT_DISPLAY_HANDLE.with(|slot| *slot.borrow_mut() = handle);
-    }
 }
 
 /// Holds the window whose chrome views are currently being installed.

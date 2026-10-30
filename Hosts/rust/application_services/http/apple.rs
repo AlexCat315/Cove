@@ -14,7 +14,7 @@
 
 #![cfg(any(target_os = "macos", target_os = "ios"))]
 
-use cove_ui_compose::primitives::media::image_data_download::{
+use cove_ui_compose::primitives::media::{
     AsyncImageError, ImageDownloadTransport,
 };
 use std::ffi::{CStr, c_char, c_void};

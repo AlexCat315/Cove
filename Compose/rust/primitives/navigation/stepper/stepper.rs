@@ -30,13 +30,13 @@ use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, TupleView, Vie
 use super::values::{StepStatus, StepperAxis, StepperItem, StepperOptions};
 
 /// A controlled workflow navigator.
-pub struct Stepper<Id: PartialEq + Clone + 'static> {
+pub struct Stepper<Id: std::hash::Hash + PartialEq + Clone + 'static> {
     pub items: Vec<StepperItem<Id>>,
     pub selection: Binding<Option<Id>>,
     pub options: StepperOptions,
 }
 
-impl<Id: PartialEq + Clone + 'static> Stepper<Id> {
+impl<Id: std::hash::Hash + PartialEq + Clone + 'static> Stepper<Id> {
     pub fn new(items: Vec<StepperItem<Id>>, selection: Binding<Option<Id>>) -> Self {
         assert!(
             items.iter().enumerate().all(|(index, item)| {
@@ -127,12 +127,12 @@ impl<Id: PartialEq + Clone + 'static> Stepper<Id> {
             move |event: &KeyEvent| stepper_navigation(event, vertical)
         });
         let _ = (&items_for_host, selection, count, identity);
-        AnyView::new(host).accessibility(move |semantics| {
+        AnyView::new(AnyView::new(host).accessibility(move |semantics| {
             semantics.role = AccessibilityRole::List;
             semantics.label = label.clone();
             semantics.state.is_enabled = is_enabled;
             let _ = options;
-        })
+        }))
     }
 
     fn navigation_snapshot(&self) -> Rc<dyn Fn(&KeyEvent, bool) -> Option<SelectionNavigation>> {
@@ -160,12 +160,12 @@ impl<Id: PartialEq + Clone + 'static> Stepper<Id> {
         let count = self.items.len();
         let is_enabled = self.options.is_enabled && item.is_enabled;
         let tooltip = format!("Step {} of {} · {}", index + 1, count, item.status.description());
-        let marker = AnyView::new(StepperMarker {
+        let marker = AnyView::new(AnyView::new(StepperMarker {
             number: index + 1,
             status: item.status,
             is_selected: selected,
         })
-        .accessibility_hidden(true);
+        .accessibility_hidden(true));
         let mut labels: Vec<AnyView> = vec![AnyView::new(
             Text::new(item.title.clone()).semantic_font(SemanticFontRef::body_strong()),
         )];
@@ -259,7 +259,7 @@ impl<Id: PartialEq + Clone + 'static> Stepper<Id> {
     }
 }
 
-impl<Id: PartialEq + Clone + 'static> Stepper<Id> {
+impl<Id: std::hash::Hash + PartialEq + Clone + 'static> Stepper<Id> {
     fn snapshot(&self) -> Stepper<Id> {
         Stepper {
             items: self.items.clone(),
@@ -269,7 +269,7 @@ impl<Id: PartialEq + Clone + 'static> Stepper<Id> {
     }
 }
 
-impl<Id: PartialEq + Clone + 'static> View for Stepper<Id> {
+impl<Id: std::hash::Hash + PartialEq + Clone + 'static> View for Stepper<Id> {
     fn body(&self) -> AnyView {
         if self.options.axis == StepperAxis::Vertical {
             return self.content(true);
@@ -280,11 +280,13 @@ impl<Id: PartialEq + Clone + 'static> View for Stepper<Id> {
         let budget = self.horizontal_budget();
         let wide = Rc::new(self.snapshot().content(false));
         let compact = Rc::new(self.snapshot().content(true));
-        AnyView::new(ContainerSizeReader::new(move |size: cove_core::Size| {
-            let use_wide = width_allows_horizontal(size.width, budget);
-            AnyView::new(if use_wide { wide.clone() } else { compact.clone() })
-        }))
-        .frame_min_width(0.0)
+        AnyView::new(
+            AnyView::new(ContainerSizeReader::new(move |size: cove_core::Size| {
+                let use_wide = width_allows_horizontal(size.width, budget);
+                AnyView::new(if use_wide { wide.clone() } else { compact.clone() })
+            }))
+            .frame_min_width(0.0),
+        )
     }
 }
 

@@ -278,7 +278,7 @@ impl PrimitiveView for Scrollbar {
             match phase {
                 PointerPhase::Down => {
                     if let Some(chain) = FocusChainHolder::current() {
-                        chain.focus(Some(owner.clone()), false);
+                        chain.focus(Some(&owner), false);
                     }
                     if let Some(capture) = PointerCaptureHolder::current() {
                         capture.acquire(&owner, true);

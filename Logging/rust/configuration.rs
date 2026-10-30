@@ -109,6 +109,11 @@ impl Default for Buffering {
 pub struct Redaction {
     pub keys: BTreeSet<String>,
 }
+impl From<BTreeSet<String>> for Redaction {
+    fn from(keys: BTreeSet<String>) -> Self {
+        Self { keys }
+    }
+}
 impl Default for Redaction {
     fn default() -> Self {
         [
@@ -123,7 +128,9 @@ impl Default for Redaction {
             "access_token",
             "refresh_token",
         ]
+        .into_iter()
         .map(str::to_owned)
+        .collect::<BTreeSet<String>>()
         .into()
     }
 }

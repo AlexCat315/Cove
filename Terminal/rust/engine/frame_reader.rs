@@ -13,14 +13,14 @@ use crate::engine::placeholders::PlaceholderCell;
 use std::ptr;
 
 /// Owned render-state handles, reused across frames.
-pub(super) struct RenderState {
+pub(crate) struct RenderState {
     pub state: GhosttyRenderState,
     pub row_iterator: GhosttyRenderStateRowIterator,
     pub row_cells: GhosttyRenderStateRowCells,
 }
 
 impl RenderState {
-    pub(super) fn new() -> Self {
+    pub(crate) fn new() -> Self {
         // SAFETY: all three handles are owned by this value and freed in `Drop`.
         unsafe {
             let mut state: GhosttyRenderState = ptr::null_mut();
@@ -51,12 +51,12 @@ impl Drop for RenderState {
 
 /// Scratch buffers a frame read reuses.
 #[derive(Default)]
-pub(super) struct FrameScratch {
+pub(crate) struct FrameScratch {
     graphemes: Vec<u8>,
 }
 
 impl TerminalEngine {
-    pub(super) fn read_frame(&mut self) -> TerminalFrame {
+    pub(crate) fn read_frame(&mut self) -> TerminalFrame {
         let state = &self.render;
         // SAFETY: the render state and terminal are live for the whole read; the
         // library only writes into the scratch buffer we own.
@@ -105,7 +105,7 @@ impl TerminalEngine {
     ) {
         // SAFETY: caller guarantees a live iterator positioned on row `y`.
         unsafe {
-            let mut cells = ptr::null_mut();
+            let mut cells: GhosttyRenderStateRowCells = ptr::null_mut();
             if ffi::ghostty_render_state_row_get(iterator, ffi::RENDER_STATE_ROW_DATA_CELLS, ptr::addr_of_mut!(cells).cast())
                 != ffi::GHOSTTY_SUCCESS
             {

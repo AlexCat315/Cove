@@ -47,8 +47,12 @@ impl LogEvent {
     }
 }
 
-pub type MetadataProvider = Arc<dyn Fn() -> BTreeMap<String, LogValue> + Send + Sync>;
+/// Deferred metadata merged ahead of the handler's own values, mirroring
+/// swift-log's `MetadataProvider.get()`.
+#[derive(Clone)]
+pub struct MetadataProvider(pub Arc<dyn Fn() -> BTreeMap<String, LogValue> + Send + Sync>);
 
+#[derive(Clone)]
 pub struct UnifiedLogHandler {
     pub label: String,
     pub runtime: Arc<LogRuntime>,
@@ -94,11 +98,17 @@ impl UnifiedLogHandler {
     }
 
     /// Ambient context is merged first, then the provider, the handler's own
-    /// metadata and finally the explicit event metadata.
-    pub fn log(&self, event: &LogEvent) {
+    /// metadata and finally the explicit event metadata. Returns the sequence
+    /// assigned to the record, or `None` when the level was filtered out or the
+    /// queue rejected it.
+    pub fn log_sequence(&self, event: &LogEvent) -> Option<u64> {
+        // swift-log consults `logLevel` before dispatching an event.
+        if event.level < self.log_level() {
+            return None;
+        }
         let mut values = LogContext::current();
         if let Some(provider) = &self.metadata_provider {
-            for (key, value) in provider() {
+            for (key, value) in (provider.0)() {
                 values.insert(key, value);
             }
         }
@@ -110,6 +120,10 @@ impl UnifiedLogHandler {
                 values.insert(key.clone(), value.clone());
             }
         }
-        self.runtime.submit(&self.label, event, values);
+        self.runtime.submit(&self.label, event, values)
+    }
+
+    pub fn log(&self, event: &LogEvent) {
+        self.log_sequence(event);
     }
 }

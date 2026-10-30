@@ -125,7 +125,7 @@ pub struct LogQuery {
     #[serde(default)]
     pub labels: Vec<String>,
     #[serde(default)]
-    pub text: String,
+    pub text: Option<String>,
     #[serde(default, rename = "afterSequence")]
     pub after_sequence: Option<u64>,
 }
@@ -149,9 +149,9 @@ impl LogQuery {
         {
             return false;
         }
-        if self.text.is_empty() {
+        let Some(text) = self.text.as_deref().filter(|text| !text.is_empty()) else {
             return true;
-        }
+        };
         // `localizedCaseInsensitiveContains` is locale aware in Foundation; the
         // portable Rust path performs the same case-folded substring search.
         let haystack = format!(
@@ -163,7 +163,7 @@ impl LogQuery {
             record.location.function,
             record.process.run_id
         );
-        haystack.to_lowercase().contains(&self.text.to_lowercase())
+        haystack.to_lowercase().contains(&text.to_lowercase())
     }
 }
 

@@ -55,7 +55,7 @@ pub struct LogRuntime {
 impl LogRuntime {
     pub fn new(run_id: impl Into<String>) -> Arc<Self> {
         let configuration = LoggingConfiguration::new(|value| value.storage.enabled = false);
-        let mut sanitizer = RecordSanitizer::new(&configuration);
+        let sanitizer = RecordSanitizer::new(&configuration);
         let identity = Process {
             pid: i64::from(std::process::id()),
             name: sanitizer.text(&process_name(), 256),
@@ -110,6 +110,28 @@ impl LogRuntime {
 
     pub fn logger(self: &Arc<Self>, label: &str) -> UnifiedLogHandler {
         UnifiedLogHandler::new(label, self.clone())
+    }
+
+    /// Aggregated entry point kept for producers that already hold a location
+    /// and metadata. Delegates to the handler path so filtering, sanitizing and
+    /// subscriber delivery are identical.
+    pub fn log(
+        &self,
+        level: Level,
+        label: &str,
+        message: &str,
+        metadata: BTreeMap<String, LogValue>,
+        location: Location,
+    ) -> io::Result<Option<u64>> {
+        let handler = UnifiedLogHandler::new(
+            label,
+            self.clone_handle(),
+        );
+        let mut event = LogEvent::new(level, message).with_location(location);
+        if !metadata.is_empty() {
+            event = event.with_metadata(metadata);
+        }
+        Ok(handler.log_sequence(&event))
     }
 
     /// Installs configuration, opens the session file and replays the history
@@ -218,7 +240,12 @@ impl LogRuntime {
         Ok(())
     }
 
-    pub fn submit(&self, label: &str, event: &LogEvent, metadata: BTreeMap<String, LogValue>) {
+    pub fn submit(
+        &self,
+        label: &str,
+        event: &LogEvent,
+        metadata: BTreeMap<String, LogValue>,
+    ) -> Option<u64> {
         let configuration = self.configuration();
         let mut sanitizer = RecordSanitizer::new(&configuration);
         let message = sanitizer.text(&event.message, configuration.buffering.message_bytes);
@@ -231,6 +258,7 @@ impl LogRuntime {
         };
         let label = sanitizer.text(label, 256);
         let mut fallback = false;
+        let mut assigned = None;
         let schedule = {
             let mut capture = self.capture.lock().unwrap_or_else(|e| e.into_inner());
             capture.sequence = capture.sequence.wrapping_add(1);
@@ -253,11 +281,13 @@ impl LogRuntime {
                     // Preserve the newest high-severity event; its displaced
                     // predecessor is counted.
                     capture.pending.remove(0);
+                    assigned = Some(record.sequence);
                     capture.pending.push(record);
                     fallback = true;
                 }
                 false
             } else {
+                assigned = Some(record.sequence);
                 capture.pending.push(record);
                 if capture.scheduled {
                     false
@@ -280,6 +310,7 @@ impl LogRuntime {
         if event.level >= Level::Error && configuration.storage.flush_on_error {
             self.flush();
         }
+        assigned
     }
 
     fn drain(&self) {
@@ -309,7 +340,7 @@ impl LogRuntime {
             .into();
             let mut event = LogEvent::new(Level::Warning, "Log queue capacity exceeded");
             event.metadata = Some(metadata);
-            self.logger("com.cove.logging").log(&event);
+            self.clone_handle().logger("com.cove.logging").log(&event);
         }
         let pending = {
             let mut capture = self.capture.lock().unwrap_or_else(|e| e.into_inner());
@@ -378,7 +409,7 @@ impl LogRuntime {
             [("error".to_owned(), LogValue::from(error.to_string()))]
                 .into(),
         );
-        self.logger("com.cove.logging").log(&event);
+        self.clone_handle().logger("com.cove.logging").log(&event);
         crate::system::console_write(
             5,
             &format!(

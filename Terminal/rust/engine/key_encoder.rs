@@ -5,7 +5,6 @@
 //! encoder turns it into the bytes the terminal's live modes call for
 //! (application cursor keys, keypad mode, Kitty keyboard flags, ...).
 
-use crate::engine::TerminalEngine;
 use crate::engine::ffi::{self, GhosttyKeyEncoder, GhosttyKeyEvent};
 use std::ptr;
 
@@ -150,13 +149,13 @@ fn ghostty_key(scancode: u32) -> Option<i32> {
 }
 
 /// Wraps a Ghostty key encoder so the bytes follow the terminal's live modes.
-pub(super) struct KeyEncoder {
+pub(crate) struct KeyEncoder {
     encoder: GhosttyKeyEncoder,
     event: GhosttyKeyEvent,
 }
 
 impl KeyEncoder {
-    pub(super) fn new() -> Self {
+    pub(crate) fn new() -> Self {
         // SAFETY: both allocations are owned by this value and freed in `Drop`.
         unsafe {
             let mut encoder: GhosttyKeyEncoder = ptr::null_mut();
@@ -167,14 +166,14 @@ impl KeyEncoder {
         }
     }
 
-    pub(super) fn encode(&self, key: &TerminalKey, terminal: ffi::GhosttyTerminal) -> Vec<u8> {
+    pub(crate) fn encode(&self, key: &TerminalKey, terminal: ffi::GhosttyTerminal) -> Vec<u8> {
         if self.encoder.is_null() || self.event.is_null() {
             return Vec::new();
         }
         let Some(code) = ghostty_key(key.scancode) else {
             return Vec::new();
         };
-        let mut text = key.text.as_bytes().to_vec();
+        let text = key.text.as_bytes().to_vec();
         // SAFETY: the encoder and event are live; `text` outlives the call and
         // the event's borrowed pointer is cleared before `text` is dropped.
         unsafe {
@@ -233,12 +232,5 @@ impl Drop for KeyEncoder {
                 ffi::ghostty_key_encoder_free(self.encoder);
             }
         }
-    }
-}
-
-impl TerminalEngine {
-    /// Bytes for a key press in the terminal's current keyboard modes.
-    pub fn encode_key(&self, key: &TerminalKey) -> Vec<u8> {
-        self.keys.encode(key, self.terminal)
     }
 }

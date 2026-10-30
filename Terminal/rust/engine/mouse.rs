@@ -79,13 +79,13 @@ impl TerminalMouseEvent {
 }
 
 /// Wraps Ghostty's mouse encoder.
-pub(super) struct MouseEncoder {
+pub(crate) struct MouseEncoder {
     encoder: GhosttyMouseEncoder,
     event: GhosttyMouseEvent,
 }
 
 impl MouseEncoder {
-    pub(super) fn new() -> Self {
+    pub(crate) fn new() -> Self {
         // SAFETY: both allocations are owned by this value and freed in `Drop`.
         unsafe {
             let mut encoder: GhosttyMouseEncoder = ptr::null_mut();
@@ -96,7 +96,7 @@ impl MouseEncoder {
         }
     }
 
-    pub(super) fn encode(
+    pub(crate) fn encode(
         &self,
         mouse: &TerminalMouseEvent,
         terminal: ffi::GhosttyTerminal,

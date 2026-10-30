@@ -8,7 +8,7 @@ use super::configuration::{Installation, LoggingConfiguration};
 use super::environment::LogLaunch;
 use super::handler::{LogEvent, UnifiedLogHandler};
 use super::observation::LogObservation;
-use super::record::{Level, Location, LogQuery, LogRecord, LogSnapshot, LogValue};
+use super::record::{Level, LogQuery, LogRecord, LogSnapshot, LogValue};
 use super::runtime::{register_runtime, LogRuntime, LoggingStatus};
 use std::collections::BTreeMap;
 use std::ffi::{c_char, CStr};

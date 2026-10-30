@@ -41,7 +41,8 @@ use cove_imaging::ImageAssetRegistryHolder;
 use cove_logging::{Level, LogEvent, LogSystem};
 use cove_platform::{InputEvent, WindowId};
 use cove_runtime::{
-    NativeAccessibility, PlatformFrameRateMode, PlatformWindowSession, Sdl3PlatformHost,
+    NativeAccessibility, PlatformFrameRateMode, PlatformHost, PlatformWindowSession,
+    Sdl3PlatformHost,
 };
 use cove_shell::{NativeRenderSurface, WindowChromeHitTest, WindowOptions, WindowTitleBarStyle};
 use cove_text::{TextBootstrapOptions, TextEnvironment, TextEnvironmentHolder};
@@ -83,10 +84,6 @@ fn fps_log_enabled() -> bool {
 
 fn force_continuous_frame_drive() -> bool {
     environment_flag("COVEUI_FORCE_CONTINUOUS_FRAMES").as_deref() == Some("1")
-}
-
-fn title_bar_style(style: AppWindowTitleBarStyle) -> WindowTitleBarStyle {
-    style.platform_style()
 }
 
 /// Mutable host state. Held behind an `Rc` so the shell callbacks can reach it.
@@ -164,7 +161,7 @@ impl Application {
         let options = WindowOptions {
             width: if previews_phone() { 390 } else { config.window.width.max(1) },
             height: if previews_phone() { 844 } else { config.window.height.max(1) },
-            title_bar_style: title_bar_style(config.window.title_bar_style),
+            title_bar_style: config.window.title_bar_style.platform_style(),
             shows_dock_icon: config.window.shows_dock_icon,
         };
         let host = Sdl3PlatformHost::new(config.window.title.clone(), options);
@@ -338,7 +335,10 @@ impl Application {
                 let host = host.clone();
                 move |mode: PlatformFrameRateMode| host.set_frame_rate_mode(mode)
             })),
-            set_runtime_vsync_enabled: None,
+            set_runtime_vsync_enabled: Some(Rc::new({
+                let application = Application { state: state.clone() };
+                move |enabled: bool| application.set_vsync_enabled(enabled)
+            })),
             current_runtime_display_refresh_rate: Some(Rc::new({
                 let host = host.clone();
                 move || host.current_display_refresh_rate(None)
@@ -460,9 +460,12 @@ impl Application {
             })),
             set_close_interceptor: Some(Rc::new({
                 let host = host.clone();
-                move |handler: Option<Rc<dyn Fn(Option<WindowId>) -> bool>>| match handler {
-                    Some(handler) => host.set_window_close_interceptor(Some(handler)),
-                    None => host.set_window_close_interceptor(None),
+                move |handler: Option<Rc<dyn Fn(Option<WindowId>) -> bool>>| {
+                    // The close interceptor is a run-loop callback slot rather than
+                    // a shell method: the host consults it before destroying a
+                    // window the OS asked to close.
+                    let callbacks = host.callbacks();
+                    *callbacks.window_close_interceptor.borrow_mut() = handler;
                 }
             })),
             quit: Some(Rc::new({
@@ -496,11 +499,14 @@ impl Application {
                     );
                 }
             })),
-            set_runtime_vsync_enabled: Some(Rc::new({
+            memory_query: Some(Rc::new({
                 let application = Application { state: state.clone() };
-                move |enabled: bool| application.set_vsync_enabled(enabled)
+                move || Some(application.diagnostic_memory_snapshot().counters)
             })),
-            ..DisplayBindings::default()
+            trim_memory: Some(Rc::new({
+                let application = Application { state: state.clone() };
+                move || application.trim_memory()
+            })),
         };
         display_handle.install(bindings);
     }
@@ -512,7 +518,7 @@ impl Application {
 
         {
             let state = state.clone();
-            *callbacks.callbacks().on_init.borrow_mut() = Some(Rc::new(
+            *callbacks.on_init.borrow_mut() = Some(Rc::new(
                 move |native: NativeRenderSurface, width: u32, height: u32| {
                     let application = Application { state: state.clone() };
                     if let Err(error) =
@@ -525,7 +531,7 @@ impl Application {
         }
         {
             let state = state.clone();
-            *callbacks.callbacks().on_resize.borrow_mut() =
+            *callbacks.on_resize.borrow_mut() =
                 Some(Rc::new(move |width: u32, height: u32| {
                     let application = Application { state: state.clone() };
                     if let Err(error) = application.handle_resize(width, height) {
@@ -536,7 +542,7 @@ impl Application {
         {
             let state = state.clone();
             let weak: Weak<ApplicationState> = Rc::downgrade(&state);
-            *callbacks.callbacks().on_before_commit.borrow_mut() =
+            *callbacks.on_before_commit.borrow_mut() =
                 Some(Rc::new(move |delta_time: f64| {
                     if let Some(state) = weak.upgrade() {
                         Application { state }.handle_frame_preparation(delta_time);
@@ -546,7 +552,7 @@ impl Application {
         {
             let state = state.clone();
             let weak: Weak<ApplicationState> = Rc::downgrade(&state);
-            *callbacks.callbacks().on_frame.borrow_mut() =
+            *callbacks.on_frame.borrow_mut() =
                 Some(Rc::new(move |_native: NativeRenderSurface| -> bool {
                     match weak.upgrade() {
                         Some(state) => Application { state }.handle_frame(),
@@ -556,21 +562,21 @@ impl Application {
         }
         {
             let state = state.clone();
-            *callbacks.callbacks().on_window_teardown.borrow_mut() =
+            *callbacks.on_window_teardown.borrow_mut() =
                 Some(Rc::new(move |window_id: WindowId| {
                     Application { state: state.clone() }.release_gpu_surface(window_id);
                 }));
         }
         {
             let state = state.clone();
-            *callbacks.callbacks().on_window_presentation_changed.borrow_mut() =
+            *callbacks.on_window_presentation_changed.borrow_mut() =
                 Some(Rc::new(move |window_id: WindowId, active: bool| {
                     Application { state: state.clone() }.handle_presentation_changed(window_id, active);
                 }));
         }
         {
             let state = state.clone();
-            *callbacks.callbacks().on_teardown.borrow_mut() = Some(Rc::new(move || {
+            *callbacks.on_teardown.borrow_mut() = Some(Rc::new(move || {
                 let application = Application { state: state.clone() };
                 application.release_all_gpu_surfaces();
                 application.diagnostics.borrow_mut().stop();
@@ -721,19 +727,18 @@ impl Application {
                 let environment = state.environment.clone();
                 let portal_store = composition.portal_store.clone();
                 let scaler = state.config.typography.scaler.clone();
+                let logical = {
+                    let main = state.main_window.borrow();
+                    (main.logical_w as f32, main.logical_h as f32)
+                };
                 chrome::with_window_chrome_context(window_id, || {
                     use cove_composition::ViewExt;
                     use cove_ui_compose::theme::tokens::TextScalerViewExt;
                     let content = AdaptiveApplicationContent::new(root_view, environment)
                         .text_scaler(scaler)
                         .composition_local(PortalStoreEnvironment::key(), Some(portal_store));
-                    composition.install_view(AnyView::new(content), 0.0, 0.0);
+                    composition.install_view(AnyView::new(content), logical.0, logical.1);
                 });
-                let logical = {
-                    let main = state.main_window.borrow();
-                    (main.logical_w as f32, main.logical_h as f32)
-                };
-                composition.compute_layout(logical.0, logical.1);
                 self.sync_main_window_chrome_hit_test();
                 state.main_window.borrow_mut().did_install_root = true;
             }
@@ -1024,7 +1029,7 @@ impl Application {
     pub fn diagnostic_memory_snapshot(&self) -> crate::desktop::diagnostics::DiagnosticMemorySnapshot {
         let value = self.memory_snapshot();
         let state = &self.state;
-        let mut counters = BTreeMap::from([
+        let counters = BTreeMap::from([
             ("shapingEntries".to_owned(), value.shaping.as_ref().map_or(0, |cache| cache.entries as u64)),
             ("shapingBytes".to_owned(), value.shaping.as_ref().map_or(0, |cache| cache.estimated_bytes as u64)),
             ("layoutEntries".to_owned(), value.text_layout.as_ref().map_or(0, |cache| cache.entries as u64)),
@@ -1036,12 +1041,16 @@ impl Application {
                 state.composition.graph.skipped_parent_updates() as u64,
             ),
         ]);
-        counters.retain(|_, count| *count != 0 || true);
-        let windows = value
-            .windows
-            .into_iter()
-            .map(|(id, window)| (format!("{:?}", id), window.counters()))
-            .collect();
+        // `DiagnosticMemorySnapshot.windows` is a flat map, so each window's
+        // counters are keyed `<window>.<counter>` to keep every value while
+        // matching the shared shape.
+        let mut windows = BTreeMap::new();
+        for (id, window) in value.windows {
+            let prefix = format!("{id:?}");
+            for (name, count) in window.counters() {
+                windows.insert(format!("{prefix}.{name}"), count);
+            }
+        }
         crate::desktop::diagnostics::DiagnosticMemorySnapshot { counters, windows }
     }
 
@@ -1099,7 +1108,7 @@ impl Application {
         let options = WindowOptions {
             width: request.width,
             height: request.height,
-            title_bar_style: title_bar_type(state.config.window.title_bar_style),
+            title_bar_style: state.config.window.title_bar_style.platform_style(),
             shows_dock_icon: state.config.window.shows_dock_icon,
         };
         let session = match state.host.open_window(
@@ -1256,8 +1265,4 @@ impl Application {
             .borrow_mut()
             .retain(|id, _| live.contains(id));
     }
-}
-
-fn title_bar_type(style: AppWindowTitleBarStyle) -> WindowTitleBarStyle {
-    style.platform_style()
 }

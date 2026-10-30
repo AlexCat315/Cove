@@ -1,3 +1,9 @@
+//! Aggregated process surface: command resolution, bounded session, and the
+//! event vocabulary shared with `event_buffer`.
+pub use crate::event_buffer::{
+    Failure, ProcessEventBuffer, ProcessEventBufferError, ProcessEventSize, ProcessFailure,
+};
+
 use crate::native;
 use std::{
     collections::BTreeMap,

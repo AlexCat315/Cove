@@ -292,7 +292,7 @@ impl PrimitiveView for AlertHost {
         if self.snapshot.has_actions
             && let Some(actions) = self.snapshot.actions.clone()
         {
-            let group = crate::LayoutContainer::with_erased_content(
+            let group = crate::LayoutContainer::<ActionGroupLayout, AnyView>::with_erased_content(
                 ActionGroupLayout {
                     stacks: false,
                     alignment: crate::HorizontalAlignment::Leading,

@@ -36,42 +36,55 @@ impl GhosttyString {
     }
 }
 
+#[repr(C)]
 pub struct TerminalImpl {
     _private: [u8; 0],
 }
+#[repr(C)]
 pub struct RenderStateImpl {
     _private: [u8; 0],
 }
+#[repr(C)]
 pub struct RowIteratorImpl {
     _private: [u8; 0],
 }
+#[repr(C)]
 pub struct RowCellsImpl {
     _private: [u8; 0],
 }
+#[repr(C)]
 pub struct KittyGraphicsImpl {
     _private: [u8; 0],
 }
+#[repr(C)]
 pub struct KittyGraphicsImageImpl {
     _private: [u8; 0],
 }
+#[repr(C)]
 pub struct KittyGraphicsPlacementIteratorImpl {
     _private: [u8; 0],
 }
+#[repr(C)]
 pub struct KeyEncoderImpl {
     _private: [u8; 0],
 }
+#[repr(C)]
 pub struct KeyEventImpl {
     _private: [u8; 0],
 }
+#[repr(C)]
 pub struct MouseEncoderImpl {
     _private: [u8; 0],
 }
+#[repr(C)]
 pub struct MouseEventImpl {
     _private: [u8; 0],
 }
+#[repr(C)]
 pub struct SelectionGestureImpl {
     _private: [u8; 0],
 }
+#[repr(C)]
 pub struct SelectionGestureEventImpl {
     _private: [u8; 0],
 }
@@ -913,7 +926,7 @@ pub fn sized_placement_render_info() -> GhosttyKittyGraphicsPlacementRenderInfo 
     value
 }
 
-fn size_of_val<T>(value: &T) -> usize {
+fn size_of_val<T>(_value: &T) -> usize {
     std::mem::size_of::<T>()
 }
 

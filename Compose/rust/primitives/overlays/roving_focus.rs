@@ -199,7 +199,7 @@ impl<Id: PartialEq + Clone + 'static> PrimitiveView for RovingFocusHost<Id> {
                 return;
             }
             if let Some(chain) = FocusChainHolder::current() {
-                chain.focus(Some(item.clone()), state.visible);
+                chain.focus(Some(&item), state.visible);
             }
             crate::primitives::layout::ScrollReveal::reveal(&item, false);
             request.borrow_mut().target = None;
@@ -263,7 +263,7 @@ impl<Id: PartialEq + Clone + 'static> PrimitiveView for RovingFocusHost<Id> {
                 && item.accepts_subtree_input()
                 && let Some(chain) = FocusChainHolder::current()
             {
-                chain.focus(Some(item.clone()), true);
+                chain.focus(Some(&item), true);
                 crate::primitives::layout::ScrollReveal::reveal(&item, false);
                 request.borrow_mut().target = None;
             }

@@ -6,7 +6,7 @@
 //! high id byte.
 
 use crate::engine::TerminalEngine;
-use crate::engine::frame::TerminalImagePlacement;
+use crate::engine::images::TerminalImagePlacement;
 use crate::engine::placeholder_diacritics::PLACEHOLDER_DIACRITICS;
 
 /// U+10EEEE, the placeholder base codepoint.
@@ -131,7 +131,7 @@ impl PlaceholderRun {
         let grid_width = (columns * cell.0) as f64;
         let grid_height = (rows * cell.1) as f64;
 
-        let (scale, mut offset_x, mut offset_y);
+        let (scale, mut offset_x, offset_y);
         if image_width * grid_height > image_height * grid_width {
             scale = grid_width / image_width;
             offset_x = 0.0;
@@ -217,7 +217,7 @@ impl PlaceholderRun {
 
 impl TerminalEngine {
     /// Image strips drawn by placeholder cells in the captured frame.
-    pub(super) fn placeholder_placements(&self, cells: &[PlaceholderCell]) -> Vec<TerminalImagePlacement> {
+    pub(crate) fn placeholder_placements(&self, cells: &[PlaceholderCell]) -> Vec<TerminalImagePlacement> {
         if cells.is_empty() {
             return Vec::new();
         }

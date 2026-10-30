@@ -240,12 +240,10 @@ impl<T: Clone + 'static> View for LazyGridView<T> {
         let mut scroll = crate::ScrollView::new(axis, AnyView::new(content))
             .scrollbar_gutter(crate::ScrollbarGutter::Stable);
         if let Some(offset) = &self.scroll_offset {
-            let state = offset.clone();
-            let reader = state.clone();
-            scroll = scroll.scroll_offset(cove_core::Binding::new(
-                move || reader.get(),
-                move |value| state.set(value),
-            ));
+            // `State` is `Arc`-backed and thread-safe; the surrounding `Rc`
+            // handle is UI-thread-only, so clone the `State` out of it rather
+            // than capturing the `Rc` in the binding.
+            scroll = scroll.scroll_offset((**offset).binding());
         }
         let visible_rows = self.visible_rows.clone();
         let visible_columns = self.visible_columns.clone();

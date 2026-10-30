@@ -30,7 +30,11 @@ fn no_payload(request: &Envelope) -> bool {
         .as_ref()
         .is_none_or(|p| p.is_null() || p.as_object().is_some_and(|p| p.is_empty()))
 }
-fn state(payload: &Option<JsonValue>) -> Option<BTreeMap<String, String>> {
+/// Read a flat string map out of an envelope payload. Returns `None` when the
+/// payload is absent, is not an object, or holds any non-string value — the same
+/// strictness as Swift's `compactMapValues(\\.stringValue)` preceded by an
+/// all-values check.
+pub fn state(payload: &Option<JsonValue>) -> Option<BTreeMap<String, String>> {
     let object = payload.as_ref()?.as_object()?;
     object
         .iter()

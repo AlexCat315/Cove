@@ -24,8 +24,39 @@ pub enum ProcessFailure {
 
 pub type Failure = Arc<ProcessFailure>;
 
-struct State {
-    events: VecDeque<ProcessEvent>,
+impl ProcessFailure {
+    /// Shares one failure between the buffer and every reader it wakes.
+    pub fn shared(self) -> Failure {
+        Arc::new(self)
+    }
+}
+
+/// Bytes an event is charged against the buffer budget. Terminal events cost
+/// nothing, so a full buffer still accepts the exit notice.
+pub trait ProcessEventSize {
+    fn size(&self) -> usize;
+}
+
+impl ProcessEventSize for ProcessEvent {
+    fn size(&self) -> usize {
+        match self {
+            Self::Stdout(data) | Self::Stderr(data) => data.len(),
+            Self::Exited(_) | Self::StdoutClosed | Self::StderrClosed => 0,
+        }
+    }
+}
+
+impl ProcessEventSize for crate::process::ProcessEvent {
+    fn size(&self) -> usize {
+        match self {
+            Self::Stdout(data) | Self::Stderr(data) => data.len(),
+            Self::Exit { .. } => 0,
+        }
+    }
+}
+
+struct State<E> {
+    events: VecDeque<E>,
     bytes: usize,
     waiting: bool,
     completion: Option<Result<(), Failure>>,
@@ -33,13 +64,13 @@ struct State {
 
 /// Bounded, single-consumer queue whose reader threads and deadline signal the
 /// same condition.
-pub struct ProcessEventBuffer {
+pub struct ProcessEventBuffer<E = ProcessEvent> {
     maximum_bytes: usize,
-    state: Mutex<State>,
+    state: Mutex<State<E>>,
     signal: Condvar,
 }
 
-impl ProcessEventBuffer {
+impl<E> ProcessEventBuffer<E> {
     pub fn new(maximum_bytes: usize) -> Self {
         Self {
             maximum_bytes,
@@ -52,10 +83,12 @@ impl ProcessEventBuffer {
             signal: Condvar::new(),
         }
     }
+}
 
+impl<E: ProcessEventSize> ProcessEventBuffer<E> {
     /// Returns `false` when the event does not fit; the caller reports the
     /// output limit. Events after completion are accepted and discarded.
-    pub fn append(&self, event: ProcessEvent) -> bool {
+    pub fn append(&self, event: E) -> bool {
         let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
         if state.completion.is_some() {
             return true;
@@ -86,13 +119,13 @@ impl ProcessEventBuffer {
         self.signal.notify_all();
     }
 
-    pub fn next(&self) -> Result<Option<ProcessEvent>, Failure> {
+    pub fn next(&self) -> Result<Option<E>, Failure> {
         self.next_until(None)
     }
 
     /// Waits for one available event, the completion result or the deadline.
     /// Only one consumer may wait at a time.
-    pub fn next_until(&self, deadline: Option<Instant>) -> Result<Option<ProcessEvent>, Failure> {
+    pub fn next_until(&self, deadline: Option<Instant>) -> Result<Option<E>, Failure> {
         let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
         if state.waiting {
             return Err(Arc::new(ProcessEventBufferError::MultipleConsumers.into()));
@@ -131,7 +164,7 @@ impl ProcessEventBuffer {
     pub fn next_synchronously(
         &self,
         deadline: Option<Instant>,
-    ) -> Result<Option<ProcessEvent>, Failure> {
+    ) -> Result<Option<E>, Failure> {
         self.next_until(deadline)
     }
 }

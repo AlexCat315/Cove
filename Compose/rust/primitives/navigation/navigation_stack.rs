@@ -77,7 +77,7 @@ fn now() -> f64 {
 }
 
 /// Session-owned page stack.
-pub struct NavigationStack<Route: Hash + Clone + 'static> {
+pub struct NavigationStack<Route: Hash + Clone + PartialEq + Send + Sync + 'static> {
     pub path: Binding<Vec<Route>>,
     /// Horizontal travel of the page transition in logical points.
     pub transition_distance: f32,
@@ -97,7 +97,7 @@ pub struct NavigationPages {
     pub forward: bool,
 }
 
-impl<Route: Hash + Clone + 'static> NavigationStack<Route> {
+impl<Route: Hash + Clone + PartialEq + Send + Sync + 'static> NavigationStack<Route> {
     pub fn new(
         path: Binding<Vec<Route>>,
         root: impl Fn() -> AnyView + 'static,
@@ -164,7 +164,7 @@ impl<Route: Hash + Clone + 'static> NavigationStack<Route> {
             AnyView::new(NavigationPageFocusHost { is_top, content }),
         )
         .retaining_content(true);
-        AnyView::new(page).offset(shift * sign)
+        AnyView::new(crate::animation::geometry::offset(page, shift * sign, 0.0))
     }
 
     fn page_content(&self, route: Option<Route>, theme: &Theme, width: f32, height: f32) -> AnyView {
@@ -186,10 +186,9 @@ impl<Route: Hash + Clone + 'static> NavigationStack<Route> {
         )
     }
 
-    fn stack(&self, view: &NavigationStackHost<Route>, theme: &Theme, sign: f32) -> AnyView {
+    fn stack_pages(&self, sign: f32, width: f32, height: f32, theme: &Theme) -> AnyView {
         let routes = self.path.get();
         let forward = routes.len() >= self.last_count.get();
-        let width = view.width;
         let mut pages: Vec<AnyView> = Vec::new();
         pages.push(AnyView::new(NavigationPathWatcher {
             count: routes.len(),
@@ -198,7 +197,7 @@ impl<Route: Hash + Clone + 'static> NavigationStack<Route> {
                 move |count, animates| state.observe(count, animates)
             }),
         }));
-        pages.push(self.page(None, 0, routes.len(), sign, forward, theme, width, view.height));
+        pages.push(self.page(None, 0, routes.len(), sign, forward, theme, width, height));
         for (offset, route) in routes.iter().enumerate() {
             pages.push(self.page(
                 Some(route.clone()),
@@ -208,7 +207,7 @@ impl<Route: Hash + Clone + 'static> NavigationStack<Route> {
                 forward,
                 theme,
                 width,
-                view.height,
+                height,
             ));
         }
         AnyView::new(
@@ -220,6 +219,8 @@ impl<Route: Hash + Clone + 'static> NavigationStack<Route> {
                     crate::Alignment::TopLeading,
                     AnyView::new(crate::TupleView::new(pages)),
                 )),
+                on_change: None,
+                on_end: None,
             }
             .with_callbacks(
                 Rc::new({
@@ -253,7 +254,7 @@ impl<Route: Hash + Clone + 'static> NavigationStack<Route> {
     }
 }
 
-struct NavigationState<Route: Hash + Clone + 'static> {
+struct NavigationState<Route: Hash + Clone + PartialEq + Send + Sync + 'static> {
     path: Binding<Vec<Route>>,
     last_count: crate::State<usize>,
     last_routes: crate::State<Vec<Route>>,
@@ -263,7 +264,7 @@ struct NavigationState<Route: Hash + Clone + 'static> {
     width: f32,
 }
 
-impl<Route: Hash + Clone + 'static> NavigationState<Route> {
+impl<Route: Hash + Clone + PartialEq + Send + Sync + 'static> NavigationState<Route> {
     fn observe(&self, count: usize, animates: bool) {
         if count == self.last_count.get() {
             return;
@@ -298,26 +299,27 @@ impl<Route: Hash + Clone + 'static> NavigationState<Route> {
 }
 
 /// Size and direction context resolved by the navigation host.
-pub struct NavigationStackHost<Route: Hash + Clone + 'static> {
+pub struct NavigationStackHost<Route: Hash + Clone + PartialEq + Send + Sync + 'static> {
     pub stack: Rc<NavigationStack<Route>>,
     pub width: f32,
     pub height: f32,
     pub direction: Direction,
 }
 
-impl<Route: Hash + Clone + 'static> View for NavigationStackHost<Route> {
+impl<Route: Hash + Clone + PartialEq + Send + Sync + 'static> View for NavigationStackHost<Route> {
     fn body(&self) -> AnyView {
         let width = self.width;
         let height = self.height;
         let sign = if self.direction == Direction::Rtl { -1.0 } else { 1.0 };
-        AnyView::new(ThemeReader::new(move |theme: &Theme| {
-            self.stack.stack(self, theme, sign)
-        }))
-        .frame_size(width, height)
+        let stack = self.stack.clone();
+        let inner = AnyView::new(ThemeReader::new(move |theme: &Theme| {
+            stack.stack_pages(sign, width, height, theme)
+        }));
+        AnyView::new(inner.frame_size(width, height))
     }
 }
 
-impl<Route: Hash + Clone + 'static> View for NavigationStack<Route> {
+impl<Route: Hash + Clone + PartialEq + Send + Sync + 'static> View for NavigationStack<Route> {
     fn body(&self) -> AnyView {
         let stack = Rc::new(self.snapshot());
         let width_cell = Rc::new(Cell::new(0.0_f32));
@@ -341,7 +343,7 @@ impl<Route: Hash + Clone + 'static> View for NavigationStack<Route> {
     }
 }
 
-impl<Route: Hash + Clone + 'static> NavigationStack<Route> {
+impl<Route: Hash + Clone + PartialEq + Send + Sync + 'static> NavigationStack<Route> {
     fn snapshot(&self) -> NavigationStack<Route> {
         NavigationStack {
             path: self.path.clone(),
@@ -598,7 +600,7 @@ impl PrimitiveView for NavigationPageFocusHost {
             let Some(title) = find_title(owner) else { return };
             let Some(chain) = FocusChainHolder::current() else { return };
             owner.set_attachment(PAGE_TITLE_FOCUSED, true);
-            chain.focus(Some(title), false);
+            chain.focus(Some(&title), false);
             let _ = &weak;
         }) as cove_core::scene::LayoutUpdateHook));
     }

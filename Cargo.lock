@@ -216,7 +216,6 @@ dependencies = [
  "cove-logging",
  "cove-platform",
  "cove-system",
- "cove-ui-compose",
  "serde",
  "serde_json",
  "thiserror",
@@ -307,6 +306,7 @@ dependencies = [
 name = "cove-logging"
 version = "0.3.0-dev"
 dependencies = [
+ "cc",
  "cove-system",
  "serde",
  "serde_json",

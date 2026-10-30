@@ -33,13 +33,13 @@ impl ProcessRunner {
                         > budget.output_bytes
                     {
                         session.cancel();
-                        return Err(ProcessError::OutputLimit.into());
+                        return Err(ProcessFailure::Process(ProcessError::OutputLimit));
                     }
                 }
                 Ok(None) => return Ok(result),
                 Err(error) => {
                     session.cancel();
-                    return Err(error);
+                    return Err(shared_failure(error));
                 }
             }
         }
@@ -84,15 +84,26 @@ impl ProcessRunner {
                 Ok(event) => event,
                 Err(error) => {
                     session.cancel();
-                    return Err(error);
+                    return Err(shared_failure(error));
                 }
             };
             result.append(&event);
             if result.stdout.len().saturating_add(result.stderr.len()) > budget.output_bytes {
                 session.cancel();
-                return Err(ProcessError::OutputLimit.into());
+                return Err(ProcessFailure::Process(ProcessError::OutputLimit));
             }
         }
         Ok(result)
+    }
+}
+
+/// The event buffer shares one failure between consumers through an `Arc`; the
+/// runner reports an owned copy so callers get a plain `ProcessFailure`.
+fn shared_failure(failure: std::sync::Arc<ProcessFailure>) -> ProcessFailure {
+    match failure.as_ref() {
+        ProcessFailure::Process(error) => ProcessFailure::Process(error.clone()),
+        ProcessFailure::Io(error) => ProcessFailure::Io(std::io::Error::new(error.kind(), error.to_string())),
+        ProcessFailure::Cancelled => ProcessFailure::Cancelled,
+        ProcessFailure::Buffer(error) => ProcessFailure::Buffer(*error),
     }
 }

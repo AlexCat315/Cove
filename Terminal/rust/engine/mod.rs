@@ -5,10 +5,9 @@
 //! `feed`, so they can reach the engine through the userdata pointer cached in
 //! `TerminalEngine::from_userdata`.
 
-use crate::engine::ffi::{self, GhosttyTerminal};
-use crate::engine::frame::{TerminalFrame, TerminalRGB};
+use crate::engine::ffi::GhosttyTerminal;
 use crate::engine::frame_reader::{FrameScratch, RenderState};
-use crate::engine::key_encoder::{KeyEncoder, TerminalKey};
+use crate::engine::key_encoder::KeyEncoder;
 use crate::engine::mouse::MouseEncoder;
 use crate::engine::selection::SelectionGesture;
 use std::{cell::Cell, ptr, rc::Rc};
@@ -24,10 +23,10 @@ mod placeholder_diacritics;
 mod placeholders;
 mod selection;
 
-pub use frame::{CellWidth, CursorShape, TerminalCell, TerminalCellAttributes, TerminalCursor};
+pub use frame::{CellWidth, CursorShape, TerminalCell, TerminalCellAttributes, TerminalCursor, TerminalFrame, TerminalRGB};
 pub use frame::TerminalScrollPosition;
 pub use images::TerminalImagePlacement;
-pub use key_encoder::{KeyModifiers, TerminalKey as Key};
+pub use key_encoder::{KeyModifiers, TerminalKey};
 pub use mouse::{MouseAction, MouseButton, TerminalMouseEvent};
 pub use placeholders::{PlaceholderCell, PlaceholderRun, PLACEHOLDER_CODEPOINT};
 pub use selection::{SelectionPhase, TerminalPointer};
@@ -43,14 +42,14 @@ pub type TitleHandler = Rc<dyn Fn(&str)>;
 /// `&mut self` where it mutates terminal state, and the Ghostty handles it owns
 /// are neither `Send` nor `Sync`.
 pub struct TerminalEngine {
-    pub(super) terminal: GhosttyTerminal,
-    pub(super) render: RenderState,
-    pub(super) scratch: FrameScratch,
-    pub(super) keys: KeyEncoder,
-    pub(super) mouse: MouseEncoder,
-    pub(super) selection: SelectionGesture,
-    pub(super) columns: usize,
-    pub(super) rows: usize,
+    pub(crate) terminal: GhosttyTerminal,
+    pub(crate) render: RenderState,
+    pub(crate) scratch: FrameScratch,
+    pub(crate) keys: KeyEncoder,
+    pub(crate) mouse: MouseEncoder,
+    pub(crate) selection: SelectionGesture,
+    pub(crate) columns: usize,
+    pub(crate) rows: usize,
     cell: (usize, usize),
     on_reply: Cell<Option<ReplyHandler>>,
     on_bell: Cell<Option<BellHandler>>,
@@ -214,6 +213,23 @@ impl TerminalEngine {
         }
     }
 
+    // MARK: Callbacks
+
+    /// Replacement for the bytes the terminal answers on its own (DSR, DA, mode
+    /// reports). The handler runs synchronously inside `feed`.
+    pub fn set_reply_handler(&mut self, handler: ReplyHandler) {
+        self.on_reply.set(Some(handler));
+    }
+
+    pub fn set_bell_handler(&mut self, handler: BellHandler) {
+        self.on_bell.set(Some(handler));
+    }
+
+    /// Reports the new title after the program sets one.
+    pub fn set_title_handler(&mut self, handler: TitleHandler) {
+        self.on_title_change.set(Some(handler));
+    }
+
     pub fn cell_size(&self) -> (usize, usize) {
         self.cell
     }
@@ -255,7 +271,7 @@ impl TerminalEngine {
 
     // MARK: Private
 
-    pub(super) fn is_mode_set(&self, number: u16, ansi: bool) -> bool {
+    pub(crate) fn is_mode_set(&self, number: u16, ansi: bool) -> bool {
         let mut config = ffi::GhosttyTerminalModeConfig { mode: ffi::ghostty_mode_new(number, ansi), value: false };
         // SAFETY: the terminal is live and `config` is the documented type.
         let result = unsafe {
@@ -268,7 +284,7 @@ impl TerminalEngine {
     /// memory transmission stay disabled: only inline data is accepted.
     fn enable_images(&self) {
         install_png_decoder();
-        let mut limit: u64 = 256 * 1024 * 1024;
+        let limit: u64 = 256 * 1024 * 1024;
         // SAFETY: the terminal is live and `limit` is a `uint64_t` as documented.
         unsafe {
             ffi::ghostty_terminal_set(

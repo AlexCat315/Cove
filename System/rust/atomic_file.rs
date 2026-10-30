@@ -1,6 +1,7 @@
 //! Translation of `System/Sources/CoveFileSystem/AtomicFile.swift`.
 use super::permissions::FilePermissions;
 use super::replacement::FileReplacement;
+use crate::files::Access;
 use std::fs::{self, OpenOptions};
 use std::io::{self, Write};
 use std::path::Path;
@@ -8,13 +9,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub enum AtomicFile {}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum Access {
-    #[default]
-    Standard,
-    OwnerOnly,
-}
 
 impl AtomicFile {
     /// Writes a sibling staging file and publishes it with one replacement

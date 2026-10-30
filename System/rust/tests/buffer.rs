@@ -40,7 +40,7 @@ fn fragmented_output_uses_byte_budget() {
 
 #[test]
 fn finish_releases_an_idle_reader() {
-    let buffer = ProcessEventBuffer::new(128);
+    let buffer: ProcessEventBuffer = ProcessEventBuffer::new(128);
     buffer.finish();
     assert!(
         matches!(buffer.next(), Ok(None)),

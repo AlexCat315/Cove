@@ -12,5 +12,10 @@ pub use rhi::*;
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 pub mod metal;
 
+/// The Vulkan backend reaches the driver through a runtime-loaded loader, so it
+/// is compiled on every host: only its registration is limited to the platforms
+/// that ship a Vulkan driver.
+pub mod vulkan;
+
 pub mod ui;
 pub use ui::*;

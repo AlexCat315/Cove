@@ -30,7 +30,7 @@ pub struct ProcessSession {
 }
 
 struct Core {
-    events: Arc<ProcessEventBuffer>,
+    events: Arc<ProcessEventBuffer<ProcessEvent>>,
     state: ProcessIOState,
     process: Arc<NativeProcess>,
     budget: ProcessBudget,
@@ -280,7 +280,7 @@ impl Drop for ProcessSession {
 
 /// Blocking replacement for the Swift `AsyncThrowingStream`.
 pub struct ProcessEventStream {
-    buffer: Arc<ProcessEventBuffer>,
+    buffer: Arc<ProcessEventBuffer<ProcessEvent>>,
 }
 
 impl Iterator for ProcessEventStream {

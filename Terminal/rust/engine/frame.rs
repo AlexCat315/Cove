@@ -3,6 +3,9 @@
 //! Captured on the UI thread after the engine has consumed output, then painted
 //! without touching the engine again.
 
+use crate::engine::images::TerminalImagePlacement;
+use crate::engine::placeholders::PlaceholderCell;
+
 /// 8-bit sRGB color as resolved by the VT engine.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct TerminalRGB {

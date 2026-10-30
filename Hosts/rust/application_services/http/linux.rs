@@ -9,7 +9,7 @@
 //! around it before attempting a load.
 
 use super::core::{self, TransportIoError, Url};
-use cove_ui_compose::primitives::media::image_data_download::{
+use cove_ui_compose::primitives::media::{
     AsyncImageError, DownloadProgress, ImageDownloadTransport,
 };
 use std::io::{Read, Write};

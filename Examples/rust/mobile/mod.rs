@@ -128,7 +128,8 @@ mod checks {
         assert_eq!(model.matches("   ").len(), 4, "whitespace is trimmed first");
         assert_eq!(model.matches("crystal").len(), 1);
         assert_eq!(model.matches("CRYSTAL").len(), 1);
-        assert_eq!(model.matches("r").len(), 4, "every name contains 'r'");
+        // "Crystal Rush", "Harbor Night" and "Launch Trailer" contain 'r'; "CoveUI" does not.
+        assert_eq!(model.matches("r").len(), 3);
         assert!(model.matches("nope").is_empty());
     }
 

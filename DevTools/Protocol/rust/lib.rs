@@ -209,3 +209,9 @@ payload!(DevToolsDiscovery {
     pid: u32,
     endpoint: String
 });
+
+/// Decode an envelope payload into a concrete type. Returns `None` for an
+/// absent or malformed payload, matching Swift's `decodePayload(_:from:)`.
+pub fn decode_payload<T: serde::de::DeserializeOwned>(payload: &Option<JsonValue>) -> Option<T> {
+    serde_json::from_value(payload.clone()?).ok()
+}
