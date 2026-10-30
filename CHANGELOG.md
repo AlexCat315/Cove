@@ -4,6 +4,30 @@
 
 ## Unreleased
 
+- 迁移盘点改为脚本生成，并与磁盘对齐：新增 `Tools/Cove/rust/migration_inventory.py`，遍历 Rust 树按同名模块与主类型定义重新推导每个 Swift 文件的目标路径与状态，同时重写 `Docs/rust-migration-files.json` 与 `Docs/rust-migration-files.md`。生产源码实际为 651 → 802 / 984 已写入，上一版"460 已写入 / 477 未开始"是人工维护造成的陈旧值。
+
+- 修复"写而未编译"缺陷（与编译错误同级）：System 16 个、Logging 15 个、Tools/Cove 8 个、Tools/Support 12 个、Compose 2 个 Rust 文件此前从未被 `mod` 声明；`Core/rust/tests/` 6 个与 `Graphics/rust/tests/` 7 个测试文件从未声明为 Cargo 测试目标，`cargo` 完全看不到它们。System 与 Logging 现按 Swift 包结构重挂模块，并删除重复的单体实现（Logging 511 行 `lib.rs`、System 合并版 process），关键对外 API 保持可用（`LogRuntime::log` 五参形式、`LogQuery.text: Option<String>`、`MetadataProvider` 改为 newtype、`Access::Inherit` 单一类型）。
+
+- 新增 `Logging/rust/build.rs` 编译 `Sources/CCoveLog/Router.c`，`LogSystem::bootstrap` 不再因 `cove_log_set_handler` 未定义而在链接期失败。
+
+- Graphics 三个原生后端全部完成：Metal（macOS/iOS）、Vulkan（Windows/Linux/Android，`vulkan/sys.rs` 为手写 FFI，运行期 `dlopen`/`LoadLibraryA` 加载，无新依赖）、DX12（Windows，COM vtable 直调，无 `windows` 依赖）。`backend_factory::install_backends` 按 `cfg` 注册。DX12 加速结构未链接 DXR 分发，能力探测如实不宣称光追；`command_list` 的描述符表逐 draw 绑定仍待 Windows 真机验证。
+
+- Terminal 完成：POSIX `forkpty`（macOS/Linux）、Windows ConPTY、Windows 命令行引号；链接 vendored Ghostty 静态库，FFI 布局由真实 `ghostty_type_json()` 清单生成并加编译期尺寸断言。会话线程改用 `Arc` 邮箱 + `LocalInvalidationHandle` 桥接替代 Swift 的 `NSLock` + `DispatchQueue.main`。
+
+- Hosts 完成：Android 15 + Desktop 26 个文件，49 个 Rust 文件；`install_platform_services()` 在桌面 `Application::run` 与 Android `cove_android_create_application` 两处启动路径调用，使远端图片加载真正生效。逐平台矩阵与 7 项已知缺口记录在 `Hosts/rust/PLATFORM_COVERAGE.md`。
+
+- Sources（WebView/Workspace）与 DevTools 完成：WKWebView（objc2 + `define_class!` 导航代理）、WebView2（手写 COM vtable）、WebKitGTK（dlopen GTK3/GTK4）三个真实后端；DevTools 客户端/服务端/Agent/Inspector 全部落地，`std::net` 实现 RFC 6455 传输，`pump()` 每帧驱动。
+
+- Browser 宿主落地：`Browser/rust/prototype/` 按 Swift `main.swift` 的 `@_cdecl` ABI 复刻全部导出（`cove_render`/`cove_font_*`/`cove_pointer`/`cove_key`/`cove_text`/`cove_units`/`cove_snapshot`/`cove_dispatch` 等），帧载荷与 DevTools 会话流程一致；单线程 reactor 用 `thread_local!` 承载 Swift 的 `nonisolated(unsafe)` 全局。
+
+- Tools CLI 与 Support 完成：`main.rs` 此前完全没有 `mod` 声明，导致 8 个模块全部是死代码，且 5 个被引用的模块不存在。现已接入 23 个命令分发、`--version`/`--help`、SDK 重执行引导，并以真实二进制核对退出码与 stderr 文本；Android/Desktop/iOS 平台构建命令为真实实现。
+
+- 修复一批共享 API 缺口：`Rect::size()`/`Rect::origin()`、`KeyModifiers::is_empty()`、`ScrollConsumePolicy: Default`（`whenScrollable`，与 `ScrollView` 默认一致）、`ObservableStateRegistrar: Clone`、`scene::scrolling` 重导出、Compose 根导出 `State`/`LayoutNode`/`ScrollView` 系列。`ModifiedContent` 的固有方法 `modifier()` 曾遮蔽 `ViewExt::modifier(_:)`，改名为 `modifier_ref()`。
+
+- 已知缺口：Linux `https://` 图片加载（无 TLS crate，如实上报 `https=false`）；macOS 菜单栏（`cove-shell` 只有上下文菜单入口）；Wasm 图片 transport（需专用 fetch/XHR）；Apple 图片 MIME 与 macOS 内存压力读取采用回退实现。
+
+- 全量迁移尚未完成：Compose 仍有 82 个文件未开始，Examples 46 个、Tests 424 个待迁移。所有 Rust 代码仍未做行为对照、跨平台验收与 GUI 冒烟；按要求统一验证放在全部转换之后。
+
 - 翻译 Metal 后端第一批：`MetalSubmissionStatus`、`MetalLibraryCache`、`MetalRenderBindings`、`MetalUploadRing` 落地到 `Graphics/rust/metal/`，并在 `Graphics/rust/lib.rs` 中以 Apple 目标 cfg 声明模块。设备、注册表、加速结构、管线、传输与提交编码器尚未翻译，未编译、未测试。
 
 - 修复 Rust 工作区可编译性：为 `Compose/CompositionMacros` 补上 proc-macro 的 `path`，修正 `cove-composition` 的导出与类型错误（`ModifierReplay` 导出、场景几何重导出、`DynamicField: Clone`、slot tag 包装、`&dyn View`/`&AnyView` 混用、`ViewScope::uninstall` 签名），并为 `Graphics/rust/ui/draw_geometry.rs` 的语句位 `unsafe` 块加括号。仅为局部 `cargo check`，不构成验收。
