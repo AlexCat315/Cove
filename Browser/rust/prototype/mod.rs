@@ -24,6 +24,15 @@ use std::cell::RefCell;
 /// The concrete reactor type this host exports through the C ABI.
 pub type Content = BrowserPrototype<cove_examples::CounterView>;
 
+/// The layout debug name recorded by `.debug_name(_)`, read back from a node.
+///
+/// The DevTools protocol identifies nodes by this name for `select.node` and
+/// recording replay, so the host must resolve it the same way the inspector
+/// does: through the layout debug attachment.
+pub fn node_debug_name(node: &cove_core::scene::Node) -> Option<String> {
+    node.attachment::<String>(cove_composition::LayoutDebugAttachmentKey::DEBUG_NAME)
+}
+
 thread_local! {
     /// The process has exactly one reactor, mirroring the Swift global `app`.
     static APP: RefCell<Option<Content>> = const { RefCell::new(None) };

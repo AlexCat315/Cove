@@ -4,5 +4,7 @@ pub mod select;
 pub mod slider;
 
 pub use radio_group::{RadioGroup, RadioOption};
-pub use select::{KeyboardShortcut, KeyboardShortcutModifier, KeyboardShortcutPlatform, SelectOption};
+pub use select::{
+    KeyboardShortcut, KeyboardShortcutModifier, KeyboardShortcutPlatform, Select, SelectOption,
+};
 pub use slider::{Slider, SliderAxis, SliderGeometry, SliderHost};

@@ -1,4 +1,5 @@
 //! Overlay primitives.
+pub mod anchored;
 pub mod support;
 pub mod popover;
 pub mod portal;
@@ -11,6 +12,10 @@ pub mod roving_focus;
 pub use focus_scope::FocusScope;
 pub use selection_key_host::SelectionKeyHost;
 pub use menu::{MenuDescriptor, MenuItemDescriptor};
+pub use anchored::{
+    AnchoredOverlayHost, PopoverAnchor, PopoverEdge, PopoverGeometry, PopoverOverflow,
+    PopoverPlacement, PopoverSurface, PopoverSurfaceHost,
+};
 pub use popover::{
     Popover, PopoverSizing, PopoverTriggerDescription,
 };

@@ -11,7 +11,7 @@ use cove_core::scene::{
 };
 use cove_core::{Point, Rect, Size};
 use crate::animation::transition::Transition;
-use crate::modifiers::layout::PaddingExt;
+use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use crate::primitives::overlays::portal::portal_registry::PortalResource;
 use crate::primitives::overlays::portal::{
     portal_window_bounds, PortalFitConstraints, PortalPlacementMode, PortalStoreEnvironment,
@@ -209,12 +209,12 @@ fn place(
     let size = resource.frame().map(|frame| Size { width: frame.width, height: frame.height }).unwrap_or(provisional);
     let geometry = anchor.geometry(size, placement);
     let minimum_width = if sizing_anchor { anchor.frame().width } else { 0.0 };
-    resource.update_fit(PortalFitConstraints::new(
-        Some(minimum_width),
-        Some(margin),
-        Some(geometry.maximum_size.width),
-        Some(geometry.maximum_size.height),
-    ));
+    resource.update_fit(PortalFitConstraints {
+        minimum_width,
+        viewport_margin: margin,
+        maximum_width: Some(geometry.maximum_size.width),
+        maximum_height: Some(geometry.maximum_size.height),
+    });
     resource.update_position(Point::new(geometry.frame.x, geometry.frame.y));
 }
 
@@ -312,7 +312,8 @@ impl PrimitiveView for AnchoredOverlayHost {
             false,
             PortalPlacementMode::Fixed,
             Some(Rc::new(move |size: Size| {
-                placement_for_size.geometry(size, placement).frame.origin()
+                let frame = placement_for_size.geometry(size, placement).frame;
+                Point::new(frame.x, frame.y)
             })),
             Some(
                 Transition::opacity()
@@ -486,14 +487,15 @@ impl PrimitiveView for PopoverSurfaceHost {
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         let maximum = self.anchor.geometry(Size::default(), self.placement).maximum_size.height;
+        let scroll = crate::primitives::layout::ScrollView::new(
+            crate::primitives::layout::ScrollAxis::Both,
+            self.content.clone(),
+        )
+        .scrollbar_gutter(crate::primitives::layout::ScrollbarGutter::Overlay);
         vec![AnyView::new(
-            crate::primitives::layout::ScrollView::new(
-                crate::primitives::layout::ScrollAxis::Both,
-                self.content.clone(),
-            )
-            .scrollbar_gutter(crate::primitives::layout::ScrollbarGutter::Overlay)
-            .frame(None, None, None, None, None, Some((maximum - 48.0).max(0.0)))
-            .padding(24.0),
+            AnyView::new(scroll)
+                .frame(None, None, None, None, None, Some((maximum - 48.0).max(0.0)))
+                .padding(24.0),
         )]
     }
 }

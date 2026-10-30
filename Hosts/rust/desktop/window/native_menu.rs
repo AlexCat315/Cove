@@ -226,11 +226,19 @@ impl NativeMenuBar {
 pub mod installer {
     use super::*;
 
-    /// macOS presents native menus through AppKit. The shell owns the
-    /// `NSApplication` main menu, so the host hands it the snapshot and the
-    /// action table and the shell installs the `NSMenuItem` targets.
+    /// macOS presents menus through AppKit. The action table and the native menu
+    /// presenter are installed here.
+    ///
+    /// The application menu *bar* is not installed: `cove-shell` exposes only
+    /// `cove_shell_menu_popup` (an `NSMenu` for context popups), with no entry
+    /// point for `NSApplication.mainMenu`. `snapshot()` already produces the
+    /// exact tree the bar needs, so installing it is a shell-side addition, not a
+    /// host-side one. Until then an application's menu bar is not shown, and the
+    /// Compose menu path remains the one that works.
     pub fn install(menu_bar: &NativeMenuBar) {
-        let (snapshot, actions) = menu_bar.snapshot();
+        let (_snapshot, actions) = menu_bar.snapshot();
+        // Retained so a popup routed through the shell can resolve its item ids
+        // back to the authored closures.
         native_menu_bridge::set_actions(actions);
         cove_core::scene::NativeMenuPresenter::set_present(Some(std::rc::Rc::new(
             move |menu: &cove_platform::NativeMenuSnapshot, point: cove_core::Point| {
@@ -239,7 +247,6 @@ pub mod installer {
                     .flatten()
             },
         )));
-        let _ = snapshot;
     }
 }
 

@@ -16,7 +16,7 @@ use crate::primitives::controls::button::{Button, ButtonRole};
 use crate::primitives::overlays::anchored::{
     AnchoredOverlayHost, PopoverOverflow, PopoverPlacement, PopoverSurface,
 };
-use crate::theme::styles::buttons::{ButtonStyle, ButtonStyleConfiguration};
+use crate::theme::styles::buttons::{ButtonStyle, ButtonStyleConfiguration, ButtonStyleViewExt};
 use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, View};
 
 /// How the popup sizes itself.

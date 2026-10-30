@@ -10,7 +10,7 @@ use std::os::raw::c_char;
 
 use crate::export_buffer::{self, ExportBuffer};
 use crate::prototype::Content;
-use crate::prototype::{with_app, Content};
+use crate::prototype::with_app;
 
 /// Publishes the frame for `width`×`height` logical points.
 #[unsafe(no_mangle)]

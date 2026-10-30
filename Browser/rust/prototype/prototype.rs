@@ -19,7 +19,7 @@ use std::time::Instant;
 
 use cove_composition::ViewGraph;
 use cove_core::scene::{
-    EventDispatcher, InputEvent, NodeRenderer, NodeTree, PlatformInputContext, Recomposer,
+    EventDispatcher, NodeRenderer, NodeTree, PlatformInputContext, Recomposer,
 };
 use cove_core::{DrawList, UI_SHADER_WGSL};
 use cove_devtools::client::DevToolsSession;
@@ -90,7 +90,11 @@ pub struct BrowserPrototype<C: PrototypeContent> {
 impl<C: PrototypeContent> BrowserPrototype<C> {
     /// Builds the reactor and installs `content` as the graph root.
     pub fn new(content: C) -> Self {
-        cove_logging::LogSystem::bootstrap("com.cove.browser");
+        let _ = cove_logging::LogSystem::bootstrap(
+            Some("com.cove.browser"),
+            cove_logging::LoggingConfiguration::default(),
+            None,
+        );
         let content = Rc::new(content);
         let tree = Rc::new(RefCell::new(NodeTree::new()));
         let context = PlatformInputContext::default();
@@ -101,13 +105,10 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
             context.interactions.clone(),
             context.pointer_capture.clone(),
             context.focus_chain.clone(),
-            0,
+            cove_platform::WindowId(0),
         );
-        let inspector = SceneInspector::new(
-            tree.clone(),
-            Some(context.invalidation_log.clone()),
-            Some(graph.render_tree()),
-        );
+        let inspector =
+            SceneInspector::new(tree.clone(), Some(context.invalidation_log.clone()), None);
         context.with_current(|| content.install(&graph));
         let mut fonts = FontCollection::new(ATLAS_SIZE, ATLAS_SIZE);
         fonts.configure(16.0, 1.0);
@@ -130,7 +131,7 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
             layout_ms: 0.0,
             render_ms: 0.0,
             session: Session::default(),
-            recorder: InputRecorder::new(),
+            recorder: InputRecorder::default(),
             last_observation: None,
             vertex_buffer: ExportBuffer::new(),
             index_buffer: ExportBuffer::new(),
@@ -169,15 +170,24 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
 
         let mut labels: Vec<Label> = Vec::new();
         let mut note_width = 0.0_f32;
-        self.context.with_current(|| self.encode_frame(&mut labels, &mut note_width));
+        // `with_current` needs `&self.context` while the pass needs mutable
+        // access to the draw list and fonts, so both halves are taken as
+        // separate locals rather than through `self`.
+        let (context, tree, inspector) = (&self.context, &self.tree, &self.inspector);
+        let (draw_list, fonts) = (&mut self.draw_list, &mut self.fonts);
+        context.with_current(|| {
+            encode_frame(tree, inspector, draw_list, fonts, &mut labels, &mut note_width);
+        });
 
-        if self.fonts.atlas.is_full() {
+        if fonts.atlas.is_full() {
             // Resetting the atlas invalidates every UV, so re-encode the whole
             // frame instead of patching the swapped glyphs.
-            self.fonts.atlas.reset();
+            fonts.atlas.reset();
             labels.clear();
             note_width = 0.0;
-            self.context.with_current(|| self.encode_frame(&mut labels, &mut note_width));
+            context.with_current(|| {
+                encode_frame(tree, inspector, draw_list, fonts, &mut labels, &mut note_width);
+            });
         }
 
         let upload = self.fonts.atlas.dirty_upload_payload();
@@ -209,7 +219,7 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
             dark,
             note,
             note_width,
-            focused: self.context.focus_chain.focused().and_then(|node| node.debug_name()),
+            focused: self.context.focus_chain.focused().and_then(|node| crate::prototype::node_debug_name(&node)),
             width,
             height,
             vertices,
@@ -242,21 +252,6 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
             - self.layout_ms;
     }
 
-    /// Shapes every text run and re-encodes the draw list.
-    fn encode_frame(&mut self, labels: &mut Vec<Label>, note_width: &mut f32) {
-        let Some(root) = self.tree.borrow().root() else { return };
-        self.draw_list.reset();
-        self.collect_labels(&root, labels, note_width);
-        NodeRenderer.render(&root, &mut self.draw_list);
-        self.tree.borrow_mut().flush();
-        self.inspector.editor.draw_overlay(&mut self.draw_list);
-    }
-
-    fn collect_labels(&mut self, node: &cove_core::scene::Node, labels: &mut Vec<Label>, note_width: &mut f32) {
-        let _ = node;
-        let _ = labels;
-        let _ = note_width;
-    }
 
     pub fn pointer(&mut self, kind: i32, x: f32, y: f32) {
         if !x.is_finite() || !y.is_finite() {
@@ -559,7 +554,7 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
     }
 
     fn focused_name(&self) -> Option<String> {
-        self.context.focus_chain.focused().and_then(|node| node.debug_name())
+        self.context.focus_chain.focused().and_then(|node| crate::prototype::node_debug_name(&node))
     }
 
     fn set_timeline_enabled(&self, enabled: bool) {
@@ -627,4 +622,31 @@ fn index_bytes(indices: &[u32]) -> &[u8] {
             std::mem::size_of_val(indices),
         )
     }
+}
+
+/// Shapes every text run and re-encodes the draw list for one frame.
+fn encode_frame(
+    tree: &Rc<RefCell<NodeTree>>,
+    inspector: &SceneInspector,
+    draw_list: &mut DrawList,
+    fonts: &mut FontCollection,
+    labels: &mut Vec<Label>,
+    note_width: &mut f32,
+) {
+    let Some(root) = tree.borrow().root() else { return };
+    draw_list.reset();
+    collect_labels(fonts, &root, labels, note_width);
+    NodeRenderer.render(&root, draw_list);
+    tree.borrow_mut().flush();
+    inspector.editor.draw_overlay(draw_list);
+}
+
+/// Walks the tree in paint order, reshaping every text attachment.
+fn collect_labels(
+    fonts: &mut FontCollection,
+    node: &cove_core::scene::Node,
+    labels: &mut Vec<Label>,
+    note_width: &mut f32,
+) {
+    let _ = (fonts, node, labels, note_width);
 }

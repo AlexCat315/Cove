@@ -16,6 +16,22 @@ impl Default for PortalFitConstraints {
 }
 
 impl PortalFitConstraints {
+    /// Memberwise construction, matching Swift's synthesized initializer.
+    pub fn new(
+        minimum_width: Option<f32>,
+        viewport_margin: Option<f32>,
+        maximum_width: Option<f32>,
+        maximum_height: Option<f32>,
+    ) -> Self {
+        let defaults = Self::default();
+        Self {
+            minimum_width: minimum_width.unwrap_or(defaults.minimum_width),
+            viewport_margin: viewport_margin.unwrap_or(defaults.viewport_margin),
+            maximum_width,
+            maximum_height,
+        }
+    }
+
     pub fn width_range(self, window: Rect) -> (f32, f32) {
         let available = (window.width - self.viewport_margin * 2.0).max(0.0);
         let maximum = self.maximum_width.map(|width| available.min(width.max(0.0))).unwrap_or(available);

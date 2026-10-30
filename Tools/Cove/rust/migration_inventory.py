@@ -72,7 +72,20 @@ def score(swift_source: str, candidate: str, stem: str) -> int:
     candidate_stem = os.path.basename(candidate)[:-3]
     if candidate_stem == "mod" or candidate_stem == "lib":
         return 0
-    if candidate_stem != stem and snake(candidate_stem) != stem:
+    candidate_snake = snake(candidate_stem)
+    exact = candidate_stem == stem or candidate_snake == stem
+    if not exact:
+        # Swift files often carry a module prefix that the Rust module drops:
+        # `DX12Backend.swift` -> `dx12/backend.rs`, `MetalDevice.swift` ->
+        # `metal/device.rs`, `CoveUIWorkspaceModel.swift` -> `workspace/model.rs`.
+        # A suffix match on a snake_case word boundary covers that shape.
+        suffix = stem.removeprefix("_")
+        exact = (
+            suffix.endswith("_" + candidate_snake)
+            and candidate_snake in suffix
+            and len(candidate_snake) >= 4
+        )
+    if not exact:
         return 0
 
     path = 1

@@ -35,6 +35,10 @@ impl Rect {
             height,
         }
     }
+    /// `CGRect.origin` — the top-left corner as a point.
+    pub const fn origin(&self) -> Point {
+        Point { x: self.x, y: self.y }
+    }
     /// `CGRect.size` — the extent without the origin.
     pub const fn size(&self) -> Size {
         Size { width: self.width, height: self.height }

@@ -571,6 +571,32 @@ impl Default for D3D12_COMPUTE_PIPELINE_STATE_DESC {
     }
 }
 
+/// `D3D12_ROOT_PARAMETER`: a root descriptor or a 32-bit-constant entry.
+///
+/// The C struct holds a union whose largest member is a descriptor table; this
+/// declaration keeps the same size by using a fixed payload array, and the
+/// `ParameterType` field selects which member the driver reads.
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct D3D12_ROOT_PARAMETER {
+    pub ParameterType: u32,
+    pub ShaderVisibility: u32,
+    pub shader_register: u32,
+    pub register_space: u32,
+    pub payload: [u32; 4],
+}
+
+/// `D3D12_ROOT_SIGNATURE_DESC`.
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct D3D12_ROOT_SIGNATURE_DESC {
+    pub NumParameters: u32,
+    pub pParameters: *const D3D12_ROOT_PARAMETER,
+    pub NumStaticSamplers: u32,
+    pub pStaticSamplers: *const core::ffi::c_void,
+    pub Flags: u32,
+}
+
 /// `D3D12_SAMPLER_DESC`.
 #[repr(C)]
 #[derive(Clone, Copy)]

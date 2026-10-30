@@ -237,15 +237,11 @@ impl RhiBackend for Dx12Backend {
         _handle: AccelerationStructure,
         _descriptor: AccelerationStructureDescriptor,
     ) -> RhiResult<()> {
-        // The capability probe reports acceleration structures only when the
-        // adapter exposes DXR, so reaching here without support is a real gap.
-        if !self.device.capabilities.ray_tracing.acceleration_structures {
-            return Err(RhiError::unsupported_feature(
-                "adapter has no ray tracing support",
-            ));
-        }
+        // Acceleration structures stay unadvertised, so the frontend rejects such
+        // a request before reaching here; this guard keeps the backend honest if a
+        // caller bypasses the capability check.
         Err(RhiError::unsupported_feature(
-            "DX12 acceleration-structure builds need the DXR dispatch tables, which this build does not link",
+            "DX12 acceleration structures are not implemented by this build",
         ))
     }
 

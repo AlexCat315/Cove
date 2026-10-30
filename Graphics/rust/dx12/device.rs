@@ -237,15 +237,19 @@ fn probe_features(_device: sys::ComPtr) -> (u32, bool, bool) {
 }
 
 /// Shapes the RHI capability set from the probed feature level.
+///
+/// Ray tracing stays **unadvertised** even on an adapter that supports DXR: the
+/// capability set is a promise the backend will honour, and this build does not
+/// link the DXR build/execute dispatch tables. The adapter's real support is
+/// reported separately through `AdapterCapabilities`, which is diagnostic.
 pub fn capabilities_for(feature_level: u32, mesh: bool, task: bool) -> Capabilities {
+    let _ = feature_level;
     Capabilities::configure(|capabilities| {
         capabilities.graphics = true;
         capabilities.compute = true;
         capabilities.indirect_draw = true;
         capabilities.textures.texture_3d = true;
         capabilities.textures.cube = true;
-        capabilities.ray_tracing.acceleration_structures = feature_level >= 11;
-        capabilities.ray_tracing.compute_ray_query = feature_level >= 12;
         capabilities.mesh_shading.mesh = mesh;
         capabilities.mesh_shading.task = task;
         capabilities.max_queues = QueueLimits::default();
@@ -352,7 +356,10 @@ mod windows_impl {
 
         let (feature_level, ray_tracing, ray_query) = probe_features(device);
         let mesh = feature_level >= 12;
-        let capabilities = capabilities_for(feature_level, mesh, mesh && config.prefer_low_power);
+        // `capabilities_for` deliberately leaves ray tracing unadvertised; the
+        // adapter's real support rides on `adapter_capabilities` instead.
+        let capabilities = capabilities_for(feature_level, mesh, mesh);
+        let _ = (ray_tracing, ray_query);
         Ok(Dx12DeviceHandle {
             device,
             factory,
@@ -369,6 +376,8 @@ mod windows_impl {
             config,
             capabilities,
             adapter_capabilities: AdapterCapabilities {
+                // Diagnostic: what the adapter reports, not what this build
+                // implements.
                 ray_tracing,
                 mesh_shading: mesh,
             },

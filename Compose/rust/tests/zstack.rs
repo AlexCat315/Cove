@@ -12,12 +12,16 @@ mod support;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cove_composition::{AnyView, LayoutDebugExt, TupleView, View, ViewExt};
+use cove_composition::{Alignment, AnyView, LayoutDebugExt, TupleView, View, ViewExt};
 use cove_core::scene::{Align, EventDispatcher, FlexDirection, Justify, Node, Wrap};
 use cove_platform::{InputEvent, MouseButton, MouseButtonEvent, PointerKind};
-use cove_ui_compose::{BoxView, Button, ZStack};
+use cove_ui_compose::modifiers::layout::LayoutFrameExt;
+use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::layout::zstack::ZStack;
+use cove_ui_compose::primitives::text::Text;
+use cove_ui_compose::BoxView;
 
-use support::{GlobalTestLock, TestScene};
+use support::{debug_name, GlobalTestLock, TestScene};
 
 /// A bare box with an explicit size, the Swift `Box {}.frame(...)` shape.
 fn sized(width: f32, height: f32, name: &str) -> AnyView {
@@ -50,7 +54,7 @@ fn measures_and_aligns() {
     GlobalTestLock::with_scheduler(|| {
         let graph = support::graph();
         let stack = ZStack::new(
-            Align::TopLeading,
+            Alignment::TopLeading,
             AnyView::new(TupleView::new(vec![
                 sized(100.0, 40.0, "large"),
                 sized(20.0, 20.0, "small"),
@@ -76,7 +80,7 @@ fn measures_and_aligns() {
 
         // The default alignment centers the small child within the large one.
         let stack = ZStack::new(
-            Align::Center,
+            Alignment::Center,
             AnyView::new(TupleView::new(vec![
                 unsized_box().frame_width(100.0).frame_height(40.0),
                 sized(20.0, 20.0, "small"),
@@ -98,7 +102,7 @@ fn rtl_alignment() {
     GlobalTestLock::with_scheduler(|| {
         let graph = support::graph();
         let stack = ZStack::new(
-            Align::TopLeading,
+            Alignment::TopLeading,
             AnyView::new(TupleView::new(vec![
                 unsized_box().frame_width(100.0).frame_height(40.0),
                 sized(20.0, 20.0, "small"),
@@ -129,7 +133,7 @@ fn topmost_child_wins_hit_testing() {
             back_hits.borrow_mut().push("back")
         });
         let stack = ZStack::new(
-            Align::Center,
+            Alignment::Center,
             AnyView::new(TupleView::new(vec![
                 AnyView::new(back.frame_width(100.0).frame_height(100.0)),
                 AnyView::new(front.frame_width(100.0).frame_height(100.0)),
@@ -173,7 +177,7 @@ fn card_content_stays_inside_its_box() {
             let label = cove_ui_compose::Text::new("Top-left layer").debug_name("label");
             let accent = BoxView::new(
                 FlexDirection::Row,
-                Align::Center,
+                Alignment::Center,
                 Justify::Center,
                 Wrap::NoWrap,
                 0.0,
@@ -183,7 +187,7 @@ fn card_content_stays_inside_its_box() {
             .frame_height(72.0)
             .debug_name("accent");
             let stack = ZStack::new(
-                Align::TopLeading,
+                Alignment::TopLeading,
                 AnyView::new(TupleView::new(vec![AnyView::new(accent)])),
             )
             .frame_width(320.0)
@@ -208,7 +212,7 @@ fn named(graph: &Rc<cove_composition::ViewGraph>, name: &str) -> Node {
     }
     collected
         .into_iter()
-        .find(|node| node.debug_name().as_deref() == Some(name))
+        .find(|node| support::debug_name(node).as_deref() == Some(name))
         .unwrap_or_else(|| panic!("node {name} exists"))
 }
 

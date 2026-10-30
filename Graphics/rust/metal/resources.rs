@@ -654,7 +654,7 @@ mod tests {
 
     #[test]
     fn a_vertex_descriptor_is_device_independent() {
-        let descriptor = unsafe { MTLVertexDescriptor::new() };
+        let descriptor = MTLVertexDescriptor::new();
         let layout = descriptor.layouts();
         // SAFETY: slot 0 always exists in the layout array.
         let first = unsafe { layout.objectAtIndexedSubscript(0) };

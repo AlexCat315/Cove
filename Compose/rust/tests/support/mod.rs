@@ -17,10 +17,11 @@ use cove_core::scene::{
     AnimatorScheduler, FocusChain, FocusChainHolder, InteractionRegistry, InteractionRegistryHolder,
     Node, NodeTree, PointerCapture, PointerCaptureHolder, Recomposer,
 };
-use cove_composition::ViewGraph;
+use cove_composition::{LayoutDebugAttachmentKey, ViewGraph};
 use std::rc::Rc;
 
-use cove_core::{Font, FontWeight, TextCacheLimits};
+use cove_core::{Font, FontWeight};
+use cove_text::TextCacheLimits;
 use cove_text::{FontAtlas, TextEnvironment, TextEnvironmentHolder, TextFontResolver, TextShaper};
 
 /// Cross-platform test font resolved from the host's system fonts. CoveUI no
@@ -67,7 +68,7 @@ impl GlobalTestLock {
     /// Runs `body` with exclusive access and a fresh animation scheduler
     /// installed for the duration, matching `$current.withValue`.
     pub fn with_scheduler<T>(body: impl FnOnce() -> T) -> T {
-        Self::locked(|| AnimatorScheduler::new().with_current(body))
+        Self::locked(|| AnimatorScheduler::default().with_current(body))
     }
 }
 
@@ -124,9 +125,7 @@ impl TestScene {
 
     /// The node carrying `name` as its layout debug name.
     pub fn named(&self, name: &str) -> Option<Node> {
-        self.nodes()
-            .into_iter()
-            .find(|node| node.debug_name().as_deref() == Some(name))
+        self.nodes().into_iter().find(|node| debug_name(node).as_deref() == Some(name))
     }
 }
 
@@ -136,6 +135,11 @@ pub fn graph() -> std::rc::Rc<ViewGraph> {
         std::rc::Rc::new(std::cell::RefCell::new(NodeTree::new())),
         std::rc::Rc::new(Recomposer::new()),
     ))
+}
+
+/// The layout debug name recorded by `.debug_name(_)`.
+pub fn debug_name(node: &Node) -> Option<String> {
+    node.attachment::<String>(LayoutDebugAttachmentKey::DEBUG_NAME)
 }
 
 fn collect(node: &Node, into: &mut Vec<Node>) {
@@ -156,7 +160,7 @@ pub fn test_text_environment(size: f32, line_height: f32) -> TextEnvironment {
     if let Some(face) = atlas.font_face() {
         shaper.set_face(face, size);
     }
-    let resolver = TextFontResolver::new("Arial", atlas.clone(), 256, 1.0);
+    let resolver = TextFontResolver::new("Arial", atlas.clone());
     TextEnvironment::new(
         atlas,
         shaper,

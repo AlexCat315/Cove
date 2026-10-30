@@ -20,7 +20,7 @@
 
 | 范围 | 文件数 | 已写入 | 进行中 | 未开始 |
 | --- | ---: | ---: | ---: | ---: |
-| 生产源码 | 984 | 651 | 0 | 333 |
+| 生产源码 | 984 | 802 | 0 | 182 |
 | 测试源码 | 424 | 30 | 0 | 394 |
 | SwiftPM 清单 | 25 | 19（Cargo 清单） | 0 | 6 |
 | CLI 项目模板 | 5 | 0 | 0 | 5 |
@@ -48,26 +48,26 @@ System 16 个、Logging 15 个、Tools/Cove 8 个、Tools/Support 12 个、Compo
 
 ## 逐模块进度（生产源码）
 
-| 模块 | Swift 文件 | Swift 行 | 已写入 | 未开始 | Rust 文件（快照） |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Compose（含 Composition、宏） | 414 | 52,554 | 239 | 175 | 271 |
-| Graphics | 107 | 14,534 | 65 | 42 | 58 |
-| Core | 97 | 12,299 | 97 | 0 | 93 |
-| Tools（CLI/Support） | 69 | 3,901 | 58 | 11 | 29 |
-| Examples | 61 | 7,135 | 9 | 52 | 10 |
-| DevTools（含 Protocol） | 51 | 5,183 | 26 | 25 | 14 |
-| Hosts | 51 | 4,254 | 45 | 6 | 69 |
-| Terminal | 29 | 3,088 | 17 | 12 | 18 |
-| Sources（Workspace/WebView） | 19 | 4,861 | 9 | 10 | 15 |
-| System | 17 | 1,004 | 17 | 0 | 21 |
-| Logging | 15 | 705 | 15 | 0 | 16 |
-| Text | 14 | 2,576 | 14 | 0 | 16 |
-| Shell | 13 | 2,529 | 13 | 0 | 14 |
-| Runtime | 11 | 1,485 | 11 | 0 | 12 |
-| Imaging | 9 | 696 | 9 | 0 | 11 |
-| PlatformCore | 6 | 540 | 6 | 0 | 2 |
-| Browser | 1 | 400 | 1 | 0 | 7 |
-| 合计 | 984 | 117,744 | 651 | 333 | 676 |
+| 模块 | Swift 文件 | Swift 行 | 已写入 | 未开始 |
+| --- | ---: | ---: | ---: | ---: |
+| Compose（含 Composition、宏） | 414 | 52,554 | 326 | 88 |
+| Graphics | 107 | 14,534 | 93 | 14 |
+| Core | 97 | 12,299 | 97 | 0 |
+| Tools（CLI/Support） | 69 | 3,901 | 61 | 8 |
+| Examples | 61 | 7,135 | 15 | 46 |
+| DevTools（含 Protocol） | 51 | 5,183 | 37 | 14 |
+| Hosts | 51 | 4,254 | 46 | 5 |
+| Terminal | 29 | 3,088 | 26 | 3 |
+| Sources（Workspace/WebView） | 19 | 4,861 | 15 | 4 |
+| System | 17 | 1,004 | 17 | 0 |
+| Logging | 15 | 705 | 15 | 0 |
+| Text | 14 | 2,576 | 14 | 0 |
+| Shell | 13 | 2,529 | 13 | 0 |
+| Runtime | 11 | 1,485 | 11 | 0 |
+| Imaging | 9 | 696 | 9 | 0 |
+| PlatformCore | 6 | 540 | 6 | 0 |
+| Browser | 1 | 400 | 1 | 0 |
+| 合计 | 984 | 117,744 | 802 | 182 |
 
 Rust 文件数列为磁盘快照，不等于逐 Swift 文件一一对应；多个 Swift 文件可能映射到一个 Rust 模块，也可能一个 Swift 文件拆到多个 Rust/C 文件。逐文件关系在清单中。
 
@@ -151,6 +151,27 @@ Compose 各子树共享 `Compose/rust/lib.rs`、`primitives/mod.rs`、`theme/mod
 ### 必须串行的共享文件
 
 根 `Cargo.toml`（新增/调整 crate）、`Docs/rust-migration.md`、`Docs/rust-migration-files.json`、`Docs/rust-migration-files.md`、`CHANGELOG.md`、`README.md`。修改这些文件的批次不得与其他批次并行。每个文件迁移完成即更新清单中该行状态与目标路径。
+
+## 原生后端与宿主状态（本轮完成）
+
+| 层 | 状态 | 覆盖 |
+| --- | --- | --- |
+| Metal | 完成 | macOS / iOS，`Graphics/rust/metal/`，`backend_factory::install_backends` 按 `cfg` 注册 |
+| Vulkan | 完成 | Windows / Linux / Android；`sys.rs` 为手写 FFI（`dlopen`/`LoadLibraryA` 运行期加载，无新依赖） |
+| DX12 | 完成（一处待硬件验证） | Windows；COM vtable 直调，无 `windows` 依赖 |
+| Terminal | 完成 | POSIX `forkpty`（macOS/Linux）、Windows ConPTY、Windows 命令行引号；Ghostty 静态库链接，FFI 布局用真实 `ghostty_type_json()` 清单做编译期断言 |
+| Hosts | 完成 | Android 15 + Desktop 26；`Hosts/rust/PLATFORM_COVERAGE.md` 为逐平台矩阵 |
+
+三个原生后端均无 `todo!()`/`unimplemented!()`；Vulkan 与 DX12 源码在所有宿主上编译（这就是 macOS 上 `cargo check` 有意义的原因），只有加载器与 surface 创建按平台 `cfg` 门控，错误平台返回明确的 "unsupported backend"。
+
+### 已知缺口（不隐藏）
+
+1. **Linux `https://`**：工作区依赖集无 TLS crate，`TransportCapabilities` 报 `https=false` 并给出具名限制；`file://` 与 `http://` 正常。刻意不引入 rustls/native-tls，避免把 TLS+crypto 拖进所有平台（含 Wasm）。
+2. **DX12 描述符表绑定**：`command_list.rs` 已创建 root signature 与 descriptor heap，但 `SetPipelineState`/`SetDescriptorHeaps` 的逐 draw 绑定序列仍为空实现，需 Windows 真机验证后才能称为生产可用。
+3. **DX12 加速结构**：本构建未链接 DXR 分发，`capabilities_for` 不宣称光追；`create_acceleration_structure` 返回明确错误。适配器自身的 DXR 支持仍通过 `AdapterCapabilities` 作为诊断信息上报。
+4. **macOS 菜单栏**：`cove-shell` 只暴露 `cove_shell_menu_popup`（上下文菜单），没有 `NSApplication.mainMenu` 入口；`NativeMenuBar::snapshot()` 已能生成所需树结构，缺的是 shell 侧入口。
+5. **Wasm 宿主**：`cove-hosts` 不是 `cove-browser` 的依赖，两者独立；Wasm 上 `platform_transport()` 返回 `None`，http/https 图片返回 `HostUnavailable`，需要 Wasm 专用 fetch/XHR transport。
+6. **Apple 图片 MIME 与 macOS 内存压力**：前者用 URL 扩展名回退（NSData 无 MIME），后者读取已发布级别而非自持 `dispatch_source`。两者都需要手写 ObjC block ABI，为可靠性做了取舍。
 
 ## 平台边界
 

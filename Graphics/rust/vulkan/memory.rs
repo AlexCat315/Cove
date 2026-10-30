@@ -346,6 +346,22 @@ fn take_free_region(
 mod tests {
     use super::*;
 
+    /// A command table whose entries are never called. `find_memory_type` only
+    /// reads `memory_properties`, so the table exists to satisfy the struct shape;
+    /// it is built with an explicit null-entry loader rather than `zeroed()`, which
+    /// would be undefined behaviour for a type holding raw pointers.
+    fn null_core_commands() -> sys::CoreCommands {
+        fn missing(_name: &core::ffi::CStr) -> sys::PFN_vkVoidFunction {
+            core::ptr::null()
+        }
+        // SAFETY: the loader returns null for every name, so `CoreCommands::load`
+        // reports `None` instead of producing a table. The fallback below is only
+        // reached if a required entry point is renamed, in which case the test
+        // panics rather than calling through a null pointer.
+        unsafe { sys::CoreCommands::load(&missing) }
+            .expect("the test needs no device entry point")
+    }
+
     fn block(size: sys::VkDeviceSize) -> VulkanMemoryBlock {
         VulkanMemoryBlock {
             memory: 1,
@@ -436,9 +452,13 @@ mod tests {
                 | sys::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             heapIndex: 1,
         };
+        // `find_memory_type` only reads `memory_properties`, so the command table is
+        // never dereferenced here; it is left as a null-filled table rather than a
+        // zeroed struct, which would be undefined behaviour for a pointer-bearing
+        // type.
         let allocator = VulkanMemoryAllocator {
             device: core::ptr::null_mut(),
-            core: unsafe { core::mem::zeroed() },
+            core: null_core_commands(),
             memory_properties: properties,
             buffer_image_granularity: 1,
             blocks: Vec::new(),

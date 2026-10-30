@@ -352,7 +352,7 @@ pub fn upload_snapshot(
         data.len(),
     )?;
     rhi_byte_range(0, byte_count, data.len())?;
-    transfer(device, record, data, byte_count, region, bytes_per_row, subresource, true)
+    transfer_upload(device, record, data, byte_count, region, bytes_per_row, subresource)
 }
 
 /// Reads one region back through a readback heap.
@@ -385,7 +385,7 @@ pub fn read_snapshot(
         extent_height,
         destination.len(),
     )?;
-    transfer(
+    transfer_read(
         device,
         record,
         destination,
@@ -393,15 +393,41 @@ pub fn read_snapshot(
         TextureUploadRegion::new(width as i64, height as i64),
         bytes_per_row,
         subresource,
-        false,
     )
+}
+
+/// One staged copy from `bytes` into the texture.
+fn transfer_upload(
+    device: &mut Dx12DeviceHandle,
+    record: &super::backend::TextureSnapshot,
+    bytes: &[u8],
+    byte_count: usize,
+    region: TextureUploadRegion,
+    bytes_per_row: usize,
+    subresource: TextureSubresource,
+) -> RhiResult<()> {
+    transfer(device, record, Some(bytes), None, byte_count, region, bytes_per_row, subresource, true)
+}
+
+/// One staged copy from the texture into `destination`.
+fn transfer_read(
+    device: &mut Dx12DeviceHandle,
+    record: &super::backend::TextureSnapshot,
+    destination: &mut [u8],
+    byte_count: usize,
+    region: TextureUploadRegion,
+    bytes_per_row: usize,
+    subresource: TextureSubresource,
+) -> RhiResult<()> {
+    transfer(device, record, None, Some(destination), byte_count, region, bytes_per_row, subresource, false)
 }
 
 /// One staged copy between a texture and a buffer.
 fn transfer(
     device: &mut Dx12DeviceHandle,
     record: &super::backend::TextureSnapshot,
-    bytes: &mut [u8],
+    source: Option<&[u8]>,
+    destination: Option<&mut [u8]>,
     byte_count: usize,
     region: TextureUploadRegion,
     bytes_per_row: usize,
@@ -410,7 +436,7 @@ fn transfer(
 ) -> RhiResult<()> {
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = (device, record, bytes, byte_count, region, bytes_per_row, subresource, upload);
+        let _ = (device, record, source, destination, byte_count, region, bytes_per_row, subresource, upload);
         Err(RhiError::unsupported_backend("DirectX 12 is only available on Windows"))
     }
     #[cfg(target_os = "windows")]
@@ -427,6 +453,7 @@ fn transfer(
         if upload {
             let pointer = staging.mapped;
             rhi_require(!pointer.is_null(), "upload heap is not mapped")?;
+            let bytes = source.ok_or_else(|| RhiError::invalid_argument("missing upload source"))?;
             // SAFETY: the staging buffer holds at least `byte_count` bytes and the
             // source slice is distinct.
             unsafe {
@@ -445,11 +472,13 @@ fn transfer(
         if result.is_ok() && !upload {
             let pointer = staging.mapped;
             if !pointer.is_null() {
-                // SAFETY: the copy completed and the readback mapping covers the
-                // range; the destination is a distinct live slice.
-                unsafe {
-                    std::ptr::copy_nonoverlapping(pointer, bytes.as_mut_ptr(), byte_count)
-                };
+                if let Some(destination) = destination {
+                    // SAFETY: the copy completed and the readback mapping covers the
+                    // range; the destination is a distinct live slice.
+                    unsafe {
+                        std::ptr::copy_nonoverlapping(pointer, destination.as_mut_ptr(), byte_count)
+                    };
+                }
             }
         }
         // SAFETY: the copy completed (or failed before queueing), so the staging

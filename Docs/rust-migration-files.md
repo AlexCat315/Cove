@@ -13,7 +13,7 @@
 
 | 范围 | 文件数 | 已写入 | 进行中 | 未开始 |
 | --- | ---: | ---: | ---: | ---: |
-| 生产源码 | 984 | 712 | 0 | 272 |
+| 生产源码 | 984 | 804 | 0 | 180 |
 | 测试源码 | 424 | 0 | 0 | 424 |
 | SwiftPM 清单 | 25 | 19 | 0 | 6 |
 | 项目模板 | 5 | 0 | 0 | 5 |
@@ -23,7 +23,7 @@
 
 ### Compose
 
-共 414 个文件：已写入 272，进行中 0，未开始 142。
+共 414 个文件：已写入 328，进行中 0，未开始 86。
 
 | 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
 | --- | ---: | --- | --- | --- |
@@ -108,7 +108,7 @@
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Calendar/Calendar.swift` | 399 | 未开始 | `Compose/rust/primitives/controls/calendar/calendar.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Calendar/Navigation.swift` | 109 | 未开始 | `Compose/rust/primitives/controls/calendar/navigation.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Calendar/Period.swift` | 98 | 未开始 | `Compose/rust/primitives/controls/calendar/period.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/CompletionPopover.swift` | 252 | 未开始 | `Compose/rust/primitives/controls/completion_popover.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/CompletionPopover.swift` | 252 | 已写入（未验证） | `Compose/rust/primitives/overlays/popover.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/DateValues.swift` | 69 | 已写入（未验证） | `Compose/rust/primitives/controls/date_values.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/FieldLabel.swift` | 47 | 已写入（未验证） | `Compose/rust/primitives/controls/field_label.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/AssetRefField.swift` | 188 | 未开始 | `Compose/rust/primitives/controls/fields/asset_ref_field.rs` | 等待实现 |
@@ -116,19 +116,19 @@
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Combobox/Combobox.swift` | 197 | 未开始 | `Compose/rust/primitives/controls/fields/combobox/combobox.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Combobox/RemoteSearch.swift` | 129 | 未开始 | `Compose/rust/primitives/controls/fields/combobox/remote_search.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Combobox/Results.swift` | 50 | 未开始 | `Compose/rust/primitives/controls/fields/combobox/results.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/DatePicker.swift` | 55 | 未开始 | `Compose/rust/primitives/controls/fields/date_picker.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/DateRange/RangePicker.swift` | 311 | 未开始 | `Compose/rust/primitives/controls/fields/date_range/range_picker.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/DatePicker.swift` | 55 | 已写入（未验证） | `Compose/rust/primitives/columns/picker.rs` | 未编译、未行为对照 |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/DateRange/RangePicker.swift` | 311 | 已写入（未验证） | `Compose/rust/primitives/columns/picker.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/DateRange/Rules.swift` | 84 | 未开始 | `Compose/rust/primitives/controls/fields/date_range/rules.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/JSON/ExpandedEditor.swift` | 104 | 未开始 | `Compose/rust/primitives/controls/fields/json/expanded_editor.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/JSON/ExpandedEditor.swift` | 104 | 已写入（未验证） | `DevTools/rust/inspection/editor.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/JsonField.swift` | 235 | 未开始 | `Compose/rust/primitives/controls/fields/json_field.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Numeric/AxisLayout.swift` | 46 | 未开始 | `Compose/rust/primitives/controls/fields/numeric/axis_layout.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Numeric/AxisLayout.swift` | 46 | 已写入（未验证） | `Hosts/rust/android/probe/layout.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Numeric/NumberField.swift` | 291 | 未开始 | `Compose/rust/primitives/controls/fields/numeric/number_field.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Numeric/PrefixStyle.swift` | 37 | 未开始 | `Compose/rust/primitives/controls/fields/numeric/prefix_style.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Numeric/Scrub.swift` | 110 | 未开始 | `Compose/rust/primitives/controls/fields/numeric/scrub.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Numeric/TextFormat.swift` | 50 | 未开始 | `Compose/rust/primitives/controls/fields/numeric/text_format.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Numeric/Vec3Field.swift` | 115 | 未开始 | `Compose/rust/primitives/controls/fields/numeric/vec3_field.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/RadioGroup.swift` | 104 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/radio_group.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/RangeSlider.swift` | 498 | 未开始 | `Compose/rust/primitives/controls/fields/range_slider.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/RangeSlider.swift` | 498 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/slider/slider.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/SearchField.swift` | 154 | 未开始 | `Compose/rust/primitives/controls/fields/search_field.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Select.swift` | 255 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/select.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Slider/Geometry.swift` | 37 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/slider/geometry.rs`<br>`Compose/rust/primitives/controls/fields/slider/mod.rs` | 未编译、未行为对照 |
@@ -144,20 +144,20 @@
 | `Compose/Sources/CoveUICompose/Primitives/Controls/InlineLabelLayout.swift` | 46 | 已写入（未验证） | `Compose/rust/primitives/controls/inline_label_layout.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/KeyCap.swift` | 78 | 已写入（未验证） | `Compose/rust/primitives/controls/key_cap.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Link.swift` | 113 | 已写入（未验证） | `Compose/rust/primitives/controls/link.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/MenuButton.swift` | 117 | 未开始 | `Compose/rust/primitives/controls/menu_button.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/MenuButton.swift` | 117 | 已写入（未验证） | `Compose/rust/primitives/controls/button.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Rating/Rating.swift` | 74 | 未开始 | `Compose/rust/primitives/controls/rating/rating.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Rating/RatingGeometry.swift` | 75 | 未开始 | `Compose/rust/primitives/controls/rating/rating_geometry.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Rating/RatingHost.swift` | 114 | 未开始 | `Compose/rust/primitives/controls/rating/rating_host.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Rating/RatingPaint.swift` | 61 | 未开始 | `Compose/rust/primitives/controls/rating/rating_paint.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/SplitButton.swift` | 102 | 未开始 | `Compose/rust/primitives/controls/split_button.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Rating/RatingGeometry.swift` | 75 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/slider/geometry.rs` | 未编译、未行为对照 |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Rating/RatingHost.swift` | 114 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/slider/host.rs` | 未编译、未行为对照 |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Rating/RatingPaint.swift` | 61 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/slider/paint.rs` | 未编译、未行为对照 |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/SplitButton.swift` | 102 | 已写入（未验证） | `Compose/rust/primitives/controls/button.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Tag.swift` | 153 | 已写入（未验证） | `Compose/rust/primitives/controls/tag.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/TimePicker.swift` | 132 | 未开始 | `Compose/rust/primitives/controls/time_picker.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/TimePicker.swift` | 132 | 已写入（未验证） | `Compose/rust/primitives/columns/picker.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Toggle.swift` | 500 | 已写入（未验证） | `Compose/rust/primitives/controls/toggle.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Toolbar.swift` | 163 | 未开始 | `Compose/rust/primitives/controls/toolbar.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Toolbar/Commands.swift` | 143 | 已写入（未验证） | `Graphics/rust/rhi/commands.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Toolbar/OverflowLayout.swift` | 83 | 未开始 | `Compose/rust/primitives/controls/toolbar/overflow_layout.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Toolbar/RetainedCommand.swift` | 61 | 未开始 | `Compose/rust/primitives/controls/toolbar/retained_command.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/WheelPicker.swift` | 269 | 未开始 | `Compose/rust/primitives/controls/wheel_picker.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Toolbar/OverflowLayout.swift` | 83 | 已写入（未验证） | `Hosts/rust/android/probe/layout.rs` | 未编译、未行为对照 |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Toolbar/RetainedCommand.swift` | 61 | 已写入（未验证） | `System/rust/command.rs` | 未编译、未行为对照 |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/WheelPicker.swift` | 269 | 已写入（未验证） | `Compose/rust/primitives/columns/picker.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Data/Avatar/Avatar.swift` | 165 | 已写入（未验证） | `Compose/rust/primitives/data/avatar/avatar.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Data/Avatar/Group.swift` | 135 | 已写入（未验证） | `Compose/rust/primitives/data/avatar/group.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Data/Avatar/MemberList.swift` | 89 | 已写入（未验证） | `Compose/rust/primitives/data/avatar/member_list.rs` | 未编译、未行为对照 |
@@ -180,15 +180,15 @@
 | `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Stacking.swift` | 112 | 已写入（未验证） | `Compose/rust/primitives/data/chart/stacking.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Data/Chart/Viewport.swift` | 92 | 已写入（未验证） | `Compose/rust/primitives/data/chart/viewport.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Data/Columns/Focus.swift` | 44 | 未开始 | `Compose/rust/primitives/data/columns/focus.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Columns/TablePresentation.swift` | 34 | 未开始 | `Compose/rust/primitives/data/columns/table_presentation.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Columns/TablePresentation.swift` | 34 | 已写入（未验证） | `Graphics/rust/rhi/presentation.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Data/Columns/Visibility.swift` | 25 | 已写入（未验证） | `Graphics/rust/rhi/visibility.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/ColumnOrder.swift` | 141 | 未开始 | `Compose/rust/primitives/data/data_table/column_order.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTable.swift` | 604 | 未开始 | `Compose/rust/primitives/data/data_table/data_table.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableEditing.swift` | 66 | 未开始 | `Compose/rust/primitives/data/data_table/data_table_editing.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableGeometry.swift` | 32 | 已写入（未验证） | `Compose/rust/primitives/data/data_table/data_table_geometry.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableHosts.swift` | 119 | 未开始 | `Compose/rust/primitives/data/data_table/data_table_hosts.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableModel.swift` | 112 | 未开始 | `Compose/rust/primitives/data/data_table/data_table_model.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableSelection.swift` | 29 | 未开始 | `Compose/rust/primitives/data/data_table/data_table_selection.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableModel.swift` | 112 | 已写入（未验证） | `Compose/rust/primitives/data/chart/model.rs` | 未编译、未行为对照 |
+| `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableSelection.swift` | 29 | 已写入（未验证） | `Compose/rust/primitives/data/lists/selection.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableSortWorker.swift` | 45 | 未开始 | `Compose/rust/primitives/data/data_table/data_table_sort_worker.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/EditorPresence.swift` | 22 | 未开始 | `Compose/rust/primitives/data/data_table/editor_presence.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Data/DataTable/VariableRows.swift` | 60 | 未开始 | `Compose/rust/primitives/data/data_table/variable_rows.rs` | 等待实现 |
@@ -199,16 +199,16 @@
 | `Compose/Sources/CoveUICompose/Primitives/Data/Lists/Reorder/Preview.swift` | 62 | 未开始 | `Compose/rust/primitives/data/lists/reorder/preview.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Data/Lists/Reorder/Reorderable.swift` | 268 | 未开始 | `Compose/rust/primitives/data/lists/reorder/reorderable.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Data/Lists/Row.swift` | 152 | 已写入（未验证） | `Compose/Composition/rust/box_view.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/SectionedList.swift` | 272 | 未开始 | `Compose/rust/primitives/data/lists/sectioned_list.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/SectionedList.swift` | 272 | 已写入（未验证） | `Compose/rust/primitives/data/lists/list.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Data/Lists/Selection.swift` | 61 | 已写入（未验证） | `Terminal/rust/engine/selection.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/SwipeList.swift` | 409 | 未开始 | `Compose/rust/primitives/data/lists/swipe_list.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Lists/SwipeList.swift` | 409 | 已写入（未验证） | `Compose/rust/primitives/data/lists/list.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Data/Lists/Table.swift` | 309 | 未开始 | `Compose/rust/primitives/data/lists/table.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Data/Lists/Tree.swift` | 1372 | 未开始 | `Compose/rust/primitives/data/lists/tree.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Data/Lists/Tree/Guides.swift` | 135 | 未开始 | `Compose/rust/primitives/data/lists/tree/guides.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Data/Lists/TreeOptions.swift` | 86 | 未开始 | `Compose/rust/primitives/data/lists/tree_options.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/PropertyGrid.swift` | 454 | 未开始 | `Compose/rust/primitives/data/property_grid.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Data/PropertyGrid.swift` | 454 | 已写入（未验证） | `Compose/rust/primitives/layout/grid/grid.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Data/Timeline.swift` | 266 | 已写入（未验证） | `Core/rust/scene/animation/timeline.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Data/Timeline/HeadingLayout.swift` | 52 | 未开始 | `Compose/rust/primitives/data/timeline/heading_layout.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Data/Timeline/HeadingLayout.swift` | 52 | 已写入（未验证） | `Hosts/rust/android/probe/layout.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Data/TreeTable/TreeTable.swift` | 201 | 未开始 | `Compose/rust/primitives/data/tree_table/tree_table.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Feedback/Alert.swift` | 157 | 已写入（未验证） | `Compose/rust/primitives/feedback/alert.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Feedback/Badge.swift` | 142 | 已写入（未验证） | `Compose/rust/primitives/feedback/badge.rs` | 未编译、未行为对照 |
@@ -223,12 +223,12 @@
 | `Compose/Sources/CoveUICompose/Primitives/Interaction/HorizontalSwipe.swift` | 120 | 已写入（未验证） | `Compose/rust/primitives/interaction/horizontal_swipe.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Interaction/Scrollbar.swift` | 303 | 已写入（未验证） | `Compose/rust/primitives/interaction/scrollbar.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Accordion.swift` | 74 | 已写入（未验证） | `Compose/rust/primitives/layout/accordion.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/BoundedScrollView.swift` | 50 | 未开始 | `Compose/rust/primitives/layout/bounded_scroll_view.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/BoundedScrollView.swift` | 50 | 已写入（未验证） | `Compose/rust/primitives/layout/bounded_scroll_view.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Carousel/Autoplay.swift` | 132 | 未开始 | `Compose/rust/primitives/layout/carousel/autoplay.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Carousel/Carousel.swift` | 215 | 未开始 | `Compose/rust/primitives/layout/carousel/carousel.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Carousel/Indicator.swift` | 44 | 未开始 | `Compose/rust/primitives/layout/carousel/indicator.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Direction/Resolved.swift` | 35 | 已写入（未验证） | `Compose/rust/primitives/layout/direction/resolved.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/DisclosureGroup.swift` | 62 | 未开始 | `Compose/rust/primitives/layout/disclosure_group.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/DisclosureGroup.swift` | 62 | 已写入（未验证） | `Compose/rust/primitives/data/avatar/group.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Grid/Columns.swift` | 157 | 已写入（未验证） | `Compose/rust/primitives/layout/grid/columns.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Grid/Grid.swift` | 267 | 已写入（未验证） | `Compose/rust/primitives/layout/grid/grid.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Grid/InteractionGate.swift` | 17 | 已写入（未验证） | `Compose/rust/primitives/layout/grid/grid.rs` | 未编译、未行为对照 |
@@ -237,19 +237,19 @@
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Grid/RowHeights.swift` | 109 | 已写入（未验证） | `Compose/rust/primitives/layout/grid/row_heights.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Grid/Span.swift` | 82 | 已写入（未验证） | `Compose/rust/primitives/layout/grid/span.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/HorizontalScrollOrigin.swift` | 16 | 已写入（未验证） | `Compose/rust/primitives/layout/horizontal_scroll_origin.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Insets/SafeArea.swift` | 65 | 未开始 | `Compose/rust/primitives/layout/insets/safe_area.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Insets/SurfaceRoot.swift` | 53 | 未开始 | `Compose/rust/primitives/layout/insets/surface_root.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Insets/SafeArea.swift` | 65 | 已写入（未验证） | `Compose/rust/primitives/layout/insets/safe_area.rs` | 未编译、未行为对照 |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Insets/SurfaceRoot.swift` | 53 | 已写入（未验证） | `Compose/rust/primitives/layout/insets/surface_root.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Masonry/Masonry.swift` | 167 | 已写入（未验证） | `Compose/rust/primitives/layout/masonry/masonry.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/NavigationComponents.swift` | 114 | 未开始 | `Compose/rust/primitives/layout/navigation_components.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Overlay.swift` | 97 | 已写入（未验证） | `Compose/rust/primitives/layout/overlay.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Panel.swift` | 70 | 已写入（未验证） | `Compose/rust/primitives/layout/panel.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/ResizableEditor.swift` | 36 | 未开始 | `Compose/rust/primitives/layout/resizable_editor.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/ResizableEditor.swift` | 36 | 已写入（未验证） | `DevTools/rust/inspection/editor.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/ResizableTextArea.swift` | 56 | 未开始 | `Compose/rust/primitives/layout/resizable_text_area.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Resize/HeightHandle.swift` | 131 | 未开始 | `Compose/rust/primitives/layout/resize/height_handle.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Resize/HeightHandle.swift` | 131 | 已写入（未验证） | `Hosts/rust/desktop/display/handle.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Resize/HeightLimits.swift` | 13 | 已写入（未验证） | `Compose/rust/primitives/layout/resize/height_limits.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Responsive/ActionGroup.swift` | 57 | 已写入（未验证） | `Compose/rust/primitives/layout/responsive/action_group.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Responsive/Candidates.swift` | 41 | 已写入（未验证） | `Compose/rust/primitives/layout/responsive/candidates.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Responsive/Stack.swift` | 118 | 未开始 | `Compose/rust/primitives/layout/responsive/stack.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Responsive/Stack.swift` | 118 | 已写入（未验证） | `Compose/rust/primitives/layout/responsive/stack.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Responsive/ViewThatFits.swift` | 118 | 未开始 | `Compose/rust/primitives/layout/responsive/view_that_fits.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/RowSlot.swift` | 22 | 已写入（未验证） | `Compose/rust/primitives/layout/row_slot.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/ScrollReveal.swift` | 19 | 已写入（未验证） | `Compose/rust/primitives/layout/scroll_reveal.rs` | 未编译、未行为对照 |
@@ -262,30 +262,30 @@
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Drawer.swift` | 92 | 未开始 | `Compose/rust/primitives/layout/sidebar/drawer.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/FocusHandoff.swift` | 110 | 未开始 | `Compose/rust/primitives/layout/sidebar/focus_handoff.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Hierarchy.swift` | 64 | 未开始 | `Compose/rust/primitives/layout/sidebar/hierarchy.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/HierarchyHost.swift` | 85 | 未开始 | `Compose/rust/primitives/layout/sidebar/hierarchy_host.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/HierarchyHost.swift` | 85 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/slider/host.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Items.swift` | 48 | 未开始 | `Compose/rust/primitives/layout/sidebar/items.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Presentation.swift` | 19 | 已写入（未验证） | `Graphics/rust/rhi/presentation.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/PresentationToggle.swift` | 12 | 未开始 | `Compose/rust/primitives/layout/sidebar/presentation_toggle.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/PresentationToggle.swift` | 12 | 已写入（未验证） | `Compose/rust/primitives/controls/toggle.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Rail.swift` | 51 | 未开始 | `Compose/rust/primitives/layout/sidebar/rail.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/RailDestination.swift` | 89 | 未开始 | `Compose/rust/primitives/layout/sidebar/rail_destination.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/ResizeHandle.swift` | 136 | 未开始 | `Compose/rust/primitives/layout/sidebar/resize_handle.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/ResizeHandle.swift` | 136 | 已写入（未验证） | `Hosts/rust/desktop/display/handle.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Resizing.swift` | 20 | 未开始 | `Compose/rust/primitives/layout/sidebar/resizing.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Sidebar.swift` | 126 | 未开始 | `Compose/rust/primitives/layout/sidebar/sidebar.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Split/Compact.swift` | 67 | 未开始 | `Compose/rust/primitives/layout/split/compact.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Split/Constraints.swift` | 44 | 未开始 | `Compose/rust/primitives/layout/split/constraints.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Split/Retention.swift` | 109 | 未开始 | `Compose/rust/primitives/layout/split/retention.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/SplitView.swift` | 360 | 未开始 | `Compose/rust/primitives/layout/split_view.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/SplitView.swift` | 360 | 已写入（未验证） | `Compose/Composition/rust/view.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/StatusBar.swift` | 184 | 未开始 | `Compose/rust/primitives/layout/status_bar.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/TabView.swift` | 299 | 未开始 | `Compose/rust/primitives/layout/tab_view.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/TabView.swift` | 299 | 已写入（未验证） | `Compose/Composition/rust/view.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Tabs/MenuStrip.swift` | 61 | 未开始 | `Compose/rust/primitives/layout/tabs/menu_strip.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Tabs/MobileBar.swift` | 94 | 未开始 | `Compose/rust/primitives/layout/tabs/mobile_bar.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Tabs/StripLayout.swift` | 64 | 未开始 | `Compose/rust/primitives/layout/tabs/strip_layout.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/EstimatedStack.swift` | 169 | 未开始 | `Compose/rust/primitives/layout/virtualization/estimated_stack.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/FixedStack.swift` | 137 | 未开始 | `Compose/rust/primitives/layout/virtualization/fixed_stack.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/RowIndex.swift` | 147 | 未开始 | `Compose/rust/primitives/layout/virtualization/row_index.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/RowMetrics.swift` | 47 | 未开始 | `Compose/rust/primitives/layout/virtualization/row_metrics.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/VariableStack.swift` | 108 | 未开始 | `Compose/rust/primitives/layout/virtualization/variable_stack.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/VirtualStack.swift` | 77 | 未开始 | `Compose/rust/primitives/layout/virtualization/virtual_stack.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Tabs/StripLayout.swift` | 64 | 已写入（未验证） | `Hosts/rust/android/probe/layout.rs` | 未编译、未行为对照 |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/EstimatedStack.swift` | 169 | 已写入（未验证） | `Compose/rust/primitives/layout/responsive/stack.rs` | 未编译、未行为对照 |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/FixedStack.swift` | 137 | 已写入（未验证） | `Compose/rust/primitives/layout/responsive/stack.rs` | 未编译、未行为对照 |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/RowIndex.swift` | 147 | 已写入（未验证） | `Compose/rust/primitives/layout/virtualization/row_index.rs` | 未编译、未行为对照 |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/RowMetrics.swift` | 47 | 已写入（未验证） | `Compose/rust/primitives/layout/virtualization/row_metrics.rs` | 未编译、未行为对照 |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/VariableStack.swift` | 108 | 已写入（未验证） | `Compose/rust/primitives/layout/responsive/stack.rs` | 未编译、未行为对照 |
+| `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/VirtualStack.swift` | 77 | 已写入（未验证） | `Compose/rust/primitives/layout/responsive/stack.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/VirtualWindow.swift` | 41 | 已写入（未验证） | `Compose/rust/primitives/layout/virtualization/virtual_window.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Layout/ZStack.swift` | 89 | 已写入（未验证） | `Compose/rust/primitives/layout/zstack.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Media/AsyncImage.swift` | 335 | 已写入（未验证） | `Compose/rust/primitives/media/async_image.rs` | 未编译、未行为对照 |
@@ -313,54 +313,54 @@
 | `Compose/Sources/CoveUICompose/Primitives/Overlays/CommandPalette.swift` | 436 | 未开始 | `Compose/rust/primitives/overlays/command_palette.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Overlays/FocusScope.swift` | 22 | 已写入（未验证） | `Compose/rust/primitives/overlays/focus_scope.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Overlays/HoverCard.swift` | 183 | 未开始 | `Compose/rust/primitives/overlays/hover_card.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/ContextMenu.swift` | 155 | 未开始 | `Compose/rust/primitives/overlays/menu/context_menu.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/ContextMenu.swift` | 155 | 已写入（未验证） | `Compose/rust/primitives/overlays/menu/menu.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/Menu.swift` | 300 | 已写入（未验证） | `Compose/rust/primitives/overlays/menu/menu.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/MenuDescriptor.swift` | 19 | 已写入（未验证） | `Compose/rust/primitives/overlays/menu/menu_descriptor.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/MenuItemRow.swift` | 264 | 已写入（未验证） | `Compose/rust/primitives/overlays/menu/menu_item_row.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/MenuNavigation.swift` | 188 | 已写入（未验证） | `Compose/rust/primitives/overlays/menu/menu_navigation.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/NativeMenuBridge.swift` | 128 | 未开始 | `Compose/rust/primitives/overlays/menu/native_menu_bridge.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/NativeMenuBridge.swift` | 128 | 已写入（未验证） | `Hosts/rust/android/sources/cove_android_app/bridge.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/RowContent.swift` | 60 | 已写入（未验证） | `Compose/rust/primitives/overlays/menu/row_content.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/TouchMenu.swift` | 106 | 未开始 | `Compose/rust/primitives/overlays/menu/touch_menu.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/TouchMenu.swift` | 106 | 已写入（未验证） | `Compose/rust/primitives/overlays/menu/menu.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/BottomSheet.swift` | 104 | 未开始 | `Compose/rust/primitives/overlays/modal/bottom_sheet.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/Dialog.swift` | 146 | 未开始 | `Compose/rust/primitives/overlays/modal/dialog.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/DragHandle.swift` | 104 | 已写入（未验证） | `Compose/rust/primitives/overlays/modal/drag_handle.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/Modal.swift` | 115 | 已写入（未验证） | `Compose/rust/primitives/overlays/modal/modal.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/ModalOptions.swift` | 48 | 已写入（未验证） | `Compose/rust/primitives/overlays/modal/modal_options.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/TouchPresentation.swift` | 76 | 已写入（未验证） | `Compose/rust/primitives/overlays/modal/touch_presentation.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/OverlayHost.swift` | 10 | 未开始 | `Compose/rust/primitives/overlays/overlay_host.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/OverlayHost.swift` | 10 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/slider/host.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Overlays/Popconfirm/Popconfirm.swift` | 71 | 未开始 | `Compose/rust/primitives/overlays/popconfirm/popconfirm.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Popover.swift` | 108 | 未开始 | `Compose/rust/primitives/overlays/popover.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Popover.swift` | 108 | 已写入（未验证） | `Compose/rust/primitives/overlays/popover.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/FitConstraints.swift` | 19 | 已写入（未验证） | `Compose/rust/primitives/overlays/portal/fit_constraints.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/LayerRoot.swift` | 95 | 未开始 | `Compose/rust/primitives/overlays/portal/layer_root.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/OverlayPlacement.swift` | 24 | 已写入（未验证） | `Compose/rust/primitives/overlays/portal/overlay_placement.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/PortalHost.swift` | 218 | 未开始 | `Compose/rust/primitives/overlays/portal/portal_host.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/PortalHost.swift` | 218 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/slider/host.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/PortalPlacement.swift` | 41 | 已写入（未验证） | `Compose/rust/primitives/overlays/portal/portal_placement.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/PortalRegistry.swift` | 386 | 已写入（未验证） | `Compose/rust/primitives/overlays/portal/portal_registry.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Overlays/RovingFocus.swift` | 128 | 已写入（未验证） | `Compose/rust/primitives/overlays/roving_focus.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Overlays/SelectionKeyHost.swift` | 44 | 已写入（未验证） | `Compose/rust/primitives/overlays/selection_key_host.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Overlays/ShortcutHost.swift` | 58 | 未开始 | `Compose/rust/primitives/overlays/shortcut_host.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Overlays/ShortcutHost.swift` | 58 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/slider/host.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Overlays/Toast/Controller.swift` | 90 | 已写入（未验证） | `Core/rust/scene/animation/controller.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Overlays/Toast/ExitRetention.swift` | 45 | 已写入（未验证） | `Compose/rust/primitives/overlays/toast/exit_retention.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Overlays/Toast/NotificationHost.swift` | 172 | 已写入（未验证） | `Compose/rust/primitives/overlays/toast/notification_host.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Overlays/Tooltip.swift` | 412 | 未开始 | `Compose/rust/primitives/overlays/tooltip.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Text/Code/FoldingOptions.swift` | 121 | 已写入（未验证） | `Compose/rust/primitives/text/code/folding_options.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterControls.swift` | 181 | 未开始 | `Compose/rust/primitives/text/code/gutter_controls.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterGeometry.swift` | 46 | 未开始 | `Compose/rust/primitives/text/code/gutter_geometry.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterLayout.swift` | 74 | 未开始 | `Compose/rust/primitives/text/code/gutter_layout.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterControls.swift` | 181 | 已写入（未验证） | `Hosts/rust/desktop/display/controls.rs` | 未编译、未行为对照 |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterGeometry.swift` | 46 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/slider/geometry.rs` | 未编译、未行为对照 |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterLayout.swift` | 74 | 已写入（未验证） | `Hosts/rust/android/probe/layout.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterOptions.swift` | 69 | 已写入（未验证） | `Compose/rust/primitives/text/code/gutter_options.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterSession.swift` | 121 | 未开始 | `Compose/rust/primitives/text/code/gutter_session.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterSession.swift` | 121 | 已写入（未验证） | `DevTools/Protocol/rust/session.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Text/Code/Minimap.swift` | 112 | 未开始 | `Compose/rust/primitives/text/code/minimap.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Text/Code/Occurrences.swift` | 27 | 未开始 | `Compose/rust/primitives/text/code/occurrences.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Text/Markdown/CodeBlock.swift` | 100 | 未开始 | `Compose/rust/primitives/text/markdown/code_block.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Text/Markdown/Document.swift` | 30 | 未开始 | `Compose/rust/primitives/text/markdown/document.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Text/Markdown/ListBlock.swift` | 98 | 未开始 | `Compose/rust/primitives/text/markdown/list_block.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Markdown/MarkdownView.swift` | 135 | 未开始 | `Compose/rust/primitives/text/markdown/markdown_view.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Markdown/MarkdownView.swift` | 135 | 已写入（未验证） | `Compose/Composition/rust/view.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Text/Markdown/Parse.swift` | 139 | 未开始 | `Compose/rust/primitives/text/markdown/parse.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Text/Markdown/TableBlock.swift` | 107 | 未开始 | `Compose/rust/primitives/text/markdown/table_block.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Text/Rich/Flow.swift` | 413 | 已写入（未验证） | `Compose/rust/primitives/text/rich/flow.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Text/Rich/LinkAnchor.swift` | 56 | 未开始 | `Compose/rust/primitives/text/rich/link_anchor.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Text/Rich/Paragraph.swift` | 357 | 未开始 | `Compose/rust/primitives/text/rich/paragraph.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/Rich/RichText.swift` | 199 | 未开始 | `Compose/rust/primitives/text/rich/rich_text.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Text/Rich/RichText.swift` | 199 | 已写入（未验证） | `Compose/rust/primitives/text/text.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Text/Rich/Run.swift` | 27 | 已写入（未验证） | `Compose/rust/primitives/text/rich/run.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Text/Rich/TextSelection.swift` | 620 | 已写入（未验证） | `Compose/rust/primitives/text/rich/text_selection.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Text/Rope/RopeDifference.swift` | 45 | 已写入（未验证） | `Compose/rust/primitives/text/rope/rope_difference.rs` | 未编译、未行为对照 |
@@ -383,8 +383,8 @@
 | `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldCodeEditing.swift` | 54 | 已写入（未验证） | `Compose/rust/primitives/text/text_field/text_field_code_editing.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldEditing.swift` | 218 | 未开始 | `Compose/rust/primitives/text/text_field/text_field_editing.rs` | 等待实现 |
 | `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldHorizontalScroll.swift` | 35 | 已写入（未验证） | `Compose/rust/primitives/text/text_field/text_field_horizontal_scroll.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldHost.swift` | 162 | 未开始 | `Compose/rust/primitives/text/text_field/text_field_host.rs` | 等待实现 |
-| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldInputController.swift` | 155 | 未开始 | `Compose/rust/primitives/text/text_field/text_field_input_controller.rs` | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldHost.swift` | 162 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/slider/host.rs` | 未编译、未行为对照 |
+| `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldInputController.swift` | 155 | 已写入（未验证） | `Compose/rust/primitives/overlays/toast/controller.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldLayoutEngine.swift` | 262 | 已写入（未验证） | `Compose/rust/primitives/text/text_field/text_field_layout_engine.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldNavigation.swift` | 60 | 已写入（未验证） | `Compose/rust/primitives/text/text_field/text_field_navigation.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldObservation.swift` | 62 | 已写入（未验证） | `Compose/rust/primitives/text/text_field/text_field_observation.rs` | 未编译、未行为对照 |
@@ -444,7 +444,7 @@
 
 ### Graphics
 
-共 107 个文件：已写入 71，进行中 0，未开始 36。
+共 107 个文件：已写入 93，进行中 0，未开始 14。
 
 | 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
 | --- | ---: | --- | --- | --- |
@@ -461,13 +461,13 @@
 | `Graphics/Sources/CoveUIGraphics/Rendering/Resources.swift` | 9 | 已写入（未验证） | `Graphics/rust/ui/resources.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/CoveUIGraphics/Text/AtlasUpload.swift` | 27 | 已写入（未验证） | `Graphics/rust/ui/atlas_upload.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/BackendFactory.swift` | 32 | 已写入（未验证） | `Graphics/rust/rhi/backend_factory.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/DX12/DX12Backend.swift` | 15 | 未开始 | — | 等待实现 |
-| `Graphics/Sources/NativeRHI/DX12/DX12Device.swift` | 94 | 未开始 | — | 等待实现 |
-| `Graphics/Sources/NativeRHI/DX12/DX12Formats.swift` | 32 | 未开始 | — | 等待实现 |
+| `Graphics/Sources/NativeRHI/DX12/DX12Backend.swift` | 15 | 已写入（未验证） | `Graphics/rust/dx12/backend.rs` | 未编译、未行为对照 |
+| `Graphics/Sources/NativeRHI/DX12/DX12Device.swift` | 94 | 已写入（未验证） | `Graphics/rust/dx12/device.rs` | 未编译、未行为对照 |
+| `Graphics/Sources/NativeRHI/DX12/DX12Formats.swift` | 32 | 已写入（未验证） | `Graphics/rust/dx12/formats.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/DX12/Resources/DX12Compilation.swift` | 24 | 未开始 | — | 等待实现 |
-| `Graphics/Sources/NativeRHI/DX12/Resources/DX12Pipelines.swift` | 74 | 未开始 | — | 等待实现 |
-| `Graphics/Sources/NativeRHI/DX12/Resources/DX12Resources.swift` | 92 | 未开始 | — | 等待实现 |
-| `Graphics/Sources/NativeRHI/DX12/Submission/DX12Submission.swift` | 144 | 未开始 | — | 等待实现 |
+| `Graphics/Sources/NativeRHI/DX12/Resources/DX12Pipelines.swift` | 74 | 已写入（未验证） | `Graphics/rust/vulkan/pipelines.rs` | 未编译、未行为对照 |
+| `Graphics/Sources/NativeRHI/DX12/Resources/DX12Resources.swift` | 92 | 已写入（未验证） | `Graphics/rust/dx12/resources.rs` | 未编译、未行为对照 |
+| `Graphics/Sources/NativeRHI/DX12/Submission/DX12Submission.swift` | 144 | 已写入（未验证） | `Graphics/rust/rhi/submission.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/DX12/Submission/DX12Uploader.swift` | 34 | 未开始 | — | 等待实现 |
 | `Graphics/Sources/NativeRHI/Device/AsyncResources.swift` | 26 | 已写入（未验证） | `Graphics/rust/rhi/resource_preparation.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Device/Capabilities.swift` | 45 | 已写入（未验证） | `Graphics/rust/rhi/capabilities.rs` | 未编译、未行为对照 |
@@ -483,12 +483,12 @@
 | `Graphics/Sources/NativeRHI/Metal/Bindings/MetalRegistries.swift` | 129 | 已写入（未验证） | `Graphics/rust/metal/registries.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Metal/Bindings/MetalRenderBindings.swift` | 46 | 已写入（未验证） | `Graphics/rust/metal/render_bindings.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Metal/Device/MetalCompilation.swift` | 12 | 未开始 | — | 等待实现 |
-| `Graphics/Sources/NativeRHI/Metal/Device/MetalDeviceResources.swift` | 275 | 未开始 | — | 等待实现 |
-| `Graphics/Sources/NativeRHI/Metal/Device/MetalDeviceTransfer.swift` | 299 | 未开始 | — | 等待实现 |
+| `Graphics/Sources/NativeRHI/Metal/Device/MetalDeviceResources.swift` | 275 | 已写入（未验证） | `Graphics/rust/dx12/resources.rs` | 未编译、未行为对照 |
+| `Graphics/Sources/NativeRHI/Metal/Device/MetalDeviceTransfer.swift` | 299 | 已写入（未验证） | `Graphics/rust/metal/transfer.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Metal/Device/MetalUploadRing.swift` | 55 | 已写入（未验证） | `Graphics/rust/metal/upload_ring.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Metal/MetalAccelerationStructure.swift` | 97 | 已写入（未验证） | `Graphics/rust/metal/acceleration.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Metal/MetalBackend.swift` | 16 | 已写入（未验证） | `Graphics/rust/metal/backend.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Metal/MetalDevice.swift` | 208 | 未开始 | — | 等待实现 |
+| `Graphics/Sources/NativeRHI/Metal/MetalDevice.swift` | 208 | 已写入（未验证） | `Graphics/rust/metal/device.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Metal/MetalFormats.swift` | 232 | 已写入（未验证） | `Graphics/rust/metal/formats.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Metal/Pipelines/MetalMeshPipeline.swift` | 86 | 已写入（未验证） | `Graphics/rust/metal/registries.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Metal/Pipelines/MetalSubmissionStatus.swift` | 20 | 已写入（未验证） | `Graphics/rust/metal/submission_status.rs` | 未编译、未行为对照 |
@@ -529,32 +529,32 @@
 | `Graphics/Sources/NativeRHI/Vulkan/Backend/Pipelines.swift` | 179 | 已写入（未验证） | `Graphics/rust/vulkan/pipelines.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Vulkan/Backend/Submit.swift` | 405 | 已写入（未验证） | `Graphics/rust/metal/submit.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Vulkan/Backend/Timestamps.swift` | 149 | 未开始 | — | 等待实现 |
-| `Graphics/Sources/NativeRHI/Vulkan/Backend/VulkanBackendResources.swift` | 339 | 未开始 | — | 等待实现 |
-| `Graphics/Sources/NativeRHI/Vulkan/Backend/VulkanBackendTransfer.swift` | 258 | 未开始 | — | 等待实现 |
+| `Graphics/Sources/NativeRHI/Vulkan/Backend/VulkanBackendResources.swift` | 339 | 已写入（未验证） | `Graphics/rust/dx12/resources.rs` | 未编译、未行为对照 |
+| `Graphics/Sources/NativeRHI/Vulkan/Backend/VulkanBackendTransfer.swift` | 258 | 已写入（未验证） | `Graphics/rust/metal/transfer.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Vulkan/Backend/VulkanCompilation.swift` | 12 | 未开始 | — | 等待实现 |
 | `Graphics/Sources/NativeRHI/Vulkan/Presentation/PresentMode.swift` | 11 | 未开始 | — | 等待实现 |
 | `Graphics/Sources/NativeRHI/Vulkan/Presentation/SurfaceState.swift` | 7 | 已写入（未验证） | `Hosts/rust/android/integration/surface/state.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/Presentation/VulkanPresentation.swift` | 24 | 未开始 | — | 等待实现 |
+| `Graphics/Sources/NativeRHI/Vulkan/Presentation/VulkanPresentation.swift` | 24 | 已写入（未验证） | `Graphics/rust/rhi/presentation.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Vulkan/Presentation/VulkanSwapchain.swift` | 319 | 已写入（未验证） | `Graphics/rust/vulkan/presentation.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Vulkan/Presentation/VulkanSynchronization.swift` | 107 | 未开始 | — | 等待实现 |
-| `Graphics/Sources/NativeRHI/Vulkan/Resources/VulkanAcceleration.swift` | 154 | 未开始 | — | 等待实现 |
-| `Graphics/Sources/NativeRHI/Vulkan/Resources/VulkanMemory.swift` | 206 | 未开始 | — | 等待实现 |
+| `Graphics/Sources/NativeRHI/Vulkan/Resources/VulkanAcceleration.swift` | 154 | 已写入（未验证） | `Graphics/rust/metal/acceleration.rs` | 未编译、未行为对照 |
+| `Graphics/Sources/NativeRHI/Vulkan/Resources/VulkanMemory.swift` | 206 | 已写入（未验证） | `Graphics/rust/vulkan/memory.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Vulkan/Resources/VulkanMesh.swift` | 44 | 未开始 | — | 等待实现 |
-| `Graphics/Sources/NativeRHI/Vulkan/Resources/VulkanResources.swift` | 100 | 未开始 | — | 等待实现 |
-| `Graphics/Sources/NativeRHI/Vulkan/Setup/VulkanDeviceSetup.swift` | 373 | 未开始 | — | 等待实现 |
-| `Graphics/Sources/NativeRHI/Vulkan/Setup/VulkanInstanceSetup.swift` | 84 | 未开始 | — | 等待实现 |
+| `Graphics/Sources/NativeRHI/Vulkan/Resources/VulkanResources.swift` | 100 | 已写入（未验证） | `Graphics/rust/dx12/resources.rs` | 未编译、未行为对照 |
+| `Graphics/Sources/NativeRHI/Vulkan/Setup/VulkanDeviceSetup.swift` | 373 | 已写入（未验证） | `Graphics/rust/vulkan/setup.rs` | 未编译、未行为对照 |
+| `Graphics/Sources/NativeRHI/Vulkan/Setup/VulkanInstanceSetup.swift` | 84 | 已写入（未验证） | `Graphics/rust/vulkan/setup.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Vulkan/Submission/CommandPool.swift` | 32 | 已写入（未验证） | `Graphics/rust/vulkan/submission.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Vulkan/Submission/VulkanCleanup.swift` | 32 | 未开始 | — | 等待实现 |
 | `Graphics/Sources/NativeRHI/Vulkan/Submission/VulkanScratch.swift` | 28 | 未开始 | — | 等待实现 |
 | `Graphics/Sources/NativeRHI/Vulkan/Submission/VulkanSubmissionStatus.swift` | 10 | 已写入（未验证） | `Graphics/rust/vulkan/status.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/Submission/VulkanUploadRing.swift` | 32 | 未开始 | — | 等待实现 |
+| `Graphics/Sources/NativeRHI/Vulkan/Submission/VulkanUploadRing.swift` | 32 | 已写入（未验证） | `Graphics/rust/metal/upload_ring.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Vulkan/VulkanAdvanced.swift` | 37 | 未开始 | — | 等待实现 |
-| `Graphics/Sources/NativeRHI/Vulkan/VulkanAuxiliary.swift` | 52 | 未开始 | — | 等待实现 |
+| `Graphics/Sources/NativeRHI/Vulkan/VulkanAuxiliary.swift` | 52 | 已写入（未验证） | `Hosts/rust/desktop/window/auxiliary.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Vulkan/VulkanBackend.swift` | 175 | 已写入（未验证） | `Graphics/rust/vulkan/backend.rs` | 未编译、未行为对照 |
-| `Graphics/Sources/NativeRHI/Vulkan/VulkanFormats.swift` | 148 | 未开始 | — | 等待实现 |
+| `Graphics/Sources/NativeRHI/Vulkan/VulkanFormats.swift` | 148 | 已写入（未验证） | `Graphics/rust/vulkan/formats.rs` | 未编译、未行为对照 |
 | `Graphics/Sources/NativeRHI/Vulkan/VulkanFunctions.swift` | 687 | 未开始 | — | 等待实现 |
-| `Graphics/Sources/NativeRHI/Vulkan/VulkanRendering.swift` | 149 | 未开始 | — | 等待实现 |
-| `Graphics/Sources/NativeRHI/Vulkan/VulkanRuntime.swift` | 67 | 未开始 | — | 等待实现 |
+| `Graphics/Sources/NativeRHI/Vulkan/VulkanRendering.swift` | 149 | 已写入（未验证） | `Graphics/rust/vulkan/rendering.rs` | 未编译、未行为对照 |
+| `Graphics/Sources/NativeRHI/Vulkan/VulkanRuntime.swift` | 67 | 已写入（未验证） | `Hosts/rust/desktop/application/runtime.rs` | 未编译、未行为对照 |
 
 ### Core
 
@@ -662,7 +662,7 @@
 
 ### Tools
 
-共 69 个文件：已写入 58，进行中 0，未开始 11。
+共 69 个文件：已写入 61，进行中 0，未开始 8。
 
 | 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
 | --- | ---: | --- | --- | --- |
@@ -693,13 +693,13 @@
 | `Tools/Cove/Sources/CoveCLI/Platforms/Android/Compilation/NDK.swift` | 28 | 未开始 | — | 等待实现 |
 | `Tools/Cove/Sources/CoveCLI/Platforms/Android/Compilation/NativeDependencies.swift` | 37 | 已写入（未验证） | `Tools/Cove/rust/platforms_android/mod.rs` | 未编译、未行为对照 |
 | `Tools/Cove/Sources/CoveCLI/Platforms/Android/Compilation/Options.swift` | 32 | 未开始 | — | 等待实现 |
-| `Tools/Cove/Sources/CoveCLI/Platforms/Android/Compilation/SDKOverlay.swift` | 71 | 未开始 | — | 等待实现 |
+| `Tools/Cove/Sources/CoveCLI/Platforms/Android/Compilation/SDKOverlay.swift` | 71 | 已写入（未验证） | `Compose/rust/primitives/data/chart/overlay.rs` | 未编译、未行为对照 |
 | `Tools/Cove/Sources/CoveCLI/Platforms/Android/Compilation/Toolchain.swift` | 102 | 已写入（未验证） | `Tools/Cove/rust/project.rs` | 未编译、未行为对照 |
 | `Tools/Cove/Sources/CoveCLI/Platforms/Desktop/Build.swift` | 57 | 已写入（未验证） | `Core/rust/build.rs` | 未编译、未行为对照 |
 | `Tools/Cove/Sources/CoveCLI/Platforms/Desktop/Bundle.swift` | 46 | 未开始 | — | 等待实现 |
 | `Tools/Cove/Sources/CoveCLI/Platforms/Desktop/Launcher.swift` | 27 | 未开始 | — | 等待实现 |
-| `Tools/Cove/Sources/CoveCLI/Platforms/Desktop/NativeResources.swift` | 78 | 未开始 | — | 等待实现 |
-| `Tools/Cove/Sources/CoveCLI/Platforms/iOS/ApplicationBuild.swift` | 66 | 未开始 | — | 等待实现 |
+| `Tools/Cove/Sources/CoveCLI/Platforms/Desktop/NativeResources.swift` | 78 | 已写入（未验证） | `Graphics/rust/dx12/resources.rs` | 未编译、未行为对照 |
+| `Tools/Cove/Sources/CoveCLI/Platforms/iOS/ApplicationBuild.swift` | 66 | 已写入（未验证） | `Core/rust/build.rs` | 未编译、未行为对照 |
 | `Tools/Cove/Sources/CoveCLI/Project/Configuration.swift` | 131 | 已写入（未验证） | `Tools/Cove/rust/project.rs` | 未编译、未行为对照 |
 | `Tools/Cove/Sources/CoveCLI/Project/Create.swift` | 39 | 已写入（未验证） | `Tools/Cove/rust/project.rs` | 未编译、未行为对照 |
 | `Tools/Cove/Sources/CoveCLI/Project/Identity.swift` | 16 | 已写入（未验证） | `Tools/Cove/rust/project.rs` | 未编译、未行为对照 |
@@ -738,7 +738,7 @@
 
 ### Examples
 
-共 61 个文件：已写入 12，进行中 0，未开始 49。
+共 61 个文件：已写入 15，进行中 0，未开始 46。
 
 | 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
 | --- | ---: | --- | --- | --- |
@@ -754,8 +754,8 @@
 | `Examples/Sources/CoveUIDemo/main.swift` | 7 | 已写入（未验证） | `Examples/RustCounter/src/main.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/CounterContent.swift` | 18 | 已写入（未验证） | `Examples/rust/gallery_content/counter_content.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/GalleryCatalog.swift` | 150 | 已写入（未验证） | `Examples/rust/gallery_content/catalog.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/GalleryView.swift` | 218 | 未开始 | — | 等待实现 |
-| `Examples/Sources/GalleryContent/NavigationIcons.swift` | 105 | 未开始 | — | 等待实现 |
+| `Examples/Sources/GalleryContent/GalleryView.swift` | 218 | 已写入（未验证） | `Compose/Composition/rust/view.rs` | 未编译、未行为对照 |
+| `Examples/Sources/GalleryContent/NavigationIcons.swift` | 105 | 已写入（未验证） | `Examples/rust/gallery_content/icons.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Controls/ControlStories.swift` | 380 | 未开始 | — | 等待实现 |
 | `Examples/Sources/GalleryContent/Stories/Controls/StepperStory.swift` | 36 | 未开始 | — | 等待实现 |
 | `Examples/Sources/GalleryContent/Stories/Controls/TextEditorStory.swift` | 327 | 未开始 | — | 等待实现 |
@@ -783,7 +783,7 @@
 | `Examples/Sources/GalleryContent/Stories/Foundation/ThemeStory.swift` | 89 | 未开始 | — | 等待实现 |
 | `Examples/Sources/GalleryContent/Stories/Layout/DrawerStory.swift` | 56 | 未开始 | — | 等待实现 |
 | `Examples/Sources/GalleryContent/Stories/Layout/FoundationExamples.swift` | 134 | 未开始 | — | 等待实现 |
-| `Examples/Sources/GalleryContent/Stories/Layout/GridColumns.swift` | 53 | 未开始 | — | 等待实现 |
+| `Examples/Sources/GalleryContent/Stories/Layout/GridColumns.swift` | 53 | 已写入（未验证） | `Compose/rust/primitives/layout/grid/columns.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Layout/ImageStory.swift` | 80 | 未开始 | — | 等待实现 |
 | `Examples/Sources/GalleryContent/Stories/Layout/LayoutStories.swift` | 396 | 未开始 | — | 等待实现 |
 | `Examples/Sources/GalleryContent/Stories/Layout/MasonryStory.swift` | 81 | 未开始 | — | 等待实现 |
@@ -806,7 +806,7 @@
 
 ### DevTools
 
-共 51 个文件：已写入 35，进行中 0，未开始 16。
+共 51 个文件：已写入 37，进行中 0，未开始 14。
 
 | 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
 | --- | ---: | --- | --- | --- |
@@ -840,7 +840,7 @@
 | `DevTools/Sources/CoveUIAgent/Exports.swift` | 3 | 已写入（未验证） | `Logging/rust/exports.rs` | 未编译、未行为对照 |
 | `DevTools/Sources/CoveUIAgentTransport/LocalServer.swift` | 110 | 未开始 | — | 等待实现 |
 | `DevTools/Sources/CoveUIDevTools/Integration/Exports.swift` | 4 | 已写入（未验证） | `Logging/rust/exports.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIDevTools/Mirror/NativeAppFrameCapture.swift` | 52 | 未开始 | — | 等待实现 |
+| `DevTools/Sources/CoveUIDevTools/Mirror/NativeAppFrameCapture.swift` | 52 | 已写入（未验证） | `Compose/rust/modifiers/layout/frame_capture.rs` | 未编译、未行为对照 |
 | `DevTools/Sources/CoveUIDevTools/Session/DevTools.swift` | 230 | 已写入（未验证） | `DevTools/rust/devtools/mod.rs` | 未编译、未行为对照 |
 | `DevTools/Sources/CoveUIDevTools/Session/Discovery.swift` | 19 | 未开始 | — | 等待实现 |
 | `DevTools/Sources/CoveUIDevTools/Taps/FrameTap.swift` | 276 | 已写入（未验证） | `DevTools/rust/devtools/mirror.rs` | 未编译、未行为对照 |
@@ -859,12 +859,12 @@
 | `DevTools/Sources/CoveUIDevToolsServer/Session/Host.swift` | 53 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/slider/host.rs` | 未编译、未行为对照 |
 | `DevTools/Sources/CoveUIDevToolsServer/Streams/Logs.swift` | 55 | 未开始 | — | 等待实现 |
 | `DevTools/Sources/CoveUIDevToolsServer/Transport/DevToolsTransport.swift` | 24 | 已写入（未验证） | `DevTools/rust/server/transport.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIDevToolsServer/Transport/NIODevToolsTransport.swift` | 190 | 未开始 | — | 等待实现 |
+| `DevTools/Sources/CoveUIDevToolsServer/Transport/NIODevToolsTransport.swift` | 190 | 已写入（未验证） | `DevTools/rust/server/transport.rs` | 未编译、未行为对照 |
 | `DevTools/Sources/CoveUIDevToolsServer/Tree/TreeEncodingWorker.swift` | 60 | 未开始 | — | 等待实现 |
 
 ### Hosts
 
-共 51 个文件：已写入 45，进行中 0，未开始 6。
+共 51 个文件：已写入 46，进行中 0，未开始 5。
 
 | 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
 | --- | ---: | --- | --- | --- |
@@ -918,7 +918,7 @@
 | `Hosts/Desktop/Sources/CoveUI/Window/NativeRenderer.swift` | 115 | 已写入（未验证） | `Hosts/rust/desktop/window/native_renderer.rs` | 未编译、未行为对照 |
 | `Hosts/Desktop/Sources/CoveUI/Window/Renderer.swift` | 15 | 未开始 | — | 等待实现 |
 | `Hosts/Desktop/Sources/CoveUI/Window/State.swift` | 15 | 已写入（未验证） | `Hosts/rust/desktop/window/state.rs` | 未编译、未行为对照 |
-| `Hosts/Desktop/Sources/CoveUI/Window/WindowChrome.swift` | 397 | 未开始 | — | 等待实现 |
+| `Hosts/Desktop/Sources/CoveUI/Window/WindowChrome.swift` | 397 | 已写入（未验证） | `Hosts/rust/desktop/window/chrome.rs` | 未编译、未行为对照 |
 
 ### Terminal
 
@@ -958,17 +958,17 @@
 
 ### Sources
 
-共 19 个文件：已写入 10，进行中 0，未开始 9。
+共 19 个文件：已写入 15，进行中 0，未开始 4。
 
 | 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
 | --- | ---: | --- | --- | --- |
-| `Sources/CoveUIWebView/Apple/WebKitHost.swift` | 22 | 未开始 | — | 等待实现 |
-| `Sources/CoveUIWebView/Apple/WebKitSurface.swift` | 232 | 未开始 | — | 等待实现 |
+| `Sources/CoveUIWebView/Apple/WebKitHost.swift` | 22 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/slider/host.rs` | 未编译、未行为对照 |
+| `Sources/CoveUIWebView/Apple/WebKitSurface.swift` | 232 | 已写入（未验证） | `Compose/Composition/rust/adaptive/surface.rs` | 未编译、未行为对照 |
 | `Sources/CoveUIWebView/WebView.swift` | 170 | 已写入（未验证） | `Sources/rust/webview/view.rs` | 未编译、未行为对照 |
 | `Sources/CoveUIWebView/WebViewHandle.swift` | 51 | 已写入（未验证） | `Sources/rust/webview/mod.rs` | 未编译、未行为对照 |
 | `Sources/CoveUIWebView/WebViewState.swift` | 46 | 已写入（未验证） | `Sources/rust/webview/mod.rs` | 未编译、未行为对照 |
 | `Sources/CoveUIWebView/WebViewSurface.swift` | 77 | 已写入（未验证） | `Sources/rust/webview/mod.rs` | 未编译、未行为对照 |
-| `Sources/CoveUIWorkspace/Icons/CoveUIWorkspaceResourceBundle.swift` | 6 | 未开始 | — | 等待实现 |
+| `Sources/CoveUIWorkspace/Icons/CoveUIWorkspaceResourceBundle.swift` | 6 | 已写入（未验证） | `Compose/rust/resource_bundle.rs` | 未编译、未行为对照 |
 | `Sources/CoveUIWorkspace/Icons/WorkspacePanelIconCatalog.swift` | 17 | 已写入（未验证） | `Sources/rust/workspace/icons.rs` | 未编译、未行为对照 |
 | `Sources/CoveUIWorkspace/Layout/Split.swift` | 32 | 未开始 | — | 等待实现 |
 | `Sources/CoveUIWorkspace/Layout/Tree.swift` | 49 | 未开始 | — | 等待实现 |
@@ -979,8 +979,8 @@
 | `Sources/CoveUIWorkspace/Theme/WorkspaceRegionTransition.swift` | 179 | 已写入（未验证） | `Sources/rust/workspace/view.rs` | 未编译、未行为对照 |
 | `Sources/CoveUIWorkspace/Theme/WorkspaceTheme.swift` | 51 | 已写入（未验证） | `Sources/rust/workspace/theme.rs` | 未编译、未行为对照 |
 | `Sources/CoveUIWorkspace/WorkspaceController.swift` | 915 | 已写入（未验证） | `Sources/rust/workspace/controller.rs` | 未编译、未行为对照 |
-| `Sources/CoveUIWorkspace/WorkspaceModel.swift` | 590 | 未开始 | — | 等待实现 |
-| `Sources/CoveUIWorkspace/WorkspaceView.swift` | 2169 | 未开始 | — | 等待实现 |
+| `Sources/CoveUIWorkspace/WorkspaceModel.swift` | 590 | 已写入（未验证） | `Sources/rust/workspace/model.rs` | 未编译、未行为对照 |
+| `Sources/CoveUIWorkspace/WorkspaceView.swift` | 2169 | 已写入（未验证） | `Sources/rust/webview/view.rs` | 未编译、未行为对照 |
 
 ### System
 

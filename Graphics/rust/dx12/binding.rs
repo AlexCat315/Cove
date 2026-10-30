@@ -171,20 +171,173 @@ pub fn unregister_set(registries: &mut Dx12Registries, handle: BindingSet) {
     registries.binding_sets.remove(&handle.id());
 }
 
-/// Serializes a root signature and creates it on the device.
+/// Builds and creates the root signature a pipeline layout needs.
+///
+/// D3D12 root signatures are serialized from a `D3D12_ROOT_SIGNATURE_DESC` and then
+/// created from the blob. The descriptor ranges come from the layout's
+/// declarations: one root descriptor per declared slot, which is the simplest
+/// mapping that keeps every binding addressable without a descriptor table.
 fn create_root_signature(
     device: &Dx12DeviceHandle,
     declarations: &[BindingLayoutEntry],
     push_constants: &[crate::rhi::PushConstantRange],
 ) -> RhiResult<sys::ComPtr> {
-    let _ = (device, declarations, push_constants);
-    // A serialized root signature needs `D3D12SerializeRootSignature` (from
-    // d3d12.dll) plus the descriptor ranges each declaration implies. The
-    // declarations and the DWORDS budget are validated above; the serializer call
-    // is the remaining piece this build does not link.
-    Err(RhiError::unsupported_feature(
-        "DX12 root-signature serialization is not linked in this build",
-    ))
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (device, declarations, push_constants);
+        Err(RhiError::unsupported_backend("DirectX 12 is only available on Windows"))
+    }
+    #[cfg(target_os = "windows")]
+    {
+        // A root descriptor is the widest parameter form and needs no heap, so each
+        // declared buffer/texture slot becomes one. Constants occupy b[0] when the
+        // layout declares any push range.
+        let mut parameters: Vec<sys::D3D12_ROOT_PARAMETER> = Vec::new();
+        for declaration in declarations {
+            let parameter_type = match declaration.binding_type {
+                crate::rhi::BindingType::UniformBuffer => 0u32,   // CBV
+                crate::rhi::BindingType::StorageBuffer => 1u32,   // SRV
+                crate::rhi::BindingType::StorageTexture => 2u32,  // UAV
+                crate::rhi::BindingType::Texture => 1u32,         // SRV
+                // A sampler is a descriptor-table entry in D3D12, not a root
+                // descriptor, so it is left to the descriptor-table path.
+                crate::rhi::BindingType::Sampler => continue,
+                crate::rhi::BindingType::AccelerationStructure => 1u32,
+            };
+            parameters.push(sys::D3D12_ROOT_PARAMETER {
+                ParameterType: parameter_type,
+                ShaderVisibility: if declaration.visibility.contains(
+                    crate::rhi::ShaderVisibility::FRAGMENT,
+                ) {
+                    2
+                } else {
+                    1
+                },
+                shader_register: declaration.slot,
+                register_space: 0,
+                // Root-descriptor flags: none.
+                payload: [0; 4],
+            });
+        }
+        if !push_constants.is_empty() {
+            // 32-bit constants occupy one root parameter of `DWORD` count.
+            parameters.push(sys::D3D12_ROOT_PARAMETER {
+                ParameterType: 3,
+                ShaderVisibility: 1,
+                shader_register: 0,
+                register_space: 0,
+                payload: [1, 0, 0, 0],
+            });
+        }
+
+        let description = sys::D3D12_ROOT_SIGNATURE_DESC {
+            NumParameters: parameters.len() as u32,
+            pParameters: parameters.as_ptr(),
+            NumStaticSamplers: 0,
+            pStaticSamplers: core::ptr::null(),
+            Flags: sys::D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
+        };
+        let mut blob: sys::ComPtr = core::ptr::null_mut();
+        let mut error_blob: sys::ComPtr = core::ptr::null_mut();
+        // SAFETY: the description and the parameter array it points at outlive the
+        // call, and both out-parameters are live locals.
+        let status = unsafe {
+            let serialize = resolve_serialize_root_signature()?;
+            serialize(
+                &description,
+                sys::D3D12_ROOT_SIGNATURE_VERSION_1,
+                &mut blob,
+                &mut error_blob,
+            )
+        };
+        if status != sys::S_OK || blob.is_null() {
+            // SAFETY: the error blob, when present, is owned by this call.
+            unsafe { sys::IUnknownVtbl::release(error_blob) };
+            return Err(RhiError::invalid_argument(sys::hresult_message(status)));
+        }
+        let mut signature: sys::ComPtr = core::ptr::null_mut();
+        // SAFETY: the blob is a live `ID3DBlob`; its vtable prefix exposes
+        // `GetBufferPointer`/`GetBufferSize` after `IUnknown`.
+        let (pointer, length) = unsafe {
+            let vtbl = *(blob as *mut *const BlobVtbl);
+            (((*vtbl).GetBufferPointer)(blob), ((*vtbl).GetBufferSize)(blob))
+        };
+        // SAFETY: the device is live and the blob buffer stays valid until the blob
+        // is released below.
+        let status = unsafe {
+            let vtbl = *(device.device as *mut *const sys::ID3D12DeviceVtbl);
+            ((*vtbl).CreateRootSignature)(
+                device.device,
+                0,
+                pointer.cast_const(),
+                length,
+                &sys::IID_ID3D12_ROOT_SIGNATURE,
+                &mut signature,
+            )
+        };
+        // SAFETY: the blob was created above and the signature now owns a copy of
+        // its bytes.
+        unsafe {
+            sys::IUnknownVtbl::release(blob);
+            sys::IUnknownVtbl::release(error_blob);
+        }
+        if status != sys::S_OK || signature.is_null() {
+            return Err(RhiError::invalid_argument(sys::hresult_message(status)));
+        }
+        Ok(signature)
+    }
+}
+
+/// `D3D12SerializeRootSignature` from `d3d12.dll`.
+#[cfg(target_os = "windows")]
+type SerializeRootSignature = unsafe extern "system" fn(
+    *const sys::D3D12_ROOT_SIGNATURE_DESC,
+    u32,
+    *mut sys::ComPtr,
+    *mut sys::ComPtr,
+) -> sys::HRESULT;
+
+#[cfg(target_os = "windows")]
+fn resolve_serialize_root_signature() -> RhiResult<SerializeRootSignature> {
+    if let Some(serialize) = SERIALIZE_ROOT_SIGNATURE.get() {
+        return Ok(*serialize);
+    }
+    // SAFETY: the DLL name is NUL-terminated and the symbol is looked up with the
+    // signature its type declares.
+    let module = unsafe { LoadLibraryA(c"d3d12.dll".as_ptr()) };
+    if module.is_null() {
+        return Err(RhiError::unsupported_backend("d3d12.dll is unavailable"));
+    }
+    // SAFETY: the module handle is live.
+    let symbol = unsafe { GetProcAddress(module, c"D3D12SerializeRootSignature".as_ptr()) };
+    if symbol.is_null() {
+        return Err(RhiError::unsupported_backend(
+            "D3D12SerializeRootSignature is unavailable",
+        ));
+    }
+    // SAFETY: `D3D12SerializeRootSignature` has the documented signature.
+    let serialize: SerializeRootSignature = unsafe { core::mem::transmute_copy(&symbol) };
+    let _ = SERIALIZE_ROOT_SIGNATURE.set(serialize);
+    Ok(serialize)
+}
+
+#[cfg(target_os = "windows")]
+static SERIALIZE_ROOT_SIGNATURE: std::sync::OnceLock<SerializeRootSignature> =
+    std::sync::OnceLock::new();
+
+/// `ID3DBlob`'s vtable prefix.
+#[cfg(target_os = "windows")]
+#[repr(C)]
+struct BlobVtbl {
+    base: sys::IUnknownVtbl,
+    GetBufferPointer: unsafe extern "system" fn(sys::ComPtr) -> *mut core::ffi::c_void,
+    GetBufferSize: unsafe extern "system" fn(sys::ComPtr) -> usize,
+}
+
+#[cfg(target_os = "windows")]
+unsafe extern "system" {
+    fn LoadLibraryA(name: *const i8) -> sys::HINSTANCE;
+    fn GetProcAddress(module: sys::HINSTANCE, name: *const i8) -> *mut core::ffi::c_void;
 }
 
 #[cfg(test)]

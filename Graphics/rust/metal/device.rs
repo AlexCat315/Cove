@@ -271,7 +271,7 @@ mod tests {
 
     #[test]
     fn a_new_swapchain_has_no_acquired_drawable() {
-        let window = MetalWindowSwapchain::new(unsafe { CAMetalLayer::new() }, 1);
+        let window = MetalWindowSwapchain::new(CAMetalLayer::new(), 1);
         assert_eq!(window.generation, 1);
         assert!(window.current_drawable.is_none());
         assert!(window.current_texture_id.is_none());

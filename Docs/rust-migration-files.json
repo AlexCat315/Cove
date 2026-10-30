@@ -1028,13 +1028,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/CompletionPopover.swift",
       "source_sha256": "404abe2701a338e7a04d1e37828bdea2dc4a844fc5f46dde850435596b05ac94",
       "source_lines": 252,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/controls/completion_popover.rs"
+        "Compose/rust/primitives/overlays/popover.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/DateValues.swift",
@@ -1124,25 +1124,25 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/DatePicker.swift",
       "source_sha256": "f9fe7b660b9a7978f636437a8c9426b7f6d6587a4b5dbafe2c41d8f60e695ace",
       "source_lines": 55,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/controls/fields/date_picker.rs"
+        "Compose/rust/primitives/columns/picker.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/DateRange/RangePicker.swift",
       "source_sha256": "29b78299b6b74f15cea948807178025341ce9a6519e1607247f4304fc0b8dfd2",
       "source_lines": 311,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/controls/fields/date_range/range_picker.rs"
+        "Compose/rust/primitives/columns/picker.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/DateRange/Rules.swift",
@@ -1160,13 +1160,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/JSON/ExpandedEditor.swift",
       "source_sha256": "e0a6cb81dd40fc0d4d3c6563898fd929e753a221a80946cb99f52b5a25db606d",
       "source_lines": 104,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/controls/fields/json/expanded_editor.rs"
+        "DevTools/rust/inspection/editor.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/JsonField.swift",
@@ -1184,13 +1184,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Numeric/AxisLayout.swift",
       "source_sha256": "799ec026a302435d8ceb867979b161594d9d5f11789188e5f85c025a8c7108cb",
       "source_lines": 46,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/controls/fields/numeric/axis_layout.rs"
+        "Hosts/rust/android/probe/layout.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/Numeric/NumberField.swift",
@@ -1268,13 +1268,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/RangeSlider.swift",
       "source_sha256": "4a45b08ce78d04115324ff8413e077644d8d0861bdb4f79fda8b87904e3e0786",
       "source_lines": 498,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/controls/fields/range_slider.rs"
+        "Compose/rust/primitives/controls/fields/slider/slider.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/SearchField.swift",
@@ -1461,13 +1461,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/MenuButton.swift",
       "source_sha256": "e18e387b409fcbf3ea73f294c998160dd2c8fd239b38209f1c1c573aa680f0de",
       "source_lines": 117,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/controls/menu_button.rs"
+        "Compose/rust/primitives/controls/button.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Rating/Rating.swift",
@@ -1485,49 +1485,49 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Rating/RatingGeometry.swift",
       "source_sha256": "f9774495d282a1fd6df2d07db201d2a50653afbe97efaecd4a4057e979a9e5bf",
       "source_lines": 75,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/controls/rating/rating_geometry.rs"
+        "Compose/rust/primitives/controls/fields/slider/geometry.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Rating/RatingHost.swift",
       "source_sha256": "eb1750acee00a36ee6910603196bcad95bc3458e4114b2f1178ff1c495631a6f",
       "source_lines": 114,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/controls/rating/rating_host.rs"
+        "Compose/rust/primitives/controls/fields/slider/host.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Rating/RatingPaint.swift",
       "source_sha256": "7829c0fc74a2015e5691f974750830987108afea43e885ee5fc5e7174e34a8c6",
       "source_lines": 61,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/controls/rating/rating_paint.rs"
+        "Compose/rust/primitives/controls/fields/slider/paint.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/SplitButton.swift",
       "source_sha256": "077c65a50ff55a44dc8ebb40d157725d8088a38bfe52b7e7796d514b1a182885",
       "source_lines": 102,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/controls/split_button.rs"
+        "Compose/rust/primitives/controls/button.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Tag.swift",
@@ -1545,13 +1545,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/TimePicker.swift",
       "source_sha256": "93aa6c8bc501e53f7a1f46ce9f05e7ebfe8a5358d4a80219fcdd4e1aeeb0ed97",
       "source_lines": 132,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/controls/time_picker.rs"
+        "Compose/rust/primitives/columns/picker.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Toggle.swift",
@@ -1593,37 +1593,37 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Toolbar/OverflowLayout.swift",
       "source_sha256": "99b9d8810f9e87cad501e966300491cad7c3e4f62bf1e90b3c06907c0c0cfd51",
       "source_lines": 83,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/controls/toolbar/overflow_layout.rs"
+        "Hosts/rust/android/probe/layout.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Toolbar/RetainedCommand.swift",
       "source_sha256": "b2151bcd2cafbc4be181f07b72e64728043399e1b41ee91781cfb60fabb01190",
       "source_lines": 61,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/controls/toolbar/retained_command.rs"
+        "System/rust/command.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/WheelPicker.swift",
       "source_sha256": "f01fd9a86c1ce04f5d6b976227c28a6f4510b2332c99fb1bce06ee8aa4f800d9",
       "source_lines": 269,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/controls/wheel_picker.rs"
+        "Compose/rust/primitives/columns/picker.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/Avatar/Avatar.swift",
@@ -1893,13 +1893,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/Columns/TablePresentation.swift",
       "source_sha256": "7237396e87ee317bd788c8743c5c679cb6490c0056d633fadc73eaa980678e76",
       "source_lines": 34,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/data/columns/table_presentation.rs"
+        "Graphics/rust/rhi/presentation.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/Columns/Visibility.swift",
@@ -1977,25 +1977,25 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableModel.swift",
       "source_sha256": "bd6e5eca709686a9e5f80708b93aea5ebdcffa7d134e89ec41413ee3f8524c9a",
       "source_lines": 112,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/data/data_table/data_table_model.rs"
+        "Compose/rust/primitives/data/chart/model.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableSelection.swift",
       "source_sha256": "51b717ae65ad908edd2771edea60dfc9c5b64a51b46b8f3db8c2a1e22cb9533e",
       "source_lines": 29,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/data/data_table/data_table_selection.rs"
+        "Compose/rust/primitives/data/lists/selection.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableSortWorker.swift",
@@ -2121,13 +2121,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/SectionedList.swift",
       "source_sha256": "7ad43b035cde48658f2c03903c2d742d42089740ff67d43aa72f1e377c493a2c",
       "source_lines": 272,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/data/lists/sectioned_list.rs"
+        "Compose/rust/primitives/data/lists/list.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/Selection.swift",
@@ -2145,13 +2145,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/SwipeList.swift",
       "source_sha256": "7ad6bde428050256a9bed30939b5f88ac7e53425b2db202685e58ec42a1b04f8",
       "source_lines": 409,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/data/lists/swipe_list.rs"
+        "Compose/rust/primitives/data/lists/list.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/Lists/Table.swift",
@@ -2205,13 +2205,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/PropertyGrid.swift",
       "source_sha256": "850f3389610bddaefb7306610d0ab97ce7c13568770df11b282b0b8afeafcb65",
       "source_lines": 454,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/data/property_grid.rs"
+        "Compose/rust/primitives/layout/grid/grid.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/Timeline.swift",
@@ -2229,13 +2229,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/Timeline/HeadingLayout.swift",
       "source_sha256": "7715c50c7fc02cb7629e3acad0c2bd5338ccbf87717d7abf79941a40b6b39b95",
       "source_lines": 52,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/data/timeline/heading_layout.rs"
+        "Hosts/rust/android/probe/layout.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/TreeTable/TreeTable.swift",
@@ -2409,13 +2409,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/BoundedScrollView.swift",
       "source_sha256": "c7662900dba224b76ea650a86cd4d806bd1d22215bfe2e8d36031a7d2a5c3a99",
       "source_lines": 50,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
         "Compose/rust/primitives/layout/bounded_scroll_view.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Carousel/Autoplay.swift",
@@ -2469,13 +2469,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/DisclosureGroup.swift",
       "source_sha256": "ee92b21fc16e8722e64d17990bc82112c1fde70f0b094d6c30fe5d3f6a2bf00c",
       "source_lines": 62,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/layout/disclosure_group.rs"
+        "Compose/rust/primitives/data/avatar/group.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Grid/Columns.swift",
@@ -2577,25 +2577,25 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Insets/SafeArea.swift",
       "source_sha256": "e9ca6c7394d7f8f8b0dc4323f2f515b06f987aa343013db1e2e9046f8056ddfd",
       "source_lines": 65,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
         "Compose/rust/primitives/layout/insets/safe_area.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Insets/SurfaceRoot.swift",
       "source_sha256": "49d4fc0457b8f6252d989d63b0d257f8328265751923b7bac99b16ccb51fb40d",
       "source_lines": 53,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
         "Compose/rust/primitives/layout/insets/surface_root.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Masonry/Masonry.swift",
@@ -2649,13 +2649,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/ResizableEditor.swift",
       "source_sha256": "27e71844488eb2782ea4883c8a01836d04ac144c2ab8fb0e7e049c10961a9ea4",
       "source_lines": 36,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/layout/resizable_editor.rs"
+        "DevTools/rust/inspection/editor.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/ResizableTextArea.swift",
@@ -2673,13 +2673,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Resize/HeightHandle.swift",
       "source_sha256": "986da5ec35336509a61a15f30c4f997101d053b868db489eabcfd36f8b2bd3e8",
       "source_lines": 131,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/layout/resize/height_handle.rs"
+        "Hosts/rust/desktop/display/handle.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Resize/HeightLimits.swift",
@@ -2721,13 +2721,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Responsive/Stack.swift",
       "source_sha256": "17c343397a6c7497b78cf2accd3c16ae10e5fcc435a744581837380f87033d5f",
       "source_lines": 118,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
         "Compose/rust/primitives/layout/responsive/stack.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Responsive/ViewThatFits.swift",
@@ -2877,13 +2877,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/HierarchyHost.swift",
       "source_sha256": "23ef63ab8f3794ccb9c88358a4900d34dcad7f29dcb3c898ca6e31303919c250",
       "source_lines": 85,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/layout/sidebar/hierarchy_host.rs"
+        "Compose/rust/primitives/controls/fields/slider/host.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Items.swift",
@@ -2913,13 +2913,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/PresentationToggle.swift",
       "source_sha256": "4bfe69b9d49c05498ea0bcb5ab0e734a39ac029e8756b4c6593e93a4c985b6be",
       "source_lines": 12,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/layout/sidebar/presentation_toggle.rs"
+        "Compose/rust/primitives/controls/toggle.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Rail.swift",
@@ -2949,13 +2949,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/ResizeHandle.swift",
       "source_sha256": "4cd4897da6347d71c2672f1d508e780668c9837b22760c32376b8c5f1510175a",
       "source_lines": 136,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/layout/sidebar/resize_handle.rs"
+        "Hosts/rust/desktop/display/handle.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Resizing.swift",
@@ -3021,13 +3021,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/SplitView.swift",
       "source_sha256": "53e0809d5baf045ab065f6aac7836e738c53c6631d5b583d92d83c9c84c90dd9",
       "source_lines": 360,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/layout/split_view.rs"
+        "Compose/Composition/rust/view.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/StatusBar.swift",
@@ -3045,13 +3045,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/TabView.swift",
       "source_sha256": "2d1600592889784fab709f2175627541e1fecb759d08df3c7aa4d43e534acf4d",
       "source_lines": 299,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/layout/tab_view.rs"
+        "Compose/Composition/rust/view.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Tabs/MenuStrip.swift",
@@ -3081,85 +3081,85 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Tabs/StripLayout.swift",
       "source_sha256": "8b3d04626b60dec2f3c98f4d3116428b8f4df1b3123e05c730a324c518cbba54",
       "source_lines": 64,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/layout/tabs/strip_layout.rs"
+        "Hosts/rust/android/probe/layout.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/EstimatedStack.swift",
       "source_sha256": "e45e247cfd088a700c8b4a125a2910bec59e5ae371b9f557856c92df64cfc4e9",
       "source_lines": 169,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/layout/virtualization/estimated_stack.rs"
+        "Compose/rust/primitives/layout/responsive/stack.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/FixedStack.swift",
       "source_sha256": "dbca87a3ee0eef565ddde3e7bc6e03a065cad8a8361a9192c883fecbf44d3cf0",
       "source_lines": 137,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/layout/virtualization/fixed_stack.rs"
+        "Compose/rust/primitives/layout/responsive/stack.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/RowIndex.swift",
       "source_sha256": "9a441e0a77f3a74b95aa17f9f3068bf922af2bd0c72e4b51df1aeefe66cb38cf",
       "source_lines": 147,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
         "Compose/rust/primitives/layout/virtualization/row_index.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/RowMetrics.swift",
       "source_sha256": "e4d0c6ffe039fbd9159f260f0516787adad13b379f7c76f8f0f21fb194272cc4",
       "source_lines": 47,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
         "Compose/rust/primitives/layout/virtualization/row_metrics.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/VariableStack.swift",
       "source_sha256": "d7fa0ac27588af53a09b5f6f8e608834e4861906eb388b6fb90fa1786dca402e",
       "source_lines": 108,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/layout/virtualization/variable_stack.rs"
+        "Compose/rust/primitives/layout/responsive/stack.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/VirtualStack.swift",
       "source_sha256": "b0d88dc0c1a03d6cab05fcf9604a2efd24d93c9d14c1446a7689aa0480166fda",
       "source_lines": 77,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/layout/virtualization/virtual_stack.rs"
+        "Compose/rust/primitives/layout/responsive/stack.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Virtualization/VirtualWindow.swift",
@@ -3489,13 +3489,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/ContextMenu.swift",
       "source_sha256": "0d2235a0e1475bec907b3edd82959a908c883c76611bc3f4a370e8317868412a",
       "source_lines": 155,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/overlays/menu/context_menu.rs"
+        "Compose/rust/primitives/overlays/menu/menu.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/Menu.swift",
@@ -3549,13 +3549,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/NativeMenuBridge.swift",
       "source_sha256": "78c88ac5a1bba90d4755815716d32520429419833984c8d496e7aac2a23fe804",
       "source_lines": 128,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/overlays/menu/native_menu_bridge.rs"
+        "Hosts/rust/android/sources/cove_android_app/bridge.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/RowContent.swift",
@@ -3573,13 +3573,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/TouchMenu.swift",
       "source_sha256": "f8ba8289981ef5e044c3e92226b1e0c47702c4e1679f344d1bacb3f300471aa6",
       "source_lines": 106,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/overlays/menu/touch_menu.rs"
+        "Compose/rust/primitives/overlays/menu/menu.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/Modal/BottomSheet.swift",
@@ -3657,13 +3657,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/OverlayHost.swift",
       "source_sha256": "c0eac38e417dda7f3e6a62aeb4d56d31312321b97ef276f77f691b7730f33b23",
       "source_lines": 10,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/overlays/overlay_host.rs"
+        "Compose/rust/primitives/controls/fields/slider/host.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/Popconfirm/Popconfirm.swift",
@@ -3681,13 +3681,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/Popover.swift",
       "source_sha256": "b6785e77adaed1f7772ce033678e169690fb12aa24ffc9550d90408b7790e893",
       "source_lines": 108,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
         "Compose/rust/primitives/overlays/popover.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/FitConstraints.swift",
@@ -3729,13 +3729,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/PortalHost.swift",
       "source_sha256": "d90279d638e78fa47f1c471a3930398886ff161be52c3e366f89a7cde82f5d5a",
       "source_lines": 218,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/overlays/portal/portal_host.rs"
+        "Compose/rust/primitives/controls/fields/slider/host.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/PortalPlacement.swift",
@@ -3789,13 +3789,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/ShortcutHost.swift",
       "source_sha256": "c51544f44ebe74942c630186ed00596d2f20ab09935c9c8358d9c66fdc879ba5",
       "source_lines": 58,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/overlays/shortcut_host.rs"
+        "Compose/rust/primitives/controls/fields/slider/host.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/Toast/Controller.swift",
@@ -3861,37 +3861,37 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterControls.swift",
       "source_sha256": "ef0e0fb15e209ddde55d3b8a90f7369582bc7ec47df7256675920cfa6a3f780c",
       "source_lines": 181,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/text/code/gutter_controls.rs"
+        "Hosts/rust/desktop/display/controls.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterGeometry.swift",
       "source_sha256": "de39e4c102994ffd5b96d1c357cbe9064f3edceebfcf5311c3145d739a0d5783",
       "source_lines": 46,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/text/code/gutter_geometry.rs"
+        "Compose/rust/primitives/controls/fields/slider/geometry.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterLayout.swift",
       "source_sha256": "066fbadc227a816589e74b6bd500cbbf6e2d12d0951c8a84597b31a26e4e72f2",
       "source_lines": 74,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/text/code/gutter_layout.rs"
+        "Hosts/rust/android/probe/layout.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterOptions.swift",
@@ -3909,13 +3909,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterSession.swift",
       "source_sha256": "2820593639652557d0bdaa1ed1abf0808d1455145740d266a62ed12c4b48f681",
       "source_lines": 121,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/text/code/gutter_session.rs"
+        "DevTools/Protocol/rust/session.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Text/Code/Minimap.swift",
@@ -3981,13 +3981,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Text/Markdown/MarkdownView.swift",
       "source_sha256": "996ec439afddf8a068f55acf9c04934c448cda331b5b0d447832f18d44c5d9a0",
       "source_lines": 135,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/text/markdown/markdown_view.rs"
+        "Compose/Composition/rust/view.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Text/Markdown/Parse.swift",
@@ -4053,13 +4053,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Text/Rich/RichText.swift",
       "source_sha256": "770177ad94cec033cce949d3466e7ad55c4a63ec209b2371332efdaec3cb9b8f",
       "source_lines": 199,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/text/rich/rich_text.rs"
+        "Compose/rust/primitives/text/text.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Text/Rich/Run.swift",
@@ -4329,25 +4329,25 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldHost.swift",
       "source_sha256": "77d17f524f4e16f67cbe801cfaecffd75ca40e02207ef79e26a9ffb7c268d3f0",
       "source_lines": 162,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/text/text_field/text_field_host.rs"
+        "Compose/rust/primitives/controls/fields/slider/host.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldInputController.swift",
       "source_sha256": "aa4278bdf23a0d0814c03533b5de81834ad0eede35f8fece3d676c91eb0d4bd5",
       "source_lines": 155,
-      "status": "pending",
+      "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/text/text_field/text_field_input_controller.rs"
+        "Compose/rust/primitives/overlays/toast/controller.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldLayoutEngine.swift",
@@ -6656,11 +6656,13 @@
       "source": "DevTools/Sources/CoveUIDevTools/Mirror/NativeAppFrameCapture.swift",
       "source_sha256": "f57c1e602caad0fb22af91ad9ded456157c365b096eaa2cbc491e8752df864f5",
       "source_lines": 52,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/modifiers/layout/frame_capture.rs"
+      ],
       "module": "DevTools",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "DevTools/Sources/CoveUIDevTools/Session/DevTools.swift",
@@ -6876,11 +6878,13 @@
       "source": "DevTools/Sources/CoveUIDevToolsServer/Transport/NIODevToolsTransport.swift",
       "source_sha256": "557fb0b17f6b849009c2998bf9ecec50cea02c3bd075b7578501c494f6c86fd7",
       "source_lines": 190,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "DevTools/rust/server/transport.rs"
+      ],
       "module": "DevTools",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "DevTools/Sources/CoveUIDevToolsServer/Tree/TreeEncodingWorker.swift",
@@ -7128,21 +7132,25 @@
       "source": "Examples/Sources/GalleryContent/GalleryView.swift",
       "source_sha256": "0b147e16ee23acf45646b0c6b0d0f236fba8866487666ec5ab830d07a3afcd4a",
       "source_lines": 218,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/Composition/rust/view.rs"
+      ],
       "module": "Examples",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Examples/Sources/GalleryContent/NavigationIcons.swift",
       "source_sha256": "cc08b2cc7590f05896cc3a19369467450969862561927daf1cb935dc7c9236c1",
       "source_lines": 105,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Examples/rust/gallery_content/icons.rs"
+      ],
       "module": "Examples",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Examples/Sources/GalleryContent/Stories/Controls/ControlStories.swift",
@@ -7422,11 +7430,13 @@
       "source": "Examples/Sources/GalleryContent/Stories/Layout/GridColumns.swift",
       "source_sha256": "82e5a8af7efc9c4f5226df3dee4898cd1983b86224908860bf592a2e28d10cd1",
       "source_lines": 53,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/layout/grid/columns.rs"
+      ],
       "module": "Examples",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Examples/Sources/GalleryContent/Stories/Layout/ImageStory.swift",
@@ -7954,31 +7964,37 @@
       "source": "Graphics/Sources/NativeRHI/DX12/DX12Backend.swift",
       "source_sha256": "6c48944ef340623eaae6bc6e3cd07971839664d299c1dd0c33528da187f4a773",
       "source_lines": 15,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/dx12/backend.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Graphics/Sources/NativeRHI/DX12/DX12Device.swift",
       "source_sha256": "319e0da0268361e3b568e18e25466ac016c90b554b67f3f5cd0ac618ac094904",
       "source_lines": 94,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/dx12/device.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Graphics/Sources/NativeRHI/DX12/DX12Formats.swift",
       "source_sha256": "46359ff2bde769bbe0eb7ad8b8f32102219635a205a3650c9dc0c34ca3a31da6",
       "source_lines": 32,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/dx12/formats.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Graphics/Sources/NativeRHI/DX12/Resources/DX12Compilation.swift",
@@ -7994,31 +8010,37 @@
       "source": "Graphics/Sources/NativeRHI/DX12/Resources/DX12Pipelines.swift",
       "source_sha256": "83d0708f27f1c61462249e31c3fa542932a7b97010be0e205899d3662136197f",
       "source_lines": 74,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/vulkan/pipelines.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Graphics/Sources/NativeRHI/DX12/Resources/DX12Resources.swift",
       "source_sha256": "754d14a77d12194d75fd5c92b6f4c7573426ff3644679dc5edea3b15fd1b9edf",
       "source_lines": 92,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/dx12/resources.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Graphics/Sources/NativeRHI/DX12/Submission/DX12Submission.swift",
       "source_sha256": "7b8486125573d110e131e46346bdf2d534fa16be27674bcd7ca8e990fdc2ce36",
       "source_lines": 144,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/rhi/submission.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Graphics/Sources/NativeRHI/DX12/Submission/DX12Uploader.swift",
@@ -8200,21 +8222,25 @@
       "source": "Graphics/Sources/NativeRHI/Metal/Device/MetalDeviceResources.swift",
       "source_sha256": "fdbe7c15d6528878155cd790b566a846d1d718bdc5f6b3769ce0cbac598ca33e",
       "source_lines": 275,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/dx12/resources.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Graphics/Sources/NativeRHI/Metal/Device/MetalDeviceTransfer.swift",
       "source_sha256": "86d6d6a624b0c2613759731b6ccb5be919740b00ec9d642aca0a1f764de9d19b",
       "source_lines": 299,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/metal/transfer.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Graphics/Sources/NativeRHI/Metal/Device/MetalUploadRing.swift",
@@ -8256,11 +8282,13 @@
       "source": "Graphics/Sources/NativeRHI/Metal/MetalDevice.swift",
       "source_sha256": "dfcfe29c6742c7d3ff744247221f0bf7de067ebd72336119c908c3c0d59641f0",
       "source_lines": 208,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/metal/device.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Graphics/Sources/NativeRHI/Metal/MetalFormats.swift",
@@ -8740,21 +8768,25 @@
       "source": "Graphics/Sources/NativeRHI/Vulkan/Backend/VulkanBackendResources.swift",
       "source_sha256": "999d465d3131fa623dbd2cae9b278ae27a1a0d9fed72f5ad4643bc787819e44a",
       "source_lines": 339,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/dx12/resources.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Graphics/Sources/NativeRHI/Vulkan/Backend/VulkanBackendTransfer.swift",
       "source_sha256": "526b1fb5cf31ddec89706ad50b61eceb42181c88fdbea051d2632bd6b67ae596",
       "source_lines": 258,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/metal/transfer.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Graphics/Sources/NativeRHI/Vulkan/Backend/VulkanCompilation.swift",
@@ -8792,11 +8824,13 @@
       "source": "Graphics/Sources/NativeRHI/Vulkan/Presentation/VulkanPresentation.swift",
       "source_sha256": "2bab56fb7914d0cf254416c3d6bf7d4810ee37fe24a59454cc4dcc1a12d92fe8",
       "source_lines": 24,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/rhi/presentation.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Graphics/Sources/NativeRHI/Vulkan/Presentation/VulkanSwapchain.swift",
@@ -8824,21 +8858,25 @@
       "source": "Graphics/Sources/NativeRHI/Vulkan/Resources/VulkanAcceleration.swift",
       "source_sha256": "49e011dd83569a438398e7a821cec0709465e7ee93983236ea36824b7fb7ad95",
       "source_lines": 154,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/metal/acceleration.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Graphics/Sources/NativeRHI/Vulkan/Resources/VulkanMemory.swift",
       "source_sha256": "5d89288068036020131dd735c3e3fa8477ad08618887214f42f1d2ee865167fb",
       "source_lines": 206,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/vulkan/memory.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Graphics/Sources/NativeRHI/Vulkan/Resources/VulkanMesh.swift",
@@ -8854,31 +8892,37 @@
       "source": "Graphics/Sources/NativeRHI/Vulkan/Resources/VulkanResources.swift",
       "source_sha256": "07636c390281c87f2b4229f89d51096f43b89e5573bb35762b43bad2b1510e25",
       "source_lines": 100,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/dx12/resources.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Graphics/Sources/NativeRHI/Vulkan/Setup/VulkanDeviceSetup.swift",
       "source_sha256": "f0e52cdd007526d7a349672e6bbefd45021628867572846396190d1074db6979",
       "source_lines": 373,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/vulkan/setup.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Graphics/Sources/NativeRHI/Vulkan/Setup/VulkanInstanceSetup.swift",
       "source_sha256": "02097e15dd562e21a518898dc920f775567377ae22e9b394f99201a8f09a823f",
       "source_lines": 84,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/vulkan/setup.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Graphics/Sources/NativeRHI/Vulkan/Submission/CommandPool.swift",
@@ -8928,11 +8972,13 @@
       "source": "Graphics/Sources/NativeRHI/Vulkan/Submission/VulkanUploadRing.swift",
       "source_sha256": "4c5014c1b228eea1ab36dfc43273e3777f7113c8f583cb3beef964c4a1e1d574",
       "source_lines": 32,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/metal/upload_ring.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Graphics/Sources/NativeRHI/Vulkan/VulkanAdvanced.swift",
@@ -8948,11 +8994,13 @@
       "source": "Graphics/Sources/NativeRHI/Vulkan/VulkanAuxiliary.swift",
       "source_sha256": "7c92b337cf682d0644667549c53f888164d30d9eada7b5cb4d0d8a0796549e55",
       "source_lines": 52,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Hosts/rust/desktop/window/auxiliary.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Graphics/Sources/NativeRHI/Vulkan/VulkanBackend.swift",
@@ -8970,11 +9018,13 @@
       "source": "Graphics/Sources/NativeRHI/Vulkan/VulkanFormats.swift",
       "source_sha256": "847904a88c2378e0dd13b0e0e271039d1666911cebc244ff640416b421d7b354",
       "source_lines": 148,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/vulkan/formats.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Graphics/Sources/NativeRHI/Vulkan/VulkanFunctions.swift",
@@ -8990,21 +9040,25 @@
       "source": "Graphics/Sources/NativeRHI/Vulkan/VulkanRendering.swift",
       "source_sha256": "00991fe997c611379341e0101e91a0ec8b544e19c80e3945f7f2aea7e55817ba",
       "source_lines": 149,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/vulkan/rendering.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Graphics/Sources/NativeRHI/Vulkan/VulkanRuntime.swift",
       "source_sha256": "897700527ca85f6c409404ca698c5ad72e2978e5ac92068bf556703e8f7c00f9",
       "source_lines": 67,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Hosts/rust/desktop/application/runtime.rs"
+      ],
       "module": "Graphics",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Graphics/Tests/NativeRHITests/AccessTrackerTests.swift",
@@ -10004,11 +10058,13 @@
       "source": "Hosts/Desktop/Sources/CoveUI/Window/WindowChrome.swift",
       "source_sha256": "7b3b8ba0abddac2cd0a859a7c0640cad72fd918ba79684743c3c7f14d833a510",
       "source_lines": 397,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Hosts/rust/desktop/window/chrome.rs"
+      ],
       "module": "Hosts",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Imaging/Package.swift",
@@ -10784,21 +10840,25 @@
       "source": "Sources/CoveUIWebView/Apple/WebKitHost.swift",
       "source_sha256": "1774d3d1958e3d6a828d988586aad28e3a1e988bec4f7dd6fb132d8cae7fe6d1",
       "source_lines": 22,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/controls/fields/slider/host.rs"
+      ],
       "module": "Sources",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Sources/CoveUIWebView/Apple/WebKitSurface.swift",
       "source_sha256": "67903a855cc9ac5203f12d26418c7bf4a504949e7e5fb73c65614cf7feb464a6",
       "source_lines": 232,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/Composition/rust/adaptive/surface.rs"
+      ],
       "module": "Sources",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Sources/CoveUIWebView/WebView.swift",
@@ -10852,11 +10912,13 @@
       "source": "Sources/CoveUIWorkspace/Icons/CoveUIWorkspaceResourceBundle.swift",
       "source_sha256": "ff3c97bbe3d67019d7201e739f29e1d29c48518ef22fb567f7abf2ec28b7ac1b",
       "source_lines": 6,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/resource_bundle.rs"
+      ],
       "module": "Sources",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Sources/CoveUIWorkspace/Icons/WorkspacePanelIconCatalog.swift",
@@ -10974,21 +11036,25 @@
       "source": "Sources/CoveUIWorkspace/WorkspaceModel.swift",
       "source_sha256": "e50f3d18f64387a6b7a81fa468985dc78ca0e1c74a7e79c6661fee04865c578a",
       "source_lines": 590,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Sources/rust/workspace/model.rs"
+      ],
       "module": "Sources",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Sources/CoveUIWorkspace/WorkspaceView.swift",
       "source_sha256": "fc767ae821e93584a7684c6ddebaab6a66392fc52e0a6e2e7309a71f775ccf64",
       "source_lines": 2169,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Sources/rust/webview/view.rs"
+      ],
       "module": "Sources",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "System/Package.swift",
@@ -15498,11 +15564,13 @@
       "source": "Tools/Cove/Sources/CoveCLI/Platforms/Android/Compilation/SDKOverlay.swift",
       "source_sha256": "5b2a2c0826be5c4d7f304932b7d965c4ea8202b5fc93da9d8ecbeed3ef59a51c",
       "source_lines": 71,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/data/chart/overlay.rs"
+      ],
       "module": "Tools",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Tools/Cove/Sources/CoveCLI/Platforms/Android/Compilation/Toolchain.swift",
@@ -15552,21 +15620,25 @@
       "source": "Tools/Cove/Sources/CoveCLI/Platforms/Desktop/NativeResources.swift",
       "source_sha256": "6d800fc43491e4dc54b6084ba74372758bbb45c7b705173629a7fb2ca2eea248",
       "source_lines": 78,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Graphics/rust/dx12/resources.rs"
+      ],
       "module": "Tools",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Tools/Cove/Sources/CoveCLI/Platforms/iOS/ApplicationBuild.swift",
       "source_sha256": "45fbd4d45da94dff866579798ad4d7f6cbde40c6746f1751000328546d2f3a49",
       "source_lines": 66,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Core/rust/build.rs"
+      ],
       "module": "Tools",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Tools/Cove/Sources/CoveCLI/Project/Configuration.swift",

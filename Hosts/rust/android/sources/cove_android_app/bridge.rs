@@ -280,6 +280,17 @@ pub unsafe extern "C" fn cove_android_create_application(
             return std::ptr::null_mut();
         }
     };
+    // Remote image loading needs a platform transport; without this call the
+    // holder stays empty and every http(s) image reports HostUnavailable.
+    let capabilities = crate::application_services::install_platform_services();
+    log(
+        &format!(
+            "Platform services installed http={} https={} file={}",
+            capabilities.http, capabilities.https, capabilities.file
+        ),
+        Level::Info,
+        "com.cove.android.application",
+    );
     let runtime = match RuntimeOptions::from_json(options.as_bytes()) {
         Ok(runtime) => runtime,
         Err(error) => {

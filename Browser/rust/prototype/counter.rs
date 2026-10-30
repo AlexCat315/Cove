@@ -10,11 +10,13 @@ use std::rc::Rc;
 use cove_composition::ViewGraph;
 use cove_examples::CounterView;
 
-use crate::prototype::PrototypeContent;
+use super::prototype::PrototypeContent;
 
 impl PrototypeContent for CounterView {
     fn install(self: &Rc<Self>, graph: &Rc<ViewGraph>) {
-        graph.install(self.clone(), Default::default());
+        // `Rc<CounterView>` is not a `View`; the shared example is installed by
+        // value and the reactor keeps its own handle for state access.
+        graph.install(CounterView::clone(self), Default::default());
     }
 
     fn checkpoint(&self) -> BTreeMap<String, String> {

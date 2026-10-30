@@ -156,6 +156,16 @@ impl Application {
             Level::Info,
             format!("Application starting title={}", config.window.title),
         ));
+        // Remote image loading needs a platform transport; without this call the
+        // holder stays empty and every http(s) image reports HostUnavailable.
+        let capabilities = crate::application_services::install_platform_services();
+        LogSystem::logger("com.cove.ui.application").log(&LogEvent::new(
+            Level::Info,
+            format!(
+                "Platform services installed http={} https={} file={}",
+                capabilities.http, capabilities.https, capabilities.file
+            ),
+        ));
 
         let application = Application::new(config, backend, callbacks, checkpoint)?;
         let result = application.start(root_view);

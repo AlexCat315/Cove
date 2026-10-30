@@ -341,7 +341,6 @@ fn create_compute_native(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn pipeline_creation_reports_unsupported_off_windows() {
