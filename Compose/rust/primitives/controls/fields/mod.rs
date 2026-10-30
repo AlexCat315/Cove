@@ -21,3 +21,23 @@ pub mod date_range_rules;
 pub use date_range_rules::{DateRangePreset, DateRangeRules};
 pub mod time_input_model;
 pub use time_input_model::{TimeInputHourCycle, TimeInputState, TimeSegment};
+pub mod vec3_model;
+pub use vec3_model::{
+    minimum_axis_width, shows_mixed, Vec3, Vec3Axis, Vec3Codec, Vec3Constraints,
+};
+pub mod json_field_model;
+pub use json_field_model::{
+    normalized_commit_text, pretty_printed, validate, JsonFieldLabels, JsonFieldValidation,
+};
+pub mod color_field_model;
+pub use color_field_model::{hex_string, panel_width, parse_hex};
+pub mod combobox_model;
+pub use combobox_model::{
+    results_presentation, too_short_prompt, ComboboxResultsPresentation, ComboboxSearchPhase,
+    ComboboxSearchSession, DEFAULT_FAILURE_MESSAGE,
+};
+pub mod asset_ref_model;
+pub use asset_ref_model::{
+    field_description, field_tooltip, has_preview, icon_for, picker_options, placeholder_kind,
+    AssetIconKind, AssetRef,
+};

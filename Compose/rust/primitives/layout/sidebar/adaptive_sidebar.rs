@@ -255,6 +255,72 @@ impl cove_composition::ViewModifier for SemanticBodyStrong {
 }
 
 impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> AdaptiveSidebar<Id> {
+    /// Navigation plus the content it owns.
+    ///
+    /// The header and footer default to empty views; callers add them with the
+    /// builders below. Section IDs must be unique, matching `Sidebar`.
+    pub fn new(
+        title: impl Into<String>,
+        selection: Binding<Option<Id>>,
+        sections: Vec<SidebarSection<Id>>,
+    ) -> Self {
+        assert!(
+            sections
+                .iter()
+                .enumerate()
+                .all(|(index, section)| sections
+                    .iter()
+                    .enumerate()
+                    .all(|(other, candidate)| other == index || candidate.id != section.id)),
+            "AdaptiveSidebar section IDs must be unique"
+        );
+        Self {
+            title: title.into(),
+            presentation: None,
+            collapse: None,
+            selection,
+            width: None,
+            expanded: None,
+            sections,
+            options: AdaptiveSidebarOptions::default(),
+            local_presentation: cove_core::State::new(false),
+            local_collapse: cove_core::State::new(false),
+            focus: Rc::new(SidebarFocusHandoff::default()),
+            header: AnyView::new(cove_composition::EmptyView),
+            footer: AnyView::new(cove_composition::EmptyView),
+            content: AnyView::new(cove_composition::EmptyView),
+        }
+    }
+
+    /// The pane the sidebar navigates.
+    pub fn content(mut self, content: impl View + 'static) -> Self {
+        self.content = AnyView::new(content);
+        self
+    }
+
+    /// Binds the drawer's presented state, so a caller can open it.
+    pub fn presentation(mut self, is_presented: Binding<bool>) -> Self {
+        self.presentation = Some(is_presented);
+        self
+    }
+
+    /// Binds the requested docked width.
+    pub fn width(mut self, width: Binding<f32>) -> Self {
+        self.width = Some(width);
+        self
+    }
+
+    /// Binds which groups are expanded.
+    pub fn expanded(mut self, expanded: Binding<std::collections::HashSet<Id>>) -> Self {
+        self.expanded = Some(expanded);
+        self
+    }
+
+    pub fn options(mut self, options: AdaptiveSidebarOptions) -> Self {
+        self.options = options;
+        self
+    }
+
     fn snapshot(&self) -> AdaptiveSnapshot<Id> {
         AdaptiveSnapshot {
             title: self.title.clone(),

@@ -32,3 +32,8 @@ pub use modal::{
 pub use roving_focus::{
     roving_identity, RovingFocusHost, RovingFocusRequest, RovingItem, SelectionNavigation,
 };
+pub mod command_palette_model;
+pub use command_palette_model::{
+    destination, display_entries, entries, normalize, ranked, record_recent, CommandEntry,
+    CommandItem,
+};

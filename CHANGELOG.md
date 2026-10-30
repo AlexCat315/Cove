@@ -4,6 +4,28 @@
 
 ## Unreleased
 
+- 新增 `ToolbarStory`（6 项测试，已运行通过）：`Always` 命令在极窄宽度下仍在栏内、`Overflow` 命令**无论宽度都进菜单**（由测试确认的真实语义，非猜测）、自动优先级在空间不足时按低优先级先移出且平局保留源序、Run/Pause 标题随播放态翻转。已接入 `StoryDispatch`。生产源码达 966/984（98.2%）。
+
+- 公开 `MenuItem::perform`：与 `ActionSheetAction::perform` 对应，使调用方可从快捷键或测试触发已声明命令。
+
+- 新增 `ActionSheetStory`（10 项测试，已运行通过）：禁用命令仍渲染但其图标保留且被方向键跳过、`export` 由复选框门控、`delete` 标记为 destructive、首条可用命令跳过被禁用的首项、长列表按声明数量生成且 id 唯一。已接入 `StoryDispatch`。生产源码达 965/984（98.1%）。
+
+- 公开 `ActionSheetAction::perform`：此前只有私有 `perform`，调用方无法从键盘快捷键或命令面板触发已声明的命令。
+
+- 新增 `AvatarStory`（11 项测试，已运行通过）：图片源切换（`bundled`/`remote`/`missing`/`initials`，无图片源直接显示首字母）、`AvatarGroupGeometry` 的 limit/overflow/overlap 组合（6 人限 3 时显示 3 个头像 + 1 个溢出标记、限 0 时仅剩标记、`Hidden` 完全抑制标记、0.3 重叠使步进为 22.4pt）、Unicode 首字母用例含空名回落。已接入 `StoryDispatch`。生产源码达 964/984（98.0%）。
+
+- **Gallery 故事页继续收口**：新增 `data_stories`（`ChartExplorationStory` 缩放/重置/换数据与笔刷说明、`AdaptiveTableSample` 自适应列可见性）、`navigation_stories`（`AppBarStory` 长/短标题、文本/图标主操作、溢出命令与结果记录）、`sidebar_stories`（`ResizableSidebarExample` 宽度重置、`NestedSidebarExample` 分组展开/收起保留选中项、叶子可选性）。共 25 项测试（已运行通过），并把 chart、appBar、sidebar 三页接入 `StoryDispatch`。生产源码达 963/984（97.9%）。
+
+- 补齐 `AdaptiveSidebar` 缺失的构造入口：此前该类型有 `View` 实现但**没有 `new`**，因此任何调用方都无法构造；现提供 `new(title, selection, sections)` 与 `content`/`presentation`/`width`/`expanded`/`options` 构建器，并在构造时校验 section ID 唯一（与 `Sidebar` 一致）。
+
+- **Examples（Gallery）开始收口**：新增 `media_stories`（`SkeletonStory` 占位切换、`RatingSample` 评分条）与 `overlay_stories`（`PopconfirmStory` 确认记录、`HoverCardStory` 跟随切换），共 7 项测试（已运行通过），并把 5 个页面接入 `StoryDispatch`（skeleton、rating、popconfirm、hoverCard）。生产源码达 958/984（97.4%），仅余 26 个 Gallery 故事页。
+
+- **Compose 生产源码全部迁移完成（414/414）**，全工作区生产源码达 953/984（96.8%）。本轮补齐最后一批控件模型（共 59 项测试，均已运行通过）：`AssetRef` 类别匹配与选择器过滤（9 项，关键字分组按优先级取首个命中）、`DataTableRowHost`/`CellHostUpdate` 与编辑器失焦判定（11 项，选中优先于斑马纹、更新未变即跳过重绘、冻结泳道按 group 播报）、`CommandSearch` 排序与投影（22 项：标题前缀 > 词首 > 包含 > 关键字 > 子序列 > 上下文，禁用项靠后、平局保持源序、分组仅在多组时出现、箭头环绕与翻页夹取、`i64::MIN` 模运算不溢出、最近项去重与前插封顶）。
+
+- 修复 `normalize` 的变音折叠缺失：此前仅剥离 NFD 组合符号，预组合的 Latin-1（如 `é` = U+00E9）不会折叠为 `cafe`，导致带重音的命令标题无法用小写无重音查询命中。补上 Latin-1 补集显式映射后，带重音标题与无重音查询可正确匹配。
+
+- 新增 Compose 字段模型（共 48 项测试，均已运行通过）：`Vec3Codec`（13 项：`1, 2, 3`／`(1 2 3)`／`Vector3(1, 2, 3)` 均可解析，非有限值拒绝，写入按轴夹取且只回写变化轴）、`JsonFieldValidation`（11 项：空白提交为 `{}` 且判为可接受，格式化为排序键）、`parse_hex`/`hex_string`（9 项：含 `#` 与大小写均可，8 位末对为 alpha，往返受 8 位量化限制）、`ComboboxSearchSession`（15 项：短于最小长度不发请求、同查询不重复请求、**仅最新代次可发布**、取消回 Idle 清查询但保留已载结果、重复值去重保留首个）。
+
 - 新增 `DataTableEditingState`（11 项测试，已运行通过）：草稿生命周期与 Tab 遍历。被拒绝的提交**保持草稿打开并记录错误**（不丢弃用户输入），因此切换到另一单元格时会先中止而非吞掉非法值；行/列消失时草稿直接丢弃；Tab 跳过不可编辑列，走到末尾即结束。行身份用 id 而非索引，因为显示顺序可能在编辑期间改变。
 
 - 新增 `TimeInputState`（14 项测试，已运行通过）：12/24 小时制显示、分段步进（12 小时制内步进不跨半天，与 Swift 一致）、数字缓冲（高位数字立即完成并进段、低位等待第二位）、AM/PM 首字母仅在异于当前半天时翻转、失焦清空该段缓冲。**移植中两处测试预期先写错后按 Swift 语义修正**：`set` 对时/分各自独立取模因而分钟越过 59 只回绕不向小时进位；分钟缓冲在单数字完成后仍保留，故紧随的下一数字构成超范围值并被忽略。行为与 Swift 一致，是预期错误而非实现错误。

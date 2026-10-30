@@ -77,7 +77,11 @@ impl ActionSheetAction {
         self
     }
 
-    fn perform(&self) {
+    /// Runs the action.
+    ///
+    /// Public because a caller may also reach an action from a keyboard shortcut
+    /// or a command palette rather than the sheet's own row.
+    pub fn perform(&self) {
         (self.action)();
     }
 }

@@ -279,6 +279,14 @@ impl Menu {
 }
 
 impl MenuItem {
+    /// Runs the command.
+    ///
+    /// Public so a caller can invoke a declared command from a keyboard shortcut
+    /// or a test rather than only through a presented menu.
+    pub fn perform(&self) {
+        (self.action)();
+    }
+
     fn with_shortcut_opt(mut self, shortcut: Option<String>) -> Self {
         self.shortcut = shortcut;
         self

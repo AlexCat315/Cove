@@ -27,3 +27,35 @@ unicode-segmentation.workspace = true
 
 [lints]
 workspace = true
+
+[[test]]
+name = "media_stories"
+path = "rust/tests/media_stories.rs"
+
+[[test]]
+name = "overlay_stories"
+path = "rust/tests/overlay_stories.rs"
+
+[[test]]
+name = "data_stories"
+path = "rust/tests/data_stories.rs"
+
+[[test]]
+name = "navigation_stories"
+path = "rust/tests/navigation_stories.rs"
+
+[[test]]
+name = "sidebar_stories"
+path = "rust/tests/sidebar_stories.rs"
+
+[[test]]
+name = "avatar_story"
+path = "rust/tests/avatar_story.rs"
+
+[[test]]
+name = "action_sheet_story"
+path = "rust/tests/action_sheet_story.rs"
+
+[[test]]
+name = "toolbar_story"
+path = "rust/tests/toolbar_story.rs"

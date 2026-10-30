@@ -106,6 +106,36 @@ impl StoryDispatch {
             Self::Story(GalleryPage::ViewportTraits) => {
                 Some(AnyView::new(stories::ViewportTraitsStory::new()))
             }
+            Self::Story(GalleryPage::Skeleton) => {
+                Some(AnyView::new(stories::SkeletonStory::new(options)))
+            }
+            Self::Story(GalleryPage::Rating) => {
+                Some(AnyView::new(stories::RatingSample::new(options)))
+            }
+            Self::Story(GalleryPage::Popconfirm) => {
+                Some(AnyView::new(stories::PopconfirmStory::new(options)))
+            }
+            Self::Story(GalleryPage::HoverCard) => {
+                Some(AnyView::new(stories::HoverCardStory::new(options)))
+            }
+            Self::Story(GalleryPage::Chart) => {
+                Some(AnyView::new(stories::ChartExplorationStory::new()))
+            }
+            Self::Story(GalleryPage::AppBar) => {
+                Some(AnyView::new(stories::AppBarStory::new(options)))
+            }
+            Self::Story(GalleryPage::Sidebar) => {
+                Some(AnyView::new(stories::ResizableSidebarExample::new(options)))
+            }
+            Self::Story(GalleryPage::Avatar) => {
+                Some(AnyView::new(stories::AvatarStory::new(options)))
+            }
+            Self::Story(GalleryPage::ActionSheet) => {
+                Some(AnyView::new(stories::ActionSheetStory::new(options)))
+            }
+            Self::Story(GalleryPage::Toolbar) => {
+                Some(AnyView::new(stories::ToolbarStory::new(options)))
+            }
             Self::Story(_) | Self::Pending { .. } => None,
         }
     }
