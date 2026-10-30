@@ -124,9 +124,6 @@ impl StoryDispatch {
             Self::Story(GalleryPage::AppBar) => {
                 Some(AnyView::new(stories::AppBarStory::new(options)))
             }
-            Self::Story(GalleryPage::Sidebar) => {
-                Some(AnyView::new(stories::ResizableSidebarExample::new(options)))
-            }
             Self::Story(GalleryPage::Avatar) => {
                 Some(AnyView::new(stories::AvatarStory::new(options)))
             }
@@ -156,6 +153,12 @@ impl StoryDispatch {
             }
             Self::Story(GalleryPage::Image) => {
                 Some(AnyView::new(stories::ImageStory::new(options)))
+            }
+            Self::Story(GalleryPage::Sidebar) => {
+                Some(AnyView::new(stories::SidebarStory::new(options)))
+            }
+            Self::Story(GalleryPage::DataTable) => {
+                Some(AnyView::new(stories::DataTableStory::new(options)))
             }
             Self::Story(_) | Self::Pending { .. } => None,
         }

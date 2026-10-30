@@ -7356,11 +7356,14 @@
       "source": "Examples/Sources/GalleryContent/Stories/Data/DataTableStory.swift",
       "source_sha256": "17cc0cf11a42826b58a48ddf6461ffdfe16d4333ce3a26091fa977a6fad7ce92",
       "source_lines": 131,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Examples/rust/gallery_content/stories/data_table_story.rs"
+      ],
       "module": "Examples",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Examples/Sources/GalleryContent/Stories/Data/DateTableStories.swift",
@@ -7690,11 +7693,14 @@
       "source": "Examples/Sources/GalleryContent/Stories/Layout/SidebarStory.swift",
       "source_sha256": "9b7fa634965699d761bc49d184568aeff952d66680316f75a3c404767bfe3bd4",
       "source_lines": 118,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Examples/rust/gallery_content/stories/sidebar_story.rs"
+      ],
       "module": "Examples",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Examples/Sources/GalleryContent/Stories/Navigation/AppBarStory.swift",

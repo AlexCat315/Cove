@@ -91,3 +91,15 @@ path = "rust/tests/image_story.rs"
 [[test]]
 name = "settings_screen"
 path = "rust/tests/settings_screen.rs"
+
+[[test]]
+name = "sidebar_story"
+path = "rust/tests/sidebar_story.rs"
+
+[[test]]
+name = "data_table_story"
+path = "rust/tests/data_table_story.rs"
+
+[[test]]
+name = "product_stories"
+path = "rust/tests/product_stories.rs"
