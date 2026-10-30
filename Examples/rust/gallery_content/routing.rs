@@ -136,6 +136,21 @@ impl StoryDispatch {
             Self::Story(GalleryPage::Toolbar) => {
                 Some(AnyView::new(stories::ToolbarStory::new(options)))
             }
+            Self::Story(GalleryPage::NavigationDrawer) => {
+                Some(AnyView::new(stories::DrawerStory::new(options)))
+            }
+            Self::Story(GalleryPage::NavigationRail) => {
+                Some(AnyView::new(stories::RailStory::new(options)))
+            }
+            Self::Story(GalleryPage::TimePicker) => {
+                Some(AnyView::new(stories::TimePickerStory::new(options)))
+            }
+            Self::Story(GalleryPage::Markdown) => {
+                Some(AnyView::new(stories::MarkdownStory::new(options)))
+            }
+            Self::Story(GalleryPage::WheelPicker) => {
+                Some(AnyView::new(stories::WheelPickerStory::new(options)))
+            }
             Self::Story(_) | Self::Pending { .. } => None,
         }
     }

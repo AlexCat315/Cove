@@ -4,6 +4,16 @@
 
 ## Unreleased
 
+- **补齐 `WheelPicker`/`WheelPickerOption` 整块缺失**：`Primitives/Controls/WheelPicker.swift` 此前在 Rust 侧完全没有对应类型，`StoryDispatch` 的阻塞登记里也标着 `WheelPickerOption` 待实现。现实现为 `Compose/rust/primitives/controls/fields/wheel_picker.rs`（12 项测试，已运行通过）：按值而非标签识别选项、禁用行可见但不可提交、步进双向跳过禁用行且两端不环绕、`Home`/`End` 跳到首个/末个**可用**行、可见窗口居中并在末端整体回滑。首次实现的回滑逻辑只退一步导致窗口从 7..11 而非 6..11 开始，由测试发现并改为整体重算。
+
+- 新增 `WheelPickerStory`（11 项测试，已运行通过）：时/分/半天三档时间轮与 0…10 音量轮（10 禁用）、`Now`/`Reset` 的 24→12 小时折叠、分钟按 5 取整向下吸附、`09:05`/`12:00` 双位补零。生产源码达 971/984（98.7%）。
+
+- 新增 `MarkdownStory`（9 项测试，已运行通过）：三份文档（完整发布说明 / 精简安装片段 / 可编辑草稿）均按声明结构解析；测试断言了 ` ```swift `、表格、`[x]`/`[ ]` 任务项、引用、粗体、删除线与中文段落确实出现在源文档中。草稿实际解析为 **3** 个块（标题、描述段落、列表）——我最初的预期写成 2，用一个临时探针打印真实块结构后修正了测试而非实现；探针文件已删除。生产源码达 970/984（98.6%）。
+
+- 新增 `TimePickerStory`（10 项测试，已运行通过）：12 小时制下午夜与正午均显示 `12`、11:59 仍为 AM、13:45 为 `01:45 PM`；24 小时制零填充无标记；秒数开关的字段顺序；清空后显示 `No time`。已接入 `StoryDispatch`。生产源码达 969/984（98.5%）。
+
+- 新增 `DrawerStory` 与 `RailStory`（`navigation_layout_stories`，12 项测试，已运行通过）：抽屉 20 个目标中跳过不可用项、`closesOnSelection` 决定选择后是否关闭、未选中时标题为 `none`；导航栏 72pt（有标签）/56pt（无标签）两档宽度、跳过禁用目标、`999` 等长徽标不被截断。已接入 `StoryDispatch`。生产源码达 968/984（98.4%）。
+
 - 新增 `ToolbarStory`（6 项测试，已运行通过）：`Always` 命令在极窄宽度下仍在栏内、`Overflow` 命令**无论宽度都进菜单**（由测试确认的真实语义，非猜测）、自动优先级在空间不足时按低优先级先移出且平局保留源序、Run/Pause 标题随播放态翻转。已接入 `StoryDispatch`。生产源码达 966/984（98.2%）。
 
 - 公开 `MenuItem::perform`：与 `ActionSheetAction::perform` 对应，使调用方可从快捷键或测试触发已声明命令。

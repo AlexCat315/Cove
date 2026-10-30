@@ -7278,11 +7278,14 @@
       "source": "Examples/Sources/GalleryContent/Stories/Controls/TimePickerStory.swift",
       "source_sha256": "eb87d8be6b0b811fe0408f5212a4b5a25094e94e24d61ba46510686e1ca099b3",
       "source_lines": 95,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Examples/rust/gallery_content/stories/time_picker_story.rs"
+      ],
       "module": "Examples",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Examples/Sources/GalleryContent/Stories/Controls/ToolbarStory.swift",
@@ -7301,11 +7304,14 @@
       "source": "Examples/Sources/GalleryContent/Stories/Controls/WheelPickerStory.swift",
       "source_sha256": "c85e1a74647e015101cec95b73ece090e230131d890a72a4b35311549ac98b60",
       "source_lines": 104,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Examples/rust/gallery_content/stories/wheel_picker_story.rs"
+      ],
       "module": "Examples",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Examples/Sources/GalleryContent/Stories/Data/AdaptiveTables.swift",
@@ -7369,11 +7375,14 @@
       "source": "Examples/Sources/GalleryContent/Stories/Data/MarkdownStory.swift",
       "source_sha256": "44f9c8e07370497ea134f906c0fcecc74f1d779db73ee1a6f99327cf215d0793",
       "source_lines": 77,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Examples/rust/gallery_content/stories/markdown_story.rs"
+      ],
       "module": "Examples",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Examples/Sources/GalleryContent/Stories/Data/RichTextStory.swift",
@@ -7535,11 +7544,14 @@
       "source": "Examples/Sources/GalleryContent/Stories/Layout/DrawerStory.swift",
       "source_sha256": "3237b31b6dfdfacbc3e912204f6c90e8d37eadd82d83fb2efb46464faeca5c6a",
       "source_lines": 56,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Examples/rust/gallery_content/stories/navigation_layout_stories.rs"
+      ],
       "module": "Examples",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Examples/Sources/GalleryContent/Stories/Layout/FoundationExamples.swift",
@@ -7646,11 +7658,14 @@
       "source": "Examples/Sources/GalleryContent/Stories/Layout/RailStory.swift",
       "source_sha256": "636ee897a831c592dc3d082a2bb1a4696a42807a1a475769ae64a70830384466",
       "source_lines": 84,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Examples/rust/gallery_content/stories/navigation_layout_stories.rs"
+      ],
       "module": "Examples",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Examples/Sources/GalleryContent/Stories/Layout/ResizableSidebarExample.swift",
@@ -14289,8 +14304,10 @@
       "source": "Tests/CoveUIComposeTests/WheelPickerTests.swift",
       "source_sha256": "144c4d549c8f316d70232b26ece8f9e0ecada862cc58a0138961b30c6acf1b9f",
       "source_lines": 169,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "wheel_picker"
+      ],
       "module": "Tests",
       "kind": "test",
       "planned": false

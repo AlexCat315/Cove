@@ -59,3 +59,19 @@ path = "rust/tests/action_sheet_story.rs"
 [[test]]
 name = "toolbar_story"
 path = "rust/tests/toolbar_story.rs"
+
+[[test]]
+name = "navigation_layout_stories"
+path = "rust/tests/navigation_layout_stories.rs"
+
+[[test]]
+name = "time_picker_story"
+path = "rust/tests/time_picker_story.rs"
+
+[[test]]
+name = "markdown_story"
+path = "rust/tests/markdown_story.rs"
+
+[[test]]
+name = "wheel_picker_story"
+path = "rust/tests/wheel_picker_story.rs"

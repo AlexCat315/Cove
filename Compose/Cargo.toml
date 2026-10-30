@@ -168,3 +168,7 @@ path = "rust/tests/data_table_hosts_model.rs"
 [[test]]
 name = "command_palette_model"
 path = "rust/tests/command_palette_model.rs"
+
+[[test]]
+name = "wheel_picker"
+path = "rust/tests/wheel_picker.rs"
