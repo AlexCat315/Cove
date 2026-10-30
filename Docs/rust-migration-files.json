@@ -7349,11 +7349,14 @@
       "source": "Examples/Sources/GalleryContent/Stories/Data/DataStories.swift",
       "source_sha256": "8dfb840ecbb50c34040ce6f2b7574606fa2c170c1da13c88e8bf537f758b9c9c",
       "source_lines": 714,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Examples/rust/gallery_content/stories/data_stories_file.rs"
+      ],
       "module": "Examples",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Examples/Sources/GalleryContent/Stories/Data/DataTableStory.swift",

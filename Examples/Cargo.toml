@@ -123,3 +123,7 @@ path = "rust/tests/navigation_stories_file.rs"
 [[test]]
 name = "data_stories_file"
 path = "rust/tests/data_stories_file.rs"
+
+[[test]]
+name = "adaptive_examples"
+path = "rust/tests/adaptive_examples.rs"

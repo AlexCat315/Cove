@@ -13,7 +13,7 @@
 
 | 范围 | 文件数 | 已写入 | 进行中 | 未开始 |
 | --- | ---: | ---: | ---: | ---: |
-| 生产源码 | 984 | 982 | 0 | 2 |
+| 生产源码 | 984 | 983 | 0 | 1 |
 | 测试源码 | 424 | 56 | 0 | 368 |
 | SwiftPM 清单 | 25 | 19 | 0 | 6 |
 | 项目模板 | 5 | 0 | 0 | 5 |
@@ -738,7 +738,7 @@
 
 ### Examples
 
-共 61 个文件：已写入 59，进行中 0，未开始 2。
+共 61 个文件：已写入 60，进行中 0，未开始 1。
 
 | 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
 | --- | ---: | --- | --- | --- |
@@ -764,7 +764,7 @@
 | `Examples/Sources/GalleryContent/Stories/Controls/WheelPickerStory.swift` | 104 | 已写入（未验证） | `Examples/rust/gallery_content/stories/wheel_picker_story.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Data/AdaptiveTables.swift` | 19 | 已写入（未验证） | `Examples/rust/gallery_content/stories/data_stories.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Data/ChartExploration.swift` | 37 | 已写入（未验证） | `Examples/rust/gallery_content/stories/data_stories.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Data/DataStories.swift` | 714 | 未开始 | — | 等待实现 |
+| `Examples/Sources/GalleryContent/Stories/Data/DataStories.swift` | 714 | 已写入（未验证） | `Examples/rust/gallery_content/stories/data_stories_file.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Data/DataTableStory.swift` | 131 | 已写入（未验证） | `Examples/rust/gallery_content/stories/data_table_story.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Data/DateTableStories.swift` | 114 | 已写入（未验证） | `Examples/rust/gallery_content/stories/calendar.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Data/MarkdownStory.swift` | 77 | 已写入（未验证） | `Examples/rust/gallery_content/stories/markdown_story.rs` | 未编译、未行为对照 |
