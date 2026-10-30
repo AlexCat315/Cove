@@ -11,7 +11,6 @@ use cove_core::scene::{
     AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, Justify, Node, Wrap,
 };
 use cove_core::{Binding, TextAlignment};
-use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::AppearanceExt;
 use crate::primitives::feedback::EmptyState;
@@ -259,8 +258,6 @@ struct TableSession<Id> {
     selection: Option<Id>,
     sort: Option<TableSort>,
     widths: BTreeMap<String, f32>,
-    visibility: BTreeMap<String, bool>,
-    viewport_width: f32,
 }
 
 impl<Id> Default for TableSession<Id> {
@@ -269,15 +266,13 @@ impl<Id> Default for TableSession<Id> {
             selection: None,
             sort: None,
             widths: BTreeMap::new(),
-            visibility: BTreeMap::new(),
-            viewport_width: 0.0,
         }
     }
 }
 
 /// A fixed header and virtualized rows sharing one horizontal scroll.
 pub struct Table<Record: 'static, Id: PartialEq + Clone + 'static> {
-    pub records: Vec<Record>,
+    pub records: Rc<Vec<Record>>,
     pub row_id: Rc<dyn Fn(&Record) -> Id>,
     pub columns: Vec<TableColumn<Record>>,
     pub options: TableOptions<Id>,
@@ -310,7 +305,7 @@ impl<Record: 'static, Id: PartialEq + Clone + 'static> Table<Record, Id> {
             "Table row IDs must be unique"
         );
         Self {
-            records,
+            records: Rc::new(records),
             row_id,
             columns,
             options: TableOptions::default(),
@@ -327,6 +322,14 @@ impl<Record: 'static, Id: PartialEq + Clone + 'static> Table<Record, Id> {
     pub fn on_activate(mut self, handler: impl Fn(&Record) + 'static) -> Self {
         self.on_activate = Some(Rc::new(handler));
         self
+    }
+
+    /// The current selection: the caller's binding, or this session's.
+    fn selected_id(&self) -> Option<Id> {
+        match self.options.selection.as_ref() {
+            Some(binding) => binding.get(),
+            None => self.session.borrow().selection.clone(),
+        }
     }
 
     fn sort(&self) -> Option<TableSort> {
@@ -397,13 +400,29 @@ impl<Record: 'static, Id: PartialEq + Clone + 'static> View for Table<Record, Id
         let layout = self.options.layout.clone().validated();
         let sort = self.sort();
         let order = Self::sorted(&self.records, &self.columns, sort.as_ref());
+        // Explicit per-column overrides win: `false` hides, `true` forces shown.
+        // Automatic fitting needs the Columns/Visibility resolver, which is not
+        // ported; absent overrides therefore leave a column as authored.
+        let overrides = self.options.column_visibility.as_ref().map(|binding| binding.get());
+        let visible: Vec<bool> = self
+            .columns
+            .iter()
+            .map(|column| match overrides.as_ref().and_then(|map| map.get(&column.id)) {
+                Some(false) => false,
+                Some(true) => true,
+                None => column.visibility != ColumnVisibility::Hidden,
+            })
+            .collect();
         let widths: Vec<f32> = self.columns.iter().map(|column| self.width_of(column)).collect();
         let total_width: f32 = widths.iter().sum();
 
         let mut header_cells: Vec<AnyView> = Vec::new();
         for (index, column) in self.columns.iter().enumerate() {
+            if !visible[index] {
+                continue;
+            }
             let is_sorted = sort.as_ref().is_some_and(|sort| sort.column_id == column.id);
-            let direction = sort.as_ref().filter(|sort| is_sorted).map(|sort| sort.direction);
+            let direction = sort.as_ref().filter(|_| is_sorted).map(|sort| sort.direction);
             let table_session = self.session.clone();
             let sort_binding = self.options.sort.clone();
             let enabled = self.options.is_enabled;
@@ -415,7 +434,6 @@ impl<Record: 'static, Id: PartialEq + Clone + 'static> View for Table<Record, Id
                 column_id: column_id.clone(),
                 width: widths[index],
                 height: layout.header_height,
-                alignment: column.layout.alignment,
                 sortable,
                 is_enabled: enabled,
                 is_sorted,
@@ -458,9 +476,14 @@ impl<Record: 'static, Id: PartialEq + Clone + 'static> View for Table<Record, Id
 
         let mut rows: Vec<AnyView> = Vec::new();
         for (position, record_index) in order.iter().enumerate() {
-            let record = &self.records[*record_index];
+            // Copy the index so the row's press handler owns it.
+            let row_index = *record_index;
+            let record = &self.records[row_index];
             let mut cells: Vec<AnyView> = Vec::new();
             for (index, column) in self.columns.iter().enumerate() {
+                if !visible[index] {
+                    continue;
+                }
                 cells.push(AnyView::new(TableCell {
                     content: column.cell(record),
                     width: widths[index],
@@ -469,8 +492,28 @@ impl<Record: 'static, Id: PartialEq + Clone + 'static> View for Table<Record, Id
                     label: column.title.clone(),
                 }));
             }
+            let row_key = (self.row_id)(record);
+            let selected = self.selected_id();
+            let is_selected = selected.as_ref() == Some(&row_key);
+            let selection_binding = self.options.selection.clone();
+            let session = self.session.clone();
+            let on_activate = self.on_activate.clone();
+            let records_for_rows = self.records.clone();
             rows.push(AnyView::new(TableRowPaint {
                 is_striped: layout.is_striped && position % 2 == 1,
+                is_selected,
+                is_enabled: self.options.is_enabled,
+                on_press: Rc::new(move || {
+                    match selection_binding.as_ref() {
+                        Some(binding) => binding.set(Some(row_key.clone())),
+                        None => session.borrow_mut().selection = Some(row_key.clone()),
+                    }
+                    if let Some(handler) = on_activate.as_ref() {
+                        if let Some(record) = records_for_rows.get(row_index) {
+                            handler(record);
+                        }
+                    }
+                }),
                 content: AnyView::new(
                     BoxView::new(
                         FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 0.0,
@@ -570,23 +613,48 @@ crate::impl_primitive_view!(TableHeaderPaint);
 /// A body row: the strike tint alternates here, where the node's theme is known.
 struct TableRowPaint {
     is_striped: bool,
+    is_selected: bool,
+    is_enabled: bool,
+    on_press: Rc<dyn Fn()>,
     content: AnyView,
 }
 
 impl PrimitiveView for TableRowPaint {
     fn make_node(&self) -> Node {
         let node = Node::new();
-        node.set_is_hit_testable(false);
+        node.set_is_hit_testable(self.is_enabled);
         node
     }
 
     fn update_node(&self, node: &Node) {
-        if self.is_striped {
-            let theme = theme_for_node(node);
-            node.set_background_color(Some(theme.colors.on_surface.multiplied_alpha(0.04)));
+        let theme = theme_for_node(node);
+        node.set_background_color(if self.is_selected {
+            Some(theme.colors.selection)
+        } else if self.is_striped {
+            Some(theme.colors.on_surface.multiplied_alpha(0.04))
         } else {
-            node.set_background_color(None);
+            None
+        });
+        let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() else { return };
+        if !self.is_enabled {
+            registry.remove(node);
+            return;
         }
+        let on_press = self.on_press.clone();
+        registry.set_pointer(
+            node,
+            cove_core::scene::InputHandlerRoute::control(),
+            Rc::new(move |event, phase, event_phase| {
+                if event.button != cove_platform::MouseButton::Left
+                    || phase != cove_core::scene::PointerPhase::Up
+                    || event_phase != cove_core::scene::EventPhase::Target
+                {
+                    return cove_core::scene::EventResult::Ignored;
+                }
+                on_press();
+                cove_core::scene::EventResult::Handled
+            }),
+        );
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
@@ -601,7 +669,6 @@ struct TableHeaderCell {
     column_id: String,
     width: f32,
     height: f32,
-    alignment: TextAlignment,
     sortable: bool,
     is_enabled: bool,
     is_sorted: bool,

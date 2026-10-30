@@ -20,7 +20,7 @@
 
 | 范围 | 文件数 | 已写入 | 进行中 | 未开始 |
 | --- | ---: | ---: | ---: | ---: |
-| 生产源码 | 984 | 878 | 0 | 106 |
+| 生产源码 | 984 | 887 | 0 | 97 |
 | 测试源码 | 424 | 50 | 0 | 374 |
 | SwiftPM 清单 | 25 | 19（Cargo 清单） | 0 | 6 |
 | CLI 项目模板 | 5 | 0 | 0 | 5 |
@@ -50,11 +50,11 @@ System 16 个、Logging 15 个、Tools/Cove 8 个、Tools/Support 12 个、Compo
 
 | 模块 | Swift 文件 | Swift 行 | 已写入 | 未开始 |
 | --- | ---: | ---: | ---: | ---: |
-| Compose | 414 | 52,554 | 367 | 47 |
+| Compose | 414 | 52,554 | 372 | 42 |
 | Graphics | 107 | 14,534 | 102 | 5 |
 | Core | 97 | 12,299 | 97 | 0 |
 | Tools | 69 | 3,901 | 69 | 0 |
-| Examples | 61 | 7,135 | 20 | 41 |
+| Examples | 61 | 7,135 | 24 | 37 |
 | DevTools | 51 | 5,183 | 41 | 10 |
 | Hosts | 51 | 4,254 | 50 | 1 |
 | Terminal | 29 | 3,088 | 28 | 1 |
@@ -67,7 +67,7 @@ System 16 个、Logging 15 个、Tools/Cove 8 个、Tools/Support 12 个、Compo
 | Imaging | 9 | 696 | 9 | 0 |
 | PlatformCore | 6 | 540 | 6 | 0 |
 | Browser | 1 | 400 | 1 | 0 |
-| 合计 | 984 | 117,744 | 878 | 106 |
+| 合计 | 984 | 117,744 | 887 | 97 |
 
 Rust 文件数列为磁盘快照，不等于逐 Swift 文件一一对应；多个 Swift 文件可能映射到一个 Rust 模块，也可能一个 Swift 文件拆到多个 Rust/C 文件。逐文件关系在清单中。
 
@@ -269,6 +269,69 @@ DX12 描述符表逐 draw 绑定与加速结构、Apple 图片 MIME 与 macOS �
 7. 更新正式版本、安装器、SDK 元数据、所有示例与 CHANGELOG，再启用 Rust SDK 发布。
 
 旧 Swift CI 保存在 `Docs/legacy/ci-swift.yml`，用于追踪原生依赖、测试包、发布安装与平台验收范围。
+
+## 清单工具的可信度
+
+`Tools/Cove/rust/migration_inventory.py` 从磁盘重新推导状态，本轮补充三项校验，
+因为发现了两起"同名不同子系统"的错配：
+
+1. **可达性校验**：`.rs` 文件的 stem 若从未被任何 `mod` 语句声明，即为死代码，
+   不能计入"已写入"。本项目已三次出现该类缺陷（System 16、Logging 15、Tools 20 个孤儿文件）。
+   本轮据此降级 2 条记录。
+2. **基名边界匹配**：头部注释里用裸 `in` 判断曾让 `Visibility.swift` 命中
+   `AnimatedVisibility.swift`；现要求基名前有非标识符边界。
+3. **通用词黑名单**：`Visibility`、`Support`、`Options`、`Tree`、`Selection` 等普通词
+   会被无关子系统用作类型名，仅凭类型名命中不算证据。
+
+已确认的两起错配：
+- `Primitives/Data/Columns/Visibility.swift`（表格列可见性规划）曾被映射到
+  `Graphics/rust/rhi/visibility.rs`（GPU 可见性缓冲），实为完全无关模块。该 Swift 文件
+  25 行（`TableColumnPlan::resolve` + `tracks`），**确属未迁移**，已改回 `pending`。
+- `Primitives/Controls/DateValues.swift` 的 Rust 文件从未被 `mod` 声明，且所引用的
+  `foundation::{Calendar, CalendarUnit, Date}` 整个模块不存在——已由本轮补齐
+  `foundation/{date,calendar}.rs`。
+
+审计结论：**当前 0 条生产源码记录声称的目标文件不存在或不可达**。
+
+## Compose API 注意事项（踩坑记录）
+
+以下陷阱在本轮由多人反复踩到，按实际报错文本组织，供后续实现参考。
+
+1. **扩展 trait 必须逐个导入。** `BoxView`/`Text`/`Button` 几乎没有固有 builder 方法；
+   `.padding()`、`.corner_radius()`、`.frame_height()`、`.flex()`、`.semantic_background()`、
+   `.semantic_foreground()`、`.button_style()` 分别来自
+   `PaddingExt`、`FlexExt`、`LayoutFrameExt`、`AppearanceExt`、`SemanticStyleViewExt`、`ButtonStyleViewExt`。
+   缺一个导入就报 "no method named X"——**看起来像 API 不存在，实际是缺 import**。
+
+2. **`.button_style()` 与 `.semantic_foreground()` 返回 `ModifiedContent`，不是 `AnyView`。**
+   样式必须是擦除前的最后一次调用；`ModifiedContent` 没有固有 `.corner_radius()`，
+   混用样式与布局的修饰器链要特别小心。禁止用 `AnyView::new(modified_content)` 掩盖类型错误
+   （会经 downcast 快路径**静默丢弃修饰器**）。
+
+3. **`button_style` 会先解析为 `ViewModifier`。** 报错形如
+   "`SecondaryButtonStyle: ViewModifier` is not satisfied"，具有误导性；导入
+   `ButtonStyleViewExt` 即可。
+
+4. **已擦除值用 `AnyView::with_modifier(m)`。** 具体 `View` 用 `ViewExt::modifier`；
+   `ModifiedContent` 或 builder 输出需先 `AnyView::new(x)` 再 `with_modifier`。
+
+5. **两套对齐类型。** `cove_core::scene::{Align, FlexDirection, Justify, Wrap}` 用于 flex；
+   `cove_ui_compose::Alignment` 用于 `BoxView::with_alignment`、`Grid`、`Masonry`。
+
+6. **`Checkbox` 的 label 是结构体字段，不是方法。** 用
+   `Checkbox::labeled(label, Binding<CheckboxState>)`；`from_boolean` 无 label 槽位。
+
+7. **`LazyGrid::new` 取 11 个参数**；`GridRowHeights::fixed(n)` 是构造函数（不是 `::Fixed`）。
+
+8. **`Spinner::new(size)` 需要尺寸；`Badge::enabled(bool)` 不是 `.is_enabled()`；
+   `ProgressView::new(Option<f64>)` / `ProgressCircle::new(Option<f64>)`。**
+
+9. **`body()` 不能把 `&self` 捕获进 `'static` 闭包**（如 `ContainerSizeReader`）。
+   需要先克隆出快照结构体（见 `AdaptiveSidebar` 的 `AdaptiveSnapshot`）。
+
+10. **`ModifiedContent` 的私有字段曾名为 `modifier`，遮蔽 `ViewExt::modifier(self, m)`**，
+    报错为 "private field, not a method"。字段已改名 `applied`；如再遇到同类报错，
+    检查是否又出现同名字段遮蔽。
 
 ## 迁移约定
 

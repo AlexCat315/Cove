@@ -22,6 +22,7 @@ pub use horizontal_scroll_origin::*;
 pub use accordion::{Accordion, AccordionItem};
 pub use bounded_scroll_view::BoundedScrollView;
 pub use insets::{safe_area_insets, SafeArea, SafeAreaEdges, SurfaceRoot};
+pub use masonry::*;
 pub use overlay::*;
 pub use panel::Panel;
 pub use row_slot::*;

@@ -13,15 +13,14 @@ use cove_ui_compose::primitives::data::chart::{
     ChartContent, ChartGuides, ChartStyle, ChartXDomain, ChartMark, ChartOrientation, ChartPlot, ChartSeries, ChartSeriesStyle, ChartStacking,
     ChartValueAxis,
 };
-use cove_ui_compose::primitives::feedback::{Badge, ProgressView, StatusTone};
+use cove_ui_compose::primitives::feedback::StatusTone;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
 use cove_ui_compose::theme::ThemeReader;
 use cove_ui_compose::{
-    AnyView, BoxView, DynamicField, LayoutDebugExt, TupleView, View, ViewExt, ViewModifier,
+    AnyView, BoxView, DynamicField, LayoutDebugExt, TupleView, View,
 };
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
-use cove_core::scene::{LayoutNode, Node};
 
 use crate::gallery_content::catalog::GalleryOptions;
 

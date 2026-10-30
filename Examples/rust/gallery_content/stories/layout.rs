@@ -10,7 +10,7 @@ use cove_ui_compose::primitives::layout::grid::{Grid, GridColumn, GridRowHeights
 use cove_ui_compose::primitives::layout::masonry::masonry::Masonry;
 use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::text::Text;
-use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
+use cove_ui_compose::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
 use cove_ui_compose::theme::styles::buttons::button_style::ButtonStyleViewExt;

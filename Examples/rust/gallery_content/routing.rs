@@ -33,12 +33,17 @@ impl StoryDispatch {
         match page {
             // Pages whose story is fully ported today.
             GalleryPage::Introduction
+            | GalleryPage::Button
+            | GalleryPage::Checkbox
+            | GalleryPage::Toggle
             | GalleryPage::Badge
             | GalleryPage::Alert
             | GalleryPage::Progress
             | GalleryPage::Empty
             | GalleryPage::Animation
-            | GalleryPage::ViewportTraits => Self::Story(page),
+            | GalleryPage::ViewportTraits
+            | GalleryPage::Masonry
+            | GalleryPage::RichText => Self::Story(page),
             _ => Self::pending(page),
         }
     }
@@ -61,6 +66,21 @@ impl StoryDispatch {
         match self {
             Self::Story(GalleryPage::Introduction) => {
                 Some(AnyView::new(stories::IntroductionStory::new(options)))
+            }
+            Self::Story(GalleryPage::Button) => {
+                Some(AnyView::new(stories::ButtonStory::new(options)))
+            }
+            Self::Story(GalleryPage::Checkbox) => {
+                Some(AnyView::new(stories::CheckboxStory::new(options)))
+            }
+            Self::Story(GalleryPage::Toggle) => {
+                Some(AnyView::new(stories::ToggleStory::new(options)))
+            }
+            Self::Story(GalleryPage::Masonry) => {
+                Some(AnyView::new(stories::MasonryStory::new(options)))
+            }
+            Self::Story(GalleryPage::RichText) => {
+                Some(AnyView::new(stories::RichTextStory::new()))
             }
             Self::Story(GalleryPage::Badge) => Some(AnyView::new(stories::BadgeStory)),
             Self::Story(GalleryPage::Alert) => Some(AnyView::new(stories::AlertStory::new())),
@@ -106,7 +126,7 @@ impl MigrationPending {
     /// [`MigrationPending::is_portable`].
     pub fn entries() -> &'static [(GalleryPage, &'static str, &'static [&'static str])] {
         &[
-            (GalleryPage::Introduction, "Overview/Dashboard.swift", &["ButtonGroup", "ButtonGroupItem"]),
+            (GalleryPage::Introduction, "Overview/Dashboard.swift", &[]),
             (GalleryPage::Button, "Controls/ControlStories.swift", &["DatePicker"]),
             (GalleryPage::Checkbox, "Controls/ControlStories.swift", &[]),
             (GalleryPage::Toggle, "Controls/ControlStories.swift", &[]),
@@ -114,7 +134,7 @@ impl MigrationPending {
             (GalleryPage::RangeSlider, "Controls/ControlStories.swift", &[]),
             (GalleryPage::Rating, "Feedback/RatingStory.swift", &["Rating"]),
             (GalleryPage::TextField, "Controls/ControlStories.swift", &[]),
-            (GalleryPage::SearchField, "Controls/ControlStories.swift", &["Toolbar"]),
+            (GalleryPage::SearchField, "Controls/ControlStories.swift", &[]),
             (GalleryPage::TextArea, "Controls/ControlStories.swift", &[]),
             (GalleryPage::TextEditor, "Controls/TextEditorStory.swift", &["Tooltip"]),
             (GalleryPage::WheelPicker, "Controls/WheelPickerStory.swift", &["WheelPickerOption"]),
@@ -137,9 +157,9 @@ impl MigrationPending {
             (GalleryPage::VirtualStack, "Data/DataStories.swift", &[]),
             (GalleryPage::Chart, "Data/DataStories.swift", &[]),
             (GalleryPage::Icon, "Data/DataStories.swift", &[]),
-            (GalleryPage::Avatar, "Feedback/AvatarStory.swift", &["ButtonGroup"]),
-            (GalleryPage::Image, "Layout/ImageStory.swift", &["ButtonGroup"]),
-            (GalleryPage::Web, "Data/WebStory.swift", &["ButtonGroup", "ButtonGroupItem"]),
+            (GalleryPage::Avatar, "Feedback/AvatarStory.swift", &[]),
+            (GalleryPage::Image, "Layout/ImageStory.swift", &[]),
+            (GalleryPage::Web, "Data/WebStory.swift", &[]),
             (GalleryPage::RichText, "Data/RichTextStory.swift", &[]),
             (GalleryPage::Markdown, "Data/MarkdownStory.swift", &[]),
             (GalleryPage::Menu, "Layout/OverlayStories.swift", &[]),
@@ -148,9 +168,9 @@ impl MigrationPending {
             (GalleryPage::Popover, "Layout/OverlayStories.swift", &[]),
             (GalleryPage::Modal, "Layout/OverlayStories.swift", &[]),
             (GalleryPage::Disclosure, "Layout/OverlayStories.swift", &[]),
-            (GalleryPage::Tabs, "Layout/OverlayStories.swift", &["TabView"]),
+            (GalleryPage::Tabs, "Layout/OverlayStories.swift", &[]),
             (GalleryPage::Panel, "Layout/LayoutStories.swift", &[]),
-            (GalleryPage::SplitView, "Layout/LayoutStories.swift", &["SplitView"]),
+            (GalleryPage::SplitView, "Layout/LayoutStories.swift", &[]),
             (GalleryPage::ScrollView, "Layout/LayoutStories.swift", &[]),
             (GalleryPage::BoundedScroll, "Layout/LayoutStories.swift", &[]),
             (GalleryPage::PropertyGrid, "Layout/LayoutStories.swift", &["PropertyGrid", "PropertyGridRow", "PropertyGridSection"]),
@@ -172,9 +192,9 @@ impl MigrationPending {
             (GalleryPage::Sidebar, "Layout/SidebarStory.swift", &[]),
             (GalleryPage::NavigationDrawer, "Layout/DrawerStory.swift", &[]),
             (GalleryPage::NavigationRail, "Layout/RailStory.swift", &[]),
-            (GalleryPage::AppBar, "Navigation/AppBarStory.swift", &["AppBar", "ToolbarItem"]),
-            (GalleryPage::Table, "Data/DateTableStories.swift", &["TableColumn"]),
-            (GalleryPage::DataTable, "Data/DataTableStory.swift", &["TableColumn"]),
+            (GalleryPage::AppBar, "Navigation/AppBarStory.swift", &["AppBar"]),
+            (GalleryPage::Table, "Data/DateTableStories.swift", &[]),
+            (GalleryPage::DataTable, "Data/DataTableStory.swift", &[]),
             (GalleryPage::Calendar, "Data/DateTableStories.swift", &["CalendarView"]),
             (GalleryPage::DatePicker, "Data/DateTableStories.swift", &["DatePicker"]),
             (GalleryPage::DateRangePicker, "Controls/ControlStories.swift", &["DateRangePicker"]),
@@ -185,7 +205,7 @@ impl MigrationPending {
             (GalleryPage::Accordion, "Layout/NavigationStories.swift", &[]),
             (GalleryPage::Breadcrumb, "Layout/NavigationStories.swift", &["Breadcrumb", "BreadcrumbItem"]),
             (GalleryPage::Pagination, "Layout/NavigationStories.swift", &["Pagination"]),
-            (GalleryPage::ButtonGroup, "Layout/NavigationStories.swift", &["ButtonGroup", "ButtonGroupItem"]),
+            (GalleryPage::ButtonGroup, "Layout/NavigationStories.swift", &[]),
             (GalleryPage::SplitButton, "Controls/ControlStories.swift", &[]),
             (GalleryPage::Tag, "Layout/NavigationStories.swift", &[]),
             (GalleryPage::KeyCap, "Layout/NavigationStories.swift", &[]),
@@ -198,10 +218,10 @@ impl MigrationPending {
             (GalleryPage::NavigationStack, "Layout/NavigationStories.swift", &[]),
             (GalleryPage::HoverCard, "Overlays/HoverStory.swift", &[]),
             (GalleryPage::Timeline, "Data/DataStories.swift", &[]),
-            (GalleryPage::Toolbar, "Controls/ToolbarStory.swift", &["Toolbar", "ToolbarItem"]),
+            (GalleryPage::Toolbar, "Controls/ToolbarStory.swift", &[]),
             (GalleryPage::Link, "Controls/ControlStories.swift", &[]),
             (GalleryPage::StatusBar, "Layout/LayoutStories.swift", &[]),
-            (GalleryPage::Carousel, "Layout/LayoutStories.swift", &["Carousel"]),
+            (GalleryPage::Carousel, "Layout/LayoutStories.swift", &[]),
             (GalleryPage::Skeleton, "Feedback/SkeletonStory.swift", &[]),
             (GalleryPage::Stepper, "Controls/StepperStory.swift", &[]),
         ]
@@ -302,8 +322,8 @@ mod checks {
         let portable = MigrationPending::portable();
         let blocked = MigrationPending::blocked();
         assert_eq!(portable.len() + blocked.len(), entries.len());
-        assert_eq!(portable.len(), 72, "72 pages are portable today");
-        assert_eq!(blocked.len(), 26, "26 pages wait on Compose");
+        assert_eq!(portable.len(), 84, "84 pages are portable today");
+        assert_eq!(blocked.len(), 14, "14 pages wait on Compose");
         for page in &portable {
             assert!(MigrationPending::entry(*page).1.is_empty());
         }
@@ -322,13 +342,14 @@ mod checks {
 
     #[test]
     fn blocked_pages_report_their_missing_widgets() {
-        let dispatch = StoryDispatch::new(GalleryPage::Checkbox);
+        // `rating` still needs the Rating widget.
+        let dispatch = StoryDispatch::new(GalleryPage::Rating);
         assert!(!dispatch.is_implemented());
         assert!(dispatch.view(GalleryOptions::default()).is_none());
         let message = dispatch.pending_message().expect("a pending page reports");
-        assert!(message.contains("checkbox"));
-        assert!(message.contains("Checkbox"));
-        assert!(message.contains("Controls/ControlStories.swift"));
+        assert!(message.contains("rating"));
+        assert!(message.contains("Rating"));
+        assert!(message.contains("Feedback/RatingStory.swift"));
 
         // Portable-but-not-yet-ported pages still report, with an empty widget
         // list, because the dispatch arm does not exist yet.

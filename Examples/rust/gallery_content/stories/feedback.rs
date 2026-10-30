@@ -5,7 +5,7 @@
 
 use cove_core::scene::animation::AnimationCurve;
 use cove_core::State;
-use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
+use cove_ui_compose::modifiers::layout::{FlexExt, PaddingExt};
 use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::primitives::feedback::{
     Alert, AlertTone, Badge, BadgeVariant, EmptyState, ProgressCircle, ProgressView, Spinner,

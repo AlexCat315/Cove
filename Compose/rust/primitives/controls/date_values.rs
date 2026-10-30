@@ -48,7 +48,7 @@ impl CalendarGrid {
     pub fn days_in_month(month: Date, calendar: &Calendar) -> Vec<Date> {
         let start = Self::month_start(month, calendar);
         let weekday = calendar.component(CalendarUnit::Weekday, start);
-        let leading = (weekday - calendar.first_weekday() + 7) % 7;
+        let leading = (weekday - calendar.first_weekday() as i32).rem_euclid(7);
         let Some(first) = calendar.date_by_adding(CalendarUnit::Day, -leading, start) else { return Vec::new() };
         (0..42).filter_map(|offset| calendar.date_by_adding(CalendarUnit::Day, offset, first)).collect()
     }

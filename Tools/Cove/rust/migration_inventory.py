@@ -79,22 +79,32 @@ def score(swift_source: str, candidate: str, stem: str) -> int:
         # `DX12Backend.swift` -> `dx12/backend.rs`, `MetalDevice.swift` ->
         # `metal/device.rs`, `CoveUIWorkspaceModel.swift` -> `workspace/model.rs`.
         # A suffix match on a snake_case word boundary covers that shape.
+        # A prefixed Swift name (`DX12Backend`) may drop its prefix in Rust
+        # (`backend`), but the *whole* remaining suffix must be the candidate
+        # stem — otherwise `Visibility` would match `animated_visibility`.
         suffix = stem.removeprefix("_")
-        exact = (
-            suffix.endswith("_" + candidate_snake)
-            and candidate_snake in suffix
-            and len(candidate_snake) >= 4
+        exact = suffix == candidate_snake or (
+            suffix.endswith("_" + candidate_snake) and len(candidate_snake) >= 4
         )
     if not exact:
         return 0
 
+    swift_parts = swift_source.split(os.sep)
+    candidate_parts = candidate.split(os.sep)
     path = 1
     swift_crate = crate_root(swift_source)
     if swift_crate and crate_root(candidate) == swift_crate:
         path += 4
+    else:
+        # A candidate in a different crate is only plausible when the *stem*
+        # match is on a shared, generic word (`Visibility`, `Support`,
+        # `Options`). Those collide across subsystems, so require the Swift
+        # file's own directory name to appear in the candidate's path.
+        swift_parent = swift_parts[-2].lower() if len(swift_parts) > 1 else ""
+        candidate_lower = candidate.lower()
+        if not swift_parent or swift_parent not in candidate_lower:
+            return 0
     # Prefer the same relative subdirectory shape.
-    swift_parts = swift_source.split(os.sep)
-    candidate_parts = candidate.split(os.sep)
     if swift_parts[:2] == candidate_parts[:2]:
         path += 2
     if len(candidate_parts) > 1 and swift_parts[-2].lower() in (
@@ -110,10 +120,19 @@ def score(swift_source: str, candidate: str, stem: str) -> int:
 
 
 def derive(entries: list[dict], rust: list[str]) -> None:
+    declared = declared_modules()
     for entry in entries:
         if entry["kind"] != "production":
             continue
-        existing = [p for p in entry.get("rust", []) if os.path.exists(os.path.join(ROOT, p))]
+        if entry.get("status") == "pending" and not entry.get("rust"):
+            # An explicitly cleared entry is an operator correction (the previous
+            # target was a wrong mapping); leave it pending.
+            continue
+        existing = [
+            p
+            for p in entry.get("rust", [])
+            if os.path.exists(os.path.join(ROOT, p)) and is_reachable(p, declared)
+        ]
         if existing:
             entry["rust"] = existing
             entry["status"] = "written_unverified"
@@ -132,10 +151,19 @@ def derive(entries: list[dict], rust: list[str]) -> None:
             entry["status"] = "written_unverified"
             entry["planned"] = False
         else:
-            entry["rust"] = entry.get("rust", [])
+            # A stale target list must not survive: it is what made the
+            # `Visibility.swift` collision look like coverage.
+            entry["rust"] = []
             entry["status"] = "pending"
             entry["planned"] = True
 
+
+# Type names that are ordinary words and therefore collide across subsystems.
+GENERIC_TYPE_NAMES = {
+    "visibility", "support", "options", "values", "style", "layout", "content",
+    "state", "selection", "presentation", "resolution", "split", "tree", "model",
+    "handler", "service", "store", "reader", "host", "result", "item", "row",
+}
 
 _HEADER_CACHE: dict[str, str] = {}
 
@@ -312,6 +340,45 @@ def test_target_names() -> list[str]:
     return names
 
 
+_DECLARED_CACHE: dict[str, set[str]] = {}
+
+
+def declared_modules() -> set[str]:
+    """Every module name declared by any `mod` statement in the tree.
+
+    A `.rs` file whose stem is never declared is dead code: the compiler never
+    sees it, so it cannot be "written" in any meaningful sense. This project has
+    produced that class of bug repeatedly (System 16, Logging 15, Tools 20).
+    """
+    names: set[str] = set()
+    for dirpath, dirnames, filenames in os.walk(ROOT):
+        dirnames[:] = [d for d in dirnames if d not in EXCLUDED_DIRS]
+        for filename in filenames:
+            if not filename.endswith(".rs"):
+                continue
+            try:
+                text = open(os.path.join(dirpath, filename), encoding="utf-8", errors="ignore").read()
+            except OSError:
+                continue
+            for match in re.finditer(
+                r"^\s*(?:pub(?:\([^)]*\))?\s+)?mod\s+([A-Za-z0-9_]+)\s*;", text, re.M
+            ):
+                names.add(match.group(1))
+    return names
+
+
+def is_reachable(path: str, declared: set[str]) -> bool:
+    """Whether a Rust file is named by some `mod` statement, or is a crate entry."""
+    stem = os.path.basename(path)[:-3]
+    if stem in ("lib", "main", "build", "mod"):
+        return True
+    if stem in declared:
+        return True
+    # `mod foo;` may live in `foo/mod.rs`, and a directory module is declared by
+    # its parent `mod foo;` — already covered above — so nothing else is needed.
+    return False
+
+
 def main() -> int:
     with open(JSON_PATH, encoding="utf-8") as handle:
         document = json.load(handle)
@@ -345,15 +412,32 @@ def main() -> int:
             continue
         if entry["kind"] != "production":
             continue
-        if types.get(stem):
-            entry["rust"] = sorted(set(types[stem]))[:3]
-            entry["status"] = "written_unverified"
-            entry["planned"] = False
-            continue
+        # Common English words are used as type names by unrelated subsystems
+        # (`Visibility` is a GPU buffer and a table column plan), so a bare name
+        # hit is not evidence. Only distinctive names are matched this way.
+        if types.get(stem) and stem.lower() not in GENERIC_TYPE_NAMES:
+            usable = [
+                path
+                for path in types[stem]
+                if path.endswith("mod.rs") is False
+                and os.path.basename(path)[:-3] not in ("lib", "main", "build")
+            ]
+            if usable:
+                entry["rust"] = sorted(set(usable))[:3]
+                entry["status"] = "written_unverified"
+                entry["planned"] = False
+                continue
         # Consolidated modules document the Swift files they replace in their
         # header (e.g. "Translation of .../ResourcesSupport/Bundle.swift and
         # .../Lookup.swift"), so a filename mention there is coverage evidence.
-        mentioned = [path for path in rust if stem in source_header(path)]
+        # Match the full Swift basename, not the bare stem: `Visibility.swift`
+        # must not be "found" inside a header that says `AnimatedVisibility.swift`.
+        # Require a path separator before the basename: `Visibility.swift` is a
+        # substring of `AnimatedVisibility.swift`, and a bare `in` test would
+        # credit the wrong module.
+        basename = os.path.basename(entry["source"])
+        pattern = re.compile(r"(?<![A-Za-z0-9_])" + re.escape(basename))
+        mentioned = [path for path in rust if pattern.search(source_header(path))]
         if mentioned:
             entry["rust"] = sorted(set(mentioned))[:3]
             entry["status"] = "written_unverified"
@@ -363,6 +447,19 @@ def main() -> int:
             entry["rust"] = sorted(set(types[stem]))[:3]
             entry["status"] = "written_unverified"
             entry["planned"] = False
+
+    # Final pass: a claim backed only by unreachable files is not coverage.
+    declared = declared_modules()
+    demoted = 0
+    for entry in document["entries"]:
+        if entry["status"] != "written_unverified" or entry["kind"] != "production":
+            continue
+        reachable = [p for p in entry.get("rust", []) if is_reachable(p, declared)]
+        if entry.get("rust") and not reachable:
+            entry["status"] = "pending"
+            entry["planned"] = True
+            entry["rust"] = []
+            demoted += 1
 
     with open(JSON_PATH, "w", encoding="utf-8") as handle:
         json.dump(document, handle, indent=2, ensure_ascii=False)
@@ -374,6 +471,7 @@ def main() -> int:
     print(f"production entries: {len(production)}")
     print(f"written (some file on disk): {len(production) - len(pending)}")
     print(f"pending: {len(pending)}")
+    print(f"demoted (target files are unreachable dead code): {demoted}")
     for entry in pending:
         print(f"  MISSING {entry['module']:12s} {entry['source']}")
     return 0

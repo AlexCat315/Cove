@@ -202,36 +202,19 @@ fn variant_button(
     style: Option<AnyButtonStyle>,
     debug: Option<&'static str>,
 ) -> AnyView {
-    let clicks = clicks.clone();
-    let button = Button::title(label, move || clicks.update(|value| *value += 1)).enabled(enabled);
+    let build = |clicks: State<i32>| {
+        Button::title(label, move || clicks.update(|value| *value += 1)).enabled(enabled)
+    };
     match style {
         Some(style) => AnyView::new(
-            Button::title(label, {
-                let clicks = clicks.clone();
-                move || clicks.update(|value| *value += 1)
-            })
-            .enabled(enabled)
-            .button_style_any(style),
+            build(clicks.clone())
+                .button_style_any(style),
         ),
         None => match debug {
-            Some(name) => AnyView::new(button.debug_name(name)),
-            None => AnyView::new(button),
+            Some(name) => AnyView::new(build(clicks.clone()).debug_name(name)),
+            None => AnyView::new(build(clicks.clone())),
         },
     }
-}
-
-/// Adapts a boolean binding to the tri-state checkbox contract.
-///
-/// `Checkbox::from_boolean` builds the same adapter but has no label slot, so
-/// the labeled constructor needs the binding prepared here.
-fn bool_checkbox_state(is_on: Binding<bool>) -> Binding<CheckboxState> {
-    Binding::new(
-        {
-            let is_on = is_on.clone();
-            move || if is_on.get() { CheckboxState::On } else { CheckboxState::Off }
-        },
-        move |value: CheckboxState| is_on.set(value == CheckboxState::On),
-    )
 }
 
 /// `CheckboxStory`.
@@ -277,15 +260,15 @@ impl View for CheckboxStory {
             12.0,
             AnyView::new(TupleView::new(vec![
                 AnyView::new(
-                    Checkbox::labeled(
+                    Checkbox::labeled_from_boolean(
                         "Accept the terms",
-                        bool_checkbox_state(Binding::new(
+                        Binding::new(
                             {
                                 let checked = checked.clone();
                                 move || checked.get()
                             },
                             move |value| checked.set(value),
-                        )),
+                        ),
                     )
                     .enabled(enabled),
                 ),

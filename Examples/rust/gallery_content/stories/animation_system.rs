@@ -221,3 +221,196 @@ mod checks {
         assert_eq!(story.drag.get(), Point::new(0.0, 0.0));
     }
 }
+
+impl cove_ui_compose::View for AnimationSystemExamples {
+    fn body(&self) -> cove_ui_compose::AnyView {
+        use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
+        use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
+        
+        use cove_ui_compose::primitives::controls::Button;
+        use cove_ui_compose::primitives::feedback::{Badge, StatusTone};
+        use cove_ui_compose::primitives::text::Text;
+        use cove_ui_compose::theme::styles::buttons::button_style::ButtonStyleViewExt;
+        use cove_ui_compose::theme::styles::buttons::SecondaryButtonStyle;
+        use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
+        use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView};
+
+        use crate::gallery_content::stories::StorySection;
+
+        let enabled = self.is_enabled;
+
+        // Tracks & phases
+        let play = {
+            let run = self.run.clone();
+            AnyView::new(
+                AnyView::new(
+                    Button::title("Play sequence", move || run.update(|value| *value += 1))
+                        .enabled(enabled),
+                )
+                .debug_name("animation-sequence-play"),
+            )
+        };
+        let track_badge = AnyView::new(Badge::new("Keyframes").tone(StatusTone::Info));
+        let phase_badge = AnyView::new(
+            Badge::new(DemoPhase::Idle.raw_value()).tone(StatusTone::Info),
+        );
+        let badges = AnyView::new(
+            BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            24.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(
+                    BoxView::new(
+                        FlexDirection::Column,
+                        Align::Center,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        0.0,
+                        track_badge,
+                    )
+                    .debug_name("animation-keyframe"),
+                ),
+                AnyView::new(
+                    BoxView::new(
+                        FlexDirection::Column,
+                        Align::Center,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        0.0,
+                        phase_badge,
+                    )
+                    .debug_name("animation-phase"),
+                ),
+                ])),
+            )
+            .frame_height(58.0),
+        );
+
+        let loop_toggle = {
+            let looping = self.looping.clone();
+            // Styling returns `ModifiedContent`, so it must be the last call
+            // before erasing; the debug name is applied to the erased view.
+            AnyView::new(
+                AnyView::new(
+                    Button::title(
+                        if self.looping.get() { "Stop loop" } else { "Start loop" },
+                        move || looping.update(|value| *value = !*value),
+                    )
+                    .enabled(enabled)
+                    .button_style(SecondaryButtonStyle),
+                )
+                .debug_name("animation-loop-toggle"),
+            )
+        };
+
+        let tracks = AnyView::new(StorySection::new(
+            "Tracks & phases",
+            "Play a scale track beside a sequence of domain phases. Both stop when their owning view leaves the tree.",
+            AnyView::new(BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                12.0,
+                AnyView::new(TupleView::new(vec![play, badges, loop_toggle])),
+            )),
+        ));
+
+        // Numbers & completion
+        let add = {
+            let count = self.count.clone();
+            AnyView::new(
+                Button::title("Add 10", move || count.update(|value| *value += 10.0))
+                    .enabled(enabled)
+                    .debug_name("animation-number-add"),
+            )
+        };
+        let complete = {
+            let expanded = self.expanded.clone();
+            let completed = self.completed.clone();
+            AnyView::new(
+                Button::title("Animate with completion", move || {
+                    expanded.update(|value| *value = !*value);
+                    completed.update(|value| *value += 1);
+                })
+                .enabled(enabled)
+                .button_style(SecondaryButtonStyle)
+                .debug_name("animation-completion-play"),
+            )
+        };
+        let bar = AnyView::new(
+            BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
+                AnyView::new(Text::new("")),
+            )
+            .frame_size(self.completion_bar_width(), 16.0)
+            .semantic_background(SemanticColorRef::accent())
+            .debug_name("animation-completion-bar"),
+        );
+
+        let numbers = AnyView::new(StorySection::new(
+            "Numbers & completion",
+            "Numbers interpolate without delaying their accessible value. Completion runs after the animation finishes and is discarded on interruption.",
+            AnyView::new(BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                12.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(BoxView::new(
+                        FlexDirection::Row,
+                        Align::Center,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        12.0,
+                        AnyView::new(TupleView::new(vec![
+                            AnyView::new(
+                                Text::new(format!("{:.2}", self.count.get()))
+                                    .debug_name("animation-number"),
+                            ),
+                            add,
+                        ])),
+                    )),
+                    complete,
+                    bar,
+                    AnyView::new(
+                        Text::new(self.completed_line())
+                            .debug_name("animation-completion-count"),
+                    ),
+                ])),
+            )),
+        ));
+
+        AnyView::new(
+            BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                24.0,
+                AnyView::new(TupleView::new(vec![tracks, numbers])),
+            )
+            .flex(0.0)
+            .debug_name("animation-system"),
+        )
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_ui_compose::DynamicField> {
+        vec![
+            cove_ui_compose::DynamicField::state("run", &self.run),
+            cove_ui_compose::DynamicField::state("trailing", &self.trailing),
+            cove_ui_compose::DynamicField::state("looping", &self.looping),
+            cove_ui_compose::DynamicField::state("count", &self.count),
+            cove_ui_compose::DynamicField::state("expanded", &self.expanded),
+            cove_ui_compose::DynamicField::state("completed", &self.completed),
+        ]
+    }
+}

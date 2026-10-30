@@ -189,7 +189,7 @@ mod checks {
 impl cove_ui_compose::View for AnimationCurveExamples {
     fn body(&self) -> cove_ui_compose::AnyView {
         use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
-        use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
+        use cove_ui_compose::modifiers::layout::LayoutFrameExt;
         use cove_ui_compose::modifiers::style::AppearanceExt;
         use cove_ui_compose::primitives::controls::Button;
         use cove_ui_compose::primitives::text::Text;

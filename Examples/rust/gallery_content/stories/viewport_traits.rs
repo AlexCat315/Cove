@@ -9,11 +9,10 @@
 
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{Environment, Idiom, Orientation, SizeClass};
-use cove_core::TextScale;
 use cove_ui_compose::adaptive::SurfaceReader;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
-use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View, ViewExt};
+use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View};
 
 use crate::gallery_content::stories::StorySection;
 
@@ -189,7 +188,7 @@ impl ViewportDebugName {
 #[cfg(test)]
 mod checks {
     use super::*;
-    use cove_core::Keyboard;
+    use cove_core::{Keyboard, TextScale};
 
     fn environment(width: f32, height: f32) -> Environment {
         let mut environment = Environment::default();

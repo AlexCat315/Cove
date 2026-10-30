@@ -146,6 +146,18 @@ impl Checkbox {
         Self { state, is_enabled: true, label: Some(label.into()) }
     }
 
+    /// Boolean convenience that also carries a visible label.
+    ///
+    /// `from_boolean` erases to tri-state internally and has no label slot, so
+    /// without this every caller holding a `Binding<bool>` plus a label had to
+    /// hand-roll a tri-state adapter. `Toggle` already has `labeled(_:is_on:)`,
+    /// so this closes the only asymmetry between the two controls.
+    pub fn labeled_from_boolean(label: impl Into<String>, is_on: Binding<bool>) -> Self {
+        let mut value = Self::from_boolean(is_on);
+        value.label = Some(label.into());
+        value
+    }
+
     pub fn enabled(mut self, is_enabled: bool) -> Self {
         self.is_enabled = is_enabled;
         self

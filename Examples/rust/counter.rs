@@ -9,14 +9,14 @@
 
 use cove_core::scene::{
     Align, CompositionLocal, EventPhase, EventResult, FlexDirection, FocusChainHolder, HoverPhase,
-    InputHandlerRoute, InteractionRegistryHolder, Justify, LayoutNode, Node, PointerCaptureAttachmentKey,
-    PointerCaptureHolder, PointerPhase, TextInputAttachmentKey, Wrap,
+    InputHandlerRoute, InteractionRegistryHolder, Justify, LayoutNode, Node,
+    PointerCaptureHolder, PointerPhase, Wrap,
 };
 use cove_core::{Color, Point, State};
 use cove_platform::{MouseButton, SystemCursor};
 use cove_ui_compose::{
     impl_primitive_view, AnyView, BoxView, DynamicField, LayoutDebugExt, PrimitiveView, TupleView,
-    View, ViewExt, ViewModifier,
+    View, ViewExt,
 };
 
 use std::collections::BTreeMap;
@@ -479,8 +479,6 @@ struct DemoButton {
     name: &'static str,
     grow: f32,
     action: Rc<dyn Fn()>,
-    pressed: State<bool>,
-    hovered: State<bool>,
 }
 
 const PRESSED: &str = "__counter_pressed";
@@ -497,8 +495,6 @@ impl DemoButton {
             name,
             grow,
             action: Rc::new(action),
-            pressed: State::new(false),
-            hovered: State::new(false),
         }
     }
 }
@@ -564,7 +560,7 @@ impl PrimitiveView for DemoButton {
             }
         }));
 
-        let key_node = node.downgrade();
+        let _key_node = node.downgrade();
         let key_action = self.action.clone();
         registry.set_key(node, InputHandlerRoute::control(), Rc::new(move |event, delivery| {
             if delivery != EventPhase::Target
