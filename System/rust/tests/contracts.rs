@@ -15,8 +15,13 @@ use cove_system::process::{ProcessCommand, ProcessEvent, ProcessLimits, ProcessS
 
 /// Locates the fixture binary Cargo builds next to the test executable.
 fn fixture() -> PathBuf {
+    // `current_exe()` is `.../<profile>/deps/contracts-<hash>`. The fixture is a
+    // `[[bin]]`, which Cargo writes to `.../<profile>/`, so step up twice.
     let mut directory = std::env::current_exe().expect("test executable path");
     directory.pop();
+    if directory.file_name().is_some_and(|name| name == "deps") {
+        directory.pop();
+    }
     #[cfg(windows)]
     let name = "cove_process_fixture.exe";
     #[cfg(not(windows))]

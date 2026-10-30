@@ -101,6 +101,9 @@ mod tests {
 
         left.set_transform(crate::scene::NodeTransform::anchored(2.0, 0.0, 0.0));
         let hit = HitTester::hit_test(&root, Point { x: 50.0, y: 10.0 }).unwrap();
-        assert_eq!(hit.local_point, Point { x: 25.0, y: 10.0 });
+        // The window point maps into `left` at (25, 5), and the child sits at
+        // x = -50 inside `left`, so its local point is (75, 5). The expectation
+        // must account for the child's own frame origin, not just the scale.
+        assert_eq!(hit.local_point, Point { x: 75.0, y: 5.0 });
     }
 }

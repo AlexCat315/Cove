@@ -4,6 +4,16 @@
 
 ## Unreleased
 
+- **开始统一测试与验证**（迁移完成后首次全量运行）。`cove-core` 从 10 项失败修至 **103/103 全通过**，`cove-system`（含进程契约 5 项）与 `cove-logging` 亦全部通过。修复的真实缺陷：
+
+- **布局引擎 `gap` 从未生效**：`line_main` 计算时计入了间距，但逐子项推进的游标没有加上 `gap`，导致设置间距只是缩小内容而不移动任何元素，尾部元素压在起始边上。
+- **`align_items: Stretch` 下容器宽度塌缩为 0**：交叉轴测量只取最宽子项，未认领被提议的交叉轴范围，使自动宽度的列布局宽度为 0。修正时限定为"仅当存在自动交叉轴尺寸的子项"，否则显式尺寸的行仍应贴合内容（该限制由 `grow_shares_free_space` 测试守住）。
+- **`cove-system` 进程契约测试引用了从未创建的 fixture 二进制**：`contracts.rs` 的 5 项测试全部依赖 `cove_process_fixture`，但仓库中没有该程序，测试始终失败。新增 `System/rust/bin/cove_process_fixture.rs`（`output`/`interactive`/`environment`/`sleep`/`arguments` 五种模式），并修正测试对 `target/<profile>/deps` 与 `target/<profile>/` 的路径推断。
+- **`LogRuntime` 的 `&self` 方法必然 panic**：`clone_handle` 从 thread-local 表里按指针找回自身 `Arc`，但构造函数从未登记，且工作线程与本线程的 thread-local 互不相通。改为在值内保存 `Weak<Self>` 自引用，任意线程可用；`register_runtime` 保留为幂等空函数以免破坏公开导出。
+- **`LogQuery::default()` 隐含 `Info` 下限**：日志管道测试用默认查询读取 Trace/Debug 记录必然为空，改为显式 `minimum: Level::Trace`。
+
+- 另修正 5 处测试自身的错误预期（均经交叉核对 Swift 实现确认为测试写错而非实现错误）：`Weak` 控制器在测试中被提前释放、命中测试忽略子节点自身 frame 偏移、滚动偏移符号、分析抗锯齿描边的半像素外扩、非图层节点被期望拥有缓存列表。
+
 - **生产源码迁移全部完成：984/984（100%）**。本轮补齐最后两个文件：`DataStories`（19 项测试）与 `AdaptiveExamples`（13 项测试）。至此 17 个模块全部完成，`Docs/rust-migration-files.json` 中无任何 `pending` 条目，每条均有 Rust 目标。
 
 - 新增 `DataStories`（19 项测试，已运行通过）：**树搜索在命中时保留其祖先**（"retains matching ancestors"——命中项与其路径可见，非命中的子节点被过滤，否则宽泛查询会倾倒整棵子树）、刷新阈值 64pt 且进行中不可重入、虚拟栈跳转到末行而非越界、滑行动作日志与未知行/未知动作的拒绝。

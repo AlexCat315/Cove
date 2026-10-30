@@ -174,8 +174,12 @@ mod tests {
         node.replace_animation_controller("opacity", Some(first_any));
         assert!(node.has_animation_controller("opacity"));
 
+        // The registry holds a *weak* box, exactly like Swift, so the caller is
+        // responsible for keeping the controller alive. Letting `second` drop at
+        // the end of this statement would make the weak upgrade fail and the
+        // assertion below would be testing the drop, not the replacement.
         let second = AnimationController::new(0.5_f32, 1.0, animation, 0.0, |_| {});
-        node.replace_animation_controller("opacity", Some(second));
+        node.replace_animation_controller("opacity", Some(second.clone()));
         assert!(first.is_finished(), "the outgoing controller must be cancelled");
         assert!(node.has_animation_controller("opacity"));
     }

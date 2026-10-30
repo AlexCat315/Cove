@@ -412,6 +412,10 @@ mod tests {
         let card = Node::new();
         card.set_frame(Rect::new(10.0, 10.0, 50.0, 50.0));
         card.set_background_color(Some(Color::BLACK));
+        // Only a layer root owns a cached `DrawList`; a plain painted node is
+        // drawn straight into its parent's list. Clipping makes this card a
+        // layer, which is the thing under test here.
+        card.set_clips_to_bounds(true);
         root.add_child(&card);
         let tree = RenderTree::new();
         tree.install(&root);

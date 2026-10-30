@@ -64,7 +64,13 @@ fn standard_logger_preserves_value_semantics_and_dynamic_module_filters() {
         .log(&LogEvent::new(Level::Info, "prefix must match a segment"));
 
     runtime.flush();
-    let snapshot = runtime.snapshot(&LogQuery::default());
+    // `LogQuery::default()` starts at `Info`, so the Trace and Debug records
+    // under test need an explicit minimum — otherwise the query itself filters
+    // them out and the assertions would pass for the wrong reason.
+    let snapshot = runtime.snapshot(&LogQuery {
+        minimum: Level::Trace,
+        ..LogQuery::default()
+    });
     assert_eq!(messages(&snapshot), vec!["local override", "module default"]);
     assert_eq!(
         snapshot.records[0].metadata.get("owner"),

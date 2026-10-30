@@ -50,6 +50,13 @@ pub struct LogRuntime {
     written: AtomicU64,
     write_failures: AtomicU64,
     file: Mutex<Option<LogFile>>,
+    /// The owning `Arc`, filled in by `new`.
+    ///
+    /// `&self` methods need an owned handle to hand work to the executor. A
+    /// thread-local used to supply it, but the worker runs on a different thread
+    /// and therefore never saw the registration. Storing the handle in the value
+    /// itself makes it thread-independent.
+    self_handle: Mutex<Option<Weak<LogRuntime>>>,
 }
 
 impl LogRuntime {
@@ -61,7 +68,7 @@ impl LogRuntime {
             name: sanitizer.text(&process_name(), 256),
             run_id: sanitizer.text(&run_id.into(), 256),
         };
-        Arc::new(Self {
+        let runtime = Arc::new(Self {
             worker: LogExecutor::new(),
             capture: Mutex::new(Capture {
                 configuration,
@@ -80,7 +87,11 @@ impl LogRuntime {
             written: AtomicU64::new(0),
             write_failures: AtomicU64::new(0),
             file: Mutex::new(None),
-        })
+            self_handle: Mutex::new(None),
+        });
+        *runtime.self_handle.lock().unwrap_or_else(|error| error.into_inner()) =
+            Some(Arc::downgrade(&runtime));
+        runtime
     }
 
     pub fn configuration(&self) -> LoggingConfiguration {
@@ -530,36 +541,26 @@ impl LogRuntime {
     }
 
     fn clone_handle(&self) -> Arc<Self> {
-        // `submit`, `drain` and `snapshot` are also reachable through the
-        // runtime stored by a handler; an Arc is required to schedule work.
-        RUNTIME_HANDLES.with(|handles| {
-            handles
-                .borrow()
-                .iter()
-                .find(|handle| std::ptr::eq(handle.as_ref(), self))
-                .cloned()
-        })
-        .expect("log runtime invoked through an Arc handle")
+        // `submit`, `drain` and `snapshot` are also reachable through the runtime
+        // stored by a handler; an Arc is required to schedule work. The handle is
+        // stored in the value, so this works from any thread.
+        self.self_handle
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .as_ref()
+            .and_then(Weak::upgrade)
+            .expect("log runtime invoked through an Arc handle")
     }
 }
 
-thread_local! {
-    /// Registration of the current Arc so `&self` methods can schedule work.
-    static RUNTIME_HANDLES: std::cell::RefCell<Vec<Arc<LogRuntime>>> =
-        const { std::cell::RefCell::new(Vec::new()) };
-}
 
-/// Registers `runtime` for the current thread. The system runtime calls this
-/// once during bootstrap; callers that construct a runtime directly must call
-/// it before submitting records.
-pub fn register_runtime(runtime: &Arc<LogRuntime>) {
-    RUNTIME_HANDLES.with(|handles| {
-        let mut handles = handles.borrow_mut();
-        if !handles.iter().any(|handle| Arc::ptr_eq(handle, runtime)) {
-            handles.push(runtime.clone());
-        }
-    });
-}
+/// Retained for the bootstrap call in `system.rs`.
+///
+/// It used to register the runtime in a thread-local so `&self` methods could
+/// recover their own `Arc`. The handle is now stored inside the runtime, so there
+/// is nothing left to register; the function stays so the public export and the
+/// bootstrap sequence keep working.
+pub fn register_runtime(_runtime: &Arc<LogRuntime>) {}
 
 fn process_name() -> String {
     std::env::args()

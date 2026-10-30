@@ -824,6 +824,29 @@ impl LayoutNode {
             if count > 1 {
                 main += gap * (count - 1) as f32;
             }
+            // Stretched children fill the cross axis, so the container must claim
+            // the cross extent it was offered rather than hugging the widest
+            // child. Without this a column of auto-width rows collapses to zero
+            // width even though `align_items` says they should stretch.
+            // Only auto-sized children stretch, so the container claims the
+            // offered cross extent only when at least one child left its cross
+            // size to the layout. A column of explicitly sized rows still hugs
+            // its widest child.
+            let any_auto_cross = self.children().iter().any(|child| {
+                let child_style = child.style();
+                child_style.display != Display::None
+                    && child_style.position_type != PositionType::Absolute
+                    && (if row { child_style.height.is_auto() } else { child_style.width.is_auto() })
+            });
+            if style.align_items == Align::Stretch && any_auto_cross {
+                if row {
+                    if let Some(available) = content_height {
+                        cross = cross.max(available);
+                    }
+                } else if let Some(available) = content_width {
+                    cross = cross.max(available);
+                }
+            }
             Size {
                 width: definite_width.unwrap_or(if row { main + inset_width } else { cross + inset_width }),
                 height: definite_height.unwrap_or(if row { cross + inset_height } else { main + inset_height }),
@@ -1003,7 +1026,14 @@ impl LayoutNode {
                 };
                 let (child_width, child_height) = if row { (child_main, child_cross) } else { (child_cross, child_main) };
                 child.arrange(content.x + child_left, content.y + child_top, child_width, child_height, direction);
-                cursor += child_main + if row { child_margin.horizontal() } else { child_margin.vertical() } + spacing;
+                // `line_main` already counted the gap between items, so the
+                // cursor must advance by it too — otherwise a gap shrinks the
+                // content without moving anything, and the trailing items
+                // overlap the leading edge.
+                cursor += child_main
+                    + if row { child_margin.horizontal() } else { child_margin.vertical() }
+                    + if offset + 1 < line.len() { gap } else { 0.0 }
+                    + spacing;
             }
             cross_cursor += line_cross + if line_index + 1 < lines.len() { gap } else { 0.0 };
         }

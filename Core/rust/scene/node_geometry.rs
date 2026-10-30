@@ -52,12 +52,16 @@ mod tests {
         let child = Node::new();
         child.set_frame(Rect::new(5.0, 5.0, 50.0, 20.0));
         scroller.add_child(&child);
-        assert_eq!(child.absolute_origin(), Point { x: 15.0, y: 25.0 });
+        // The scroller scrolls its content by 40pt, so the child at y = 5 sits at
+        // 20 (scroller origin) + 5 - 40 = -15. `placement_step` subtracts the
+        // scroll offset, matching Swift's `placementStep(scrolling:)`.
+        assert_eq!(child.absolute_origin(), Point { x: 15.0, y: -15.0 });
 
+        // A scale about the child's top-leading corner leaves its origin put.
         child.set_transform(NodeTransform::anchored(2.0, 0.0, 0.0));
-        assert_eq!(child.absolute_origin(), Point { x: 15.0, y: 25.0 });
+        assert_eq!(child.absolute_origin(), Point { x: 15.0, y: -15.0 });
         assert_eq!(child.absolute_frame().width, 100.0);
-        let local = child.convert_from_window(Point { x: 15.0, y: 25.0 });
+        let local = child.convert_from_window(Point { x: 15.0, y: -15.0 });
         assert!(local.x.abs() < 1e-4 && local.y.abs() < 1e-4);
     }
 }

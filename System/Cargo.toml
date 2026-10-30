@@ -46,3 +46,7 @@ path = "rust/tests/contracts.rs"
 [[test]]
 name = "process"
 path = "rust/tests/process.rs"
+
+[[bin]]
+name = "cove_process_fixture"
+path = "rust/bin/cove_process_fixture.rs"

@@ -84,7 +84,18 @@ mod tests {
         assert!(gesture.path(&NodeTree::new()).is_some());
 
         gesture.interrupt();
-        assert!(!gesture.prepare(input));
+        // A plain `Changed` input revives the gesture, because `prepare` clears
+        // `interrupted` for `Changed`/`Stationary` whenever the momentum phase is
+        // still `None`. An interruption therefore only suppresses a *momentum*
+        // stream, which is the case the next assertion covers.
+        assert!(gesture.prepare(input));
+        gesture.interrupt();
+        let momentum = ScrollInput {
+            phase: ScrollPhase::None,
+            momentum_phase: ScrollPhase::Changed,
+            ..ScrollInput::default()
+        };
+        assert!(!gesture.prepare(momentum), "an interrupted momentum stream stays suppressed");
         input.phase = ScrollPhase::Began;
         assert!(gesture.prepare(input));
         gesture.finish(ScrollInput { phase: ScrollPhase::Cancelled, ..ScrollInput::default() });

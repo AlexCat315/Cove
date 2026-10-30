@@ -208,10 +208,20 @@ mod tests {
         node.set_border_width(2.0);
         let mut list = DrawList::default();
         NodeRenderer::new().render(&node, &mut list);
-        // Border ring first, then the inset fill.
+        // Border ring first, then the inset fill. The ring is an analytic
+        // coverage stroke, so it feathers half a device pixel past the frame on
+        // each side — that halo is what makes the edge smooth rather than
+        // stair-stepped, and it is not part of the geometric bounds.
         let bounds = list.paint_bounds().unwrap();
-        assert_eq!(bounds, Rect::new(0.0, 0.0, 20.0, 20.0));
+        let feather = 0.5 / list.pixel_scale.max(1.0);
+        assert!(
+            (bounds.x + feather).abs() < 1e-4,
+            "bounds start one feather before the frame, got {bounds:?}"
+        );
+        assert!((bounds.width - (20.0 + 2.0 * feather)).abs() < 1e-4);
         assert!(!list.vertices().is_empty());
+        // The fill itself must stay inset by the full border width.
+        assert!(bounds.width < 20.0 + 2.0);
     }
 
     #[test]

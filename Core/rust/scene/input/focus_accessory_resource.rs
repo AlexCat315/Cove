@@ -53,9 +53,14 @@ mod tests {
             let trigger = Node::new();
             let portal = Node::new();
             let chain = FocusChainHolder::current().unwrap();
-            portal.add_resource(Rc::new(FocusAccessoryResource::new(&trigger)));
+            let resource = Rc::new(FocusAccessoryResource::new(&trigger));
+            portal.add_resource(resource.clone());
+            // A resource attaches when its node mounts, exactly as `addResource`
+            // does on a live tree; attaching without a mount would leave the
+            // chain unaware of the portal.
+            resource.mount(&portal);
             assert_eq!(chain.accessory_roots(), vec![portal.clone()]);
-            portal.remove_from_parent();
+            resource.unmount(&portal);
             assert!(chain.accessory_roots().is_empty());
         });
     }
