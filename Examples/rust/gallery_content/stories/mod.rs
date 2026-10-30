@@ -26,6 +26,7 @@ pub mod sidebar_story;
 pub mod navigation_layout_stories;
 pub mod navigation_stories;
 pub mod overlay_stories;
+pub mod overlay_stories_file;
 pub mod overview;
 pub mod placement_example;
 pub mod product_stories;
@@ -36,6 +37,7 @@ pub mod time_picker_story;
 pub mod toolbar_story;
 pub mod wheel_picker_story;
 pub mod viewport_traits;
+pub mod web_story;
 
 pub use animation::AnimationStory;
 pub use animation_curves::{AnimationCurveExamples, CurveChoice};
@@ -56,6 +58,9 @@ pub use sidebar_story::SidebarStory;
 pub use navigation_layout_stories::{DrawerStory, RailStory};
 pub use navigation_stories::AppBarStory;
 pub use overlay_stories::{HoverCardStory, PopconfirmStory};
+pub use overlay_stories_file::{
+    DisclosureStory, MenuStory, ModalStory, PopoverStory, TabsStory,
+};
 pub use layout::{LayoutGridStory, LazyGridStory, MasonrySample, MasonryStory};
 pub use feedback::{AlertStory, BadgeStory, EmptyStory, ProgressStory, StorySection};
 pub use placement_example::PlacementExample;
@@ -69,4 +74,5 @@ pub use time_picker_story::TimePickerStory;
 pub use toolbar_story::ToolbarStory;
 pub use wheel_picker_story::WheelPickerStory;
 pub use overview::{DashboardCard, IntroductionStory, MetricCard};
+pub use web_story::WebStory;
 pub use viewport_traits::{ViewportDebugName, ViewportTraits, ViewportTraitsStory};

@@ -103,3 +103,11 @@ path = "rust/tests/data_table_story.rs"
 [[test]]
 name = "product_stories"
 path = "rust/tests/product_stories.rs"
+
+[[test]]
+name = "web_story"
+path = "rust/tests/web_story.rs"
+
+[[test]]
+name = "overlay_stories_file"
+path = "rust/tests/overlay_stories_file.rs"

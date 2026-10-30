@@ -7406,11 +7406,14 @@
       "source": "Examples/Sources/GalleryContent/Stories/Data/WebStory.swift",
       "source_sha256": "00674a7a6ea217ad6d6e591a1e887fc38f4155c21b0e793f6a4329707491624b",
       "source_lines": 193,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Examples/rust/gallery_content/stories/web_story.rs"
+      ],
       "module": "Examples",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Examples/Sources/GalleryContent/Stories/Feedback/AvatarStory.swift",
@@ -7657,11 +7660,14 @@
       "source": "Examples/Sources/GalleryContent/Stories/Layout/ProductStories.swift",
       "source_sha256": "22c5b15cb05fc0ac228a8ad57509587be9b05fdf5b60d7f19e35c3ef357da1ad",
       "source_lines": 152,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Examples/rust/gallery_content/stories/product_stories.rs"
+      ],
       "module": "Examples",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Examples/Sources/GalleryContent/Stories/Layout/RailStory.swift",

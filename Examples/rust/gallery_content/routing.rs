@@ -160,6 +160,27 @@ impl StoryDispatch {
             Self::Story(GalleryPage::DataTable) => {
                 Some(AnyView::new(stories::DataTableStory::new(options)))
             }
+            Self::Story(GalleryPage::Web) => {
+                Some(AnyView::new(stories::WebStory::new(options)))
+            }
+            Self::Story(GalleryPage::Menu) => {
+                Some(AnyView::new(stories::MenuStory::new(options)))
+            }
+            Self::Story(GalleryPage::ContextMenu) => {
+                Some(AnyView::new(stories::MenuStory::new(options)))
+            }
+            Self::Story(GalleryPage::Popover) => {
+                Some(AnyView::new(stories::PopoverStory::new(options)))
+            }
+            Self::Story(GalleryPage::Modal) => {
+                Some(AnyView::new(stories::ModalStory::new(options)))
+            }
+            Self::Story(GalleryPage::Disclosure) => {
+                Some(AnyView::new(stories::DisclosureStory::new(options)))
+            }
+            Self::Story(GalleryPage::Tabs) => {
+                Some(AnyView::new(stories::TabsStory::new(options)))
+            }
             Self::Story(_) | Self::Pending { .. } => None,
         }
     }
