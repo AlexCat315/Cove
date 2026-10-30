@@ -7720,11 +7720,14 @@
       "source": "Examples/Sources/GalleryContent/Stories/Overlays/CommandStory.swift",
       "source_sha256": "d6c972d702e5cd997c76eab5b854009f0986c64cfd976c01eb50fde02e9e7a74",
       "source_lines": 67,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Examples/rust/gallery_content/stories/command_story.rs"
+      ],
       "module": "Examples",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Examples/Sources/GalleryContent/Stories/Overlays/HoverStory.swift",
@@ -7743,11 +7746,14 @@
       "source": "Examples/Sources/GalleryContent/Stories/Overlays/Popconfirm/PlacementExample.swift",
       "source_sha256": "b94b8f3ef671a2f04ad677c1c5ca363063e40f312f87bb877ca5d16ac0008157",
       "source_lines": 73,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Examples/rust/gallery_content/stories/placement_example.rs"
+      ],
       "module": "Examples",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Examples/Sources/GalleryContent/Stories/Overlays/PopconfirmStory.swift",

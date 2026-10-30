@@ -75,3 +75,15 @@ path = "rust/tests/markdown_story.rs"
 [[test]]
 name = "wheel_picker_story"
 path = "rust/tests/wheel_picker_story.rs"
+
+[[test]]
+name = "command_story"
+path = "rust/tests/command_story.rs"
+
+[[test]]
+name = "placement_example"
+path = "rust/tests/placement_example.rs"
+
+[[test]]
+name = "image_story"
+path = "rust/tests/image_story.rs"

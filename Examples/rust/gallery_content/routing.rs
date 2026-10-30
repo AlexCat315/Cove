@@ -151,6 +151,12 @@ impl StoryDispatch {
             Self::Story(GalleryPage::WheelPicker) => {
                 Some(AnyView::new(stories::WheelPickerStory::new(options)))
             }
+            Self::Story(GalleryPage::CommandPalette) => {
+                Some(AnyView::new(stories::CommandStory::new(options)))
+            }
+            Self::Story(GalleryPage::Image) => {
+                Some(AnyView::new(stories::ImageStory::new(options)))
+            }
             Self::Story(_) | Self::Pending { .. } => None,
         }
     }

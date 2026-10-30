@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+- 新增 `PlacementExample`（11 项测试，已运行通过）：12 种摆放与 `PopoverPlacement::ALL` 一一对应、紧凑镜像三向分支（leading 贴右、trailing 贴左、居中折半，且触发器超宽时夹到边缘不出现负坐标）、上/侧/下三档垂直位置、触发器宽度受视口上限约束。该组件是 Popconfirm 页的子组件而非独立页，故不接入 `StoryDispatch`。生产源码达 973/984（98.9%）。
+
+- 新增 `CommandStory`（11 项测试，已运行通过）：8 条命令分 4 组、仅 `Deploy to Device` 禁用；文档承诺的 `GO`/`go f`/`appearance` 三种查询均按真实排序模型命中；禁用命令不执行也不入最近列表；最近命令新前旧后并封顶 3 条、重复运行不产生重复项。**测试发现我的实现把 `showsRecent` 传反了**（应为查询为空时显示最近项），据 Swift 源码 `showsRecentCommands && trimmedQuery.isEmpty` 修正。生产源码达 972/984（98.8%）。
+
 - **补齐 `WheelPicker`/`WheelPickerOption` 整块缺失**：`Primitives/Controls/WheelPicker.swift` 此前在 Rust 侧完全没有对应类型，`StoryDispatch` 的阻塞登记里也标着 `WheelPickerOption` 待实现。现实现为 `Compose/rust/primitives/controls/fields/wheel_picker.rs`（12 项测试，已运行通过）：按值而非标签识别选项、禁用行可见但不可提交、步进双向跳过禁用行且两端不环绕、`Home`/`End` 跳到首个/末个**可用**行、可见窗口居中并在末端整体回滑。首次实现的回滑逻辑只退一步导致窗口从 7..11 而非 6..11 开始，由测试发现并改为整体重算。
 
 - 新增 `WheelPickerStory`（11 项测试，已运行通过）：时/分/半天三档时间轮与 0…10 音量轮（10 禁用）、`Now`/`Reset` 的 24→12 小时折叠、分钟按 5 取整向下吸附、`09:05`/`12:00` 双位补零。生产源码达 971/984（98.7%）。

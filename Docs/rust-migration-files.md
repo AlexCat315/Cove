@@ -13,7 +13,7 @@
 
 | 范围 | 文件数 | 已写入 | 进行中 | 未开始 |
 | --- | ---: | ---: | ---: | ---: |
-| 生产源码 | 984 | 971 | 0 | 13 |
+| 生产源码 | 984 | 973 | 0 | 11 |
 | 测试源码 | 424 | 56 | 0 | 368 |
 | SwiftPM 清单 | 25 | 19 | 0 | 6 |
 | 项目模板 | 5 | 0 | 0 | 5 |
@@ -738,7 +738,7 @@
 
 ### Examples
 
-共 61 个文件：已写入 48，进行中 0，未开始 13。
+共 61 个文件：已写入 50，进行中 0，未开始 11。
 
 | 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
 | --- | ---: | --- | --- | --- |
@@ -796,9 +796,9 @@
 | `Examples/Sources/GalleryContent/Stories/Layout/SidebarStory.swift` | 118 | 未开始 | — | 等待实现 |
 | `Examples/Sources/GalleryContent/Stories/Navigation/AppBarStory.swift` | 53 | 已写入（未验证） | `Examples/rust/gallery_content/stories/navigation_stories.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Overlays/ActionSheetStory.swift` | 75 | 已写入（未验证） | `Examples/rust/gallery_content/stories/action_sheet_story.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Overlays/CommandStory.swift` | 67 | 未开始 | — | 等待实现 |
+| `Examples/Sources/GalleryContent/Stories/Overlays/CommandStory.swift` | 67 | 已写入（未验证） | `Examples/rust/gallery_content/stories/command_story.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Overlays/HoverStory.swift` | 50 | 已写入（未验证） | `Examples/rust/gallery_content/stories/overlay_stories.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Overlays/Popconfirm/PlacementExample.swift` | 73 | 未开始 | — | 等待实现 |
+| `Examples/Sources/GalleryContent/Stories/Overlays/Popconfirm/PlacementExample.swift` | 73 | 已写入（未验证） | `Examples/rust/gallery_content/stories/placement_example.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Overlays/PopconfirmStory.swift` | 74 | 已写入（未验证） | `Examples/rust/gallery_content/stories/overlay_stories.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Overview/Dashboard.swift` | 105 | 已写入（未验证） | `Examples/rust/gallery_content/stories/overview.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Overview/MetricCard.swift` | 49 | 已写入（未验证） | `Examples/rust/gallery_content/stories/overview.rs` | 未编译、未行为对照 |
