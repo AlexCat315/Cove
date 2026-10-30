@@ -11,6 +11,7 @@ pub mod panel;
 pub mod row_slot;
 pub mod scroll_reveal;
 pub mod scroll_view;
+pub mod navigation_components;
 pub mod sidebar;
 pub mod zstack;
 pub mod resize;

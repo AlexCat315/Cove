@@ -192,6 +192,9 @@ Compose 各子树共享 `Compose/rust/lib.rs`、`primitives/mod.rs`、`theme/mod
 | Text：RichText / Paragraph / LinkAnchor | exact（一处具名边界） | `RichTextFlow::span()` 以字节偏移取索引，若某字形簇跨越两个不同链接的 span，字形着色取第一个；命中测试走 `fragment.span` 始终正确 |
 | Text：RichTextSurface 文本选择 | compromise-with-follow-up | 绘制与命中已移植，但未注册 `TextSelectionScope`：跨富文本段的拖选未接通。渲染无错误，只是无法跨段选择 |
 | Controls（Toggle/Checkbox、Slider、RadioGroup、Select） | exact | Toggle 36pt / Checkbox 16pt 与原实现一致 |
+| Controls：`ButtonGroup`/`Toolbar`/`AppBar` | exact | 溢出布局端到端接通（`LayoutContainer` + `impl Layout` + `AppBar` 提供预算），并有断言优先级顺序与 `Always` 保证的测试；`available_width: None` 时走不回退路径，与 Swift 的 `fitsContent: true` 一致 |
+| Controls：`Rating` | equivalent-with-named-difference | 精度/绘制/指针/键盘/无障碍精确；悬停预览未受 `supportsControlHover` 门控（`Node` 无该标记），仅影响观感 |
+| Controls：`CalendarView`/`DatePicker` | equivalent-with-named-difference | 结构与行为精确；**标签为英文硬编码**，未实现 `DateFormatter` 本地化 |
 | Data：List 家族 | exact | |
 | Styles：10 个组件样式 | exact | |
 
@@ -264,6 +267,10 @@ Compose 各子树共享 `Compose/rust/lib.rs`、`primitives/mod.rs`、`theme/mod
 - 日期基础层的 API **按位置传参**（`interval_start(unit, date, cal)`），刻意不引入
   Rust 没有的具名参数约定，使调用点读起来接近 Swift 的
   `CalendarGrid.interval(of:containing:calendar:)`。
+- `weekday_of` 曾有错位一天的实现缺陷（纪元第 0 天返回 6 而非 5），已修复并交叉验证。
+  该缺陷会连带影响 `date_interval_start` 的周起始计算、`CalendarUnit::Weekday` 取值
+  与 `iso_week_of` 的年界周数。**这类"自写日期算法"必须有独立参考实现对拍**，
+  不能只靠内部自洽的单元测试。
 
 ### 已知缺口（功能层面，已在实现中具名记录）
 
@@ -346,6 +353,18 @@ DX12 描述符表逐 draw 绑定与加速结构、Apple 图片 MIME 与 macOS �
 10. **`ModifiedContent` 的私有字段曾名为 `modifier`，遮蔽 `ViewExt::modifier(self, m)`**，
     报错为 "private field, not a method"。字段已改名 `applied`；如再遇到同类报错，
     检查是否又出现同名字段遮蔽。
+
+11. **尺寸/几何走构造函数，不走 builder。** `Icon::new(resource, size)` 必须给尺寸，
+    `ProgressView::new(Option<f64>)`、`ProgressCircle::new(Option<f64>)`、
+    `Spinner::new(size)` 同理；`GridRowHeights::fixed(n)` 是构造函数而非 `::Fixed`。
+    这些原语**没有** `.size()` / `.height()` builder，字段是私有的，所以写
+    `.size(28.0)` 会得到误导性的 "private field, not a method"。
+    **看到 "private field" 时先查签名，不要找 trait import。**
+
+12. **`impl View for X` 也可能写成 `impl<T: ...> View for X<T>`。** 用文本搜索判断某控件
+    是否存在时，两种形式都要匹配——只匹配前者会漏报（`ButtonGroup` 曾被误判为缺失）。
+    更可靠的做法是构建"拥有 `View`/`PrimitiveView` 实现"的可渲染类型集合
+    （`Tools/Cove/rust/migration_inventory.py` 的 `renderable_index()`，当前 323 个）。
 
 ## 迁移约定
 

@@ -117,10 +117,14 @@ impl DateParts {
     }
 }
 
-/// Weekday, Sunday = 1.
+/// Weekday, Sunday = 1 … Saturday = 7.
+///
+/// 1970-01-01 was a Thursday, which is 5 in this scheme, so epoch day 0 must map
+/// to 5: `(0 + 4) % 7 + 1 == 5`. A previous version used `(day % 7 + 5) % 7 + 1`,
+/// which reports every weekday as the next one — Saturday read as Sunday and
+/// Sunday as Monday — and corrupted week-interval starts and ISO week numbers.
 pub fn weekday_of(epoch_day: i64) -> u32 {
-    // 1970-01-01 was a Thursday (5).
-    (epoch_day.rem_euclid(7) + 5).rem_euclid(7) as u32 + 1
+    ((epoch_day + 4).rem_euclid(7) + 1) as u32
 }
 
 /// ISO weekday, Monday = 1.

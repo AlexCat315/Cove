@@ -104,3 +104,11 @@ path = "rust/tests/hit_tester.rs"
 [[test]]
 name = "interpolatable"
 path = "rust/tests/interpolatable.rs"
+
+[[test]]
+name = "layer_aware_renderer"
+path = "rust/tests/layer_aware_renderer.rs"
+
+[[test]]
+name = "linear_gradient"
+path = "rust/tests/linear_gradient.rs"

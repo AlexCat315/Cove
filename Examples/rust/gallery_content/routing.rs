@@ -43,7 +43,9 @@ impl StoryDispatch {
             | GalleryPage::Animation
             | GalleryPage::ViewportTraits
             | GalleryPage::Masonry
-            | GalleryPage::RichText => Self::Story(page),
+            | GalleryPage::RichText
+            | GalleryPage::Calendar
+            | GalleryPage::Stepper => Self::Story(page),
             _ => Self::pending(page),
         }
     }
@@ -81,6 +83,12 @@ impl StoryDispatch {
             }
             Self::Story(GalleryPage::RichText) => {
                 Some(AnyView::new(stories::RichTextStory::new()))
+            }
+            Self::Story(GalleryPage::Calendar) => {
+                Some(AnyView::new(stories::CalendarStory::new(options)))
+            }
+            Self::Story(GalleryPage::Stepper) => {
+                Some(AnyView::new(stories::StepperStory::new(options)))
             }
             Self::Story(GalleryPage::Badge) => Some(AnyView::new(stories::BadgeStory)),
             Self::Story(GalleryPage::Alert) => Some(AnyView::new(stories::AlertStory::new())),
@@ -342,24 +350,24 @@ mod checks {
 
     #[test]
     fn blocked_pages_report_their_missing_widgets() {
-        // `rating` still needs the Rating widget.
-        let dispatch = StoryDispatch::new(GalleryPage::Rating);
+        // `tree` still needs the Tree widget.
+        let dispatch = StoryDispatch::new(GalleryPage::Tree);
         assert!(!dispatch.is_implemented());
         assert!(dispatch.view(GalleryOptions::default()).is_none());
         let message = dispatch.pending_message().expect("a pending page reports");
-        assert!(message.contains("rating"));
-        assert!(message.contains("Rating"));
-        assert!(message.contains("Feedback/RatingStory.swift"));
+        assert!(message.contains("tree"));
+        assert!(message.contains("Tree"));
+        assert!(message.contains("Data/DataStories.swift"));
 
         // Portable-but-not-yet-ported pages still report, with an empty widget
         // list, because the dispatch arm does not exist yet.
-        let dispatch = StoryDispatch::new(GalleryPage::Stepper);
+        let dispatch = StoryDispatch::new(GalleryPage::RangeSlider);
         assert!(!dispatch.is_implemented());
         assert_eq!(
             dispatch,
             StoryDispatch::Pending {
-                page: GalleryPage::Stepper,
-                story_file: "Controls/StepperStory.swift",
+                page: GalleryPage::RangeSlider,
+                story_file: "Controls/ControlStories.swift",
                 missing_widgets: &[],
             }
         );

@@ -1,5 +1,6 @@
 //! Buttons, bars, pickers and other controls.
 pub mod adaptive;
+pub mod app_bar;
 pub mod calendar;
 pub mod date_values;
 pub mod button;

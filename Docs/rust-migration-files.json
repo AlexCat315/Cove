@@ -944,11 +944,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/AppBar.swift",
       "source_sha256": "27f0c6978969ece5e14a5f2b8baeace64dc35fb60d1d56313e8d3c89d7471b6b",
       "source_lines": 115,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/controls/app_bar.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/AppBar/Back.swift",

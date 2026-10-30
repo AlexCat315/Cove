@@ -13,8 +13,14 @@ use cove_ui_compose::primitives::data::chart::{
     ChartContent, ChartGuides, ChartStyle, ChartXDomain, ChartMark, ChartOrientation, ChartPlot, ChartSeries, ChartSeriesStyle, ChartStacking,
     ChartValueAxis,
 };
-use cove_ui_compose::primitives::feedback::StatusTone;
+use cove_core::Binding;
+use cove_ui_compose::primitives::controls::button_group::{ButtonGroup, ButtonGroupItem};
+use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::feedback::{Badge, ProgressView, StatusTone};
+use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use cove_ui_compose::primitives::text::Text;
+use cove_ui_compose::theme::styles::buttons::button_style::ButtonStyleViewExt;
+use cove_ui_compose::theme::styles::buttons::SecondaryButtonStyle;
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
 use cove_ui_compose::theme::ThemeReader;
 use cove_ui_compose::{
@@ -192,6 +198,54 @@ impl View for MetricCard {
     }
 }
 
+/// One timeline row: a status dot, a title and a detail line.
+struct ActivityRow {
+    title: String,
+    detail: &'static str,
+    tone: StatusTone,
+}
+
+impl ActivityRow {
+    fn new(title: impl Into<String>, detail: &'static str, tone: StatusTone) -> Self {
+        Self {
+            title: title.into(),
+            detail,
+            tone,
+        }
+    }
+}
+
+impl View for ActivityRow {
+    fn body(&self) -> AnyView {
+        AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::FlexStart,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            10.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(
+                    Badge::new("").tone(self.tone).shows_dot(true),
+                ),
+                AnyView::new(BoxView::new(
+                    FlexDirection::Column,
+                    Align::FlexStart,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    5.0,
+                    AnyView::new(TupleView::new(vec![
+                        AnyView::new(Text::new(self.title.clone())),
+                        AnyView::new(
+                            Text::new(self.detail)
+                                .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                        ),
+                    ])),
+                )),
+            ])),
+        ))
+    }
+}
+
 /// A flexible gap, matching Swift's `Spacer()`.
 struct DashboardSpacer;
 
@@ -307,6 +361,57 @@ impl IntroductionStory {
 
 impl View for IntroductionStory {
     fn body(&self) -> AnyView {
+        let enabled = self.options.is_enabled;
+
+        // Period switcher: `today` / `week`, controlled by the story state.
+        let period_selection = Binding::new(
+            {
+                let period = self.period.clone();
+                move || period.get()
+            },
+            {
+                let period = self.period.clone();
+                move |value: Option<String>| period.set(value)
+            },
+        );
+        let period_group = AnyView::new(
+            ButtonGroup::new(
+                vec![
+                    ButtonGroupItem::new("today".to_string(), "Today"),
+                    ButtonGroupItem::new("week".to_string(), "This week"),
+                ],
+                period_selection,
+            )
+            .enabled(enabled),
+        )
+        ;
+        let period_group = AnyView::new(period_group.debug_name("dashboard-period"));
+
+        let header = AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            12.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(BoxView::new(
+                    FlexDirection::Column,
+                    Align::FlexStart,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    4.0,
+                    AnyView::new(TupleView::new(vec![
+                        AnyView::new(Text::new("Your workspace, at a glance")),
+                        AnyView::new(
+                            Text::new("Sample project · local session")
+                                .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                        ),
+                    ])),
+                )),
+                period_group,
+            ])),
+        ));
+
         let engine = if self.is_paused.get() { "Paused" } else { "Ready" };
         let metrics = AnyView::new(BoxView::new(
             FlexDirection::Row,
@@ -350,6 +455,204 @@ impl View for IntroductionStory {
             ])),
         ));
 
+        // Asset import card with its live progress, controls and activity line.
+        let import = {
+            let paused = self.is_paused.clone();
+            let activity = self.activity.clone();
+            let progress = self.progress.clone();
+            let completed = self.completed.clone();
+            let is_paused = self.is_paused.get();
+            let value = self.progress.get();
+
+            let pause = AnyView::new(
+                Button::title(if is_paused { "Resume" } else { "Pause" }, {
+                    let paused = paused.clone();
+                    let activity = activity.clone();
+                    move || {
+                        let next = !paused.get();
+                        paused.set(next);
+                        activity.set(
+                            if next {
+                                "Asset import paused · just now"
+                            } else {
+                                "Asset import resumed · just now"
+                            }
+                            .into(),
+                        );
+                    }
+                })
+                .enabled(enabled && value < 1.0)
+                .button_style(SecondaryButtonStyle)
+                .debug_name("dashboard-pause"),
+            );
+
+            let advance = AnyView::new(
+                Button::title(
+                    if value >= 1.0 { "Import again" } else { "Advance" },
+                    {
+                        let activity = activity.clone();
+                        let progress = progress.clone();
+                        let completed = completed.clone();
+                        move || {
+                            if progress.get() >= 1.0 {
+                                progress.set(0.0);
+                                activity.set("New asset import started · just now".into());
+                            } else {
+                                let next = (progress.get() + 0.12).min(1.0);
+                                progress.set(next);
+                                if next >= 1.0 {
+                                    completed.update(|count| *count += 1);
+                                    activity.set("Asset import completed · just now".into());
+                                } else {
+                                    activity.set("Imported next batch · just now".into());
+                                }
+                            }
+                        }
+                    },
+                )
+                .enabled(enabled && !is_paused)
+                .debug_name("dashboard-advance"),
+            );
+
+            AnyView::new(DashboardCard::new(AnyView::new(BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                12.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(BoxView::new(
+                        FlexDirection::Row,
+                        Align::Center,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        12.0,
+                        AnyView::new(TupleView::new(vec![
+                            AnyView::new(Text::new("Asset import")),
+                            AnyView::new(
+                                Badge::new(self.import_label())
+                                    .tone(self.import_tone())
+                                    .shows_dot(true),
+                            ),
+                        ])),
+                    )),
+                    AnyView::new(BoxView::new(
+                        FlexDirection::Row,
+                        Align::Center,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        12.0,
+                        AnyView::new(TupleView::new(vec![
+                            AnyView::new(
+                                cove_ui_compose::primitives::media::Icon::new(
+                                    icons::file::folder(),
+                                    28.0,
+                                )
+                                .semantic_foreground(SemanticColorRef::accent()),
+                            ),
+                            AnyView::new(BoxView::new(
+                                FlexDirection::Column,
+                                Align::FlexStart,
+                                Justify::FlexStart,
+                                Wrap::NoWrap,
+                                5.0,
+                                AnyView::new(TupleView::new(vec![
+                                    AnyView::new(Text::new("Environment assets")),
+                                    AnyView::new(
+                                        Text::new("Textures, materials and scene geometry")
+                                            .semantic_foreground(
+                                                SemanticColorRef::on_surface_muted(),
+                                            ),
+                                    ),
+                                ])),
+                            )),
+                        ])),
+                    )),
+                    AnyView::new(
+                        AnyView::new(ProgressView::new(Some(value)).height(6.0))
+                            .debug_name("dashboard-progress"),
+                    ),
+                    AnyView::new(BoxView::new(
+                        FlexDirection::Row,
+                        Align::Center,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        10.0,
+                        AnyView::new(TupleView::new(vec![
+                            AnyView::new(
+                                Text::new(format!("{}% imported", self.percent_imported()))
+                                    .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                            ),
+                            pause,
+                            advance,
+                        ])),
+                    )),
+                ])),
+            ))))
+        };
+
+        let activity_card = AnyView::new(DashboardCard::new(AnyView::new(BoxView::new(
+            FlexDirection::Column,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            10.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(Text::new("Recent activity")),
+                AnyView::new(ActivityRow::new(
+                    self.activity.get(),
+                    "Environment assets",
+                    StatusTone::Info,
+                )),
+                AnyView::new(Text::new("Scene saved")),
+                AnyView::new(Text::new("Shader compiled")),
+            ])),
+        ))));
+
+        let cards = AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::Wrap,
+            16.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(AnyView::new(import).flex_with(2.0, 1.0, Some(420.0))),
+                AnyView::new(AnyView::new(activity_card).flex_with(1.0, 1.0, Some(260.0))),
+            ])),
+        ));
+
+        let footer = AnyView::new(DashboardCard::new(AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            12.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(BoxView::new(
+                    FlexDirection::Column,
+                    Align::FlexStart,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    6.0,
+                    AnyView::new(TupleView::new(vec![
+                        AnyView::new(Text::new("Made from real components")),
+                        AnyView::new(
+                            Text::new(format!(
+                                "Explore {} stories. Switch appearance, change density, use the keyboard, or reset this session.",
+                                crate::gallery_content::catalog::GalleryCatalog::entries().len()
+                            ))
+                            .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                        ),
+                    ])),
+                )),
+                AnyView::new(
+                    Badge::new("Light + dark")
+                        .tone(StatusTone::Info)
+                        .shows_dot(true),
+                ),
+            ])),
+        ))));
+
         AnyView::new(
             BoxView::new(
                 FlexDirection::Column,
@@ -357,14 +660,7 @@ impl View for IntroductionStory {
                 Justify::FlexStart,
                 Wrap::NoWrap,
                 20.0,
-                AnyView::new(TupleView::new(vec![
-                    AnyView::new(Text::new("Your workspace, at a glance")),
-                    AnyView::new(
-                        Text::new("Sample project · local session")
-                            .semantic_foreground(SemanticColorRef::on_surface_muted()),
-                    ),
-                    metrics,
-                ])),
+                AnyView::new(TupleView::new(vec![header, metrics, cards, footer])),
             )
             .debug_name("dashboard-story"),
         )
@@ -441,6 +737,42 @@ mod checks {
         story.period.set(Some("week".into()));
         assert_eq!(story.asset_value(), "1,284");
         assert_eq!(story.asset_detail(), "Imported this week");
+    }
+
+    #[test]
+    fn period_switcher_defaults_to_today_and_drives_the_asset_metric() {
+        let story = IntroductionStory::new(GalleryOptions::default());
+        assert_eq!(story.period.get(), Some("today".to_string()));
+        assert_eq!(story.asset_value(), "248");
+        assert_eq!(story.asset_detail(), "Imported today");
+        // Selecting "week" is what the ButtonGroup writes back.
+        story.period.set(Some("week".to_string()));
+        assert_eq!(story.asset_value(), "1,284");
+        assert_eq!(story.asset_detail(), "Imported this week");
+        // Clearing the selection falls back to the today figures.
+        story.period.set(None);
+        assert_eq!(story.asset_value(), "248");
+    }
+
+    #[test]
+    fn pause_blocks_advance_and_completion_unlocks_import_again() {
+        let story = IntroductionStory::new(GalleryOptions::default());
+        // While paused the activity line reports the pause and the label follows.
+        story.toggle_pause();
+        assert_eq!(story.activity.get(), "Asset import paused · just now");
+        assert_eq!(story.import_label(), "Paused");
+        story.toggle_pause();
+        assert_eq!(story.import_label(), "Running");
+        // Completing once is idempotent at the boundary: the label stays Complete.
+        while story.progress.get() < 1.0 {
+            story.advance();
+        }
+        assert_eq!(story.import_label(), "Complete");
+        assert_eq!(story.import_tone(), StatusTone::Success);
+        let completed = story.completed.get();
+        story.advance();
+        assert_eq!(story.completed.get(), completed, "restarting does not re-count");
+        assert_eq!(story.import_label(), "Running");
     }
 
     #[test]

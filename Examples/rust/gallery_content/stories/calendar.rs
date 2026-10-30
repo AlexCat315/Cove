@@ -265,6 +265,8 @@ mod checks {
         Date::from_seconds(epoch_day * Date::SECONDS_PER_DAY)
     }
 
+    /// Regression test for `weekday_of` being off by one: 1970-01-01 must be
+    /// weekday 5 (Thursday) in the Sunday=1 scheme, so 2024-01-01 is a Monday.
     #[test]
     fn weekends_are_saturday_and_sunday() {
         // 2024-01-01 is a Monday (epoch day 19723).

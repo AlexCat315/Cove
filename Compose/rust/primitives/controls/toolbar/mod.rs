@@ -3,6 +3,9 @@
 //! Groups controls with shared density and arrow-key navigation along the axis.
 //! Child inputs get first refusal for caret movement. Disabling the toolbar blocks
 //! all hosted input and removes its descendants from focus traversal.
+pub mod commands;
+pub mod overflow_layout;
+
 use std::rc::Rc;
 
 use cove_core::scene::{
@@ -131,6 +134,10 @@ impl ToolbarItem {
 }
 
 /// Groups controls with arrow-key navigation along the toolbar axis.
+pub use commands::{ToolbarCommandPresentation, ToolbarCommands};
+pub use overflow_layout::{ToolbarArrangement, ToolbarOverflowLayout};
+
+/// A toolbar's items and options.
 pub struct Toolbar {
     pub options: ToolbarOptions,
     /// Explicit minimum height; `None` follows the control size.

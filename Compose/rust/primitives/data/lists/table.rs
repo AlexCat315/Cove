@@ -14,6 +14,7 @@ use cove_core::{Binding, TextAlignment};
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::AppearanceExt;
 use crate::primitives::feedback::EmptyState;
+use crate::primitives::layout::grid::{ColumnVisibilityPlan, ColumnVisibilityTrack};
 use crate::primitives::layout::{ScrollAxis, ScrollView, ScrollbarGutter};
 use crate::primitives::text::Text;
 use crate::modifiers::style::SemanticStyleViewExt;
@@ -821,3 +822,96 @@ impl PrimitiveView for TableCell {
     }
 }
 crate::impl_primitive_view!(TableCell);
+
+// MARK: - Column plan
+
+/// Resolves which table columns are shown for a given available width.
+///
+/// Translation of `Primitives/Data/Columns/Visibility.swift`. The generic
+/// `ColumnVisibilityPlan` (shared with `Grid`) decides *which* columns fit; this
+/// adapter supplies the table-specific inputs: measured widths, the pinned and
+/// frozen prefixes, and the rule that a frozen prefix wider than the viewport
+/// stops being frozen.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TableColumnPlan {
+    /// Indices of the columns to show, in authored order.
+    pub indices: Vec<usize>,
+    /// Columns that must stay available regardless of width.
+    pub required_ids: std::collections::HashSet<String>,
+    /// Leading columns kept out of horizontal scrolling.
+    pub frozen_count: usize,
+    pub available_width: f32,
+}
+
+/// The table's three-way visibility maps onto the shared plan's two-way one.
+///
+/// `Hidden` is handled by the table before planning (the column is filtered out
+/// entirely), so only `Required` and `Optional` reach the resolver. Optional
+/// columns all share priority 0, which keeps them in authored order.
+fn table_visibility(visibility: ColumnVisibility) -> crate::primitives::layout::grid::ColumnVisibility {
+    match visibility {
+        ColumnVisibility::Required => crate::primitives::layout::grid::ColumnVisibility::Required,
+        ColumnVisibility::Optional | ColumnVisibility::Hidden => {
+            crate::primitives::layout::grid::ColumnVisibility::Automatic { priority: 0 }
+        }
+    }
+}
+
+impl TableColumnPlan {
+    /// Widths may be user-resized; anything absent falls back to the authored
+    /// width, constrained to the column's own min/max.
+    pub fn tracks<Record>(
+        columns: &[TableColumn<Record>],
+        widths: &BTreeMap<String, f32>,
+    ) -> Vec<ColumnVisibilityTrack> {
+        columns
+            .iter()
+            .map(|column| {
+                let authored = widths
+                    .get(&column.id)
+                    .copied()
+                    .unwrap_or(column.layout.width);
+                ColumnVisibilityTrack {
+                    id: column.id.clone(),
+                    title: column.title.clone(),
+                    visibility: table_visibility(column.visibility),
+                    width: column.layout.constrained(authored),
+                }
+            })
+            .collect()
+    }
+
+    pub fn resolve<Record>(
+        columns: &[TableColumn<Record>],
+        widths: &BTreeMap<String, f32>,
+        overrides: &std::collections::HashMap<String, bool>,
+        available_width: f32,
+        frozen_count: usize,
+        pinned_ids: &std::collections::HashSet<String>,
+    ) -> Self {
+        let frozen_count = frozen_count.min(columns.len());
+        let tracks = Self::tracks(columns, widths);
+
+        // Pinned columns and the frozen prefix can never be dropped.
+        let mut required: std::collections::HashSet<String> = pinned_ids.clone();
+        required.extend(columns.iter().take(frozen_count).map(|column| column.id.clone()));
+
+        let plan = ColumnVisibilityPlan::resolve(&tracks, overrides, available_width, 0.0, &required);
+
+        // A frozen prefix that fills the viewport cannot stay frozen: there would
+        // be no scrollable region left for the remaining columns.
+        let frozen_width: f32 = tracks.iter().take(frozen_count).map(|track| track.width).sum();
+        let frozen_count = if frozen_width >= available_width.max(0.0) {
+            0
+        } else {
+            frozen_count
+        };
+
+        Self {
+            indices: plan.indices,
+            required_ids: plan.required_ids,
+            frozen_count,
+            available_width: available_width.max(0.0),
+        }
+    }
+}
