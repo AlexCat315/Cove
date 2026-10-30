@@ -424,7 +424,7 @@ fn animated_visibility(
     on_visibility_settled: Option<Rc<dyn Fn(bool)>>,
     content: AnyView,
 ) -> AnyView {
-    AnyView::new(AnimatedVisibility::new(
+    AnyView::new(AnimatedVisibility::with_motion(
         is_visible,
         transition,
         Some(SemanticMotionRef::entering()),
@@ -577,7 +577,7 @@ impl PortalResource {
     pub fn surface_reveal(anchor: Point, theme: &Theme) -> Transition {
         let scale = theme.motion.surface.reveal_scale;
         let resolved = if scale.is_finite() { scale.clamp(0.0, 1.0) } else { crate::theme::SurfaceMotion::default().reveal_scale };
-        Transition::scale(resolved as f64, anchor)
+        Transition::scale(resolved, anchor)
     }
 
     /// Logical dismissal is immediate. Only noninteractive paint survives the

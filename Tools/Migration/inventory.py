@@ -130,6 +130,12 @@ def mapped_paths(source: str) -> tuple[str, list[str]]:
             return "written_unverified", ["Compose/rust/modifiers/layout/mod.rs"]
         if relative == "Animation/WithAnimation":
             return "written_unverified", ["Compose/rust/lib.rs", "Core/rust/scene/animation/context.rs"]
+        if relative == "Animation/AnimatedVisibility":
+            return "written_unverified", ["Compose/rust/animation/content/animated_visibility.rs"]
+        if relative == "Animation/Transition":
+            return "written_unverified", ["Compose/rust/animation/transition.rs"]
+        if relative == "Animation/TransitionView":
+            return "written_unverified", ["Compose/rust/animation/transition_view.rs"]
         if relative == "CoveUIComposeResourceBundle":
             return "written_unverified", ["Compose/rust/resource_bundle.rs", "PlatformCore/rust/resources.rs"]
         if relative == "Primitives/Columns/Priority":
