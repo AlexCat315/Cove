@@ -101,12 +101,19 @@ fn the_empty_phase_prompts_for_a_source() {
 #[test]
 fn the_empty_and_failure_states_share_a_caption_but_not_their_detail() {
     let empty = surface_for(&AsyncImagePhase::Empty, || unreachable!());
-    let failure = surface_for(&AsyncImagePhase::Failure(
-        cove_ui_compose::primitives::media::AsyncImageError::new("404"),
-    ), || "404".to_owned());
+    let failure = surface_for(
+        &AsyncImagePhase::Failure(
+            cove_ui_compose::primitives::media::AsyncImageError::FileNotFound,
+        ),
+        || "Image file not found".to_owned(),
+    );
     assert_eq!(surface_caption(&empty), "No image");
     assert_eq!(surface_caption(&failure), "Image unavailable");
-    assert_eq!(surface_detail(&failure), "404", "the error description is the detail");
+    assert_eq!(
+        surface_detail(&failure),
+        "Image file not found",
+        "the error description is the detail"
+    );
     assert_ne!(surface_detail(&empty), surface_detail(&failure));
 }
 
