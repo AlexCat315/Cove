@@ -10,6 +10,7 @@ pub mod form;
 pub mod form_validation;
 pub mod key_cap;
 pub mod link;
+pub mod rating;
 pub mod tag;
 pub mod toolbar;
 pub mod toggle;
@@ -24,6 +25,6 @@ pub use link::{Link, LinkUnderline};
 pub use tag::{Tag, TagVariant};
 pub use toolbar::{
     Toolbar, ToolbarAxis, ToolbarAxisEnvironment, ToolbarDividerEdge, ToolbarGroup, ToolbarItem,
-    ToolbarOptions, ToolbarSeparator, toolbar_height,
+    ToolbarItemPlacement, ToolbarOptions, ToolbarSeparator, toolbar_height,
 };
 pub use toggle::{BoolControlHost, BoolControlVariant, Checkbox, CheckboxState, Toggle};

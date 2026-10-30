@@ -33,3 +33,7 @@ zig-out/
 # Local visual comparison assets (reference screenshots and capture scripts)
 .compare/
 skills-lock.json
+
+# Python bytecode from the migration tooling
+__pycache__/
+*.pyc

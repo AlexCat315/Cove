@@ -127,7 +127,7 @@ impl MigrationPending {
     pub fn entries() -> &'static [(GalleryPage, &'static str, &'static [&'static str])] {
         &[
             (GalleryPage::Introduction, "Overview/Dashboard.swift", &[]),
-            (GalleryPage::Button, "Controls/ControlStories.swift", &["DatePicker"]),
+            (GalleryPage::Button, "Controls/ControlStories.swift", &[]),
             (GalleryPage::Checkbox, "Controls/ControlStories.swift", &[]),
             (GalleryPage::Toggle, "Controls/ControlStories.swift", &[]),
             (GalleryPage::Slider, "Feedback/FeedbackStories.swift", &[]),
@@ -168,7 +168,7 @@ impl MigrationPending {
             (GalleryPage::Popover, "Layout/OverlayStories.swift", &[]),
             (GalleryPage::Modal, "Layout/OverlayStories.swift", &[]),
             (GalleryPage::Disclosure, "Layout/OverlayStories.swift", &[]),
-            (GalleryPage::Tabs, "Layout/OverlayStories.swift", &[]),
+            (GalleryPage::Tabs, "Layout/OverlayStories.swift", &["TabItem"]),
             (GalleryPage::Panel, "Layout/LayoutStories.swift", &[]),
             (GalleryPage::SplitView, "Layout/LayoutStories.swift", &[]),
             (GalleryPage::ScrollView, "Layout/LayoutStories.swift", &[]),
@@ -195,12 +195,12 @@ impl MigrationPending {
             (GalleryPage::AppBar, "Navigation/AppBarStory.swift", &["AppBar"]),
             (GalleryPage::Table, "Data/DateTableStories.swift", &[]),
             (GalleryPage::DataTable, "Data/DataTableStory.swift", &[]),
-            (GalleryPage::Calendar, "Data/DateTableStories.swift", &["CalendarView"]),
-            (GalleryPage::DatePicker, "Data/DateTableStories.swift", &["DatePicker"]),
+            (GalleryPage::Calendar, "Data/DateTableStories.swift", &[]),
+            (GalleryPage::DatePicker, "Data/DateTableStories.swift", &[]),
             (GalleryPage::DateRangePicker, "Controls/ControlStories.swift", &["DateRangePicker"]),
             (GalleryPage::TimeField, "Data/DateTableStories.swift", &[]),
             (GalleryPage::TimePicker, "Controls/TimePickerStory.swift", &["TimeInput", "TimePicker"]),
-            (GalleryPage::Popconfirm, "Overlays/PopconfirmStory.swift", &[]),
+            (GalleryPage::Popconfirm, "Overlays/PopconfirmStory.swift", &["Popconfirm"]),
             (GalleryPage::ActionSheet, "Overlays/ActionSheetStory.swift", &[]),
             (GalleryPage::Accordion, "Layout/NavigationStories.swift", &[]),
             (GalleryPage::Breadcrumb, "Layout/NavigationStories.swift", &["Breadcrumb", "BreadcrumbItem"]),
@@ -214,14 +214,14 @@ impl MigrationPending {
             (GalleryPage::AlertDialog, "Layout/NavigationStories.swift", &[]),
             (GalleryPage::Sheet, "Layout/NavigationStories.swift", &[]),
             (GalleryPage::BottomSheet, "Layout/NavigationStories.swift", &[]),
-            (GalleryPage::CommandPalette, "Overlays/CommandStory.swift", &["CommandPalette"]),
+            (GalleryPage::CommandPalette, "Overlays/CommandStory.swift", &["CommandItem", "CommandPalette"]),
             (GalleryPage::NavigationStack, "Layout/NavigationStories.swift", &[]),
-            (GalleryPage::HoverCard, "Overlays/HoverStory.swift", &[]),
+            (GalleryPage::HoverCard, "Overlays/HoverStory.swift", &["HoverCard"]),
             (GalleryPage::Timeline, "Data/DataStories.swift", &[]),
             (GalleryPage::Toolbar, "Controls/ToolbarStory.swift", &[]),
             (GalleryPage::Link, "Controls/ControlStories.swift", &[]),
             (GalleryPage::StatusBar, "Layout/LayoutStories.swift", &[]),
-            (GalleryPage::Carousel, "Layout/LayoutStories.swift", &[]),
+            (GalleryPage::Carousel, "Layout/LayoutStories.swift", &["CarouselPage"]),
             (GalleryPage::Skeleton, "Feedback/SkeletonStory.swift", &[]),
             (GalleryPage::Stepper, "Controls/StepperStory.swift", &[]),
         ]
@@ -322,8 +322,8 @@ mod checks {
         let portable = MigrationPending::portable();
         let blocked = MigrationPending::blocked();
         assert_eq!(portable.len() + blocked.len(), entries.len());
-        assert_eq!(portable.len(), 84, "84 pages are portable today");
-        assert_eq!(blocked.len(), 14, "14 pages wait on Compose");
+        assert_eq!(portable.len(), 83, "83 pages are portable today");
+        assert_eq!(blocked.len(), 15, "15 pages wait on Compose");
         for page in &portable {
             assert!(MigrationPending::entry(*page).1.is_empty());
         }

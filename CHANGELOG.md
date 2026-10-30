@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+- 新增日期/日历基础层：`foundation/date.rs`（`Date` 以纪元秒表示，`DateParts` 墙钟时间，Howard Hinnant 民历换算双向，`iso_week_of` 返回 ISO 周年+周数，圣诞周归属按"含该周周四的年份"处理）与 `foundation/calendar.rs`（固定 UTC 偏移 + `first_weekday`，`component`/`date`/`start_of_day`/`date_by_adding`/`date_interval_start`，月相加按目标月末夹取，周起始用 `rem_euclid`）。工作区无 `time`/`chrono`/`jiff`，故自行实现而非引入依赖。**具名差异：固定偏移、无 DST 规则**——对日历网格是正确取舍（日期是标签不是时长），但不与 Foundation 逐字节等价。
+
+- 补齐此前被误判完成的控件：`DateValues`（`DateAvailability`/`CalendarGrid`，其 Rust 文件从未被 `mod` 声明且所引用的 `foundation` 日期模块不存在）、`Calendar`（period/navigation 模型 + `CalendarView`）、`DatePicker`、`Table`/`TableColumn`、`Toolbar`、`ButtonGroup`、`Rating` 等一批"模型与样式齐备但无视图"的组件。`CalendarView`/`DatePicker` 的**标签为英文硬编码**，未实现 `DateFormatter` 的本地化符号查找——英文下与 Swift 一致，其他语言不正确，已登记为已知缺口。
+
 - `Checkbox::labeled_from_boolean(label, Binding<bool>)` 新增：`from_boolean` 内部会转成三态、没有 label 槽位，而三态路径有 `labeled`，造成布尔路径无法带标签。`Toggle` 本就有 `labeled(_:is_on:)`，此项补齐唯一的不对称。另修复 `masonry` 模块缺少 `pub use`（`primitives::layout::masonry::Masonry` 与 `primitives::layout::Masonry` 现均可用），与其余布局模块保持一致。
 
 - 迁移清单工具增加三项可信度校验并修正两起错配：`.rs` 文件的 stem 若未被任何 `mod` 声明（死代码）不计入已写入；头部注释的基名匹配要求非标识符边界（避免 `Visibility.swift` 命中 `AnimatedVisibility.swift`）；普通英文词（`Visibility`/`Support`/`Options` 等）不作跨子系统匹配依据。据此确认 `Primitives/Data/Columns/Visibility.swift`（表格列可见性规划，25 行）未迁移——此前被错映射到 `Graphics/rust/rhi/visibility.rs`（GPU 可见性缓冲）；`Primitives/Controls/DateValues.swift` 亦为孤儿文件且引用了不存在的 `foundation` 日期模块。审计后当前 0 条生产记录指向不存在或不可达的目标。

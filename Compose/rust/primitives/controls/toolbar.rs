@@ -13,6 +13,7 @@ use cove_core::scene::{
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::AppearanceExt;
+use crate::primitives::controls::button::ButtonIconSource;
 use crate::primitives::overlays::roving_focus::SelectionNavigation;
 use crate::theme::{theme_for_node, ControlSize, ControlSizeEnvironment};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
@@ -79,20 +80,53 @@ impl ToolbarOptions {
     }
 }
 
-/// A toolbar's item: any control with a single Tab stop.
-pub struct ToolbarItem {
-    content: AnyView,
+/// Where one command sits in the bar.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ToolbarItemPlacement {
+    /// Larger priorities remain in the bar longer. Ties retain source order.
+    #[default]
+    Automatic,
+    AutomaticWithPriority(i32),
+    /// Keep a primary command in the bar, scrolling if necessary.
+    Always,
+    /// Always in the overflow menu.
+    Overflow,
 }
 
-impl ToolbarItem {
-    pub fn new(content: impl View + 'static) -> Self {
-        Self { content: AnyView::new(content) }
+impl ToolbarItemPlacement {
+    /// Larger stays in the bar longer; `Always` wins, `Overflow` never inlines.
+    pub fn priority(self) -> i32 {
+        match self {
+            Self::Always => i32::MAX,
+            Self::Automatic => 0,
+            Self::AutomaticWithPriority(value) => value,
+            Self::Overflow => i32::MIN,
+        }
     }
 }
 
-impl View for ToolbarItem {
-    fn body(&self) -> AnyView {
-        self.content.clone()
+/// One command shared by the bar and its overflow menu. Actions and enabled,
+/// selected and destructive semantics come from the same `MenuItem` value.
+#[derive(Clone)]
+pub struct ToolbarItem {
+    pub command: crate::primitives::overlays::menu::MenuItem,
+    pub icon: Option<ButtonIconSource>,
+    pub placement: ToolbarItemPlacement,
+}
+
+impl ToolbarItem {
+    pub fn new(command: crate::primitives::overlays::menu::MenuItem) -> Self {
+        Self { command, icon: None, placement: ToolbarItemPlacement::Automatic }
+    }
+
+    pub fn icon(mut self, icon: ButtonIconSource) -> Self {
+        self.icon = Some(icon);
+        self
+    }
+
+    pub fn placement(mut self, placement: ToolbarItemPlacement) -> Self {
+        self.placement = placement;
+        self
     }
 }
 

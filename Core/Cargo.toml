@@ -100,3 +100,7 @@ path = "rust/tests/focus_chain.rs"
 [[test]]
 name = "hit_tester"
 path = "rust/tests/hit_tester.rs"
+
+[[test]]
+name = "interpolatable"
+path = "rust/tests/interpolatable.rs"

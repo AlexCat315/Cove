@@ -8,6 +8,7 @@
 pub mod animation;
 pub mod animation_curves;
 pub mod animation_system;
+pub mod calendar;
 pub mod controls;
 pub mod feedback;
 pub mod layout;
@@ -19,6 +20,7 @@ pub mod viewport_traits;
 pub use animation::AnimationStory;
 pub use animation_curves::{AnimationCurveExamples, CurveChoice};
 pub use animation_system::{AnimationSystemExamples, DemoPhase};
+pub use calendar::CalendarStory;
 pub use controls::{ButtonStory, CheckboxStory, ToggleStory};
 pub use layout::{LayoutGridStory, LazyGridStory, MasonrySample, MasonryStory};
 pub use feedback::{AlertStory, BadgeStory, EmptyStory, ProgressStory, StorySection};

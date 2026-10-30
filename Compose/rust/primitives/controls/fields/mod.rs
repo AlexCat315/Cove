@@ -1,9 +1,11 @@
 //! Form fields: selects, sliders and radio groups.
+pub mod date_picker;
 pub mod numeric;
 pub mod radio_group;
 pub mod select;
 pub mod slider;
 
+pub use date_picker::{DatePicker, DatePickerOptions, DatePickerPresentation};
 pub use numeric::{
     NumberField, NumberFieldPrefix, NumericPrefixFieldStyle, NumericScrub, NumericScrubHandle,
     NumericTextFormat,

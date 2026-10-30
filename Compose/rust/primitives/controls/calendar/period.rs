@@ -3,7 +3,7 @@
 //! What one selection covers, and the browsing level above it.
 use crate::foundation::{Calendar, CalendarUnit, Date};
 
-use super::super::date_values::{CalendarGrid, DateAvailability};
+use super::super::date_values::DateAvailability;
 
 /// What one selection covers. The bound date is the period's first day, and any
 /// date inside the period shows as selected, so callers may store either.

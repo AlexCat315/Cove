@@ -1018,11 +1018,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Calendar/Period.swift",
       "source_sha256": "0431d434de090d98c939700e3e44f7fcd2863e36ad0d1b0aac319903cde62718",
       "source_lines": 98,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/controls/calendar/period.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/CompletionPopover.swift",
@@ -1449,11 +1451,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Rating/Rating.swift",
       "source_sha256": "9f81f8aeea58556d97ef82ff96fa1f8d915e428421401fba75145af15c166fbf",
       "source_lines": 74,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/controls/rating/rating.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Rating/RatingGeometry.swift",
@@ -6985,11 +6989,13 @@
       "source": "Examples/Mobile/Sources/AppContent/Today.swift",
       "source_sha256": "a7d4c65f0100250038c30f11d4e6eeead568753095bbfb78f0cd09f8299efb34",
       "source_lines": 49,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Examples/rust/mobile/today.rs"
+      ],
       "module": "Examples",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Examples/Mobile/Tests/AppContentTests/Model.swift",
@@ -7113,11 +7119,13 @@
       "source": "Examples/Sources/GalleryContent/Stories/Controls/StepperStory.swift",
       "source_sha256": "f16aa845ea10fbb83074a1a674497115a20bd7bdcc37ccb9e9b341bd3dc9fb35",
       "source_lines": 36,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Examples/rust/gallery_content/stories/stepper.rs"
+      ],
       "module": "Examples",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Examples/Sources/GalleryContent/Stories/Controls/TextEditorStory.swift",
@@ -7203,11 +7211,13 @@
       "source": "Examples/Sources/GalleryContent/Stories/Data/DateTableStories.swift",
       "source_sha256": "7e99560c25ad2bf019c1e21e44a122fbecd903bffe95585254a987e10ce3cdb0",
       "source_lines": 114,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Examples/rust/gallery_content/stories/calendar.rs"
+      ],
       "module": "Examples",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Examples/Sources/GalleryContent/Stories/Data/MarkdownStory.swift",
@@ -14362,8 +14372,10 @@
       "source": "Tests/CoveUIRuntimeTests/InterpolatableTests.swift",
       "source_sha256": "165fa43d7c0322100f28e9fc506d123bcb1f0ea5ce8cc3d6033e7a7efb3c3c81",
       "source_lines": 93,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "interpolatable"
+      ],
       "module": "Tests",
       "kind": "test",
       "planned": false

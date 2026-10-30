@@ -11,10 +11,10 @@ use crate::foundation::{Calendar as FoundationCalendar, CalendarUnit, Date};
 use cove_core::scene::{AccessibilityRole, AccessibilitySemantics};
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
-use crate::primitives::controls::button::{Button, ButtonIcon, ButtonIconSource, ButtonRole};
+use crate::primitives::controls::button::{Button, ButtonIconSource, ButtonRole};
 use crate::primitives::layout::{ScrollAxis, ScrollView, ScrollbarGutter};
 use crate::primitives::text::Text;
-use crate::theme::styles::buttons::{ButtonStyle, ButtonStyleConfiguration, ButtonStyleViewExt, GhostButtonStyle};
+use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
 use crate::theme::{theme_for_node, SemanticColorRef, SemanticFontRef};
 use crate::{AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View};
 
@@ -574,10 +574,6 @@ impl CalendarMonth {
         if candidates.contains(&focused) { Some(focused) } else { candidates.first().copied() }
     }
 
-    fn is_enabled(&self, day: Date) -> bool {
-        self.view.options.presentation.is_enabled
-            && self.view.options.availability.contains(day, &self.view.options.calendar)
-    }
 }
 
 /// The month title, rendered as the month and year.

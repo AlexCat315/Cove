@@ -251,6 +251,20 @@ Compose 各子树共享 `Compose/rust/lib.rs`、`primitives/mod.rs`、`theme/mod
 影响：Gallery 98 页中 26 页因此无法渲染（其余 72 页可移植）。本轮按解锁页数排序补齐，
 `ButtonGroup`（4 页）优先，其后 `Toolbar`／`Table`／`DatePicker`（各 3 页）。
 
+### 日期与日历的具名差异
+
+- `foundation/{date,calendar}.rs` 采用**固定 UTC 偏移，不实现 DST/闰秒规则**。
+  Foundation 的 `Calendar` 在夏令时切换日 `startOfDay` 会是 23 或 25 小时；此处恒为 24 小时。
+  对日历网格而言这是正确取舍（日期是标签而非时长，网格也不会因 DST 出现空洞），
+  但不与 Foundation 逐字节等价。
+- `CalendarView` / `DatePicker` 的**月份名与极短星期符号为英文静态表**，无障碍标签按
+  `"March 5, 2026"` 拼接，未使用 `DateFormatter` 的 `dateStyle = .medium` 与本地化符号查找。
+  **英文环境下与 Swift 一致，其他语言不正确。** 需 tz 数据库与本地化符号表才能消除，
+  属独立决策事项。
+- 日期基础层的 API **按位置传参**（`interval_start(unit, date, cal)`），刻意不引入
+  Rust 没有的具名参数约定，使调用点读起来接近 Swift 的
+  `CalendarGrid.interval(of:containing:calendar:)`。
+
 ### 已知缺口（功能层面，已在实现中具名记录）
 
 见上文「逐模块保真度」与「原生后端与宿主状态」两节。摘要：

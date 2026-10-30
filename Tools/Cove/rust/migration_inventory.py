@@ -165,6 +165,31 @@ GENERIC_TYPE_NAMES = {
     "handler", "service", "store", "reader", "host", "result", "item", "row",
 }
 
+# `impl View for Name` and `impl<T: ...> View for Name<T>` are both
+# renderable declarations. Matching only the non-generic form silently
+# under-reports coverage — a bug found twice (ButtonGroup, TableColumn).
+_RENDERABLE_CACHE: dict[str, str] = {}
+
+
+def renderable_index() -> dict[str, list[str]]:
+    """Public type name -> Rust files that give it a `View`/`PrimitiveView` impl."""
+    index: dict[str, list[str]] = {}
+    pattern = re.compile(
+        r"impl(?:<[^>]*>)?\s+(?:crate::)?(?:View|PrimitiveView)\s+for\s+([A-Za-z0-9_]+)"
+    )
+    macro = re.compile(r"impl_primitive_view!\(\s*([A-Za-z0-9_]+)")
+    for path in rust_files():
+        try:
+            text = open(os.path.join(ROOT, path), encoding="utf-8", errors="ignore").read()
+        except OSError:
+            continue
+        for match in pattern.finditer(text):
+            index.setdefault(match.group(1), []).append(path)
+        for match in macro.finditer(text):
+            index.setdefault(match.group(1), []).append(path)
+    return index
+
+
 _HEADER_CACHE: dict[str, str] = {}
 
 

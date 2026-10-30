@@ -13,8 +13,8 @@
 
 | 范围 | 文件数 | 已写入 | 进行中 | 未开始 |
 | --- | ---: | ---: | ---: | ---: |
-| 生产源码 | 984 | 887 | 0 | 97 |
-| 测试源码 | 424 | 52 | 0 | 372 |
+| 生产源码 | 984 | 892 | 0 | 92 |
+| 测试源码 | 424 | 53 | 0 | 371 |
 | SwiftPM 清单 | 25 | 19 | 0 | 6 |
 | 项目模板 | 5 | 0 | 0 | 5 |
 | 合计 | 1438 | — | — | — |
@@ -23,7 +23,7 @@
 
 ### Compose
 
-共 414 个文件：已写入 372，进行中 0，未开始 42。
+共 414 个文件：已写入 374，进行中 0，未开始 40。
 
 | 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
 | --- | ---: | --- | --- | --- |
@@ -107,7 +107,7 @@
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Button/Chrome.swift` | 280 | 已写入（未验证） | `Compose/rust/theme/styles/buttons/builtin_button_chrome.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Calendar/Calendar.swift` | 399 | 已写入（未验证） | `Compose/rust/foundation/calendar.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Calendar/Navigation.swift` | 109 | 已写入（未验证） | `Compose/rust/primitives/layout/sidebar/mod.rs`<br>`Compose/rust/primitives/layout/sidebar/sidebar.rs`<br>`Compose/rust/primitives/navigation/mod.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Calendar/Period.swift` | 98 | 未开始 | — | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Calendar/Period.swift` | 98 | 已写入（未验证） | `Compose/rust/primitives/controls/calendar/period.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/CompletionPopover.swift` | 252 | 已写入（未验证） | `Compose/rust/primitives/overlays/popover.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/DateValues.swift` | 69 | 已写入（未验证） | `Compose/rust/primitives/controls/date_values.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/FieldLabel.swift` | 47 | 已写入（未验证） | `Compose/rust/primitives/controls/field_label.rs` | 未编译、未行为对照 |
@@ -145,7 +145,7 @@
 | `Compose/Sources/CoveUICompose/Primitives/Controls/KeyCap.swift` | 78 | 已写入（未验证） | `Compose/rust/primitives/controls/key_cap.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Link.swift` | 113 | 已写入（未验证） | `Compose/rust/primitives/controls/link.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/MenuButton.swift` | 117 | 已写入（未验证） | `Compose/rust/primitives/controls/button.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Primitives/Controls/Rating/Rating.swift` | 74 | 未开始 | — | 等待实现 |
+| `Compose/Sources/CoveUICompose/Primitives/Controls/Rating/Rating.swift` | 74 | 已写入（未验证） | `Compose/rust/primitives/controls/rating/rating.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Rating/RatingGeometry.swift` | 75 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/slider/geometry.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Rating/RatingHost.swift` | 114 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/slider/host.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Primitives/Controls/Rating/RatingPaint.swift` | 61 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/slider/paint.rs` | 未编译、未行为对照 |
@@ -738,7 +738,7 @@
 
 ### Examples
 
-共 61 个文件：已写入 24，进行中 0，未开始 37。
+共 61 个文件：已写入 27，进行中 0，未开始 34。
 
 | 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
 | --- | ---: | --- | --- | --- |
@@ -748,7 +748,7 @@
 | `Examples/Mobile/Sources/AppContent/Model.swift` | 30 | 已写入（未验证） | `Compose/rust/primitives/data/chart/model.rs` | 未编译、未行为对照 |
 | `Examples/Mobile/Sources/AppContent/Projects.swift` | 57 | 未开始 | — | 等待实现 |
 | `Examples/Mobile/Sources/AppContent/Settings.swift` | 50 | 未开始 | — | 等待实现 |
-| `Examples/Mobile/Sources/AppContent/Today.swift` | 49 | 未开始 | — | 等待实现 |
+| `Examples/Mobile/Sources/AppContent/Today.swift` | 49 | 已写入（未验证） | `Examples/rust/mobile/today.rs` | 未编译、未行为对照 |
 | `Examples/Platforms/iOS/main.swift` | 10 | 已写入（未验证） | `Examples/RustCounter/src/main.rs` | 未编译、未行为对照 |
 | `Examples/Sources/CoveUIDemo/Launch.swift` | 79 | 已写入（未验证） | `Hosts/rust/android/contract/launch.rs` | 未编译、未行为对照 |
 | `Examples/Sources/CoveUIDemo/main.swift` | 7 | 已写入（未验证） | `Examples/RustCounter/src/main.rs` | 未编译、未行为对照 |
@@ -757,7 +757,7 @@
 | `Examples/Sources/GalleryContent/GalleryView.swift` | 218 | 已写入（未验证） | `Compose/Composition/rust/view.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/NavigationIcons.swift` | 105 | 已写入（未验证） | `Examples/rust/gallery_content/icons.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Controls/ControlStories.swift` | 380 | 已写入（未验证） | `Examples/rust/gallery_content/stories/controls.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Controls/StepperStory.swift` | 36 | 未开始 | — | 等待实现 |
+| `Examples/Sources/GalleryContent/Stories/Controls/StepperStory.swift` | 36 | 已写入（未验证） | `Examples/rust/gallery_content/stories/stepper.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Controls/TextEditorStory.swift` | 327 | 未开始 | — | 等待实现 |
 | `Examples/Sources/GalleryContent/Stories/Controls/TimePickerStory.swift` | 95 | 未开始 | — | 等待实现 |
 | `Examples/Sources/GalleryContent/Stories/Controls/ToolbarStory.swift` | 71 | 未开始 | — | 等待实现 |
@@ -766,7 +766,7 @@
 | `Examples/Sources/GalleryContent/Stories/Data/ChartExploration.swift` | 37 | 未开始 | — | 等待实现 |
 | `Examples/Sources/GalleryContent/Stories/Data/DataStories.swift` | 714 | 未开始 | — | 等待实现 |
 | `Examples/Sources/GalleryContent/Stories/Data/DataTableStory.swift` | 131 | 未开始 | — | 等待实现 |
-| `Examples/Sources/GalleryContent/Stories/Data/DateTableStories.swift` | 114 | 未开始 | — | 等待实现 |
+| `Examples/Sources/GalleryContent/Stories/Data/DateTableStories.swift` | 114 | 已写入（未验证） | `Examples/rust/gallery_content/stories/calendar.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Data/MarkdownStory.swift` | 77 | 未开始 | — | 等待实现 |
 | `Examples/Sources/GalleryContent/Stories/Data/RichTextStory.swift` | 58 | 已写入（未验证） | `Examples/rust/gallery_content/stories/rich_text.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Data/WebStory.swift` | 193 | 未开始 | — | 等待实现 |

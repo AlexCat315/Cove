@@ -5,7 +5,7 @@
 
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::Binding;
-use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
+use cove_ui_compose::modifiers::layout::{FlexExt, PaddingExt};
 use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::primitives::data::avatar::Avatar;
 use cove_ui_compose::primitives::feedback::{Badge, ProgressView};
