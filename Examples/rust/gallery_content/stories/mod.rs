@@ -16,6 +16,7 @@ pub mod layout;
 pub mod overview;
 pub mod rich_text;
 pub mod stepper;
+pub mod theme;
 pub mod viewport_traits;
 
 pub use animation::AnimationStory;
@@ -28,5 +29,6 @@ pub use layout::{LayoutGridStory, LazyGridStory, MasonrySample, MasonryStory};
 pub use feedback::{AlertStory, BadgeStory, EmptyStory, ProgressStory, StorySection};
 pub use rich_text::RichTextStory;
 pub use stepper::StepperStory;
+pub use theme::ThemeStory;
 pub use overview::{DashboardCard, IntroductionStory, MetricCard};
 pub use viewport_traits::{ViewportDebugName, ViewportTraits, ViewportTraitsStory};

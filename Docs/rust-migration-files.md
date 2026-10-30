@@ -13,7 +13,7 @@
 
 | 范围 | 文件数 | 已写入 | 进行中 | 未开始 |
 | --- | ---: | ---: | ---: | ---: |
-| 生产源码 | 984 | 894 | 0 | 90 |
+| 生产源码 | 984 | 895 | 0 | 89 |
 | 测试源码 | 424 | 54 | 0 | 370 |
 | SwiftPM 清单 | 25 | 19 | 0 | 6 |
 | 项目模板 | 5 | 0 | 0 | 5 |
@@ -738,7 +738,7 @@
 
 ### Examples
 
-共 61 个文件：已写入 28，进行中 0，未开始 33。
+共 61 个文件：已写入 29，进行中 0，未开始 32。
 
 | 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
 | --- | ---: | --- | --- | --- |
@@ -780,7 +780,7 @@
 | `Examples/Sources/GalleryContent/Stories/Foundation/AnimationSystem.swift` | 81 | 已写入（未验证） | `Examples/rust/gallery_content/stories/animation_system.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Foundation/IntrinsicFitting.swift` | 35 | 已写入（未验证） | `Examples/rust/gallery_content/stories/intrinsic_fitting.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Foundation/SurfaceTraits.swift` | 70 | 已写入（未验证） | `Examples/rust/gallery_content/stories/viewport_traits.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Foundation/ThemeStory.swift` | 89 | 未开始 | — | 等待实现 |
+| `Examples/Sources/GalleryContent/Stories/Foundation/ThemeStory.swift` | 89 | 已写入（未验证） | `Examples/rust/gallery_content/stories/theme.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Layout/DrawerStory.swift` | 56 | 未开始 | — | 等待实现 |
 | `Examples/Sources/GalleryContent/Stories/Layout/FoundationExamples.swift` | 134 | 已写入（未验证） | `Examples/rust/gallery_content/stories/layout.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Layout/GridColumns.swift` | 53 | 已写入（未验证） | `Compose/rust/primitives/layout/grid/columns.rs` | 未编译、未行为对照 |

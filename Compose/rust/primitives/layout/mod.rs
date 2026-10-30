@@ -13,6 +13,7 @@ pub mod scroll_reveal;
 pub mod scroll_view;
 pub mod navigation_components;
 pub mod sidebar;
+pub mod tab_view;
 pub mod zstack;
 pub mod resize;
 pub mod virtualization;

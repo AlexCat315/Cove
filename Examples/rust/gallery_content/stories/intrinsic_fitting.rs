@@ -12,7 +12,8 @@
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{Binding, State};
 use cove_ui_compose::adaptive::ContainerSizeReader;
-use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
+use cove_ui_compose::modifiers::layout::{LayoutFrameExt, PaddingExt};
+use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::layout::responsive::{
     LayoutThatFits, StackAxis, StackLayout,
@@ -182,12 +183,13 @@ impl FitChip {
 impl View for FitChip {
     fn body(&self) -> AnyView {
         AnyView::new(
-            // Every `*Ext` call returns `ModifiedContent`; chain them and erase
-            // once at the end. Only the final call needs to be a modifier.
-            Text::new(self.title)
-                .padding_edges(10.0, 6.0)
-                .semantic_background(SemanticColorRef::surface_variant())
-                .corner_radius(6.0),
+            // Each `*Ext` call returns `ModifiedContent`, which has no further
+            // inherent methods, so the chain is erased between modifier groups.
+            AnyView::new(
+                AnyView::new(Text::new(self.title).padding_edges(10.0, 6.0))
+                    .semantic_background(SemanticColorRef::surface_variant()),
+            )
+            .corner_radius(6.0),
         )
     }
 }

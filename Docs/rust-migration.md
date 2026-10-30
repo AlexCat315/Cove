@@ -325,9 +325,13 @@ DX12 描述符表逐 draw 绑定与加速结构、Apple 图片 MIME 与 macOS �
    缺一个导入就报 "no method named X"——**看起来像 API 不存在，实际是缺 import**。
 
 2. **`.button_style()` 与 `.semantic_foreground()` 返回 `ModifiedContent`，不是 `AnyView`。**
-   样式必须是擦除前的最后一次调用；`ModifiedContent` 没有固有 `.corner_radius()`，
-   混用样式与布局的修饰器链要特别小心。禁止用 `AnyView::new(modified_content)` 掩盖类型错误
-   （会经 downcast 快路径**静默丢弃修饰器**）。
+   **但 `ModifiedContent` 实现了 `View`**（`view_modifier.rs`），而所有 `*Ext` trait 都是
+   `impl<T: View + Sized + 'static>` 的 blanket 实现，因此**修饰器可以自由串联**：
+   `Text::new(x).padding_edges(10.0, 6.0).semantic_background(col).corner_radius(6.0)`
+   合法（已用编译探针验证）。不需要在每组之间插入 `AnyView::new(...)`。
+   真正需要擦除的情况只有：值是 `Rc<dyn View>` / 裸 `&dyn View`，或所需 trait 未导入。
+   禁止用 `AnyView::new(modified_content)` 掩盖类型错误——会经 downcast 快路径
+   **静默丢弃修饰器**。
 
 3. **`button_style` 会先解析为 `ViewModifier`。** 报错形如
    "`SecondaryButtonStyle: ViewModifier` is not satisfied"，具有误导性；导入
@@ -354,14 +358,22 @@ DX12 描述符表逐 draw 绑定与加速结构、Apple 图片 MIME 与 macOS �
     报错为 "private field, not a method"。字段已改名 `applied`；如再遇到同类报错，
     检查是否又出现同名字段遮蔽。
 
-11. **尺寸/几何走构造函数，不走 builder。** `Icon::new(resource, size)` 必须给尺寸，
+11. **`"no method named X"` 的三种成因**（按出现频率）：
+    (a) **缺 trait import** —— 最常见，如 `corner_radius` 来自 `AppearanceExt`
+    （不是 `LayoutFrameExt`）；`button_style` 来自 `ButtonStyleViewExt`；
+    (b) **参数个数不符 / 字段私有** —— 见下条；
+    (c) **值的类型没有 blanket `View` 实现** —— 如 `Rc<dyn View>`、裸 `&dyn View`，
+    此时才需要先擦除为 `AnyView`。
+    **注意 `ModifiedContent` 属于 (a) 类排查对象，不属于 (c)** ——它实现了 `View`。
+
+12. **尺寸/几何走构造函数，不走 builder。** `Icon::new(resource, size)` 必须给尺寸，
     `ProgressView::new(Option<f64>)`、`ProgressCircle::new(Option<f64>)`、
     `Spinner::new(size)` 同理；`GridRowHeights::fixed(n)` 是构造函数而非 `::Fixed`。
     这些原语**没有** `.size()` / `.height()` builder，字段是私有的，所以写
     `.size(28.0)` 会得到误导性的 "private field, not a method"。
     **看到 "private field" 时先查签名，不要找 trait import。**
 
-12. **`impl View for X` 也可能写成 `impl<T: ...> View for X<T>`。** 用文本搜索判断某控件
+13. **`impl View for X` 也可能写成 `impl<T: ...> View for X<T>`。** 用文本搜索判断某控件
     是否存在时，两种形式都要匹配——只匹配前者会漏报（`ButtonGroup` 曾被误判为缺失）。
     更可靠的做法是构建"拥有 `View`/`PrimitiveView` 实现"的可渲染类型集合
     （`Tools/Cove/rust/migration_inventory.py` 的 `renderable_index()`，当前 323 个）。

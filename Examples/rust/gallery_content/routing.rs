@@ -45,7 +45,8 @@ impl StoryDispatch {
             | GalleryPage::Masonry
             | GalleryPage::RichText
             | GalleryPage::Calendar
-            | GalleryPage::Stepper => Self::Story(page),
+            | GalleryPage::Stepper
+            | GalleryPage::ViewThatFits => Self::Story(page),
             _ => Self::pending(page),
         }
     }
@@ -89,6 +90,9 @@ impl StoryDispatch {
             }
             Self::Story(GalleryPage::Stepper) => {
                 Some(AnyView::new(stories::StepperStory::new(options)))
+            }
+            Self::Story(GalleryPage::ViewThatFits) => {
+                Some(AnyView::new(stories::ViewThatFitsStory::new()))
             }
             Self::Story(GalleryPage::Badge) => Some(AnyView::new(stories::BadgeStory)),
             Self::Story(GalleryPage::Alert) => Some(AnyView::new(stories::AlertStory::new())),

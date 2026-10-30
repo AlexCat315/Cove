@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+- 修复 `cove_ui_compose` 未导出 `modifiers` 模块导致的可见性缺口：`FrameDimension` 等修饰器类型此前无法从 crate 外部引用（`pub use modifiers::layout::FrameDimension;` 已补，纯增量）。同时纠正一处流传的误判——**`ModifiedContent` 实现了 `View`，所有 `*Ext` trait 均为 blanket 实现，修饰器可自由串联**，无需在每组之间插入 `AnyView::new(...)`；已用编译探针验证并写入迁移文档。"no method named X" 的真实成因是缺 trait import、参数不符/字段私有、或值本身无 `View` 实现，三者已分列记录。
+
+- 补齐 Gallery 侧视图缺失的控件：`Toolbar` 溢出布局接通（`LayoutContainer` + `impl Layout` + `AppBar` 供给可用宽度，并有断言优先级顺序与 `Always` 保证的测试）、`AppBar`、`ButtonGroup`、`Table`/`TableColumn`、`Calendar`/`DatePicker`、`Rating`、`Breadcrumb`、`Pagination`。`PaginationModel::items` 的 `start == 3` / `end == total-2` 邻页特例已按原实现移植并单测。
+
 - 修复 `foundation/date.rs::weekday_of` 的错位一天缺陷：原式 `(epoch_day.rem_euclid(7) + 5).rem_euclid(7) + 1` 对纪元第 0 天返回 6，而正确值为 5（1970-01-01 为周四，Sunday=1 记法）。所有星期被报成下一天。改为 `((epoch_day + 4).rem_euclid(7) + 1)`。影响面：`Calendar::date_interval_start` 的 `leading = (weekday - first_weekday).rem_euclid(7)` 因此对每个日期都算错，导致 `CalendarView` 的周粒度选区错位、`CalendarUnit::Weekday` 取值偏移一天、`iso_week_of` 在年界返回错误周数。已用 Python `datetime.isocalendar()` 交叉验证修复后结果：2024-12-30 → 2025-W01、2021-01-01 → 2020-W53、2025/2026-01-01 → W01 全部一致。
 
 - 新增日期/日历基础层：`foundation/date.rs`（`Date` 以纪元秒表示，`DateParts` 墙钟时间，Howard Hinnant 民历换算双向，`iso_week_of` 返回 ISO 周年+周数，圣诞周归属按"含该周周四的年份"处理）与 `foundation/calendar.rs`（固定 UTC 偏移 + `first_weekday`，`component`/`date`/`start_of_day`/`date_by_adding`/`date_interval_start`，月相加按目标月末夹取，周起始用 `rem_euclid`）。工作区无 `time`/`chrono`/`jiff`，故自行实现而非引入依赖。**具名差异：固定偏移、无 DST 规则**——对日历网格是正确取舍（日期是标签不是时长），但不与 Foundation 逐字节等价。
