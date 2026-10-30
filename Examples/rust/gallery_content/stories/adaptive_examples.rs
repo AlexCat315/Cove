@@ -188,7 +188,7 @@ pub fn unsupported_pages() -> Vec<GalleryPage> {
 }
 
 /// Every page variant that can appear in the gallery.
-pub const ALL_PAGES: [GalleryPage; 97] = [
+pub const ALL_PAGES: [GalleryPage; 98] = [
     GalleryPage::Introduction,
     GalleryPage::Button,
     GalleryPage::Checkbox,
@@ -200,6 +200,7 @@ pub const ALL_PAGES: [GalleryPage; 97] = [
     GalleryPage::TextArea,
     GalleryPage::TextEditor,
     GalleryPage::NumberField,
+    GalleryPage::Vec3Field,
     GalleryPage::ColorField,
     GalleryPage::Select,
     GalleryPage::JsonField,
