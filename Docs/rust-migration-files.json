@@ -7271,11 +7271,14 @@
       "source": "Examples/Sources/GalleryContent/Stories/Controls/TextEditorStory.swift",
       "source_sha256": "35376afad4a55e7270ce252a0a3e48992a145fe03542605672544ac113d5633f",
       "source_lines": 327,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Examples/rust/gallery_content/stories/text_editor_story.rs"
+      ],
       "module": "Examples",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Examples/Sources/GalleryContent/Stories/Controls/TimePickerStory.swift",
@@ -7627,11 +7630,14 @@
       "source": "Examples/Sources/GalleryContent/Stories/Layout/NavigationStories.swift",
       "source_sha256": "1340bfbd9a913859d5e96fb5cfa5366633de877ee2a33182405eb9e96038c6c0",
       "source_lines": 291,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Examples/rust/gallery_content/stories/navigation_stories_file.rs"
+      ],
       "module": "Examples",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Examples/Sources/GalleryContent/Stories/Layout/NestedSidebarExample.swift",
@@ -7650,11 +7656,14 @@
       "source": "Examples/Sources/GalleryContent/Stories/Layout/OverlayStories.swift",
       "source_sha256": "3e78df4fe3ae49106854cdd85a5c27eacf1ab03c8db11894fca16434917c7098",
       "source_lines": 199,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Examples/rust/gallery_content/stories/overlay_stories_file.rs"
+      ],
       "module": "Examples",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Examples/Sources/GalleryContent/Stories/Layout/ProductStories.swift",

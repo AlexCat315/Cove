@@ -111,3 +111,15 @@ path = "rust/tests/web_story.rs"
 [[test]]
 name = "overlay_stories_file"
 path = "rust/tests/overlay_stories_file.rs"
+
+[[test]]
+name = "text_editor_story"
+path = "rust/tests/text_editor_story.rs"
+
+[[test]]
+name = "navigation_stories_file"
+path = "rust/tests/navigation_stories_file.rs"
+
+[[test]]
+name = "data_stories_file"
+path = "rust/tests/data_stories_file.rs"

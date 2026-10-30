@@ -181,6 +181,60 @@ impl StoryDispatch {
             Self::Story(GalleryPage::Tabs) => {
                 Some(AnyView::new(stories::TabsStory::new(options)))
             }
+            Self::Story(GalleryPage::TextEditor) => {
+                Some(AnyView::new(stories::TextEditorStory::new(options)))
+            }
+            Self::Story(GalleryPage::Accordion) => {
+                Some(AnyView::new(stories::AccordionStory::new(options)))
+            }
+            Self::Story(GalleryPage::Breadcrumb) => {
+                Some(AnyView::new(stories::BreadcrumbStory::new()))
+            }
+            Self::Story(GalleryPage::Pagination) => {
+                Some(AnyView::new(stories::PaginationStory::new(options)))
+            }
+            Self::Story(GalleryPage::ButtonGroup) => {
+                Some(AnyView::new(stories::ButtonGroupStory::new(options)))
+            }
+            Self::Story(GalleryPage::Tag) => {
+                Some(AnyView::new(stories::TagStory::new(options)))
+            }
+            Self::Story(GalleryPage::Label) => {
+                Some(AnyView::new(stories::LabelStory::new()))
+            }
+            Self::Story(GalleryPage::Dialog) => {
+                Some(AnyView::new(stories::DialogStory::new()))
+            }
+            Self::Story(GalleryPage::AlertDialog) => {
+                Some(AnyView::new(stories::AlertDialogStory::new()))
+            }
+            Self::Story(GalleryPage::Sheet) => {
+                Some(AnyView::new(stories::SheetStory::new(options)))
+            }
+            Self::Story(GalleryPage::BottomSheet) => {
+                Some(AnyView::new(stories::BottomSheetStory::new(options)))
+            }
+            Self::Story(GalleryPage::NavigationStack) => {
+                Some(AnyView::new(stories::NavigationStackStory::new()))
+            }
+            Self::Story(GalleryPage::Tree) => {
+                Some(AnyView::new(stories::TreeStory::new(options)))
+            }
+            Self::Story(GalleryPage::VirtualStack) => {
+                Some(AnyView::new(stories::VirtualStackStory::new()))
+            }
+            Self::Story(GalleryPage::SwipeList) => {
+                Some(AnyView::new(stories::SwipeListStory::new()))
+            }
+            Self::Story(GalleryPage::RefreshableList) => {
+                Some(AnyView::new(stories::RefreshListStory::new()))
+            }
+            Self::Story(GalleryPage::DragAndDrop) => {
+                Some(AnyView::new(stories::DragAndDropStory::new()))
+            }
+            Self::Story(GalleryPage::SectionedList) => {
+                Some(AnyView::new(stories::SectionedListStory::new()))
+            }
             Self::Story(_) | Self::Pending { .. } => None,
         }
     }

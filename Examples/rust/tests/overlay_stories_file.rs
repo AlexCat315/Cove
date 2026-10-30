@@ -24,7 +24,11 @@ fn labels_and_separators_are_not_commands() {
     // Copy, Pin, General, System theme, Blue, Green, Restricted, Unavailable,
     // Delete = 9.
     assert_eq!(leaves, 9);
-    assert!(entries.len() > leaves, "decoration rows exist alongside the commands");
+    // Seven top-level rows: a label, Copy, Pin, a separator, the Settings
+    // submenu, Unavailable and Delete. The submenu contributes most of the nine
+    // leaves while counting as one row, so the row count is the smaller number.
+    assert_eq!(entries.len(), 7);
+    assert!(entries.len() < leaves, "a submenu holds several leaves but is one row");
     assert!(matches!(entries[0], MenuEntry::Label { .. }));
     assert!(matches!(entries[3], MenuEntry::Separator { .. }));
 }

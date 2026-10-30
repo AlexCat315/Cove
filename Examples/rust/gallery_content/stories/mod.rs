@@ -14,6 +14,7 @@ pub mod avatar_story;
 pub mod command_story;
 pub mod controls;
 pub mod data_stories;
+pub mod data_stories_file;
 pub mod data_table_story;
 pub mod feedback;
 pub mod image_story;
@@ -25,6 +26,7 @@ pub mod sidebar_stories;
 pub mod sidebar_story;
 pub mod navigation_layout_stories;
 pub mod navigation_stories;
+pub mod navigation_stories_file;
 pub mod overlay_stories;
 pub mod overlay_stories_file;
 pub mod overview;
@@ -32,6 +34,7 @@ pub mod placement_example;
 pub mod product_stories;
 pub mod rich_text;
 pub mod stepper;
+pub mod text_editor_story;
 pub mod theme;
 pub mod time_picker_story;
 pub mod toolbar_story;
@@ -48,6 +51,10 @@ pub use avatar_story::AvatarStory;
 pub use command_story::CommandStory;
 pub use controls::{ButtonStory, CheckboxStory, ToggleStory};
 pub use data_stories::{AdaptiveTableSample, ChartExplorationStory};
+pub use data_stories_file::{
+    DragAndDropStory, RefreshListStory, SectionedListStory, SwipeListStory, TreeStory,
+    VirtualStackStory,
+};
 pub use data_table_story::DataTableStory;
 pub use image_story::ImageStory;
 pub use intrinsic_fitting::{ViewThatFitsStory, FIT_CHIPS};
@@ -57,6 +64,10 @@ pub use sidebar_stories::{NestedSidebarExample, ResizableSidebarExample};
 pub use sidebar_story::SidebarStory;
 pub use navigation_layout_stories::{DrawerStory, RailStory};
 pub use navigation_stories::AppBarStory;
+pub use navigation_stories_file::{
+    AccordionStory, AlertDialogStory, BottomSheetStory, BreadcrumbStory, ButtonGroupStory,
+    DialogStory, LabelStory, NavigationStackStory, PaginationStory, SheetStory, TagStory,
+};
 pub use overlay_stories::{HoverCardStory, PopconfirmStory};
 pub use overlay_stories_file::{
     DisclosureStory, MenuStory, ModalStory, PopoverStory, TabsStory,
@@ -69,6 +80,7 @@ pub use product_stories::{
 };
 pub use rich_text::RichTextStory;
 pub use stepper::StepperStory;
+pub use text_editor_story::TextEditorStory;
 pub use theme::ThemeStory;
 pub use time_picker_story::TimePickerStory;
 pub use toolbar_story::ToolbarStory;

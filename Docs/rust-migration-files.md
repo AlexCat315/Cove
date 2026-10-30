@@ -13,7 +13,7 @@
 
 | 范围 | 文件数 | 已写入 | 进行中 | 未开始 |
 | --- | ---: | ---: | ---: | ---: |
-| 生产源码 | 984 | 979 | 0 | 5 |
+| 生产源码 | 984 | 982 | 0 | 2 |
 | 测试源码 | 424 | 56 | 0 | 368 |
 | SwiftPM 清单 | 25 | 19 | 0 | 6 |
 | 项目模板 | 5 | 0 | 0 | 5 |
@@ -738,7 +738,7 @@
 
 ### Examples
 
-共 61 个文件：已写入 56，进行中 0，未开始 5。
+共 61 个文件：已写入 59，进行中 0，未开始 2。
 
 | 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
 | --- | ---: | --- | --- | --- |
@@ -758,7 +758,7 @@
 | `Examples/Sources/GalleryContent/NavigationIcons.swift` | 105 | 已写入（未验证） | `Examples/rust/gallery_content/icons.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Controls/ControlStories.swift` | 380 | 已写入（未验证） | `Examples/rust/gallery_content/stories/controls.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Controls/StepperStory.swift` | 36 | 已写入（未验证） | `Examples/rust/gallery_content/stories/stepper.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Controls/TextEditorStory.swift` | 327 | 未开始 | — | 等待实现 |
+| `Examples/Sources/GalleryContent/Stories/Controls/TextEditorStory.swift` | 327 | 已写入（未验证） | `Examples/rust/gallery_content/stories/text_editor_story.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Controls/TimePickerStory.swift` | 95 | 已写入（未验证） | `Examples/rust/gallery_content/stories/time_picker_story.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Controls/ToolbarStory.swift` | 71 | 已写入（未验证） | `Examples/rust/gallery_content/stories/toolbar_story.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Controls/WheelPickerStory.swift` | 104 | 已写入（未验证） | `Examples/rust/gallery_content/stories/wheel_picker_story.rs` | 未编译、未行为对照 |
@@ -787,9 +787,9 @@
 | `Examples/Sources/GalleryContent/Stories/Layout/ImageStory.swift` | 80 | 已写入（未验证） | `Examples/rust/gallery_content/stories/image_story.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Layout/LayoutStories.swift` | 396 | 已写入（未验证） | `Examples/rust/gallery_content/stories/animation.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Layout/MasonryStory.swift` | 81 | 已写入（未验证） | `Examples/rust/gallery_content/stories/layout.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Layout/NavigationStories.swift` | 291 | 未开始 | — | 等待实现 |
+| `Examples/Sources/GalleryContent/Stories/Layout/NavigationStories.swift` | 291 | 已写入（未验证） | `Examples/rust/gallery_content/stories/navigation_stories_file.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Layout/NestedSidebarExample.swift` | 56 | 已写入（未验证） | `Examples/rust/gallery_content/stories/sidebar_stories.rs` | 未编译、未行为对照 |
-| `Examples/Sources/GalleryContent/Stories/Layout/OverlayStories.swift` | 199 | 未开始 | — | 等待实现 |
+| `Examples/Sources/GalleryContent/Stories/Layout/OverlayStories.swift` | 199 | 已写入（未验证） | `Examples/rust/gallery_content/stories/overlay_stories_file.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Layout/ProductStories.swift` | 152 | 已写入（未验证） | `Examples/rust/gallery_content/stories/product_stories.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Layout/RailStory.swift` | 84 | 已写入（未验证） | `Examples/rust/gallery_content/stories/navigation_layout_stories.rs` | 未编译、未行为对照 |
 | `Examples/Sources/GalleryContent/Stories/Layout/ResizableSidebarExample.swift` | 31 | 已写入（未验证） | `Examples/rust/gallery_content/stories/sidebar_stories.rs` | 未编译、未行为对照 |
