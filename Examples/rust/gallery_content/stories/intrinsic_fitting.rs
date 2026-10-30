@@ -182,10 +182,12 @@ impl FitChip {
 impl View for FitChip {
     fn body(&self) -> AnyView {
         AnyView::new(
+            // Every `*Ext` call returns `ModifiedContent`; chain them and erase
+            // once at the end. Only the final call needs to be a modifier.
             Text::new(self.title)
                 .padding_edges(10.0, 6.0)
-                .corner_radius(6.0)
-                .semantic_background(SemanticColorRef::surface_variant()),
+                .semantic_background(SemanticColorRef::surface_variant())
+                .corner_radius(6.0),
         )
     }
 }

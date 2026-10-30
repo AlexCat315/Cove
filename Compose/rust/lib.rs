@@ -23,6 +23,7 @@ pub use cove_core::scene::{with_animation, with_animation_completion, AnimationC
 /// crate root, matching the Swift module's flat namespace.
 pub use cove_core::State;
 pub use cove_core::scene::{LayoutNode, Node};
+pub use modifiers::layout::FrameDimension;
 pub use primitives::layout::scroll_view::{
     ScrollAxis, ScrollGeometry, ScrollRequest, ScrollView, ScrollViewport, ScrollbarGutter,
 };

@@ -7343,11 +7343,13 @@
       "source": "Examples/Sources/GalleryContent/Stories/Foundation/IntrinsicFitting.swift",
       "source_sha256": "c52292fbb22ff133075f090476f32ce1a3d296597f6bb8638c4a24829f13ca3f",
       "source_lines": 35,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Examples/rust/gallery_content/stories/intrinsic_fitting.rs"
+      ],
       "module": "Examples",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Examples/Sources/GalleryContent/Stories/Foundation/SurfaceTraits.swift",
@@ -14406,8 +14408,10 @@
       "source": "Tests/CoveUIRuntimeTests/LinearGradientTests.swift",
       "source_sha256": "6da82030a685b487b1c686db342b558e1fe775a0bab96aacf4dd730abc4e0bbc",
       "source_lines": 49,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "linear_gradient"
+      ],
       "module": "Tests",
       "kind": "test",
       "planned": false
