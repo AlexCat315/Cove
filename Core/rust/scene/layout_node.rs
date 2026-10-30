@@ -20,6 +20,10 @@ pub enum LayoutStyleValue {
     Percent(f32),
 }
 impl LayoutStyleValue {
+    /// Prefer an explicit physical value; fall back to the logical one.
+    fn or_logical(self, logical: LayoutStyleValue) -> LayoutStyleValue {
+        if matches!(self, Self::Auto) { logical } else { self }
+    }
     fn resolve(self, basis: Option<f32>) -> Option<f32> {
         match self {
             Self::Auto => None,
@@ -59,6 +63,12 @@ pub struct StyleEdges {
     pub right: LayoutStyleValue,
     pub bottom: LayoutStyleValue,
     pub left: LayoutStyleValue,
+    /// Logical insets kept unresolved so they can bind to the effective
+    /// direction at layout time. A view that sets `Edge::End` before it has a
+    /// parent would otherwise bake the physical edge from `Direction::Inherit`
+    /// (i.e. always LTR), and no later `Rtl` could undo it.
+    pub start: LayoutStyleValue,
+    pub end: LayoutStyleValue,
 }
 impl StyleEdges {
     pub fn set(&mut self, edge: Edge, value: LayoutStyleValue, direction: Direction) {
@@ -83,6 +93,7 @@ impl StyleEdges {
             Edge::Left => self.left = value,
             Edge::Right => self.right = value,
             Edge::Start => {
+                self.start = value;
                 if rtl {
                     self.right = value;
                 } else {
@@ -90,6 +101,7 @@ impl StyleEdges {
                 }
             }
             Edge::End => {
+                self.end = value;
                 if rtl {
                     self.left = value;
                 } else {
@@ -769,7 +781,21 @@ impl LayoutNode {
     }
 
     /// Intrinsic measurement. `avail_*` are at-most constraints from the parent.
+    /// The direction this node lays its children out in.
+    ///
+    /// A node that sets its own `direction` overrides the inherited one; every
+    /// other node passes the inherited direction through. Without this, a
+    /// per-node `.layout_direction(Rtl)` was stored but never consulted, so RTL
+    /// rows rendered left-to-right no matter what the style said.
+    fn effective_direction(&self, inherited: Direction) -> Direction {
+        match self.0.borrow().style.direction {
+            Direction::Inherit => inherited,
+            direction => direction,
+        }
+    }
+
     fn measure(&self, owner_width: Option<f32>, owner_height: Option<f32>, avail_width: Option<f32>, avail_height: Option<f32>, direction: Direction) -> Size {
+        let direction = self.effective_direction(direction);
         let style = self.0.borrow().style;
         if style.display == Display::None {
             return Size::default();
@@ -887,6 +913,7 @@ impl LayoutNode {
 
     /// Assigns computed frames for this node and its descendants.
     fn arrange(&self, left: f32, top: f32, width: f32, height: f32, direction: Direction) {
+        let direction = self.effective_direction(direction);
         let style = self.0.borrow().style;
         if style.display == Display::None {
             self.0.borrow_mut().computed = ComputedLayout { left, top, width: 0.0, height: 0.0, ..ComputedLayout::default() };
@@ -1016,7 +1043,14 @@ impl LayoutNode {
             if reverse {
                 cursor = main_extent - line_main - cursor;
             }
-            let line_cross_extent = if style.align_items == Align::Stretch { cross_extent - cross_cursor } else { line_cross };
+            // Yoga resolves a non-stretch child's cross extent against the
+            // container, not against the tallest child on the line. Only the
+            // wrapped multi-line case subtracts the consumed cross cursor.
+            let line_cross_extent = if style.align_items == Align::Stretch || style.flex_wrap == Wrap::NoWrap {
+                cross_extent - cross_cursor
+            } else {
+                line_cross
+            };
             let mut cross_offset = cross_cursor;
             if style.flex_wrap != Wrap::NoWrap {
                 cross_offset = match style.align_content {
@@ -1045,7 +1079,16 @@ impl LayoutNode {
                     }
                 };
                 let (child_left, child_top) = if row {
-                    (cursor + child_margin.left, cross_offset + cross_shift + child_margin.top)
+                    // Yoga mirrors the row main axis under RTL, so the first
+                    // child sits at the trailing (right) edge. `reverse` has
+                    // already offset the cursor, and mirroring on top of it
+                    // reproduces Yoga's RTL + `row-reverse` = LTR result.
+                    let left = if direction == Direction::Rtl {
+                        main_extent - cursor - child_main
+                    } else {
+                        cursor
+                    };
+                    (left + child_margin.left, cross_offset + cross_shift + child_margin.top)
                 } else {
                     (cross_offset + cross_shift + child_margin.left, cursor + child_margin.top)
                 };
@@ -1072,8 +1115,25 @@ impl LayoutNode {
             let measured = child.measure(Some(content.width), Some(content.height), Some(content.width), Some(content.height), direction);
             let width = child_style.width.resolve(Some(content.width)).unwrap_or(measured.width);
             let height = child_style.height.resolve(Some(content.height)).unwrap_or(measured.height);
-            let left_inset = child_style.position.left.resolve(Some(content.width));
-            let right_inset = child_style.position.right.resolve(Some(content.width));
+            // Resolve logical start/end with the direction actually in force at
+            // layout time. The eager physical value written by `set` is only a
+            // fallback for nodes created before their direction was known.
+            let rtl = direction == Direction::Rtl;
+            let (logical_left, logical_right) = if rtl {
+                (child_style.position.end, child_style.position.start)
+            } else {
+                (child_style.position.start, child_style.position.end)
+            };
+            let left_inset = child_style
+                .position
+                .left
+                .or_logical(logical_left)
+                .resolve(Some(content.width));
+            let right_inset = child_style
+                .position
+                .right
+                .or_logical(logical_right)
+                .resolve(Some(content.width));
             let top_inset = child_style.position.top.resolve(Some(content.height));
             let bottom_inset = child_style.position.bottom.resolve(Some(content.height));
             let left = match (left_inset, right_inset) {

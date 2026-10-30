@@ -9,6 +9,7 @@ pub mod image_load_services;
 pub mod loading_animation_clock;
 pub mod skeleton;
 pub mod ui_icon_catalog;
+pub mod ui_icons;
 pub mod vector_image_raster;
 
 pub use async_image::{
@@ -30,4 +31,5 @@ pub use image_load_services::{
 pub use loading_animation_clock::*;
 pub use skeleton::{Skeleton, SkeletonAppearance, SkeletonMotion, SkeletonShape};
 pub use ui_icon_catalog::*;
+pub use ui_icons::UIIcons;
 pub use vector_image_raster::*;

@@ -69,16 +69,29 @@ pub struct DevToolsHost {
     pub window: DevToolsHostWindow,
     /// Schedules work onto the host's UI thread. A synchronous host loop cannot
     /// yield to an async executor, so it supplies this explicitly.
-    pub execute: Option<std::rc::Rc<dyn Fn(Box<dyn FnOnce()>)>>,
+    pub execute: Option<HostMainExecutor>,
 }
+
+/// Produces a tree snapshot. The host runtime invokes it on its scene thread
+/// before the JSON encode happens.
+pub type SceneSnapshotProvider = std::rc::Rc<dyn Fn() -> TreeSnapshot>;
+
+/// Invoked when a client requests `select.node`. The host decides what
+/// selecting means, such as drawing an overlay.
+pub type NodeSelectionHandler = std::rc::Rc<dyn Fn(&str)>;
+
+pub type NodeSelectionClearHandler = std::rc::Rc<dyn Fn()>;
+
+/// Schedules a callback onto the host's UI thread.
+pub type HostMainExecutor = std::rc::Rc<dyn Fn(Box<dyn FnOnce()>)>;
 
 #[derive(Default)]
 pub struct DevToolsHostScene {
     pub inspect: Option<std::rc::Rc<dyn Fn(&Envelope) -> Envelope>>,
     pub reset: Option<std::rc::Rc<dyn Fn()>>,
-    pub snapshot: Option<std::rc::Rc<dyn Fn() -> TreeSnapshot>>,
-    pub select: Option<std::rc::Rc<dyn Fn(&str)>>,
-    pub clear_selection: Option<std::rc::Rc<dyn Fn()>>,
+    pub snapshot: Option<SceneSnapshotProvider>,
+    pub select: Option<NodeSelectionHandler>,
+    pub clear_selection: Option<NodeSelectionClearHandler>,
     pub diagnostics: Option<std::rc::Rc<dyn Fn(&Envelope) -> Envelope>>,
 }
 
@@ -207,6 +220,30 @@ impl DevToolsLogFeed {
         }
     }
 }
+
+/// Rejection reasons for a server that cannot bind as configured.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DevServerConfigurationError {
+    UnsupportedHost(String),
+}
+
+impl DevServerConfigurationError {
+    pub fn message(&self) -> String {
+        match self {
+            Self::UnsupportedHost(host) => format!(
+                "Unsupported DevTools host '{host}'. Use localhost/127.0.0.1/::1 for loopback or 0.0.0.0/:: for all interfaces."
+            ),
+        }
+    }
+}
+
+impl std::fmt::Display for DevServerConfigurationError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.message())
+    }
+}
+
+impl std::error::Error for DevServerConfigurationError {}
 
 /// Highest level a client asked for, if it narrowed the window.
 pub fn query_minimum(query: &LogQuery) -> Level {

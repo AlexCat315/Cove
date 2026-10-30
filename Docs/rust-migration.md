@@ -2,7 +2,7 @@
 
 仓库根目录：`/Users/cyke666/dev/Cove`。本文路径均相对该目录。
 
-目标语言为 Rust 2024（`rust-version = 1.90`），性能关键路径保留 C。当前工作区版本 `0.3.0-dev`。最后更新：2026-10-30（本轮重新盘点，清单由 `Tools/Cove/rust/migration_inventory.py` 从磁盘重新生成）。
+目标语言为 Rust 2024（`rust-version = 1.90`），性能关键路径保留 C。当前工作区版本 `0.3.0-dev`。最后更新：2026-10-30（清单改为**符号校验**生成，见下节“本轮盘点方法与结论”）。
 
 逐文件清单：`Docs/rust-migration-files.json`（机器可读，schema 2）与 `Docs/rust-migration-files.md`（逐文件表格）。每个 Swift 文件一行，记录源路径、源码 SHA-256、行数、模块、类型（生产/测试/清单/模板）、状态、Rust/C 目标与是否只是计划路径。**本文与清单不一致时以清单为准，并应先修清单。**
 
@@ -20,54 +20,78 @@
 
 | 范围 | 文件数 | 已写入 | 进行中 | 未开始 |
 | --- | ---: | ---: | ---: | ---: |
-| 生产源码 | 984 | 984 | 0 | 0 |
-| 测试源码 | 424 | 50 | 0 | 374 |
+| 生产源码 | 984 | 950 | 0 | 34 |
+| 测试源码 | 424 | 79 | 0 | 345 |
 | SwiftPM 清单 | 25 | 19（Cargo 清单） | 0 | 6 |
 | CLI 项目模板 | 5 | 0 | 0 | 5 |
-| 合计 | 1,438 | — | — | — |
+| 合计 | 1,438 | 1,048 | 0 | 390 |
 
-本轮修正：清单此前由人工维护，已与磁盘脱节。现改为脚本生成——
-`python3 Tools/Cove/rust/migration_inventory.py` 遍历 Rust 树，按同名模块与主类型定义
-重新推导每个 Swift 文件的目标路径与状态，并同时重写
-`Docs/rust-migration-files.json` 与 `Docs/rust-migration-files.md`。
-因此上一版"460 已写入 / 477 未开始"是陈旧值；实际为 651 / 333。
+剩余 34 个生产文件合计 2,380 行，分类列于下节“34 个生产文件未开始”。
 
-另有 51 个 Rust 文件此前从未被 `mod` 声明，因而**根本没有被编译**：
-System 16 个、Logging 15 个、Tools/Cove 8 个、Tools/Support 12 个、Compose 2 个（已修复）。
-同理，`Core/rust/tests/` 6 个与 `Graphics/rust/tests/` 7 个测试文件从未声明为 Cargo 测试目标，
-`cargo` 完全看不到它们（已补 `[[test]]`）。这类"写而未编译"的问题与编译错误同级，必须计入缺陷。
+## 本轮盘点方法与结论
 
-本次盘点修正了两类历史失真：
+### 清单此前是错的，错在“路径存在即算完成”
 
-1. `Docs/rust-migration-files.json` 中有 1,063 个文件曾被标为 `pending`，其中 System 16、Logging 15、Tools/Support 12、Graphics RHI 前端 40+、Hosts Android 10、DevTools Protocol 8 实际已有 Rust 实现，只是没有逐文件映射。已补上目标路径并改为 `written_unverified`；`GridInteractionGate` 已存在于 `Compose/rust/primitives/layout/grid/grid.rs`，不再重复新建。
-2. `Tools/Cove/Sources/CoveCLI/Platforms/Android/APK/Package.swift` 是 Swift 生产源码，不是 SwiftPM 清单；已重新归类。
+旧清单按文件名相似度把 Swift 文件映射到 Rust 文件，只要目标 `.rs` 存在就记
+`written_unverified`。于是 `DataTable.swift` 被记到 919 行的 `lists/table.rs`，
+`SplitView.swift` 被记到 25 行的 `Composition/rust/view.rs`——文件真实存在，
+覆盖却是假的。上一版“984 已写入 / 0 未开始”就是这样产生的。
 
-218 条 `pending` 记录带有计划路径，但对应 `.rs` 文件不存在，仍按未开始处理，不得计入完成。
+本轮改为**符号校验**（`Tools/Cove/rust/migration_inventory.py`）：
 
-另有 13 个已写入的 Rust 测试文件（`Core/rust/tests/` 6 个、`Graphics/rust/tests/` 7 个）尚未声明为 Cargo 测试目标，因此对应 Swift 测试仍记 `pending`，也不能声称测试已迁移。接入测试目标属于批次 7。
+1. 索引 Rust 树的全部声明：`struct`/`enum`/`trait`/`type`、宏调用的首个标识符
+   （`handle!(Sampler, ..)`、`payload!(HelloPayload {..})`、`identifier!(WorkspaceSlotID, ..)`）、
+   `pub fn`、`pub use ... as ...` 的改名两端。
+2. 每个 Swift 生产文件取其**自身主类型名**与**声明的全部公有类型名**，逐个在索引中查。
+3. 记录的路径若声明不出任何相关符号，不再算完成：先按符号重新定位真正的实现文件；
+   仍找不到则置 `pending` 并清空错误路径，避免“陈旧路径冒充覆盖”。
+4. Swift 用无 case 的 `enum` 当命名空间（`RopeEditing.join(_:_:)`），Rust 侧拉平成自由函数；
+   该形状按“至少两个 static 成员在同一文件内命中”认定，不误判为缺失。
+
+### 这个方法立刻暴露了真实缺口
+
+按旧口径 984/984 全部“已写入”。按符号校验，实际有 **69 个生产文件当年根本没有实现**
+（含 `DataTable`、`GridInteractionGate`、`Chart`、`PropertyGrid`、`TreeTable`、`Tree`、
+`SplitView`、`Tooltip`、`CommandPalette`、`ContextMenu`、`WorkspaceView`、
+`ImmersiveWindowTitleBar`、`GalleryView` 等）。本轮已补齐其中 35 个，剩余 34 个见下节。
+
+同时纠正一处本文此前的错误陈述：上一版称
+“`GridInteractionGate` 已存在于 `Compose/rust/primitives/layout/grid/grid.rs`”。
+经 `grep -rn InteractionGate --include=*.rs Compose/rust` 核实，**该类型此前并不存在**，
+文件 `Primitives/Layout/Grid/InteractionGate.swift` 声明的是 `GridInteractionHost`。该说法作废。
+
+### 34 个生产文件未开始（2,380 行）
+
+集中在三处，均已逐文件登记在 `Docs/rust-migration-files.md`：
+
+- **Compose 代码编辑器 Gutter 家族**（`GutterControls`、`GutterSession`、`GutterLayout`、
+  `GutterGeometry`，共 422 行）与 `TextFieldInputController`（155 行）。
+- **Graphics 原生后端补件**（Vulkan 传输/资源/呈现/上传环 414 行，DX12 提交/管线 218 行，
+  `AsyncResources` 26 行）。这些是原生后端内部件，需要在各自后端内补齐。
+- **Swift 宏插件**（`TrackStateReadsMacro` 210 行、`Plugin` 7 行）。Swift 语法宏在 Rust 无对等
+  插件 API，需按 `@TrackStateReads` 的**展开后效果**实现 `macro_rules!` / derive，
+  不能 1:1 直译。
+
+其余为个位数到几十行的接缝文件（`StructuralView`、`UIVertex` 已在 Rust 以 `Vertex`/`Rect`
+存在，属改名；`NSNumber+Boolean` 是 Objective-C 扩展，无 Rust 对等物）。
+
+### 状态口径不变
+
+`written_unverified` 仍**不代表通过验收**：本轮未做逐文件行为对照，仅以
+`cargo check --workspace` 为编译门禁。全部转换结束后再统一验证。
 
 ## 逐模块进度（生产源码）
 
 | 模块 | Swift 文件 | Swift 行 | 已写入 | 未开始 |
 | --- | ---: | ---: | ---: | ---: |
-| Compose | 414 | 52,554 | 414 | 0 |
-| Graphics | 107 | 14,534 | 107 | 0 |
-| Core | 97 | 12,299 | 97 | 0 |
-| Tools | 69 | 3,901 | 69 | 0 |
-| Examples | 61 | 7,135 | 61 | 0 |
-| DevTools | 51 | 5,183 | 51 | 0 |
-| Hosts | 51 | 4,254 | 51 | 0 |
-| Terminal | 29 | 3,088 | 29 | 0 |
-| Sources | 19 | 4,861 | 19 | 0 |
-| System | 17 | 1,004 | 17 | 0 |
-| Logging | 15 | 705 | 15 | 0 |
-| Text | 14 | 2,576 | 14 | 0 |
-| Shell | 13 | 2,529 | 13 | 0 |
-| Runtime | 11 | 1,485 | 11 | 0 |
-| Imaging | 9 | 696 | 9 | 0 |
-| PlatformCore | 6 | 540 | 6 | 0 |
-| Browser | 1 | 400 | 1 | 0 |
-| 合计 | 984 | 117,744 | 984 | 0 |
+| Compose | 414 | 52,554 | 394 | 20 |
+| Graphics | 107 | 14,534 | 100 | 7 |
+| Core | 97 | 12,299 | 95 | 2 |
+| Shell | 13 | 2,529 | 11 | 2 |
+| Examples | 61 | 7,135 | 60 | 1 |
+| Sources | 19 | 4,861 | 18 | 1 |
+| Tools | 69 | 3,901 | 68 | 1 |
+| 合计 | 984 | 117,744 | 950 | 34 |
 
 Rust 文件数列为磁盘快照，不等于逐 Swift 文件一一对应；多个 Swift 文件可能映射到一个 Rust 模块，也可能一个 Swift 文件拆到多个 Rust/C 文件。逐文件关系在清单中。
 

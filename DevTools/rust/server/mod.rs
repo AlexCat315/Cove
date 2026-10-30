@@ -6,10 +6,19 @@
 pub mod config;
 pub mod transport;
 
-pub use config::{DevToolsConfig, DevToolsHost, DevToolsLogFeed};
+pub use config::{
+    DevServerConfigurationError, DevToolsConfig, DevToolsHost, DevToolsHostScene, DevToolsLogFeed,
+    HostMainExecutor, NodeSelectionClearHandler, NodeSelectionHandler, SceneSnapshotProvider,
+};
 pub use transport::{
     DevToolsConnection, DevToolsTransport, DevToolsTransportEvent, StdDevToolsTransport,
 };
+
+/// Swift's `NIODevToolsTransport`. SwiftNIO is not a workspace dependency, so
+/// `StdDevToolsTransport` implements the same wire behaviour — HTTP upgrade,
+/// token check, RFC 6455 framing — on standard sockets. One transport, not a
+/// second parallel one.
+pub type NIODevToolsTransport = StdDevToolsTransport;
 
 use crate::server::config::hello_envelope;
 use cove_devtools_protocol::{

@@ -119,9 +119,206 @@ def score(swift_source: str, candidate: str, stem: str) -> int:
     return path
 
 
+_DECL_CACHE: dict[str, str] = {}
+
+
+def _rust_declarations(path: str) -> str:
+    """Every declaration-ish token in a Rust file, cached.
+
+    Used to refuse a mapping whose target file exists but never names anything
+    resembling the Swift type. Before this check, `SplitView.swift` was reported
+    as migrated because a 25-line `Composition/rust/view.rs` happened to exist —
+    the file was real, the coverage was not.
+    """
+    cached = _DECL_CACHE.get(path)
+    if cached is not None:
+        return cached
+    try:
+        text = open(os.path.join(ROOT, path), encoding="utf-8", errors="ignore").read()
+    except OSError:
+        text = ""
+    _DECL_CACHE[path] = text
+    return text
+
+
+def _normalise(name: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", name.lower())
+
+
+def names_any_symbol(entry: dict) -> bool:
+    """Whether any mapped Rust file declares a type matching the Swift source.
+
+    Compares the Swift file's own stem plus every public type it declares
+    against the declarations, macro invocations (`handle!(Sampler, ..)`,
+    `payload!(HelloPayload {..})`, `identifier!(WorkspaceSlotID, ..)`) and
+    `pub use` renames in the mapped targets. A rename that has no declaring
+    counterpart will demote here — that is the point: an unverified rename must
+    be recorded as such rather than counted as written.
+    """
+    text = "\n".join(_rust_declarations(p) for p in entry.get("rust", []))
+    if not text:
+        return False
+    blob = _normalise(text)
+    try:
+        swift = open(os.path.join(ROOT, entry["source"]), encoding="utf-8", errors="ignore").read()
+    except OSError:
+        return False
+    names = {os.path.splitext(os.path.basename(entry["source"]))[0]}
+    names.update(re.findall(
+        r"^(?:@\w+(?:\([^)]*\))?\s+)*(?:public|open)\s+(?:final\s+)?"
+        r"(?:struct|class|enum|protocol|actor|typealias)\s+(\w+)",
+        swift, re.M,
+    ))
+    for name in names:
+        candidate = name.removeprefix("_")
+        if len(candidate) < 4:
+            continue
+        if _normalise(candidate) in blob:
+            return True
+    # Swift uses caseless enums as namespaces (`RopeEditing.join(_:_:)`). The
+    # Rust port flattens those to free functions, so match the member names when
+    # the Swift file declares at least two of them in the mapped target.
+    members = set(re.findall(r"static\s+func\s+(\w+)", swift))
+    members.update(re.findall(r"static\s+(?:var|let)\s+(\w+)", swift))
+    if len(members) >= 2:
+        hits = sum(1 for m in members if len(m) >= 4 and _normalise(m) in blob)
+        if hits >= 2:
+            return True
+    return False
+
+
+_SYMBOL_INDEX: dict[str, list[str]] | None = None
+
+
+def symbol_index() -> dict[str, list[str]]:
+    """Normalised declared symbol -> Rust files declaring it, built once.
+
+    Covers plain declarations, `pub use` renames and macro invocations so a
+    deliberate rename still resolves. This is what lets the inventory follow a
+    real translation (`RangePicker.swift` -> `controls/fields/date_range.rs`)
+    instead of freezing on whatever path an earlier manual pass recorded.
+    """
+    global _SYMBOL_INDEX
+    if _SYMBOL_INDEX is not None:
+        return _SYMBOL_INDEX
+    index: dict[str, list[str]] = {}
+    for root, dirs, files in os.walk(ROOT):
+        dirs[:] = [d for d in dirs if d not in EXCLUDED_DIRS]
+        for name in files:
+            if not name.endswith(".rs"):
+                continue
+            relative = os.path.relpath(os.path.join(root, name), ROOT)
+            try:
+                text = open(os.path.join(ROOT, relative), encoding="utf-8", errors="ignore").read()
+            except OSError:
+                continue
+            found: set[str] = set()
+            for match in re.finditer(
+                r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:unsafe\s+)?"
+                r"(?:struct|enum|trait|union|type)\s+(\w+)",
+                text, re.M,
+            ):
+                found.add(match.group(1))
+            for match in re.finditer(
+                r"^\s*pub(?:\([^)]*\))?\s+(?:const\s+)?fn\s+(\w+)", text, re.M
+            ):
+                found.add(match.group(1))
+            for match in re.finditer(r"\b[a-z_]+!\(([^)]*)\)", text, re.S):
+                for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", match.group(1)):
+                    found.add(token)
+            for match in re.finditer(
+                r"pub\s+use\s+[\w:]*?(\w+)\s+as\s+(\w+)", text
+            ):
+                found.add(match.group(1))
+                found.add(match.group(2))
+            for symbol in found:
+                index.setdefault(_normalise(symbol), []).append(relative)
+    _SYMBOL_INDEX = index
+    return index
+
+
+def resolve_by_symbol(entry: dict) -> list[str]:
+    """Rust files that declare one of this Swift file's type names."""
+    try:
+        swift = open(os.path.join(ROOT, entry["source"]), encoding="utf-8", errors="ignore").read()
+    except OSError:
+        return []
+    names = [os.path.splitext(os.path.basename(entry["source"]))[0]]
+    names.extend(re.findall(
+        r"^(?:@\w+(?:\([^)]*\))?\s+)*(?:public|open)\s+(?:final\s+)?"
+        r"(?:struct|class|enum|protocol|actor|typealias)\s+(\w+)",
+        swift, re.M,
+    ))
+    index = symbol_index()
+    hits: list[str] = []
+    for name in names:
+        candidate = name.removeprefix("_")
+        if len(candidate) < 4:
+            continue
+        for path in index.get(_normalise(candidate), []):
+            if path not in hits:
+                hits.append(path)
+    if hits:
+        return hits
+    # A Swift caseless enum used as a namespace (`RopeEditing.join`) flattens to
+    # free functions in Rust. Score each candidate by how many of the Swift
+    # static members it defines, and accept the best one when at least two match.
+    members = {m for m in re.findall(r"static\s+func\s+(\w+)", swift) if len(m) >= 4}
+    members.update(m for m in re.findall(r"static\s+(?:var|let)\s+(\w+)", swift) if len(m) >= 4)
+    if len(members) < 2:
+        return hits
+    best: tuple[int, str] | None = None
+    for member in members:
+        for path in index.get(_normalise(member), []):
+            score = sum(
+                1 for other in members
+                if path in index.get(_normalise(other), [])
+            )
+            if score >= 2 and (best is None or score > best[0]):
+                best = (score, path)
+    return [best[1]] if best else hits
+
+
+def not_portable_reason(entry: dict) -> str | None:
+    """A precise reason when a Swift file cannot map 1:1 onto Rust.
+
+    These are recorded rather than silently counted as migrated. Each one is a
+    real translation decision the operator must see.
+    """
+    source = entry["source"]
+    name = os.path.basename(source)
+    try:
+        text = open(os.path.join(ROOT, source), encoding="utf-8", errors="ignore").read()
+    except OSError:
+        return None
+    if "MemberMacro" in text or "ExtensionMacro" in text or "SwiftSyntax" in text:
+        return (
+            "Swift macro plugin; the Rust equivalent is a declarative macro or "
+            "derive in Compose/CompositionMacros, not a runtime translation"
+        )
+    if re.search(r"extension\s+NSNumber", text):
+        return (
+            "Objective-C interop extension on a Foundation type; "
+            "no Rust counterpart exists and none is needed"
+        )
+    if name.endswith("+Interpolatable.swift"):
+        return (
+            "protocol conformance in Swift; in Rust the behaviour is an inherent "
+            "impl on the same type and needs no separate item"
+        )
+    if name == "App.swift" and "/Mobile/" in source:
+        return "app entry point for the iOS example; needs a host shell, tracked as an Examples item"
+    return None
+
+
 def derive(entries: list[dict], rust: list[str]) -> None:
     declared = declared_modules()
     for entry in entries:
+        # Test, manifest and template rows are resolved by their own passes.
+        # `derive` used to run first and promote test rows to
+        # `written_unverified` whenever any file was on disk, which then made the
+        # test pass skip them (`status != "pending"`) — so newly translated
+        # suites never showed up in the inventory.
         if entry["kind"] != "production":
             continue
         # `verified_by: "operator"` marks a row a human checked by symbol. The
@@ -130,18 +327,50 @@ def derive(entries: list[dict], rust: list[str]) -> None:
         if entry.get("verified_by") == "operator":
             continue
         if entry.get("status") == "pending" and not entry.get("rust"):
-            # An explicitly cleared entry is an operator correction (the previous
-            # target was a wrong mapping); leave it pending.
-            continue
+            # A row cleared BY THIS SCRIPT (it carries our explanatory note) must
+            # be re-examined, otherwise the recovery passes below can never
+            # re-admit it. Only an operator-cleared row without that note is
+            # authoritative.
+            if entry.get("note", "").startswith("no Rust/C declaration matches"):
+                entry.pop("note", None)
+            else:
+                continue
         existing = [
             p
             for p in entry.get("rust", [])
             if os.path.exists(os.path.join(ROOT, p)) and is_reachable(p, declared)
         ]
         if existing:
-            entry["rust"] = existing
-            entry["status"] = "written_unverified"
-            entry["planned"] = False
+            probe = dict(entry, rust=existing)
+            if names_any_symbol(probe):
+                entry["rust"] = existing
+                entry["status"] = "written_unverified"
+                entry["planned"] = False
+                continue
+            # The recorded file exists but never names the Swift type. Look for
+            # the file that actually declares it before declaring the row
+            # unproven — the implementation usually moved during refactors.
+            recovered = [
+                p for p in resolve_by_symbol(entry)
+                if os.path.exists(os.path.join(ROOT, p)) and is_reachable(p, declared)
+            ]
+            if recovered:
+                entry["rust"] = recovered[:3]
+                entry["status"] = "written_unverified"
+                entry["planned"] = False
+                entry.pop("note", None)
+                continue
+            # Nothing declares the symbol. Record the row as unstarted with an
+            # empty target rather than leaving a stale path that reads like
+            # coverage (`RatingHost.swift` -> `slider/host.rs` was one). The
+            # later passes may still recover a target by symbol.
+            entry["rust"] = []
+            entry["status"] = "pending"
+            entry["planned"] = True
+            entry["note"] = not_portable_reason(entry) or (
+                "no Rust/C declaration matches this Swift file; "
+                "the previously recorded path declared nothing relevant"
+            )
             continue
 
         source = entry["source"]
@@ -456,8 +685,18 @@ def main() -> int:
             # suffix and sometimes the word boundaries (`ZStackTests` ->
             # `zstack`). Compare on collapsed alphanumerics with the suffix
             # removed, so both spellings match.
+            # Exact match first; then allow the common irregular plural/abbrev
+            # shapes (`CacheTests` -> `caches`, `DrawListResourceTests` ->
+            # `draw_list_resources`) where the target is a short pluralisation.
             matches = [target for target in declared_tests
                        if collapse_test_name(target) == collapse_test_name(stem)]
+            if not matches:
+                collapsed = collapse_test_name(stem)
+                matches = [
+                    target for target in declared_tests
+                    if collapse_test_name(target) in (collapsed + "s", collapsed + "es")
+                    or collapsed in (collapse_test_name(target) + "s", collapse_test_name(target) + "es")
+                ]
             if matches:
                 entry["rust"] = matches
                 entry["status"] = "written_unverified"

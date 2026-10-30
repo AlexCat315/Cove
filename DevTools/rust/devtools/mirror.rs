@@ -4,9 +4,15 @@
 //! per frame and the sinks forward to the server. None of them instrument
 //! anything on their own.
 use cove_devtools_protocol::{MirrorFrame, TimingFrame};
+use cove_graphics::rhi::{
+    CommandBuffer, Device, QueueClass, RenderColorTarget, RhiError, TextureDescriptor, TextureFormat,
+    TextureResource, TextureSubresource, TextureUsage,
+};
+use cove_graphics::ui::{NativeDrawListRenderer, NativeUIViewport};
 use cove_platform::{InputEvent, KeyEvent, KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent, MouseWheelEvent, ScrollInput};
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 
 /// Owned BGRA8 pixels supplied by a host renderer. Padding may follow each row.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -606,6 +612,211 @@ fn write_jpeg(
     out.extend_from_slice(&[0xFF, 0xD9]); // EOI
 }
 
+// MARK: - Offscreen capture
+
+/// Backend that renders the current draw list into an offscreen BGRA8 target
+/// and reads it back.
+pub type OffscreenFrameSource = Rc<dyn Fn(&cove_core::DrawList, (u32, u32), (f32, f32)) -> Result<FrameTapPixels, FrameTapError>>;
+
+/// Largest capture extent the mirror will request, in pixels.
+pub const MAX_MIRROR_EXTENT: (u32, u32) = (3840, 2160);
+
+/// An allocated offscreen target and the extent it was created for.
+type MirrorTarget = Option<(TextureResource, (u32, u32))>;
+
+/// Renders a frame offscreen and reads the pixels back, reusing the target
+/// texture while the extent is unchanged.
+///
+/// `new` takes a host-supplied source, which is how tests and hosts with a
+/// custom renderer drive the mirror. `with_device` builds the GPU source from
+/// the same RHI primitives the window presenter uses.
+pub struct NativeAppFrameCapture {
+    source: OffscreenFrameSource,
+    /// Extent the source last rendered at. Tracked here so a host-supplied
+    /// source gets the same reuse accounting as the GPU one.
+    extent: std::cell::Cell<Option<(u32, u32)>>,
+    /// Shared with the GPU source so `reset` frees the texture it rendered into
+    /// rather than only forgetting the extent.
+    target: Rc<RefCell<MirrorTarget>>,
+}
+
+impl NativeAppFrameCapture {
+    /// Clear colour for the offscreen pass: opaque black.
+    pub const CLEAR_COLOR: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
+
+    pub fn new(source: OffscreenFrameSource) -> Self {
+        Self {
+            source,
+            extent: std::cell::Cell::new(None),
+            target: Rc::new(RefCell::new(None)),
+        }
+    }
+
+    /// Build a capture backed by an offscreen GPU pass.
+    ///
+    /// `renderer` is the scene renderer that already produced this frame.
+    ///
+    /// Swift built a `makeSibling` copy and then called
+    /// `synchronizeTextures(from:)` before every capture, because a sibling
+    /// snapshots the texture store at construction and would otherwise render
+    /// with a stale glyph atlas. Here the mirror renderer shares the source
+    /// store instead (`makePresentationRenderer`, the same call the window
+    /// presenter uses), which keeps uploads live and makes that per-capture
+    /// copy unnecessary. Everything else matches: the mirror never mutates
+    /// presentation state, since reveal retention and record sequencing live in
+    /// per-instance `PresentationState`.
+    pub fn with_device(
+        device: Arc<Device>,
+        renderer: &NativeDrawListRenderer,
+    ) -> Result<Self, FrameTapError> {
+        let renderer = device
+            .with_frame_session(|| renderer.make_presentation_renderer(TextureFormat::Bgra8Unorm, 1))
+            .map_err(frame_tap_error)?;
+        let target: Rc<RefCell<MirrorTarget>> = Rc::new(RefCell::new(None));
+        let source = device_backed_source(device, renderer, target.clone());
+        Ok(Self { source, extent: std::cell::Cell::new(None), target })
+    }
+
+    /// Drop the offscreen target; the next capture allocates a fresh one.
+    pub fn reset(&self) {
+        self.extent.set(None);
+        *self.target.borrow_mut() = None;
+    }
+
+    /// The extent currently allocated, if any.
+    pub fn target_extent(&self) -> Option<(u32, u32)> {
+        self.extent.get()
+    }
+
+    /// `true` when the requested extent needs a new target.
+    pub fn requires_new_target(&self, size: (u32, u32)) -> bool {
+        self.extent.get() != Some(size)
+    }
+
+    /// Capture `list` at `size` pixels against a `logical` point viewport.
+    ///
+    /// The device-backed source opens its own frame session, so this must run
+    /// outside one — the same ordering the host uses when it mirrors after the
+    /// presentation frame has been submitted.
+    pub fn capture(
+        &self,
+        list: &cove_core::DrawList,
+        size: (u32, u32),
+        logical: (f32, f32),
+    ) -> Result<FrameTapPixels, FrameTapError> {
+        if size.0 == 0 || size.1 == 0 || size.0 > MAX_MIRROR_EXTENT.0 || size.1 > MAX_MIRROR_EXTENT.1 {
+            return Err(FrameTapError::InvalidArgument(format!(
+                "mirror capture extent exceeds {}x{}",
+                MAX_MIRROR_EXTENT.0, MAX_MIRROR_EXTENT.1
+            )));
+        }
+        self.extent.set(Some(size));
+        let pixels = (self.source)(list, size, logical)?;
+        let stride = size.0 as usize * 4;
+        if pixels.bytes_per_row < stride || pixels.data.len() < stride * size.1 as usize {
+            return Err(FrameTapError::InvalidArgument(
+                "mirror readback is smaller than the requested extent".into(),
+            ));
+        }
+        Ok(FrameTapPixels::new(pixels.data, stride))
+    }
+
+    /// This capture as the closure `FrameTap` takes.
+    pub fn frame_capture(self: Rc<Self>) -> FrameCapture {
+        Rc::new(move |list, width, height, logical_width, logical_height| {
+            self.capture(list, (width, height), (logical_width, logical_height))
+        })
+    }
+}
+
+fn frame_tap_error(error: RhiError) -> FrameTapError {
+    match error {
+        RhiError::InvalidArgument(detail) => FrameTapError::InvalidArgument(detail),
+        RhiError::OutOfMemory => FrameTapError::Unsupported("mirror capture target allocation failed".into()),
+        other => FrameTapError::Unsupported(other.to_string()),
+    }
+}
+
+/// The offscreen render plus readback, allocating the target on first use and
+/// whenever the extent changes.
+///
+/// `target` is shared with `NativeAppFrameCapture` so `reset` can free it
+/// without the source having to hand ownership back.
+fn device_backed_source(
+    device: Arc<Device>,
+    renderer: NativeDrawListRenderer,
+    target: Rc<RefCell<MirrorTarget>>,
+) -> OffscreenFrameSource {
+    let renderer = RefCell::new(renderer);
+    Rc::new(move |list, size, logical| {
+        let viewport = NativeUIViewport::new([size.0 as usize, size.1 as usize], [logical.0, logical.1]);
+        device
+            .with_frame_session(|| {
+                let mut slot = target.borrow_mut();
+                let needs_target = slot.as_ref().is_none_or(|(_, extent)| *extent != size);
+                if needs_target {
+                    let created = TextureResource::new(
+                        device.clone(),
+                        TextureDescriptor::new(
+                            size.0 as usize,
+                            size.1 as usize,
+                            TextureFormat::Bgra8Unorm,
+                            TextureUsage::COLOR_TARGET
+                                | TextureUsage::TRANSFER_SOURCE
+                                | TextureUsage::SAMPLED,
+                        )
+                        .with_label("devtools-mirror-target"),
+                    )?;
+                    *slot = Some((created, size));
+                }
+                // Copy the handle out so the slot borrow does not span any GPU
+                // call; `Texture` is a plain handle and stays valid while the
+                // resource above owns the storage.
+                let Some((resource, _)) = slot.as_ref() else { return Err(RhiError::OutOfMemory) };
+                let texture = resource.texture();
+                drop(slot);
+                let mut renderer = renderer.borrow_mut();
+                let backdrop = renderer.supports_backdrop().then_some(texture);
+                device.begin_frame()?;
+                // Matches the host presenter: the guard closes the frame on
+                // every path, including a recording or submission failure.
+                struct EndFrame<'a>(&'a Device);
+                impl Drop for EndFrame<'_> {
+                    fn drop(&mut self) {
+                        self.0.end_frame();
+                    }
+                }
+                let _end = EndFrame(&device);
+                let mut commands = CommandBuffer::new();
+                let mut frame = renderer.record(
+                    list,
+                    &mut commands,
+                    RenderColorTarget::clearing(texture, NativeAppFrameCapture::CLEAR_COLOR),
+                    viewport,
+                    backdrop,
+                )?;
+                device.submit(&commands, QueueClass::Graphics, &[], &[], None)?;
+                frame.did_submit();
+                drop(_end);
+                // Readback requires a closed frame; the contract puts it after
+                // `endFrame` and waits for prior GPU work.
+                device.wait_until_idle()?;
+                let stride = size.0 as usize * 4;
+                let mut pixels = vec![0u8; stride * size.1 as usize];
+                device.read_texture_data(
+                    texture,
+                    size.0 as usize,
+                    size.1 as usize,
+                    stride,
+                    TextureSubresource::new(0, 0),
+                    &mut pixels,
+                )?;
+                Ok(FrameTapPixels::new(pixels, stride))
+            })
+            .map_err(frame_tap_error)
+    })
+}
+
 // MARK: - Timing
 
 /// Rolling timing publisher. The host runtime calls `record` once per frame.
@@ -922,5 +1133,60 @@ mod tests {
         assert_eq!(delivered.get(), 2, "after the interval");
         tap.stop();
         assert!(!tap.is_active());
+    }
+
+    #[test]
+    fn native_capture_rejects_an_extent_past_the_mirror_budget() {
+        let capture = NativeAppFrameCapture::new(Rc::new(|_list, size, _logical| {
+            Ok(FrameTapPixels::new(vec![0; size.0 as usize * size.1 as usize * 4], size.0 as usize * 4))
+        }));
+        let list = cove_core::DrawList::default();
+        assert!(matches!(
+            capture.capture(&list, (MAX_MIRROR_EXTENT.0 + 1, 16), (16.0, 16.0)),
+            Err(FrameTapError::InvalidArgument(_))
+        ));
+        assert!(capture.capture(&list, (0, 16), (16.0, 16.0)).is_err());
+        assert_eq!(capture.target_extent(), None, "a rejected extent allocates nothing");
+    }
+
+    #[test]
+    fn native_capture_reuses_the_target_and_packs_the_stride() {
+        let padded = Rc::new(std::cell::Cell::new(true));
+        let source_padded = padded.clone();
+        let capture = NativeAppFrameCapture::new(Rc::new(move |_list, size, _logical| {
+            let stride = if source_padded.get() { size.0 as usize * 4 + 8 } else { size.0 as usize * 4 };
+            Ok(FrameTapPixels::new(vec![0; stride * size.1 as usize], stride))
+        }));
+        let list = cove_core::DrawList::default();
+        assert!(capture.requires_new_target((32, 16)));
+        capture.capture(&list, (32, 16), (32.0, 16.0)).expect("padded readback");
+        assert_eq!(capture.target_extent(), Some((32, 16)));
+        assert!(!capture.requires_new_target((32, 16)), "same extent keeps the target");
+        assert!(capture.requires_new_target((64, 16)));
+        capture.reset();
+        assert_eq!(capture.target_extent(), None);
+    }
+
+    #[test]
+    fn reset_frees_the_shared_gpu_target() {
+        // The host-supplied constructor still shares the slot the device-backed
+        // source writes into, so `reset` must clear both the extent and it.
+        let capture = NativeAppFrameCapture::new(Rc::new(|_list, size, _logical| {
+            Ok(FrameTapPixels::new(vec![0; size.0 as usize * size.1 as usize * 4], size.0 as usize * 4))
+        }));
+        *capture.target.borrow_mut() = None;
+        capture.capture(&cove_core::DrawList::default(), (8, 8), (8.0, 8.0)).expect("capture");
+        assert_eq!(capture.target_extent(), Some((8, 8)));
+        capture.reset();
+        assert_eq!(capture.target_extent(), None);
+        assert!(capture.target.borrow().is_none(), "the target slot is cleared too");
+    }
+
+    #[test]
+    fn native_capture_rejects_a_short_readback() {
+        let capture = NativeAppFrameCapture::new(Rc::new(|_list, _size, _logical| {
+            Ok(FrameTapPixels::new(vec![0; 4], 16))
+        }));
+        assert!(capture.capture(&cove_core::DrawList::default(), (32, 16), (32.0, 16.0)).is_err());
     }
 }

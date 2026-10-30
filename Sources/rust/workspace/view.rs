@@ -19,13 +19,14 @@ use cove_core::scene::{
 };
 use cove_core::Color;
 use cove_platform::MouseButton;
+use cove_ui_compose::theme::tokens::SemanticColorRef;
 use std::cell::RefCell;
 use std::rc::Rc;
 
 const TAB_PRESS_KEY: &str = "__workspace_tab_press";
 const FLOATING_DRAG_KEY: &str = "__workspace_floating_window_drag";
 const FLOATING_REDOCK_KEY: &str = "__workspace_floating_window_redock";
-const RESIZE_GEOMETRY_KEY: &str = "workspace.resize.geometry";
+pub(crate) const RESIZE_GEOMETRY_KEY: &str = "workspace.resize.geometry";
 const RAIL_THICKNESS: f32 = 40.0;
 
 /// Retained press state for a tab drag.
@@ -115,7 +116,11 @@ impl WorkspaceBox {
         self.hit_testable = true;
         self
     }
-    pub fn child(mut self, child: AnyView) -> Self {
+    pub fn child(mut self, child: impl View + 'static) -> Self {
+        self.children.push(AnyView::new(child));
+        self
+    }
+    pub fn any_child(mut self, child: AnyView) -> Self {
         self.children.push(child);
         self
     }
@@ -163,7 +168,11 @@ impl_primitive_view!(WorkspaceBox);
 
 /// A pane background: rounded, clipped, no own hit area.
 pub struct WorkspacePane {
+    /// Explicit fill, used when no semantic slot is set.
     pub fill: Color,
+    /// Theme-resolved fill. Takes precedence over [`Self::fill`], so a theme
+    /// switch repaints the pane without rebuilding the view.
+    pub semantic_fill: Option<SemanticColorRef>,
     pub children: Vec<AnyView>,
     debug_name: Option<String>,
     layout_role: Option<String>,
@@ -172,7 +181,12 @@ pub struct WorkspacePane {
 
 impl WorkspacePane {
     pub fn new(fill: Color) -> Self {
-        Self { fill, children: Vec::new(), debug_name: None, layout_role: None, semantic_role: None }
+        Self { fill, semantic_fill: None, children: Vec::new(), debug_name: None, layout_role: None, semantic_role: None }
+    }
+
+    /// A pane whose fill resolves against the active theme at paint time.
+    pub fn semantic(fill: SemanticColorRef) -> Self {
+        Self { semantic_fill: Some(fill), ..Self::new(Color::CLEAR) }
     }
     pub fn child(mut self, child: AnyView) -> Self {
         self.children.push(child);
@@ -203,7 +217,11 @@ impl PrimitiveView for WorkspacePane {
     }
     fn update_node(&self, node: &Node) {
         node.set_is_hit_testable(false);
-        node.set_background_color(Some(self.fill));
+        let fill = match &self.semantic_fill {
+            Some(semantic) => semantic.resolve(&cove_ui_compose::theme::theme_for_node(node)),
+            None => self.fill,
+        };
+        node.set_background_color(Some(fill));
         node.set_corner_radius(theme_radius_lg(node));
         if let Some(name) = &self.debug_name {
             node.set_attachment(LayoutDebugAttachmentKey::DEBUG_NAME, name.clone());

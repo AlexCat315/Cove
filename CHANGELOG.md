@@ -4,6 +4,25 @@
 
 ## Unreleased
 
+- **迁移清单此前虚报完成度，已改为符号校验并修正**。旧清单按文件名相似度映射 Rust 文件，只要目标 `.rs` 存在即记“已写入”，于是 `DataTable.swift` 被记到无关的 `lists/table.rs`、`SplitView.swift` 被记到 25 行的 `view.rs`，得出“984/984 全部完成”的假结论。`Tools/Cove/rust/migration_inventory.py` 改为索引全部 Rust 声明（含宏调用与 `pub use ... as` 改名两端），逐文件核对 Swift 主类型名是否真实存在；对不上时先按符号重定位，仍找不到则置 `pending` 并清空错误路径。按新口径，当年**实际有 69 个生产文件没有实现**。
+- **补齐 35 个此前完全缺失的视图与类型**（本轮）：
+  - Compose 数据：`DataTable`（含 model/selection/view，保留 20 万行虚拟化）、`TreeTable`、`Tree`、`Chart`、`ChartDataTable`、`PropertyGrid` 全家、`SectionedList`、`SwipeList`、`ReorderableList`。
+  - Compose 控件：`Combobox`、`SearchField`、`RangeSlider`、`ColorField`、`JsonField`、`TimeField`、`TimeInput`、`TimePicker`、`Vec3Field`、`AssetRefField`、`DateRangePicker/Calendar`、`SplitButton`、`MenuButton`、`CompletionPopover`。
+  - Compose 布局/浮层：`SplitView`（含分割条拖拽与键盘）、`ResizableEditor`、`DisclosureGroup`、`NavigationRail`、`Tooltip`（悬停/焦点触发、仲裁、Escape 关闭）、`CommandPalette`（排名过滤、翻页、回车执行）、`ContextMenu`、`OverlayHost`、`ShortcutHost`、`Sheet`、`GridInteractionHost`、`ToolbarMetrics`、`UIIcons`、`DefaultDarkTheme`/`DefaultLightTheme`。
+  - 宿主与工作区：`WorkspaceView`（2651 行，含四个具名分割、标签拖拽重排、浮动层、紧凑呈现）、`ImmersiveWindowTitleBar`、`WindowDragRegion`、`WindowControlStrip/Button`、`GalleryView`。
+  - DevTools：`DevToolsCodec`、`InspectionValidation`、`NativeAppFrameCapture`（真实 GPU 离屏渲染 + 回读）、`UIAccessibilityActions`、`DevServerConfigurationError::UnsupportedHost`。
+  - Core：`WorkspacePanelDescriptor`、`WorkspacePanelRegistry`、`WorkspaceThemeEnvironment`。
+- **修复布局引擎两处偏离 Yoga 的真实缺陷**（此前被测试以“已知差异”绕过，属掩盖而非修复）：
+  - `align_self`/`align_items` 的交叉轴居中改为对**容器**交叉轴求解。原实现取行内最高子项，导致 100 高容器内 30 高子项居中落在 `y=0` 而非 `y=35`。
+  - `direction: Rtl` 现在真正镜像主轴排布。原实现的 `arrange_flex` 只看 `flex_direction.is_reverse()`，`direction` 传入后未参与主轴放置，RTL 行仍从左往右；现与 Yoga 一致（首个子项落在右边缘）。
+- **修复 DevTools 三处真实缺陷**：诊断记录曾输出 `parentId`/`nodeId`/`missingIds`，而 Swift 与 `DevTools/Client/*.js` 读的是 `parentID`/`nodeID`/`missingIDs`，JS 客户端一直静默取不到字段；`capture_presentation` 未考虑场景模态作用域，被模态遮住的控件仍报 `input_enabled: true`；`Tools::skills()` 返回空库，Swift 返回内置 ui-diagnostics 指南。
+- **修复控件三处真实缺陷**：滑块 `shows_ticks` 从未绘制（`paint::ticks()` 完整但 `render()` 未调用）；`NumericTextFormat` 用 `char::to_digit` 只认 ASCII，阿拉伯-印度数字等 `Nd` 数字被拒（Swift `NumberFormatter` 接受），改为 77 个 `Nd` 区块表；微小负数渲染成 `-0` 而 Swift 为 `0`。
+- **修复 `Tree` 搜索过滤不展开祖先**：命中位于折叠分支时不可达，改为与 Swift `filterAndAutoExpand` 一致（`is_expanded = explicitly_expanded || child_subtree_matches`），经实际运行验证行数/深度/路径键。
+- **修复 `NativeAppFrameCapture::reset()` 泄漏显存**：原来只清 extent，纹理仍留在闭包里；现在 capture 与 source 共享目标槽，`reset` 真正释放。
+- **补齐清单生成器的两处判定缺陷**：`derive()` 会把测试行提前置为 `written_unverified`，使后续测试映射遍直接跳过（新迁移的测试套件永远不显示）；脚本自己清空的 `pending` 行会被当成“操作者纠正”而永久跳过，无法再被符号恢复。
+
+仍未开始：34 个生产文件（2,380 行，主要是 Gutter 家族、Graphics 原生后端补件、Swift 宏插件）、345 个测试文件、6 个 Cargo 清单、5 个 CLI 模板。
+
 - **修复 `agent_transport` 回环测试的死锁**：`loopback_server_round_trips_one_line` 用 `read_to_end` 等待 EOF，但传输层是**持久连接的行协议**——`serve` 回完一行后继续读下一行、永不关闭连接，于是客户端等 EOF、服务端等输入，`cargo test --workspace` 永久挂起（用户报告的 `cove_sample.txt` 采样即为此）。测试改为先 `shutdown(Write)` 半关闭写端再读。
 
 死锁解除后暴露出 5 个被它掩盖的真实缺陷：

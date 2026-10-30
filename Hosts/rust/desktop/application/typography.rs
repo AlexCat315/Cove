@@ -54,9 +54,16 @@ impl PrimitiveView for AdaptiveApplicationContent {
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         let environment = self.environment.get();
-        // `surface_environment` is a `View` extension, so the modifier is applied
-        // to the erased view and the result re-erased once more.
-        vec![AnyView::new(self.content.clone().surface_environment(environment))]
+        // The host root is the application's `SurfaceRoot`: publishing only the
+        // environment left `SafeArea` reading zero insets under the window root,
+        // because the inset composition local is installed by `SurfaceRoot`, not
+        // by the bare `surface_environment` modifier. Delegating here is what
+        // makes host safe-area insets reach authored content.
+        let _ = environment;
+        vec![AnyView::new(cove_ui_compose::primitives::layout::SurfaceRoot::new(
+            self.environment.get(),
+            self.content.clone(),
+        ))]
     }
 }
 

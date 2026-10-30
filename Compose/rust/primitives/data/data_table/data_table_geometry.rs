@@ -8,6 +8,12 @@ pub struct DataTableColumnGeometry {
     pub total_width: f32,
 }
 
+impl Clone for DataTableColumnGeometry {
+    fn clone(&self) -> Self {
+        Self { widths: self.widths.clone(), starts: self.starts.clone(), frozen_count: self.frozen_count, total_width: self.total_width }
+    }
+}
+
 impl DataTableColumnGeometry {
     pub fn new(widths: Vec<f32>, frozen_count: usize) -> Self {
         let frozen_count = frozen_count.min(widths.len());

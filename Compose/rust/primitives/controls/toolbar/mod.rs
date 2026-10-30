@@ -46,6 +46,25 @@ pub fn toolbar_height(size: ControlSize) -> f32 {
     size.button_height() + 8.0
 }
 
+/// Toolbar density derived from the control size.
+pub struct ToolbarMetrics;
+
+impl ToolbarMetrics {
+    /// Height at the regular control size.
+    pub fn height() -> f32 {
+        Self::height_for(ControlSize::Regular)
+    }
+
+    /// Control height inside a regular toolbar.
+    pub fn control_height() -> f32 {
+        Self::height() - 8.0
+    }
+
+    pub fn height_for(size: ControlSize) -> f32 {
+        size.button_height() + 8.0
+    }
+}
+
 pub struct ToolbarAxisEnvironment;
 impl ToolbarAxisEnvironment {
     pub fn axis() -> Rc<CompositionLocal<ToolbarAxis>> {

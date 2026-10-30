@@ -13,6 +13,7 @@ path = "rust/lib.rs"
 cove-devtools-protocol.workspace = true
 cove-composition.workspace = true
 cove-core.workspace = true
+cove-graphics.workspace = true
 cove-platform.workspace = true
 cove-system.workspace = true
 cove-logging.workspace = true

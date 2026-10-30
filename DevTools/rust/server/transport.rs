@@ -6,6 +6,7 @@
 //! ping/pong, close, and bounded fragment reassembly. It runs one accept thread
 //! plus one reader thread per connection and delivers events through a channel,
 //! so the server keeps its single-threaded protocol core.
+use crate::server::config::DevServerConfigurationError;
 use std::io::{self, Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -36,19 +37,20 @@ pub trait DevToolsTransport {
 
 /// Reject a host that would expose DevTools beyond loopback unless the caller
 /// explicitly asked for all interfaces.
-pub fn resolve_bind_address(host: &str) -> io::Result<&'static str> {
+pub fn resolve_bind_address(host: &str) -> Result<&'static str, DevServerConfigurationError> {
     match host {
         "localhost" | "127.0.0.1" => Ok("127.0.0.1"),
         "::1" => Ok("::1"),
         "0.0.0.0" => Ok("0.0.0.0"),
         "::" => Ok("::"),
         "*" => Ok("0.0.0.0"),
-        other => Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!(
-                "Unsupported DevTools host '{other}'. Use localhost/127.0.0.1/::1 for loopback or 0.0.0.0/:: for all interfaces."
-            ),
-        )),
+        other => Err(DevServerConfigurationError::UnsupportedHost(other.into())),
+    }
+}
+
+impl From<DevServerConfigurationError> for io::Error {
+    fn from(error: DevServerConfigurationError) -> Self {
+        io::Error::new(io::ErrorKind::InvalidInput, error.message())
     }
 }
 
@@ -89,8 +91,7 @@ impl DevToolsTransport for StdDevToolsTransport {
     }
 
     fn start(&self, host: &str, port: u16, on_event: Arc<dyn Fn(DevToolsTransportEvent) + Send + Sync>) -> io::Result<()> {
-        let address = resolve_bind_address(host)?;
-        let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
+        let address = resolve_bind_address(host)?;        let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
         if state.listener.is_some() {
             return Ok(());
         }

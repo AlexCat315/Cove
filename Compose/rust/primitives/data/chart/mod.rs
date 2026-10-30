@@ -14,6 +14,8 @@ pub mod plot;
 pub mod scale;
 pub mod stacking;
 pub mod viewport;
+pub mod view;
+pub mod data_table;
 
 pub use axes::*;
 pub use axis::*;
@@ -30,3 +32,5 @@ pub use plot::*;
 pub use scale::*;
 pub use stacking::*;
 pub use viewport::*;
+pub use view::Chart;
+pub use data_table::{ChartDataTable, ChartDataTableEntry, CHART_DATA_GAP};

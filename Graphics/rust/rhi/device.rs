@@ -19,6 +19,7 @@ use cove_logging::{Level, LogRuntime, LogValue, Location};
 
 use super::{
     AccelerationStructure, AccelerationStructureBuild, AccelerationStructureDescriptor,
+    ResourcePreparationContext, ResourcePreparationProgress,
     AdapterCapabilities, BindingLayout, BindingLayoutDescriptor, BindingLayoutEntry, BindingResource,
     BindingSet, BindingSetDescriptor, Buffer, BufferDescriptor, CacheStats, Capabilities,
     CommandBuffer, ComputePipeline, ComputePipelineDescriptor, DeviceCaches, DeviceConfig,
@@ -1008,6 +1009,86 @@ impl Device {
             return Err(RhiError::FrameNotActive);
         };
         uploader.write(data, alignment)
+    }
+
+    // MARK: Resource preparation
+
+    /// Whether this backend implements the snapshot/compile/publish split that
+    /// makes non-blocking resource preparation possible.
+    pub fn supports_background_compilation(&self) -> bool {
+        self.backend().supports_background_compilation()
+    }
+
+    /// Runs one declared preparation on the calling thread.
+    ///
+    /// Rust has no `async`/`await` continuation here: the Swift version hopped
+    /// to a preparation queue and resumed a continuation, which only buys
+    /// concurrency. Callers that want it run this on their own worker and
+    /// collect the progress through `on_progress`.
+    pub fn prepare_resources<T>(
+        &self,
+        label: impl Into<String>,
+        total_steps: Option<usize>,
+        on_progress: impl Fn(ResourcePreparationProgress) + Send + Sync + 'static,
+        operation: impl FnOnce(&ResourcePreparationContext) -> RhiResult<T>,
+    ) -> RhiResult<T> {
+        if !self.supports_background_compilation() {
+            return Err(RhiError::unsupported_feature(
+                "backend does not support background compilation",
+            ));
+        }
+        let context = ResourcePreparationContext::new(label, total_steps, on_progress);
+        let context = std::rc::Rc::new(context);
+        let probe = context.clone();
+        context.run(move || operation(&probe))
+    }
+
+    /// One-step shader preparation, mirroring the Swift `AsyncResources` entry.
+    pub fn make_shader_module_prepared(
+        &self,
+        descriptor: ShaderModuleDescriptor,
+        on_progress: impl Fn(ResourcePreparationProgress) + Send + Sync + 'static,
+    ) -> RhiResult<ShaderModule> {
+        let label = descriptor.entry_point.clone();
+        self.prepare_resources(label, Some(1), on_progress, |context| {
+            context.step("Shader", || self.make_shader_module(descriptor))
+        })
+    }
+
+    /// One-step graphics-pipeline preparation.
+    pub fn make_graphics_pipeline_prepared(
+        &self,
+        descriptor: GraphicsPipelineDescriptor,
+        on_progress: impl Fn(ResourcePreparationProgress) + Send + Sync + 'static,
+    ) -> RhiResult<GraphicsPipeline> {
+        let label = descriptor.label.unwrap_or("Graphics pipeline").to_string();
+        self.prepare_resources(label, Some(1), on_progress, |context| {
+            context.step("Graphics pipeline", || self.make_graphics_pipeline(descriptor))
+        })
+    }
+
+    /// One-step compute-pipeline preparation.
+    pub fn make_compute_pipeline_prepared(
+        &self,
+        descriptor: ComputePipelineDescriptor,
+        on_progress: impl Fn(ResourcePreparationProgress) + Send + Sync + 'static,
+    ) -> RhiResult<ComputePipeline> {
+        let label = descriptor.label.unwrap_or("Compute pipeline").to_string();
+        self.prepare_resources(label, Some(1), on_progress, |context| {
+            context.step("Compute pipeline", || self.make_compute_pipeline(descriptor))
+        })
+    }
+
+    /// One-step mesh-pipeline preparation.
+    pub fn make_mesh_pipeline_prepared(
+        &self,
+        descriptor: MeshPipelineDescriptor,
+        on_progress: impl Fn(ResourcePreparationProgress) + Send + Sync + 'static,
+    ) -> RhiResult<MeshPipeline> {
+        let label = descriptor.label.unwrap_or("Mesh pipeline").to_string();
+        self.prepare_resources(label, Some(1), on_progress, |context| {
+            context.step("Mesh pipeline", || self.make_mesh_pipeline(descriptor))
+        })
     }
 
     // MARK: Submission

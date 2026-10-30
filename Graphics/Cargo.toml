@@ -65,3 +65,19 @@ path = "rust/tests/lru_map.rs"
 [[test]]
 name = "state_tracker"
 path = "rust/tests/state_tracker.rs"
+
+[[test]]
+name = "submission_planner"
+path = "rust/tests/submission_planner.rs"
+
+[[test]]
+name = "render_attachment_validation"
+path = "rust/tests/render_attachment_validation.rs"
+
+[[test]]
+name = "shader_artifact"
+path = "rust/tests/shader_artifact.rs"
+
+[[test]]
+name = "reflected_binding_layout"
+path = "rust/tests/reflected_binding_layout.rs"

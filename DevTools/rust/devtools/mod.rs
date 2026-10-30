@@ -19,6 +19,8 @@ use std::sync::Arc;
 
 pub mod mirror;
 
+pub use mirror::NativeAppFrameCapture;
+
 /// Host-facing DevTools owner.
 pub struct DevTools {
     config: DevToolsConfig,

@@ -8,20 +8,17 @@
 use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
 
+use crate::modifiers::layout::LayoutFrameExt;
 use cove_core::scene::{
-    Align, AnimatorScheduler, EventResult, FlexDirection, HoverPhase, InputHandlerRoute,
-    InteractionRegistryHolder, LayoutNode, Node, NodeResource, PointerPhase, Wrap,
+    Align, AnimatorScheduler, EventResult, FocusChainHolder, HoverPhase, InputHandlerRoute,
+    InteractionRegistryHolder, LayoutNode, Node, NodeResource, PointerPhase,
 };
 use cove_core::{Point, Rect, Size};
 use cove_composition::{AnyView, PrimitiveView, View};
-use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
-use crate::modifiers::style::AppearanceExt;
 use crate::primitives::overlays::portal::{
-    PortalPlacementMode, PortalResource, PortalStore, PortalStoreHolder,
+    PortalPlacementMode, PortalResource, PortalStoreHolder,
 };
-use crate::primitives::text::Text;
-use crate::theme::{theme_for_node, SemanticColorRef};
-use crate::{impl_primitive_view, BoxView};
+use crate::impl_primitive_view;
 
 /// How long the pointer must rest before a tip appears.
 pub const DEFAULT_DELAY: f64 = 0.6;
@@ -255,6 +252,34 @@ impl Default for TooltipSession {
             is_finished: Cell::new(true),
             self_weak: RefCell::new(Weak::new()),
         }
+    }
+}
+
+impl NodeResource for TooltipSession {
+    fn mount(&self, node: &Node) {
+        *self.node.borrow_mut() = Some(node.clone());
+        *self.owner.borrow_mut() = TooltipArbitration::current();
+        if let Some(arbitration) = self.arbitration() {
+            let weak = self.me_weak();
+            if let Some(session) = weak.upgrade() {
+                arbitration.register(&session);
+            }
+        }
+    }
+
+    fn unmount(&self, _node: &Node) {
+        self.hide();
+        if let Some(arbitration) = self.arbitration()
+            && let Some(session) = self.me_weak().upgrade()
+        {
+            arbitration.unregister(&session);
+        }
+        *self.owner.borrow_mut() = None;
+        *self.node.borrow_mut() = None;
+    }
+
+    fn as_any_rc(self: Rc<Self>) -> Rc<dyn std::any::Any> {
+        self
     }
 }
 
@@ -584,3 +609,341 @@ impl cove_core::scene::AnyAnimationController for ClockRef {
         self
     }
 }
+
+/// The active window's tooltip rules; `None` until a window registers one.
+pub struct TooltipArbitrationHolder;
+
+impl TooltipArbitrationHolder {
+    pub fn current() -> Option<Rc<TooltipArbitration>> {
+        TooltipArbitration::current()
+    }
+}
+
+/// Registers a window's tooltip rules for as long as its input context is
+/// current, mirroring `PortalStoreAmbient`.
+pub struct TooltipArbitrationAmbient {
+    pub arbitration: Rc<TooltipArbitration>,
+}
+
+impl TooltipArbitrationAmbient {
+    pub fn new() -> Self {
+        Self { arbitration: TooltipArbitration::new() }
+    }
+
+    pub fn with(arbitration: Rc<TooltipArbitration>) -> Self {
+        Self { arbitration }
+    }
+}
+
+impl Default for TooltipArbitrationAmbient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl cove_core::scene::ScopedAmbient for TooltipArbitrationAmbient {
+    fn activate(&self) -> Box<dyn FnOnce()> {
+        TooltipArbitration::activate(Some(self.arbitration.clone()))
+    }
+}
+
+/// An arbitrary target and non-interactive description, presented outside
+/// clipping through the portal.
+pub struct Tooltip {
+    pub options: TooltipOptions,
+    /// Explicitly anchored tips are already debounced by their producer (for
+    /// example LSP hover), so presentation follows `is_presented` directly.
+    pub anchor: Option<TooltipAnchor>,
+    pub is_presented: bool,
+    /// Whether the target had to clip its text, so a redundant description stays
+    /// quiet.
+    pub shows_truncated_text: Rc<dyn Fn() -> bool>,
+    target: Option<AnyView>,
+    content: AnyView,
+}
+
+impl Tooltip {
+    pub fn new(target: impl View + 'static, content: impl View + 'static) -> Self {
+        Self {
+            options: TooltipOptions::default(),
+            anchor: None,
+            is_presented: true,
+            shows_truncated_text: Rc::new(|| true),
+            target: Some(AnyView::new(target)),
+            content: AnyView::new(content),
+        }
+    }
+
+    pub fn anchored(anchor: TooltipAnchor, content: impl View + 'static) -> Self {
+        Self {
+            options: TooltipOptions::default(),
+            anchor: Some(anchor),
+            is_presented: true,
+            shows_truncated_text: Rc::new(|| true),
+            target: None,
+            content: AnyView::new(content),
+        }
+    }
+
+    pub fn options(mut self, options: TooltipOptions) -> Self {
+        self.options = options.validated();
+        self
+    }
+
+    pub fn configure(mut self, configure: impl FnOnce(&mut TooltipOptions)) -> Self {
+        configure(&mut self.options);
+        self.options.validate();
+        self
+    }
+
+    pub fn presented(mut self, is_presented: bool) -> Self {
+        self.is_presented = is_presented;
+        self
+    }
+
+    pub fn only_when_truncated(mut self, only_when_truncated: bool) -> Self {
+        self.options.only_when_truncated = only_when_truncated;
+        self
+    }
+
+    pub fn shows_truncated_text(mut self, resolve: impl Fn() -> bool + 'static) -> Self {
+        self.shows_truncated_text = Rc::new(resolve);
+        self
+    }
+}
+
+impl View for Tooltip {
+    fn body(&self) -> AnyView {
+        if let Some(anchor) = self.anchor {
+            return AnyView::new(CoordinateTooltipHost {
+                anchor,
+                content: self.content.clone(),
+                options: self.options.clone(),
+                is_presented: self.is_presented,
+            });
+        }
+        let focus = FocusChainHolder::current();
+        let focused = focus.as_ref().and_then(|chain| chain.focused());
+        let focus_visible = focus.as_ref().is_some_and(|chain| chain.is_focus_visible());
+        AnyView::new(TooltipHost {
+            target: self.target.clone().unwrap_or_else(|| AnyView::new(crate::EmptyView)),
+            content: self.content.clone(),
+            options: self.options.clone(),
+            focused,
+            focus_visible,
+            shows_truncated_text: self.shows_truncated_text.clone(),
+        })
+    }
+
+    fn tag(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+}
+
+/// Explicitly anchored tip: presentation follows `is_presented` directly.
+struct CoordinateTooltipHost {
+    anchor: TooltipAnchor,
+    content: AnyView,
+    options: TooltipOptions,
+    is_presented: bool,
+}
+
+impl PrimitiveView for CoordinateTooltipHost {
+    fn make_node(&self) -> Node {
+        let node = Node::new();
+        node.set_is_hit_testable(false);
+        node.add_resource(PortalResource::new());
+        node.set_attachment("tooltip.coordinate", true);
+        node
+    }
+
+    fn make_layout_node(&self) -> Option<LayoutNode> {
+        None
+    }
+
+    fn update_node(&self, node: &Node) {
+        let available = node.accepts_subtree_input();
+        node.set_attachment(COORDINATE_AVAILABLE, available);
+        let host = CoordinateTooltipHost {
+            anchor: self.anchor,
+            content: self.content.clone(),
+            options: self.options.clone(),
+            is_presented: self.is_presented,
+        };
+        node.set_layout_did_update(Some(Rc::new(move |node: &Node| {
+            let next = node.accepts_subtree_input();
+            if node.attachment::<bool>(COORDINATE_AVAILABLE) == Some(next) {
+                return;
+            }
+            node.set_attachment(COORDINATE_AVAILABLE, next);
+            host.present(node);
+        })));
+        self.present(node);
+    }
+
+    fn children(&self, _node: &Node) -> Vec<AnyView> {
+        Vec::new()
+    }
+}
+impl_primitive_view!(CoordinateTooltipHost);
+
+const COORDINATE_AVAILABLE: &str = "CoveUI.tooltip.coordinate.available";
+
+impl CoordinateTooltipHost {
+    fn present(&self, node: &Node) {
+        let Some(resource) = node.first_resource::<PortalResource>() else { return };
+        if !node.accepts_subtree_input() || !self.is_presented || !self.options.is_enabled {
+            resource.unmount(node);
+            return;
+        }
+        let anchor = self.anchor.rect();
+        let options = self.options.clone();
+        let content = AnyView::new(ContentBox { content: AnyView::new(SizeLimited {
+            content: self.content.clone(),
+            max_width: options.max_width,
+        }) });
+        resource.present(
+            Some(PortalStoreHolder::current()),
+            Point::new(anchor.x, anchor.y + anchor.height + options.gap),
+            None,
+            content,
+            false,
+            PortalPlacementMode::Fixed,
+            Some(Rc::new(move |_size: Size| {
+                Point::new(anchor.x, anchor.y + anchor.height + options.gap)
+            })),
+            None,
+        );
+        let target = anchor;
+        resource.set_dismissal(Rc::new(move || target), Rc::new(|| {}));
+    }
+}
+
+/// Pointer/focus host: owns the portal resource and the arbitration session.
+struct TooltipHost {
+    target: AnyView,
+    content: AnyView,
+    options: TooltipOptions,
+    focused: Option<Node>,
+    focus_visible: bool,
+    shows_truncated_text: Rc<dyn Fn() -> bool>,
+}
+
+impl PrimitiveView for TooltipHost {
+    fn make_node(&self) -> Node {
+        let node = Node::new();
+        node.set_is_hit_testable(true);
+        node.add_resource(PortalResource::new());
+        node.set_attachment(PORTAL_ATTACHMENT, node.first_resource::<PortalResource>().expect("portal resource"));
+        node.set_attachment("tooltip.host", true);
+        node
+    }
+
+    fn make_layout_node(&self) -> Option<LayoutNode> {
+        let layout = LayoutNode::new();
+        layout.set_align_items(Align::Stretch);
+        Some(layout)
+    }
+
+    fn update_node(&self, node: &Node) {
+        let session = node.first_resource::<TooltipSession>().unwrap_or_else(|| {
+            let session = TooltipSession::new();
+            node.add_resource(session.clone());
+            session
+        });
+        let in_subtree = self.focused.as_ref().is_some_and(|focused| {
+            FocusChainHolder::current()
+                .is_some_and(|chain| chain.contains(focused, node))
+        });
+        let truncated = self.shows_truncated_text.clone();
+        session.configure(
+            self.content.clone(),
+            self.options.clone(),
+            self.focus_visible && in_subtree,
+            Rc::new(move || truncated()),
+        );
+        if !supports_control_hover(node) {
+            session.set_hovered(false);
+        }
+        if let Some(registry) = InteractionRegistryHolder::current() {
+            let hover_session = Rc::downgrade(&session);
+            let hover_owner = node.downgrade();
+            registry.set_hover(node, Rc::new(move |phase: HoverPhase| {
+                let Some(session) = hover_session.upgrade() else { return };
+                let allowed = Node::upgrade(&hover_owner)
+                    .is_some_and(|owner| supports_control_hover(&owner));
+                session.set_hovered(phase == HoverPhase::Enter && allowed);
+            }));
+            let pointer_session = Rc::downgrade(&session);
+            registry.set_pointer(
+                node,
+                InputHandlerRoute::control(),
+                Rc::new(move |_, phase, _| {
+                    if phase == PointerPhase::Down
+                        && let Some(session) = pointer_session.upgrade()
+                    {
+                        session.dismiss();
+                    }
+                    EventResult::Ignored
+                }),
+            );
+            let key_session = Rc::downgrade(&session);
+            registry.set_key(node, InputHandlerRoute::control(), Rc::new(move |event, _| {
+                if event.scancode != crate::Scancode::ESCAPE {
+                    return EventResult::Ignored;
+                }
+                key_session
+                    .upgrade()
+                    .is_some_and(|session| session.dismiss())
+                    .then_some(EventResult::Handled)
+                    .unwrap_or(EventResult::Ignored)
+            }));
+        }
+        let layout_session = Rc::downgrade(&session);
+        node.set_layout_did_update(Some(Rc::new(move |_node: &Node| {
+            if let Some(session) = layout_session.upgrade() {
+                session.update_position();
+            }
+        })));
+    }
+
+    fn children(&self, _node: &Node) -> Vec<AnyView> {
+        vec![self.target.clone()]
+    }
+}
+impl_primitive_view!(TooltipHost);
+
+fn supports_control_hover(node: &Node) -> bool {
+    crate::primitives::controls::adaptive::supports_control_hover(node)
+}
+
+/// Bounds a chip's width while keeping its measured height.
+struct SizeLimited {
+    content: AnyView,
+    max_width: f32,
+}
+
+impl PrimitiveView for SizeLimited {
+    fn make_node(&self) -> Node {
+        let node = Node::new();
+        node.set_is_hit_testable(false);
+        node
+    }
+
+    fn make_layout_node(&self) -> Option<LayoutNode> {
+        let layout = LayoutNode::new();
+        layout.set_max_width(Some(self.max_width));
+        Some(layout)
+    }
+
+    fn update_layout(&self, layout: &LayoutNode) {
+        layout.set_max_width(Some(self.max_width));
+    }
+
+    fn update_node(&self, _node: &Node) {}
+
+    fn children(&self, _node: &Node) -> Vec<AnyView> {
+        vec![self.content.clone()]
+    }
+}
+impl_primitive_view!(SizeLimited);

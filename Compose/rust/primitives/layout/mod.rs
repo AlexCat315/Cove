@@ -19,6 +19,10 @@ pub mod sidebar;
 pub mod tab_view;
 pub mod tab_overflow;
 pub mod split_compact;
+pub mod split;
+pub mod disclosure_group;
+pub mod resizable_editor;
+pub mod navigation_rail;
 pub mod mobile_tab_bar;
 pub mod zstack;
 pub mod resize;
@@ -44,6 +48,10 @@ pub use scroll_view::{
     ScrollbarGutter,
 };
 pub use zstack::*;
+pub use split::*;
+pub use disclosure_group::DisclosureGroup;
+pub use resizable_editor::ResizableEditor;
+pub use navigation_rail::NavigationRail;
 pub use resize::height_limits::EditorHeightLimits;
 pub use virtualization::virtual_window::{VirtualRowKey, VirtualWindow};
 pub use responsive::{ActionGroupLayout, LayoutThatFits};

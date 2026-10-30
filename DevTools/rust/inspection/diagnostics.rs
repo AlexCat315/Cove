@@ -61,6 +61,7 @@ pub struct DiagnosticMemorySnapshot {
 #[serde(rename_all = "camelCase")]
 pub struct DiagnosticNode {
     pub node: NodeSummary,
+    #[serde(rename = "parentID")]
     pub parent_id: Option<String>,
     pub semantics: Option<AccessibilitySemantics>,
     pub presentation: DiagnosticPresentation,
@@ -84,6 +85,7 @@ pub struct DiagnosticPresentation {
 #[serde(rename_all = "camelCase")]
 pub struct DiagnosticCompactNode {
     pub id: String,
+    #[serde(rename = "parentID")]
     pub parent_id: Option<String>,
     pub role: Option<String>,
     pub label: Option<String>,
@@ -145,6 +147,7 @@ impl DiagnosticCompactNode {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DiagnosticGeometryIssue {
+    #[serde(rename = "nodeID")]
     pub node_id: String,
     pub invalid_values: BTreeMap<String, String>,
     pub source: Option<SourceLocation>,
@@ -154,6 +157,7 @@ pub struct DiagnosticGeometryIssue {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DiagnosticOverflowIssue {
+    #[serde(rename = "nodeID")]
     pub node_id: String,
     pub debug_name: Option<String>,
     /// Points of content below the node's bottom edge.
@@ -185,6 +189,7 @@ pub struct DiagnosticOverview {
 pub struct DiagnosticsStateQuery {
     pub metadata: DiagnosticPage<StateDescriptor>,
     pub values: Vec<StateValue>,
+    #[serde(rename = "missingIDs")]
     pub missing_ids: Vec<String>,
 }
 
@@ -830,7 +835,31 @@ fn collect_overflow(root: &Node) -> Vec<DiagnosticOverflowIssue> {
 /// Compute visible bounds and input availability for every node.
 fn capture_presentation(root: &Node) -> BTreeMap<String, DiagnosticPresentation> {
     let mut result = BTreeMap::new();
-    fn visit(node: &Node, clip: Option<Rect>, draws: bool, input: bool, result: &mut BTreeMap<String, DiagnosticPresentation>) -> Option<Rect> {
+    // The focus chain of the owning scene's active modal scope, when one is
+    // mounted. A linear walk avoids repeatedly descending the same deep
+    // composition subtrees the way a lazy recursive search would.
+    fn modal_input(root: &Node) -> Option<std::rc::Rc<cove_core::scene::FocusChain>> {
+        let mut pending = vec![root.clone()];
+        while let Some(candidate) = pending.pop() {
+            if let Some(resource) = candidate.first_resource::<cove_core::scene::ModalFocusResource>()
+                && let Some(chain) = resource.bound_focus_chain()
+                && chain.has_modal_scope()
+            {
+                return Some(chain);
+            }
+            pending.extend(candidate.children().into_iter().rev());
+        }
+        None
+    }
+    let input_scope = modal_input(root);
+    fn visit(
+        node: &Node,
+        clip: Option<Rect>,
+        draws: bool,
+        input: bool,
+        input_scope: Option<&std::rc::Rc<cove_core::scene::FocusChain>>,
+        result: &mut BTreeMap<String, DiagnosticPresentation>,
+    ) -> Option<Rect> {
         let frame = node.frame();
         let bounds = node.absolute_frame();
         let valid = [frame.x, frame.y, frame.width, frame.height, bounds.x, bounds.y, bounds.width, bounds.height]
@@ -871,18 +900,23 @@ fn capture_presentation(root: &Node) -> BTreeMap<String, DiagnosticPresentation>
         };
         let mut descendants: Option<Rect> = None;
         for child in node.children() {
-            if let Some(frame) = visit(&child, child_clip, draws, input, result) {
+            if let Some(frame) = visit(&child, child_clip, draws, input, input_scope, result) {
                 descendants = Some(descendants.map_or(frame, |current| current.union(frame)));
             }
         }
         // Layout-transparent component anchors inherit their visible
         // descendants without fabricating an independent hit-test box.
-        let visible = if node.layout_node().is_none() && bounds.width <= 0.0 { descendants } else { own };
+        // A layout-transparent component anchor inherits its visible
+        // descendants; Swift's `bounds.isEmpty` is true on either empty axis.
+        let empty_bounds = bounds.width <= 0.0 || bounds.height <= 0.0;
+        let visible = if node.layout_node().is_none() && empty_bounds { descendants } else { own };
         result.insert(
             node.id().0.to_string(),
             DiagnosticPresentation {
                 is_visible: visible.is_some(),
-                input_enabled: input && visible.is_some(),
+                input_enabled: input
+                    && visible.is_some()
+                    && input_scope.is_none_or(|chain| chain.permits_input(node)),
                 visible_frame: visible.map(|frame| NodeFrame {
                     x: frame.x as f64,
                     y: frame.y as f64,
@@ -897,7 +931,14 @@ fn capture_presentation(root: &Node) -> BTreeMap<String, DiagnosticPresentation>
         }
     }
     let frame = root.absolute_frame();
-    visit(root, (frame.width > 0.0 && frame.height > 0.0).then_some(frame), true, true, &mut result);
+    visit(
+        root,
+        (frame.width > 0.0 && frame.height > 0.0).then_some(frame),
+        true,
+        true,
+        input_scope.as_ref(),
+        &mut result,
+    );
     result
 }
 
@@ -1076,3 +1117,28 @@ fn next_capture_id() -> String {
     static COUNTER: AtomicU64 = AtomicU64::new(1);
     format!("trace-{}", COUNTER.fetch_add(1, Ordering::Relaxed))
 }
+
+/// Swift names for the diagnostic records. Each is the same value as the Rust
+/// name it points at, so the two spellings cannot describe different shapes.
+pub type UIDiagnosticNode = DiagnosticNode;
+pub type UIDiagnosticCompactNode = DiagnosticCompactNode;
+pub type UIDiagnosticPage<T> = DiagnosticPage<T>;
+pub type UIDiagnosticGeometryIssue = DiagnosticGeometryIssue;
+pub type UIDiagnosticLayoutSummary = DiagnosticLayoutSummary;
+pub type UIDiagnosticOverflowIssue = DiagnosticOverflowIssue;
+pub type UIDiagnosticMemorySnapshot = DiagnosticMemorySnapshot;
+pub type UIDiagnosticPresentation = DiagnosticPresentation;
+pub type UIDiagnosticOverview = DiagnosticOverview;
+pub type UIStateQuery = DiagnosticsStateQuery;
+pub type UITraceCapture = TraceCapture;
+pub type UITraceComparison = TraceComparison;
+pub type UITracePhase = TracePhase;
+pub type UITracePhaseChange = TracePhaseChange;
+pub type UITraceQuery = TraceQuery;
+
+/// Swift's `UIDiagnostics`: the read-only facade an agent or MCP client holds.
+/// It is `Diagnostics` itself — every query above already lives there.
+pub type UIDiagnostics = Diagnostics;
+
+/// The canonical diagnostic tool registry, under the Swift name.
+pub use crate::inspection::tools::{Tool as UIDiagnosticTool, Tools as UIDiagnosticTools};

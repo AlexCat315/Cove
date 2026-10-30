@@ -19,3 +19,23 @@ cove-logging.workspace = true
 cc.workspace = true
 [lints]
 workspace = true
+
+[[test]]
+name = "event_dispatcher_tests"
+path = "rust/tests/event_dispatcher_tests.rs"
+
+[[test]]
+name = "multi_window_smoke_tests"
+path = "rust/tests/multi_window_smoke_tests.rs"
+
+[[test]]
+name = "event_dispatcher_cursor_tests"
+path = "rust/tests/event_dispatcher_cursor_tests.rs"
+
+[[test]]
+name = "frame_deadline_tests"
+path = "rust/tests/frame_deadline_tests.rs"
+
+[[test]]
+name = "draw_list_tests"
+path = "rust/tests/draw_list_tests.rs"

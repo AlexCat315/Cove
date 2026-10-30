@@ -3,6 +3,9 @@
 //! drawn. The grab area of a split overhangs both panes and reserves no layout
 //! space beyond the gutter.
 
+use cove_core::scene::{CompositionLocal, Node};
+use std::rc::Rc;
+
 /// Workspace metrics carried as a composition-local value.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct WorkspaceTheme {
@@ -57,6 +60,25 @@ impl WorkspaceTheme {
             shows_collapsed_rails,
         }
     }
+}
+
+/// Composition-local carrying [`WorkspaceTheme`]. A host provides it once near
+/// the root; every descendant reads the nearest provided value.
+pub struct WorkspaceThemeEnvironment;
+
+impl WorkspaceThemeEnvironment {
+    pub fn key() -> Rc<CompositionLocal<WorkspaceTheme>> {
+        thread_local! {
+            static KEY: Rc<CompositionLocal<WorkspaceTheme>> =
+                Rc::new(CompositionLocal::constant(WorkspaceTheme::default()));
+        }
+        KEY.with(Rc::clone)
+    }
+}
+
+/// The theme resolved for `node`, falling back to the default metrics.
+pub fn resolve_workspace_theme(node: &Node) -> WorkspaceTheme {
+    node.composition_value(&WorkspaceThemeEnvironment::key())
 }
 
 /// Region sizing used by the collapse/expand transition. `Divider` reserves

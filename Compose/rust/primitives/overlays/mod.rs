@@ -13,6 +13,10 @@ pub mod modal;
 pub mod roving_focus;
 pub mod toast;
 pub mod tooltip;
+pub mod command_palette;
+pub mod context_menu;
+pub mod overlay_host;
+pub mod shortcut_host;
 
 pub use focus_scope::FocusScope;
 pub use selection_key_host::SelectionKeyHost;
@@ -36,4 +40,12 @@ pub mod command_palette_model;
 pub use command_palette_model::{
     destination, display_entries, entries, normalize, ranked, record_recent, CommandEntry,
     CommandItem,
+};
+pub use command_palette::{CommandPalette, PaletteCommand};
+pub use context_menu::ContextMenu;
+pub use overlay_host::OverlayHost;
+pub use shortcut_host::ShortcutHost;
+pub use tooltip::{
+    Tooltip, TooltipAnchor, TooltipArbitration, TooltipArbitrationAmbient, TooltipArbitrationHolder,
+    TooltipOptions, TooltipSession,
 };

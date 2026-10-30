@@ -27,3 +27,11 @@ libc.workspace = true
 
 [lints]
 workspace = true
+
+[[test]]
+name = "app_display_handle_tests"
+path = "rust/tests/app_display_handle_tests.rs"
+
+[[test]]
+name = "application_tests"
+path = "rust/tests/application_tests.rs"

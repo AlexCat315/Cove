@@ -12,6 +12,36 @@ pub enum Subscription {
     Timeline,
 }
 
+impl Subscription {
+    pub const ALL: [Subscription; 6] = [
+        Subscription::Tree,
+        Subscription::Log,
+        Subscription::Timing,
+        Subscription::Mirror,
+        Subscription::State,
+        Subscription::Timeline,
+    ];
+
+    /// Wire name, matching Swift's raw values.
+    pub fn name(self) -> &'static str {
+        match self {
+            Subscription::Tree => "tree",
+            Subscription::Log => "log",
+            Subscription::Timing => "timing",
+            Subscription::Mirror => "mirror",
+            Subscription::State => "state",
+            Subscription::Timeline => "timeline",
+        }
+    }
+
+    pub fn parse(name: &str) -> Option<Self> {
+        Subscription::ALL.into_iter().find(|value| value.name() == name)
+    }
+}
+
+/// Swift's `DevToolsSubscription`: the same six subscriptions, one definition.
+pub type DevToolsSubscription = Subscription;
+
 #[derive(Default)]
 pub struct Session {
     pub subscriptions: BTreeSet<Subscription>,
@@ -124,6 +154,51 @@ fn valid_color(value: &JsonValue) -> bool {
             && s.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
     })
 }
+/// Swift's `InspectionValidation`: the command allowlist plus the payload
+/// predicates the session uses to reject a malformed inspection request.
+pub struct InspectionValidation;
+
+impl InspectionValidation {
+    /// Every inspection command. A name outside this set is unknown, not
+    /// merely invalid.
+    pub const COMMANDS: [&'static str; 10] = [
+        "inspect.pick.start",
+        "inspect.pick.stop",
+        "inspect.hover",
+        "inspect.pick",
+        "inspect.style.set",
+        "inspect.style.undo",
+        "inspect.style.redo",
+        "inspect.style.clear",
+        "inspect.style.clearAll",
+        "inspect.recomposition.reset",
+    ];
+
+    pub fn is_command(kind: &str) -> bool {
+        Self::COMMANDS.contains(&kind)
+    }
+
+    /// Node identifiers are non-empty and at most 128 bytes.
+    pub fn valid_id(value: Option<&JsonValue>) -> bool {
+        valid_id(value)
+    }
+
+    /// `#RRGGBB` or `#RRGGBBAA`.
+    pub fn valid_color(value: &JsonValue) -> bool {
+        valid_color(value)
+    }
+
+    /// A finite JSON number.
+    pub fn number(value: Option<&JsonValue>) -> Option<f64> {
+        value.and_then(JsonValue::as_f64).filter(|number| number.is_finite())
+    }
+
+    /// The reason a request cannot run, or `None` when it is valid.
+    pub fn error(request: &Envelope) -> Option<&'static str> {
+        inspection_error(request)
+    }
+}
+
 pub fn inspection_error(request: &Envelope) -> Option<&'static str> {
     let object = request.payload.as_ref().and_then(JsonValue::as_object);
     match request.r#type.as_str() {

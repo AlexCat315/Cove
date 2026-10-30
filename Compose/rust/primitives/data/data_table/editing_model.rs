@@ -140,6 +140,92 @@ impl DataTableEditingState {
     }
 }
 
+/// One in-progress cell edit, keyed by the table's own row identity.
+///
+/// The string-keyed [`DataTableCellDraft`] above is the identity-free form used
+/// by the model tests; a mounted table uses this one so a row id never has to
+/// round-trip through a `String`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CellDraft<Id> {
+    pub row_id: Id,
+    pub column_id: String,
+    pub original: String,
+    pub buffer: String,
+    pub error: Option<String>,
+}
+
+impl<Id: Clone + Eq> CellDraft<Id> {
+    /// Whether this draft already owns `(row_id, column_id)`.
+    pub fn is_for(&self, row_id: &Id, column_id: &str) -> bool {
+        self.row_id == *row_id && self.column_id == column_id
+    }
+
+    /// Whether the buffer differs from the text the editor opened with.
+    pub fn is_dirty(&self) -> bool {
+        self.buffer != self.original
+    }
+}
+
+/// Id-keyed draft lifecycle for a mounted table.
+#[derive(Clone, Debug, Default)]
+pub struct CellEditing<Id> {
+    pub draft: Option<CellDraft<Id>>,
+}
+
+impl<Id: Clone + Eq> CellEditing<Id> {
+    pub fn new() -> Self {
+        Self { draft: None }
+    }
+
+    pub fn is_editing(&self, row_id: &Id, column_id: &str) -> bool {
+        self.draft.as_ref().is_some_and(|draft| draft.is_for(row_id, column_id))
+    }
+
+    pub fn error(&self) -> Option<&str> {
+        self.draft.as_ref().and_then(|draft| draft.error.as_deref())
+    }
+
+    pub fn cancel(&mut self) {
+        self.draft = None;
+    }
+
+    /// Opens a draft for one cell, replacing any other.
+    pub fn begin(&mut self, row_id: Id, column_id: impl Into<String>, initial: impl Into<String>) {
+        let initial = initial.into();
+        self.draft = Some(CellDraft {
+            row_id,
+            column_id: column_id.into(),
+            original: initial.clone(),
+            buffer: initial,
+            error: None,
+        });
+    }
+
+    pub fn set_buffer(&mut self, value: impl Into<String>) {
+        if let Some(draft) = &mut self.draft {
+            draft.buffer = value.into();
+            draft.error = None;
+        }
+    }
+
+    /// Rejects the open draft, keeping the buffer the person typed.
+    pub fn reject(&mut self, message: impl Into<String>) {
+        if let Some(draft) = &mut self.draft {
+            draft.error = Some(message.into());
+        }
+    }
+
+    /// Closes the draft and reports the value to persist, when it changed.
+    pub fn accept(&mut self) -> Option<(Id, String, String)> {
+        let draft = self.draft.take()?;
+        if draft.is_dirty() {
+            Some((draft.row_id, draft.column_id, draft.buffer))
+        } else {
+            None
+        }
+    }
+}
+
 /// One column's editability, for Tab traversal.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EditableColumn {

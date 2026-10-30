@@ -107,6 +107,54 @@ pub enum ComparisonResult {
     Descending,
 }
 
+/// How a column's cell becomes editable text.
+///
+/// The table owns only the draft lifecycle; reading the current value and
+/// writing the accepted one stay with the caller, so a record type needs no
+/// editor protocol of its own.
+pub struct TableTextEditing<Record> {
+    pub text: Rc<dyn Fn(&Record) -> String>,
+    pub update: Rc<dyn Fn(&mut Record, &str)>,
+    /// A message rejects the draft and leaves the authored row untouched.
+    pub validate: Option<Rc<dyn Fn(&str) -> Option<String>>>,
+}
+
+impl<Record> Clone for TableTextEditing<Record> {
+    fn clone(&self) -> Self {
+        Self {
+            text: self.text.clone(),
+            update: self.update.clone(),
+            validate: self.validate.clone(),
+        }
+    }
+}
+
+impl<Record> TableTextEditing<Record> {
+    pub fn new(
+        text: impl Fn(&Record) -> String + 'static,
+        update: impl Fn(&mut Record, &str) + 'static,
+    ) -> Self {
+        Self { text: Rc::new(text), update: Rc::new(update), validate: None }
+    }
+
+    pub fn validate(mut self, validate: impl Fn(&str) -> Option<String> + 'static) -> Self {
+        self.validate = Some(Rc::new(validate));
+        self
+    }
+
+    pub fn text_of(&self, record: &Record) -> String {
+        (self.text)(record)
+    }
+
+    pub fn apply(&self, record: &mut Record, value: &str) {
+        (self.update)(record, value);
+    }
+
+    pub fn rejection(&self, value: &str) -> Option<String> {
+        self.validate.as_ref().and_then(|validate| validate(value))
+    }
+}
+
 /// One column: title, layout, sort comparison and cell content.
 pub struct TableColumn<Record> {
     pub id: String,
@@ -115,6 +163,8 @@ pub struct TableColumn<Record> {
     pub visibility: ColumnVisibility,
     /// Equal comparisons retain source order in both sort directions.
     pub compare: Option<Rc<dyn Fn(&Record, &Record) -> ComparisonResult>>,
+    /// Present when the column can be edited in place.
+    pub text_editing: Option<TableTextEditing<Record>>,
     content: Rc<dyn Fn(&Record) -> AnyView>,
 }
 
@@ -126,6 +176,7 @@ impl<Record> Clone for TableColumn<Record> {
             layout: self.layout,
             visibility: self.visibility,
             compare: self.compare.clone(),
+            text_editing: self.text_editing.clone(),
             content: self.content.clone(),
         }
     }
@@ -143,6 +194,7 @@ impl<Record> TableColumn<Record> {
             layout: TableColumnLayout::default(),
             visibility: ColumnVisibility::Required,
             compare: None,
+            text_editing: None,
             content: Rc::new(content),
         }
     }
@@ -162,6 +214,11 @@ impl<Record> TableColumn<Record> {
         compare: impl Fn(&Record, &Record) -> ComparisonResult + 'static,
     ) -> Self {
         self.compare = Some(Rc::new(compare));
+        self
+    }
+
+    pub fn text_editing(mut self, editing: TableTextEditing<Record>) -> Self {
+        self.text_editing = Some(editing);
         self
     }
 

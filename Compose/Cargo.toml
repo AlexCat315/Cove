@@ -172,3 +172,75 @@ path = "rust/tests/command_palette_model.rs"
 [[test]]
 name = "wheel_picker"
 path = "rust/tests/wheel_picker.rs"
+
+[[test]]
+name = "slider"
+path = "rust/tests/slider.rs"
+
+[[test]]
+name = "avatar"
+path = "rust/tests/avatar.rs"
+
+[[test]]
+name = "theme"
+path = "rust/tests/theme.rs"
+
+[[test]]
+name = "grid_span"
+path = "rust/tests/grid_span.rs"
+
+[[test]]
+name = "text_divider"
+path = "rust/tests/text_divider.rs"
+
+[[test]]
+name = "avatar_presence"
+path = "rust/tests/avatar_presence.rs"
+
+[[test]]
+name = "text_selection_geometry"
+path = "rust/tests/text_selection_geometry.rs"
+
+[[test]]
+name = "numeric_locale"
+path = "rust/tests/numeric_locale.rs"
+
+[[test]]
+name = "view_graph"
+path = "rust/tests/view_graph.rs"
+
+[[test]]
+name = "overlay"
+path = "rust/tests/overlay.rs"
+
+[[test]]
+name = "theme_environment"
+path = "rust/tests/theme_environment.rs"
+
+[[test]]
+name = "app_storage"
+path = "rust/tests/app_storage.rs"
+
+[[test]]
+name = "data_table_model"
+path = "rust/tests/data_table_model.rs"
+
+[[test]]
+name = "data_table_layout"
+path = "rust/tests/data_table_layout.rs"
+
+[[test]]
+name = "tree_behavior"
+path = "rust/tests/tree_behavior.rs"
+
+[[test]]
+name = "data_table_layout_order"
+path = "rust/tests/data_table_layout_order.rs"
+
+[[test]]
+name = "data_table_interaction"
+path = "rust/tests/data_table_interaction.rs"
+
+[[test]]
+name = "property_grid_sizing"
+path = "rust/tests/property_grid_sizing.rs"

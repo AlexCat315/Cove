@@ -4,7 +4,9 @@
 //! `TreeNodeKey`) are shared with the future translation of the large
 //! `Tree.swift` view, so they live here rather than inside that view.
 pub mod options;
+pub mod view;
 
+pub use view::{flatten_tree, Tree, TreeEntry, TreeSearchMetadata};
 pub use options::{
     TreeDragOperations, TreeEvents, TreeLayout, TreeOptions, TreeSearch, TreeSelection, TreeSlots,
 };

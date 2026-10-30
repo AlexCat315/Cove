@@ -112,3 +112,51 @@ path = "rust/tests/layer_aware_renderer.rs"
 [[test]]
 name = "linear_gradient"
 path = "rust/tests/linear_gradient.rs"
+
+[[test]]
+name = "node_tree_tests"
+path = "rust/tests/node_tree_tests.rs"
+
+[[test]]
+name = "z_index_tests"
+path = "rust/tests/z_index_tests.rs"
+
+[[test]]
+name = "node_lifecycle_cleanup_tests"
+path = "rust/tests/node_lifecycle_cleanup_tests.rs"
+
+[[test]]
+name = "recomposer_tests"
+path = "rust/tests/recomposer_tests.rs"
+
+[[test]]
+name = "scaled_hit_tester_tests"
+path = "rust/tests/scaled_hit_tester_tests.rs"
+
+[[test]]
+name = "geometry_funnel_repro_tests"
+path = "rust/tests/geometry_funnel_repro_tests.rs"
+
+[[test]]
+name = "layout_tests"
+path = "rust/tests/layout_tests.rs"
+
+[[test]]
+name = "flat_render_plan_tests"
+path = "rust/tests/flat_render_plan_tests.rs"
+
+[[test]]
+name = "observation_tests"
+path = "rust/tests/observation_tests.rs"
+
+[[test]]
+name = "node_renderer_tests"
+path = "rust/tests/node_renderer_tests.rs"
+
+[[test]]
+name = "shadow_quantization_tests"
+path = "rust/tests/shadow_quantization_tests.rs"
+
+[[test]]
+name = "rounded_clip_tests"
+path = "rust/tests/rounded_clip_tests.rs"

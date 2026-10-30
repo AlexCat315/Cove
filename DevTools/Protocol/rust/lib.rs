@@ -1,12 +1,26 @@
 //! Transport-neutral DevTools schema. Rust input recordings use protocol 0.2.
+//!
+//! Swift's `JSONValue` maps to `JsonValue` below — deliberately a re-export of
+//! `serde_json::Value`, not a second type: that enum already has exactly Swift's
+//! variants (`Null`/`Bool`/`Number`/`String`/`Array`/`Object`) and its accessors
+//! are Swift's `stringValue`/`objectValue`. Keeping one type means a payload can
+//! never hold two incompatible JSON trees.
 mod recording;
 mod session;
 pub use recording::*;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 pub use serde_json::Value as JsonValue;
 pub use session::*;
 
 pub const PROTOCOL_VERSION: &str = "cove-devtools/0.2";
+
+/// Swift's `DevToolsProtocol` namespace. The Rust crate keeps the version in
+/// `PROTOCOL_VERSION`, which is the value `hello` advertises.
+pub struct DevToolsProtocol;
+
+impl DevToolsProtocol {
+    pub const VERSION: &'static str = PROTOCOL_VERSION;
+}
 
 macro_rules! payload {
     ($name:ident { $($(#[$attr:meta])* $field:ident : $kind:ty),* $(,)? }) => {
@@ -214,4 +228,115 @@ payload!(DevToolsDiscovery {
 /// absent or malformed payload, matching Swift's `decodePayload(_:from:)`.
 pub fn decode_payload<T: serde::de::DeserializeOwned>(payload: &Option<JsonValue>) -> Option<T> {
     serde_json::from_value(payload.clone()?).ok()
+}
+
+/// Serialisation helpers, matching Swift's `DevToolsCodec`.
+pub struct DevToolsCodec;
+
+impl DevToolsCodec {
+    /// Host-produced protocol values must be finite and JSON-encodable. A value
+    /// that is not yields `Null` rather than panicking the way Swift's `try!`
+    /// would.
+    pub fn json<T: Serialize>(value: &T) -> JsonValue {
+        serde_json::to_value(value).unwrap_or(JsonValue::Null)
+    }
+
+    /// Decode a payload slot into a concrete type.
+    pub fn decode<T: DeserializeOwned>(payload: &Option<JsonValue>) -> Option<T> {
+        decode_payload(payload)
+    }
+}
+
+/// Swift names for the wire types above. Each is the same value as the Rust
+/// name it points at, never a parallel definition, so the two spellings cannot
+/// drift apart.
+pub type DevToolsEnvelope = Envelope;
+pub type InputInventoryPayload = InputInventory;
+pub type MirrorActivatePayload = MirrorActivate;
+/// Swift nests this in `MirrorActivatePayload.Action`.
+pub type MirrorActivateAction = MirrorAction;
+pub type MirrorFramePayload = MirrorFrame;
+pub type MirrorInputPayload = MirrorInput;
+pub type MirrorStartPayload = MirrorStart;
+pub type MirrorStoppedPayload = MirrorStopped;
+pub type RenderInventoryPayload = RenderInventory;
+pub type SelectNodePayload = SelectNode;
+pub type TimingFramePayload = TimingFrame;
+pub type TreeSnapshotPayload = TreeSnapshot;
+pub type WindowResizePayload = WindowResize;
+pub type ObservedStatePayload = ObservedState;
+pub type RegisteredStatePayload = RegisteredState;
+pub type StateObservationPayload = StateObservation;
+pub type StateWatchPayload = StateWatch;
+pub type TimelineEventPayload = TimelineEvent;
+pub type TimelineReasonPayload = TimelineReason;
+pub type TimelineSnapshotPayload = TimelineSnapshot;
+pub type RecompositionPayload = Recomposition;
+pub type RecompositionReasonPayload = RecompositionReason;
+pub type SourceLocationPayload = SourceLocation;
+
+/// Swift nested this in `DevToolsProtocol`; the seven cases and their wire names
+/// are already `cove_logging::Level`, so there is one definition.
+pub type LogLevel = cove_logging::Level;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn envelope_uses_the_swift_field_names() {
+        let envelope = DevToolsEnvelope::new("tree.subscribe", Some(3), None);
+        let value = serde_json::to_value(&envelope).unwrap();
+        assert_eq!(value["type"], "tree.subscribe");
+        assert_eq!(value["id"], 3);
+        assert!(value.get("payload").is_some());
+    }
+
+    #[test]
+    fn payloads_round_trip_through_the_codec() {
+        let frame = TimingFramePayload {
+            frame: 1,
+            recomposition_ms: None,
+            layout_ms: 0.5,
+            draw_ms: 0.25,
+            present_ms: 0.125,
+            presented: Some(true),
+            total_ms: 1.0,
+            node_count: 4,
+            batch_count: 2,
+        };
+        let payload = Some(DevToolsCodec::json(&frame));
+        assert_eq!(DevToolsCodec::decode::<TimingFramePayload>(&payload), Some(frame));
+        let value = payload.unwrap();
+        assert!(value.get("recompositionMs").is_some());
+        assert!(value.get("presented").is_some());
+    }
+
+    #[test]
+    fn mirror_activate_reads_the_snake_case_node_id() {
+        let payload = Some(serde_json::json!({ "node_id": "7" }));
+        let decoded = DevToolsCodec::decode::<MirrorActivatePayload>(&payload).unwrap();
+        assert_eq!(decoded.node_id, "7");
+        assert_eq!(decoded.action, MirrorAction::Activate);
+    }
+
+    #[test]
+    fn source_location_keeps_the_capitalised_id_keys() {
+        let location = SourceLocationPayload {
+            file_id: "f".into(),
+            file_path: "/tmp/a.swift".into(),
+            line: 1,
+            column: 2,
+        };
+        let value = DevToolsCodec::json(&location);
+        assert_eq!(value["fileID"], "f");
+        assert_eq!(value["filePath"], "/tmp/a.swift");
+    }
+
+    #[test]
+    fn json_value_is_serde_json_value() {
+        let value: JsonValue = serde_json::json!({ "a": 1 });
+        assert_eq!(value.as_object().map(|object| object.len()), Some(1));
+        assert_eq!(DevToolsProtocol::VERSION, PROTOCOL_VERSION);
+    }
 }

@@ -1,0 +1,559 @@
+//! Immersive window chrome views.
+//!
+//! Translation of the view half of
+//! `Hosts/Desktop/Sources/CoveUI/Window/WindowChrome.swift`. The Swift file mixed
+//! the immersive title bar with the native hit-test collector; `chrome.rs` owns
+//! the host half (the per-window ambient, attachment keys and the incremental
+//! collector) and this module owns the composed views:
+//!
+//! - [`ImmersiveWindowTitleBar`] — the title bar row itself;
+//! - [`WindowDragRegion`] — the region the platform may use to drag the window;
+//! - [`WindowControlStrip`] / [`WindowControlButton`] — custom minimize,
+//!   maximize/restore and close;
+//! - [`WindowChromeInteractiveRegion`] — marks a region that must stay
+//!   interactive.
+//!
+//! `NativeMenuInstaller` / `NativeMenuActionTarget` have no Rust counterpart by
+//! design: `window::native_menu` owns the installer (an action table plus the
+//! AppKit presenter) and the bridge routes chosen ids back to authored closures,
+//! so a separate target object would duplicate the action table.
+use cove_composition::{
+    impl_primitive_view, AnyView, LayoutDebugAttachmentKey, PrimitiveView, View, ViewExt,
+};
+use cove_core::scene::{
+    Align, FlexDirection, InputHandlerRoute, InputRoutingPriority, InteractionRegistryHolder, Justify, LayoutNode,
+    Node,
+};
+use cove_platform::MouseButton;
+use cove_shell::WindowChromeHitTest;
+use cove_ui_compose::primitives::controls::button::{ButtonIcon, ButtonIconSource};
+use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
+use std::rc::Rc;
+
+use super::chrome::{
+    platform_resize_border_width, AppWindowChromeContextHolder, ImmersiveWindowControlStyle, CONFIGURATION_KEY,
+    DRAG_REGION_KEY, INTERACTIVE_REGION_KEY,
+};
+use crate::desktop::application::composition::AppDisplayHandleHolder;
+use crate::desktop::display::AppDisplayHandle;
+
+/// Default title bar height. The bar is `height` tall including its padding.
+pub const DEFAULT_TITLE_BAR_HEIGHT: f32 = 34.0;
+/// Default synthetic resize border on platforms without a native one.
+pub const DEFAULT_RESIZE_BORDER_WIDTH: f32 = 6.0;
+/// macOS keeps the native traffic lights, so the leading controls are reserved.
+pub const DEFAULT_NATIVE_CONTROLS_LEADING_INSET: f32 = 76.0;
+/// Custom control strip width.
+pub const CONTROL_STRIP_WIDTH: f32 = 100.0;
+
+/// The immersive title bar.
+///
+/// The leading content is supplied by the host; the drag region absorbs the
+/// remaining width so the whole bar row moves the window. On macOS the native
+/// traffic lights occupy the leading inset and no custom strip is drawn.
+pub struct ImmersiveWindowTitleBar {
+    pub height: f32,
+    pub resize_border_width: f32,
+    pub control_style: ImmersiveWindowControlStyle,
+    pub native_controls_leading_inset: f32,
+    pub leading: AnyView,
+}
+
+impl ImmersiveWindowTitleBar {
+    pub fn new(leading: impl View + 'static) -> Self {
+        Self {
+            height: DEFAULT_TITLE_BAR_HEIGHT,
+            resize_border_width: DEFAULT_RESIZE_BORDER_WIDTH,
+            control_style: ImmersiveWindowControlStyle::Automatic,
+            native_controls_leading_inset: DEFAULT_NATIVE_CONTROLS_LEADING_INSET,
+            leading: AnyView::new(leading),
+        }
+    }
+
+    pub fn height(mut self, height: f32) -> Self {
+        self.height = height.max(0.0);
+        self
+    }
+
+    pub fn resize_border_width(mut self, width: f32) -> Self {
+        self.resize_border_width = width.max(0.0);
+        self
+    }
+
+    pub fn control_style(mut self, style: ImmersiveWindowControlStyle) -> Self {
+        self.control_style = style;
+        self
+    }
+
+    pub fn native_controls_leading_inset(mut self, inset: f32) -> Self {
+        self.native_controls_leading_inset = inset.max(0.0);
+        self
+    }
+}
+
+impl View for ImmersiveWindowTitleBar {
+    fn body(&self) -> AnyView {
+        let style = self.control_style.resolve();
+        let mut children: Vec<AnyView> = Vec::new();
+        if style == ImmersiveWindowControlStyle::Native {
+            children.push(AnyView::new(WindowChromeFixedSpace { width: self.native_controls_leading_inset }));
+        }
+        children.push(AnyView::new(WindowChromeInteractiveRegion::new(self.leading.clone())));
+        children.push(AnyView::new(AnyView::new(WindowDragRegion::default()).modifier(WindowDragRegionHeight(self.height))));
+        if style == ImmersiveWindowControlStyle::Custom {
+            children.push(
+                AnyView::new(AnyView::new(WindowControlStrip::new()).modifier(WindowControlStripFrame)),
+            );
+        }
+        AnyView::new(
+            WindowChromeRow { children }.modifier(WindowTitleBarModifier {
+                height: self.height,
+                resize_border_width: platform_resize_border_width(self.resize_border_width),
+            }),
+        )
+    }
+}
+
+/// `WindowChromeFixedSpace`: a non-hit-testable width reservation for the
+/// platform's own window controls.
+pub struct WindowChromeFixedSpace {
+    pub width: f32,
+}
+
+impl PrimitiveView for WindowChromeFixedSpace {
+    fn make_node(&self) -> Node {
+        let node = Node::new();
+        node.set_is_hit_testable(false);
+        node
+    }
+    fn update_node(&self, _node: &Node) {}
+    fn make_layout_node(&self) -> Option<LayoutNode> {
+        let layout = LayoutNode::new();
+        layout.set_width(Some(self.width));
+        layout.set_height(Some(1.0));
+        layout.set_flex_shrink(0.0);
+        Some(layout)
+    }
+    fn update_layout(&self, layout: &LayoutNode) {
+        layout.set_width(Some(self.width));
+        layout.set_height(Some(1.0));
+        layout.set_flex_shrink(0.0);
+    }
+}
+impl_primitive_view!(WindowChromeFixedSpace);
+
+/// The title bar row: leading, drag region, optional custom controls.
+struct WindowChromeRow {
+    children: Vec<AnyView>,
+}
+
+impl PrimitiveView for WindowChromeRow {
+    fn make_node(&self) -> Node {
+        let node = Node::new();
+        node.set_is_hit_testable(false);
+        node
+    }
+    fn update_node(&self, _node: &Node) {}
+    fn make_layout_node(&self) -> Option<LayoutNode> {
+        let layout = LayoutNode::new();
+        layout.set_flex_direction(FlexDirection::Row);
+        layout.set_align_items(Align::Center);
+        layout.set_justify_content(Justify::FlexStart);
+        layout.set_min_width(Some(0.0));
+        Some(layout)
+    }
+    fn children(&self, _node: &Node) -> Vec<AnyView> {
+        self.children.clone()
+    }
+}
+impl_primitive_view!(WindowChromeRow);
+
+/// Installs the authored hit-test declaration, then the bar's own frame and
+/// roles. The installer node is a zero-size child so a title bar can carry more
+/// than one.
+struct WindowTitleBarModifier {
+    height: f32,
+    resize_border_width: f32,
+}
+
+impl cove_composition::ViewModifier for WindowTitleBarModifier {
+    fn apply_node(&self, node: &Node) {
+        node.set_attachment(
+            CONFIGURATION_KEY,
+            WindowChromeHitTest {
+                title_bar_height: self.height,
+                resize_border_width: self.resize_border_width,
+                uses_explicit_drag_rects: true,
+                ..WindowChromeHitTest::default()
+            },
+        );
+        node.set_z_index(20_000.0);
+        node.set_attachment(LayoutDebugAttachmentKey::LAYOUT_ROLE, "app-window-title-bar".to_owned());
+        node.set_attachment(LayoutDebugAttachmentKey::DEBUG_NAME, "app-window-title-bar".to_owned());
+        let colors = cove_ui_compose::theme::theme_for_node(node).colors;
+        node.set_background_color(Some(colors.surface));
+    }
+    fn apply_layout(&self, layout: &LayoutNode) {
+        layout.set_flex_direction(FlexDirection::Row);
+        layout.set_align_items(Align::Center);
+        layout.set_height(Some(self.height));
+        layout.set_flex_shrink(0.0);
+        layout.set_padding(6.0, cove_core::scene::Edge::Left);
+        layout.set_padding(6.0, cove_core::scene::Edge::Right);
+        layout.set_padding(3.0, cove_core::scene::Edge::Top);
+        layout.set_padding(3.0, cove_core::scene::Edge::Bottom);
+    }
+}
+
+struct WindowDragRegionHeight(f32);
+
+impl cove_composition::ViewModifier for WindowDragRegionHeight {
+    fn apply_layout(&self, layout: &LayoutNode) {
+        layout.set_height(Some(self.0));
+    }
+}
+
+struct WindowControlStripFrame;
+
+impl cove_composition::ViewModifier for WindowControlStripFrame {
+    fn apply_layout(&self, layout: &LayoutNode) {
+        layout.set_width(Some(CONTROL_STRIP_WIDTH));
+        layout.set_height(Some(24.0));
+        layout.set_flex_shrink(0.0);
+    }
+}
+
+/// `WindowDragRegion`: the empty band the platform treats as a drag handle. A
+/// double click toggles maximize on every platform, matching the Swift pointer
+/// handler.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct WindowDragRegion {
+    pub min_length: f32,
+}
+
+impl WindowDragRegion {
+    pub fn new(min_length: f32) -> Self {
+        Self { min_length: min_length.max(0.0) }
+    }
+}
+
+impl PrimitiveView for WindowDragRegion {
+    fn make_node(&self) -> Node {
+        let node = Node::new();
+        node.set_is_hit_testable(true);
+        node
+    }
+
+    fn update_node(&self, node: &Node) {
+        node.set_attachment(DRAG_REGION_KEY, true);
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
+        let route = InputHandlerRoute::new(
+            cove_core::scene::InputHandlerRole::Control,
+            InputRoutingPriority::CAPTURE,
+            "window.chrome.dragRegion",
+        );
+        registry.set_pointer(node, route, Rc::new(move |event, phase, _| {
+            if phase != cove_core::scene::PointerPhase::Down
+                || event.button != MouseButton::Left
+                || event.clicks < 2
+            {
+                return cove_core::scene::EventResult::Ignored;
+            }
+            with_display_handle(|handle| match AppWindowChromeContextHolder::current() {
+                Some(context) => handle.toggle_maximize_window_for(context.window_id),
+                None => handle.toggle_maximize_window(),
+            });
+            cove_core::scene::EventResult::Handled
+        }));
+    }
+
+    fn make_layout_node(&self) -> Option<LayoutNode> {
+        Some(LayoutNode::new())
+    }
+
+    fn update_layout(&self, layout: &LayoutNode) {
+        layout.set_flex_grow(1.0);
+        if self.min_length > 0.0 {
+            layout.set_flex_basis(self.min_length);
+        }
+    }
+}
+impl_primitive_view!(WindowDragRegion);
+
+/// `WindowChromeInteractiveRegionModifier`: marks a subtree that must stay
+/// interactive rather than becoming a drag handle.
+pub struct WindowChromeInteractiveRegion {
+    pub content: AnyView,
+}
+
+impl WindowChromeInteractiveRegion {
+    pub fn new(content: impl View + 'static) -> Self {
+        Self { content: AnyView::new(content) }
+    }
+}
+
+impl View for WindowChromeInteractiveRegion {
+    fn body(&self) -> AnyView {
+        AnyView::new(self.content.clone().modifier(WindowChromeInteractiveRegionModifier))
+    }
+}
+
+struct WindowChromeInteractiveRegionModifier;
+
+impl cove_composition::ViewModifier for WindowChromeInteractiveRegionModifier {
+    fn apply_node(&self, node: &Node) {
+        node.set_attachment(INTERACTIVE_REGION_KEY, true);
+    }
+}
+
+/// `WindowControlStrip`: minimize, maximize/restore and close. The maximize glyph
+/// is derived from the real window state each render, so a click also forces a
+/// display request.
+pub struct WindowControlStrip;
+
+impl WindowControlStrip {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl Default for WindowControlStrip {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl View for WindowControlStrip {
+    fn body(&self) -> AnyView {
+        let window_id = AppWindowChromeContextHolder::current().map(|context| context.window_id);
+        let is_maximized = is_window_maximized(window_id);
+
+        let minimize = WindowControlButton::new(
+            icons::navigation::minimize(),
+            "Minimize",
+            "window-control-minimize",
+            Background::Normal,
+            move || {
+                with_display_handle(|handle| match window_id {
+                    Some(id) => handle.minimize_window_for(id),
+                    None => handle.minimize_window(),
+                });
+            },
+        );
+        let maximize = WindowControlButton::new(
+            if is_maximized { icons::navigation::shrink() } else { icons::navigation::maximize() },
+            if is_maximized { "Restore" } else { "Maximize" },
+            if is_maximized { "window-control-restore" } else { "window-control-maximize" },
+            Background::Normal,
+            move || {
+                with_display_handle(|handle| match window_id {
+                    Some(id) => handle.toggle_maximize_window_for(id),
+                    None => handle.toggle_maximize_window(),
+                });
+                with_display_handle(|handle| handle.request_display());
+            },
+        );
+        let close = WindowControlButton::new(
+            icons::action::x(),
+            "Close",
+            "window-control-close",
+            Background::Destructive,
+            move || {
+                with_display_handle(|handle| match window_id {
+                    Some(id) => handle.close_window(id),
+                    None => handle.close_main_window(),
+                });
+            },
+        );
+
+        AnyView::new(WindowControlRow {
+            children: vec![
+                AnyView::new(minimize),
+                AnyView::new(maximize),
+                AnyView::new(close),
+            ],
+        })
+    }
+}
+
+/// Whether the close button draws destructive.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Background {
+    #[default]
+    Normal,
+    Destructive,
+}
+
+/// `WindowControlButton`: one 32x24 icon-only action.
+pub struct WindowControlButton {
+    icon: cove_imaging::BundleImageResource,
+    tooltip: String,
+    debug_name: String,
+    background: Background,
+    action: Rc<dyn Fn()>,
+}
+
+impl WindowControlButton {
+    pub fn new(
+        icon: cove_imaging::BundleImageResource,
+        tooltip: impl Into<String>,
+        debug_name: impl Into<String>,
+        background: Background,
+        action: impl Fn() + 'static,
+    ) -> Self {
+        Self {
+            icon,
+            tooltip: tooltip.into(),
+            debug_name: debug_name.into(),
+            background,
+            action: Rc::new(action),
+        }
+    }
+}
+
+impl PrimitiveView for WindowControlButton {
+    fn make_node(&self) -> Node {
+        let node = Node::new();
+        node.set_is_hit_testable(true);
+        node.set_is_focusable(true);
+        node
+    }
+
+    fn update_node(&self, node: &Node) {
+        node.set_attachment(INTERACTIVE_REGION_KEY, true);
+        node.set_attachment(LayoutDebugAttachmentKey::DEBUG_NAME, self.debug_name.clone());
+        let mut semantics = cove_core::scene::AccessibilitySemantics::new(
+            cove_core::scene::AccessibilityRole::Button,
+        );
+        semantics.label = self.tooltip.clone();
+        node.set_accessibility(Some(semantics));
+        let mut actions = node.accessibility_actions();
+        let action = self.action.clone();
+        actions.activate = Some(Rc::new(move || action()));
+        node.set_accessibility_actions(actions);
+
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
+        let pointer_action = self.action.clone();
+        registry.set_pointer(node, InputHandlerRoute::new(
+            cove_core::scene::InputHandlerRole::Control,
+            InputRoutingPriority::CAPTURE,
+            "window.chrome.control",
+        ), Rc::new(move |event, phase, _| {
+            if phase != cove_core::scene::PointerPhase::Up || event.button != MouseButton::Left {
+                return cove_core::scene::EventResult::Ignored;
+            }
+            pointer_action();
+            cove_core::scene::EventResult::Handled
+        }));
+    }
+
+    fn make_layout_node(&self) -> Option<LayoutNode> {
+        let layout = LayoutNode::new();
+        layout.set_flex_direction(FlexDirection::Row);
+        layout.set_align_items(Align::Center);
+        layout.set_justify_content(Justify::Center);
+        layout.set_width(Some(32.0));
+        layout.set_height(Some(24.0));
+        layout.set_flex_shrink(0.0);
+        Some(layout)
+    }
+
+    fn update_layout(&self, layout: &LayoutNode) {
+        layout.set_width(Some(32.0));
+        layout.set_height(Some(24.0));
+        layout.set_flex_shrink(0.0);
+    }
+
+    fn children(&self, node: &Node) -> Vec<AnyView> {
+        let tint = if self.background == Background::Destructive {
+            let colors = cove_ui_compose::theme::theme_for_node(node).colors;
+            Some(colors.error)
+        } else {
+            None
+        };
+        vec![AnyView::new(ButtonIcon::new(
+            ButtonIconSource::resource(self.icon.clone()),
+            Some(12.0),
+            tint,
+        ))]
+    }
+}
+impl_primitive_view!(WindowControlButton);
+
+/// Two-point-spaced row of window control buttons.
+struct WindowControlRow {
+    children: Vec<AnyView>,
+}
+
+impl PrimitiveView for WindowControlRow {
+    fn make_node(&self) -> Node {
+        let node = Node::new();
+        node.set_is_hit_testable(false);
+        node
+    }
+    fn update_node(&self, _node: &Node) {}
+    fn make_layout_node(&self) -> Option<LayoutNode> {
+        let layout = LayoutNode::new();
+        layout.set_flex_direction(FlexDirection::Row);
+        layout.set_align_items(Align::Center);
+        layout.set_justify_content(Justify::FlexEnd);
+        layout.set_gap(2.0, cove_core::scene::Gutter::All);
+        Some(layout)
+    }
+    fn children(&self, _node: &Node) -> Vec<AnyView> {
+        self.children.clone()
+    }
+}
+impl_primitive_view!(WindowControlRow);
+
+fn is_window_maximized(window_id: Option<cove_platform::WindowId>) -> bool {
+    let Some(handle) = AppDisplayHandleHolder::current() else {
+        return false;
+    };
+    match window_id {
+        Some(id) => handle.is_window_maximized_for(id),
+        None => handle.is_window_maximized(),
+    }
+}
+
+/// Run `body` with the installed display handle, mirroring Swift's
+/// `withAppDisplayHandle`: no handle means the request goes nowhere.
+fn with_display_handle(body: impl FnOnce(&AppDisplayHandle)) {
+    if let Some(handle) = AppDisplayHandleHolder::current() {
+        body(&handle);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn automatic_control_style_matches_the_platform() {
+        let resolved = ImmersiveWindowControlStyle::Automatic.resolve();
+        #[cfg(target_os = "macos")]
+        assert_eq!(resolved, ImmersiveWindowControlStyle::Native);
+        #[cfg(not(target_os = "macos"))]
+        assert_eq!(resolved, ImmersiveWindowControlStyle::Custom);
+    }
+
+    #[test]
+    fn macos_needs_no_synthetic_resize_border() {
+        #[cfg(target_os = "macos")]
+        assert_eq!(platform_resize_border_width(DEFAULT_RESIZE_BORDER_WIDTH), 0.0);
+        #[cfg(not(target_os = "macos"))]
+        assert_eq!(platform_resize_border_width(DEFAULT_RESIZE_BORDER_WIDTH), DEFAULT_RESIZE_BORDER_WIDTH);
+    }
+
+    #[test]
+    fn drag_region_never_reserves_a_width() {
+        let region = WindowDragRegion::default();
+        let layout = region.make_layout_node().unwrap();
+        assert!(layout.width().is_none());
+        assert_eq!(region.min_length, 0.0);
+    }
+}

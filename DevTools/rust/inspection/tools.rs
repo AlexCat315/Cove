@@ -203,7 +203,7 @@ impl Tools {
     }
 
     pub fn skills() -> AgentSkillLibrary {
-        AgentSkillLibrary::default()
+        default_skill_library()
     }
 }
 

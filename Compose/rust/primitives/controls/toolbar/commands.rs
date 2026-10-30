@@ -35,6 +35,7 @@ pub struct ToolbarCommands {
     pub on_content_width: Option<Rc<dyn Fn(f32)>>,
     pub axis: ToolbarAxis,
     overflow: Rc<RefCell<Vec<u64>>>,
+    overflow_focus: Rc<crate::primitives::layout::split::SplitFocusTransfer>,
     is_presented: Rc<RefCell<bool>>,
     overflow_hovered: Rc<RefCell<bool>>,
 }
@@ -56,6 +57,7 @@ impl ToolbarCommands {
             on_content_width: None,
             axis,
             overflow: Rc::new(RefCell::new(Vec::new())),
+            overflow_focus: crate::primitives::layout::split::SplitFocusTransfer::new(),
             is_presented: Rc::new(RefCell::new(false)),
             overflow_hovered: Rc::new(RefCell::new(false)),
         }
@@ -85,6 +87,7 @@ impl ToolbarCommands {
             on_content_width: self.on_content_width.clone(),
             axis: self.axis,
             overflow: self.overflow.clone(),
+            overflow_focus: self.overflow_focus.clone(),
             is_presented: self.is_presented.clone(),
             overflow_hovered: self.overflow_hovered.clone(),
         }
@@ -178,12 +181,18 @@ impl cove_composition::ViewModifier for ActionControlLabel {
 
 impl View for ToolbarCommands {
     fn body(&self) -> AnyView {
-        AnyView::new(ToolbarCommandsBody { commands: self.snapshot() })
+        AnyView::new(ToolbarCommandsBody {
+            commands: self.snapshot(),
+            overflow_focus: self.overflow_focus.clone(),
+        })
     }
 }
 
 struct ToolbarCommandsBody {
     commands: ToolbarCommands,
+    /// Shared with `ToolbarRetainedCommand` so a hidden command remembers the
+    /// focus visibility it had, and the overflow row can restore it.
+    overflow_focus: Rc<crate::primitives::layout::split::SplitFocusTransfer>,
 }
 
 impl PrimitiveView for ToolbarCommandsBody {
@@ -209,6 +218,8 @@ impl PrimitiveView for ToolbarCommandsBody {
             let visible = !overflow.contains(&item.command.id);
             children.push(AnyView::new(ToolbarRetainedCommand {
                 is_visible: visible,
+                is_overflow: false,
+                focus: self.overflow_focus.clone(),
                 content: AnyView::new(
                     commands
                         .command(item)
@@ -269,6 +280,8 @@ impl PrimitiveView for ToolbarCommandsBody {
         .enabled(commands.is_enabled);
         children.push(AnyView::new(ToolbarRetainedCommand {
             is_visible: !overflow.is_empty(),
+            is_overflow: true,
+            focus: self.overflow_focus.clone(),
             content: AnyView::new(popover),
         }));
 
@@ -319,8 +332,13 @@ impl PrimitiveView for ToolbarCommandsBody {
 crate::impl_primitive_view!(ToolbarCommandsBody);
 
 /// A command that keeps its measured size even while parked off-screen.
+/// Keep command nodes measured and mounted while their menu representation is
+/// active. Hidden commands receive neither input nor accessibility traversal.
 struct ToolbarRetainedCommand {
     is_visible: bool,
+    /// Set on the overflow representation, which is what receives focus back.
+    is_overflow: bool,
+    focus: Rc<crate::primitives::layout::split::SplitFocusTransfer>,
     content: AnyView,
 }
 
@@ -332,7 +350,61 @@ impl PrimitiveView for ToolbarRetainedCommand {
     }
 
     fn update_node(&self, node: &Node) {
+        node.set_is_interaction_enabled(self.is_visible);
         node.set_opacity(if self.is_visible { 1.0 } else { 0.0 });
+        node.set_accessibility(Some(cove_core::scene::AccessibilitySemantics {
+            role: cove_core::scene::AccessibilityRole::Group,
+            is_hidden: !self.is_visible,
+            ..Default::default()
+        }));
+
+        if !self.is_visible {
+            // A hidden command must not keep focus or pointer capture, and the
+            // restored focus state is remembered for the next reveal.
+            if let Some(chain) = cove_core::scene::FocusChainHolder::current()
+                && let Some(focused) = chain.focused()
+                && chain.contains(&focused, node)
+            {
+                *self.focus.pending_visibility.borrow_mut() = Some(chain.is_focus_visible());
+                chain.clear();
+            }
+            if let Some(capture) = cove_core::scene::PointerCaptureHolder::current()
+                && let Some(target) = capture.target()
+                && cove_core::scene::FocusChainHolder::current()
+                    .is_some_and(|chain| chain.contains(&target, node))
+            {
+                capture.release();
+            }
+        }
+
+        // Once the overflow row lays out, hand focus to its first tab stop.
+        if self.is_overflow {
+            let focus = self.focus.clone();
+            let is_visible = self.is_visible;
+            node.set_layout_did_update(Some(Rc::new(move |owner: &Node| {
+                let Some(visible) = *focus.pending_visibility.borrow() else { return };
+                let mut pending = vec![owner.clone()];
+                let mut target = None;
+                while let Some(candidate) = pending.pop() {
+                    if !candidate.accepts_subtree_input() {
+                        continue;
+                    }
+                    if candidate.is_focusable() && candidate.is_tab_stop() {
+                        target = Some(candidate);
+                        break;
+                    }
+                    pending.extend(candidate.children().into_iter().rev());
+                }
+                let _ = is_visible;
+                if let Some(target) = target {
+                    if let Some(chain) = cove_core::scene::FocusChainHolder::current() {
+                        chain.focus(Some(&target), visible);
+                    }
+                    crate::primitives::layout::ScrollReveal::reveal(&target, false);
+                    *focus.pending_visibility.borrow_mut() = None;
+                }
+            })));
+        }
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {

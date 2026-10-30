@@ -121,7 +121,7 @@ impl PrimitiveView for SliderHost {
         }));
 
         let value_for_set = self.value.clone();
-        let host_for_set = Snapshot { range: self.range, step: self.step };
+        let host_for_set = Snapshot { range: self.range, step: self.step, shows_ticks: self.shows_ticks };
         let value_for_inc = self.value.clone();
         let host_for_inc = host_for_set;
         let value_for_dec = self.value.clone();
@@ -184,7 +184,7 @@ impl PrimitiveView for SliderHost {
         let vertical_axis = !self.axis.is_horizontal();
         node.set_attachment("__slider_axis", if vertical_axis { 1_u8 } else { 0_u8 });
         node.set_attachment("__slider_value", self.value.get().to_bits());
-        let snapshot = Snapshot { range: self.range, step: self.step };
+        let snapshot = Snapshot { range: self.range, step: self.step, shows_ticks: self.shows_ticks };
         let value_for_draw = self.value.clone();
         let weak = node.downgrade();
         node.update_draw(
@@ -315,6 +315,7 @@ impl_primitive_view!(SliderHost);
 struct Snapshot {
     range: (f64, f64),
     step: Option<f64>,
+    shows_ticks: bool,
 }
 
 impl Snapshot {
@@ -436,6 +437,22 @@ fn render(node: &Node, snapshot: &Snapshot, list: &mut cove_core::DrawList, orig
             appearance.track_corner_radius,
             appearance.fill_color,
         );
+    }
+    if snapshot.shows_ticks
+        && let Some(step) = snapshot.step
+    {
+        let tick_color = theme.colors.on_surface_muted.multiplied_alpha(0.6 * node.opacity());
+        for tick in super::paint::ticks(
+            &geometry,
+            origin,
+            appearance.track_height,
+            step,
+            span,
+            fraction,
+            appearance.thumb_length,
+        ) {
+            let _ = list.add_rect(tick.rect, tick_color);
+        }
     }
     let thumb_center = geometry.position(fraction);
     let thumb = geometry.thumb_rect(thumb_center, appearance.thumb_length, appearance.thumb_diameter, origin);

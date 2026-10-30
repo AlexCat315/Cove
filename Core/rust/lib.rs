@@ -1,4 +1,16 @@
 //! Geometry, owned draw buffers, observable state and animation primitives.
+//!
+//! The `UI`-prefixed names in `Core/Sources/CoveUICore` are spelled without the
+//! prefix here; the rename is deliberate and each pair is a straight port, not a
+//! gap. `UILinearGradient` → [`LinearGradient`], `UIVertex` → [`Vertex`],
+//! `UIRect` → [`Rect`], `UIClip` → [`Clip`], `UIRoundedRect` →
+//! [`RoundedRect`], `UIShader` → [`UI_SHADER_WGSL`], `UIReveal` → [`Reveal`],
+//! `LineBreaks` → [`line_break_opportunities`], `StateReadTracking` →
+//! [`ReadScope`], `UIEnvironment` → [`Environment`], `UIBackdrop` →
+//! [`Backdrop`], `UITextureAsset` → [`TextureAsset`], `DecodedImage` →
+//! [`Bitmap`], `InputContext` → [`scene::PlatformInputContext`], `TextLayout` →
+//! [`TextLayoutResult`] and `LayoutCalculationState` →
+//! [`scene::LayoutNodeData`].
 mod animation;
 mod adaptive_environment;
 mod analytic_clipper;

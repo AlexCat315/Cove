@@ -11,7 +11,9 @@ use super::ids::{
     WorkspaceTabGroupID,
 };
 use super::sizing::{WorkspacePanelSizing, WorkspaceRect};
+use cove_composition::{AnyView, EmptyView};
 use std::collections::BTreeMap;
+use std::rc::Rc;
 
 /// Recursive layout of a slot. A split is located by its two children; the
 /// common ancestor stays stable when hidden branches are compacted.
@@ -404,6 +406,137 @@ impl WorkspaceDocument {
             .iter()
             .filter(|(_, group)| !group.panels.is_empty())
             .all(|(id, _)| attached.contains(id))
+    }
+}
+
+/// Authored panel metadata has one representation; the factory is transient.
+pub struct WorkspacePanelDescriptor {
+    pub panel: WorkspacePanel,
+    pub default_slot: WorkspaceSlotID,
+    factory: Rc<dyn Fn() -> AnyView>,
+}
+
+impl WorkspacePanelDescriptor {
+    pub fn new(id: WorkspacePanelID, title: impl Into<String>) -> Self {
+        Self::with(Self::panel_for(id, title))
+    }
+
+    fn panel_for(id: WorkspacePanelID, title: impl Into<String>) -> WorkspacePanel {
+        WorkspacePanel::new(id, title)
+    }
+
+    pub fn with(panel: WorkspacePanel) -> Self {
+        Self { panel, default_slot: WorkspaceSlotID::center(), factory: Rc::new(|| AnyView::new(EmptyView)) }
+    }
+
+    pub fn default_slot(mut self, slot: WorkspaceSlotID) -> Self {
+        self.default_slot = slot;
+        self
+    }
+
+    pub fn configure(mut self, configure: impl FnOnce(&mut WorkspacePanel)) -> Self {
+        configure(&mut self.panel);
+        self
+    }
+
+    pub fn content(mut self, content: impl Fn() -> AnyView + 'static) -> Self {
+        self.factory = Rc::new(content);
+        self
+    }
+
+    /// The view for this panel. A descriptor without content renders empty,
+    /// like Swift's `AnyView(EmptyView())` fallback.
+    pub fn make(&self) -> AnyView {
+        (self.factory)()
+    }
+}
+
+impl Clone for WorkspacePanelDescriptor {
+    fn clone(&self) -> Self {
+        Self { panel: self.panel.clone(), default_slot: self.default_slot.clone(), factory: self.factory.clone() }
+    }
+}
+
+/// Descriptors registered by identity, in registration order.
+///
+/// Updating a descriptor cannot change its panel identity: the identity is the
+/// map key, so a descriptor carrying another panel id replaces nothing.
+#[derive(Default)]
+pub struct WorkspacePanelRegistry {
+    by_id: BTreeMap<WorkspacePanelID, WorkspacePanelDescriptor>,
+    order: Vec<WorkspacePanelID>,
+}
+
+impl WorkspacePanelRegistry {
+    pub fn new(descriptors: impl IntoIterator<Item = WorkspacePanelDescriptor>) -> Self {
+        let mut registry = Self::default();
+        for descriptor in descriptors {
+            registry.register(descriptor);
+        }
+        registry
+    }
+
+    pub fn register(&mut self, descriptor: WorkspacePanelDescriptor) {
+        let id = descriptor.panel.id.clone();
+        if !self.by_id.contains_key(&id) {
+            self.order.push(id.clone());
+        }
+        self.by_id.insert(id, descriptor);
+    }
+
+    /// Re-author a registered descriptor. An update that would change the
+    /// panel identity is rejected, matching the Swift precondition.
+    pub fn update_descriptor(&mut self, id: &WorkspacePanelID, update: impl FnOnce(&mut WorkspacePanelDescriptor)) {
+        let Some(mut descriptor) = self.by_id.get(id).cloned() else {
+            return;
+        };
+        update(&mut descriptor);
+        if &descriptor.panel.id != id {
+            return;
+        }
+        self.by_id.insert(id.clone(), descriptor);
+    }
+
+    pub fn descriptor(&self, id: &WorkspacePanelID) -> Option<&WorkspacePanelDescriptor> {
+        self.by_id.get(id)
+    }
+
+    pub fn make(&self, id: &WorkspacePanelID) -> AnyView {
+        self.by_id.get(id).map_or_else(|| AnyView::new(EmptyView), WorkspacePanelDescriptor::make)
+    }
+
+    /// A content closure for [`WorkspaceView`], so the registry can be handed to
+    /// a view without the caller rebuilding the indirection.
+    pub fn content(&self) -> Rc<dyn Fn(WorkspacePanelID) -> AnyView> {
+        let snapshot: BTreeMap<WorkspacePanelID, AnyView> =
+            self.order.iter().filter_map(|id| self.by_id.get(id).map(|d| (id.clone(), d.make()))).collect();
+        Rc::new(move |id| snapshot.get(&id).cloned().unwrap_or_else(|| AnyView::new(EmptyView)))
+    }
+
+    pub fn unregister(&mut self, id: &WorkspacePanelID) {
+        self.by_id.remove(id);
+        self.order.retain(|candidate| candidate != id);
+    }
+
+    pub fn count(&self) -> usize {
+        self.by_id.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.by_id.is_empty()
+    }
+
+    pub fn ids(&self) -> &[WorkspacePanelID] {
+        &self.order
+    }
+
+    pub fn descriptors(&self) -> Vec<WorkspacePanelDescriptor> {
+        self.order.iter().filter_map(|id| self.by_id.get(id).cloned()).collect()
+    }
+
+    /// The panels of every registered descriptor, in registration order.
+    pub fn panels(&self) -> Vec<WorkspacePanel> {
+        self.descriptors().into_iter().map(|descriptor| descriptor.panel).collect()
     }
 }
 

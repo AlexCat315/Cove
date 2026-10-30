@@ -5,6 +5,7 @@ pub mod dialog;
 pub mod drag_handle;
 pub mod modal;
 pub mod modal_options;
+pub mod sheet;
 pub mod touch_presentation;
 
 pub use action_sheet::{
@@ -15,6 +16,7 @@ pub use bottom_sheet::{BottomSheet, BottomSheetOptions};
 pub use dialog::{alert_dialog_tone, AlertDialog, AlertDialogOptions, Dialog, DialogOptions};
 pub use drag_handle::SheetDragHandle;
 pub use modal::Modal;
+pub use sheet::{Sheet, SheetOptions};
 pub use modal_options::{
     ModalBackdrop, ModalDismissal, ModalGeometry, ModalOptions, ModalPlacement,
 };

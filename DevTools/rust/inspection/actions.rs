@@ -62,6 +62,23 @@ pub fn perform_accessibility_action(tree: &Rc<RefCell<NodeTree>>, request: &Mirr
     }
 }
 
+impl UIAccessibilityActions {
+    pub fn new(tree: Rc<RefCell<NodeTree>>) -> Self {
+        Self { tree }
+    }
+
+    /// `None` on success, or why the action could not run.
+    pub fn perform(&self, request: &MirrorActivate) -> Option<String> {
+        perform_accessibility_action(&self.tree, request)
+    }
+}
+
+/// Performs one accessibility action on a live node exactly as an assistive
+/// client would, or reveals it in its scroll containers.
+pub struct UIAccessibilityActions {
+    tree: Rc<RefCell<NodeTree>>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

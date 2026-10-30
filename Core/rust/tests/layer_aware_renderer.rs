@@ -214,3 +214,242 @@ fn subtree_fade_parity() {
         "removing the fade restores full alpha"
     );
 }
+
+#[test]
+fn cache_reuse() {
+    let t = Tree::new();
+    let mut renderer = LayerAwareNodeRenderer::new();
+
+    let mut first = DrawList::default();
+    renderer.render(&t.render, &mut first);
+
+    let leaf = t.render.render_object(&t.b).expect("the leaf has a render object");
+    assert!(leaf.is_layer_root(), "clipping promotes the leaf to a layer root");
+    assert!(!leaf.cache_invalid(), "a fresh composite leaves the cache valid");
+    let cached = leaf.cached_layer_list().expect("the leaf recorded a layer list");
+
+    let mut second = DrawList::default();
+    renderer.render(&t.render, &mut second);
+
+    assert_eq!(
+        leaf.cached_layer_list().map(|list| list.vertices().len()),
+        Some(cached.vertices().len()),
+        "the second composite keeps the retained layer list"
+    );
+    assert_eq!(second.vertices().len(), first.vertices().len());
+    assert_eq!(second.indices().len(), first.indices().len());
+}
+
+#[test]
+fn debug_styles_invalidate_cached_layer() {
+    let t = Tree::new();
+    let mut renderer = LayerAwareNodeRenderer::new();
+    renderer.render(&t.render, &mut DrawList::default());
+
+    let white = Color::WHITE.rgba8();
+    let black = Color::BLACK.rgba8();
+
+    t.b.set_debug_background_color(Some(Color::WHITE));
+    let mut list = DrawList::default();
+    renderer.render(&t.render, &mut list);
+    assert!(
+        list.vertices().iter().any(|vertex| vertex.color == white),
+        "the temporary background paints over the authored colour",
+    );
+
+    t.b.set_background_color(Some(Color::BLACK));
+    let mut list = DrawList::default();
+    renderer.render(&t.render, &mut list);
+    assert!(
+        list.vertices().iter().any(|vertex| vertex.color == white),
+        "the temporary background still wins while it is installed",
+    );
+
+    t.b.set_debug_background_color(None);
+    let mut list = DrawList::default();
+    renderer.render(&t.render, &mut list);
+    assert!(
+        list.vertices().iter().any(|vertex| vertex.color == black),
+        "clearing the temporary background restores the authored colour",
+    );
+    assert!(
+        !list.vertices().iter().any(|vertex| vertex.color == white),
+        "the temporary colour no longer appears",
+    );
+}
+
+#[test]
+fn changes_between_unflushed_passes() {
+    let t = Tree::new();
+    let mut renderer = LayerAwareNodeRenderer::new();
+    renderer.render(&t.render, &mut DrawList::default());
+    renderer.render(&t.render, &mut DrawList::default());
+
+    assert!(t.b.render_dirty(), "an unflushed dirty flag survives a composite");
+    let root = t.render.root().expect("an installed render tree has a root");
+    assert!(root.cached_layer_list().is_some(), "the root retained a layer list");
+    assert!(!root.cache_invalid(), "the retained root cache is valid");
+
+    t.b.set_background_color(Some(Color::from_rgba8(0, 0, 255, 255)));
+    assert!(root.cache_invalid(), "a paint change invalidates the enclosing cache");
+    assert!(
+        t.render.render_object(&t.b).is_some_and(|object| object.cache_invalid()),
+        "the painted leaf is invalidated too",
+    );
+
+    let mut actual = DrawList::default();
+    let mut expected = DrawList::default();
+    renderer.render(&t.render, &mut actual);
+    NodeRenderer.render(&t.root, &mut expected);
+    assert_eq!(
+        actual.vertices().iter().map(|v| v.color).collect::<Vec<_>>(),
+        expected.vertices().iter().map(|v| v.color).collect::<Vec<_>>(),
+        "the refreshed cache matches the uncached render",
+    );
+}
+
+#[test]
+fn painter_changes_between_unflushed_passes() {
+    let t = Tree::new();
+    let paint = |width: f32, color: Color| {
+        move |list: &mut DrawList, origin: Point| {
+            let _ = list.add_rect(Rect::new(origin.x, origin.y, width, width), color);
+        }
+    };
+    t.b.update_draw(1, paint(8.0, Color::WHITE));
+    let mut renderer = LayerAwareNodeRenderer::new();
+    renderer.render(&t.render, &mut DrawList::default());
+    renderer.render(&t.render, &mut DrawList::default());
+
+    t.b.update_draw(2, paint(12.0, Color::BLACK));
+    let root = t.render.root().expect("an installed render tree has a root");
+    assert!(root.cache_invalid(), "a new painter identity invalidates before any flush");
+
+    let mut actual = DrawList::default();
+    let mut expected = DrawList::default();
+    renderer.render(&t.render, &mut actual);
+    NodeRenderer.render(&t.root, &mut expected);
+    assert_eq!(
+        actual.vertices().iter().map(|v| v.x).collect::<Vec<_>>(),
+        expected.vertices().iter().map(|v| v.x).collect::<Vec<_>>(),
+    );
+    assert_eq!(
+        actual.vertices().iter().map(|v| v.color).collect::<Vec<_>>(),
+        expected.vertices().iter().map(|v| v.color).collect::<Vec<_>>(),
+        "the new painter is visible on the retry pass",
+    );
+}
+
+#[test]
+fn container_cache_is_deferred_until_stable() {
+    let t = Tree::new();
+    let mut renderer = LayerAwareNodeRenderer::new();
+    let root = t.render.root().expect("an installed render tree has a root");
+
+    renderer.render(&t.render, &mut DrawList::default());
+    assert!(
+        root.cached_layer_list().is_none(),
+        "a changed container renders directly instead of caching",
+    );
+    assert!(!root.cache_invalid(), "the direct render leaves the object valid");
+
+    renderer.render(&t.render, &mut DrawList::default());
+    let stable = root.cached_layer_list().expect("the second pass caches the stable container");
+
+    renderer.render(&t.render, &mut DrawList::default());
+    assert_eq!(
+        root.cached_layer_list().map(|list| list.vertices().len()),
+        Some(stable.vertices().len()),
+        "the third pass reuses the stable cache",
+    );
+}
+
+#[test]
+fn dirty_bubbles_to_enclosing_layer() {
+    let t = Tree::new();
+    let mut renderer = LayerAwareNodeRenderer::new();
+    renderer.render(&t.render, &mut DrawList::default());
+
+    let root = t.render.root().expect("an installed render tree has a root");
+    let leaf = t.render.render_object(&t.b).expect("the leaf has a render object");
+    assert!(!root.cache_invalid());
+    assert!(!leaf.cache_invalid());
+
+    // A is not a layer root, so its dirty flag invalidates the nearest enclosing
+    // layer (the root) and leaves the separate leaf layer alone.
+    t.a.set_background_color(Some(Color::from_rgba8(0, 0, 255, 255)));
+    assert!(root.cache_invalid(), "the enclosing layer is invalidated");
+    assert!(!leaf.cache_invalid(), "a separate layer below is untouched");
+}
+
+#[test]
+fn dirty_nested_layer_invalidates_ancestor_caches() {
+    let t = Tree::new();
+    let mut renderer = LayerAwareNodeRenderer::new();
+    renderer.render(&t.render, &mut DrawList::default());
+
+    let root = t.render.root().expect("an installed render tree has a root");
+    let leaf = t.render.render_object(&t.b).expect("the leaf has a render object");
+    assert!(!root.cache_invalid());
+    assert!(!leaf.cache_invalid());
+
+    t.b.set_content_offset(Point { x: 0.0, y: 12.0 });
+    assert!(leaf.cache_invalid(), "the nested layer is invalidated");
+    assert!(root.cache_invalid(), "the ancestor cache is invalidated too");
+}
+
+#[test]
+fn re_records_after_invalidation() {
+    let t = Tree::new();
+    let mut renderer = LayerAwareNodeRenderer::new();
+    renderer.render(&t.render, &mut DrawList::default());
+
+    let leaf = t.render.render_object(&t.b).expect("the leaf has a render object");
+    let first = leaf.cached_layer_list().expect("the leaf recorded a layer list");
+
+    t.b.set_background_color(Some(Color::from_rgba8(128, 128, 128, 255)));
+    assert!(leaf.cache_invalid(), "the paint change invalidates the leaf");
+
+    renderer.render(&t.render, &mut DrawList::default());
+    let second = leaf.cached_layer_list().expect("the leaf re-recorded a layer list");
+    assert_ne!(
+        second.vertices().iter().map(|v| v.color).collect::<Vec<_>>(),
+        first.vertices().iter().map(|v| v.color).collect::<Vec<_>>(),
+        "the new composite re-recorded the dirty layer",
+    );
+    assert!(!leaf.cache_invalid(), "the fresh cache is valid again");
+}
+
+#[test]
+fn opacity_promotes_and_invalidates_classification() {
+    let t = Tree::new();
+    let a = t.render.render_object(&t.a).expect("A has a render object");
+    assert!(!a.is_layer_root(), "a plain container is not a layer root");
+
+    t.a.set_opacity(0.5);
+    assert!(a.is_layer_root(), "opacity promotes the node to a layer root");
+}
+
+#[test]
+fn stable_painter_identity_preserves_cache() {
+    let t = Tree::new();
+    t.b.update_draw("same", |list: &mut DrawList, origin: Point| {
+        let _ = list.add_rect(Rect::new(origin.x, origin.y, 4.0, 4.0), Color::WHITE);
+    });
+    let mut renderer = LayerAwareNodeRenderer::new();
+    renderer.render(&t.render, &mut DrawList::default());
+
+    let object = t.render.render_object(&t.b).expect("the leaf has a render object");
+    assert!(object.is_layer_root());
+    let first = object.cached_layer_list().expect("the leaf recorded a layer list");
+
+    t.b.update_draw("same", |_: &mut DrawList, _: Point| {});
+    assert!(!object.cache_invalid(), "re-authoring the same identity is not a change");
+
+    renderer.render(&t.render, &mut DrawList::default());
+    assert_eq!(
+        object.cached_layer_list().map(|list| list.vertices().len()),
+        Some(first.vertices().len()),
+        "the stable identity keeps its retained cache",
+    );
+}

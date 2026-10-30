@@ -12,3 +12,11 @@ cove-platform.workspace = true
 cove-composition-macros.workspace = true
 [lints]
 workspace = true
+
+[[test]]
+name = "state_field_read_tests"
+path = "rust/tests/state_field_read_tests.rs"
+
+[[test]]
+name = "structural_modifier_tests"
+path = "rust/tests/structural_modifier_tests.rs"
