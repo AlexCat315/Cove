@@ -229,6 +229,12 @@ mod tests {
         let mut stream = TcpStream::connect(("127.0.0.1", port)).expect("connect");
         stream.write_all(b"{\"a\":1}\n").expect("write");
         stream.flush().expect("flush");
+        // The transport is a *persistent* line protocol: `serve` writes one
+        // response and keeps reading for the next line. `read_to_end` only
+        // returns at EOF, so the client must close its writing half first —
+        // otherwise the client waits for EOF while the server waits for more
+        // input, and the test deadlocks.
+        stream.shutdown(std::net::Shutdown::Write).expect("half-close");
         let mut response = Vec::new();
         stream.read_to_end(&mut response).expect("read");
         let text = String::from_utf8_lossy(&response);

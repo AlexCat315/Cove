@@ -41,7 +41,9 @@ impl McpServer {
             return Some(invalid_request(json!(null), "Request exceeds 1 MiB."));
         }
         let Ok(value) = serde_json::from_slice::<Value>(data) else {
-            return Some(invalid_request(json!(null), "Invalid JSON."));
+            // JSON-RPC 2.0 reserves -32700 for a body that is not JSON at all;
+            // -32600 means "valid JSON, but not a valid Request object".
+            return Some(error(&json!(null), -32700, "Parse error."));
         };
         let Some(request) = value.as_object() else {
             return Some(invalid_request(json!(null), "Invalid JSON-RPC request."));

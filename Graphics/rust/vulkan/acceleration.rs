@@ -508,11 +508,21 @@ mod tests {
             .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
             .collect();
         assert_eq!(matrix, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]);
-        // The mask sits at byte 56, after the transform and the instance word.
-        assert_eq!(u32::from_le_bytes(bytes[56..60].try_into().unwrap()), 0x42);
+        // Spec layout: transform 0..48, `customIndex:24|mask:8` at 48..52,
+        // `offset|flags` at 52..56, then the 8-byte address at 56..64.
+        let word = u32::from_le_bytes(bytes[48..52].try_into().unwrap());
+        assert_eq!(word >> 24, 0x42, "the mask is the high byte of the instance word");
+        assert_eq!(word & 0x00FF_FFFF, 0, "instance 0 has custom index 0");
         assert_eq!(
-            u64::from_le_bytes(bytes[56 + 8..64].try_into().unwrap_or([0; 8])),
-            0
+            u32::from_le_bytes(bytes[52..56].try_into().unwrap())
+                & 0x00FF_FFFF,
+            1,
+            "the cull-disable flag is bit 0 of the offset word"
+        );
+        assert_eq!(
+            u64::from_le_bytes(bytes[56..64].try_into().unwrap()),
+            0xDEAD_BEEF,
+            "the device address ends the record"
         );
     }
 

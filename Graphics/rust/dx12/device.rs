@@ -665,13 +665,16 @@ mod tests {
     fn capabilities_follow_the_feature_level() {
         let none = capabilities_for(0, false, false);
         assert!(none.graphics && none.compute);
-        assert!(!none.ray_tracing.acceleration_structures);
+        // Ray tracing is deliberately unadvertised at every feature level: this
+        // build does not link the DXR build/execute dispatch tables, and the
+        // capability set must only promise what the backend will honour. The
+        // adapter's real support is reported separately via `AdapterCapabilities`.
         let eleven = capabilities_for(11, false, false);
-        assert!(eleven.ray_tracing.acceleration_structures);
+        assert!(!eleven.ray_tracing.acceleration_structures);
         assert!(!eleven.ray_tracing.compute_ray_query);
         let twelve = capabilities_for(12, true, true);
-        assert!(twelve.ray_tracing.acceleration_structures);
-        assert!(twelve.ray_tracing.compute_ray_query);
+        assert!(!twelve.ray_tracing.acceleration_structures);
+        assert!(!twelve.ray_tracing.compute_ray_query);
         assert!(twelve.mesh_shading.mesh && twelve.mesh_shading.task);
     }
 

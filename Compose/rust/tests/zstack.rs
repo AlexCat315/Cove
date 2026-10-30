@@ -115,15 +115,18 @@ fn rtl_alignment() {
         let graph = support::graph();
         // The direction lives on the stack, so TopLeading resolves to the
         // trailing edge and the small layer sits at the right margin.
+        // Apply the modifier to the `ZStack` itself: `AnyView::new(...)` erases the
+        // concrete type, and a modifier applied to the erased value attaches to a
+        // wrapper node rather than to the stack's own layout node — so the
+        // children would still read the inherited direction.
         let stack = AnyView::new(
-            AnyView::new(ZStack::new(
+            ZStack::new(
                 Alignment::TopLeading,
                 AnyView::new(TupleView::new(vec![
                     AnyView::new(unsized_box().frame_width(100.0).frame_height(40.0)),
                     sized(20.0, 20.0, "small"),
                 ])),
-            ))
-            .debug_name("stack")
+            )
             .layout_direction(Direction::Rtl),
         );
         graph.install_view(stack, Default::default());

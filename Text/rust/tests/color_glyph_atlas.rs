@@ -78,11 +78,15 @@ fn invalid_rgba_data_does_not_consume_shelf_space() {
 #[test]
 fn reset_clears_both_planes_and_exhaustion_state() {
     let mut plane = ColorGlyphAtlas::new(4, 4);
+    // The packer leaves a one-pixel gutter after every cell, so a 2x2 glyph at
+    // the origin consumes x = 0..3 and the next 2x2 cannot share that shelf:
+    // 2 + 2 + 1 > 4 forces a new shelf at y = 3, where 3 + 2 + 1 > 4 also fails.
+    // A 4x4 plane therefore holds exactly one 2x2 glyph.
     plane.insert(&bitmap(1, 2)).expect("first glyph fits");
-    // A 4x4 plane holds exactly one 2x2 shelf of two cells; the third insert
-    // cannot fit and marks the plane exhausted.
-    plane.insert(&bitmap(2, 2)).expect("second glyph fits");
-    assert!(plane.insert(&bitmap(3, 2)).is_none(), "the plane is exhausted");
+    assert!(
+        plane.insert(&bitmap(2, 2)).is_none(),
+        "the gutter leaves no room for a second 2x2 glyph"
+    );
     assert!(plane.is_full);
 
     plane.reset();

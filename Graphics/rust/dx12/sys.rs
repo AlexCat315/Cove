@@ -33,7 +33,10 @@ pub type LUID = u64;
 
 pub const S_OK: HRESULT = 0;
 pub const S_FALSE: HRESULT = 1;
-pub const E_FAIL: HRESULT = -2_147_467_263; // 0x80004005
+// 0x80004005 as a signed 32-bit value. The literal previously ended in …263,
+// which is 0x80004001 — a different code — so every E_FAIL message reported the
+// wrong HRESULT.
+pub const E_FAIL: HRESULT = -2_147_467_259; // 0x80004005
 pub const E_INVALIDARG: HRESULT = -2_147_024_635; // 0x80070057
 pub const E_OUTOFMEMORY: HRESULT = -2_147_024_632; // 0x8007000E
 pub const DXGI_ERROR_NOT_FOUND: HRESULT = -2_000_527_102; // 0x887A0002
@@ -703,17 +706,22 @@ pub struct D3D12_SHADER_BYTECODE {
 impl D3D12_SHADER_BYTECODE {
     /// Reads a shader bytecode struct back out of its inline storage.
     ///
+    /// The struct is two machine words — a pointer and a length — so it is 8 bytes
+    /// on a 32-bit target and 16 on a 64-bit one. The storage size therefore comes
+    /// from `size_of` rather than a hardcoded constant; a fixed 8-byte buffer is
+    /// too small on 64-bit and `transmute_copy` is undefined behaviour there.
+    ///
     /// # Safety
     /// `storage` must contain a `D3D12_SHADER_BYTECODE` written by [`Self::write_into`].
-    pub unsafe fn read_from(storage: &[u8; 8]) -> Self {
-        // SAFETY: the caller guarantees `storage` holds a `D3D12_SHADER_BYTECODE`,
-        // which is exactly eight bytes on both 32- and 64-bit targets.
+    pub unsafe fn read_from(storage: &[u8; core::mem::size_of::<Self>()]) -> Self {
+        // SAFETY: `storage` is exactly `size_of::<Self>()` bytes and the caller
+        // guarantees it holds a previously written value.
         unsafe { core::mem::transmute_copy(storage) }
     }
 
     /// Writes this struct into the inline storage a pipeline descriptor exposes.
-    pub fn write_into(self, storage: &mut [u8; 8]) {
-        // SAFETY: `D3D12_SHADER_BYTECODE` is eight bytes, matching `storage`.
+    pub fn write_into(self, storage: &mut [u8; core::mem::size_of::<Self>()]) {
+        // SAFETY: the sizes match by construction.
         *storage = unsafe { core::mem::transmute_copy(&self) };
     }
 }
@@ -853,13 +861,17 @@ mod tests {
             pShaderBytecode: 0x1000usize as *const c_void,
             BytecodeLength: 64,
         };
-        let mut storage = [0u8; 8];
+        let mut storage = [0u8; std::mem::size_of::<D3D12_SHADER_BYTECODE>()];
         bytecode.write_into(&mut storage);
         // SAFETY: `storage` was just written by `write_into`.
         let restored = unsafe { D3D12_SHADER_BYTECODE::read_from(&storage) };
         assert_eq!(restored.pShaderBytecode, bytecode.pShaderBytecode);
         assert_eq!(restored.BytecodeLength, 64);
-        assert_eq!(std::mem::size_of::<D3D12_SHADER_BYTECODE>(), 8);
+        // Two machine words, so 16 bytes on a 64-bit target.
+        assert_eq!(
+            std::mem::size_of::<D3D12_SHADER_BYTECODE>(),
+            2 * std::mem::size_of::<usize>()
+        );
     }
 
     #[test]

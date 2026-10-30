@@ -351,15 +351,14 @@ mod tests {
     /// it is built with an explicit null-entry loader rather than `zeroed()`, which
     /// would be undefined behaviour for a type holding raw pointers.
     fn null_core_commands() -> sys::CoreCommands {
-        fn missing(_name: &core::ffi::CStr) -> sys::PFN_vkVoidFunction {
-            core::ptr::null()
-        }
-        // SAFETY: the loader returns null for every name, so `CoreCommands::load`
-        // reports `None` instead of producing a table. The fallback below is only
-        // reached if a required entry point is renamed, in which case the test
-        // panics rather than calling through a null pointer.
-        unsafe { sys::CoreCommands::load(&missing) }
-            .expect("the test needs no device entry point")
+        // `find_memory_type` only reads `memory_properties`, so every entry point
+        // may be null. Building the table from `MaybeUninit::zeroed` is sound
+        // because each field is an `Option<unsafe extern fn>`, whose null bit
+        // pattern is the valid `None`. Going through `CoreCommands::load` would
+        // fail: it requires a real entry point for every name.
+        // SAFETY: all-zeros is a valid representation for a struct of nullable
+        // function pointers.
+        unsafe { core::mem::MaybeUninit::<sys::CoreCommands>::zeroed().assume_init() }
     }
 
     fn block(size: sys::VkDeviceSize) -> VulkanMemoryBlock {
@@ -387,7 +386,11 @@ mod tests {
         assert_eq!(take_free_region(&mut storage, 100, 1), Some(0));
         assert_eq!(storage.free_regions, vec![(100, 924)]);
         assert_eq!(take_free_region(&mut storage, 24, 8), Some(104));
-        assert_eq!(storage.free_regions, vec![(128, 896)]);
+        // The 8-byte alignment leaves a 4-byte padding fragment at offset 100.
+        // Swift keeps that tail too (`if padding > 0 { freeRegions.append(...) }`)
+        // and only merges adjacent regions when an allocation is freed, so the
+        // block carries two free regions here rather than one.
+        assert_eq!(storage.free_regions, vec![(100, 4), (128, 896)]);
     }
 
     #[test]

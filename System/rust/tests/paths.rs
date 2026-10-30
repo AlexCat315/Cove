@@ -58,11 +58,14 @@ fn ancestors_terminate_at_filesystem_root() {
     let unique: std::collections::HashSet<_> = ancestors.iter().collect();
     assert_eq!(unique.len(), ancestors.len());
 
-    let last = ancestors.last().unwrap().clone();
-    assert_eq!(last.parent(), None);
+    // `ancestors` was reversed above, so the filesystem root is *first* and the
+    // deepest path is last. Checking `last()` would assert that the deepest path
+    // has no parent, which is the opposite of what this test means.
+    let root_most = ancestors.first().unwrap().clone();
+    assert_eq!(root_most.parent(), None);
 
     #[cfg(unix)]
-    assert!(resolve_path(&last).is_ok());
+    assert!(resolve_path(&root_most).is_ok());
 }
 
 #[cfg(unix)]

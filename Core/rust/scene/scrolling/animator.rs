@@ -279,7 +279,11 @@ impl ScrollAnimator {
     // MARK: - Frame driver
 
     pub fn tick(&self, delta_time: f64) {
-        if let Some(deadline) = self.state.borrow().release_deadline {
+        // Copy the deadline out first: an `if let` on `self.state.borrow()` keeps
+        // the immutable borrow alive for the whole body, so calling `settle()`
+        // (which needs `borrow_mut`) would panic with "already borrowed".
+        let deadline = self.state.borrow().release_deadline;
+        if let Some(deadline) = deadline {
             if self.now() < deadline {
                 return;
             }
@@ -410,6 +414,9 @@ impl ScrollAnimator {
     }
     fn record_input(&self, time: f64) {
         let physics = self.physics.get();
+        // Read the position *before* taking the mutable borrow: `position()`
+        // borrows the same `RefCell`, so calling it while `state` is held
+        // panics with "already borrowed".
         let position = self.position();
         let mut state = self.state.borrow_mut();
         state.tracker_x.window = physics.momentum.tracking_window;

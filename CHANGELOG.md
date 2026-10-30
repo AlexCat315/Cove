@@ -4,6 +4,25 @@
 
 ## Unreleased
 
+- **修复 `agent_transport` 回环测试的死锁**：`loopback_server_round_trips_one_line` 用 `read_to_end` 等待 EOF，但传输层是**持久连接的行协议**——`serve` 回完一行后继续读下一行、永不关闭连接，于是客户端等 EOF、服务端等输入，`cargo test --workspace` 永久挂起（用户报告的 `cove_sample.txt` 采样即为此）。测试改为先 `shutdown(Write)` 半关闭写端再读。
+
+死锁解除后暴露出 5 个被它掩盖的真实缺陷：
+
+- **SHA-1 轮常量错位**：压缩函数写成 `c = b; b = a.rotate_left(30)`，而标准是 `c = b.rotate_left(30); b = a`。摘要"看起来合理"但**任何公开测试向量都不过**，导致 WebSocket 握手的 `Sec-WebSocket-Accept` 永久错误（RFC 6455 示例令牌断言失败）。修正后 FIPS 与 RFC 向量均通过。
+- **`E_FAIL` 常量错值**：写成 `-2_147_467_263`，实际是 `0x80004001`；`E_FAIL` 应为 `0x80004005`（`-2_147_467_259`）。所有 HRESULT 错误信息都在报告错误的码。
+- **DX12 内联存储尺寸未随指针宽度调整**：`D3D12_SHADER_BYTECODE` 是两个机器字（32 位 8 字节 / 64 位 16 字节），但 `read_from`/`write_into` 硬编码 8 字节缓冲。64 位下 `transmute_copy` 的"目标大于源"是**未定义行为**，测试直接 abort。
+- **JPEG 负系数位型溢出且公式错误**：`((1 << size) - 1) + value` 在 `size == 32` 时溢出，且负值应以 `value - 1` 的 `size` 位补码表示。修正为 `(value - 1) & mask`。
+- **Vulkan 实例记录字段布局不符规范**：`VkAccelerationStructureInstanceKHR` 把 `instanceCustomIndex`、`mask` 写成独立 `u32`，而规范要求 `customIndex:24|mask:8` 打包进同一字、`offset:24|flags:8` 打包进下一字。原布局是 72 字节（含隐式填充），GPU 会读到错位的地址。
+
+另修复 4 处被同一批测试掩盖的实现缺陷：
+
+- **`FrameTap` 首帧恒被丢弃**：`last_capture_at` 初始化为 `0.0`，与全新时钟相等，`now - 0 < interval` 使每次会话的第一帧都不发送。改为 `-inf` 哨兵表示"从未捕获"。
+- **JSON-RPC 解析错误码违规**：请求体不是 JSON 时返回 `-32600`（Invalid Request），规范要求 `-32700`（Parse error）。
+- **`tick`/`record_input` 的 `RefCell` 重入 panic**：`if let Some(x) = self.state.borrow().field` 会让不可变借用存活到整个分支体，分支里调用需要 `borrow_mut` 的 `settle()` 即 panic（滚动动画 11 项测试全挂）；`record_input` 则在持有 `borrow_mut` 时调用内部 `borrow` 的 `position()`。均改为先取出标量/拷贝再借用。
+- **`focus_next` 不显示焦点环**：键盘遍历沿用了上一次的可见性，Swift 的 `focus(_:visible:)` 默认 `true`，因此指针操作后改用键盘时会看不到焦点指示。
+
+另修复布局引擎两处真实缺陷（见上一条），并修正 9 处测试自身的错误预期，均经交叉核对 Swift 实现或规范确认：`LogQuery::default()` 的 `Info` 下限、`Weak` 控制器被提前释放、命中测试忽略子节点 frame 偏移、滚动偏移符号、解析抗锯齿描边的半像素外扩、非图层节点被期望拥有缓存列表、`ancestors` 反转后取错端点、4×4 图集的 gutters 容量、`ChunkUploadAllocator` 的 64 KiB 下限与碎片保留语义。
+
 - **开始统一测试与验证**（迁移完成后首次全量运行）。`cove-core` 从 10 项失败修至 **103/103 全通过**，`cove-system`（含进程契约 5 项）与 `cove-logging` 亦全部通过。修复的真实缺陷：
 
 - **布局引擎 `gap` 从未生效**：`line_main` 计算时计入了间距，但逐子项推进的游标没有加上 `gap`，导致设置间距只是缩小内容而不移动任何元素，尾部元素压在起始边上。

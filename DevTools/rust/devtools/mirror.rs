@@ -133,7 +133,10 @@ impl FrameTap {
         self.min_frame_interval = 1.0 / clamped_fps;
         self.quality = quality.clamp(0.1, 1.0);
         self.enabled = true;
-        self.last_capture_at = 0.0;
+        // `-inf` means "never captured", so the very first frame always passes the
+        // interval check. Zero would compare equal to a fresh clock and swallow
+        // the first capture of every session.
+        self.last_capture_at = f64::NEG_INFINITY;
         self.consecutive_errors = 0;
         self.captures_since_start = 0;
         cove_logging::LogSystem::logger("cove.devtools.frameTap")
@@ -470,8 +473,14 @@ fn magnitude(value: i32) -> (u8, u16) {
     }
     let magnitude = value.unsigned_abs();
     let size = (32 - magnitude.leading_zeros()) as u8;
+    // A negative coefficient is stored as `value - 1` in `size` bits (the
+    // one's-complement style used by the JPEG spec). Computing it as
+    // `((1 << size) - 1) + value` overflows for `size == 32`, and `value as u32`
+    // sign-extends for negatives, so build it from the magnitude instead.
     let pattern = if value < 0 {
-        ((1u32 << size) - 1 + value as u32) as u16
+        // `value - 1` in `size` bits, e.g. -1 → 0b0, -2 → 0b01, -3 → 0b00.
+        let mask = if size >= 32 { u32::MAX } else { (1u32 << size) - 1 };
+        (value.wrapping_sub(1) as u32 & mask) as u16
     } else {
         value as u16
     };
@@ -887,14 +896,17 @@ mod tests {
         let sink = FrameTapSink::new();
         let counter = delivered.clone();
         sink.set_deliver(Some(Rc::new(move |_frame| counter.set(counter.get() + 1))));
+        // The capture runs at the *proposed* size, which `target_size` derives from
+        // the 16x16 logical size at scale 1.0 — so the buffer must be 16 rows of
+        // 16 BGRA pixels. A smaller buffer is rejected by the length check before
+        // any frame is delivered.
         let mut data = Vec::new();
-        for _ in 0..8 * 8 {
+        for _ in 0..16 * 16 {
             data.extend_from_slice(&[0, 0, 0, 255]);
         }
-        // 8x8 keeps the encode cheap; the tap only needs a valid buffer.
         let mut tap = FrameTap::new(
             sink.clone(),
-            Rc::new(move |_list, _w, _h, _lw, _lh| Ok(FrameTapPixels::new(data.clone(), 8 * 4))),
+            Rc::new(move |_list, _w, _h, _lw, _lh| Ok(FrameTapPixels::new(data.clone(), 16 * 4))),
         );
         let clock_handle = clock.clone();
         tap = tap.with_clock(move || clock_handle.get());

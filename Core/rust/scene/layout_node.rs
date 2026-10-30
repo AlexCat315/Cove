@@ -556,6 +556,27 @@ impl LayoutNode {
         )
     }
     fn apply_minimum_size(&self) {
+        // Yoga treats a fixed dimension as the flex basis without clamping it to
+        // the minimum, so a definite parent sizes the node to the smaller authored
+        // value. Write each fixed dimension already raised to its effective
+        // minimum, matching Swift's `writeWidthStyle`/`writeHeightStyle`.
+        let (min_width, min_height) = self.effective_minimum();
+        let (width, height) = {
+            let style = self.0.borrow().style;
+            (style.width, style.height)
+        };
+        if let LayoutStyleValue::Points(fixed) = width
+            && let Some(minimum) = min_width
+            && fixed < minimum
+        {
+            self.update_style(|style| style.width = LayoutStyleValue::Points(minimum));
+        }
+        if let LayoutStyleValue::Points(fixed) = height
+            && let Some(minimum) = min_height
+            && fixed < minimum
+        {
+            self.update_style(|style| style.height = LayoutStyleValue::Points(minimum));
+        }
         self.mark_layout_dirty_hint();
     }
     pub fn box_sizing(&self) -> BoxSizing {
@@ -854,9 +875,13 @@ impl LayoutNode {
         };
 
         let _ = margin;
+        // Clamp against the *effective* minimum so a transient control-extent
+        // floor raises the authored value; using `style.min_width` alone would
+        // ignore the floor and leave a box below the platform touch target.
+        let (min_width, min_height) = self.effective_minimum();
         Size {
-            width: clamp(size.width, style.min_width, style.max_width),
-            height: clamp(size.height, style.min_height, style.max_height),
+            width: clamp(size.width, min_width, style.max_width),
+            height: clamp(size.height, min_height, style.max_height),
         }
     }
 

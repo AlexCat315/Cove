@@ -708,18 +708,27 @@ mod tests {
 
     #[test]
     fn the_upload_allocator_reuses_and_grows_chunks() {
+        // `ChunkUploadAllocator::new` raises the requested chunk size to a 64 KiB
+        // GPU minimum, so the test uses realistic sizes rather than a 1024-byte
+        // chunk that can never be created.
+        let chunk = 64 * 1024;
         let mut allocator =
-            ChunkUploadAllocator::new(1024, |capacity| Ok(FakeChunk { storage: vec![0; capacity] }));
+            ChunkUploadAllocator::new(chunk, |capacity| Ok(FakeChunk { storage: vec![0; capacity] }));
         let first = allocator.allocate(100, 16).expect("first");
         assert_eq!(first.offset(), 0);
         let second = allocator.allocate(100, 16).expect("second");
         assert_eq!(second.offset(), 112);
         assert_eq!(allocator.chunk_count(), 1);
-        // A request that cannot fit the current chunk opens another one.
-        let large = allocator.allocate(4096, 16).expect("large");
-        assert_eq!(large.offset(), 0);
+        // A request that cannot fit the *remainder* of the current chunk opens
+        // another one. Two 100-byte allocations used 112 bytes, leaving 65 424;
+        // 65 440 is the smallest aligned request above that, and still below the
+        // default size so the new chunk is exactly `chunk` bytes rather than
+        // doubling.
+        let large = allocator.allocate(chunk - 96, 16).expect("large");
+        assert_eq!(large.offset(), 0, "a new chunk starts at zero");
         assert_eq!(allocator.chunk_count(), 2);
-        assert_eq!(allocator.total_chunk_capacity(), 1024 + 4096);
+        // The second chunk is also `chunk` bytes, so the total is two of them.
+        assert_eq!(allocator.total_chunk_capacity(), chunk * 2);
         allocator.reset();
         assert_eq!(allocator.allocate(16, 16).expect("after reset").offset(), 0);
         assert!(allocator.allocate(0, 16).is_err());

@@ -943,9 +943,11 @@ pub struct VkImageCopy {
 #[derive(Clone, Copy, Default)]
 pub struct VkAccelerationStructureInstanceKHR {
     pub transform: [f32; 12],
+    /// `instanceCustomIndex:24 | mask:8`, per the spec's bitfield packing.
     pub instance_word: u32,
-    pub instanceCustomIndex: u32,
-    pub mask: u32,
+    /// `instanceShaderBindingTableRecordOffset:24 | flags:8`.
+    pub offset_and_flags: u32,
+    /// 64-bit device address; `repr(C)` puts this at offset 56.
     pub accelerationStructureReference: VkDeviceAddress,
 }
 
@@ -958,9 +960,9 @@ impl VkAccelerationStructureInstanceKHR {
             // Bit 0 is `triangleFacingCullDisable`, bits 1-23 are the SBT
             // record offset, and bits 24-31 are the mask<<24 shadow field. Swift
             // disables facing culling and leaves the offset at zero.
-            instance_word: VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR,
-            instanceCustomIndex: custom_index,
-            mask,
+            // Low 24 bits are the custom index, high 8 bits are the visibility mask.
+            instance_word: (custom_index & 0x00FF_FFFF) | ((mask & 0xFF) << 24),
+            offset_and_flags: VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR,
             accelerationStructureReference: address,
         }
     }

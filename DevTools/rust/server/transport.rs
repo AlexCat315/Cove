@@ -483,10 +483,14 @@ fn sha1(data: &[u8]) -> [u8; 20] {
                 .wrapping_add(e)
                 .wrapping_add(constant)
                 .wrapping_add(*word);
+            // Standard SHA-1 rotation: the 30-bit rotate belongs on `c` (the
+            // incoming `b`), while `b` simply becomes the old `a`. Swapping the
+            // two — `c = b` with `b = a.rotate_left(30)` — still produces a
+            // plausible-looking digest but fails every published vector.
             e = d;
             d = c;
-            c = b;
-            b = a.rotate_left(30);
+            c = b.rotate_left(30);
+            b = a;
             a = temporary;
         }
         h[0] = h[0].wrapping_add(a);

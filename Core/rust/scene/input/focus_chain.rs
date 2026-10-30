@@ -268,7 +268,11 @@ impl FocusChain {
         let scope_root = self.active_scope_root().unwrap_or_else(|| root.clone());
         let chain = self.focusables(&scope_root);
         if chain.is_empty() {
-            self.focus(None, self.is_focus_visible.get());
+            // Keyboard traversal makes the focus ring visible, matching Swift's
+            // `focus(_:visible:)` default of `true`. Carrying the previous
+            // visibility over would leave the ring hidden after a pointer-driven
+            // session, so the user could tab through controls with no indication.
+            self.focus(None, true);
             return None;
         }
         let focused = self.focused();
@@ -277,7 +281,7 @@ impl FocusChain {
             Some(index) => chain[(index + 1) % chain.len()].clone(),
             None => chain[0].clone(),
         };
-        self.focus(Some(&next), self.is_focus_visible.get());
+        self.focus(Some(&next), true);
         Some(next)
     }
     pub fn focus_previous(&self, root: &Node) -> Option<Node> {

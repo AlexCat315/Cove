@@ -304,9 +304,14 @@ mod tests {
         interfaces
             .uses
             .insert(12, PipelineUse::new(layout, PipelineKind::Mesh));
-        interfaces
-            .pipelines
-            .insert(1, PipelineLayoutDescriptor::new(Vec::new()));
+        // The pipeline must declare the set it expects at slot 0; an empty
+        // `set_layouts` makes every `set_binding_set` call fail the slot lookup,
+        // so the "matching layout" case could never succeed.
+        let set_layout = super::super::BindingLayout::new(77);
+        interfaces.pipelines.insert(
+            1,
+            PipelineLayoutDescriptor::new(vec![set_layout]),
+        );
         (interfaces, layout)
     }
 
@@ -385,7 +390,8 @@ mod tests {
         });
         assert!(interfaces.validate_commands(&buffer, &caches, false).is_err());
 
-        caches.store_binding_set(50, layout.id());
+        // The set must name the layout the pipeline declared at slot 0.
+        caches.store_binding_set(50, 77);
         assert!(interfaces.validate_commands(&buffer, &caches, false).is_ok());
     }
 }
