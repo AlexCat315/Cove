@@ -1,7 +1,7 @@
 //! Translation of CoveUIText/ColorGlyphAtlas.swift.
 use crate::{native, ColorGlyphBitmap, DirtyRegion, UploadPayload};
 use cove_core::{GlyphAtlasFormat, GlyphAtlasInfo};
-pub(crate) struct ColorGlyphAtlas { pub width: usize, pub height: usize, pixels: Vec<u8>, shelf_x: usize, shelf_y: usize, shelf_height: usize, dirty: Option<DirtyRegion>, pub is_full: bool }
+pub struct ColorGlyphAtlas { pub width: usize, pub height: usize, pixels: Vec<u8>, shelf_x: usize, shelf_y: usize, shelf_height: usize, dirty: Option<DirtyRegion>, pub is_full: bool }
 impl ColorGlyphAtlas {
     pub fn new(width: usize, height: usize) -> Self { Self { width, height, pixels: vec![0; width * height * 4], shelf_x: 0, shelf_y: 0, shelf_height: 0, dirty: None, is_full: false } }
     pub fn is_dirty(&self) -> bool { self.dirty.is_some() }

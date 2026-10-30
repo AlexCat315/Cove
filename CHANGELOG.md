@@ -4,6 +4,16 @@
 
 ## Unreleased
 
+- 修复跨越多个团队的同一类缺陷（`.modifier()` 陷阱）于源头：`ModifiedContent` 的私有字段 `modifier` 遮蔽了 `ViewExt::modifier(self, m)`，报错形如 "private field, not a method"，本会话内至少 12 次误修。字段改名为 `applied`；新增 `AnyView::with_modifier(self, m)` 与 `IdentifiedView::with_modifier(self, m)`，使已擦除的值可直接链式附加修饰器。约定：具体 `View` 用 `ViewExt::modifier`，已擦除值用 `with_modifier`，禁止用 `AnyView::new(modified_content)` 掩盖类型错误（会经 downcast 快路径静默丢弃修饰器）。
+
+- 删除 `Compose/tests/` 目录下 4 个陈旧测试文件（`theme.rs`、`theme_environment.rs`、`composition_local.rs`、`semantic_motion.rs`）。它们由 Cargo 默认自动发现路径编译，但写于早期接口（`Rect.origin` 作为字段、`ViewGraph(tree:recomposer:)` 元组构造），从未通过编译，且使 `--all-targets` 每次必然失败，污染全部验证。
+
+- 新增 `pulldown-cmark` 工作区依赖用于 Markdown 解析。Swift 侧使用 swift-markdown（cmark-gfm），手写 CommonMark 子集会在嵌套列表、惰性续行、引用式链接、HTML 块与实体处理上与 cmark-gfm 分歧。`pulldown-cmark` 关闭默认特性后仅引入 `bitflags`/`memchr`/`pulldown-cmark-escape`/`unicase` 四个纯 Rust 小依赖，无构建脚本，全平台可用（含 Wasm）。
+
+- 开始迁移 Swift 测试为 Rust 行为测试（424 个测试源文件）。`Tools/Cove/rust/migration_inventory.py` 现在按 `[[test]]` 目标名匹配测试条目，不再把它们误记为未开始。已迁移：System 6 个、Logging 流水线、Core 场景动画 6 个、`Node` 变换/资源/不透明度/无障碍几何、`Animation` 值类型、`PlatformCore` 滚动输入、`Text` 彩色字形图集，以及 Compose 侧的 `TestSupport` 等价物（`GlobalTestLock` 串行化进程级 holder、`TestScene` 私有 holder、`test_text_environment`、按 `LayoutDebugAttachmentKey::DEBUG_NAME` 读回调试名）。
+
+- `--all-targets` 全工作区曾达到 18 个 crate 全绿（含测试目标）。此后 Compose 的 68 个未开始文件仍在持续写入，属预期状态。
+
 - 迁移盘点改为脚本生成，并与磁盘对齐：新增 `Tools/Cove/rust/migration_inventory.py`，遍历 Rust 树按同名模块与主类型定义重新推导每个 Swift 文件的目标路径与状态，同时重写 `Docs/rust-migration-files.json` 与 `Docs/rust-migration-files.md`。生产源码实际为 651 → 802 / 984 已写入，上一版"460 已写入 / 477 未开始"是人工维护造成的陈旧值。
 
 - 修复"写而未编译"缺陷（与编译错误同级）：System 16 个、Logging 15 个、Tools/Cove 8 个、Tools/Support 12 个、Compose 2 个 Rust 文件此前从未被 `mod` 声明；`Core/rust/tests/` 6 个与 `Graphics/rust/tests/` 7 个测试文件从未声明为 Cargo 测试目标，`cargo` 完全看不到它们。System 与 Logging 现按 Swift 包结构重挂模块，并删除重复的单体实现（Logging 511 行 `lib.rs`、System 合并版 process），关键对外 API 保持可用（`LogRuntime::log` 五参形式、`LogQuery.text: Option<String>`、`MetadataProvider` 改为 newtype、`Access::Inherit` 单一类型）。

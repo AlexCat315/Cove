@@ -20,7 +20,7 @@
 
 | 范围 | 文件数 | 已写入 | 进行中 | 未开始 |
 | --- | ---: | ---: | ---: | ---: |
-| 生产源码 | 984 | 802 | 0 | 182 |
+| 生产源码 | 984 | 822 | 0 | 162 |
 | 测试源码 | 424 | 30 | 0 | 394 |
 | SwiftPM 清单 | 25 | 19（Cargo 清单） | 0 | 6 |
 | CLI 项目模板 | 5 | 0 | 0 | 5 |
@@ -50,15 +50,15 @@ System 16 个、Logging 15 个、Tools/Cove 8 个、Tools/Support 12 个、Compo
 
 | 模块 | Swift 文件 | Swift 行 | 已写入 | 未开始 |
 | --- | ---: | ---: | ---: | ---: |
-| Compose（含 Composition、宏） | 414 | 52,554 | 326 | 88 |
+| Compose | 414 | 52,554 | 346 | 68 |
 | Graphics | 107 | 14,534 | 93 | 14 |
 | Core | 97 | 12,299 | 97 | 0 |
-| Tools（CLI/Support） | 69 | 3,901 | 61 | 8 |
+| Tools | 69 | 3,901 | 61 | 8 |
 | Examples | 61 | 7,135 | 15 | 46 |
-| DevTools（含 Protocol） | 51 | 5,183 | 37 | 14 |
+| DevTools | 51 | 5,183 | 37 | 14 |
 | Hosts | 51 | 4,254 | 46 | 5 |
 | Terminal | 29 | 3,088 | 26 | 3 |
-| Sources（Workspace/WebView） | 19 | 4,861 | 15 | 4 |
+| Sources | 19 | 4,861 | 15 | 4 |
 | System | 17 | 1,004 | 17 | 0 |
 | Logging | 15 | 705 | 15 | 0 |
 | Text | 14 | 2,576 | 14 | 0 |
@@ -67,7 +67,7 @@ System 16 个、Logging 15 个、Tools/Cove 8 个、Tools/Support 12 个、Compo
 | Imaging | 9 | 696 | 9 | 0 |
 | PlatformCore | 6 | 540 | 6 | 0 |
 | Browser | 1 | 400 | 1 | 0 |
-| 合计 | 984 | 117,744 | 802 | 182 |
+| 合计 | 984 | 117,744 | 822 | 162 |
 
 Rust 文件数列为磁盘快照，不等于逐 Swift 文件一一对应；多个 Swift 文件可能映射到一个 Rust 模块，也可能一个 Swift 文件拆到多个 Rust/C 文件。逐文件关系在清单中。
 

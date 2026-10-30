@@ -245,6 +245,43 @@ def write_markdown(document: dict) -> None:
         handle.write("\n")
 
 
+def manifest_paths() -> list[str]:
+    """Every Cargo.toml in the tree, relative to the repo root."""
+    found: list[str] = []
+    for dirpath, dirnames, filenames in os.walk(ROOT):
+        dirnames[:] = [d for d in dirnames if d not in EXCLUDED_DIRS]
+        for filename in filenames:
+            if filename == "Cargo.toml":
+                found.append(os.path.relpath(os.path.join(dirpath, filename), ROOT))
+    return sorted(found)
+
+
+def test_target_names() -> list[str]:
+    """Names of every declared Cargo test target.
+
+    Reads `[[test]]` tables out of the crate manifests: the `name` field is what
+    a translated Swift suite is registered under, and the `path` proves the file
+    exists on disk.
+    """
+    names: list[str] = []
+    for path in manifest_paths():
+        try:
+            text = open(os.path.join(ROOT, path), encoding="utf-8").read()
+        except OSError:
+            continue
+        for block in text.split("[[test]]")[1:]:
+            name = re.search(r'^\s*name\s*=\s*"([^"]+)"', block, re.M)
+            target = re.search(r'^\s*path\s*=\s*"([^"]+)"', block, re.M)
+            if not name:
+                continue
+            if target and not os.path.exists(
+                os.path.join(ROOT, os.path.dirname(path), target.group(1))
+            ):
+                continue
+            names.append(name.group(1))
+    return names
+
+
 def main() -> int:
     with open(JSON_PATH, encoding="utf-8") as handle:
         document = json.load(handle)
@@ -252,13 +289,28 @@ def main() -> int:
     rust = rust_files()
     derive(document["entries"], rust)
 
+    # Test sources map onto `[[test]]` targets rather than onto a single file:
+    # a Swift test suite becomes a Rust integration test whose name is the
+    # snake_case stem of the Swift file.
+    declared_tests = test_target_names()
+
     # Second pass: a Swift file whose primary type is already defined by some
     # Rust module is covered even when the file naming differs.
     types = type_index()
     for entry in document["entries"]:
-        if entry["kind"] != "production" or entry["status"] != "pending":
+        if entry["status"] != "pending":
             continue
         stem = os.path.splitext(os.path.basename(entry["source"]))[0]
+        if entry["kind"] == "test":
+            snake_stem = snake(stem)
+            matches = [target for target in declared_tests if snake(target) == snake_stem]
+            if matches:
+                entry["rust"] = matches
+                entry["status"] = "written_unverified"
+                entry["planned"] = False
+            continue
+        if entry["kind"] != "production":
+            continue
         if types.get(stem):
             entry["rust"] = sorted(set(types[stem]))[:3]
             entry["status"] = "written_unverified"

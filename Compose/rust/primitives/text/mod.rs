@@ -1,5 +1,6 @@
 //! Text primitives.
 pub mod code;
+pub mod markdown;
 pub mod rope;
 pub mod rich;
 pub mod single_line;

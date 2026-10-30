@@ -21,3 +21,7 @@ cc.workspace = true
 
 [lints]
 workspace = true
+
+[[test]]
+name = "color_glyph_atlas"
+path = "rust/tests/color_glyph_atlas.rs"

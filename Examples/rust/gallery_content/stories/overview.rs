@@ -447,6 +447,8 @@ mod checks {
     #[test]
     fn metric_debug_names_match_the_gallery() {
         let card = MetricCard::new("Frame time", "8.4", "ms", "", Vec::new(), StatusTone::Info);
-        assert_eq!(card.debug_name(), "dashboard-metric-Frame time");
+        // Call the inherent accessor explicitly: `LayoutDebugExt::debug_name`
+        // also applies to views and takes the name as an argument.
+        assert_eq!(MetricCard::debug_name(&card), "dashboard-metric-Frame time");
     }
 }

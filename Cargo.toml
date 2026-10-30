@@ -56,6 +56,11 @@ cove-runtime = { path = "Runtime" }
 cove-composition = { path = "Compose/Composition" }
 cove-composition-macros = { path = "Compose/CompositionMacros" }
 cove-devtools-protocol = { path = "DevTools/Protocol" }
+# CommonMark + GFM tables/strikethrough/task lists. The Swift original used
+# swift-markdown (cmark-gfm); this is the closest vetted equivalent. Pure Rust,
+# four small transitive crates, no build script, works on every target
+# including Wasm — which is why it replaces a hand-written parser subset.
+pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
 objc2 = "0.6"
 objc2-app-kit = "0.3"
 objc2-core-foundation = "0.3"

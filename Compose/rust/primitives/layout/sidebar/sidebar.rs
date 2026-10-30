@@ -35,6 +35,8 @@ pub struct Sidebar<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 
     pub minimum_row_height: f32,
     pub on_activate: Rc<dyn Fn(Id)>,
     pub local_expanded: cove_core::State<HashSet<Id>>,
+    /// Resolved once per body pass so section lanes and row chrome agree.
+    ambient_theme: crate::theme::Theme,
     header: AnyView,
     footer: AnyView,
 }
@@ -68,6 +70,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Sideb
             minimum_row_height: 38.0,
             on_activate: Rc::new(|_| {}),
             local_expanded: cove_core::State::new(HashSet::new()),
+            ambient_theme: crate::theme::styles::default_light_theme::value(),
             header: AnyView::new(crate::EmptyView),
             footer: AnyView::new(crate::EmptyView),
         }
@@ -110,16 +113,6 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Sideb
         }
     }
 
-    fn set_expanded(&self, next: HashSet<Id>) {
-        match self.expanded.as_ref() {
-            Some(binding) => {
-                if binding.get() != next {
-                    binding.set(next);
-                }
-            }
-            None => self.local_expanded.set(next),
-        }
-    }
 
     /// One leading lane per section, even when some destinations omit an icon.
     /// Resolved against the live theme inside the row so a theme swap re-measures.
@@ -150,7 +143,8 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
         for (index, section) in self.sections.iter().enumerate() {
             let entries: Vec<SidebarEntry<Id>> =
                 hierarchy.groups.get(index).cloned().unwrap_or_default();
-            let icon_width = Self::icon_lane(&entries);
+            let icon_width = self.icon_lane_resolved(&entries);
+            let section_has_branches = entries.iter().any(|entry| entry.is_branch());
             let mut rows: Vec<AnyView> = Vec::new();
             if !section.title.is_empty() && !presentation.is_rail() {
                 rows.push(AnyView::new(
@@ -167,7 +161,42 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
                 let is_selected = selected.as_ref() == Some(&entry.item.id);
                 let is_expanded = expanded.contains(&entry.item.id);
                 let item_tab_stop = tab_stop.as_ref() == Some(&entry.item.id);
-                rows.push(self.row(entry, is_selected, is_expanded, item_tab_stop, icon_width, minimum_row_height));
+                let expanded_binding = match self.expanded.clone() {
+                    Some(binding) => binding,
+                    None => Binding::new(
+                        {
+                            let local = self.local_expanded.clone();
+                            move || local.get()
+                        },
+                        {
+                            let local = self.local_expanded.clone();
+                            move |value: HashSet<Id>| local.set(value)
+                        },
+                    ),
+                };
+                let identity: Rc<dyn Fn(&Id) -> u64> = Rc::new(|id: &Id| roving_identity(id));
+                let destination = crate::primitives::layout::sidebar::SidebarDestination {
+                    entry: entry.clone(),
+                    selection: self.selection.clone(),
+                    expanded: expanded_binding,
+                    is_selected,
+                    is_expanded,
+                    is_tab_stop: item_tab_stop,
+                    icon_width,
+                    minimum_row_height,
+                    on_activate: self.on_activate.clone(),
+                    presentation,
+                    icon_extent: icon_width.unwrap_or(20.0),
+                    disclosure_lane: section_has_branches,
+                    context_label: hierarchy.context(entry),
+                };
+                rows.push(AnyView::new(
+                    AnyView::new(destination).with_modifier(RovingItem::new(
+                        entry.item.id.clone(),
+                        item_tab_stop,
+                        identity,
+                    )),
+                ));
             }
             let identity = section.id.clone();
             let column = AnyView::new(
@@ -262,120 +291,129 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
 }
 
 impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Sidebar<Id> {
-    fn row(
-        &self,
-        entry: &SidebarEntry<Id>,
-        is_selected: bool,
-        is_expanded: bool,
-        is_tab_stop: bool,
-        icon_width: Option<f32>,
-        minimum_row_height: f32,
-    ) -> AnyView {
-        let item = &entry.item;
-        let is_enabled = entry.is_enabled;
-        let is_branch = entry.is_branch();
-        let depth = entry.ancestors.len();
-        let identity: Rc<dyn Fn(&Id) -> u64> = Rc::new(|id: &Id| roving_identity(id));
-        let row_identity = item.id.clone();
+    /// Icon lane width for one section, resolved from the ambient theme.
+    fn icon_lane_resolved(&self, entries: &[SidebarEntry<Id>]) -> Option<f32> {
+        let theme = self.ambient_theme.clone();
+        Self::icon_lane(entries, &theme)
+    }
 
-        let mut lanes: Vec<AnyView> = Vec::new();
-        if let Some(width) = icon_width {
-            let glyph = match item.icon.clone() {
-                Some(icon) => AnyView::new(ButtonIcon::new(
-                    ButtonIconSource::resource(icon),
-                    Some(width),
-                    None,
-                )),
-                None => AnyView::new(crate::EmptyView),
-            };
-            lanes.push(AnyView::new(
-                BoxView::new(
-                    FlexDirection::Row, Align::Center, Justify::Center, Wrap::NoWrap, 0.0, glyph,
-                )
-                .frame_width(width)
-                .flex_with(0.0, 0.0, None),
-            ));
-        }
-        lanes.push(AnyView::new(
-            Text::new(item.title.clone())
-                .truncated()
-                .semantic_font(SemanticFontRef::label())
-                .flex_with(1.0, 1.0, None)
-                .frame_min_width(0.0),
-        ));
-        if let Some(badge) = item.badge.clone() {
-            lanes.push(AnyView::new(
-                crate::primitives::feedback::Badge::new(badge).enabled(is_enabled),
-            ));
-        }
-        if let Some(trailing) = item.slots.trailing.clone() {
-            lanes.push(AnyView::new(trailing.flex_with(0.0, 0.0, None)));
-        }
 
-        let label = AnyView::new(
-            BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 10.0,
-                AnyView::new(TupleView::new(lanes)),
-            )
-            .padding_insets(crate::modifiers::layout::EdgeInsets::new(
-                0.0,
-                10.0 + depth.min(5) as f32 * 16.0,
-                0.0,
-                10.0,
-            ))
-            .frame(None, None, None, Some(minimum_row_height), None, None),
-        );
+}
 
-        let selection = self.selection.clone();
-        let on_activate = self.on_activate.clone();
-        let expanded_binding = self.expanded.clone();
-        let local_expanded = self.local_expanded.clone();
-        let expanded_now = self.expanded_set();
-        let id = item.id.clone();
-        let button = Button::with_options(
-            label,
-            {
-                let id = id.clone();
-                let selection = selection.clone();
-                let on_activate = on_activate.clone();
-                let expanded_binding = expanded_binding.clone();
-                let local_expanded = local_expanded.clone();
-                let expanded_now = expanded_now.clone();
-                move || {
-                    if is_branch {
-                        let mut next = expanded_now.clone();
-                        if !next.remove(&id) {
-                            next.insert(id.clone());
-                        }
-                        match expanded_binding.as_ref() {
-                            Some(binding) => binding.set(next),
-                            None => local_expanded.set(next),
-                        }
-                    } else {
-                        selection.set(Some(id.clone()));
-                        on_activate(id.clone());
-                    }
-                }
-            },
-            ButtonRole::Normal,
-            is_enabled,
-            false,
-            is_selected,
-            None,
-        )
-        .button_style(SidebarItemStyle { minimum_height: minimum_row_height });
+/// Gives a section column a stable identity across recompositions.
+struct SectionIdentity {
+    id: String,
+    content: AnyView,
+}
 
-        AnyView::new(SidebarRowBody {
-            button,
-            row_id: row_identity,
-            is_tab_stop,
-            identity,
-            label: item.title.clone(),
-            value: item.badge.clone().unwrap_or_default(),
-            is_expanded: is_branch.then_some(is_expanded),
-        })
+impl PrimitiveView for SectionIdentity {
+    fn make_node(&self) -> Node {
+        let node = Node::new();
+        node.set_is_hit_testable(false);
+        node
+    }
+
+    fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
+        None
+    }
+
+    fn update_node(&self, node: &Node) {
+        node.set_attachment("__sidebar.section", self.id.clone());
+    }
+
+    fn children(&self, _node: &Node) -> Vec<AnyView> {
+        vec![self.content.clone()]
     }
 }
+impl_primitive_view!(SectionIdentity);
+
+/// Applies the roving identity and row semantics to one row button.
+///
+/// The row is rebuilt from primitives on each pass: `Button` is not `Clone` and
+/// `button_style` returns `ModifiedContent`, so storing either would leave a
+/// value that cannot be re-emitted per frame.
+struct SidebarRowBody<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> {
+    label: AnyView,
+    is_enabled: bool,
+    is_selected: bool,
+    minimum_height: f32,
+    is_branch: bool,
+    selection: Binding<Option<Id>>,
+    on_activate: Rc<dyn Fn(Id)>,
+    expanded: Option<Binding<HashSet<Id>>>,
+    local_expanded: cove_core::State<HashSet<Id>>,
+    expanded_now: HashSet<Id>,
+    id: Id,
+    row_id: Id,
+    is_tab_stop: bool,
+    identity: Rc<dyn Fn(&Id) -> u64>,
+}
+
+impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> PrimitiveView
+    for SidebarRowBody<Id>
+{
+    fn make_node(&self) -> Node {
+        let node = Node::new();
+        node.set_is_hit_testable(false);
+        node
+    }
+
+    fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
+        None
+    }
+
+    fn update_node(&self, _node: &Node) {}
+
+    fn children(&self, _node: &Node) -> Vec<AnyView> {
+        let activation = {
+            let id = self.id.clone();
+            let selection = self.selection.clone();
+            let on_activate = self.on_activate.clone();
+            let expanded = self.expanded.clone();
+            let local_expanded = self.local_expanded.clone();
+            let expanded_now = self.expanded_now.clone();
+            let is_branch = self.is_branch;
+            move || {
+                if is_branch {
+                    let mut next = expanded_now.clone();
+                    if !next.remove(&id) {
+                        next.insert(id.clone());
+                    }
+                    match expanded.as_ref() {
+                        Some(binding) => binding.set(next),
+                        None => local_expanded.set(next),
+                    }
+                } else {
+                    selection.set(Some(id.clone()));
+                    on_activate(id.clone());
+                }
+            }
+        };
+        let button = Button::with_options(
+            self.label.clone(),
+            activation,
+            ButtonRole::Normal,
+            self.is_enabled,
+            false,
+            self.is_selected,
+            None,
+        )
+        .button_style(SidebarItemStyle { minimum_height: self.minimum_height });
+        let styled = button.button_style(SidebarItemStyle { minimum_height: self.minimum_height });
+        let roving = RovingItem::new(
+            self.row_id.clone(),
+            self.is_tab_stop,
+            self.identity.clone(),
+        );
+        vec![AnyView::new(
+            AnyView::new(styled).with_modifier(roving),
+        )]
+    }
+}
+
+impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
+    for SidebarRowBody<Id>
+{}
 
 /// Row semantics: label, badge value and branch expanded state.
 struct SidebarRowSemantics {
@@ -396,18 +434,64 @@ impl cove_composition::ViewModifier for SidebarRowSemantics {
     }
 }
 
-/// Destination row chrome: a solid selection band that does not move the text.
-struct SidebarItemStyle {
+/// The painted row, built in one pass so the modifier chain never needs erasing.
+struct SidebarChromeRow {
+    label: AnyView,
     minimum_height: f32,
+    fill: cove_core::Color,
+    ink: cove_core::Color,
+    radius: f32,
+}
+
+impl PrimitiveView for SidebarChromeRow {
+    fn make_node(&self) -> Node {
+        let node = Node::new();
+        node.set_is_hit_testable(false);
+        node
+    }
+
+    fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
+        None
+    }
+
+    fn update_node(&self, _node: &Node) {}
+
+    fn children(&self, _node: &Node) -> Vec<AnyView> {
+        let row = BoxView::new(
+            FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 0.0,
+            AnyView::new(self.label.clone().with_modifier(FlexGrowOne)),
+        )
+        .foreground_color(self.ink)
+        .background_color(self.fill)
+        .corner_radius(self.radius);
+        vec![AnyView::new(row)]
+    }
+}
+crate::impl_primitive_view!(SidebarChromeRow);
+
+/// Lets the label absorb the remaining row width.
+struct FlexGrowOne;
+
+impl cove_composition::ViewModifier for FlexGrowOne {
+    fn apply_layout(&self, layout: &cove_core::scene::LayoutNode) {
+        layout.set_flex_grow(1.0);
+        layout.set_flex_shrink(1.0);
+    }
+}
+
+/// Destination row chrome: a solid selection band that does not move the text.
+pub struct SidebarItemStyle {
+    pub minimum_height: f32,
 }
 
 impl crate::theme::styles::buttons::ButtonStyle for SidebarItemStyle {
     fn make_body(&self, configuration: crate::theme::styles::buttons::ButtonStyleConfiguration) -> AnyView {
-        let theme = for_style(&configuration);
-        let appearance = crate::theme::styles::components::selection_appearance::SelectionAppearance::resolve(
-            crate::theme::styles::components::selection_appearance::SelectionRole::Sidebar,
-            &theme,
-        );
+        let theme = configuration.theme.clone();
+        let appearance =
+            crate::theme::styles::components::selection_appearance::SelectionAppearance::resolve(
+                crate::theme::styles::components::selection_appearance::SelectionRole::Sidebar,
+                &theme,
+            );
         let fill = if configuration.is_pressed {
             appearance.pressed_fill
         } else if configuration.is_selected {
@@ -417,26 +501,19 @@ impl crate::theme::styles::buttons::ButtonStyle for SidebarItemStyle {
         } else {
             cove_core::Color::CLEAR
         };
-        AnyView::new(
-            BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 0.0,
-                AnyView::new(configuration.label.clone()).flex_with(1.0, 1.0, None),
-            )
-            .flex_with(1.0, 1.0, None)
-            .frame(None, None, Some(0.0), Some(self.minimum_height), None, None)
-            .foreground_color(if !configuration.is_enabled {
-                theme.colors.on_surface_muted
-            } else if configuration.is_selected {
-                theme.colors.on_surface
-            } else {
-                theme.colors.on_surface_variant
-            })
-            .background_color(fill)
-            .corner_radius(appearance.corner_radius),
-        )
+        let ink = if !configuration.is_enabled {
+            theme.colors.on_surface_muted
+        } else if configuration.is_selected {
+            theme.colors.on_surface
+        } else {
+            theme.colors.on_surface_variant
+        };
+        AnyView::new(SidebarChromeRow {
+            label: configuration.label.clone(),
+            minimum_height: self.minimum_height,
+            fill,
+            ink,
+            radius: appearance.corner_radius,
+        })
     }
-}
-
-fn for_style(configuration: &crate::theme::styles::buttons::ButtonStyleConfiguration) -> crate::theme::Theme {
-    configuration.theme.clone()
 }

@@ -160,7 +160,7 @@ pub fn test_text_environment(size: f32, line_height: f32) -> TextEnvironment {
     if let Some(face) = atlas.font_face() {
         shaper.set_face(face, size);
     }
-    let resolver = TextFontResolver::new("Arial", atlas.clone());
+    let resolver = TextFontResolver::new("Arial".to_string(), atlas.clone(), 256, 1.0);
     TextEnvironment::new(
         atlas,
         shaper,
@@ -180,4 +180,50 @@ pub fn with_test_text_environment<T>(body: impl FnOnce() -> T) -> T {
     let result = body();
     TextEnvironmentHolder::set_current(previous);
     result
+}
+
+/// A primitive with no layout of its own that records a label, the Swift
+/// `_DebugNode` helper from `ViewBuilderTests.swift`.
+///
+/// The label is stashed as the node's `view_tag` so tests can identify a
+/// specific materialised node without inventing a new `Node` property.
+#[derive(Clone)]
+pub struct DebugNode {
+    pub label: String,
+}
+
+impl DebugNode {
+    pub fn new(label: impl Into<String>) -> Self {
+        Self { label: label.into() }
+    }
+}
+
+impl cove_composition::PrimitiveView for DebugNode {
+    fn make_node(&self) -> Node {
+        Node::new()
+    }
+    fn update_node(&self, node: &Node) {
+        node.set_view_tag(Some(self.label.clone()));
+    }
+    fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
+        None
+    }
+}
+
+impl cove_composition::View for DebugNode {
+    fn kind(&self) -> cove_composition::ViewKind<'_> {
+        cove_composition::ViewKind::Primitive(self)
+    }
+    fn tag(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+}
+
+/// The deepest node below `root`, following first children.
+pub fn deepest_node(root: &Node) -> Node {
+    let mut cursor = root.clone();
+    while let Some(next) = cursor.children().first().cloned() {
+        cursor = next;
+    }
+    cursor
 }

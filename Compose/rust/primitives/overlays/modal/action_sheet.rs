@@ -371,7 +371,9 @@ impl PrimitiveView for ActionSheetContent {
                     .semantic_foreground(SemanticColorRef::on_surface_muted()),
             ));
         }
-        column.push(AnyView::new(
+        // Wider surfaces carry the close control in the header's trailing slot
+        // instead of the compact drag handle, so the header reserves 52pt for it.
+        let mut header_row: Vec<AnyView> = vec![AnyView::new(
             AnyView::new(BoxView::new(
                 FlexDirection::Column,
                 Align::Stretch,
@@ -380,7 +382,22 @@ impl PrimitiveView for ActionSheetContent {
                 6.0,
                 AnyView::new(TupleView::new(header)),
             ))
-            .padding_insets(EdgeInsets::new(8.0, 12.0, 10.0, if self.shows_handle { 12.0 } else { 52.0 }))
+            .flex(1.0)
+            .shrink(1.0),
+        )];
+        if !self.shows_handle {
+            header_row.push(self.close_button());
+        }
+        column.push(AnyView::new(
+            AnyView::new(BoxView::new(
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                8.0,
+                AnyView::new(TupleView::new(header_row)),
+            ))
+            .padding_insets(EdgeInsets::new(8.0, 12.0, 10.0, 12.0))
             .frame(None, None, None, Some(44.0), None, None),
         ));
         column.push(AnyView::new(Divider::new(None, 1.0, DividerAxis::Horizontal)));
@@ -423,12 +440,6 @@ impl PrimitiveView for ActionSheetContent {
             ))
             .frame_min_width(0.0),
         );
-
-        if !self.shows_handle {
-            // Wider surfaces carry the close control in the header's trailing
-            // slot instead of the compact drag handle.
-            body = AnyView::new(AnyView::new(body).padding_insets(EdgeInsets::new(0.0, 0.0, 0.0, 12.0)));
-        }
 
         let label = self.question.title.clone();
         let help = self.question.message.clone();

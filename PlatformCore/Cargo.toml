@@ -16,3 +16,7 @@ serde_json.workspace = true
 
 [lints]
 workspace = true
+
+[[test]]
+name = "scroll_input"
+path = "rust/tests/scroll_input.rs"

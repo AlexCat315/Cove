@@ -182,6 +182,9 @@ fn split_handle(
     }
 }
 
+/// Snapshot semantics: a clone shares the current root, and later edits build
+/// new nodes above it, so an old handle keeps reporting its own totals.
+#[derive(Clone)]
 pub struct TextVisualLineIndex {
     root: Rc<VisualLineNode>,
 }

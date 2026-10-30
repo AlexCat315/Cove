@@ -43,14 +43,14 @@ pub trait ViewModifier {
 /// A view paired with a modifier, produced by `ViewModifier` application.
 pub struct ModifiedContent {
     content: AnyView,
-    modifier: Rc<dyn ViewModifier>,
+    applied: Rc<dyn ViewModifier>,
 }
 impl ModifiedContent {
     pub fn new(content: AnyView, modifier: impl ViewModifier + 'static) -> Self {
-        Self { content, modifier: Rc::new(modifier) }
+        Self { content, applied: Rc::new(modifier) }
     }
     pub fn new_boxed(content: AnyView, modifier: Rc<dyn ViewModifier>) -> Self {
-        Self { content, modifier }
+        Self { content, applied: modifier }
     }
     pub fn content(&self) -> &AnyView {
         &self.content
@@ -58,13 +58,13 @@ impl ModifiedContent {
     /// The applied modifier. Named `modifier_ref` so it does not shadow
     /// `ViewExt::modifier(self, modifier)`, which stacks another modifier.
     pub fn modifier_ref(&self) -> &Rc<dyn ViewModifier> {
-        &self.modifier
+        &self.applied
     }
 }
 
 impl Clone for ModifiedContent {
     fn clone(&self) -> Self {
-        Self { content: self.content.clone(), modifier: self.modifier.clone() }
+        Self { content: self.content.clone(), applied: self.applied.clone() }
     }
 }
 

@@ -21,12 +21,61 @@ cove-system.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+pulldown-cmark.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
 
 [lints]
 workspace = true
+
+[[test]]
+name = "composition_local_compose"
+path = "rust/tests/composition_local_compose.rs"
+
+[[test]]
+name = "adaptive_environment"
+path = "rust/tests/adaptive_environment.rs"
+
+[[test]]
+name = "appearance"
+path = "rust/tests/appearance.rs"
+
+[[test]]
+name = "bool_control_label"
+path = "rust/tests/bool_control_label.rs"
+
+[[test]]
+name = "color_glyph_resample"
+path = "rust/tests/color_glyph_resample.rs"
+
+[[test]]
+name = "edge_insets_interpolatable"
+path = "rust/tests/edge_insets_interpolatable.rs"
+
+[[test]]
+name = "keyboard_shortcut"
+path = "rust/tests/keyboard_shortcut.rs"
+
+[[test]]
+name = "package_resource_bundle"
+path = "rust/tests/package_resource_bundle.rs"
+
+[[test]]
+name = "text_cache"
+path = "rust/tests/text_cache.rs"
+
+[[test]]
+name = "text_visual_line_index"
+path = "rust/tests/text_visual_line_index.rs"
+
+[[test]]
+name = "value_subtree"
+path = "rust/tests/value_subtree.rs"
+
+[[test]]
+name = "view_builder"
+path = "rust/tests/view_builder.rs"
 
 [[test]]
 name = "zstack"

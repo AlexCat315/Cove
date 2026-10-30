@@ -3,7 +3,7 @@ use crate::{native, ColorGlyphBitmap, ColorGlyphSource, FontFace};
 use cove_core::{GlyphLineMetrics, GlyphMetrics};
 use std::rc::Rc;
 #[derive(Clone)]
-pub(crate) struct FreeTypeColorGlyphFace { face: FontFace, size: f32, scale: f32 }
+pub struct FreeTypeColorGlyphFace { face: FontFace, size: f32, scale: f32 }
 impl FreeTypeColorGlyphFace {
     pub fn new(face: FontFace) -> Option<Self> { face.has_color_glyphs().then(|| Self { size: face.size(), scale: face.raster_scale(), face }) }
     pub fn source(self) -> ColorGlyphSource {
