@@ -48,7 +48,8 @@ use cove_ui_compose::primitives::data::lists::tree::{Tree, TreeOptions, TreeSele
 use cove_ui_compose::primitives::layout::{Accordion, AccordionItem, DisclosureGroup, Panel};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_field::TextField;
-use cove_ui_compose::primitives::text::text_field::buffer::TextBuffer;
+use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
+use cove_ui_compose::theme::tokens::text_scaler::TextScalerViewExt;
 use cove_ui_compose::theme::{TextScaler, Theme, ThemeViewExt};
 use cove_ui_compose::{BoxView, EmptyView};
 
@@ -384,25 +385,41 @@ fn tree_rows_share_the_scaled_geometry() {
             let capture = Rc::new(PointerCapture::new());
             InteractionRegistryHolder::set_current(Some(interactions.clone()));
 
-            let selected = Rc::new(Cell::new(None::<i32>));
-            let expanded = Rc::new(State::new(HashSet::from([0i32])));
-            let selection_for_read = selected.clone();
-            let selection_for_write = selected.clone();
+            // `Binding` requires thread-safe closures, so the observed state is a
+            // pair of atomics rather than `Rc<Cell>`. The test only reads back what
+            // it wrote, which is all the Swift `Binding` round trip asserted.
+            let primary = std::sync::Arc::new(std::sync::atomic::AtomicI32::new(i32::MIN));
+            let primary_read = primary.clone();
+            let primary_write = primary.clone();
+            let expanded = std::sync::Arc::new(std::sync::Mutex::new(HashSet::from([0i32])));
+            let expanded_read = expanded.clone();
+            let expanded_write = expanded.clone();
 
             let mut options: TreeOptions<i32, i32> = TreeOptions::default();
             options.selection = TreeSelection {
                 primary: Binding::new(
-                    move || selection_for_read.get(),
-                    move |value: Option<i32>| selection_for_write.set(value),
+                    move || {
+                        let value = primary_read.load(std::sync::atomic::Ordering::Relaxed);
+                        (value != i32::MIN).then_some(value)
+                    },
+                    move |value: Option<i32>| {
+                        primary_write.store(
+                            value.unwrap_or(i32::MIN),
+                            std::sync::atomic::Ordering::Relaxed,
+                        );
+                    },
                 ),
                 expanded: Some(Binding::new(
-                    {
-                        let expanded = expanded.clone();
-                        move || expanded.get()
+                    move || {
+                        expanded_read
+                            .lock()
+                            .unwrap_or_else(|poisoned| poisoned.into_inner())
+                            .clone()
                     },
-                    {
-                        let expanded = expanded.clone();
-                        move |value| expanded.set(value)
+                    move |value| {
+                        *expanded_write
+                            .lock()
+                            .unwrap_or_else(|poisoned| poisoned.into_inner()) = value;
                     },
                 )),
                 ..TreeSelection::default()
@@ -499,8 +516,9 @@ fn tree_rows_share_the_scaled_geometry() {
             };
             dispatcher.dispatch(&InputEvent::MouseButtonDown(event.clone()));
             dispatcher.dispatch(&InputEvent::MouseButtonUp(event));
+            let chosen = primary.load(std::sync::atomic::Ordering::Relaxed);
             assert_eq!(
-                selected.get(),
+                (chosen != i32::MIN).then_some(chosen),
                 Some(1),
                 "clicking the child row selects it"
             );

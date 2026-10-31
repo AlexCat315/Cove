@@ -41,3 +41,15 @@ path = "rust/tests/fallback_style_tests.rs"
 [[test]]
 name = "system_font_instance_tests"
 path = "rust/tests/system_font_instance_tests.rs"
+
+[[test]]
+name = "surface_rendering_tests"
+path = "rust/tests/surface_rendering_tests.rs"
+
+[[test]]
+name = "color_glyph_tests"
+path = "rust/tests/color_glyph_tests.rs"
+
+[[test]]
+name = "text_tests"
+path = "rust/tests/text_tests.rs"

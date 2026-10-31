@@ -404,3 +404,15 @@ path = "rust/tests/swift_observation_tests.rs"
 [[test]]
 name = "disclosure_container_tests"
 path = "rust/tests/disclosure_container_tests.rs"
+
+[[test]]
+name = "zz_probe_as"
+path = "rust/tests/zz_probe_as.rs"
+
+[[test]]
+name = "primitive_view_kind_regression"
+path = "rust/tests/primitive_view_kind_regression.rs"
+
+[[test]]
+name = "single_line_text_tests"
+path = "rust/tests/single_line_text_tests.rs"

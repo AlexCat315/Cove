@@ -944,11 +944,21 @@ impl<'a> PassEncoder<'a> {
             .command_buffer
             .computeCommandEncoder()
             .ok_or_else(|| RhiError::submit_failed("cannot create compute command encoder"))?;
+        // Install the encoder before encoding anything. Swift assigns
+        // `computeEncoder` first for exactly this reason: an encoding failure
+        // must still leave a live encoder for `endActiveEncoders()` to end.
+        // Otherwise the abandoned encoder is released without `endEncoding()`
+        // and Metal aborts the process on dealloc.
+        self.compute_encoder = Some(encoder);
         self.compute_threadgroup_size = crate::rhi::ThreadgroupSize::default();
+        let encoder = self
+            .compute_encoder
+            .as_ref()
+            .expect("the encoder was just installed")
+            .clone();
         for command in &record.body {
             self.encode_compute_command(command, &encoder)?;
         }
-        self.compute_encoder = Some(encoder);
         Ok(())
     }
 

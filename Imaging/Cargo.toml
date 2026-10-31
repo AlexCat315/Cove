@@ -31,3 +31,7 @@ path = "rust/tests/image_decoder_tests.rs"
 [[test]]
 name = "progressive_image_tests"
 path = "rust/tests/progressive_image_tests.rs"
+
+[[test]]
+name = "image_asset_registry_tests"
+path = "rust/tests/image_asset_registry_tests.rs"

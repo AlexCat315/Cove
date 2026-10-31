@@ -332,21 +332,25 @@ fn strip_height_ignores_the_touch_control_extent() {
         );
         let root = graph.tree.borrow().root().expect("root");
         let item = strip_item(&root, "Overview");
+        // Previously pinned as a gap: the scroller had a fixed 40pt frame and the
+        // item chrome measured 32pt, so no strip node reached the 44pt touch
+        // extent Swift uses. The minimum-size floor is now honoured, which raises
+        // both to the touch extent, so this asserts the Swift behaviour.
         assert_eq!(
             item.absolute_frame().height,
-            32.0,
-            "the Rust strip item is 32pt tall regardless of the touch extent"
+            44.0,
+            "the strip item reaches the touch control extent"
         );
         assert_eq!(
             strip_container(&root, "Overview").absolute_frame().height,
-            40.0,
-            "the Rust scroller is a fixed 40pt tall, not the touch extent"
+            44.0,
+            "the scroller is raised to the touch control extent, not a fixed 40pt"
         );
         assert!(
             nodes(&strip_container(&root, "Overview"))
                 .iter()
-                .all(|node| node.absolute_frame().height < 44.0),
-            "no strip node reaches the 44pt touch extent"
+                .any(|node| node.absolute_frame().height >= 44.0),
+            "at least one strip node carries the 44pt touch extent"
         );
     });
 }

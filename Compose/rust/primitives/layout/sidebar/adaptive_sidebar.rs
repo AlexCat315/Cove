@@ -429,4 +429,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
 impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
     for AdaptiveShell<Id>
 {
+    fn kind(&self) -> crate::ViewKind<'_> {
+        crate::ViewKind::Primitive(self)
+    }
 }

@@ -181,9 +181,10 @@ fn placeholder_initializer() {
         let mut nodes = Vec::new();
         collect(&root, &mut nodes);
         let placeholder = nodes
-            .into_iter()
+            .iter()
             .find(|node| support::debug_name(node).as_deref() == Some("thumbnail-placeholder"))
-            .expect("the placeholder content mounts");
+            .expect("the placeholder content mounts")
+            .clone();
         let host = nodes
             .iter()
             .find(|node| {

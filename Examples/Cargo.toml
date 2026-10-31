@@ -25,6 +25,15 @@ cove-logging.workspace = true
 serde.workspace = true
 unicode-segmentation.workspace = true
 
+# The Counter example's inspection suites drive the DevTools scene inspector and
+# the shared scene protocol. Swift's `CounterExampleTests` imported
+# `CoveUIDevToolsScene`/`CoveUIDevToolsProtocol` directly, so the equivalents are
+# dev-dependencies here: they are test-only and must not leak into the example
+# content that ships.
+[dev-dependencies]
+cove-devtools = { path = "../DevTools" }
+cove-devtools-protocol.workspace = true
+
 [lints]
 workspace = true
 
@@ -127,3 +136,15 @@ path = "rust/tests/data_stories_file.rs"
 [[test]]
 name = "adaptive_examples"
 path = "rust/tests/adaptive_examples.rs"
+
+[[test]]
+name = "probe_harness"
+path = "rust/tests/probe_harness.rs"
+
+[[test]]
+name = "shared_scene_tests"
+path = "rust/tests/shared_scene_tests.rs"
+
+[[test]]
+name = "inspection_tests"
+path = "rust/tests/inspection_tests.rs"

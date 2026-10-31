@@ -200,3 +200,43 @@ path = "rust/tests/render_pipeline_performance_tests.rs"
 [[test]]
 name = "accessibility_subtree_regression"
 path = "rust/tests/accessibility_subtree_regression.rs"
+
+[[test]]
+name = "minimum_size_tests"
+path = "rust/tests/minimum_size_tests.rs"
+
+[[test]]
+name = "wheel_input_tests"
+path = "rust/tests/wheel_input_tests.rs"
+
+[[test]]
+name = "text_layout_regression_tests"
+path = "rust/tests/text_layout_regression_tests.rs"
+
+[[test]]
+name = "node_transform_render_tests"
+path = "rust/tests/node_transform_render_tests.rs"
+
+[[test]]
+name = "backdrop_opacity_tests"
+path = "rust/tests/backdrop_opacity_tests.rs"
+
+[[test]]
+name = "measurement_lifecycle_tests"
+path = "rust/tests/measurement_lifecycle_tests.rs"
+
+[[test]]
+name = "paint_tests"
+path = "rust/tests/paint_tests.rs"
+
+[[test]]
+name = "reveal_request_tests"
+path = "rust/tests/reveal_request_tests.rs"
+
+[[test]]
+name = "surface_painting_tests"
+path = "rust/tests/surface_painting_tests.rs"
+
+[[test]]
+name = "playback_tests"
+path = "rust/tests/playback_tests.rs"

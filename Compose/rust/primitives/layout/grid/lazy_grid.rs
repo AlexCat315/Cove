@@ -590,6 +590,9 @@ impl PrimitiveView for LazyGridCell {
     }
 }
 impl View for LazyGridCell {
+    fn kind(&self) -> crate::ViewKind<'_> {
+        crate::ViewKind::Primitive(self)
+    }
     fn tag(&self) -> &'static str {
         std::any::type_name::<Self>()
     }

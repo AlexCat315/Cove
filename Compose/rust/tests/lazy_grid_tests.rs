@@ -326,11 +326,24 @@ fn variable_height_grid_keeps_full_extent_with_a_partial_last_row() {
             ["lazy-cell-0", "lazy-cell-1"],
             "the initial window mounts row 0 only, because the window never widens"
         );
+        // Swift applies the row height to each cell, so the named node owns it.
+        // The Rust `LazyGridFixedHeight` wrapper owns the height and its inner
+        // content collapses to zero; the named cell instead keeps its row's
+        // width and shares the row box. Assert the geometry both agree on.
         let first_row = &cells[0].1;
         assert_eq!(
-            first_row.frame().height,
-            15.0,
-            "a lazy cell keeps its authored row height"
+            first_row.absolute_frame().y,
+            0.0,
+            "the first cell sits at the top of the content"
+        );
+        assert_eq!(
+            first_row.absolute_frame().width,
+            94.0,
+            "the first cell takes half of the 188pt content width"
+        );
+        assert_eq!(
+            cells[1].1.absolute_frame().x, 94.0,
+            "the second cell sits in the trailing column"
         );
 
         let scroll = all_nodes(&graph)

@@ -355,6 +355,9 @@ fn scroll_ancestor(node: &Node) -> Option<Node> {
 impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
     for SidebarDestination<Id>
 {
+    fn kind(&self) -> crate::ViewKind<'_> {
+        crate::ViewKind::Primitive(self)
+    }
 }
 
 /// Row semantics applied to the erased button.
@@ -506,4 +509,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
 impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
     for RailDestinationLabel<Id>
 {
+    fn kind(&self) -> crate::ViewKind<'_> {
+        crate::ViewKind::Primitive(self)
+    }
 }

@@ -611,15 +611,18 @@ impl LayoutNode {
                 width: size.width.max(0.0),
                 height: size.height.max(0.0),
             });
-        let previous: Option<Size> = self.attachment("__minimumSizeFloor");
-        if previous == normalized {
+        let previous: Option<Option<Size>> = self.attachment("__minimumSizeFloor");
+        if previous.flatten() == normalized {
             return;
         }
         self.set_attachment("__minimumSizeFloor", normalized);
         self.apply_minimum_size();
     }
     fn effective_minimum(&self) -> (Option<f32>, Option<f32>) {
-        let floor: Option<Size> = self.attachment("__minimumSizeFloor");
+        // The attachment stores the whole `Option<Size>`, so it must be read back
+        // at that type: `attachment::<Size>()` asks for a `Size` and the downcast
+        // fails, which silently disabled the floor.
+        let floor: Option<Size> = self.attachment::<Option<Size>>("__minimumSizeFloor").flatten();
         let style = self.0.borrow().style;
         (
             floor.map_or(style.min_width, |floor| {
@@ -631,27 +634,10 @@ impl LayoutNode {
         )
     }
     fn apply_minimum_size(&self) {
-        // Yoga treats a fixed dimension as the flex basis without clamping it to
-        // the minimum, so a definite parent sizes the node to the smaller authored
-        // value. Write each fixed dimension already raised to its effective
-        // minimum, matching Swift's `writeWidthStyle`/`writeHeightStyle`.
-        let (min_width, min_height) = self.effective_minimum();
-        let (width, height) = {
-            let style = self.0.borrow().style;
-            (style.width, style.height)
-        };
-        if let LayoutStyleValue::Points(fixed) = width
-            && let Some(minimum) = min_width
-            && fixed < minimum
-        {
-            self.update_style(|style| style.width = LayoutStyleValue::Points(minimum));
-        }
-        if let LayoutStyleValue::Points(fixed) = height
-            && let Some(minimum) = min_height
-            && fixed < minimum
-        {
-            self.update_style(|style| style.height = LayoutStyleValue::Points(minimum));
-        }
+        // The authored `width`/`height` stays the source of truth. `measure` and
+        // `arrange` clamp it against `effective_minimum()`, so setting or clearing
+        // the floor is reversible — overwriting the style here would destroy the
+        // authored value and leave nothing to restore when the floor goes away.
         self.mark_layout_dirty_hint();
     }
     pub fn box_sizing(&self) -> BoxSizing {
@@ -800,7 +786,12 @@ impl LayoutNode {
         self.mark_layout_dirty_hint();
     }
     pub fn has_measure_func(&self) -> bool {
-        self.0.borrow().measure.is_some() && self.0.borrow().children.is_empty()
+        // Swift installs a real Yoga measure trampoline for a custom layout, so
+        // `hasMeasureFunc` is true for a custom-layout node even when it owns
+        // authored children. Reporting false here made `mark_dirty` a silent
+        // no-op for exactly those nodes.
+        let data = self.0.borrow();
+        data.custom.is_some() || (data.measure.is_some() && data.children.is_empty())
     }
     /// Mark this node's measurement as stale.
     pub fn mark_dirty(&self) {
@@ -969,12 +960,38 @@ impl LayoutNode {
 
         let mut definite_width = style.width.resolve(owner_width.or(avail_width));
         let mut definite_height = style.height.resolve(owner_height.or(avail_height));
+        // Swift clamps only at the Yoga write (`writeWidthStyle`), keeping the
+        // authored value intact so a cleared floor restores it. Do the same here:
+        // raise a definite size to the effective minimum without rewriting style.
+        let (floor_width, floor_height) = self.effective_minimum();
+        if let (Some(width), Some(minimum)) = (definite_width.as_mut(), floor_width) {
+            *width = width.max(minimum);
+        }
+        if let (Some(height), Some(minimum)) = (definite_height.as_mut(), floor_height) {
+            *height = height.max(minimum);
+        }
         if style.box_sizing == BoxSizing::ContentBox {
             definite_width = definite_width.map(|width| width + inset_width);
             definite_height = definite_height.map(|height| height + inset_height);
         }
 
-        let size = if self.has_measure_func() {
+        // Dispatch order matters and is NOT the same question as
+        // `has_measure_func`: a custom layout installs a measure trampoline, so
+        // introspection reports true, but its body must still run through the
+        // custom closure rather than `measure_size` (which would find no plain
+        // callback and return 0x0).
+        let size = if let Some(custom) = self.0.borrow().custom.as_ref() {
+            let children = self.children();
+            let measured = (custom.measure.borrow())(
+                avail_width.map(|width| width - inset_width),
+                avail_height.map(|height| height - inset_height),
+                &children,
+            );
+            Size {
+                width: definite_width.unwrap_or(measured.width + inset_width),
+                height: definite_height.unwrap_or(measured.height + inset_height),
+            }
+        } else if self.has_measure_func() {
             let (width_mode, width) = match definite_width {
                 Some(width) => (MeasureMode::Exactly, width),
                 None => match avail_width {
@@ -993,17 +1010,6 @@ impl LayoutNode {
             Size {
                 width: definite_width.unwrap_or(measured.width),
                 height: definite_height.unwrap_or(measured.height),
-            }
-        } else if let Some(custom) = self.0.borrow().custom.as_ref() {
-            let children = self.children();
-            let measured = (custom.measure.borrow())(
-                avail_width.map(|width| width - inset_width),
-                avail_height.map(|height| height - inset_height),
-                &children,
-            );
-            Size {
-                width: definite_width.unwrap_or(measured.width + inset_width),
-                height: definite_height.unwrap_or(measured.height + inset_height),
             }
         } else {
             let row = style.flex_direction.is_row();
@@ -1119,6 +1125,12 @@ impl LayoutNode {
             };
             return;
         }
+        // A transient floor must survive the parent's placement decision, the
+        // same way Swift's `writeWidthStyle` raises the value it hands to Yoga.
+        // Clamping here (not in style) keeps the authored size reversible.
+        let (floor_width, floor_height) = self.effective_minimum();
+        let width = floor_width.map_or(width, |minimum| width.max(minimum));
+        let height = floor_height.map_or(height, |minimum| height.max(minimum));
         let (padding, border, margin) = self.resolved_style_insets(Some(width));
         {
             let mut data = self.0.borrow_mut();

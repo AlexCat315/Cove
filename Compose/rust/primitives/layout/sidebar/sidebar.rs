@@ -417,6 +417,9 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
 impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
     for SidebarRowBody<Id>
 {
+    fn kind(&self) -> crate::ViewKind<'_> {
+        crate::ViewKind::Primitive(self)
+    }
 }
 
 /// Row semantics: label, badge value and branch expanded state.

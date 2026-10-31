@@ -121,3 +121,47 @@ path = "rust/tests/presentation_policy_tests.rs"
 [[test]]
 name = "vulkan_slang_tests"
 path = "rust/tests/vulkan_slang_tests.rs"
+
+[[test]]
+name = "metal_storage_hazard_tests"
+path = "rust/tests/metal_storage_hazard_tests.rs"
+
+[[test]]
+name = "metal_frame_lifecycle_tests"
+path = "rust/tests/metal_frame_lifecycle_tests.rs"
+
+[[test]]
+name = "metal_ray_query_tests"
+path = "rust/tests/metal_ray_query_tests.rs"
+
+[[test]]
+name = "metal_binding_lifetime_tests"
+path = "rust/tests/metal_binding_lifetime_tests.rs"
+
+[[test]]
+name = "draw_batch_coalescing_tests"
+path = "rust/tests/draw_batch_coalescing_tests.rs"
+
+[[test]]
+name = "native_analytic_clip_tests"
+path = "rust/tests/native_analytic_clip_tests.rs"
+
+[[test]]
+name = "metal_slang_tests"
+path = "rust/tests/metal_slang_tests.rs"
+
+[[test]]
+name = "metal_render_binding_tests"
+path = "rust/tests/metal_render_binding_tests.rs"
+
+[[test]]
+name = "metal_encoder_teardown_regression"
+path = "rust/tests/metal_encoder_teardown_regression.rs"
+
+[[test]]
+name = "resource_preparation_tests"
+path = "rust/tests/resource_preparation_tests.rs"
+
+[[test]]
+name = "zz_probe_ref"
+path = "rust/tests/zz_probe_ref.rs"

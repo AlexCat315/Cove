@@ -42,3 +42,23 @@ path = "rust/tests/panel_sizing.rs"
 [[test]]
 name = "bug_probe"
 path = "rust/tests/bug_probe.rs"
+
+[[test]]
+name = "web_view_geometry_tests"
+path = "rust/tests/web_view_geometry_tests.rs"
+
+[[test]]
+name = "web_view_lifecycle_tests"
+path = "rust/tests/web_view_lifecycle_tests.rs"
+
+[[test]]
+name = "panel_workspace_integration_tests"
+path = "rust/tests/panel_workspace_integration_tests.rs"
+
+[[test]]
+name = "workspace_controller_tests"
+path = "rust/tests/workspace_controller_tests.rs"
+
+[[test]]
+name = "zz_name_probe"
+path = "rust/tests/zz_name_probe.rs"

@@ -25,3 +25,31 @@ cc.workspace = true
 
 [lints]
 workspace = true
+
+[[test]]
+name = "engine_tests"
+path = "rust/tests/engine_tests.rs"
+
+[[test]]
+name = "key_routing_tests"
+path = "rust/tests/key_routing_tests.rs"
+
+[[test]]
+name = "rendering_feature_tests"
+path = "rust/tests/rendering_feature_tests.rs"
+
+[[test]]
+name = "session_tests"
+path = "rust/tests/session_tests.rs"
+
+[[test]]
+name = "view_tests"
+path = "rust/tests/view_tests.rs"
+
+[[test]]
+name = "windows_command_line_tests"
+path = "rust/tests/windows_command_line_tests.rs"
+
+[[test]]
+name = "windows_session_tests"
+path = "rust/tests/windows_session_tests.rs"

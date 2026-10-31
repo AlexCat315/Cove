@@ -44,3 +44,19 @@ path = "rust/tests/window_chrome_interaction_tests.rs"
 [[test]]
 name = "native_window_lifecycle_tests"
 path = "rust/tests/native_window_lifecycle_tests.rs"
+
+[[test]]
+name = "frame_clock_tests"
+path = "rust/tests/frame_clock_tests.rs"
+
+[[test]]
+name = "launch_tests"
+path = "rust/tests/launch_tests.rs"
+
+[[test]]
+name = "surface_metrics_tests"
+path = "rust/tests/surface_metrics_tests.rs"
+
+[[test]]
+name = "sm_probe"
+path = "rust/tests/sm_probe.rs"
