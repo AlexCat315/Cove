@@ -752,5 +752,29 @@ name = "status_bar_panel_truncation_tests"
 path = "rust/tests/status_bar_panel_truncation_tests.rs"
 
 [[test]]
-name = "zz_probe_vtf"
-path = "rust/tests/zz_probe_vtf.rs"
+name = "keyed_reconciler_tests"
+path = "rust/tests/keyed_reconciler_tests.rs"
+
+[[test]]
+name = "tooltip_deduplication_tests"
+path = "rust/tests/tooltip_deduplication_tests.rs"
+
+[[test]]
+name = "virtual_stack_variable_rows_tests"
+path = "rust/tests/virtual_stack_variable_rows_tests.rs"
+
+[[test]]
+name = "product_component_tests"
+path = "rust/tests/product_component_tests.rs"
+
+[[test]]
+name = "popover_tests"
+path = "rust/tests/popover_tests.rs"
+
+[[test]]
+name = "scrolled_control_click_tests"
+path = "rust/tests/scrolled_control_click_tests.rs"
+
+[[test]]
+name = "data_table_scroll_tests"
+path = "rust/tests/data_table_scroll_tests.rs"

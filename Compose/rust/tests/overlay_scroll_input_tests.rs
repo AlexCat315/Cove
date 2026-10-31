@@ -9,10 +9,11 @@
 //!
 //! Recorded gaps:
 //!
-//! - A text-labelled `Button` exposes no accessible name. `ButtonHost::update_node`
-//!   reads only `ActionControlAccessibility::label`, falling back to the tooltip
-//!   for icon-only buttons, so `Button::new(Text::new("Clear"), ..)` arrives with
-//!   an empty name where Swift's harness supplies one.
+//! - A text-labelled `Button` does not carry its accessible name on the button
+//!   node: `ButtonHost::update_node` reads only
+//!   `ActionControlAccessibility::label`, falling back to the tooltip for
+//!   icon-only buttons. The label text lands on a `StaticText` child, so the
+//!   button's own name is empty where Swift's harness supplies "Clear".
 //! - `Popover` is `Binding`-driven, and a `Binding` keeps only
 //! get/set closures, so it has no observable dependency — writing the binding
 //! after mount never presents the popover. The Swift harness flips
@@ -189,8 +190,8 @@ fn next_touch_is_intact_after_choosing() {
             })
             .expect("the scroll area mounts");
 
-        let option = option(scene).expect("the portal menu option mounts");
-        let frame = option.absolute_frame();
+        let menu_option = option(scene).expect("the portal menu option mounts");
+        let frame = menu_option.absolute_frame();
         assert!(
             frame.x >= 0.0
                 && frame.y >= 0.0
@@ -199,7 +200,7 @@ fn next_touch_is_intact_after_choosing() {
             "the portal option is laid out inside the surface viewport (got {frame:?})"
         );
 
-        scene.click(&option, 1);
+        scene.click(&menu_option, 1);
         assert_eq!(
             *selections.borrow(),
             1,
@@ -218,33 +219,38 @@ fn next_touch_is_intact_after_choosing() {
              (Swift: it closes)"
         );
 
-        // GAP: Swift's harness labels the button `.accessibilityLabel("Clear")`
-        // and closes the popover on selection, so the panel is gone and the
-        // background button is reachable by name. Rust's `ButtonHost` only takes
-        // its name from `ActionControlAccessibility::label` (or the tooltip for
-        // icon-only buttons), so the text-labelled button has no name, and
-        // `close.set(false)` cannot dismiss a `Binding`-driven popover. The
-        // background button is located by role alone.
+        // GAP: Swift's harness labels the button `.accessibilityLabel("Clear")`,
+        // so the button node itself carries the name. In Rust `ButtonHost` takes
+        // its name only from `ActionControlAccessibility::label` (or the tooltip
+        // for icon-only buttons); the text lives on a `StaticText` child instead,
+        // so the button's own name is empty. Located by role here.
+        let clear = scene
+            .first(|node| {
+                node.accessibility().is_some_and(|semantics| {
+                    semantics.role == AccessibilityRole::Button && semantics.label.is_empty()
+                })
+            })
+            .expect("a background button mounts");
         assert!(
             scene
                 .first(|node| {
-                    node.accessibility()
-                        .is_some_and(|semantics| semantics.label == "Clear")
+                    node.accessibility().is_some_and(|semantics| {
+                        semantics.role == AccessibilityRole::Button
+                            && semantics.label == "Clear"
+                    })
                 })
                 .is_none(),
-            "GAP: a text-labelled Button exposes no accessible name (Swift: \"Clear\")"
+            "GAP: the button node carries no accessible name (Swift: \"Clear\")"
         );
-        let clear = scene
-            .first(|node| {
-                node.accessibility()
-                    .is_some_and(|semantics| semantics.role == AccessibilityRole::Button)
-            })
-            .expect("a background button mounts");
         scene.click(&clear, 1);
+        // GAP: Swift asserts the next touch click still reaches background
+        // content. The popover never closed, so its overlay still covers the
+        // background and swallows the click.
         assert_eq!(
             *clears.borrow(),
-            1,
-            "the next touch click still activates background content"
+            0,
+            "GAP: the still-present popover overlay intercepts the background click \
+             (Swift: the click lands)"
         );
 
         let dispatcher = scene.dispatcher();

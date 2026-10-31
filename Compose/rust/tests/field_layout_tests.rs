@@ -543,6 +543,11 @@ fn associated_labels_resolve_duplicate_ids_within_their_own_form() {
 
         let nodes = scene.nodes();
         let inputs = fields(&nodes);
+        let scopes = nodes
+            .iter()
+            .filter(|n| n.attachment::<bool>("CoveUI.form.label-scope") == Some(true))
+            .count();
+        println!("LBL scope_count={scopes}");
         let labels: Vec<Node> = nodes
             .into_iter()
             .filter(|node| {
@@ -556,12 +561,44 @@ fn associated_labels_resolve_duplicate_ids_within_their_own_form() {
         assert_eq!(inputs.len(), 2, "both forms keep their own field");
         assert_eq!(labels.len(), 2, "both forms keep their own label");
 
-        let scopes: Vec<usize> = nodes.iter().filter(|n| n.attachment::<bool>("CoveUI.form.label-scope") == Some(true)).map(|n| n.children().len()).collect();
-        println!("LBL scopes={:?}", scopes);
+
         for (index, expected) in [(1usize, 1usize), (0, 0)] {
+            // Walk the label's ancestry and report whether the scope root is found.
+            {
+                let mut cur = Some(labels[index].clone());
+                let mut reached = false;
+                let mut depth = 0;
+                while let Some(n) = cur {
+                    depth += 1;
+                    if n.attachment::<bool>("CoveUI.form.label-scope") == Some(true) { reached = true; break; }
+                    cur = n.parent();
+                }
+                println!("LBL scope{index} reached={reached} depth={depth}");
+                // Does the scope root contain the field?
+                let mut cur2 = Some(labels[index].clone());
+                while let Some(n) = cur2 {
+                    if n.attachment::<bool>("CoveUI.form.label-scope") == Some(true) {
+                        fn has(n: &Node, id: &cove_core::scene::ElementId) -> bool {
+                            if n.id() == *id { return true; }
+                            n.children().iter().any(|c| has(c, id))
+                        }
+                        fn probe(n: &Node, id: &cove_core::scene::ElementId) -> Option<(bool, String, bool)> {
+                            if n.id() == *id {
+                                return Some((n.is_focusable(), n.accessibility().map(|s| s.identifier).unwrap_or_default(), n.accessibility().is_some()));
+                            }
+                            n.children().iter().find_map(|c| probe(c, id))
+                        }
+                        println!("LBL scope{index} contains_field={} probe={:?}", has(&n, &inputs[expected].id()), probe(&n, &inputs[expected].id()));
+                        break;
+                    }
+                    cur2 = n.parent();
+                }
+            }
             if let Some(activate) = labels[index].accessibility_actions().activate {
+                let before = scene.context.focus_chain.focused().map(|f| f.id());
                 activate();
-                println!("LBL after{index} focused={:?}", scene.context.focus_chain.focused().map(|f| f.id()));
+                let after = scene.context.focus_chain.focused().map(|f| f.id());
+                println!("LBL act{index} before={before:?} after={after:?}");
             } else {
                 println!("LBL noactivate{index}");
             }

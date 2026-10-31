@@ -193,3 +193,8 @@ path = "rust/tests/text_editor_layout_tests.rs"
 [[test]]
 name = "navigation_state_tests"
 path = "rust/tests/navigation_state_tests.rs"
+
+[[test]]
+name = "list_row_layout_tests"
+path = "rust/tests/list_row_layout_tests.rs"
+

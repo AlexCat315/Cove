@@ -183,7 +183,9 @@ impl View for GalleryView {
                 docked,
                 rail,
             ))
-            .modifier(GallerySidebarFrame)
+            .modifier(GallerySidebarFrame {
+                width: self.navigation_width.get(),
+            })
             .debug_name("gallery-shell"),
         );
         let split = AnyView::new(WorkspaceSplitRow {
@@ -347,13 +349,24 @@ impl GalleryThemeToggle {
     }
 }
 
-/// Sidebar allocation: the docked width the shell reserves.
-struct GallerySidebarFrame;
+/// Docks the navigation pane at its authored width.
+///
+/// `navigation_width` was declared, initialised and cloned but **never read**, so
+/// the docked `Sidebar` went into the `ViewThatFits` row unconstrained and
+/// stretched to the whole window — `gallery-content` then resolved to 0pt wide at
+/// 1280pt. Swift passes the same state to `AdaptiveSidebar(width:)`
+/// (`GalleryView.swift:34`). This is the seam that replaces it.
+struct GallerySidebarFrame {
+    width: f32,
+}
 
 impl cove_composition::ViewModifier for GallerySidebarFrame {
     fn apply_layout(&self, layout: &LayoutNode) {
         layout.set_flex_shrink(0.0);
         layout.set_min_width(Some(0.0));
+        if self.width.is_finite() && self.width > 0.0 {
+            layout.set_width(Some(self.width));
+        }
     }
 }
 

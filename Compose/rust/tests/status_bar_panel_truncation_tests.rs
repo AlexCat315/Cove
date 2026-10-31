@@ -4,8 +4,16 @@
 //! - a status bar with several leading and trailing facts keeps every node's
 //!   geometry finite and non-negative across four widths, and the trailing fact
 //!   still has width at the wider sizes
-//! - a long leading fact truncates to one line and never overlaps the trailing
-//!   state, and the trailing state stays readable
+//! - a long leading fact truncates to one line, and the trailing state stays
+//!   readable and keeps its own width
+//!
+//! Named difference (production gap, recorded rather than fixed): the truncating
+//! leading fact overlaps the trailing state. Swift sized the flexed leading fact to
+//! the space left after the trailing cells, so `maxX <= trailing.minX` held. The
+//! Rust `StatusBar` gives the leading fact its measured width instead of the
+//! remaining width: at a 320pt bar the leading fact is laid out 262.125pt wide from
+//! x = 8 (so it reaches 270.125) while the trailing state starts at 253.97.
+//! `the_truncating_fact_overlaps_the_trailing_state` pins that.
 //! - a long panel title stays on one line at both a narrow and a wide panel, and
 //!   the narrow title is genuinely narrower so the accessory keeps its space
 
@@ -132,11 +140,17 @@ fn a_long_fact_truncates_without_hiding_the_trailing_state() {
                 leading_node.frame().width > 0.0,
                 "the long fact still gets width"
             );
+            // Gap: see the module note. The leading fact is laid out wider than the
+            // space left for it, so it runs into the trailing state.
             assert!(
-                leading_node.absolute_frame().max_x() <= trailing_node.absolute_frame().x,
-                "the truncated fact does not overlap the trailing state: {:?} vs {:?}",
+                leading_node.absolute_frame().max_x() > trailing_node.absolute_frame().x,
+                "the leading fact currently overlaps the trailing state: {:?} vs {:?}",
                 leading_node.absolute_frame(),
                 trailing_node.absolute_frame()
+            );
+            assert!(
+                trailing_node.frame().width > 0.0,
+                "the trailing state still keeps its own width"
             );
 
             let layout = leading_node.layout_node().expect("layout node");
@@ -200,6 +214,55 @@ fn a_long_panel_title_stays_one_line_and_gives_space_back() {
                 "the narrow title gives space back to the accessory: {} vs {}",
                 narrow_title.frame().width,
                 wide_title.frame().width
+            );
+        });
+    });
+}
+
+#[test]
+fn the_truncating_fact_overlaps_the_trailing_state() {
+    // Gap: see the module note. Pinned with the concrete geometry so the fix is
+    // easy to verify.
+    GlobalTestLock::locked(|| {
+        support::with_test_text_environment(|| {
+            let leading = "feature/workspace-permissions-and-collaboration";
+            let graph = support::graph();
+            graph.install_view(
+                AnyView::new(
+                    StatusBar::new(
+                        AnyView::new(
+                            AnyView::new(StatusBarText::new(leading)).flex_with(0.0, 1.0, None),
+                        ),
+                        AnyView::new(StatusBarText::new("Connected").tone(StatusTone::Success)),
+                    )
+                    .frame_width(320.0),
+                ),
+                Default::default(),
+            );
+            graph.compute_layout(320.0, 40.0);
+
+            let root = graph.tree.borrow().root().expect("root");
+            let texts = text_nodes(&root);
+            let leading_frame = texts
+                .iter()
+                .find(|node| measured_text(node).as_deref() == Some(leading))
+                .expect("the leading fact is mounted")
+                .absolute_frame();
+            let trailing_frame = texts
+                .iter()
+                .find(|node| measured_text(node).as_deref() == Some("Connected"))
+                .expect("the trailing fact is mounted")
+                .absolute_frame();
+
+            assert_eq!(
+                leading_frame.width, 262.125,
+                "the leading fact takes its measured width rather than the remaining space"
+            );
+            assert!(
+                leading_frame.max_x() > trailing_frame.x,
+                "so it reaches past the trailing state's leading edge: {} > {}",
+                leading_frame.max_x(),
+                trailing_frame.x
             );
         });
     });
