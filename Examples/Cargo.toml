@@ -206,3 +206,15 @@ path = "rust/tests/gallery_appearance_tests.rs"
 [[test]]
 name = "drawer_tests"
 path = "rust/tests/drawer_tests.rs"
+
+[[test]]
+name = "rail_tests"
+path = "rust/tests/rail_tests.rs"
+
+[[test]]
+name = "adaptive_shell_tests"
+path = "rust/tests/adaptive_shell_tests.rs"
+
+[[test]]
+name = "selection_shell_tests"
+path = "rust/tests/selection_shell_tests.rs"

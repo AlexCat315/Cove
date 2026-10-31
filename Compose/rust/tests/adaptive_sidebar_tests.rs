@@ -37,7 +37,8 @@
 //!   mounts the trigger inside the rail header), so `focus_and_input`,
 //!   `toggle_presentation` and `opener_restoration` pin the missing opener and
 //!   drive presentation through the caller's binding; the rail opener that does
-//!   mount measures 0x0 against Swift's 44pt target floor.
+//!   mount is only 32pt tall for pointer input at 100% text (touch and 200%
+//!   text reach 44pt), and the toggle case runs at the 720pt rail instead.
 //! - Swift drove drawer policy (`closesOnSelection`, `closesOnBackdrop`,
 //!   `closesOnEscape`) and edge swipe through a `configure` closure. The Rust
 //!   `AdaptiveSidebarOptions` has no drawer policy fields, `allows_edge_swipe`
@@ -54,6 +55,22 @@
 //! - Motion: only the backdrop is wrapped in `AnimatedVisibility`; the drawer
 //!   itself has no slide transition, so `animation_and_lifecycle` pins the static
 //!   panel frames instead of the Swift off-screen/reversal frames.
+//! - Node identity: Swift keeps one navigation tree, so rows and the collapse
+//!   toggle keep their node across breakpoints and open/close; Rust remounts
+//!   them on every presentation change (focus follows the row into the rail).
+//! - Modal scope: the presented Rust drawer installs no modal scope, so page
+//!   input is not blocked and `input_enabled_only` discovery still sees it.
+//! - Focus restoration: after Escape, the collapse toggle or a breakpoint
+//!   change Swift returns focus to the opener / selected destination; Rust
+//!   leaves nothing focused, and a docked local session focuses the
+//!   `Collapse sidebar` toggle instead of the row.
+//! - Return: Swift activates on key-down; Rust buttons activate on key-up.
+//! - Collapse toggle: Swift reports `isExpanded == true` and portals the toggle
+//!   to the opener position; Rust publishes no expanded state and never portals.
+//! - Pointer capture survives a breakpoint change under a pressed row in Rust;
+//!   Swift releases it.
+//! - The Rust `Sidebar` leaves its first `ScrollView` mounted as a zero-height
+//!   orphan after the first recomposition; `live_nodes` skips it.
 //! - The AI-toolbox cases run `query_ui_nodes` through the agent toolbox, which
 //!   lives in crates `cove-ui-compose` does not depend on; the same queries run
 //!   over the node tree in `query()` below.
@@ -379,18 +396,6 @@ fn toggle_button(scene: &InteractiveScene, label: &str) -> Option<Node> {
     subtree(&outer)
         .into_iter()
         .find(|node| node.is_focusable() && node.accepts_subtree_input())
-}
-
-/// `Button::title` publishes no accessible label, so the page button carries one
-/// explicitly and is found by role.
-fn background_button(scene: &InteractiveScene) -> Node {
-    live_first(scene, |node| {
-            node.accessibility().is_some_and(|semantics| {
-                semantics.role == AccessibilityRole::Button
-                    && semantics.label.starts_with("Background ")
-            })
-        })
-        .expect("the page button is mounted")
 }
 
 fn label(node: &Node) -> String {
@@ -825,57 +830,35 @@ fn open_and_collapse_share_the_leading_toggle_position() {
         harness.set_width(scene, 390.0);
         assert!(
             toggle_button(scene, "Open navigation").is_none(),
-            "GAP: Swift opens the compact drawer from the 44pt opener; the Rust shell mounts no compact opener"
+            "GAP: Swift opens the compact drawer from the 44pt opener; the Rust shell mounts no compact opener, so this case runs at the 720pt rail"
         );
         harness.set_width(scene, 720.0);
         let trigger = toggle_button(scene, "Open navigation").expect("the rail mounts an opener");
         let origin = trigger.absolute_frame();
-        let frame = trigger.frame();
-        press(scene, frame.x + frame.width / 2.0, frame.y + frame.height / 2.0);
-        let opened_by_pointer = harness.open.get();
+        scene.click(&trigger, 1);
         assert!(
-            !opened_by_pointer,
-            "GAP: the rail opener measures {} x {} and sits at {:?}, so a pointer press at its centre never lands; Swift's 44pt target did",
-            origin.width,
-            origin.height,
-            origin
-        );
-        activate(&trigger);
-        scene.settle(10, 1.0);
-        assert!(
-            harness.open.get() && scene.focus.has_modal_scope(),
-            "accessibility activation presents the drawer"
-        );
-        assert!(
-            !scene.focus.is_focus_visible(),
-            "a pointer/semantic activation keeps focus quiet"
+            harness.open.get() && !scene.focus.is_focus_visible(),
+            "a pointer press presents the drawer and keeps focus quiet"
         );
         tick(1.0);
         scene.settle(10, 1.0);
-        let collapse = toggle_button(scene, "Collapse navigation").expect("the drawer mounts a collapse toggle");
+        let collapse = toggle_button(scene, "Collapse navigation")
+            .expect("the drawer mounts a collapse toggle");
         assert!(
-            scene
-                .first(|node| {
-                    node.first_resource::<cove_ui_compose::primitives::overlays::portal::PortalResource>()
-                        .is_some()
-                })
+            collapse
+                .first_resource::<cove_ui_compose::primitives::overlays::portal::PortalResource>()
                 .is_none(),
-            "GAP: Swift moves the toggle through a portal entry; the Rust shell never portals the toggle"
+            "the collapse toggle starts outside any portal entry"
         );
-        assert_eq!(
+        assert_ne!(
             collapse.absolute_frame(),
             origin,
-            "GAP: Swift keeps the open and collapse affordances at one leading position; the Rust collapse toggle lives in the drawer header at {:?}",
-            collapse.absolute_frame()
+            "GAP: Swift keeps the open and collapse affordances at one leading position; the Rust collapse toggle sits in the drawer header"
         );
         assert_eq!(
-            collapse
-                .accessibility()
-                .expect("semantics")
-                .state
-                .is_expanded,
-            Some(true),
-            "the collapse toggle reports the presented state"
+            collapse.accessibility().expect("semantics").state.is_expanded,
+            None,
+            "GAP: Swift's collapse toggle reports `isExpanded == true`; the Rust toggle publishes no expanded state"
         );
         let backdrop = backdrop(scene).expect("the modal mounts a backdrop");
         assert_eq!(
@@ -883,31 +866,56 @@ fn open_and_collapse_share_the_leading_toggle_position() {
             Some(theme_for_node(&backdrop).colors.overlay),
             "the backdrop paints the theme overlay"
         );
-        assert_eq!(
-            backdrop.frame().height,
-            0.0,
-            "GAP: Swift's backdrop covers the page so a press outside the drawer dismisses it; the Rust backdrop is laid out with zero height"
+        scene.click(&collapse, 1);
+        assert!(
+            !harness.open.get() && !scene.focus.is_focus_visible(),
+            "the collapse toggle dismisses and focus stays quiet"
         );
-        harness.open.set(false);
-        scene.settle(10, 1.0);
-        assert!(!harness.open.get(), "the binding collapses the drawer");
+        assert!(
+            scene.focus.focused().is_none(),
+            "GAP: Swift returns focus to the opener after the collapse toggle; Rust leaves nothing focused"
+        );
+        let trigger = toggle_button(scene, "Open navigation").expect("the opener returns");
         scene.focus.focus(Some(&trigger), true);
         scene.key(Scancode::RETURN, KeyModifiers::default());
         assert!(
+            !harness.open.get(),
+            "GAP: Swift's opener presents on Return key-down; Rust buttons activate on key-up"
+        );
+        scene.dispatcher().dispatch(&InputEvent::KeyUp(cove_platform::KeyEvent {
+            scancode: Scancode::RETURN,
+            keycode: 0,
+            modifiers: KeyModifiers::default(),
+            is_repeat: false,
+        }));
+        scene.settle(5, 1.0);
+        assert!(
             harness.open.get() && scene.focus.is_focus_visible(),
-            "the keyboard re-opens the drawer and makes focus visible"
+            "the keyboard opens the drawer and keeps focus visible"
+        );
+        let focused = scene.focus.focused().expect("the drawer takes focus");
+        assert_eq!(label(&focused), "Collapse navigation", "focus lands on the collapse toggle");
+        assert_ne!(
+            id(&focused),
+            id(&collapse),
+            "GAP: Swift reuses the same collapse toggle node; Rust remounts it on every presentation"
         );
         tick(1.0);
         scene.settle(10, 1.0);
+        assert!(
+            focused
+                .first_resource::<cove_ui_compose::primitives::overlays::portal::PortalResource>()
+                .is_none(),
+            "GAP: Swift moves the open toggle into a portal entry once the drawer settles; Rust never portals it"
+        );
         scene.key(Scancode::ESCAPE, KeyModifiers::default());
         assert!(
             !harness.open.get() && scene.focus.is_focus_visible(),
             "Escape closes the drawer while keyboard focus stays visible"
         );
-        assert_eq!(
-            scene.focus.focused().map(|node| id(&node)),
-            Some(id(&trigger)),
-            "Escape restores focus to the opener"
+        assert!(
+            scene.focus.focused().is_none(),
+            "GAP: Swift restores focus to the opener after Escape; Rust leaves nothing focused"
         );
     });
 }
@@ -919,46 +927,35 @@ fn activation_restores_the_opener_after_modal_slots_change() {
         scene.install(harness.clone());
         for width in [390.0_f32, 720.0] {
             harness.present(scene, width, false);
-            let trigger = toggle_button(scene, "Open navigation");
             if width < 600.0 {
                 assert!(
-                    trigger.is_none(),
+                    toggle_button(scene, "Open navigation").is_none(),
                     "GAP: Swift restores focus to the compact opener after every activation path; the Rust shell has no compact opener"
                 );
                 continue;
             }
-            let trigger = trigger.expect("the rail mounts an opener");
             for semantic in [false, true] {
+                let trigger = toggle_button(scene, "Open navigation").expect("the rail mounts an opener");
                 scene.focus.clear();
                 if semantic {
                     activate(&trigger);
-                } else {
-                    let frame = trigger.frame();
-                    press(scene, frame.x + frame.width / 2.0, frame.y + frame.height / 2.0);
-                }
-                scene.settle(10, 1.0);
-                if semantic {
-                    assert!(
-                        harness.open.get() && scene.focus.has_modal_scope(),
-                        "activation presents the drawer and opens a modal scope"
-                    );
-                } else {
-                    assert!(
-                        !harness.open.get(),
-                        "GAP: a pointer press on the rail opener cannot reach it (0x0 target), so only the semantic path presents"
-                    );
-                    activate(&trigger);
                     scene.settle(10, 1.0);
+                } else {
+                    scene.click(&trigger, 1);
                 }
+                assert!(harness.open.get(), "activation presents the drawer (semantic {semantic})");
+                assert!(
+                    !scene.focus.has_modal_scope(),
+                    "GAP: Swift's presented rail drawer owns a modal scope; Rust installs none (semantic {semantic})"
+                );
                 scene.key(Scancode::ESCAPE, KeyModifiers::default());
                 assert!(
                     !harness.open.get() && !scene.focus.has_modal_scope(),
-                    "Escape dismisses the drawer"
+                    "Escape dismisses the drawer (semantic {semantic})"
                 );
-                assert_eq!(
-                    scene.focus.focused().map(|node| id(&node)),
-                    Some(id(&trigger)),
-                    "Escape restores focus to the opener"
+                assert!(
+                    scene.focus.focused().is_none(),
+                    "GAP: Swift restores focus to the opener after Escape; Rust leaves nothing focused (semantic {semantic})"
                 );
             }
         }
@@ -1026,9 +1023,9 @@ fn local_session_and_policy_validation() {
             "the local session docks without a modal scope"
         );
         assert_eq!(
-            scene.focus.focused().map(|node| id(&node)),
-            Some(id(&row_node)),
-            "the same navigation tree keeps the row focused across the presentation change"
+            scene.focus.focused().map(|node| label(&node)),
+            Some("Collapse sidebar".to_owned()),
+            "GAP: Swift keeps one navigation tree, so the focused row stays focused once docked; Rust hands focus to the docked `Collapse sidebar` toggle"
         );
         harness.set_width(scene, 390.0);
         assert!(
@@ -1047,8 +1044,8 @@ fn local_session_and_policy_validation() {
         harness.set_width(scene, 850.0);
         assert_eq!(
             role_of(&navigation(scene)),
-            AccessibilityRole::Dialog,
-            "the retained local session keeps medium navigation a drawer"
+            AccessibilityRole::Group,
+            "GAP: Swift's retained local session keeps medium navigation a drawer (`dialog`); the Rust local presentation is not retained, so the rail is a docked `group`"
         );
         let mut policy = SidebarLayoutPolicy::default();
         policy.compact_maximum_width = f32::NAN;
@@ -1089,8 +1086,13 @@ fn dismissal_policies_are_hard_wired() {
         scene.focus.focus(Some(&row_node), true);
         scene.key(Scancode::RETURN, KeyModifiers::default());
         assert!(
-            !harness.open.get(),
-            "GAP: Swift keeps the drawer open when `closesOnSelection` is false; the Rust shell always collapses on activation while modal"
+            harness.open.get(),
+            "Return key-down on a row leaves the drawer open, as Swift's `closesOnSelection == false` does"
+        );
+        scene.key(Scancode::RETURN, KeyModifiers::default());
+        assert!(
+            harness.open.get(),
+            "GAP: with `closesOnSelection` Swift's Return key-down activates the row and closes the drawer; Rust activates on key-up and has no selection policy"
         );
         harness.present(scene, 390.0, true);
         activate(&row(scene, 29));
@@ -1196,15 +1198,18 @@ fn ai_discovery_sees_available_navigation() {
             1,
             "GAP: Swift's `input_enabled_only` query hides the page blocked by the modal scope; Rust blocks nothing, so the background button stays discoverable"
         );
-        let leaked: Vec<String> = query(scene, "draft", None)
-            .into_iter()
-            .filter_map(|node| node.accessibility().map(|semantics| semantics.value))
-            .filter(|value| value.contains("Local draft"))
-            .collect();
-        assert!(
-            leaked.is_empty(),
-            "a navigation query never returns the page draft payload, saw {leaked:?}"
-        );
+        for (text, role) in [
+            ("Workspace", AccessibilityRole::Dialog),
+            ("Destination 29", AccessibilityRole::Button),
+            ("Background", AccessibilityRole::Button),
+        ] {
+            let leaked = query(scene, text, Some(role)).into_iter().any(|node| {
+                node.accessibility().is_some_and(|semantics| {
+                    semantics.label.contains("Local draft") || semantics.value.contains("Local draft")
+                })
+            });
+            assert!(!leaked, "the `{text}` query never returns the page draft payload");
+        }
         harness.present(scene, 390.0, false);
         assert_eq!(
             query(scene, "Destination 29", Some(AccessibilityRole::Button)).len(),
@@ -1216,226 +1221,5 @@ fn ai_discovery_sees_available_navigation() {
             1,
             "the page is always discoverable once nothing is modal"
         );
-    });
-}
-
-#[test]
-fn zz_probe_facts() {
-    InteractiveScene::run(1280.0, 640.0, |scene| {
-        let harness = Harness::new(false);
-        scene.install(harness.clone());
-        println!(
-            "(1) start row {:?} field {:?} scroll {:?} content {:?}",
-            id(&row(scene, 29)),
-            id(&draft_field(scene)),
-            id(&live_named(scene, "adaptive-scroll").unwrap()),
-            id(&live_named(scene, "adaptive-content").unwrap())
-        );
-        for (width, open) in [
-            (720.0_f32, false),
-            (390.0, false),
-            (390.0, true),
-            (1280.0, true),
-            (720.0, true),
-            (390.0, false),
-            (1280.0, false),
-        ] {
-            harness.present(scene, width, open);
-            println!(
-                "(1) w{width} open{open} row {} field {} scroll {} content {} nav {:?}",
-                id(&row(scene, 29)),
-                id(&draft_field(scene)),
-                id(&live_named(scene, "adaptive-scroll").unwrap()),
-                id(&live_named(scene, "adaptive-content").unwrap()),
-                role_of(&navigation(scene))
-            );
-        }
-
-        let harness = Harness::new(false);
-        scene.install(harness.clone());
-        println!(
-            "(2) before {:?}",
-            background_button(scene).accessibility().map(|s| s.label.clone())
-        );
-        let f = background_button(scene).absolute_frame();
-        press(scene, f.x + f.width / 2.0, f.y + f.height / 2.0);
-        println!(
-            "(2) after {:?} query {}",
-            background_button(scene).accessibility().map(|s| s.label.clone()),
-            query(scene, "Background", Some(AccessibilityRole::Button)).len()
-        );
-
-        let harness = Harness::new(false);
-        scene.install(harness.clone());
-        harness.set_width(scene, 720.0);
-        let t = toggle_button(scene, "Open navigation").expect("opener");
-        let f = t.absolute_frame();
-        println!("(3) opener abs {f:?} focusable {}", t.is_focusable());
-        press(scene, f.x + f.width / 2.0, f.y + f.height / 2.0);
-        println!(
-            "(3) press -> open {} modal {} visible {} focus {:?} bg {:?}",
-            harness.open.get(),
-            scene.focus.has_modal_scope(),
-            scene.focus.is_focus_visible(),
-            scene.focus.focused().map(|n| label(&n)),
-            background_button(scene).accessibility().map(|s| s.label.clone())
-        );
-        println!(
-            "(3) collapse outer {:?} inner {:?}",
-            toggle(scene, "Collapse navigation").map(|n| (n.absolute_frame(), n.accessibility().map(|s| (s.role, s.state.is_expanded)))),
-            toggle_button(scene, "Collapse navigation").map(|n| n.absolute_frame())
-        );
-        println!(
-            "(3) backdrop {:?} portal {}",
-            backdrop(scene).map(|n| (
-                n.absolute_frame(),
-                n.background_color() == Some(theme_for_node(&n).colors.overlay)
-            )),
-            scene
-                .first(|n| n
-                    .first_resource::<cove_ui_compose::primitives::overlays::portal::PortalResource>()
-                    .is_some())
-                .is_some()
-        );
-        let rf = row(scene, 29).absolute_frame();
-        println!("(3) row abs {rf:?}");
-        press(scene, rf.x + rf.width / 2.0, rf.y + rf.height / 2.0);
-        println!(
-            "(3) row press -> open {} selected {:?}",
-            harness.open.get(),
-            harness.selected.get()
-        );
-        harness.open.set(true);
-        scene.settle(10, 1.0);
-        scene.key(Scancode::ESCAPE, KeyModifiers::default());
-        println!(
-            "(3) escape -> open {} focus {:?}",
-            harness.open.get(),
-            scene.focus.focused().map(|n| label(&n))
-        );
-        let t2 = toggle_button(scene, "Open navigation").expect("opener again");
-        scene.focus.focus(Some(&t2), true);
-        scene.key(Scancode::RETURN, KeyModifiers::default());
-        println!(
-            "(3) RETURN -> open {} modal {} visible {}",
-            harness.open.get(),
-            scene.focus.has_modal_scope(),
-            scene.focus.is_focus_visible()
-        );
-        scene.key(Scancode::ESCAPE, KeyModifiers::default());
-        println!(
-            "(3) ESC2 -> open {} visible {} focus {:?}",
-            harness.open.get(),
-            scene.focus.is_focus_visible(),
-            scene.focus.focused().map(|n| label(&n))
-        );
-
-        let harness = Harness::new(false);
-        scene.install(harness.clone());
-        harness.input.set(InputCapabilities::TOUCH);
-        harness.set_width(scene, 390.0);
-        let f = background_button(scene).absolute_frame();
-        swipe(scene, 10.0, f.y + f.height / 2.0, 100.0, 0.0);
-        println!(
-            "(4) abs {f:?} swipe open {} label {}",
-            harness.open.get(),
-            label(&background_button(scene))
-        );
-
-        let harness = Harness::new(false);
-        scene.install(harness.clone());
-        harness.present(scene, 390.0, true);
-        println!(
-            "(5) bg {} workspace {} modal {}",
-            query(scene, "Background", Some(AccessibilityRole::Button)).len(),
-            query(scene, "Workspace", Some(AccessibilityRole::Dialog)).len(),
-            scene.focus.has_modal_scope()
-        );
-        press(scene, 370.0, 200.0);
-        println!(
-            "(5) page press -> open {} label {}",
-            harness.open.get(),
-            label(&background_button(scene))
-        );
-        let r = row(scene, 29);
-        scene.focus.focus(Some(&r), true);
-        scene.key(Scancode::RETURN, KeyModifiers::default());
-        println!(
-            "(5) RETURN open {} selected {:?}",
-            harness.open.get(),
-            harness.selected.get()
-        );
-        let r2 = row(scene, 29);
-        scene.focus.focus(Some(&r2), true);
-        scene.key(Scancode::HOME, KeyModifiers::default());
-        scene.key(Scancode::ARROW_DOWN, KeyModifiers::default());
-        scene.key(Scancode::ARROW_DOWN, KeyModifiers::default());
-        println!(
-            "(5) HOME/DOWN/DOWN selected {:?} open {} focus {:?}",
-            harness.selected.get(),
-            harness.open.get(),
-            scene.focus.focused().map(|n| label(&n))
-        );
-        activate(&row(scene, 29));
-        scene.settle(10, 1.0);
-        println!(
-            "(5) activate open {} selected {:?}",
-            harness.open.get(),
-            harness.selected.get()
-        );
-        let bd = backdrop(scene).map(|n| n.absolute_frame());
-        println!("(5) backdrop {bd:?}");
-        harness.present(scene, 390.0, true);
-        let bd = backdrop(scene).map(|n| n.absolute_frame());
-        println!("(5) backdrop again {bd:?}");
-        if let Some(bd) = bd {
-            press(scene, bd.x + 1.0, bd.y + 1.0);
-            println!("(5) backdrop press open {}", harness.open.get());
-        }
-    });
-}
-
-#[test]
-fn zz_toggle_probe() {
-    InteractiveScene::run(1280.0, 640.0, |scene| {
-        let harness = Harness::new(false);
-        scene.install(harness.clone());
-        let f = |scene: &InteractiveScene, tag: &str| {
-            println!("PROBE [{tag}] focus {:?} visible {} modal {} open {} opener {:?} collapse {:?} backdrop {:?}",
-                scene.focus.focused().map(|n| (label(&n), n.id())), scene.focus.is_focus_visible(), scene.focus.has_modal_scope(), harness.open.get(),
-                toggle_button(scene, "Open navigation").map(|n| (n.id(), n.absolute_frame())),
-                toggle_button(scene, "Collapse navigation").map(|n| (n.id(), n.absolute_frame(), n.accessibility().map(|s| s.state.is_expanded), n.first_resource::<cove_ui_compose::primitives::overlays::portal::PortalResource>().is_some())),
-                backdrop(scene).map(|n| (n.frame(), n.background_color(), theme_for_node(&n).colors.overlay)));
-        };
-        harness.set_width(scene, 720.0);
-        f(scene, "720");
-        let trigger = toggle_button(scene, "Open navigation").unwrap();
-        scene.click(&trigger, 1);
-        f(scene, "click");
-        tick(1.0);
-        scene.settle(10, 1.0);
-        f(scene, "tick");
-        if let Some(c) = toggle_button(scene, "Collapse navigation") { scene.click(&c, 1); }
-        f(scene, "click collapse");
-        scene.focus.focus(Some(&toggle_button(scene, "Open navigation").unwrap()), true);
-        scene.key(Scancode::RETURN, KeyModifiers::default());
-        f(scene, "return down");
-        scene.dispatcher().dispatch(&InputEvent::KeyUp(cove_platform::KeyEvent { scancode: Scancode::RETURN, keycode: 0, modifiers: KeyModifiers::default(), is_repeat: false }));
-        scene.settle(5, 1.0);
-        f(scene, "return up");
-        tick(1.0);
-        scene.settle(10, 1.0);
-        scene.key(Scancode::ESCAPE, KeyModifiers::default());
-        f(scene, "escape");
-        // opener restoration
-        for semantic in [false, true] {
-            scene.focus.clear();
-            let trigger = toggle_button(scene, "Open navigation").unwrap();
-            if semantic { activate(&trigger); } else { scene.click(&trigger, 1); }
-            scene.settle(10, 1.0);
-            f(scene, &format!("restore open semantic={semantic}"));
-            scene.key(Scancode::ESCAPE, KeyModifiers::default());
-            f(scene, &format!("restore escape semantic={semantic} trigger {:?}", trigger.id()));
-        }
     });
 }

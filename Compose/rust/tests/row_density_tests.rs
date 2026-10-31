@@ -11,11 +11,14 @@
 //!   focusable, and pointer input restores the compact anchored row
 //!
 //! Named differences from the Swift suite:
-//! - **GAP: table and data-table rows do not take the touch floor.** Rust's
-//!   `DataTableSurface` resolves its layout with `touch = false`, and `Table`
-//!   mounts rows at the authored logical height, so on touch they stay at the
-//!   authored height instead of Swift's `max(authored, 44)`. The matrix asserts
-//!   the measured authored height and records the missing floor.
+//! - **GAP: no table or tree takes the touch floor.** Rust's `DataTableSurface`
+//!   resolves its layout with `touch = false`, `Table` rows are never laid out
+//!   at all, and `Tree` reports the authored height even on touch, so all three
+//!   stay below Swift's `max(authored, 44)`.
+//! - **GAP: `Table` body cells report a 0pt frame.** The non-`DataTable` table
+//!   mounts all 2,000 cell placeholders but lays none of them out, at any
+//!   width, density or input. The matrix pins the placeholders and the zero
+//!   height; the geometry cannot be asserted.
 //! - **GAP: the data-table session is private.** Swift reads
 //!   `table.session.selection.focusedID`, `viewport.size` and `offset.y`.
 //!   Rust exposes no accessor, so paging is asserted through the mounted row
@@ -28,6 +31,12 @@
 //!   whatever host it is given; there is no `touch-menu-back` or
 //!   `touch-overlay-sheet` debug node and no level change. The touch floor on
 //!   menu rows is present and is asserted.
+//! - **GAP: a submenu does not open.** `MenuSession` is a plain `RefCell`, so
+//!   activating a branch writes `opened` without triggering recomposition and
+//!   the child level never mounts. Activating `Tools` leaves `Build` absent.
+//! - A menu mounted under `LayerRoot` keeps the 44pt touch row after the
+//!   pointer input change; only a menu mounted directly rebuilds against the
+//!   new surface. Swift asserts the compact row for both.
 //! - Swift asserts the anchored menu row is exactly `body line + 12`; Rust's
 //!   row is `max(28, line + 12)` and the theme line height is not exposed, so
 //!   the pointer row is asserted as the measured compact height below 44
@@ -35,17 +44,13 @@
 
 mod support;
 
-use std::rc::Rc;
-
 use cove_composition::{AnyView, DynamicField, LayoutDebugExt, TupleView, View};
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
 use cove_core::{Environment, InputCapabilities, State};
 use cove_platform::KeyModifiers;
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
-use cove_ui_compose::primitives::data::data_table::{
-    DataTable, DataTableModel, DataTableOptions,
-};
+use cove_ui_compose::primitives::data::data_table::{DataTable, DataTableModel, DataTableOptions};
 use cove_ui_compose::primitives::data::lists::table::{
     Table, TableColumn, TableLayout, TableOptions,
 };
@@ -123,10 +128,6 @@ fn check_rows(
         "{name} materialized {} rows/cells",
         rows.len()
     );
-    if std::env::var("ROW_DENSITY_DEBUG").is_ok() {
-        let heights: Vec<f32> = rows.iter().map(|row| row.frame().height).collect();
-        eprintln!("{name}: {} rows heights {:?}", rows.len(), &heights[..heights.len().min(12)]);
-    }
     for row in &rows {
         assert_eq!(
             row.frame().height,
@@ -200,14 +201,13 @@ impl View for CollectionHarness {
                 ..TableOptions::default()
             },
         );
-        let data_table =
-            DataTable::new(model, columns()).options(DataTableOptions {
-                layout: TableLayout {
-                    row_height: authored,
-                    ..TableLayout::default()
-                },
-                ..DataTableOptions::default()
-            });
+        let data_table = DataTable::new(model, columns()).options(DataTableOptions {
+            layout: TableLayout {
+                row_height: authored,
+                ..TableLayout::default()
+            },
+            ..DataTableOptions::default()
+        });
         let mut surface = Environment::default();
         surface.input = self.input.get();
         surface.viewport.width = 1280.0;
@@ -220,20 +220,18 @@ impl View for CollectionHarness {
                 10.0,
                 AnyView::new(TupleView::new(vec![
                     AnyView::new(AnyView::new(tree).frame_height(180.0).debug_name("tree")),
-                    AnyView::new(
-                        AnyView::new(
-                            AnyView::new(BoxView::new(
-                                FlexDirection::Column,
-                                Align::Stretch,
-                                Justify::FlexStart,
-                                Wrap::NoWrap,
-                                0.0,
-                                AnyView::new(table.flex_with(1.0, 1.0, Some(0.0))),
-                            ))
-                            .frame_height(240.0)
-                            .debug_name("table"),
-                        ),
-                    ),
+                    AnyView::new(AnyView::new(
+                        AnyView::new(BoxView::new(
+                            FlexDirection::Column,
+                            Align::Stretch,
+                            Justify::FlexStart,
+                            Wrap::NoWrap,
+                            0.0,
+                            AnyView::new(table.flex_with(1.0, 1.0, Some(0.0))),
+                        ))
+                        .frame_height(240.0)
+                        .debug_name("table"),
+                    )),
                     AnyView::new(
                         AnyView::new(data_table)
                             .frame_height(240.0)
@@ -359,11 +357,7 @@ fn collection_rows_share_density_and_retain_identity() {
                         }
                         let tops = row_tops(&marker_rows);
                         for pair in tops.windows(2) {
-                            assert_eq!(
-                                pair[1] - pair[0],
-                                authored,
-                                "data-table {role:?} row tops"
-                            );
+                            assert_eq!(pair[1] - pair[0], authored, "data-table {role:?} row tops");
                         }
                     }
                     assert_eq!(
@@ -426,8 +420,8 @@ fn touch_data_table_paging_reveals_the_last_row() {
         scene.key(Scancode::ARROW_DOWN, KeyModifiers::default());
         scene.key(Scancode::PAGE_DOWN, KeyModifiers::default());
         scene.key(Scancode::END, KeyModifiers::default());
-        let last_rows: Vec<Node> = scene
-            .all(|node| node.attachment::<usize>("dataTable.rowIndex") == Some(999));
+        let last_rows: Vec<Node> =
+            scene.all(|node| node.attachment::<usize>("dataTable.rowIndex") == Some(999));
         assert_eq!(
             last_rows.len(),
             2,
@@ -446,7 +440,9 @@ fn touch_data_table_paging_reveals_the_last_row() {
             .iter()
             .map(|row| {
                 (
-                    row.accessibility().map(|s| s.role).unwrap_or(AccessibilityRole::Row),
+                    row.accessibility()
+                        .map(|s| s.role)
+                        .unwrap_or(AccessibilityRole::Row),
                     row.absolute_frame().y,
                 )
             })
@@ -494,13 +490,9 @@ impl View for ScaledHarness {
                 AnyView::new(Text::new(value.to_string()))
             },
         );
-        let menu = Menu::new(vec![MenuEntry::Item(MenuItem::new(
-            1,
-            "Command",
-            || {},
-        ))])
-        .width(320.0)
-        .max_visible_rows(2);
+        let menu = Menu::new(vec![MenuEntry::Item(MenuItem::new(1, "Command", || {}))])
+            .width(320.0)
+            .max_visible_rows(2);
         let mut surface = Environment::default();
         surface.input = self.input.get();
         surface.viewport.width = 390.0;
@@ -575,9 +567,7 @@ fn touch_floors_preserve_scaled_tree_and_menu_rows() {
                         row.frame().height
                     );
                 }
-                let menu_row = scene
-                    .labelled("Command", None)
-                    .expect("menu row mounted");
+                let menu_row = scene.labelled("Command", None).expect("menu row mounted");
                 assert!(
                     menu_row.frame().height >= 44.0,
                     "GAP: menu row keeps the 44pt touch floor at scale {scale} (actual {})",
@@ -664,12 +654,8 @@ fn touch_menu_rows_keep_height_and_pointer_restores_anchored() {
     InteractiveScene::run(390.0, 820.0, |scene| {
         scene.install(harness);
         scene.settle(4, 0.016);
-        let branch = scene
-            .labelled("Tools", None)
-            .expect("submenu branch");
-        let disabled = scene
-            .labelled("Unavailable", None)
-            .expect("disabled row");
+        let branch = scene.labelled("Tools", None).expect("submenu branch");
+        let disabled = scene.labelled("Unavailable", None).expect("disabled row");
         assert!(
             branch.frame().height >= 44.0 && disabled.frame().height >= 44.0,
             "touch menu rows meet the 44pt floor (branch {}, disabled {})",
@@ -705,7 +691,8 @@ fn touch_menu_rows_keep_height_and_pointer_restores_anchored() {
             anchored.frame().height
         );
         assert_eq!(
-            anchored.frame().height, 44.0,
+            anchored.frame().height,
+            44.0,
             "GAP: the touch floor sticks because the portal content is not rebuilt (actual {})",
             anchored.frame().height
         );

@@ -938,3 +938,71 @@ path = "rust/tests/menu_hierarchy_tests.rs"
 [[test]]
 name = "route_and_preload_tests"
 path = "rust/tests/route_and_preload_tests.rs"
+
+[[test]]
+name = "observable_state_tracking_tests"
+path = "rust/tests/observable_state_tracking_tests.rs"
+
+[[test]]
+name = "toolbar_overflow_tests"
+path = "rust/tests/toolbar_overflow_tests.rs"
+
+[[test]]
+name = "product_interaction_regression_tests"
+path = "rust/tests/product_interaction_regression_tests.rs"
+
+[[test]]
+name = "mobile_presentation_tests"
+path = "rust/tests/mobile_presentation_tests.rs"
+
+[[test]]
+name = "advanced_interaction_tests"
+path = "rust/tests/advanced_interaction_tests.rs"
+
+[[test]]
+name = "native_menu_tests"
+path = "rust/tests/native_menu_tests.rs"
+
+[[test]]
+name = "swipe_list_tests"
+path = "rust/tests/swipe_list_tests.rs"
+
+[[test]]
+name = "markdown_tests"
+path = "rust/tests/markdown_tests.rs"
+
+[[test]]
+name = "code_editing_ui_tests"
+path = "rust/tests/code_editing_ui_tests.rs"
+
+[[test]]
+name = "surface_reveal_tests"
+path = "rust/tests/surface_reveal_tests.rs"
+
+[[test]]
+name = "text_field_large_document_tests"
+path = "rust/tests/text_field_large_document_tests.rs"
+
+[[test]]
+name = "editor_interaction_tests"
+path = "rust/tests/editor_interaction_tests.rs"
+
+[[test]]
+name = "sidebar_content_tests"
+path = "rust/tests/sidebar_content_tests.rs"
+
+[[test]]
+name = "editor_height_tests"
+path = "rust/tests/editor_height_tests.rs"
+
+[[test]]
+name = "navigation_drawer_tests"
+path = "rust/tests/navigation_drawer_tests.rs"
+
+[[test]]
+name = "json_editor_tests"
+path = "rust/tests/json_editor_tests.rs"
+
+[[test]]
+name = "gutter_tests"
+path = "rust/tests/gutter_tests.rs"

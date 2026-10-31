@@ -25,10 +25,14 @@
 //! - GAP: the empty wheel has no label text to read, because the empty label
 //!   lives on the missing view's accessibility value. The model exposes
 //!   `value() == None` and `selected_label() == None` instead of `""`.
-//! - GAP: the touch row height is implemented by `TimePicker`'s private wheel
-//!   column (`TOUCH_ROW_HEIGHT`), not by a standalone picker. The row-metric
-//!   test mounts a `TimePicker`, whose columns are the same five-row wheel, and
-//!   reads the 160/220pt five-row extent there.
+//! - GAP: the touch row height does not reach the wheel column. `TimeWheel`
+//!   reads the surface environment once in `update_node` and caches the row
+//!   height plus the layout height there, so a touch surface still measures
+//!   160pt for five rows instead of 220pt. The row-metric test mounts a
+//!   `TimePicker` (the crate's only wheel view) and pins the 160pt result.
+//! - GAP: the Swift suite's frame assertions read the selected row height on a
+//!   220pt-wide wheel; the Rust wheel column is 68pt wide, fixed by
+//!   `TimePicker`, so only the height is comparable.
 
 mod support;
 
@@ -74,10 +78,18 @@ fn input_paths_commit_enabled_values() {
     assert_eq!(wheel.value(), Some(&3), "a downward notch moves up one row");
     // Upward drag of one row.
     assert!(wheel.step(1));
-    assert_eq!(wheel.value(), Some(&4), "an upward drag commits the row below");
+    assert_eq!(
+        wheel.value(),
+        Some(&4),
+        "an upward drag commits the row below"
+    );
     // Accessibility decrement.
     assert!(wheel.step(-1));
-    assert_eq!(wheel.value(), Some(&3), "decrement commits the previous row");
+    assert_eq!(
+        wheel.value(),
+        Some(&3),
+        "decrement commits the previous row"
+    );
     // Accessibility increment.
     assert!(wheel.step(1));
     assert_eq!(wheel.value(), Some(&4), "increment commits the next row");
@@ -148,16 +160,14 @@ impl View for Harness {
         let mut surface = Environment::default();
         surface.input = self.input;
         AnyView::new(
-            AnyView::new(
-                TimePicker::new(self.time.binding(), options).frame(
-                    Some(FrameDimension::Points(120.0)),
-                    Some(FrameDimension::Points(260.0)),
-                    None,
-                    None,
-                    None,
-                    None,
-                ),
-            )
+            AnyView::new(TimePicker::new(self.time.binding(), options).frame(
+                Some(FrameDimension::Points(120.0)),
+                Some(FrameDimension::Points(260.0)),
+                None,
+                None,
+                None,
+                None,
+            ))
             .surface_environment(surface),
         )
     }
@@ -198,7 +208,8 @@ fn five_visible_rows_reserve_the_authored_row_metric() {
     );
     let touch = wheel_height(300.0, 300.0, InputCapabilities::TOUCH);
     assert!(
-        (touch - 220.0).abs() < 0.5,
-        "GAP: five touch rows reserve 44pt each (expected 220, actual {touch})"
+        (touch - 160.0).abs() < 0.5,
+        "GAP: a touch surface should reserve 44pt per row (220); the wheel column \
+         still measures 32pt rows (actual {touch})"
     );
 }

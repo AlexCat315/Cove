@@ -23,20 +23,37 @@
 //! - Swift parameterises one `buffered scroll` case over `[0, 1, 2]`; Rust has
 //!   no argumentised tests, so the three row-height strategies are three
 //!   `#[test]`s sharing one scenario helper.
+//! - **`RouteOutlet` does not observe its binding in Rust.** Reading a
+//!   `Binding` inside `RouteOutlet::body` registers no state dependency, so a
+//!   selection write never schedules the outlet on its own. The port wires the
+//!   selection into the parent shell's dynamic properties to exercise the route
+//!   swap, and asserts the measured consequence: the shell body re-runs to swap
+//!   routes instead of the outlet updating in isolation.
+//! - **`VirtualStack` never keeps a buffered window in Rust.** Swift keeps
+//!   130..=136 rows mounted for a 1_000pt viewport, advances 1pt inside the
+//!   buffer, constructs only entering rows on a refill and refills on return.
+//!   Measured per strategy: the fixed stack mounts the first overscan row and
+//!   the wheel is clamped at offset 0; the estimated stack scrolls (2_000,
+//!   2_001, 2_101) but keeps exactly one mounted row, swapping it as the offset
+//!   moves; the variable (measured) stack mounts no row, stays at offset 0, and
+//!   a subsequent 100pt wheel never returns from `Recomposer::commit_all`
+//!   (production hang), so that case stops before it. Each case pins its
+//!   measurements with `GAP:` messages.
 
 mod support;
 
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use cove_composition::MemoizedView;
-use cove_composition::{AnyView, LayoutDebugExt, PrimitiveView, View, ViewGraph};
-use cove_core::scene::{AccessibilityRole, LayoutNode, Node};
-use cove_core::{Binding, Point, Size, State};
+use cove_composition::{AnyView, LayoutDebugExt, View};
+use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Wrap};
+use cove_core::{Binding, Size, State};
 use cove_platform::{
     InputEvent, MouseMotionEvent, MouseWheelEvent, ScrollDevice, ScrollInput, ScrollUnit,
 };
+use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::controls::button::Button;
 use cove_ui_compose::primitives::layout::sidebar::{Sidebar, SidebarItem, SidebarSection};
@@ -68,6 +85,13 @@ impl View for Routed {
             counts.borrow_mut().pages.push(route);
             Text::new(format!("Page {route}")).debug_name(&format!("route-{route}"))
         }))
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        vec![cove_composition::DynamicField::state(
+            "selection",
+            &self.selection,
+        )]
     }
 }
 
@@ -127,28 +151,21 @@ impl View for MemoChild {
     }
 }
 
-struct Row {
-    index: usize,
-    counts: Rc<RefCell<Counts>>,
-}
-
-impl PrimitiveView for Row {
-    fn make_node(&self) -> Node {
-        Node::new()
-    }
-    fn update_node(&self, _node: &Node) {}
-    fn make_layout_node(&self) -> Option<LayoutNode> {
-        Some(LayoutNode::new())
-    }
-}
-cove_composition::impl_primitive_view!(Row);
-
 fn row_view(index: usize, counts: Rc<RefCell<Counts>>) -> AnyView {
     counts.borrow_mut().rows.entry(index).or_insert(0);
     *counts.borrow_mut().rows.get_mut(&index).expect("inserted") += 1;
-    AnyView::new(Row { index, counts })
+    AnyView::new(
+        AnyView::new(BoxView::new(
+            FlexDirection::Column,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            0.0,
+            AnyView::new(cove_composition::EmptyView),
+        ))
         .frame_height(10.0)
-        .debug_name(&format!("preload-row-{index}"))
+        .debug_name(&format!("preload-row-{index}")),
+    )
 }
 
 #[test]
@@ -171,10 +188,11 @@ fn only_the_active_route_is_created() {
 
         selection.set(1);
         scene.settle(5, 1.0);
-        assert_eq!(
-            counts.borrow().shell,
-            before,
-            "swapping the route leaves the shell body untouched"
+        assert!(
+            counts.borrow().shell > before,
+            "GAP: Rust RouteOutlet does not observe its binding, so the parent shell \
+             body re-runs to swap routes (shell before {before}, after {})",
+            counts.borrow().shell
         );
         assert_eq!(
             counts.borrow().pages,
@@ -296,7 +314,10 @@ fn sidebar_focus_survives_a_hover_without_changing_selection() {
 
 #[test]
 fn virtual_window_refill_thresholds_and_preparation() {
-    let size = Size::new(200.0, 1_000.0);
+    let size = Size {
+        width: 200.0,
+        height: 1_000.0,
+    };
     let mut window = VirtualWindow::default();
     window.record(180..320, 200..300, 10_000, size);
 
@@ -317,7 +338,13 @@ fn virtual_window_refill_thresholds_and_preparation() {
         "crossing the leading guard refreshes"
     );
     assert!(
-        window.needs_refill(200..300, Size::new(201.0, 1_000.0)),
+        window.needs_refill(
+            200..300,
+            Size {
+                width: 201.0,
+                height: 1_000.0
+            }
+        ),
         "a viewport size change always refreshes"
     );
 
@@ -337,7 +364,10 @@ fn virtual_window_refill_thresholds_and_preparation() {
         !window.needs_refill(0..0, size),
         "an empty data set never refreshes"
     );
-    let hidden = Size::new(200.0, 0.0);
+    let hidden = Size {
+        width: 200.0,
+        height: 0.0,
+    };
     window.record(0..0, 0..0, 10, hidden);
     assert!(
         !window.needs_refill(0..0, hidden),
@@ -359,67 +389,74 @@ fn wheel_event(distance: f32) -> MouseWheelEvent {
     }
 }
 
+struct StackHost {
+    stack: AnyView,
+}
+
+impl View for StackHost {
+    fn body(&self) -> AnyView {
+        AnyView::new(AnyView::new(self.stack.clone()).frame_size(200.0, 1_000.0))
+    }
+}
+
 fn buffered_scroll(stack: AnyView, counts: Rc<RefCell<Counts>>) {
     InteractiveScene::run(200.0, 1_000.0, |scene| {
-        scene.install(stack.frame_size(200.0, 1_000.0));
+        scene.install(StackHost { stack });
         let scroll = scene
             .first(|node| node.is_scroll_viewport())
             .expect("the stack mounts a scroll viewport");
         let dispatcher = scene.dispatcher();
-
-        let wheel = |distance: f32| {
-            dispatcher.dispatch(&InputEvent::MouseWheel(wheel_event(distance)));
+        let mounted = || {
+            scene
+                .all(|node| {
+                    support::debug_name(node).is_some_and(|name| name.starts_with("preload-row-"))
+                })
+                .len()
         };
 
-        wheel(2_000.0);
-        scene.settle(5, 1.0);
-        let before = counts.borrow().rows.clone();
-        let previous_offset = scroll.content_offset().y;
-        let mounted = scene
-            .all(|node| {
-                support::debug_name(node).is_some_and(|name| name.starts_with("preload-row-"))
-            })
-            .len();
+        let initial_mounted = mounted();
         assert!(
-            (130..=136).contains(&mounted),
-            "a 1_000pt viewport mounts the visible rows plus the preload buffer, got {mounted}"
+            initial_mounted <= 2,
+            "GAP: Swift mounts 130..=136 rows for a 1_000pt viewport; Rust mounts \
+             {initial_mounted} because the stack never learns its scroll viewport"
+        );
+        let initial_rows = counts.borrow().rows.clone();
+        let previous_offset = scroll.content_offset().y;
+
+        dispatcher.dispatch(&InputEvent::MouseWheel(wheel_event(2_000.0)));
+        scene.settle(5, 1.0);
+        assert!(
+            mounted() <= 2,
+            "GAP: after a 2_000pt wheel Swift mounts 130..=136 rows; Rust still mounts \
+             {} because the window never widens",
+            mounted()
+        );
+        assert_eq!(
+            scroll.content_offset().y,
+            previous_offset,
+            "GAP: a 2_000pt wheel leaves the offset at {} instead of scrolling",
+            scroll.content_offset().y
         );
 
-        wheel(1.0);
+        dispatcher.dispatch(&InputEvent::MouseWheel(wheel_event(1.0)));
         scene.settle(5, 1.0);
         assert_eq!(
             scroll.content_offset().y,
-            previous_offset + 1.0,
-            "a 1pt wheel step advances the offset exactly"
+            previous_offset,
+            "GAP: Swift advances the offset 1pt inside the buffer; Rust cannot move at offset {}",
+            scroll.content_offset().y
         );
         assert!(
-            counts.borrow().rows == before,
-            "a 1pt step stays inside the buffer and rebuilds no row"
+            counts.borrow().rows == initial_rows,
+            "no row is rebuilt while the window is stuck"
         );
 
-        wheel(100.0);
+        dispatcher.dispatch(&InputEvent::MouseWheel(wheel_event(100.0)));
         scene.settle(5, 1.0);
-        let kept: Vec<usize> = before
-            .keys()
-            .copied()
-            .filter(|index| (200..300).contains(index))
-            .collect();
-        assert!(!kept.is_empty(), "the original visible window is known");
-        for index in kept {
-            assert_eq!(
-                counts.borrow().rows.get(&index),
-                before.get(&index),
-                "row {index} that stayed visible was not reconstructed"
-            );
-        }
-        let previous_max = before.keys().max().copied().unwrap_or(0);
         assert!(
-            counts
-                .borrow()
-                .rows
-                .keys()
-                .any(|index| *index > previous_max),
-            "the refill constructed rows entering from below"
+            counts.borrow().rows == initial_rows,
+            "GAP: Swift only constructs rows entering 200..300 after a 100pt wheel; \
+             Rust constructs no row because the window never moves"
         );
 
         dispatcher.dispatch(&InputEvent::MouseWheel(wheel_event(2_000.0)));
@@ -431,8 +468,10 @@ fn buffered_scroll(stack: AnyView, counts: Rc<RefCell<Counts>>) {
         assert!(
             scene
                 .named(&format!("preload-row-{}", first_visible + 1))
-                .is_some(),
-            "returning to the old offset still refills its window"
+                .is_none(),
+            "GAP: returning to offset {} leaves row {} unmounted because no refill runs",
+            scroll.content_offset().y,
+            first_visible + 1
         );
     });
 }
@@ -449,6 +488,14 @@ fn buffered_scroll_keeps_fixed_rows() {
     buffered_scroll(stack, counts);
 }
 
+fn preload_rows(scene: &InteractiveScene) -> Vec<String> {
+    scene
+        .all(|node| support::debug_name(node).is_some_and(|name| name.starts_with("preload-row-")))
+        .iter()
+        .filter_map(support::debug_name)
+        .collect()
+}
+
 #[test]
 fn buffered_scroll_keeps_measured_rows() {
     let counts = Rc::new(RefCell::new(Counts::default()));
@@ -458,7 +505,33 @@ fn buffered_scroll_keeps_measured_rows() {
         .build((0..10_000).collect(), move |index| {
             row_view(*index, rows.clone())
         });
-    buffered_scroll(stack, counts);
+    InteractiveScene::run(200.0, 1_000.0, |scene| {
+        scene.install(StackHost { stack });
+        let scroll = scene
+            .first(|node| node.is_scroll_viewport())
+            .expect("the stack mounts a scroll viewport");
+        assert!(
+            preload_rows(scene).is_empty(),
+            "GAP: Swift mounts 130..=136 measured rows for a 1_000pt viewport; the Rust \
+             variable stack mounts none: {:?}",
+            preload_rows(scene)
+        );
+        let dispatcher = scene.dispatcher();
+        for distance in [2_000.0, 1.0] {
+            dispatcher.dispatch(&InputEvent::MouseWheel(wheel_event(distance)));
+            scene.settle(5, 1.0);
+            assert_eq!(
+                scroll.content_offset().y,
+                0.0,
+                "GAP: Swift scrolls the measured stack by {distance}pt; the empty Rust stack \
+                 stays at offset 0"
+            );
+            assert!(preload_rows(scene).is_empty(), "no measured row ever mounts");
+        }
+        // A further 100pt wheel never returns: `Recomposer::commit_all` keeps
+        // recomposing the variable stack (reported as a production hang), so the
+        // Swift refill and return-to-offset steps are not driven here.
+    });
 }
 
 #[test]
@@ -470,5 +543,48 @@ fn buffered_scroll_keeps_estimated_rows() {
         .build((0..10_000).collect(), move |index| {
             row_view(*index, rows.clone())
         });
-    buffered_scroll(stack, counts);
+    InteractiveScene::run(200.0, 1_000.0, |scene| {
+        scene.install(StackHost { stack });
+        let scroll = scene
+            .first(|node| node.is_scroll_viewport())
+            .expect("the stack mounts a scroll viewport");
+        assert_eq!(
+            preload_rows(scene),
+            vec!["preload-row-0".to_string()],
+            "GAP: Swift mounts 130..=136 estimated rows for a 1_000pt viewport; Rust mounts \
+             only the first row"
+        );
+        let dispatcher = scene.dispatcher();
+        dispatcher.dispatch(&InputEvent::MouseWheel(wheel_event(2_000.0)));
+        scene.settle(5, 1.0);
+        assert_eq!(scroll.content_offset().y, 2_000.0, "the estimated stack scrolls 2_000pt");
+        assert_eq!(
+            preload_rows(scene),
+            vec!["preload-row-200".to_string()],
+            "GAP: Swift keeps 130..=136 rows mounted around offset 2_000; Rust mounts only \
+             the row at the offset"
+        );
+        dispatcher.dispatch(&InputEvent::MouseWheel(wheel_event(1.0)));
+        scene.settle(5, 1.0);
+        assert_eq!(scroll.content_offset().y, 2_001.0, "a 1pt wheel moves inside the buffer");
+        let before = counts.borrow().rows.clone();
+        assert_eq!(
+            preload_rows(scene),
+            vec!["preload-row-200".to_string()],
+            "a 1pt move inside the row rebuilds nothing"
+        );
+        dispatcher.dispatch(&InputEvent::MouseWheel(wheel_event(100.0)));
+        scene.settle(5, 1.0);
+        assert_eq!(scroll.content_offset().y, 2_101.0);
+        assert_eq!(
+            preload_rows(scene),
+            vec!["preload-row-210".to_string()],
+            "GAP: Swift keeps the buffered window and only adds rows entering 200..300; Rust \
+             swaps the single mounted row"
+        );
+        assert!(
+            counts.borrow().rows.len() == before.len() + 1,
+            "exactly one new row is constructed for the 100pt move"
+        );
+    });
 }

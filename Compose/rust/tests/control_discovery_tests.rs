@@ -44,9 +44,9 @@ use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::controls::button::Button;
 use cove_ui_compose::primitives::controls::form::form::{Form, FormField};
+use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::TextField;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
-use cove_ui_compose::primitives::text::Text;
 
 use support::{GlobalTestLock, with_test_text_environment};
 
@@ -312,10 +312,7 @@ fn form_view() -> impl cove_composition::View + 'static {
         vec![FormField::new(
             "name",
             "Display name",
-            TextField::new(
-                "Name",
-                Binding::constant(TextBuffer::new(DRAFT)),
-            ),
+            TextField::new("Name", Binding::constant(TextBuffer::new(DRAFT))),
         )],
         None,
         |_| {},
@@ -331,14 +328,11 @@ fn validated_tools_discover_form_fields_and_buttons_without_private_values() {
             let graph = install_and_settle(form_view(), 640.0, 400.0, 8);
 
             for (text, role) in [("Display name", "TextField"), ("Save changes", "Button")] {
-                let page = query(
-                    &graph,
-                    Query::new()
-                        .text(text)
-                        .role(role)
-                        .visible_only(),
+                let page = query(&graph, Query::new().text(text).role(role).visible_only());
+                assert_eq!(
+                    page.total, 1,
+                    "{role} `{text}` is discoverable exactly once"
                 );
-                assert_eq!(page.total, 1, "{role} `{text}` is discoverable exactly once");
 
                 let item = page.first();
                 assert!(

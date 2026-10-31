@@ -385,6 +385,7 @@ impl DevServer {
                     client.session.log_query = query.clone();
                     client.session.log_sequence = last.or(query.after_sequence).unwrap_or(0);
                 }
+                self.set_subscription(Subscription::Log, true, key);
                 let mut response = envelope
                     .ok()
                     .unwrap_or_else(|| Envelope::new("log.snapshot", envelope.id, None));

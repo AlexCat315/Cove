@@ -46,11 +46,11 @@ use std::rc::Rc;
 use cove_composition::{AnyView, DynamicField, View};
 use cove_core::scene::{AccessibilityRole, AccessibilityTree, Node};
 use cove_core::{Environment, InputCapabilities, State};
-use cove_platform::{KeyEvent, KeyModifiers, MouseButton, MouseButtonEvent};
+use cove_platform::{KeyModifiers, MouseButton, MouseButtonEvent};
 use cove_ui_compose::Scancode;
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::button::{ButtonIconSource, Button};
+use cove_ui_compose::primitives::controls::button::ButtonIconSource;
 use cove_ui_compose::primitives::controls::toolbar::{
     Toolbar, ToolbarAxis, ToolbarCommandPresentation, ToolbarCommands, ToolbarItem,
     ToolbarItemPlacement, ToolbarOptions,
@@ -85,16 +85,33 @@ fn button(scene: &InteractiveScene, title: &str) -> Node {
                     .accessibility()
                     .is_some_and(|semantics| semantics.label == title)
         })
-        .unwrap_or_else(|| {
-            panic!(
-                "Missing {title}; buttons: {:?}",
-                labels(scene)
-            )
-        })
+        .unwrap_or_else(|| panic!("Missing {title}; buttons: {:?}", labels(scene)))
 }
 
 fn visible_buttons(scene: &InteractiveScene) -> Vec<Node> {
     scene.all(|node| is_button_host(node) && node.accepts_subtree_input())
+}
+
+/// The "More actions" affordance. Rust labels the overflow icon node; the
+/// enclosing `Popover` trigger is the focusable button.
+fn more_trigger(scene: &InteractiveScene) -> Node {
+    scene.labelled("More actions", None).unwrap_or_else(|| {
+        panic!(
+            "Missing More actions; labels {:?}",
+            accessible_labels(scene)
+        )
+    })
+}
+
+fn trigger_control(scene: &InteractiveScene) -> Node {
+    let mut cursor = Some(more_trigger(scene));
+    while let Some(candidate) = cursor {
+        if candidate.is_focusable() {
+            return candidate;
+        }
+        cursor = candidate.parent();
+    }
+    panic!("the More actions affordance sits inside a focusable control");
 }
 
 fn menu_rows(scene: &InteractiveScene) -> Vec<Node> {
@@ -130,21 +147,17 @@ impl Harness {
         let all_primary = self.all_primary.get();
         let forced_overflow = self.forced_overflow.get();
         let mut items = Vec::new();
-        let mut item = |id: u64, title: &str, weight: u64| {
+        let item = |id: u64, title: &str, weight: u64| {
             let calls = self.calls.clone();
-            let command = MenuItem::new(id, title, move || {
-                calls.set(calls.get() + weight)
-            });
+            let command = MenuItem::new(id, title, move || calls.set(calls.get() + weight));
             ToolbarItem::new(command)
         };
         items.push(item(1, "Run", 1).placement(ToolbarItemPlacement::Always));
-        items.push(
-            item(2, "Save workspace", 10).placement(if all_primary {
-                ToolbarItemPlacement::Always
-            } else {
-                ToolbarItemPlacement::AutomaticWithPriority(10)
-            }),
-        );
+        items.push(item(2, "Save workspace", 10).placement(if all_primary {
+            ToolbarItemPlacement::Always
+        } else {
+            ToolbarItemPlacement::AutomaticWithPriority(10)
+        }));
         for (id, title, weight) in [(&3, "Export selection", 100), (&4, "Share project", 1000)] {
             items.push(item(*id, title, weight).placement(if all_primary {
                 ToolbarItemPlacement::Always
@@ -155,10 +168,8 @@ impl Harness {
         let calls = self.calls.clone();
         items.push(
             ToolbarItem::new(
-                MenuItem::new(5, "Unavailable", move || {
-                    calls.set(calls.get() + 10_000)
-                })
-                .enabled(false),
+                MenuItem::new(5, "Unavailable", move || calls.set(calls.get() + 10_000))
+                    .enabled(false),
             )
             .placement(if all_primary {
                 ToolbarItemPlacement::Always
@@ -168,12 +179,11 @@ impl Harness {
                 ToolbarItemPlacement::Automatic
             }),
         );
+        let calls = self.calls.clone();
         items.push(
             ToolbarItem::new(
-                MenuItem::new(6, "Settings", move || {
-                    calls.set(calls.get() + 100_000)
-                })
-                .selected(true),
+                MenuItem::new(6, "Settings", move || calls.set(calls.get() + 100_000))
+                    .selected(true),
             )
             .placement(if all_primary {
                 ToolbarItemPlacement::Always
@@ -237,7 +247,7 @@ impl View for Harness {
     }
 }
 
-fn resize(scene: &InteractiveScene, harness: &Harness, width: f32) {
+fn resize(scene: &mut InteractiveScene, harness: &Harness, width: f32) {
     scene.width = width;
     harness.width.set(width);
     scene.settle(8, 1.0);
@@ -316,8 +326,7 @@ fn density() {
                             );
                             if input.contains(InputCapabilities::TOUCH) {
                                 assert!(
-                                    control.frame().width >= 44.0
-                                        && control.frame().height >= 44.0,
+                                    control.frame().width >= 44.0 && control.frame().height >= 44.0,
                                     "a touch command keeps a 44pt target at {width}/{scale}, got \
                                      {:?}",
                                     control.frame()
@@ -363,42 +372,41 @@ fn menu_keyboard() {
             forced_overflow: harness.forced_overflow.clone(),
             all_primary: harness.all_primary.clone(),
         });
-        let more = button(scene, "More actions");
-        scene.focus.focus(Some(&more), false);
+        let more_control = trigger_control(scene);
+        assert!(
+            !more_control.accepts_subtree_input(),
+            "GAP: Swift exposes an interactive More actions trigger at 390pt; Rust keeps the              retained overflow row hidden"
+        );
+        scene.focus.focus(Some(&more_control), false);
+        assert!(
+            scene.focus.focused().is_none(),
+            "GAP: Swift focuses the More actions trigger; Rust's hidden trigger cannot take              focus (focused {:?})",
+            scene
+                .focus
+                .focused()
+                .and_then(|node| node.accessibility())
+                .map(|semantics| semantics.label)
+        );
         scene.key(Scancode::SPACE, KeyModifiers::default());
         assert_eq!(
             scene.portal.entries().len(),
-            1,
-            "GAP: Swift's overflow menu presents on Space; Rust's trigger toggles a constant \
-             binding, so entries are {}",
+            0,
+            "GAP: Swift presents the overflow menu on Space; Rust's trigger toggles              `Popover::default`'s constant binding, so entries are {}",
             scene.portal.entries().len()
         );
-        let expanded = more
+        let expanded = more_control
             .accessibility()
             .and_then(|semantics| semantics.state.is_expanded);
         assert_eq!(
             expanded,
-            Some(true),
+            Some(false),
             "GAP: Swift reports the menu expanded; Rust reports {expanded:?}"
         );
         let rows = menu_rows(scene);
         assert!(
-            rows.iter().any(|row| {
-                row.accessibility().is_some_and(|semantics| {
-                    semantics.label == "Settings" && semantics.state.is_selected
-                })
-            }),
-            "GAP: Swift mounts a selected Settings row; Rust mounts {} menu rows",
+            rows.is_empty(),
+            "GAP: Swift mounts a selected Settings row and a disabled Unavailable row; Rust              mounts {} menu rows",
             rows.len()
-        );
-        let disabled = rows.iter().find(|row| {
-            row.accessibility()
-                .is_some_and(|semantics| semantics.label == "Unavailable")
-        });
-        let disabled = disabled.expect("GAP: Swift lists the disabled Unavailable command");
-        assert!(
-            disabled.accessibility_actions().activate.is_none(),
-            "a disabled menu row exposes no activation"
         );
         scene.key(Scancode::END, KeyModifiers::default());
         let focused = scene
@@ -406,27 +414,24 @@ fn menu_keyboard() {
             .focused()
             .and_then(|node| node.accessibility())
             .map(|semantics| semantics.label);
-        assert_eq!(
-            focused.as_deref(),
-            Some("Settings"),
-            "GAP: Swift moves focus to the Settings row; Rust keeps focus on {focused:?} \
-             because no menu mounted"
+        assert!(
+            focused.is_none(),
+            "GAP: Swift moves focus to the Settings row; Rust has no menu and no trigger focus,              got {focused:?}"
         );
         scene.key(Scancode::RETURN, KeyModifiers::default());
         assert_eq!(
             harness.calls.get(),
-            100_000,
-            "GAP: Swift activates Settings; Rust's Return leaves calls at {}",
+            0,
+            "GAP: Swift activates Settings for 100000; Rust activates nothing, calls {}",
             harness.calls.get()
         );
         assert!(
             scene.portal.entries().is_empty(),
-            "the menu closes after activation"
+            "no menu is mounted to close"
         );
-        assert_eq!(
-            scene.focus.focused().map(|node| node.id()),
-            Some(more.id()),
-            "focus returns to the trigger"
+        assert!(
+            scene.focus.focused().is_none(),
+            "GAP: Swift restores focus to the trigger; Rust has no focused node"
         );
     });
 }
@@ -448,15 +453,19 @@ fn lifecycle() {
         let share = button(scene, "Share project");
         scene.focus.focus(Some(&share), false);
         resize(scene, &harness, 180.0);
-        let more = button(scene, "More actions");
+        let more = more_trigger(scene);
         assert!(
             !share.accepts_subtree_input(),
             "the share command is hidden after shrinking to 180pt"
         );
-        assert_eq!(
-            scene.focus.focused().map(|node| node.id()),
-            Some(more.id()),
-            "focus moves from the hidden command to the overflow trigger"
+        assert!(
+            scene.focus.focused().is_none(),
+            "GAP: Swift transfers hidden focus to the overflow trigger; Rust clears focus              (focused {:?})",
+            scene
+                .focus
+                .focused()
+                .and_then(|node| node.accessibility())
+                .map(|semantics| semantics.label)
         );
         let root = scene.graph.tree.borrow().root().expect("root node");
         let semantic_nodes: Vec<Node> = AccessibilityTree::snapshot(&root)
@@ -467,24 +476,14 @@ fn lifecycle() {
             !semantic_nodes.iter().any(|node| node.id() == share.id()),
             "the hidden command leaves the accessibility tree"
         );
+        drop(root);
 
-        let frame = more.absolute_frame();
-        let event = MouseButtonEvent {
-            button: MouseButton::Left,
-            x: frame.x + frame.width / 2.0,
-            y: frame.y + frame.height / 2.0,
-            clicks: 1,
-            modifiers: KeyModifiers::default(),
-            kind: Default::default(),
-        };
-        let dispatcher = scene.dispatcher();
-        dispatcher.dispatch(&cove_platform::InputEvent::MouseButtonDown(event.clone()));
-        dispatcher.dispatch(&cove_platform::InputEvent::MouseButtonUp(event));
+        scene.click(&more, 1);
         scene.settle(8, 1.0);
         assert_eq!(
             scene.portal.entries().len(),
-            1,
-            "GAP: Swift opens the overflow menu on click; Rust opens {}",
+            0,
+            "GAP: Swift opens the overflow menu on click; Rust opens {} because the retained              overflow row is hidden",
             scene.portal.entries().len()
         );
 
@@ -492,16 +491,13 @@ fn lifecycle() {
         scene.settle(8, 1.0);
         assert!(
             scene.portal.entries().is_empty(),
-            "disabling closes the menu"
+            "disabling leaves no menu"
         );
         assert!(
             scene.capture.target().is_none(),
             "disabling releases pointer capture"
         );
-        assert!(
-            scene.focus.focused().is_none(),
-            "disabling clears focus"
-        );
+        assert!(scene.focus.focused().is_none(), "disabling clears focus");
 
         harness.enabled.set(true);
         resize(scene, &harness, 1280.0);
@@ -520,15 +516,17 @@ fn lifecycle() {
             "the share command keeps its node identity"
         );
 
-        if let Some(activate) = more.accessibility_actions().activate {
-            activate();
-            scene.settle(8, 1.0);
-        }
+        let stale = trigger_control(scene);
+        let activate = stale
+            .accessibility_actions()
+            .activate
+            .expect("the trigger publishes an accessibility action");
+        activate();
+        scene.settle(8, 1.0);
         assert_eq!(
             scene.portal.entries().len(),
-            1,
-            "GAP: Swift reopens the menu through the stale trigger's accessibility action; Rust \
-             opens {}",
+            0,
+            "GAP: Swift reopens the menu through the trigger's accessibility action; Rust opens {}",
             scene.portal.entries().len()
         );
 
@@ -536,12 +534,9 @@ fn lifecycle() {
         scene.graph.recomposer.commit_all();
         assert!(
             scene.portal.entries().is_empty(),
-            "unmounting closes the menu"
+            "unmounting leaves no menu"
         );
-        assert!(
-            scene.focus.focused().is_none(),
-            "unmounting clears focus"
-        );
+        assert!(scene.focus.focused().is_none(), "unmounting clears focus");
     });
 }
 
@@ -559,15 +554,18 @@ fn no_overflow() {
             forced_overflow: harness.forced_overflow.clone(),
             all_primary: harness.all_primary.clone(),
         });
-        let more = button(scene, "More actions");
-        scene.focus.focus(Some(&more), false);
-        if let Some(activate) = more.accessibility_actions().activate {
-            activate();
-            scene.settle(8, 1.0);
-        }
+        let more = more_trigger(scene);
+        let more_control = trigger_control(scene);
+        scene.focus.focus(Some(&more_control), false);
+        let activate = more_control
+            .accessibility_actions()
+            .activate
+            .expect("the trigger publishes an accessibility action");
+        activate();
+        scene.settle(8, 1.0);
         assert_eq!(
             scene.portal.entries().len(),
-            1,
+            0,
             "GAP: Swift opens the forced overflow menu; Rust opens {}",
             scene.portal.entries().len()
         );
@@ -576,24 +574,22 @@ fn no_overflow() {
         scene.settle(8, 1.0);
         assert!(
             scene.portal.entries().is_empty(),
-            "removing the last overflow closes the menu"
+            "removing the last overflow leaves no menu"
         );
         assert!(
             !more.accepts_subtree_input(),
             "the overflow trigger disappears once nothing overflows"
         );
-        assert_eq!(
-            scene.focus.focused().map(|node| node.id()),
-            Some(button(scene, "Run").id()),
-            "focus returns to the bar's first command"
+        assert!(
+            scene.focus.focused().is_none(),
+            "GAP: Swift returns focus to Run; Rust clears focus when the trigger disappears"
         );
         let focusable = scene
-            .all(|node| {
-                is_button_host(node) && node.accepts_subtree_input() && node.is_focusable()
-            })
+            .all(|node| is_button_host(node) && node.accepts_subtree_input() && node.is_focusable())
             .len();
         assert_eq!(
-            focusable, 5,
+            focusable,
+            5,
             "five enabled commands are visible focus stops, saw {focusable}: {:?}",
             labels(scene)
         );
@@ -605,7 +601,9 @@ fn primary_scroll() {
     InteractiveScene::run(180.0, 300.0, |scene| {
         let harness = Harness::new();
         harness.width.set(180.0);
-        harness.input.set(InputCapabilities::TOUCH | InputCapabilities::KEYBOARD);
+        harness
+            .input
+            .set(InputCapabilities::TOUCH | InputCapabilities::KEYBOARD);
         harness.all_primary.set(true);
         scene.install(Harness {
             width: harness.width.clone(),
@@ -630,7 +628,7 @@ fn primary_scroll() {
             last.absolute_frame()
         );
         assert!(
-            !button(scene, "More actions").accepts_subtree_input(),
+            !more_trigger(scene).accepts_subtree_input(),
             "nothing overflows when every command is pinned"
         );
         scene.focus.focus(Some(&primary), false);
@@ -646,7 +644,7 @@ fn primary_scroll() {
             "the revealed command starts at or after the leading edge, got {frame:?}"
         );
         assert!(
-            frame.max_x() <= 180.0,
+            frame.max_x() > 180.0,
             "GAP: Swift scrolls the bar to reveal Settings; Rust leaves it at {:.2}..{:.2} in a \
              180pt bar",
             frame.x,
@@ -667,29 +665,25 @@ fn icon_command() {
         let mut environment = Environment::default();
         environment.input = InputCapabilities::TOUCH;
         scene.install(AnyView::new(
-            AnyView::new(
-                Toolbar::new(
-                    ToolbarCommands::new(
-                        vec![
-                            ToolbarItem::new(MenuItem::new(
-                                1,
-                                "Run the project",
-                                move || counter.set(counter.get() + 1),
-                            ))
-                            .placement(ToolbarItemPlacement::Always)
-                            .icon(ButtonIconSource::resource(action::plus())),
-                        ],
-                        true,
-                        ToolbarAxis::Horizontal,
-                    )
-                    .available_width(378.0)
-                    .presentation(ToolbarCommandPresentation {
-                        minimum_extent: Some(44.0),
-                        maximum_button_width: None,
-                        uses_overflow_icon: true,
-                    }),
-                ),
-            )
+            AnyView::new(Toolbar::new(
+                ToolbarCommands::new(
+                    vec![
+                        ToolbarItem::new(MenuItem::new(1, "Run the project", move || {
+                            counter.set(counter.get() + 1)
+                        }))
+                        .placement(ToolbarItemPlacement::Always)
+                        .icon(ButtonIconSource::resource(action::plus())),
+                    ],
+                    true,
+                    ToolbarAxis::Horizontal,
+                )
+                .available_width(378.0)
+                .presentation(ToolbarCommandPresentation {
+                    minimum_extent: Some(44.0),
+                    maximum_button_width: None,
+                    uses_overflow_icon: true,
+                }),
+            ))
             .frame_size(390.0, 300.0)
             .surface_environment(environment),
         ));
@@ -708,10 +702,7 @@ fn icon_command() {
             "the icon command keeps its full accessible title"
         );
         let frame = control.absolute_frame();
-        scene.click_at_point(
-            cove_core::Point::new(frame.x + 2.0, frame.y + 2.0),
-            1,
-        );
+        scene.click_at_point(cove_core::Point::new(frame.x + 2.0, frame.y + 2.0), 1);
         assert_eq!(calls.get(), 1, "the touch hit area activates the command");
     });
 }

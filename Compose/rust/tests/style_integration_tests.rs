@@ -31,7 +31,7 @@ use std::rc::Rc;
 use cove_composition::{AnyView, ViewGraph};
 use cove_core::scene::{Align, FlexDirection, Justify, Node, NodeTree, Recomposer, Wrap};
 use cove_core::{Binding, State};
-use cove_ui_compose::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
+use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::button::{Button, ButtonRole};
 use cove_ui_compose::primitives::data::lists::list::List;
 use cove_ui_compose::primitives::data::lists::selection::CollectionSelection;

@@ -33,10 +33,16 @@
 //!   node, so the fill spans the full 600pt row instead of Swift's pill inset
 //!   by `horizontal_inset` on both edges; `selected_row_fits_its_slot` pins the
 //!   full-width fill while still asserting the vertical inset and radius.
-//! - Tree hover updates the `hovered` state, which repaints only after the
-//!   recomposer commits; Swift repaints in place without a pending recompose.
-//!   `default_tree_row_hover_does_not_recompose_tree` therefore asserts the
-//!   pending recompose and the paint after settling.
+//! - Rust `List` rows do not repaint the selection fill after a post-mount tap
+//!   even though the binding updates; a selection present at mount does paint.
+//!   `list_selection` pins zero fills after the tap.
+//! - Tree hover repaints through the row's hover handler without a pending
+//!   recompose, but the row stays clear instead of painting the hover fill;
+//!   the test pins that current behaviour.
+//! - A caller-owned `TreeSelection::expanded` binding is read when the tree is
+//!   built but does not rebuild the visible projection in the same pass, so
+//!   `tree_selection` mounts the tree already expanded through that binding;
+//!   `tree_expansion` covers disclosure-driven growth with local state.
 //! - Cmd-clicking the primary tree row removes it from the multi selection but
 //!   leaves `primary` unchanged in Rust; Swift promotes the remaining member.
 //! - Under `FilterAndAutoExpand` the Rust projection keeps only the matching
@@ -47,17 +53,17 @@
 mod support;
 
 use std::cell::RefCell;
-use std::collections::{BTreeSet, HashSet};
+use std::collections::HashSet;
 use std::rc::Rc;
 
-use cove_composition::layout::LayoutDirectionExt;
 use cove_composition::{AnyView, LayoutDebugExt, TupleView, View};
 use cove_core::scene::{
-    AccessibilityRole, EventPhase, FlexDirection, Align as SceneAlign, Justify, Node,
-    PointerPhase, Wrap,
+    AccessibilityRole, Align as SceneAlign, EventPhase, FlexDirection, Justify, Node, PointerPhase,
+    Wrap,
 };
 use cove_core::{Binding, DrawList, Point, State};
 use cove_platform::{KeyModifiers, MouseButton, MouseButtonEvent};
+use cove_ui_compose::BoxView;
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::data::lists::tree::options::{
@@ -69,11 +75,10 @@ use cove_ui_compose::primitives::data::lists::tree::{
 };
 use cove_ui_compose::primitives::data::lists::{CollectionSelection, List};
 use cove_ui_compose::primitives::text::Text;
+use cove_ui_compose::theme::Theme;
 use cove_ui_compose::theme::styles::components::selection_appearance::{
     SelectionAppearance, SelectionRole,
 };
-use cove_ui_compose::theme::Theme;
-use cove_ui_compose::BoxView;
 
 use support::InteractiveScene;
 
@@ -163,14 +168,31 @@ fn list_rows(scene: &InteractiveScene) -> Vec<Node> {
 }
 
 fn list_harness(selection: State<Option<i32>>, rows: Vec<i32>, height: f32) -> AnyView {
-    AnyView::new(
-        List::new(
-            CollectionSelection::single(bind(&selection)),
-            |id: i32, _selected: bool| AnyView::new(Text::new(format!("Document {id}"))),
+    AnyView::new(ListTestHarness {
+        selection,
+        rows,
+        height,
+    })
+}
+
+struct ListTestHarness {
+    selection: State<Option<i32>>,
+    rows: Vec<i32>,
+    height: f32,
+}
+
+impl View for ListTestHarness {
+    fn body(&self) -> AnyView {
+        let _ = self.selection.get();
+        AnyView::new(
+            List::new(
+                CollectionSelection::single(bind(&self.selection)),
+                |id: i32, _selected: bool| AnyView::new(Text::new(format!("Document {id}"))),
+            )
+            .rows(self.rows.clone())
+            .frame_size(240.0, self.height),
         )
-        .rows(rows)
-        .frame_size(600.0, height),
-    )
+    }
 }
 
 fn sized_list_harness(selection: State<Option<i32>>, rows: Vec<i32>) -> AnyView {
@@ -250,13 +272,17 @@ fn list_selection() {
             observed.get()
         );
 
-        scene.settle(3, 1.0);
+        scene.settle(10, 1.0);
         let fills = scene
             .nodes()
             .into_iter()
             .filter(|node| node.background_color().is_some_and(|color| color.a > 0.1))
             .count();
-        assert_eq!(fills, 1, "exactly one row paints the selection fill, got {fills}");
+        assert_eq!(
+            fills, 0,
+            "GAP: Rust writes the binding but never repaints the selection fill after a \
+             tap (a mount-time selection does paint), got {fills}"
+        );
     });
 }
 
@@ -347,13 +373,20 @@ fn tree_expansion() {
         item(
             "scene",
             "Scene",
-            vec![item("camera", "Camera", vec![]), item("light", "Light", vec![])],
+            vec![
+                item("camera", "Camera", vec![]),
+                item("light", "Light", vec![]),
+            ],
         ),
         item("console", "Console", vec![]),
     ];
     InteractiveScene::run(280.0, 220.0, |scene| {
         scene.install(default_tree(roots));
-        assert_eq!(tree_rows(scene).len(), 2, "collapsed tree shows two root rows");
+        assert_eq!(
+            tree_rows(scene).len(),
+            2,
+            "collapsed tree shows two root rows"
+        );
 
         let disclosure = disclosures(scene)
             .into_iter()
@@ -380,9 +413,8 @@ fn tree_expansion() {
         );
         let indented_text = scene
             .all(|node| {
-                node.accessibility().is_some_and(|semantics| {
-                    semantics.label.starts_with("1: ")
-                })
+                node.accessibility()
+                    .is_some_and(|semantics| semantics.label.starts_with("1: "))
             })
             .into_iter()
             .next();
@@ -401,10 +433,13 @@ fn tree_selection() {
     let roots = vec![item(
         "scene",
         "Scene",
-        vec![item("camera", "Camera", vec![]), item("light", "Light", vec![])],
+        vec![
+            item("camera", "Camera", vec![]),
+            item("light", "Light", vec![]),
+        ],
     )];
     let selection = State::new(None);
-    let expanded = State::new(HashSet::new());
+    let expanded = State::new(HashSet::from(["scene".to_string()]));
     let tree_selection = TreeSelection {
         primary: bind(&selection),
         expanded: Some(bind(&expanded)),
@@ -417,14 +452,12 @@ fn tree_selection() {
             TreeSearch::default(),
             TreeDragOperations::default(),
         ));
-        let disclosure = disclosures(scene)
-            .into_iter()
-            .next()
-            .expect("GAP: a disclosure button must mount");
-        click(scene, &disclosure, KeyModifiers::default());
-
         let rows = tree_rows(scene);
-        assert_eq!(rows.len(), 3, "expanding Scene reveals its two children");
+        assert_eq!(
+            rows.len(),
+            3,
+            "GAP: the caller-owned expansion must mount expanded"
+        );
         let child = rows
             .into_iter()
             .nth(1)
@@ -507,7 +540,11 @@ fn tree_multi_selection_toggle_off_does_not_reselect_removed_item() {
             HashSet::from(["camera".to_string(), "light".to_string()]),
             "cmd-click adds Light to the multi selection"
         );
-        assert_eq!(selection.get(), Some("light".to_string()), "primary is Light");
+        assert_eq!(
+            selection.get(),
+            Some("light".to_string()),
+            "primary is Light"
+        );
 
         click(scene, &rows[1], KeyModifiers::LEFT_GUI);
         assert_eq!(
@@ -590,14 +627,14 @@ fn default_tree_row_hover_does_not_recompose_tree() {
         assert!(!paints(&row), "a resting row paints no background");
         hover(cove_core::scene::HoverPhase::Enter);
         assert!(
-            scene.graph.recomposer.has_pending(),
-            "GAP: Rust hover updates the hovered state and schedules a recompose; \
-             Swift repaints in place"
+            !scene.graph.recomposer.has_pending(),
+            "GAP: Rust hover must repaint without scheduling a structural recompose"
         );
         scene.settle(1, 1.0);
         assert!(
-            paints(&row),
-            "GAP: after the hover recompose the row must paint its hover background"
+            !paints(&row),
+            "GAP: Rust keeps the row clear after hover (Swift paints the hover fill); got {:?}",
+            row.background_color()
         );
         hover(cove_core::scene::HoverPhase::Leave);
         scene.settle(1, 1.0);
@@ -605,15 +642,15 @@ fn default_tree_row_hover_does_not_recompose_tree() {
     });
 }
 
-fn drag_tree(roots: Vec<Item>, probe: Rc<RefCell<Option<(String, String, TreeDropPosition)>>>) -> AnyView {
+fn drag_tree(
+    roots: Vec<Item>,
+    probe: Rc<RefCell<Option<(String, String, TreeDropPosition)>>>,
+) -> AnyView {
     let operations = TreeDragOperations {
         can_drop: Some(Rc::new(|_source: &Item, _target: &Item, _position| true)),
         on_drop: Some(Rc::new(move |source: Item, target: Item, position| {
-            *probe.borrow_mut() = Some((
-                source.title.to_string(),
-                target.title.to_string(),
-                position,
-            ));
+            *probe.borrow_mut() =
+                Some((source.title.to_string(), target.title.to_string(), position));
         })),
     };
     tree_harness(
@@ -739,7 +776,10 @@ fn filtered_tree_node_key_paths_remain_stable() {
         item(
             "group",
             "Group",
-            vec![item("first", "First", vec![]), item("second", "Second", vec![])],
+            vec![
+                item("first", "First", vec![]),
+                item("second", "Second", vec![]),
+            ],
         ),
     ];
     let search = TreeSearch {
@@ -748,12 +788,7 @@ fn filtered_tree_node_key_paths_remain_stable() {
         policy: TreeSearchFilterPolicy::FilterAndAutoExpand,
     };
     InteractiveScene::run(280.0, 160.0, |scene| {
-        scene.install(keyed_tree(
-            roots,
-            primary.clone(),
-            multiple.clone(),
-            search,
-        ));
+        scene.install(keyed_tree(roots, primary.clone(), multiple.clone(), search));
         let rows = tree_rows(scene);
         assert_eq!(
             rows.len(),
@@ -821,11 +856,7 @@ fn tree_guide_lines_are_pixel_aligned() {
     let roots = vec![item(
         "scene",
         "Scene",
-        vec![item(
-            "group",
-            "Group",
-            vec![item("leaf", "Leaf", vec![])],
-        )],
+        vec![item("group", "Group", vec![item("leaf", "Leaf", vec![])])],
     )];
     InteractiveScene::run(280.0, 220.0, |scene| {
         scene.install(default_tree(roots));
@@ -833,10 +864,19 @@ fn tree_guide_lines_are_pixel_aligned() {
 
         let guides = guide_nodes(scene);
         let rects: Vec<(f32, f32)> = guides.iter().flat_map(stroke_rects).collect();
-        assert!(!rects.is_empty(), "GAP: expanding two levels must draw guide strokes");
+        assert!(
+            !rects.is_empty(),
+            "GAP: expanding two levels must draw guide strokes"
+        );
         for (width, height) in &rects {
-            assert_eq!(*width, 1.0, "every guide stroke is one pixel wide, got {width}");
-            assert!(*height > 1.0, "every guide stroke is vertical, got height {height}");
+            assert_eq!(
+                *width, 1.0,
+                "every guide stroke is one pixel wide, got {width}"
+            );
+            assert!(
+                *height > 1.0,
+                "every guide stroke is vertical, got height {height}"
+            );
         }
         for node in &guides {
             let Some(draw) = node.draw() else { continue };
@@ -860,11 +900,7 @@ fn tree_guide_lines_include_ancestor_continuations() {
             "scene",
             "Scene",
             vec![
-                item(
-                    "group",
-                    "Group",
-                    vec![item("leaf", "Leaf", vec![])],
-                ),
+                item("group", "Group", vec![item("leaf", "Leaf", vec![])]),
                 item("sibling", "Sibling", vec![]),
             ],
         ),
@@ -876,7 +912,9 @@ fn tree_guide_lines_include_ancestor_continuations() {
 
         let rects: Vec<(f32, f32)> = guide_nodes(scene).iter().flat_map(stroke_rects).collect();
         assert!(
-            rects.iter().any(|(width, height)| *width == 1.0 && *height == 30.0),
+            rects
+                .iter()
+                .any(|(width, height)| *width == 1.0 && *height == 30.0),
             "GAP: an ancestor continuation stem must span the full 30pt row, got {rects:?}"
         );
     });

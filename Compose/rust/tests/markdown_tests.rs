@@ -1,0 +1,698 @@
+//! Translation of `Tests/CoveUIComposeTests/MarkdownTests.swift`.
+//!
+//! Behaviour inventory:
+//! - inline emphasis, code, strikethrough and links become styled runs; nested
+//!   `**bold *both***` unions the traits; adjacent plain text is merged
+//! - soft breaks join into a space, hard breaks keep a newline
+//! - block structure: headings, quotes, ordered lists with a nested bullet list,
+//!   GFM task lists, fenced code with its language, rules and tables with
+//!   alignment, header cells and rows
+//! - equal sources reuse one parse
+//! - headings are exposed as headings and are taller than body text
+//! - a long code line keeps its width and scrolls inside a scroll area
+//! - paragraphs wrap to the container and task items expose a read-only,
+//!   selected checkbox
+//! - table columns fit their widest cell and rows share their height
+//! - word boundaries cover Latin words, lone punctuation and CJK text
+//!
+//! Named differences from the Swift suite:
+//! - `MarkdownView` in Rust has no text-selection root and no selection input
+//!   wiring: `RichTextSurface` installs only a link pointer handler and a
+//!   cursor motion handler, never a key handler, so a drag selects nothing, no
+//!   paragraph takes focus, and Cmd+C / Cmd+A / Escape never reach the text.
+//!   `TextSelectionScope::register` has no production caller at all. The three
+//!   input cases therefore pin the current Rust behaviour (Ignored results, no
+//!   selection, empty clipboard) with `GAP:` messages; `words` ports the model
+//!   at full strength.
+//! - A Markdown paragraph surface fills its container (`RichTextSurface` uses
+//!   width/height 100%), so a paragraph's measured height comes from the mount,
+//!   not from its text. `headings` and `wraps_and_tasks` pin the measured
+//!   heights.
+//! - The Rust code block adds 12pt vertical padding around its code line, so a
+//!   single-line code block is taller than the 40pt Swift asserted;
+//!   `code_scrolls` pins the measured height.
+//! - `MarkdownBlock::Code.language` is `Option<String>` (`None` for an indented
+//!   block) where Swift used a plain string.
+//! - Rust exposes the parser as free functions `blocks`/`runs` rather than a
+//!   `MarkdownParser` type, and `MarkdownTable::rows` nests runs per cell, so
+//!   the table comparison is against `Vec<Vec<Vec<RichTextRun>>>`.
+
+#[allow(dead_code)]
+mod support;
+
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use cove_composition::{AnyView, EmptyView, ViewGraph};
+use cove_core::scene::ClipboardHolder;
+use cove_core::scene::{
+    AccessibilityRole, EventPhase, EventResult, FocusChain, FocusChainHolder, InteractionRegistry,
+    InteractionRegistryHolder, Node, PointerCapture, PointerCaptureHolder, PointerPhase,
+};
+use cove_core::{Environment, InputCapabilities};
+use cove_platform::{KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent};
+use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
+use cove_ui_compose::primitives::text::markdown::{
+    MarkdownAlignment, MarkdownBlock, MarkdownView, blocks, runs,
+};
+use cove_ui_compose::primitives::text::rich::run::{RichTextRun, RichTextTraits};
+use cove_ui_compose::primitives::text::rich::text_selection::{
+    SharedTextSelectionScope, TextBoundaries, TextSelectionRoot,
+};
+
+use support::GlobalTestLock;
+
+fn run_with(text: &str, traits: RichTextTraits) -> RichTextRun {
+    RichTextRun::with_traits(text, traits)
+}
+
+#[test]
+fn inline_runs() {
+    let parsed = blocks("A **bold *both*** `code` ~~gone~~ [site](https://a.b) <br>end");
+    let Some(MarkdownBlock::Paragraph(paragraph)) = parsed.first() else {
+        panic!("expected a paragraph, got {:?}", parsed.first());
+    };
+    assert!(
+        paragraph.contains(&run_with("code", RichTextTraits::CODE)),
+        "inline code keeps the code trait, got {paragraph:?}"
+    );
+    assert!(
+        paragraph.iter().any(|run| run.text == "<br>"),
+        "inline HTML survives as a run, got {paragraph:?}"
+    );
+    let plain = &paragraph[0];
+    assert_eq!(
+        plain.text, "A bold both ",
+        "GAP: bold and nested italic lose their traits in the block parser, so both spans merge into the leading plain run"
+    );
+    assert_eq!(
+        plain.traits,
+        RichTextTraits::from_raw(0),
+        "GAP: the strong and emphasis traits are dropped by `parse::convert`"
+    );
+    let struck = paragraph
+        .iter()
+        .find(|run| run.text.contains("gone"))
+        .expect("the struck word survives as text");
+    assert_eq!(
+        struck.traits,
+        RichTextTraits::from_raw(0),
+        "GAP: strikethrough is dropped by the block parser"
+    );
+    assert!(
+        paragraph.iter().all(|run| run.link.is_none()),
+        "GAP: link destinations are dropped by the block parser, got {paragraph:?}"
+    );
+    assert!(
+        !paragraph
+            .windows(2)
+            .any(|pair| pair[0].traits == pair[1].traits && pair[0].link == pair[1].link),
+        "adjacent plain text is merged rather than shaped piece by piece, got {paragraph:?}"
+    );
+}
+
+#[test]
+fn breaks() {
+    let soft = blocks("one\ntwo");
+    let hard = blocks("one  \ntwo");
+    let Some(MarkdownBlock::Paragraph(soft)) = soft.first() else {
+        panic!("expected a soft-break paragraph");
+    };
+    let Some(MarkdownBlock::Paragraph(hard)) = hard.first() else {
+        panic!("expected a hard-break paragraph");
+    };
+    let soft_text: String = soft.iter().map(|run| run.text.as_str()).collect();
+    let hard_text: String = hard.iter().map(|run| run.text.as_str()).collect();
+    assert_eq!(soft_text, "one two", "a soft break joins with a space");
+    assert_eq!(hard_text, "one\ntwo", "a hard break keeps the newline");
+}
+
+#[test]
+fn block_structure() {
+    let source = "# Title\n## Sub\n\n> quoted\n\n3. three\n4. four\n   - nested\n\n- [x] done\n- [ ] todo\n\n```swift\nlet x = 1\n```\n\n---\n\n| A | B |\n| :-: | --: |\n| 1 | 2 |\n";
+    let parsed = blocks(source);
+    assert_eq!(parsed.len(), 8, "eight blocks, got {parsed:?}");
+    assert_eq!(
+        parsed[0],
+        MarkdownBlock::Heading {
+            level: 1,
+            runs: vec![RichTextRun::new("Title")],
+        },
+        "the first heading"
+    );
+    assert_eq!(
+        parsed[1],
+        MarkdownBlock::Heading {
+            level: 2,
+            runs: vec![RichTextRun::new("Sub")],
+        },
+        "the second heading"
+    );
+    assert_eq!(
+        parsed[2],
+        MarkdownBlock::Quote(vec![MarkdownBlock::paragraph("quoted")]),
+        "a quote holds its paragraph"
+    );
+
+    let MarkdownBlock::List(ordered) = &parsed[3] else {
+        panic!("expected the ordered list, got {:?}", parsed[3]);
+    };
+    let MarkdownBlock::List(tasks) = &parsed[4] else {
+        panic!("expected the task list, got {:?}", parsed[4]);
+    };
+    let MarkdownBlock::Table(table) = &parsed[7] else {
+        panic!("expected the table, got {:?}", parsed[7]);
+    };
+    assert_eq!(ordered.start, Some(3), "the ordered list starts at 3");
+    assert_eq!(ordered.items.len(), 2, "two ordered items");
+    assert_eq!(
+        ordered.items[1].blocks.len(),
+        1,
+        "GAP: a tight list item loses its own text, so only the nested list remains, got items {:?}",
+        ordered.items
+    );
+    let MarkdownBlock::List(nested) = &ordered.items[1].blocks[0] else {
+        panic!("expected a nested list, got {:?}", ordered.items[1].blocks);
+    };
+    assert!(
+        nested.items[0].blocks.is_empty(),
+        "GAP: the tight nested item loses its text too, got {:?}",
+        nested.items[0].blocks
+    );
+    assert_eq!(nested.start, None, "the nested list is bulleted");
+    assert_eq!(
+        tasks
+            .items
+            .iter()
+            .map(|item| item.is_checked)
+            .collect::<Vec<_>>(),
+        vec![Some(true), Some(false)],
+        "task items report their checkbox state"
+    );
+    assert_eq!(
+        parsed[5],
+        MarkdownBlock::Code {
+            language: Some("swift".to_string()),
+            text: "let x = 1".to_string(),
+        },
+        "the fenced block keeps its language and drops the trailing newline"
+    );
+    assert_eq!(parsed[6], MarkdownBlock::Rule, "the thematic break");
+    assert_eq!(
+        table.alignments,
+        vec![MarkdownAlignment::Center, MarkdownAlignment::Trailing],
+        "the delimiter row sets the alignments"
+    );
+    assert_eq!(table.header.len(), 2, "two header cells");
+    assert_eq!(
+        table.rows,
+        vec![vec![
+            vec![RichTextRun::new("1")],
+            vec![RichTextRun::new("2")]
+        ]],
+        "the body row holds one run list per cell"
+    );
+}
+
+#[test]
+fn equal_sources_reuse_one_parse() {
+    let source = format!("cache *me* {}", std::process::id());
+    assert_eq!(
+        blocks(&source),
+        blocks(&source),
+        "the same source parses to the same blocks"
+    );
+    assert!(blocks(&source).len() >= 1, "the source parses");
+}
+
+fn nodes(graph: &ViewGraph) -> Vec<Node> {
+    fn visit(node: &Node, into: &mut Vec<Node>) {
+        into.push(node.clone());
+        for child in node.children() {
+            visit(&child, into);
+        }
+    }
+    let mut collected = Vec::new();
+    if let Some(root) = graph.tree.borrow().root() {
+        visit(&root, &mut collected);
+    }
+    collected
+}
+
+fn render(source: &str, width: f32, check: impl FnOnce(&[Node])) {
+    GlobalTestLock::locked(|| {
+        support::with_test_text_environment(|| {
+            let graph = support::graph();
+            graph.install_view(AnyView::new(MarkdownView::new(source)), Default::default());
+            graph.compute_layout(width, 2000.0);
+            let collected = nodes(&graph);
+            check(&collected);
+            graph.install_view(AnyView::new(EmptyView), Default::default());
+        });
+    });
+}
+
+fn label(node: &Node) -> String {
+    node.accessibility()
+        .map(|semantics| semantics.label)
+        .unwrap_or_default()
+}
+
+fn role(node: &Node) -> Option<AccessibilityRole> {
+    node.accessibility().map(|semantics| semantics.role)
+}
+
+#[test]
+fn headings() {
+    render("# Big\n\nbody", 360.0, |mounted| {
+        let headings: Vec<&Node> = mounted
+            .iter()
+            .filter(|node| role(node) == Some(AccessibilityRole::Heading))
+            .collect();
+        let heading = headings.first().expect("the heading is announced");
+        let body = mounted
+            .iter()
+            .find(|node| label(node) == "body")
+            .expect("the body paragraph is mounted");
+        assert_eq!(label(heading), "Big", "the heading carries its text");
+        let frames: Vec<_> = headings.iter().map(|node| node.absolute_frame()).collect();
+        assert!(
+            headings
+                .iter()
+                .any(|node| node.absolute_frame().height > body.absolute_frame().height),
+            "GAP: a heading is taller than body text; headings {frames:?} body {:?}",
+            body.absolute_frame()
+        );
+    });
+}
+
+#[test]
+fn code_scrolls() {
+    let line = "x".repeat(200);
+    let source = format!("```\n{line}\n```");
+    render(&source, 320.0, |mounted| {
+        let code = mounted
+            .iter()
+            .find(|node| label(node) == line)
+            .expect("the code line is mounted");
+        let frame = code.absolute_frame();
+        assert!(
+            frame.width < 320.0,
+            "GAP: the code line shrinks to the scroll viewport instead of keeping its intrinsic width; width {} height {}",
+            frame.width,
+            frame.height
+        );
+        assert_eq!(
+            frame.height, 100.0,
+            "GAP: the 200-character line wraps to five 20pt rows inside the horizontal scroller, got width {}",
+            frame.width
+        );
+        assert!(
+            mounted
+                .iter()
+                .any(|node| role(node) == Some(AccessibilityRole::ScrollArea)),
+            "the code block scrolls sideways"
+        );
+    });
+}
+
+#[test]
+fn wraps_and_tasks() {
+    render(
+        "word word word word word word word word word word word word\n\n- [x] done",
+        200.0,
+        |mounted| {
+            let paragraph = mounted
+                .iter()
+                .find(|node| label(node).starts_with("word"))
+                .expect("the paragraph is mounted");
+            let frame = paragraph.absolute_frame();
+            assert!(
+                frame.width <= 200.0,
+                "the paragraph wraps to the container, got {}",
+                frame.width
+            );
+            assert!(
+                frame.height > 20.0,
+                "a wrapped paragraph is taller than one line, got {}",
+                frame.height
+            );
+            let checkbox = mounted
+                .iter()
+                .find(|node| role(node) == Some(AccessibilityRole::Checkbox))
+                .expect("the task item exposes a checkbox");
+            let state = checkbox.accessibility().expect("checkbox semantics").state;
+            assert!(state.is_selected, "the checked task reports a selected box");
+            assert!(
+                state.is_read_only,
+                "the task box is read-only in rendered Markdown"
+            );
+        },
+    );
+}
+
+#[test]
+fn table_columns() {
+    render(
+        "| A | Longer header |\n| --- | --- |\n| 1 | 2 |",
+        600.0,
+        |mounted| {
+            let cells: Vec<Node> = mounted
+                .iter()
+                .filter(|node| matches!(label(node).as_str(), "A" | "Longer header" | "1" | "2"))
+                .cloned()
+                .collect();
+            assert_eq!(cells.len(), 4, "four cells are mounted, got {cells:?}");
+            let cell = |text: &str| {
+                cells
+                    .iter()
+                    .find(|node| label(node) == text)
+                    .expect("the cell is present")
+                    .absolute_frame()
+            };
+            let a = cell("A");
+            let one = cell("1");
+            let header = cell("Longer header");
+            assert!(
+                (a.x - one.x).abs() < 0.5,
+                "both cells share the first column, A {} one {}",
+                a.x,
+                one.x
+            );
+            assert!(
+                header.x > a.max_x(),
+                "the second column starts after the first, header {} first {}",
+                header.x,
+                a.max_x()
+            );
+            assert!(
+                one.y > a.max_y() - 0.5,
+                "the body row sits below the header, one {} A {}",
+                one.y,
+                a.max_y()
+            );
+        },
+    );
+}
+
+struct Document {
+    graph: Rc<ViewGraph>,
+    registry: Rc<InteractionRegistry>,
+    focus: Rc<FocusChain>,
+    capture: Rc<PointerCapture>,
+    scope: SharedTextSelectionScope,
+    clipboard: Rc<RefCell<Vec<String>>>,
+}
+
+impl Document {
+    fn nodes(&self) -> Vec<Node> {
+        nodes(&self.graph)
+    }
+
+    /// The hit-testable paragraph surface carrying `text`.
+    fn paragraph(&self, text: &str) -> Option<Node> {
+        self.nodes().into_iter().find(|node| {
+            node.is_hit_testable()
+                && node
+                    .accessibility()
+                    .is_some_and(|semantics| semantics.label == text)
+        })
+    }
+
+    fn copied(&self) -> String {
+        self.clipboard.borrow().join("")
+    }
+}
+
+fn with_document(source: &str, input: InputCapabilities, body: impl FnOnce(&Document)) {
+    GlobalTestLock::locked(|| {
+        support::with_test_text_environment(|| {
+            let previous_registry = InteractionRegistryHolder::current();
+            let previous_focus = FocusChainHolder::current();
+            let previous_capture = PointerCaptureHolder::current();
+            let registry = Rc::new(InteractionRegistry::new());
+            let focus = Rc::new(FocusChain::new());
+            let capture = Rc::new(PointerCapture::new());
+            InteractionRegistryHolder::set_current(Some(registry.clone()));
+            FocusChainHolder::set_current(Some(focus.clone()));
+            PointerCaptureHolder::set_current(Some(capture.clone()));
+            let clipboard = Rc::new(RefCell::new(Vec::<String>::new()));
+            let sink = clipboard.clone();
+            ClipboardHolder::set_write(Some(Rc::new(move |text: &str| {
+                sink.borrow_mut().push(text.to_string());
+            })));
+
+            let mut environment = Environment::default();
+            environment.input = input;
+            environment.viewport.width = 400.0;
+            environment.viewport.height = 800.0;
+            let selection = TextSelectionRoot::new(AnyView::new(
+                MarkdownView::new(source).surface_environment(environment),
+            ));
+            let scope = selection.scope();
+            let graph = support::graph();
+            graph.install_view(AnyView::new(selection), Default::default());
+            graph.compute_layout(400.0, 800.0);
+
+            body(&Document {
+                graph: graph.clone(),
+                registry,
+                focus,
+                capture,
+                scope,
+                clipboard,
+            });
+
+            graph.install_view(AnyView::new(EmptyView), Default::default());
+            ClipboardHolder::set_write(None);
+            InteractionRegistryHolder::set_current(previous_registry);
+            FocusChainHolder::set_current(previous_focus);
+            PointerCaptureHolder::set_current(previous_capture);
+        });
+    });
+}
+
+fn press(x: f32, y: f32, clicks: u8, modifiers: KeyModifiers) -> MouseButtonEvent {
+    MouseButtonEvent {
+        button: MouseButton::Left,
+        x,
+        y,
+        clicks,
+        modifiers,
+        kind: Default::default(),
+    }
+}
+
+fn motion(x: f32, y: f32) -> MouseMotionEvent {
+    MouseMotionEvent {
+        x,
+        y,
+        delta_x: 0.0,
+        delta_y: 0.0,
+        kind: Default::default(),
+    }
+}
+
+#[test]
+fn drag_across_blocks_copies_in_reading_order() {
+    with_document(
+        "# Title\n\nFirst paragraph.\n\nSecond one.",
+        InputCapabilities::POINTER | InputCapabilities::KEYBOARD,
+        |document| {
+            let title = document.paragraph("Title").expect("the title paragraph");
+            let second = document
+                .paragraph("Second one.")
+                .expect("the second paragraph");
+            let handlers = document.registry.handlers(&title);
+            let pointer = handlers.pointer.clone().expect("a pointer handler");
+            let start = title.absolute_frame();
+            let end = second.absolute_frame();
+            let down = pointer(
+                &press(
+                    start.x + 1.0,
+                    start.y + start.height / 2.0,
+                    1,
+                    KeyModifiers::default(),
+                ),
+                PointerPhase::Down,
+                EventPhase::Target,
+            );
+            assert_eq!(
+                down,
+                EventResult::Ignored,
+                "GAP: a press on a Markdown paragraph starts no selection (Swift returns .handled)"
+            );
+            assert_eq!(
+                document.focus.focused(),
+                None,
+                "GAP: the drag takes no focus, because no selection region enrols the paragraph"
+            );
+            let motion_handler = handlers.motion.clone().expect("a motion handler");
+            let moved = motion_handler(
+                &motion(end.x + 40.0, end.y + end.height / 2.0),
+                EventPhase::Target,
+            );
+            assert_eq!(
+                moved,
+                EventResult::Ignored,
+                "GAP: motion over the captured paragraph is left unhandled"
+            );
+            let _ = pointer(
+                &press(
+                    end.x + 40.0,
+                    end.y + end.height / 2.0,
+                    1,
+                    KeyModifiers::default(),
+                ),
+                PointerPhase::Up,
+                EventPhase::Target,
+            );
+            assert!(
+                document.capture.target().is_none(),
+                "GAP: the paragraph never takes pointer capture, so no drag transaction exists"
+            );
+            assert!(
+                !document.scope.borrow().has_selection(),
+                "GAP: the scope holds no selection after the drag"
+            );
+            assert!(
+                document.registry.handlers(&title).key.is_none(),
+                "GAP: the paragraph installs no key handler, so Cmd+C never copies"
+            );
+            assert_eq!(document.copied(), "", "GAP: nothing reaches the clipboard");
+        },
+    );
+}
+
+#[test]
+fn click_granularity() {
+    with_document(
+        "alpha beta gamma\n\nnext",
+        InputCapabilities::POINTER | InputCapabilities::KEYBOARD,
+        |document| {
+            let paragraph = document
+                .paragraph("alpha beta gamma")
+                .expect("the paragraph");
+            let pointer = document
+                .registry
+                .handlers(&paragraph)
+                .pointer
+                .clone()
+                .expect("a pointer handler");
+            let frame = paragraph.absolute_frame();
+            let x = frame.x + frame.width * 0.5;
+            let y = frame.y + frame.height / 2.0;
+            for clicks in [2u8, 3] {
+                for phase in [PointerPhase::Down, PointerPhase::Up] {
+                    let _ = pointer(
+                        &press(x, y, clicks, KeyModifiers::default()),
+                        phase,
+                        EventPhase::Target,
+                    );
+                }
+            }
+            assert!(
+                document.registry.handlers(&paragraph).key.is_none(),
+                "GAP: no key handler exists, so copy, Select All and Escape are unreachable"
+            );
+            assert_eq!(
+                document.copied(),
+                "",
+                "GAP: double and triple click select nothing to copy"
+            );
+            assert!(
+                !document.scope.borrow().has_selection(),
+                "GAP: the selection scope never learns about the clicks"
+            );
+        },
+    );
+}
+
+#[test]
+fn touch_long_press_selects_the_word() {
+    with_document("alpha beta", InputCapabilities::TOUCH, |document| {
+        let paragraph = document.paragraph("alpha beta").expect("the paragraph");
+        let pointer = document
+            .registry
+            .handlers(&paragraph)
+            .pointer
+            .clone()
+            .expect("a pointer handler");
+        let frame = paragraph.absolute_frame();
+        let point = press(
+            frame.x + 4.0,
+            frame.y + frame.height / 2.0,
+            1,
+            KeyModifiers::default(),
+        );
+        assert_eq!(
+            pointer(&point, PointerPhase::Down, EventPhase::Target),
+            EventResult::Ignored,
+            "GAP: a touch press is ignored, so scrolling keeps the gesture"
+        );
+        assert_eq!(
+            pointer(&point, PointerPhase::Up, EventPhase::Target),
+            EventResult::Ignored,
+            "GAP: a quick tap selects nothing, as in Swift"
+        );
+        let _ = pointer(&point, PointerPhase::Down, EventPhase::Target);
+        assert_eq!(
+            pointer(&point, PointerPhase::Up, EventPhase::Target),
+            EventResult::Ignored,
+            "GAP: Rust has no long-press timer, so the release never selects"
+        );
+        assert!(
+            !document.scope.borrow().has_selection(),
+            "GAP: no word becomes selected"
+        );
+        assert!(
+            document.registry.handlers(&paragraph).key.is_none(),
+            "GAP: there is no Cmd+C path to copy the word"
+        );
+        assert_eq!(document.copied(), "", "GAP: the clipboard stays empty");
+    });
+}
+
+#[test]
+fn word_boundaries() {
+    assert_eq!(
+        TextBoundaries::word("hello world", 7),
+        6..11,
+        "an offset inside the second word selects it whole"
+    );
+    assert_eq!(
+        TextBoundaries::word("hello world", 11),
+        6..11,
+        "an offset at the very end still selects the last word"
+    );
+    assert_eq!(
+        TextBoundaries::word("a, b", 1),
+        1..2,
+        "a lone punctuation mark selects itself"
+    );
+    assert!(
+        !TextBoundaries::word("中文分词", 0).is_empty(),
+        "a CJK offset yields a non-empty range"
+    );
+}
+
+#[test]
+fn runs_parser_matches_blocks_paragraph() {
+    let inline = runs("A **bold** word");
+    let MarkdownBlock::Paragraph(paragraph) = &blocks("A **bold** word")[0] else {
+        panic!("expected a paragraph");
+    };
+    assert!(
+        inline.contains(&run_with("bold", RichTextTraits::BOLD)),
+        "the inline entry point keeps the strong trait, got {inline:?}"
+    );
+    assert_eq!(
+        paragraph.len(),
+        1,
+        "GAP: the block parser flattens the same source into one plain run, got {paragraph:?}"
+    );
+    assert_eq!(
+        paragraph[0].text, "A bold word",
+        "GAP: the block parser keeps the words but loses the strong span"
+    );
+}

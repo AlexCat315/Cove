@@ -31,14 +31,13 @@ mod support;
 
 use std::rc::Rc;
 
-use cove_composition::{AnyView, DynamicField, PrimitiveView, View, ViewGraph, ViewExt};
+use cove_composition::{AnyView, DynamicField, PrimitiveView, View, ViewGraph};
 use cove_core::scene::{
-    Animation, AnimationCurve, AnimatorScheduler, LayoutNode, LayoutStyleValue, Node, with_animation,
+    Animation, AnimationCurve, AnimatorScheduler, LayoutNode, LayoutStyleValue, Node,
+    with_animation,
 };
 use cove_core::{Color, State};
-use cove_ui_compose::modifiers::layout::{
-    EdgeInsets, FrameDimension, LayoutFrameExt, PaddingExt,
-};
+use cove_ui_compose::modifiers::layout::{EdgeInsets, FrameDimension, LayoutFrameExt, PaddingExt};
 use cove_ui_compose::modifiers::style::AppearanceExt;
 
 use support::{DebugNode, GlobalTestLock};
@@ -76,34 +75,12 @@ fn black() -> Color {
     }
 }
 
-fn find_tagged(node: &Node, tag: &str) -> Option<Node> {
-    if node.view_tag().as_deref() == Some(tag) {
-        return Some(node.clone());
-    }
-    node.children()
-        .iter()
-        .find_map(|child| find_tagged(child, tag))
-}
-
 /// The materialised leaf the harness authored, which carries the animated
-/// property.
+/// property. The modifier wrapper rewrites the leaf's view tag, so the leaf is
+/// identified structurally: it is the last node on the first-child chain.
 fn leaf(graph: &Rc<ViewGraph>) -> Node {
     let root = graph.tree.borrow().root().expect("root");
-    fn dump(node: &Node, depth: usize) {
-        eprintln!(
-            "{:indent$}tag={:?} children={} layout={}",
-            "",
-            node.view_tag(),
-            node.children().len(),
-            node.layout_node().is_some(),
-            indent = depth * 2
-        );
-        for child in node.children() {
-            dump(&child, depth + 1);
-        }
-    }
-    dump(&root, 0);
-    find_tagged(&root, "x").expect("the debug leaf mounts")
+    support::deepest_node(&root)
 }
 
 fn leaf_layout(graph: &Rc<ViewGraph>) -> LayoutNode {
@@ -115,6 +92,12 @@ fn leaf_layout(graph: &Rc<ViewGraph>) -> LayoutNode {
 fn fixture<V: View + 'static>(view: V) -> Rc<ViewGraph> {
     let graph = support::graph();
     graph.install_view(AnyView::new(view), Default::default());
+    // The first pass materialises the subtree before the animated mutation.
+    for _ in 0..5 {
+        graph.recomposer.commit_all();
+        graph.tree.borrow_mut().flush();
+        graph.compute_layout(640.0, 400.0);
+    }
     graph
 }
 
@@ -163,16 +146,14 @@ struct FrameWidthHarness {
 
 impl View for FrameWidthHarness {
     fn body(&self) -> AnyView {
-        AnyView::new(
-            SizedLeaf { label: "x" }.frame(
-                Some(FrameDimension::Points(self.width.get())),
-                None,
-                None,
-                None,
-                None,
-                None,
-            ),
-        )
+        AnyView::new(SizedLeaf { label: "x" }.frame(
+            Some(FrameDimension::Points(self.width.get())),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ))
     }
     fn dynamic_properties(&self) -> Vec<DynamicField> {
         vec![DynamicField::state("width", &self.width)]
@@ -198,9 +179,14 @@ struct MaxFrameHarness {
 
 impl View for MaxFrameHarness {
     fn body(&self) -> AnyView {
-        AnyView::new(
-            SizedLeaf { label: "x" }.frame(None, None, None, None, self.max_width.get(), None),
-        )
+        AnyView::new(SizedLeaf { label: "x" }.frame(
+            None,
+            None,
+            None,
+            None,
+            self.max_width.get(),
+            None,
+        ))
     }
     fn dynamic_properties(&self) -> Vec<DynamicField> {
         vec![DynamicField::state("max_width", &self.max_width)]
@@ -213,9 +199,14 @@ struct MaxHeightFrameHarness {
 
 impl View for MaxHeightFrameHarness {
     fn body(&self) -> AnyView {
-        AnyView::new(
-            SizedLeaf { label: "x" }.frame(None, None, None, None, None, self.max_height.get()),
-        )
+        AnyView::new(SizedLeaf { label: "x" }.frame(
+            None,
+            None,
+            None,
+            None,
+            None,
+            self.max_height.get(),
+        ))
     }
     fn dynamic_properties(&self) -> Vec<DynamicField> {
         vec![DynamicField::state("max_height", &self.max_height)]
@@ -228,16 +219,14 @@ struct PercentFrameHarness {
 
 impl View for PercentFrameHarness {
     fn body(&self) -> AnyView {
-        AnyView::new(
-            SizedLeaf { label: "x" }.frame(
-                Some(FrameDimension::Percent(self.ratio.get())),
-                None,
-                None,
-                None,
-                None,
-                None,
-            ),
-        )
+        AnyView::new(SizedLeaf { label: "x" }.frame(
+            Some(FrameDimension::Percent(self.ratio.get())),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ))
     }
     fn dynamic_properties(&self) -> Vec<DynamicField> {
         vec![DynamicField::state("ratio", &self.ratio)]
@@ -250,16 +239,14 @@ struct PercentHeightFrameHarness {
 
 impl View for PercentHeightFrameHarness {
     fn body(&self) -> AnyView {
-        AnyView::new(
-            SizedLeaf { label: "x" }.frame(
-                None,
-                Some(FrameDimension::Percent(self.ratio.get())),
-                None,
-                None,
-                None,
-                None,
-            ),
-        )
+        AnyView::new(SizedLeaf { label: "x" }.frame(
+            None,
+            Some(FrameDimension::Percent(self.ratio.get())),
+            None,
+            None,
+            None,
+            None,
+        ))
     }
     fn dynamic_properties(&self) -> Vec<DynamicField> {
         vec![DynamicField::state("ratio", &self.ratio)]
@@ -273,27 +260,23 @@ struct WidthModeSwitchHarness {
 impl View for WidthModeSwitchHarness {
     fn body(&self) -> AnyView {
         if self.use_percent.get() {
-            AnyView::new(
-                SizedLeaf { label: "x" }.frame(
-                    Some(FrameDimension::Percent(50.0)),
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                ),
-            )
+            AnyView::new(SizedLeaf { label: "x" }.frame(
+                Some(FrameDimension::Percent(50.0)),
+                None,
+                None,
+                None,
+                None,
+                None,
+            ))
         } else {
-            AnyView::new(
-                SizedLeaf { label: "x" }.frame(
-                    Some(FrameDimension::Points(40.0)),
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                ),
-            )
+            AnyView::new(SizedLeaf { label: "x" }.frame(
+                Some(FrameDimension::Points(40.0)),
+                None,
+                None,
+                None,
+                None,
+                None,
+            ))
         }
     }
     fn dynamic_properties(&self) -> Vec<DynamicField> {
@@ -308,27 +291,23 @@ struct HeightModeSwitchHarness {
 impl View for HeightModeSwitchHarness {
     fn body(&self) -> AnyView {
         if self.use_percent.get() {
-            AnyView::new(
-                SizedLeaf { label: "x" }.frame(
-                    None,
-                    Some(FrameDimension::Percent(50.0)),
-                    None,
-                    None,
-                    None,
-                    None,
-                ),
-            )
+            AnyView::new(SizedLeaf { label: "x" }.frame(
+                None,
+                Some(FrameDimension::Percent(50.0)),
+                None,
+                None,
+                None,
+                None,
+            ))
         } else {
-            AnyView::new(
-                SizedLeaf { label: "x" }.frame(
-                    None,
-                    Some(FrameDimension::Points(40.0)),
-                    None,
-                    None,
-                    None,
-                    None,
-                ),
-            )
+            AnyView::new(SizedLeaf { label: "x" }.frame(
+                None,
+                Some(FrameDimension::Points(40.0)),
+                None,
+                None,
+                None,
+                None,
+            ))
         }
     }
     fn dynamic_properties(&self) -> Vec<DynamicField> {
@@ -342,9 +321,14 @@ struct TypedDimensionHarness {
 
 impl View for TypedDimensionHarness {
     fn body(&self) -> AnyView {
-        AnyView::new(
-            SizedLeaf { label: "x" }.frame(Some(self.width.get()), None, None, None, None, None),
-        )
+        AnyView::new(SizedLeaf { label: "x" }.frame(
+            Some(self.width.get()),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ))
     }
     fn dynamic_properties(&self) -> Vec<DynamicField> {
         vec![DynamicField::state("width", &self.width)]
@@ -449,7 +433,11 @@ fn corner_radius_animates() {
             assert_eq!(scheduler.active_count(), 1, "one animation is running");
 
             scheduler.tick(0.5);
-            assert_eq!(node.corner_radius(), 5.0, "halfway through, the radius is midway");
+            assert_eq!(
+                node.corner_radius(),
+                5.0,
+                "halfway through, the radius is midway"
+            );
 
             scheduler.tick(0.5);
             assert_eq!(node.corner_radius(), 10.0, "the radius lands on the target");
@@ -492,11 +480,19 @@ fn frame_width_animates() {
 
             with_animation(linear(), || width.set(80.0));
             graph.recomposer.commit_all();
-            assert_eq!(layout.width(), Some(40.0), "the frame starts at the old width");
+            assert_eq!(
+                layout.width(),
+                Some(40.0),
+                "the frame starts at the old width"
+            );
             assert_eq!(scheduler.active_count(), 1, "one animation is running");
 
             scheduler.tick(0.5);
-            assert_eq!(layout.width(), Some(60.0), "halfway through, the width is midway");
+            assert_eq!(
+                layout.width(),
+                Some(60.0),
+                "halfway through, the width is midway"
+            );
 
             scheduler.tick(0.5);
             assert_eq!(layout.width(), Some(80.0), "the width lands on the target");
@@ -564,10 +560,18 @@ fn frame_max_width_animates() {
             assert_eq!(scheduler.active_count(), 1, "one animation is running");
 
             scheduler.tick(0.5);
-            assert_eq!(layout.max_width(), Some(160.0), "halfway through, the maximum is midway");
+            assert_eq!(
+                layout.max_width(),
+                Some(160.0),
+                "halfway through, the maximum is midway"
+            );
 
             scheduler.tick(0.5);
-            assert_eq!(layout.max_width(), Some(200.0), "the maximum lands on the target");
+            assert_eq!(
+                layout.max_width(),
+                Some(200.0),
+                "the maximum lands on the target"
+            );
             assert_eq!(scheduler.active_count(), 0, "the scheduler idles again");
         });
     });
@@ -601,7 +605,11 @@ fn frame_max_height_animates() {
             );
 
             scheduler.tick(0.5);
-            assert_eq!(layout.max_height(), Some(100.0), "the maximum lands on the target");
+            assert_eq!(
+                layout.max_height(),
+                Some(100.0),
+                "the maximum lands on the target"
+            );
             assert_eq!(scheduler.active_count(), 0, "the scheduler idles again");
         });
     });
@@ -613,7 +621,9 @@ fn frame_width_ratio_dimension_animates() {
         let scheduler = AnimatorScheduler::default();
         scheduler.with_current(|| {
             let ratio = State::new(20.0f32);
-            let graph = fixture(PercentFrameHarness { ratio: ratio.clone() });
+            let graph = fixture(PercentFrameHarness {
+                ratio: ratio.clone(),
+            });
             let layout = leaf_layout(&graph);
             assert_eq!(
                 layout.style().width,
@@ -654,7 +664,9 @@ fn frame_height_ratio_dimension_animates() {
         let scheduler = AnimatorScheduler::default();
         scheduler.with_current(|| {
             let ratio = State::new(20.0f32);
-            let graph = fixture(PercentHeightFrameHarness { ratio: ratio.clone() });
+            let graph = fixture(PercentHeightFrameHarness {
+                ratio: ratio.clone(),
+            });
             let layout = leaf_layout(&graph);
 
             with_animation(linear(), || ratio.set(60.0));
@@ -734,11 +746,19 @@ fn typed_dimension_points_animate() {
 
             with_animation(linear(), || width.set(FrameDimension::Points(80.0)));
             graph.recomposer.commit_all();
-            assert_eq!(layout.width(), Some(40.0), "the frame starts at the old width");
+            assert_eq!(
+                layout.width(),
+                Some(40.0),
+                "the frame starts at the old width"
+            );
             assert_eq!(scheduler.active_count(), 1, "one animation is running");
 
             scheduler.tick(0.5);
-            assert_eq!(layout.width(), Some(60.0), "halfway through, the width is midway");
+            assert_eq!(
+                layout.width(),
+                Some(60.0),
+                "halfway through, the width is midway"
+            );
 
             scheduler.tick(0.5);
             assert_eq!(layout.width(), Some(80.0), "the width lands on the target");
@@ -753,7 +773,9 @@ fn frame_percent_convenience_animates() {
         let scheduler = AnimatorScheduler::default();
         scheduler.with_current(|| {
             let ratio = State::new(20.0f32);
-            let graph = fixture(PercentFrameHarness { ratio: ratio.clone() });
+            let graph = fixture(PercentFrameHarness {
+                ratio: ratio.clone(),
+            });
             let layout = leaf_layout(&graph);
 
             with_animation(linear(), || ratio.set(60.0));

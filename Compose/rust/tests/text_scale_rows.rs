@@ -11,15 +11,20 @@
 //!   lanes inside the body at 2x and 1x
 //!
 //! Named differences from the Swift suite:
-//! - **GAP: `Table` body cells are never laid out.** As pinned in
-//!   `row_density_tests`, the non-`DataTable` table mounts 2,000 placeholder
-//!   cells whose frames stay 0pt at every scale, so its table leg asserts
-//!   placeholders instead of scaled row heights. It is mounted once, outside
-//!   the scale loop.
-//! - **GAP: neither table takes a touch density floor.** `DataTable` resolves
-//!   its layout with `touch = false`, so rows are `36 * scale` on touch too;
-//!   the matrix asserts that measured height instead of Swift's
-//!   `max(authored * scale, 44)`.
+//! - **GAP: `Table` body cells are never laid out.** The non-`DataTable` table
+//!   mounts placeholder cells whose frames stay 0pt at every scale, so Swift's
+//!   scaled table row leg has no Rust counterpart here; the identical defect is
+//!   pinned by `row_density_tests`.
+//! - **GAP: the data table neither scales nor floors.** `DataTable` resolves
+//!   its layout with `touch = false` and its mounted surface ignores the
+//!   `textScaler` modifier, so rows stay at 36pt at every scale and input
+//!   instead of Swift's `max(authored * scale, 44)`.
+//! - **GAP: lazy-grid rows scale but their text measure does not.** Rust
+//!   doubles the row heights and gaps, yet the cell's recorded text measure
+//!   stays at the base font size at 2x.
+//! - **GAP: grid cells report `y = 0`.** Row offsets are applied by the scroll
+//!   transform, not the cell frame, so Swift's absolute `minY`/`maxY`
+//!   assertions are replaced by mounted-range assertions.
 //! - Swift asserts a "Resize First column" grip at `max(38 * scale, 44)`;
 //!   Rust's tables mount no resize grip, so the leg is removed and recorded
 //!   here rather than asserted.
@@ -39,12 +44,8 @@ use cove_core::{Binding, Environment, InputCapabilities, Point, State};
 use cove_platform::KeyModifiers;
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::data::data_table::{
-    DataTable, DataTableModel, DataTableOptions,
-};
-use cove_ui_compose::primitives::data::lists::table::{
-    Table, TableColumn, TableLayout, TableOptions,
-};
+use cove_ui_compose::primitives::data::data_table::{DataTable, DataTableModel, DataTableOptions};
+use cove_ui_compose::primitives::data::lists::table::{TableColumn, TableLayout};
 use cove_ui_compose::primitives::data::lists::{CollectionSelection, List};
 use cove_ui_compose::primitives::layout::grid::{GridRowHeights, LazyGrid};
 use cove_ui_compose::primitives::text::Text;
@@ -161,17 +162,13 @@ impl View for GeometryHarness {
                 Wrap::NoWrap,
                 8.0,
                 AnyView::new(TupleView::new(vec![
-                    AnyView::new(
-                        AnyView::new(list).frame_height(180.0).debug_name("list"),
-                    ),
+                    AnyView::new(AnyView::new(list).frame_height(180.0).debug_name("list")),
                     AnyView::new(
                         AnyView::new(data_table)
                             .frame_height(240.0)
                             .debug_name("data-table"),
                     ),
-                    AnyView::new(
-                        AnyView::new(grid).frame_height(180.0).debug_name("grid"),
-                    ),
+                    AnyView::new(AnyView::new(grid).frame_height(180.0).debug_name("grid")),
                 ])),
             ))
             .frame_width(self.width.get())
@@ -269,10 +266,8 @@ fn collection_geometry_scales_once_and_retains_identity() {
                         "fixed grid window at {value}x, saw {}",
                         grid_cells.len()
                     );
-                    let grid_cells: Vec<Node> = grid_cells
-                        .iter()
-                        .filter_map(|cell| cell.parent())
-                        .collect();
+                    let grid_cells: Vec<Node> =
+                        grid_cells.iter().filter_map(|cell| cell.parent()).collect();
                     for cell in &grid_cells {
                         assert_eq!(
                             cell.frame().height,
@@ -285,8 +280,7 @@ fn collection_geometry_scales_once_and_retains_identity() {
                     for pair in tops.windows(2) {
                         let gap = pair[1] - pair[0];
                         assert!(
-                            (gap - 30.0 * value).abs() <= 1.0
-                                || (gap - 35.0 * value).abs() <= 1.0,
+                            (gap - 30.0 * value).abs() <= 1.0 || (gap - 35.0 * value).abs() <= 1.0,
                             "fixed grid row pitch at {value}x was {gap}"
                         );
                     }
@@ -315,57 +309,6 @@ fn collection_geometry_scales_once_and_retains_identity() {
             });
         }
     }
-}
-
-struct TableProbe {
-    input: State<InputCapabilities>,
-}
-
-impl View for TableProbe {
-    fn body(&self) -> AnyView {
-        let table = Table::new((0..1_000).collect::<Vec<usize>>(), |record: &usize| *record, columns())
-            .options(TableOptions::default());
-        let mut surface = Environment::default();
-        surface.input = self.input.get();
-        AnyView::new(
-            AnyView::new(table)
-                .frame_width(390.0)
-                .frame_height(240.0)
-                .surface_environment(surface),
-        )
-    }
-
-    fn tag(&self) -> &'static str {
-        std::any::type_name::<Self>()
-    }
-}
-
-#[test]
-fn table_cells_remain_unlaid_out() {
-    let harness = TableProbe {
-        input: State::new(TOUCH),
-    };
-    InteractiveScene::run(390.0, 240.0, |scene| {
-        scene.install(harness);
-        scene.settle(4, 0.016);
-        let cells: Vec<Node> = scene.all(|node| {
-            node.accessibility().map(|semantics| semantics.role) == Some(AccessibilityRole::Cell)
-        });
-        assert_eq!(
-            cells.len(),
-            2_000,
-            "GAP: the table mounts all 2000 cell placeholders"
-        );
-        assert!(
-            cells.iter().all(|cell| cell.frame().height == 0.0),
-            "GAP: no table cell is laid out at any scale, so its Swift row-height leg \
-             cannot be ported (actual {:?})",
-            cells
-                .iter()
-                .map(|cell| cell.frame().height)
-                .collect::<Vec<_>>()
-        );
-    });
 }
 
 struct VariableGridHarness {
@@ -484,7 +427,8 @@ fn variable_grid_scales_cached_prefixes_and_clamps() {
         );
         assert_eq!(last.frame().height, 100.0, "the last row doubles");
         assert_eq!(
-            last.frame().height, 100.0,
+            last.frame().height,
+            100.0,
             "GAP: grid cell frames report y = 0 because row offsets live in the scroll transform              (last y {})",
             last.frame().y
         );
@@ -560,8 +504,8 @@ fn data_table_paging_follows_live_text_scale() {
             scene.key(Scancode::HOME, KeyModifiers::default());
             scene.key(Scancode::PAGE_DOWN, KeyModifiers::default());
             scene.key(Scancode::END, KeyModifiers::default());
-            let last: Vec<Node> = scene
-                .all(|node| node.attachment::<usize>("dataTable.rowIndex") == Some(999));
+            let last: Vec<Node> =
+                scene.all(|node| node.attachment::<usize>("dataTable.rowIndex") == Some(999));
             assert_eq!(
                 last.len(),
                 2,
@@ -581,7 +525,8 @@ fn data_table_paging_follows_live_text_scale() {
             }
             assert!(
                 scene
-                    .all(|node| node.accessibility().map(|s| s.role) == Some(AccessibilityRole::Cell))
+                    .all(|node| node.accessibility().map(|s| s.role)
+                        == Some(AccessibilityRole::Cell))
                     .len()
                     < 40,
                 "the mounted cell window stays bounded at {value}x"

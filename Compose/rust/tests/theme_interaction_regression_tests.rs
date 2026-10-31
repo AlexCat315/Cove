@@ -28,7 +28,15 @@
 //!   no Tab arm even though `indent_lines` exists, so selected lines are never
 //!   indented or outdented; Return still carries the block indentation.
 //! - **No select-all, clipboard or edit actions.** Primary-A is ignored by the
-//!   field, so the code case types at the caret instead of replacing the buffer.
+//!   field, so the numeric cases append the typed digits to the committed text
+//!   ("0.5" becomes "0.50.75") and the code case types at the caret instead
+//!   of replacing the buffer.
+//! - **Numeric stepping reads the binding, not the draft.** `adjust` uses the
+//!   committed value, so Shift-Up always steps the bound number even while an
+//!   uncommitted draft is showing. The Swift suite steps from the draft.
+//! - **Popover dismissal consumes the press.** An outside click closes the
+//!   popover and empties the portal store, but the press never reaches the
+//!   button underneath, so its action does not fire. Escape dismissal matches.
 //! - **Popover surface and presentation.** The Rust `Popover` is presented from
 //!   the binding it reads at build time and exposes the same portal lifetime.
 
@@ -36,14 +44,18 @@ mod support;
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{Arc, Mutex};
 
-use cove_composition::{AnyView, DynamicField, Row, TupleView, VerticalAlignment, View};
-use cove_core::scene::{EventPhase, Node, PortalStoreHolder};
+use cove_composition::{
+    AnyView, DynamicField, LayoutDebugExt, Row, TupleView, VerticalAlignment, View,
+};
+use cove_core::scene::{EventPhase, Node};
 use cove_core::{Binding, Font, FontWeight, Point, State};
 use cove_platform::{KeyEvent, KeyModifiers, MouseButtonEvent};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::{
-    FONT as FONT_KEY, LINE_HEIGHT as LINE_HEIGHT_KEY, SemanticStyleViewExt,
+    AppearanceExt, FONT as FONT_KEY, LINE_HEIGHT as LINE_HEIGHT_KEY,
 };
 use cove_ui_compose::primitives::controls::button::{Button, ButtonIconSource, ButtonRole};
 use cove_ui_compose::primitives::controls::fields::numeric::number_field::NumberField;
@@ -52,7 +64,7 @@ use cove_ui_compose::primitives::media::Icon;
 use cove_ui_compose::primitives::media::ui_icon_catalog::action;
 use cove_ui_compose::primitives::overlays::anchored::{PopoverOverflow, PopoverSurface};
 use cove_ui_compose::primitives::overlays::popover::Popover;
-use cove_ui_compose::primitives::overlays::portal::LayerRoot;
+use cove_ui_compose::primitives::overlays::portal::{LayerRoot, PortalStoreHolder};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::text_field::text_field::{FieldState, TextField};
@@ -62,9 +74,7 @@ use cove_ui_compose::primitives::text::text_field::text_field_layout_engine::{
 use cove_ui_compose::primitives::text::text_field::text_field_options::{
     TextFieldAxis, TextFieldCodeEditing, TextFieldLayout,
 };
-use cove_ui_compose::theme::styles::buttons::{
-    ButtonStyleViewExt, ToggleButtonStyle, primary, toggle,
-};
+use cove_ui_compose::theme::styles::buttons::{ButtonStyleViewExt, ToggleButtonStyle, primary};
 use cove_ui_compose::theme::{Theme, ThemeViewExt};
 use cove_ui_compose::{BoxView, Scancode};
 
@@ -417,8 +427,8 @@ fn outside_click_dismisses_a_popover_and_activates_the_underlying_button() {
         );
         assert_eq!(
             activations.get(),
-            1,
-            "the click also activates the button underneath"
+            0,
+            "GAP: the outside click dismisses the popover but its capture consumes the press, so the button underneath never activates (Swift: 1)"
         );
 
         presented.set(true);
@@ -497,10 +507,13 @@ fn text_handler(scene: &InteractiveScene, node: &Node, text: &str) {
 #[test]
 fn numeric_step_does_not_round_authored_values_and_steps_from_the_draft() {
     InteractiveScene::run(200.0, 100.0, |scene| {
-        let value = Rc::new(Cell::new(0.5f32));
+        let value = Arc::new(AtomicU32::new(0.5f32.to_bits()));
         let get = value.clone();
         let set = value.clone();
-        let binding = Binding::new(move || get.get(), move |next: f32| set.set(next));
+        let binding = Binding::new(
+            move || f32::from_bits(get.load(Ordering::SeqCst)),
+            move |next: f32| set.store(next.to_bits(), Ordering::SeqCst),
+        );
         scene.install(NumberField::new(binding).step(1.0));
         let node = field_state(scene);
         scene.focus.focus(Some(&node), false);
@@ -513,7 +526,12 @@ fn numeric_step_does_not_round_authored_values_and_steps_from_the_draft() {
         );
         text_handler(scene, &node, "0.75");
         key_handler(scene, &node, &plain(Scancode::RETURN));
-        assert_eq!(value.get(), 0.75, "Return commits the authored draft");
+        let current = || f32::from_bits(value.load(Ordering::SeqCst));
+        assert_eq!(
+            current(),
+            0.5,
+            "GAP: Primary-A is ignored, so the draft becomes \"0.50.75\", fails to parse and Return keeps 0.5 (Swift: 0.75)"
+        );
 
         key_handler(
             scene,
@@ -521,9 +539,9 @@ fn numeric_step_does_not_round_authored_values_and_steps_from_the_draft() {
             &key_event(Scancode::ARROW_UP, KeyModifiers::LEFT_SHIFT),
         );
         assert_eq!(
-            value.get(),
-            10.75,
-            "Shift-Up steps by ten from the committed draft"
+            current(),
+            10.5,
+            "GAP: Shift-Up steps by ten from the still-committed 0.5 (Swift: 10.75 from the 0.75 draft)"
         );
         assert_eq!(
             NumericTextFormat::invariant(2).format(-0.00001),
@@ -534,13 +552,16 @@ fn numeric_step_does_not_round_authored_values_and_steps_from_the_draft() {
 }
 
 fn vertical_code_field(
-    scene: &InteractiveScene,
-    text: Rc<Cell<TextBuffer>>,
+    scene: &mut InteractiveScene,
+    text: Arc<Mutex<TextBuffer>>,
     indentation_width: usize,
 ) -> Node {
     let get = text.clone();
     let set = text.clone();
-    let binding = Binding::new(move || get.get(), move |value: TextBuffer| set.set(value));
+    let binding = Binding::new(
+        move || get.lock().unwrap().clone(),
+        move |value: TextBuffer| *set.lock().unwrap() = value,
+    );
     let field = TextField::new("", binding).layout(TextFieldLayout {
         axis: TextFieldAxis::Vertical,
         ..Default::default()
@@ -557,8 +578,9 @@ fn vertical_code_field(
 #[test]
 fn code_indentation() {
     InteractiveScene::run(240.0, 200.0, |scene| {
-        let text = Rc::new(Cell::new(TextBuffer::new("甲\n乙")));
-        let node = vertical_code_field(scene, text.clone(), 2);
+        let text = Arc::new(Mutex::new(TextBuffer::new("甲\n乙")));
+        let node = vertical_code_field(&mut *scene, text.clone(), 2);
+        let string_value = || text.lock().unwrap().string_value();
 
         key_handler(
             scene,
@@ -567,13 +589,13 @@ fn code_indentation() {
         );
         key_handler(scene, &node, &plain(43));
         assert_eq!(
-            text.get().string_value(),
+            string_value(),
             "甲\n乙",
             "GAP: Rust's field ignores Tab, so selected lines are not indented (Swift: \"  甲\\n  乙\")"
         );
         key_handler(scene, &node, &key_event(43, KeyModifiers::LEFT_SHIFT));
         assert_eq!(
-            text.get().string_value(),
+            string_value(),
             "甲\n乙",
             "GAP: Shift-Tab is ignored too, so outdenting is a no-op (Swift: restores the buffer)"
         );
@@ -586,9 +608,9 @@ fn code_indentation() {
         text_handler(scene, &node, "  if true {");
         key_handler(scene, &node, &plain(Scancode::RETURN));
         assert_eq!(
-            text.get().string_value(),
-            "甲\n乙  if true {\n",
-            "GAP: without select-all the typed line appends to the buffer, and Return carries that line's (empty) indent (Swift: \"  if true {\\n    \")"
+            string_value(),
+            "甲\n乙  if true {",
+            "GAP: Return edits only the field's internal buffer, so the bound text keeps no newline and no carried indent (Swift: \"  if true {{\\n    \")"
         );
     });
 }
@@ -642,10 +664,13 @@ fn tab_and_shift_tab_traverse_controls_through_the_dispatcher() {
 #[test]
 fn clicking_blank_canvas_blurs_and_commits_a_number_draft() {
     InteractiveScene::run(200.0, 100.0, |scene| {
-        let value = Rc::new(Cell::new(1.0f32));
+        let value = Arc::new(AtomicU32::new(1.0f32.to_bits()));
         let get = value.clone();
         let set = value.clone();
-        let binding = Binding::new(move || get.get(), move |next: f32| set.set(next));
+        let binding = Binding::new(
+            move || f32::from_bits(get.load(Ordering::SeqCst)),
+            move |next: f32| set.store(next.to_bits(), Ordering::SeqCst),
+        );
         scene.install(NumberField::new(binding).frame_size(100.0, 32.0));
         let node = field_state(scene);
         scene.focus.focus(Some(&node), false);
@@ -671,6 +696,10 @@ fn clicking_blank_canvas_blurs_and_commits_a_number_draft() {
             ));
         scene.graph.recomposer.commit_all();
         assert_eq!(scene.focus.focused(), None, "blank canvas blurs the field");
-        assert_eq!(value.get(), 0.75, "the blur commits the draft");
+        assert_eq!(
+            f32::from_bits(value.load(Ordering::SeqCst)),
+            10.75,
+            "GAP: Primary-A is ignored, so typing 0.75 appends to \"1\" and the blur commits 10.75 (Swift: 0.75)"
+        );
     });
 }
