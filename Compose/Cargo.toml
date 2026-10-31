@@ -862,3 +862,31 @@ path = "rust/tests/popconfirm_tests.rs"
 [[test]]
 name = "text_field_navigation_tests"
 path = "rust/tests/text_field_navigation_tests.rs"
+
+[[test]]
+name = "adaptive_timeline_tests"
+path = "rust/tests/adaptive_timeline_tests.rs"
+
+[[test]]
+name = "split_presentation_tests"
+path = "rust/tests/split_presentation_tests.rs"
+
+[[test]]
+name = "selection_field_tests"
+path = "rust/tests/selection_field_tests.rs"
+
+[[test]]
+name = "grid_columns_tests"
+path = "rust/tests/grid_columns_tests.rs"
+
+[[test]]
+name = "table_columns_tests"
+path = "rust/tests/table_columns_tests.rs"
+
+[[test]]
+name = "row_density_tests"
+path = "rust/tests/row_density_tests.rs"
+
+[[test]]
+name = "tab_overflow_tests"
+path = "rust/tests/tab_overflow_tests.rs"

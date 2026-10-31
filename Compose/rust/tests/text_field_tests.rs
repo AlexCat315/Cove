@@ -56,13 +56,12 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use cove_composition::{AnyView, ViewGraph};
+use cove_core::scene::ClipboardHolder;
 use cove_core::scene::{
     EventDispatcher, EventPhase, EventResult, FocusChain, FocusChainHolder, InteractionRegistry,
-    InteractionRegistryHolder, Node, PointerCapture, PointerCaptureHolder,
-    PointerPhase, TextEditActions, TextEditCommand, TextInputAttachmentKey,
-    TextInputClient,
+    InteractionRegistryHolder, Node, PointerCapture, PointerCaptureHolder, PointerPhase,
+    TextEditActions, TextEditCommand, TextInputAttachmentKey, TextInputClient,
 };
-use cove_core::scene::ClipboardHolder;
 use cove_core::{AnimatorScheduler, Binding, Color, DrawList, Point, Rect};
 use cove_platform::{
     InputEvent, KeyEvent, KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent,
@@ -139,7 +138,8 @@ fn with_rig(body: impl FnOnce(&Rig)) {
         let previous_text = TextEnvironmentHolder::current();
         let rig = make_rig();
         body(&rig);
-        rig.graph.install(cove_composition::EmptyView, Default::default());
+        rig.graph
+            .install(cove_composition::EmptyView, Default::default());
         InteractionRegistryHolder::set_current(previous_registry);
         FocusChainHolder::set_current(previous_focus);
         TextEnvironmentHolder::set_current(previous_text);
@@ -250,13 +250,29 @@ fn platform_editor_selection() {
             .expect("the field publishes a platform input client");
         (client.select)(1, 7);
         let snapshot = (client.snapshot)();
-        assert_eq!((snapshot.selection_start, snapshot.selection_end), (1, 8), "GAP: Swift rounds a UTF-16 endpoint inside the joined emoji to its grapheme boundary (1..1); Rust maps offsets per scalar and selects 1..8: {snapshot:?}");
+        assert_eq!(
+            (snapshot.selection_start, snapshot.selection_end),
+            (1, 8),
+            "GAP: Swift rounds a UTF-16 endpoint inside the joined emoji to its grapheme boundary (1..1); Rust maps offsets per scalar and selects 1..8: {snapshot:?}"
+        );
         (client.select)(7, 7);
         (client.delete_surrounding)(0, 1);
-        assert_eq!(rig.text(), "A👩🏽‍💻中B", "GAP: Swift deletes 中 through the binding (A中B); Rust's delete_surrounding edits only the field's internal buffer and never writes the binding");
-        assert_eq!((client.snapshot)().text, "A👩🏽\u{200d}B", "GAP: Swift deletes the one grapheme before the caret; Rust's scalar offsets leave the caret inside the joined emoji, so its internal buffer loses `💻中`: {:?}", (client.snapshot)());
+        assert_eq!(
+            rig.text(),
+            "A👩🏽‍💻中B",
+            "GAP: Swift deletes 中 through the binding (A中B); Rust's delete_surrounding edits only the field's internal buffer and never writes the binding"
+        );
+        assert_eq!(
+            (client.snapshot)().text,
+            "A👩🏽\u{200d}B",
+            "GAP: Swift deletes the one grapheme before the caret; Rust's scalar offsets leave the caret inside the joined emoji, so its internal buffer loses `💻中`: {:?}",
+            (client.snapshot)()
+        );
         let actions = node.attachment::<TextEditActions>(TextInputAttachmentKey::EDIT_ACTIONS);
-        assert!(actions.is_none(), "GAP: Swift publishes TextEditActions so platform undo restores the deletion; Rust's TextField publishes no edit actions");
+        assert!(
+            actions.is_none(),
+            "GAP: Swift publishes TextEditActions so platform undo restores the deletion; Rust's TextField publishes no edit actions"
+        );
         if let Some(actions) = actions {
             (actions.perform)(TextEditCommand::Undo);
         }
@@ -272,7 +288,10 @@ fn platform_editor_selection() {
             EventPhase::Target,
         );
         let snapshot = (client.snapshot)();
-        assert!(snapshot.composition_start == 1, "composition start {snapshot:?}");
+        assert!(
+            snapshot.composition_start == 1,
+            "composition start {snapshot:?}"
+        );
         assert!(snapshot.text.starts_with("A你好"), "preview {snapshot:?}");
         assert!(rig.text() == "A👩🏽‍💻中B", "binding untouched {}", rig.text());
         (client.select)(2, 2);
@@ -281,8 +300,16 @@ fn platform_editor_selection() {
         assert!(snapshot.composition_end == 3, "comp end {snapshot:?}");
         assert!(rig.text() == "A👩🏽‍💻中B", "binding untouched {}", rig.text());
         (client.select)(0, 0);
-        assert_eq!(rig.text(), "A👩🏽‍💻中B", "GAP: Swift commits the composition into the binding (A你好👩🏽‍💻中B) once the selection leaves the marked range; Rust commits it only into the internal buffer");
-        assert!((client.snapshot)().composition_start == -1, "cleared {:?}", (client.snapshot)());
+        assert_eq!(
+            rig.text(),
+            "A👩🏽‍💻中B",
+            "GAP: Swift commits the composition into the binding (A你好👩🏽‍💻中B) once the selection leaves the marked range; Rust commits it only into the internal buffer"
+        );
+        assert!(
+            (client.snapshot)().composition_start == -1,
+            "cleared {:?}",
+            (client.snapshot)()
+        );
     });
 }
 
@@ -307,8 +334,16 @@ fn backspace_deletes() {
         let handler = rig.handlers(&node).key.expect("key handler");
         let result = handler(&plain(Scancode::BACKSPACE), EventPhase::Target);
         assert!(result == EventResult::Handled, "handled {result:?}");
-        assert_eq!(rig.text(), "abc", "GAP: Swift writes `ab` through the binding; Rust's Backspace edits only the field's internal buffer and never writes the binding");
-        assert_eq!(state_of(&node).unwrap().borrow().buffer.string_value(), "ab", "the internal buffer drops the last character");
+        assert_eq!(
+            rig.text(),
+            "abc",
+            "GAP: Swift writes `ab` through the binding; Rust's Backspace edits only the field's internal buffer and never writes the binding"
+        );
+        assert_eq!(
+            state_of(&node).unwrap().borrow().buffer.string_value(),
+            "ab",
+            "the internal buffer drops the last character"
+        );
     });
 }
 
@@ -326,7 +361,11 @@ fn arrows_move_cursor() {
         (handlers.text.clone().unwrap())("X", EventPhase::Target);
         assert!(rig.text() == "heXllo", "insert {}", rig.text());
         key_handler(&plain(Scancode::BACKSPACE), EventPhase::Target);
-        assert_eq!(rig.text(), "heXllo", "GAP: Swift Backspace restores `hello` through the binding; Rust's Backspace edits only the field's internal buffer and never writes the binding");
+        assert_eq!(
+            rig.text(),
+            "heXllo",
+            "GAP: Swift Backspace restores `hello` through the binding; Rust's Backspace edits only the field's internal buffer and never writes the binding"
+        );
     });
 }
 
@@ -355,14 +394,23 @@ fn escape_cancels() {
             ..TextFieldEvents::default()
         }));
         let node = rig.field();
-        let result = (rig.handlers(&node).key.unwrap())(&plain(Scancode::ESCAPE), EventPhase::Target);
-        assert_eq!(result, EventResult::Ignored, "GAP: Swift consumes Escape when on_cancel is set; Rust's key handler has no Escape branch");
-        assert!(!canceled.get(), "GAP: Swift invokes on_cancel on Escape; Rust never reads TextFieldEvents::on_cancel");
+        let result =
+            (rig.handlers(&node).key.unwrap())(&plain(Scancode::ESCAPE), EventPhase::Target);
+        assert_eq!(
+            result,
+            EventResult::Ignored,
+            "GAP: Swift consumes Escape when on_cancel is set; Rust's key handler has no Escape branch"
+        );
+        assert!(
+            !canceled.get(),
+            "GAP: Swift invokes on_cancel on Escape; Rust never reads TextFieldEvents::on_cancel"
+        );
     });
     with_rig(|rig| {
         rig.install(TextField::new("", rig.binding()));
         let node = rig.field();
-        let result = (rig.handlers(&node).key.unwrap())(&plain(Scancode::ESCAPE), EventPhase::Target);
+        let result =
+            (rig.handlers(&node).key.unwrap())(&plain(Scancode::ESCAPE), EventPhase::Target);
         assert!(result == EventResult::Ignored, "plain escape {result:?}");
     });
 }
@@ -380,8 +428,16 @@ fn focus_request_selects_all() {
         let node = rig.field();
         let state = state_of(&node).unwrap();
         assert!(rig.focus.focused() == Some(node.clone()), "focused");
-        assert_eq!(state.borrow().selection.anchor, None, "GAP: Swift selects the whole value on a focus request (anchor 0); Rust only focuses and leaves the caret at the end");
-        assert!(state.borrow().selection.cursor_index == 11, "cursor {:?}", state.borrow().selection);
+        assert_eq!(
+            state.borrow().selection.anchor,
+            None,
+            "GAP: Swift selects the whole value on a focus request (anchor 0); Rust only focuses and leaves the caret at the end"
+        );
+        assert!(
+            state.borrow().selection.cursor_index == 11,
+            "cursor {:?}",
+            state.borrow().selection
+        );
     });
 }
 
@@ -420,17 +476,43 @@ fn focus_state_updates_without_draw() {
                 .text_field_style(ProbingStyle(probe.clone())),
         );
         let node = rig.field();
-        assert!(probe.focused.borrow().is_empty(), "GAP: Swift renders the field through the TextFieldStyle and reports is_focused; Rust's TextFieldHost never calls the style: {:?}", probe.focused.borrow());
-        assert!(probe.editing.borrow().is_empty(), "GAP: Swift reports is_editing through the style; Rust never calls it");
+        assert!(
+            probe.focused.borrow().is_empty(),
+            "GAP: Swift renders the field through the TextFieldStyle and reports is_focused; Rust's TextFieldHost never calls the style: {:?}",
+            probe.focused.borrow()
+        );
+        assert!(
+            probe.editing.borrow().is_empty(),
+            "GAP: Swift reports is_editing through the style; Rust never calls it"
+        );
         rig.focus.focus(Some(&node), false);
         rig.graph.recomposer.commit_all();
-        assert!(focus_count.get() == 1 && blur_count.get() == 0, "focus {} blur {}", focus_count.get(), blur_count.get());
-        assert!(probe.focused.borrow().is_empty(), "GAP: Swift restyles with is_focused = true after focus; Rust never calls the style");
-        assert!(probe.editing.borrow().is_empty(), "GAP: Swift restyles with is_editing = true after focus; Rust never calls the style");
+        assert!(
+            focus_count.get() == 1 && blur_count.get() == 0,
+            "focus {} blur {}",
+            focus_count.get(),
+            blur_count.get()
+        );
+        assert!(
+            probe.focused.borrow().is_empty(),
+            "GAP: Swift restyles with is_focused = true after focus; Rust never calls the style"
+        );
+        assert!(
+            probe.editing.borrow().is_empty(),
+            "GAP: Swift restyles with is_editing = true after focus; Rust never calls the style"
+        );
         rig.focus.clear();
         rig.graph.recomposer.commit_all();
-        assert!(focus_count.get() == 1 && blur_count.get() == 1, "focus {} blur {}", focus_count.get(), blur_count.get());
-        assert!(probe.focused.borrow().is_empty(), "GAP: Swift restyles with is_focused = false after blur; Rust never calls the style");
+        assert!(
+            focus_count.get() == 1 && blur_count.get() == 1,
+            "focus {} blur {}",
+            focus_count.get(),
+            blur_count.get()
+        );
+        assert!(
+            probe.focused.borrow().is_empty(),
+            "GAP: Swift restyles with is_focused = false after blur; Rust never calls the style"
+        );
     });
 }
 
@@ -451,11 +533,23 @@ fn multiline_return_inserts_newline() {
     with_rig(|rig| {
         rig.set("abc");
         let (submitted, events) = submit_flag();
-        rig.install(TextField::new("", rig.binding()).layout(vertical()).events(events));
+        rig.install(
+            TextField::new("", rig.binding())
+                .layout(vertical())
+                .events(events),
+        );
         let node = rig.field();
         (rig.handlers(&node).key.unwrap())(&plain(Scancode::RETURN), EventPhase::Target);
-        assert_eq!(rig.text(), "abc", "GAP: Swift writes `abc\\n` through the binding; Rust inserts the newline only into the internal buffer");
-        assert_eq!(state_of(&node).unwrap().borrow().buffer.string_value(), "abc\n", "the internal buffer gains the newline");
+        assert_eq!(
+            rig.text(),
+            "abc",
+            "GAP: Swift writes `abc\\n` through the binding; Rust inserts the newline only into the internal buffer"
+        );
+        assert_eq!(
+            state_of(&node).unwrap().borrow().buffer.string_value(),
+            "abc\n",
+            "the internal buffer gains the newline"
+        );
         assert!(!submitted.get(), "no submit");
     });
 }
@@ -465,11 +559,21 @@ fn multiline_primary_return_submits() {
     with_rig(|rig| {
         rig.set("abc");
         let (submitted, events) = submit_flag();
-        rig.install(TextField::new("", rig.binding()).layout(vertical()).events(events));
+        rig.install(
+            TextField::new("", rig.binding())
+                .layout(vertical())
+                .events(events),
+        );
         let node = rig.field();
-        (rig.handlers(&node).key.unwrap())(&key(Scancode::RETURN, KeyModifiers::LEFT_GUI), EventPhase::Target);
+        (rig.handlers(&node).key.unwrap())(
+            &key(Scancode::RETURN, KeyModifiers::LEFT_GUI),
+            EventPhase::Target,
+        );
         assert!(rig.text() == "abc", "unchanged {:?}", rig.text());
-        assert!(!submitted.get(), "GAP: Swift submits a vertical field on Primary-Return; Rust treats every Return in a vertical field as a newline");
+        assert!(
+            !submitted.get(),
+            "GAP: Swift submits a vertical field on Primary-Return; Rust treats every Return in a vertical field as a newline"
+        );
     });
 }
 
@@ -480,9 +584,19 @@ fn shift_return_inserts_newline() {
         let (submitted, events) = submit_flag();
         rig.install(TextField::new("", rig.binding()).events(events));
         let node = rig.field();
-        (rig.handlers(&node).key.unwrap())(&key(Scancode::RETURN, KeyModifiers::LEFT_SHIFT), EventPhase::Target);
-        assert_eq!(rig.text(), "abc", "GAP: Swift inserts a newline on Shift-Return in a single-line field; Rust submits instead and leaves the text unchanged");
-        assert!(submitted.get(), "GAP: Swift does not submit on Shift-Return; Rust ignores the modifier and submits");
+        (rig.handlers(&node).key.unwrap())(
+            &key(Scancode::RETURN, KeyModifiers::LEFT_SHIFT),
+            EventPhase::Target,
+        );
+        assert_eq!(
+            rig.text(),
+            "abc",
+            "GAP: Swift inserts a newline on Shift-Return in a single-line field; Rust submits instead and leaves the text unchanged"
+        );
+        assert!(
+            submitted.get(),
+            "GAP: Swift does not submit on Shift-Return; Rust ignores the modifier and submits"
+        );
     });
 }
 
@@ -499,11 +613,19 @@ fn up_down_arrows_preserve_column() {
         k(&plain(Scancode::ARROW_UP), EventPhase::Target);
         k(&plain(Scancode::ARROW_UP), EventPhase::Target);
         t("X", EventPhase::Target);
-        assert_eq!(rig.text(), "abcd\na\nabcX", "GAP: Swift moves up two lines keeping the column (abcXd); Rust ignores Up/Down, so X lands at the end");
+        assert_eq!(
+            rig.text(),
+            "abcd\na\nabcX",
+            "GAP: Swift moves up two lines keeping the column (abcXd); Rust ignores Up/Down, so X lands at the end"
+        );
         k(&plain(Scancode::HOME), EventPhase::Target);
         k(&plain(Scancode::ARROW_DOWN), EventPhase::Target);
         t("Y", EventPhase::Target);
-        assert_eq!(rig.text(), "abcd\na\nYabcX", "GAP: Swift moves Down to the next line (Ya); Rust ignores Down, so Y lands at the start of the last line");
+        assert_eq!(
+            rig.text(),
+            "abcd\na\nYabcX",
+            "GAP: Swift moves Down to the next line (Ya); Rust ignores Down, so Y lands at the start of the last line"
+        );
     });
 }
 
@@ -541,10 +663,17 @@ fn dispatcher_routes_text_editing() {
             start: 2,
             length: 0,
         }));
-        assert!(rig.text().is_empty(), "composition not committed {:?}", rig.text());
+        assert!(
+            rig.text().is_empty(),
+            "composition not committed {:?}",
+            rig.text()
+        );
         rig.graph.compute_layout(180.0, 64.0);
         let area = node.attachment::<TextInputArea>(TextInputAttachmentKey::AREA);
-        assert!(area.is_none(), "GAP: Swift publishes the IME text input area during layout; Rust's TextField installs no area resolver: {area:?}");
+        assert!(
+            area.is_none(),
+            "GAP: Swift publishes the IME text input area during layout; Rust's TextField installs no area resolver: {area:?}"
+        );
         input.dispatch(&InputEvent::TextInput("你".into()));
         assert!(rig.text() == "你", "committed {:?}", rig.text());
     });
@@ -558,11 +687,27 @@ fn backspace_removes_grapheme() {
         let node = rig.field();
         let k = rig.handlers(&node).key.unwrap();
         k(&plain(Scancode::BACKSPACE), EventPhase::Target);
-        assert_eq!(rig.text(), "a😀b", "GAP: Swift deletes `b` through the binding; Rust's Backspace edits only the field's internal buffer and never writes the binding");
-        assert_eq!(state_of(&node).unwrap().borrow().buffer.string_value(), "a😀", "the internal buffer drops `b`");
+        assert_eq!(
+            rig.text(),
+            "a😀b",
+            "GAP: Swift deletes `b` through the binding; Rust's Backspace edits only the field's internal buffer and never writes the binding"
+        );
+        assert_eq!(
+            state_of(&node).unwrap().borrow().buffer.string_value(),
+            "a😀",
+            "the internal buffer drops `b`"
+        );
         k(&plain(Scancode::BACKSPACE), EventPhase::Target);
-        assert_eq!(rig.text(), "a😀b", "GAP: Swift deletes the whole emoji through the binding; Rust edits only the field's internal buffer and never writes the binding");
-        assert_eq!(state_of(&node).unwrap().borrow().buffer.string_value(), "a", "the internal buffer drops the emoji grapheme");
+        assert_eq!(
+            rig.text(),
+            "a😀b",
+            "GAP: Swift deletes the whole emoji through the binding; Rust edits only the field's internal buffer and never writes the binding"
+        );
+        assert_eq!(
+            state_of(&node).unwrap().borrow().buffer.string_value(),
+            "a",
+            "the internal buffer drops the emoji grapheme"
+        );
     });
 }
 
@@ -572,7 +717,11 @@ fn click_handler_registered() {
         rig.install(TextField::new("", rig.binding()));
         let node = rig.field();
         let pointer = rig.handlers(&node).pointer.expect("pointer handler");
-        let result = pointer(&press(100.0, 5.0, 1), PointerPhase::Down, EventPhase::Target);
+        let result = pointer(
+            &press(100.0, 5.0, 1),
+            PointerPhase::Down,
+            EventPhase::Target,
+        );
         assert!(result == EventResult::Handled, "{result:?}");
     });
 }
@@ -585,7 +734,11 @@ fn multiline_measures_taller() {
         rig.install(TextField::new("", rig.binding()).layout(vertical()));
         rig.graph.compute_layout(200.0, 200.0);
         let node = rig.field();
-        assert_eq!(node.frame().height, 32.0, "GAP: Swift measures a three-line vertical field taller than 32pt; Rust's host has no text measure and keeps its 32pt minimum");
+        assert_eq!(
+            node.frame().height,
+            32.0,
+            "GAP: Swift measures a three-line vertical field taller than 32pt; Rust's host has no text measure and keeps its 32pt minimum"
+        );
     });
 }
 
@@ -601,8 +754,16 @@ fn multiline_auto_grow_caps_and_scrolls() {
         rig.install(TextField::new("", rig.binding()));
         rig.graph.compute_layout(240.0, 400.0);
         let node = rig.field();
-        assert_eq!(node.frame().height, 32.0, "GAP: Swift auto-grows the default field for explicit lines; Rust keeps the 32pt minimum");
-        assert!(node.frame().height < 12.0 * 20.0 + 12.0, "capped {}", node.frame().height);
+        assert_eq!(
+            node.frame().height,
+            32.0,
+            "GAP: Swift auto-grows the default field for explicit lines; Rust keeps the 32pt minimum"
+        );
+        assert!(
+            node.frame().height < 12.0 * 20.0 + 12.0,
+            "capped {}",
+            node.frame().height
+        );
         let _ = draw(&node);
         let mut overlay = DrawList::default();
         if let Some(hook) = node.overlay_draw() {
@@ -619,13 +780,20 @@ fn multiline_auto_grow_caps_and_scrolls() {
         if let Some(hook) = node.overlay_draw() {
             hook(&mut hovered, Point::default());
         }
-        assert!(hovered.indices().is_empty(), "GAP: Swift draws a hover scrollbar overlay on a capped field; Rust installs no overlay draw");
+        assert!(
+            hovered.indices().is_empty(),
+            "GAP: Swift draws a hover scrollbar overlay on a capped field; Rust installs no overlay draw"
+        );
         let wheel_handler = rig.handlers(&node).wheel;
         assert!(wheel_handler.is_some(), "wheel handler");
         if let Some(handler) = wheel_handler {
             handler(&wheel(-1.0), EventPhase::Target);
         }
-        assert_eq!(node.content_offset().y, 0.0, "GAP: Swift scrolls the capped field on wheel; Rust's wheel handler always returns Ignored");
+        assert_eq!(
+            node.content_offset().y,
+            0.0,
+            "GAP: Swift scrolls the capped field on wheel; Rust's wheel handler always returns Ignored"
+        );
     });
 }
 
@@ -642,9 +810,16 @@ fn wheel_survives_redraw(focus: bool) {
         let handler = rig.handlers(&node).wheel.unwrap();
         handler(&wheel(-1.0), EventPhase::Target);
         let scrolled = node.content_offset().y;
-        assert_eq!(scrolled, 0.0, "GAP: Swift wheel-scrolls a capped field; Rust's wheel handler never scrolls");
+        assert_eq!(
+            scrolled, 0.0,
+            "GAP: Swift wheel-scrolls a capped field; Rust's wheel handler never scrolls"
+        );
         let _ = draw(&node);
-        assert!(node.content_offset().y == scrolled, "kept {}", node.content_offset().y);
+        assert!(
+            node.content_offset().y == scrolled,
+            "kept {}",
+            node.content_offset().y
+        );
     });
 }
 
@@ -666,7 +841,11 @@ fn vertical_axis_soft_wraps_long_lines() {
         rig.install(TextField::new("", rig.binding()).layout(vertical()));
         rig.graph.compute_layout(96.0, 240.0);
         let node = rig.field();
-        assert_eq!(node.frame().height, 32.0, "GAP: Swift soft-wraps and grows past 32pt at 96pt width; Rust keeps the 32pt minimum");
+        assert_eq!(
+            node.frame().height,
+            32.0,
+            "GAP: Swift soft-wraps and grows past 32pt at 96pt width; Rust keeps the 32pt minimum"
+        );
     });
 }
 
@@ -682,7 +861,11 @@ fn multiline_visible_line_limit_can_expand() {
         }));
         rig.graph.compute_layout(420.0, 1000.0);
         let node = rig.field();
-        assert_eq!(node.frame().height, 32.0, "GAP: Swift grows a 24-line limit past 250pt; Rust keeps the 32pt minimum");
+        assert_eq!(
+            node.frame().height,
+            32.0,
+            "GAP: Swift grows a 24-line limit past 250pt; Rust keeps the 32pt minimum"
+        );
     });
 }
 
@@ -691,9 +874,24 @@ fn line_numbers_and_syntax_colors_render() {
     with_rig(|rig| {
         rig.set("let answer = 42\nlet total = 7");
         TextEnvironmentHolder::set_current(Some(test_text_environment(16.0, 20.0)));
-        let keyword = Color { r: 0.8, g: 0.2, b: 0.9, a: 1.0 };
-        let number = Color { r: 0.9, g: 0.6, b: 0.2, a: 1.0 };
-        let gutter = Color { r: 0.2, g: 0.9, b: 0.6, a: 1.0 };
+        let keyword = Color {
+            r: 0.8,
+            g: 0.2,
+            b: 0.9,
+            a: 1.0,
+        };
+        let number = Color {
+            r: 0.9,
+            g: 0.6,
+            b: 0.2,
+            a: 1.0,
+        };
+        let gutter = Color {
+            r: 0.2,
+            g: 0.9,
+            b: 0.6,
+            a: 1.0,
+        };
         let code = TextFieldCodeEditing {
             shows_line_numbers: true,
             line_number_color: Some(gutter),
@@ -720,10 +918,20 @@ fn line_numbers_and_syntax_colors_render() {
         rig.graph.compute_layout(360.0, 480.0);
         let node = rig.field();
         let list = draw(&node);
-        let colors: std::collections::HashSet<u32> = list.vertices().iter().map(|v| v.color).collect();
-        assert!(!colors.contains(&keyword.rgba8()), "GAP: Swift paints the keyword syntax colour; Rust never reads syntax_color_at_utf8_offset");
-        assert!(!colors.contains(&number.rgba8()), "GAP: Swift paints the number syntax colour; Rust never reads syntax_color_at_utf8_offset");
-        assert!(!colors.contains(&gutter.rgba8()), "GAP: Swift paints the line-number gutter colour; Rust draws no gutter");
+        let colors: std::collections::HashSet<u32> =
+            list.vertices().iter().map(|v| v.color).collect();
+        assert!(
+            !colors.contains(&keyword.rgba8()),
+            "GAP: Swift paints the keyword syntax colour; Rust never reads syntax_color_at_utf8_offset"
+        );
+        assert!(
+            !colors.contains(&number.rgba8()),
+            "GAP: Swift paints the number syntax colour; Rust never reads syntax_color_at_utf8_offset"
+        );
+        assert!(
+            !colors.contains(&gutter.rgba8()),
+            "GAP: Swift paints the line-number gutter colour; Rust draws no gutter"
+        );
     });
 }
 
@@ -739,7 +947,11 @@ fn down_arrow_traverses_soft_wrapped_lines() {
         (handlers.key.clone().unwrap())(&plain(Scancode::HOME), EventPhase::Target);
         (handlers.key.clone().unwrap())(&plain(Scancode::ARROW_DOWN), EventPhase::Target);
         (handlers.text.clone().unwrap())("X", EventPhase::Target);
-        assert!(rig.text().starts_with("Xalpha"), "GAP: Swift moves Down to the next soft-wrapped row; Rust ignores Down, so X lands at the start: {:?}", rig.text());
+        assert!(
+            rig.text().starts_with("Xalpha"),
+            "GAP: Swift moves Down to the next soft-wrapped row; Rust ignores Down, so X lands at the start: {:?}",
+            rig.text()
+        );
     });
 }
 
@@ -754,7 +966,11 @@ fn renders_cjk_glyphs() {
         let node = rig.field();
         node.set_frame(Rect::new(0.0, 0.0, 180.0, 28.0));
         let list = draw(&node);
-        assert!(list.indices().len() >= 6, "indices {}", list.indices().len());
+        assert!(
+            list.indices().len() >= 6,
+            "indices {}",
+            list.indices().len()
+        );
         let font = cove_core::Font::system(14.0, cove_core::FontWeight::Regular);
         let glyphs = environment.shape("你", Some(&font));
         assert!(!glyphs.is_empty(), "shaped");
@@ -785,10 +1001,21 @@ fn renders_cjk_glyphs_in_bootstrapped_demo_environment() {
         let font = cove_core::Font::system(14.0, cove_core::FontWeight::Regular);
         let glyphs = environment.shape("你", Some(&font));
         let glyph = glyphs.iter().find(|glyph| glyph.cluster == 0).cloned();
-        let info = glyph.and_then(|glyph| environment.atlas.rasterize_glyph(glyph.glyph_id, glyph.font_id));
-        assert!(list.indices().len() > 6, "GAP: Swift's field draw emits only the one glyph quad (6 indices); Rust paints the field background and border in the same hook: {}", list.indices().len());
+        let info = glyph.and_then(|glyph| {
+            environment
+                .atlas
+                .rasterize_glyph(glyph.glyph_id, glyph.font_id)
+        });
+        assert!(
+            list.indices().len() > 6,
+            "GAP: Swift's field draw emits only the one glyph quad (6 indices); Rust paints the field background and border in the same hook: {}",
+            list.indices().len()
+        );
         assert!(glyph.is_some_and(|glyph| glyph.glyph_id != 0), "{glyph:?}");
-        assert!(info.is_some_and(|info| info.width > 0.0 && info.height > 0.0), "{info:?}");
+        assert!(
+            info.is_some_and(|info| info.width > 0.0 && info.height > 0.0),
+            "{info:?}"
+        );
     });
 }
 
@@ -822,14 +1049,20 @@ fn primary_a_select_all() {
         let k = rig.handlers(&node).key.unwrap();
         k(&primary(Scancode::A), EventPhase::Target);
         k(&plain(Scancode::BACKSPACE), EventPhase::Target);
-        assert_eq!(rig.text(), "hello", "GAP: Swift selects all on Primary-A and Backspace clears through the binding; Rust has no Primary-A and its Backspace never writes the binding");
+        assert_eq!(
+            rig.text(),
+            "hello",
+            "GAP: Swift selects all on Primary-A and Backspace clears through the binding; Rust has no Primary-A and its Backspace never writes the binding"
+        );
     });
 }
 
 fn with_clipboard(body: impl FnOnce(Rc<RefCell<String>>)) {
     let pasteboard = Rc::new(RefCell::new(String::new()));
     let (w, r) = (pasteboard.clone(), pasteboard.clone());
-    ClipboardHolder::set_write(Some(Rc::new(move |text: &str| *w.borrow_mut() = text.to_string())));
+    ClipboardHolder::set_write(Some(Rc::new(move |text: &str| {
+        *w.borrow_mut() = text.to_string()
+    })));
     ClipboardHolder::set_read(Some(Rc::new(move || Some(r.borrow().clone()))));
     body(pasteboard);
     ClipboardHolder::set_write(None);
@@ -846,10 +1079,18 @@ fn primary_c_v() {
             let k = rig.handlers(&node).key.unwrap();
             k(&primary(Scancode::A), EventPhase::Target);
             k(&primary(Scancode::C), EventPhase::Target);
-            assert!(pasteboard.borrow().is_empty(), "GAP: Swift copies the selection on Primary-C; Rust has no clipboard shortcuts: {:?}", pasteboard.borrow());
+            assert!(
+                pasteboard.borrow().is_empty(),
+                "GAP: Swift copies the selection on Primary-C; Rust has no clipboard shortcuts: {:?}",
+                pasteboard.borrow()
+            );
             k(&plain(Scancode::END), EventPhase::Target);
             k(&primary(Scancode::V), EventPhase::Target);
-            assert_eq!(rig.text(), "hello", "GAP: Swift pastes on Primary-V (hellohello); Rust has no paste shortcut");
+            assert_eq!(
+                rig.text(),
+                "hello",
+                "GAP: Swift pastes on Primary-V (hellohello); Rust has no paste shortcut"
+            );
         });
     });
 }
@@ -866,8 +1107,15 @@ fn primary_x() {
                 k(&shifted(Scancode::ARROW_LEFT), EventPhase::Target);
             }
             k(&primary(Scancode::X), EventPhase::Target);
-            assert!(pasteboard.borrow().is_empty(), "GAP: Swift cuts `def` on Primary-X; Rust has no clipboard shortcuts");
-            assert_eq!(rig.text(), "abcdef", "GAP: Swift removes the cut text (abc); Rust has no cut shortcut");
+            assert!(
+                pasteboard.borrow().is_empty(),
+                "GAP: Swift cuts `def` on Primary-X; Rust has no clipboard shortcuts"
+            );
+            assert_eq!(
+                rig.text(),
+                "abcdef",
+                "GAP: Swift removes the cut text (abc); Rust has no cut shortcut"
+            );
         });
     });
 }
@@ -878,7 +1126,9 @@ fn secure_field_masks_and_blocks_copy() {
         rig.set("s3cr3t");
         let pasteboard = Rc::new(RefCell::new("unchanged".to_string()));
         let w = pasteboard.clone();
-        ClipboardHolder::set_write(Some(Rc::new(move |text: &str| *w.borrow_mut() = text.to_string())));
+        ClipboardHolder::set_write(Some(Rc::new(move |text: &str| {
+            *w.borrow_mut() = text.to_string()
+        })));
         let behavior = TextFieldBehavior {
             secure: true,
             ..TextFieldBehavior::default()
@@ -895,14 +1145,30 @@ fn secure_field_masks_and_blocks_copy() {
             text_origin_y_offset: 0.0,
         };
         let mut draft = RenderDraftState::default();
-        let render = make_render_state(&inputs, &mut draft, &current, &state.selection, &state.composition, "", false);
-        assert!(render.buffer == current, "render buffer keeps the value {:?}", render.buffer.string_value());
+        let render = make_render_state(
+            &inputs,
+            &mut draft,
+            &current,
+            &state.selection,
+            &state.composition,
+            "",
+            false,
+        );
+        assert!(
+            render.buffer == current,
+            "render buffer keeps the value {:?}",
+            render.buffer.string_value()
+        );
         rig.install(TextField::new("", rig.binding()).behavior(behavior));
         let node = rig.field();
         let k = rig.handlers(&node).key.unwrap();
         k(&primary(Scancode::A), EventPhase::Target);
         k(&primary(Scancode::C), EventPhase::Target);
-        assert!(*pasteboard.borrow() == "unchanged", "copied {:?}", pasteboard.borrow());
+        assert!(
+            *pasteboard.borrow() == "unchanged",
+            "copied {:?}",
+            pasteboard.borrow()
+        );
         ClipboardHolder::set_write(None);
     });
 }
@@ -930,9 +1196,17 @@ fn triple_click_selects_all() {
         rig.install(TextField::new("", rig.binding()));
         let node = rig.field();
         let handlers = rig.handlers(&node);
-        (handlers.pointer.clone().unwrap())(&press(50.0, 5.0, 3), PointerPhase::Down, EventPhase::Target);
+        (handlers.pointer.clone().unwrap())(
+            &press(50.0, 5.0, 3),
+            PointerPhase::Down,
+            EventPhase::Target,
+        );
         (handlers.key.clone().unwrap())(&plain(Scancode::BACKSPACE), EventPhase::Target);
-        assert_eq!(rig.text(), "hello world", "GAP: Swift selects the whole field on a triple click and Backspace clears it; Rust ignores the click count and its Backspace never writes the binding");
+        assert_eq!(
+            rig.text(),
+            "hello world",
+            "GAP: Swift selects the whole field on a triple click and Backspace clears it; Rust ignores the click count and its Backspace never writes the binding"
+        );
     });
 }
 
@@ -943,9 +1217,17 @@ fn double_click_selects_word() {
         rig.install(TextField::new("", rig.binding()));
         let node = rig.field();
         let handlers = rig.handlers(&node);
-        (handlers.pointer.clone().unwrap())(&press(0.0, 5.0, 2), PointerPhase::Down, EventPhase::Target);
+        (handlers.pointer.clone().unwrap())(
+            &press(0.0, 5.0, 2),
+            PointerPhase::Down,
+            EventPhase::Target,
+        );
         (handlers.text.clone().unwrap())("X", EventPhase::Target);
-        assert_eq!(rig.text(), "hello   worldX", "GAP: Swift selects the word under a double click (X   world); Rust ignores the click count and inserts at the caret");
+        assert_eq!(
+            rig.text(),
+            "hello   worldX",
+            "GAP: Swift selects the word under a double click (X   world); Rust ignores the click count and inserts at the caret"
+        );
     });
 }
 
@@ -974,7 +1256,10 @@ fn motion_ignored_without_drag() {
         rig.install(TextField::new("", rig.binding()));
         let node = rig.field();
         let motion = rig.handlers(&node).motion;
-        assert!(motion.is_none(), "GAP: Swift registers a motion handler that ignores motion without a drag; Rust registers no motion handler, so drag selection does not exist");
+        assert!(
+            motion.is_none(),
+            "GAP: Swift registers a motion handler that ignores motion without a drag; Rust registers no motion handler, so drag selection does not exist"
+        );
     });
 }
 
@@ -987,18 +1272,39 @@ fn option_word_navigation() {
         let handlers = rig.handlers(&node);
         let k = handlers.key.clone().unwrap();
         let t = handlers.text.clone().unwrap();
-        k(&key(Scancode::ARROW_LEFT, KeyModifiers::LEFT_ALT), EventPhase::Target);
+        k(
+            &key(Scancode::ARROW_LEFT, KeyModifiers::LEFT_ALT),
+            EventPhase::Target,
+        );
         t("X", EventPhase::Target);
-        assert_eq!(rig.text(), "hello brave worlXd", "GAP: Swift moves by word on Option-Left (Xworld); Rust moves one character");
+        assert_eq!(
+            rig.text(),
+            "hello brave worlXd",
+            "GAP: Swift moves by word on Option-Left (Xworld); Rust moves one character"
+        );
         rig.set("hello brave world");
         k(&primary(Scancode::ARROW_LEFT), EventPhase::Target);
-        k(&key(Scancode::ARROW_RIGHT, KeyModifiers::LEFT_ALT), EventPhase::Target);
+        k(
+            &key(Scancode::ARROW_RIGHT, KeyModifiers::LEFT_ALT),
+            EventPhase::Target,
+        );
         t("Y", EventPhase::Target);
-        assert_eq!(rig.text(), "hello brave worlXYd", "GAP: Swift moves to the line start and then one word right (helloY); Rust ignores both modifiers and writes its stale internal buffer back over the reset value");
+        assert_eq!(
+            rig.text(),
+            "hello brave worlXYd",
+            "GAP: Swift moves to the line start and then one word right (helloY); Rust ignores both modifiers and writes its stale internal buffer back over the reset value"
+        );
         rig.set("hello brave world");
         k(&primary(Scancode::ARROW_RIGHT), EventPhase::Target);
-        k(&key(Scancode::BACKSPACE, KeyModifiers::LEFT_ALT), EventPhase::Target);
-        assert_eq!(rig.text(), "hello brave world", "GAP: Swift deletes the trailing word on Option-Backspace; Rust's Backspace never writes the binding");
+        k(
+            &key(Scancode::BACKSPACE, KeyModifiers::LEFT_ALT),
+            EventPhase::Target,
+        );
+        assert_eq!(
+            rig.text(),
+            "hello brave world",
+            "GAP: Swift deletes the trailing word on Option-Backspace; Rust's Backspace never writes the binding"
+        );
     });
 }
 
@@ -1012,10 +1318,18 @@ fn command_line_navigation() {
         let k = handlers.key.clone().unwrap();
         k(&primary(Scancode::ARROW_LEFT), EventPhase::Target);
         (handlers.text.clone().unwrap())("X", EventPhase::Target);
-        assert_eq!(rig.text(), "hellXo", "GAP: Swift moves to the line start on Command-Left (Xhello); Rust moves one character");
+        assert_eq!(
+            rig.text(),
+            "hellXo",
+            "GAP: Swift moves to the line start on Command-Left (Xhello); Rust moves one character"
+        );
         k(&primary(Scancode::ARROW_RIGHT), EventPhase::Target);
         k(&primary(Scancode::BACKSPACE), EventPhase::Target);
-        assert_eq!(rig.text(), "hellXo", "GAP: Swift deletes to the line start on Command-Backspace; Rust's Backspace never writes the binding");
+        assert_eq!(
+            rig.text(),
+            "hellXo",
+            "GAP: Swift deletes to the line start on Command-Backspace; Rust's Backspace never writes the binding"
+        );
     });
 }
 
@@ -1028,18 +1342,31 @@ fn caret_move_marks_render_dirty() {
         let handlers = rig.handlers(&node);
         rig.graph.tree.borrow_mut().flush();
         assert!(!rig.graph.tree.borrow().has_render_updates(), "flushed");
-        let result = (handlers.key.clone().unwrap())(&plain(Scancode::ARROW_LEFT), EventPhase::Target);
+        let result =
+            (handlers.key.clone().unwrap())(&plain(Scancode::ARROW_LEFT), EventPhase::Target);
         assert!(result == EventResult::Handled, "{result:?}");
-        assert!(!rig.graph.tree.borrow().has_render_updates(), "GAP: Swift marks the field render-dirty on a caret-only move; Rust mutates caret state without invalidating render");
+        assert!(
+            !rig.graph.tree.borrow().has_render_updates(),
+            "GAP: Swift marks the field render-dirty on a caret-only move; Rust mutates caret state without invalidating render"
+        );
         rig.graph.tree.borrow_mut().flush();
         state_of(&node).unwrap().borrow_mut().is_dragging = true;
         if let Some(motion) = handlers.motion.clone() {
             motion(
-                &MouseMotionEvent { x: 40.0, y: 10.0, delta_x: 4.0, delta_y: 0.0, kind: Default::default() },
+                &MouseMotionEvent {
+                    x: 40.0,
+                    y: 10.0,
+                    delta_x: 4.0,
+                    delta_y: 0.0,
+                    kind: Default::default(),
+                },
                 EventPhase::Target,
             );
         }
-        assert!(handlers.motion.is_none() && !rig.graph.tree.borrow().has_render_updates(), "GAP: Swift's drag-selection motion invalidates render; Rust registers no motion handler");
+        assert!(
+            handlers.motion.is_none() && !rig.graph.tree.borrow().has_render_updates(),
+            "GAP: Swift's drag-selection motion invalidates render; Rust registers no motion handler"
+        );
     });
 }
 
@@ -1053,10 +1380,18 @@ fn stale_indices_are_clamped() {
         let k = handlers.key.clone().unwrap();
         rig.set("hi");
         k(&plain(Scancode::BACKSPACE), EventPhase::Target);
-        assert_eq!(rig.text(), "hi", "GAP: Swift clamps the stale caret and deletes through the binding (h); Rust's Backspace never writes the binding");
+        assert_eq!(
+            rig.text(),
+            "hi",
+            "GAP: Swift clamps the stale caret and deletes through the binding (h); Rust's Backspace never writes the binding"
+        );
         k(&primary(Scancode::A), EventPhase::Target);
         rig.set("");
         (handlers.text.clone().unwrap())("x", EventPhase::Target);
-        assert_eq!(rig.text(), "hello worlx", "GAP: Swift collapses the stale selection over the externally emptied text (x); Rust has no Primary-A and its text handler writes its stale internal buffer back over the external value");
+        assert_eq!(
+            rig.text(),
+            "hello worlx",
+            "GAP: Swift collapses the stale selection over the externally emptied text (x); Rust has no Primary-A and its text handler writes its stale internal buffer back over the external value"
+        );
     });
 }
