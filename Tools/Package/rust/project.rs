@@ -120,6 +120,9 @@ impl Project {
         }
         if let Some(target) = target {
             command.args(["--target", target]);
+            if target.contains("apple-ios") {
+                command.env("IPHONEOS_DEPLOYMENT_TARGET", crate::apple::MINIMUM_VERSION);
+            }
         }
         process::run(&mut command)?;
         let windows = target.map_or(cfg!(windows), |target| target.contains("windows"));

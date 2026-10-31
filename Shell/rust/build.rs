@@ -252,7 +252,7 @@ fn main() {
         let extra = if os == "macos" {
             &["Carbon", "Cocoa", "ForceFeedback", "IOKit"][..]
         } else {
-            &["UIKit", "CoreBluetooth", "OpenGLES"][..]
+            &["UIKit", "CoreBluetooth", "CoreMotion", "OpenGLES"][..]
         };
         for framework in extra {
             println!("cargo:rustc-link-lib=framework={framework}");

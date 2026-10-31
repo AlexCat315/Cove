@@ -9,7 +9,7 @@ use crate::{Result, Target};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const MINIMUM_VERSION: &str = "26.0";
+pub const MINIMUM_VERSION: &str = "26.0";
 
 enum Plist<'a> {
     String(&'a str),
