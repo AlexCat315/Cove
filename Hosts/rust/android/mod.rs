@@ -3,5 +3,22 @@
 
 pub mod contract;
 pub mod integration;
+#[cfg(target_os = "android")]
+pub mod jni;
 pub mod probe;
 pub mod sources;
+
+use cove_composition::AnyView;
+use std::sync::OnceLock;
+
+static APPLICATION_CONTENT: OnceLock<fn() -> AnyView> = OnceLock::new();
+
+/// Installs the root view that `SceneLaunchMode::Application` hosts. The first
+/// installation wins; `cove_ui::application!` calls this from `JNI_OnLoad`.
+pub fn install_application_content(factory: fn() -> AnyView) {
+    let _ = APPLICATION_CONTENT.set(factory);
+}
+
+pub(crate) fn application_content() -> Option<fn() -> AnyView> {
+    APPLICATION_CONTENT.get().copied()
+}

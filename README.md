@@ -1,6 +1,6 @@
 # Cove
 
-跨平台 UI 框架，正在从 Swift 全量迁移到 Rust 2024。当前 Rust 工作区是迁移中的基础层，**还不能替代原生 UI SDK**。原有 Swift 源码保留用于逐项迁移与行为对照。构建、运行与测试直接使用 Cargo，没有单独的 CLI。
+跨平台 UI 框架，正在从 Swift 全量迁移到 Rust 2024。当前 Rust 工作区是迁移中的基础层，**还不能替代原生 UI SDK**。原有 Swift 源码保留用于逐项迁移与行为对照。构建、运行与测试使用 Cargo；打包、签名与装机使用 `cargo xtask`（`Tools/Package`）。
 
 ## 源码开发
 
@@ -11,6 +11,16 @@ cargo build --workspace
 cargo run --manifest-path Examples/RustCounter/Cargo.toml
 python3 Tools/Migration/inventory.py --status
 ```
+
+新建应用工程与打包：
+
+```sh
+cargo generate --git https://github.com/AlexCat315/Cove.git Templates/app --name my-app
+cargo xtask package android --release --package cove-mobile-example
+cargo xtask run ios --simulator --package cove-mobile-example
+```
+
+详见 [Cargo 工作流](Website/src/content/cargo.md)。
 
 实现完成后统一验证：
 

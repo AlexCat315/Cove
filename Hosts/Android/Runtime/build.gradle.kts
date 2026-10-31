@@ -1,6 +1,8 @@
 plugins { id("com.android.library") }
 
-layout.buildDirectory.set(rootProject.projectDir.resolve("../../.build/android/gradle/runtime"))
+@Suppress("UNCHECKED_CAST")
+val cove = extensions.extraProperties["cove"] as Map<String, String>
+layout.buildDirectory.set(File(cove.getValue("gradle")).resolve("runtime"))
 android {
     namespace = "com.cove.runtime"
     compileSdk = 36

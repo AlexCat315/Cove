@@ -26,9 +26,9 @@ struct CounterView: View {
 }`
 
 const cliLines = [
-  { prompt: '$', text: 'cargo new my-app && cd my-app', output: '✓ Created binary package' },
-  { prompt: '$', text: 'cargo add cove-ui --git https://github.com/AlexCat315/Cove.git', output: '✓ Adding cove-ui' },
+  { prompt: '$', text: 'cargo generate --git https://github.com/AlexCat315/Cove.git Templates/app', output: '✓ 已生成桌面 / Android / iOS 共享工程' },
   { prompt: '$', text: 'cargo run', output: '▶ 正在构建并启动 NativeRHI 窗口…' },
+  { prompt: '$', text: 'cargo xtask package android --release', output: '✓ target/cove/android/release/my-app-release.apk' },
 ]
 
 const features = [
@@ -60,7 +60,7 @@ const features = [
   {
     icon: 'M5 12h14M12 5l7 7-7 7',
     title: '纯 Cargo 工作流',
-    desc: '构建、运行、测试、交叉编译都交给 Cargo，原生依赖由 build.rs 构建。',
+    desc: '构建、运行、测试交给 Cargo，打包、签名、装机用 cargo xtask。',
   },
 ]
 

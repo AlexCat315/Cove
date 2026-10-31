@@ -4,6 +4,21 @@
 
 ## Unreleased
 
+- **应用模板与打包改为 Cargo 生态方式**：
+  - `Templates/app` 是 `cargo-generate` 模板：共享 UI（`src/`）、`Assets/`、`Platforms/`
+    （Android Gradle、macOS/Windows/Linux 平台文件）与 `xtask/`。应用身份写在
+    `[package.metadata.cove]`。
+  - 新增 `cove-package`（`Tools/Package`），以 `cargo xtask package|run|devices|android-prepare`
+    调用：macOS `.app` 组装与 codesign；Windows 目录与 `mt.exe` 清单嵌入；Linux 目录与 `.desktop`；
+    Android 以 `cargo rustc --crate-type cdylib` 产出 `libCoveAndroidApp.so`、暂存资源后由 Gradle
+    出 APK（Release 默认调试密钥，可指定发布密钥），ADB 安装启动；iOS 直接把 Rust 二进制组成
+    `.app`（Shell 经 `SDL_RunApp` 进入 UIKit，不再需要 Xcode 工程与 `main.swift`），模拟器 ad-hoc
+    签名、真机按描述文件签名，`simctl`/`devicectl` 安装启动。
+  - 新增 `cove_ui::application!(root)`：生成桌面/iOS 的 `run()` 与 Android 的 `JNI_OnLoad`，
+    后者向 Android 宿主注册同一根视图（此前 `HostedScene` 只有 `UnlinkedContent`，APK 无法承载应用）。
+  - Android JNI 胶水 `Hosts/Android/Sources/CAndroidHost/{Host,Input}.c` 迁移为
+    `Hosts/rust/android/jni.rs`：`cdylib` 只导出 Rust 符号，静态库里的 C `Java_*` 符号会被隐藏。
+  - `Examples/Mobile` 成为 Cargo 包 `cove-mobile-example`，删除其 Xcode 工程与 `main.swift`。
 - **移除 Cove CLI（破坏性）**：删除 `Tools/Cove`（`cove-cli` 及其 Swift 原版、项目模板、
   安装脚本）、仅被它使用的 `Tools/Support`（`cove-tool-support`），以及根目录 `cove` /
   `cove.cmd`。构建、运行、测试、交叉编译直接使用 Cargo；原生依赖由各 crate 的 `build.rs`

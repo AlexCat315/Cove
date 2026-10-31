@@ -32,7 +32,7 @@ impl PlatformApplication {
                     }
                 }
             }
-            let mut invocation = Invocation {
+            let mut invocation: Invocation<F, T> = Invocation {
                 body: Some(body),
                 result: None,
                 panic: None,

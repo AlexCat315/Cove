@@ -31,8 +31,8 @@ mod ndk {
     use super::*;
     use std::ffi::{c_char, c_int};
 
-    pub type LogWrite =
-        unsafe extern "C" fn(c_int, *const c_char, *const c_char, *const c_char) -> c_int;
+    /// `__android_log_write(prio, tag, text)`.
+    pub type LogWrite = unsafe extern "C" fn(c_int, *const c_char, *const c_char) -> c_int;
 
     /// `ANativeWindow_getWidth`/`getHeight`/`getFormat` share one shape.
     pub type WindowQuery = unsafe extern "C" fn(*mut c_void) -> i32;

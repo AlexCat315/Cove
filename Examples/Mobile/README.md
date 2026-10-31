@@ -1,10 +1,12 @@
 # Cove 移动示例
 
-共享内容在 `Examples/rust/mobile`（`cove-examples` crate）。
+共享内容在 `Examples/rust/mobile`；本 crate（`cove-mobile-example`）用 `cove_ui::application!` 把它接到各平台宿主。
 
 ```sh
-cargo test -p cove-examples
-COVE_DEVTOOLS=1 cargo run   # 在宿主应用内启用 DevTools
+cargo run -p cove-mobile-example
+cargo xtask package android --package cove-mobile-example
+cargo xtask run ios --simulator --package cove-mobile-example
+cargo xtask package mac --package cove-mobile-example
 ```
 
-`Platforms/Android` 与 `Platforms/iOS` 仍是 Swift 时期的原生工程：Gradle 与 Xcode 尚未改为调用 Cargo 产出 `cdylib` / `staticlib`，当前不能打包 APK 或 `.app`。
+`Platforms/Android` 可直接用 Android Studio 打开（先运行一次 `cargo xtask android-prepare --package cove-mobile-example`）。

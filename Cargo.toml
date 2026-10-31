@@ -18,9 +18,11 @@ members = [
     "DevTools",
     "DevTools/Protocol",
     "Sources",
+    "Tools/Package",
     "Browser",
     "Examples",
     "Examples/RustCounter",
+    "Examples/Mobile",
 ]
 resolver = "3"
 

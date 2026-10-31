@@ -46,6 +46,11 @@ fn zig_target(target: &str) -> Option<&'static str> {
         "aarch64-unknown-linux-gnu" => "aarch64-linux-gnu",
         "x86_64-pc-windows-msvc" => "x86_64-windows-msvc",
         "aarch64-pc-windows-msvc" => "aarch64-windows-msvc",
+        "aarch64-linux-android" => "aarch64-linux-android",
+        "x86_64-linux-android" => "x86_64-linux-android",
+        "aarch64-apple-ios" => "aarch64-ios.26.0",
+        "aarch64-apple-ios-sim" => "aarch64-ios.26.0-simulator",
+        "x86_64-apple-ios" => "x86_64-ios.26.0-simulator",
         _ => return None,
     })
 }

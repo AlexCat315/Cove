@@ -1,0 +1,14 @@
+[template]
+cargo_generate_version = ">=0.21"
+exclude = ["Platforms/Android/gradle/wrapper/gradle-wrapper.jar"]
+
+[placeholders.application_id]
+type = "string"
+prompt = "Application ID (reverse DNS)"
+default = "com.example.app"
+regex = "^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+$"
+
+[placeholders.application_name]
+type = "string"
+prompt = "Display name"
+default = "Cove App"

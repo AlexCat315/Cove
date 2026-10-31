@@ -6,3 +6,4 @@
 *.keystore
 Platforms/Android/.gradle/
 Platforms/Android/local.properties
+Platforms/Android/cove.properties

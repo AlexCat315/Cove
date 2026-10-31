@@ -1,31 +1,27 @@
-import groovy.json.JsonSlurper
-
 plugins { id("com.android.application") }
 
+@Suppress("UNCHECKED_CAST")
+val cove = extensions.extraProperties["cove"] as Map<String, String>
 val projectRoot = rootProject.projectDir.resolve("../..").canonicalFile
-val configuration = JsonSlurper().parse(projectRoot.resolve("cove.json")) as Map<*, *>
-val application = configuration["application"] as Map<*, *>
-val version = configuration["version"] as Map<*, *>
-val sdk = extensions.extraProperties["coveSDK"] as File
-val generated = projectRoot.resolve(".build/android/generated")
-layout.buildDirectory.set(projectRoot.resolve(".build/android/gradle/app"))
-rootProject.layout.buildDirectory.set(projectRoot.resolve(".build/android/gradle/root"))
+val generated = File(cove.getValue("generated"))
+layout.buildDirectory.set(File(cove.getValue("gradle")).resolve("app"))
+rootProject.layout.buildDirectory.set(File(cove.getValue("gradle")).resolve("root"))
 
 android {
     namespace = "com.cove.probe"
     compileSdk = 36
     buildToolsVersion = "36.1.0"
     defaultConfig {
-        applicationId = application["id"] as String
+        applicationId = cove.getValue("id")
         minSdk = 28
         targetSdk = 36
-        versionCode = (version["build"] as Number).toInt()
-        versionName = version["name"] as String
-        manifestPlaceholders["applicationName"] = application["name"] as String
+        versionCode = cove.getValue("build").toInt()
+        versionName = cove.getValue("version")
+        manifestPlaceholders["applicationName"] = cove.getValue("name")
         ndk { abiFilters += "arm64-v8a" }
     }
-    val cliSigning = providers.gradleProperty("coveKeystore").orNull?.let { path ->
-        signingConfigs.create("coveCLI") {
+    val release = providers.gradleProperty("coveKeystore").orNull?.let { path ->
+        signingConfigs.create("cove") {
             storeFile = file(path)
             keyAlias = providers.gradleProperty("coveKeyAlias").get()
             storePassword = System.getenv(providers.gradleProperty("coveStorePasswordEnv").get())
@@ -33,8 +29,10 @@ android {
         }
     }
     buildTypes {
-        getByName("debug") { if (cliSigning != null) signingConfig = cliSigning }
-        getByName("release") { isMinifyEnabled = false; if (cliSigning != null) signingConfig = cliSigning }
+        getByName("release") {
+            isMinifyEnabled = false
+            signingConfig = release ?: signingConfigs.getByName("debug")
+        }
         create("profile") {
             initWith(getByName("release"))
             isDebuggable = true
@@ -53,14 +51,13 @@ android {
 
 dependencies { implementation(project(":coveRuntime")) }
 
-// Android Studio and Gradle use the same Swift preparation step as the CLI.
+// Android Studio builds run the same Cargo preparation as `cargo xtask package --android`.
 listOf("debug", "profile", "release").forEach { mode ->
     val suffix = mode.replaceFirstChar { it.uppercaseChar() }
-    val prepareCove = tasks.register<Exec>("prepareCove$suffix") {
+    val prepare = tasks.register<Exec>("prepareCove$suffix") {
         onlyIf { !providers.gradleProperty("covePrepared").isPresent }
         workingDir(projectRoot)
-        commandLine(sdk.resolve(if (System.getProperty("os.name").startsWith("Windows")) "cove.cmd" else "cove").path,
-            "internal", "android-prepare", projectRoot.path, "--$mode")
+        commandLine("cargo", "xtask", "android-prepare", "--mode", mode, "--package", cove.getValue("package"))
     }
-    tasks.matching { it.name == "pre${suffix}Build" }.configureEach { dependsOn(prepareCove) }
+    tasks.matching { it.name == "pre${suffix}Build" }.configureEach { dependsOn(prepare) }
 }

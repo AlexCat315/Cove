@@ -258,29 +258,10 @@ fn main() {
     if os == "macos" || os == "ios" {
         println!("cargo:rustc-link-lib=c++");
     } else if os == "android" {
-        let ndk = ndk_root();
-        let host = if cfg!(target_os = "macos") {
-            "darwin-x86_64"
-        } else if cfg!(windows) {
-            "windows-x86_64"
-        } else {
-            "linux-x86_64"
-        };
-        let arch = if target.starts_with("aarch64") {
-            "aarch64-linux-android"
-        } else {
-            "x86_64-linux-android"
-        };
-        println!(
-            "cargo:rustc-link-search=native={}",
-            ndk.join("toolchains/llvm/prebuilt")
-                .join(host)
-                .join("sysroot/usr/lib")
-                .join(arch)
-                .display()
-        );
-        println!("cargo:rustc-link-lib=static=c++_static");
-        println!("cargo:rustc-link-lib=static=c++abi");
+        // The APK ships libc++_shared.so (Shell links it too). The NDK driver's
+        // default search finds it after the API-level libc.so; an explicit
+        // unversioned sysroot path would select the static libc.a instead.
+        println!("cargo:rustc-link-lib=c++_shared");
     } else if !msvc && !target.starts_with("wasm") {
         println!("cargo:rustc-link-lib=stdc++");
     }

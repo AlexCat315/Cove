@@ -1,0 +1,20 @@
+[package]
+name = "{{project-name}}"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[package.metadata.cove]
+id = "{{application_id}}"
+name = "{{application_name}}"
+build = 1
+
+[workspace]
+members = [".", "xtask"]
+
+[dependencies]
+cove-ui = { git = "https://github.com/AlexCat315/Cove.git" }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

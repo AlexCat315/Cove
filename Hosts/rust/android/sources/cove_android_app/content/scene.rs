@@ -103,9 +103,22 @@ impl HostedSceneContent for UnlinkedContent {
             }
             SceneLaunchMode::Game => "game content is hosted by Diffuse".to_owned(),
             SceneLaunchMode::Application => {
-                "build this UI application's APK with cove build PATH --android".to_owned()
+                "no application content is linked; declare it with cove_ui::application!".to_owned()
             }
         })
+    }
+}
+
+/// Application content installed by the linking crate through
+/// [`install_application_content`](crate::android::install_application_content).
+pub struct ApplicationContent(pub fn() -> AnyView);
+
+impl HostedSceneContent for ApplicationContent {
+    fn root(&mut self, mode: SceneLaunchMode, scale: f32) -> Result<AnyView, String> {
+        match mode {
+            SceneLaunchMode::Application => Ok((self.0)()),
+            _ => UnlinkedContent.root(mode, scale),
+        }
     }
 }
 
@@ -126,7 +139,11 @@ impl HostedScene {
         scale: f32,
         _device: Arc<Device>,
     ) -> Result<Self, String> {
-        Self::with_content(checkpoint, launch, scale, Box::new(UnlinkedContent))
+        let content: Box<dyn HostedSceneContent> = match crate::android::application_content() {
+            Some(factory) => Box::new(ApplicationContent(factory)),
+            None => Box::new(UnlinkedContent),
+        };
+        Self::with_content(checkpoint, launch, scale, content)
     }
 
     pub fn with_content(
