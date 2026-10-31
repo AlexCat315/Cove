@@ -7,10 +7,10 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
+use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
 use cove_core::scene::{
     AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, LayoutNode, Node,
 };
-use crate::{impl_primitive_view, AnyView, PrimitiveView, View};
 
 use super::avatar::Avatar;
 
@@ -61,7 +61,12 @@ impl AvatarMemberListTrigger {
         members: Vec<Avatar>,
         list: AvatarMemberList,
     ) -> Self {
-        Self { marker, members, list, presented: Rc::new(Cell::new(false)) }
+        Self {
+            marker,
+            members,
+            list,
+            presented: Rc::new(Cell::new(false)),
+        }
     }
     pub fn is_presented(&self) -> bool {
         self.presented.get()
@@ -128,7 +133,10 @@ impl PrimitiveView for AvatarMemberListContent {
                 member: member.clone(),
                 on_select: self.on_select.clone(),
             };
-            let key = member.id.clone().unwrap_or_else(|| format!("member-{index}"));
+            let key = member
+                .id
+                .clone()
+                .unwrap_or_else(|| format!("member-{index}"));
             children.push(AnyView::new(crate::IdentifiedView::new(row, key)));
         }
         children

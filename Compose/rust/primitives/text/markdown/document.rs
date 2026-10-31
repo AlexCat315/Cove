@@ -40,10 +40,16 @@ pub struct MarkdownTable {
 #[derive(Clone, Debug, PartialEq)]
 pub enum MarkdownBlock {
     Paragraph(Vec<RichTextRun>),
-    Heading { level: usize, runs: Vec<RichTextRun> },
+    Heading {
+        level: usize,
+        runs: Vec<RichTextRun>,
+    },
     Quote(Vec<MarkdownBlock>),
     List(MarkdownList),
-    Code { language: Option<String>, text: String },
+    Code {
+        language: Option<String>,
+        text: String,
+    },
     Table(MarkdownTable),
     Rule,
 }

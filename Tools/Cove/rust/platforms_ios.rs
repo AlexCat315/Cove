@@ -3,9 +3,9 @@
 //! Swift source: `Platforms/iOS/ApplicationBuild.swift`.
 
 use crate::cli::{Arguments, BuildConfiguration, Operation, OptionKey};
+use crate::platforms_desktop::CargoPackage;
 use crate::project::AppProject;
-use crate::platforms_desktop::SwiftPackage;
-use crate::support::{environment, Files, Shell, StdoutTarget, ToolError};
+use crate::support::{Files, Shell, StdoutTarget, ToolError, environment};
 use crate::toolchains::{AppleTarget, NativeSDK};
 use std::path::{Path, PathBuf};
 
@@ -55,7 +55,7 @@ impl IOSBuild {
             }),
             false,
         )?;
-        let mut build_environment = SwiftPackage::environment(&self.root)?;
+        let mut build_environment = CargoPackage::environment(&self.root)?;
         build_environment.insert(
             "COVE_RUNTIME_ARTIFACT_ROOT".into(),
             format!("Artifacts/native/{variant}/Native/vendor"),
@@ -92,7 +92,11 @@ impl IOSBuild {
             "-destination".into(),
             format!(
                 "generic/platform={}",
-                if device.is_none() { "iOS Simulator" } else { "iOS" }
+                if device.is_none() {
+                    "iOS Simulator"
+                } else {
+                    "iOS"
+                }
             ),
             "-derivedDataPath".into(),
             derived.display().to_string(),
@@ -126,10 +130,17 @@ impl IOSBuild {
             .join(format!("{configuration}-{sdk}"))
             .join("Application.app");
         let requested = self.arguments.url(OptionKey::Output);
-        let output = requested
-            .clone()
-            .unwrap_or_else(|| self.project.build_directory().join(&variant).join("Application.app"));
-        if output.extension().map(|extension| extension != "app").unwrap_or(true) {
+        let output = requested.clone().unwrap_or_else(|| {
+            self.project
+                .build_directory()
+                .join(&variant)
+                .join("Application.app")
+        });
+        if output
+            .extension()
+            .map(|extension| extension != "app")
+            .unwrap_or(true)
+        {
             return Err(ToolError::invalid("iOS --output must end in .app"));
         }
         // Never remove a user directory to assemble an artifact.

@@ -67,12 +67,19 @@ pub struct RenderPassObjects {
 
 impl RenderPassObjects {
     pub fn new(handles: RenderingHandles) -> Self {
-        Self { handles, passes: Vec::new(), framebuffers: Vec::new() }
+        Self {
+            handles,
+            passes: Vec::new(),
+            framebuffers: Vec::new(),
+        }
     }
 
     /// The render pass a graphics pipeline is compiled against: one subpass whose
     /// attachments match the pipeline's declared formats.
-    pub fn pipeline_pass(&mut self, descriptor: &GraphicsPipelineDescriptor) -> RhiResult<sys::VkRenderPass> {
+    pub fn pipeline_pass(
+        &mut self,
+        descriptor: &GraphicsPipelineDescriptor,
+    ) -> RhiResult<sys::VkRenderPass> {
         let colors: Vec<sys::VkAttachmentReference> = descriptor
             .color_attachments
             .iter()
@@ -85,7 +92,13 @@ impl RenderPassObjects {
         let mut attachments: Vec<sys::VkAttachmentDescription> = descriptor
             .color_attachments
             .iter()
-            .map(|attachment| self.attachment(format_texture(attachment.format), descriptor.sample_count, false))
+            .map(|attachment| {
+                self.attachment(
+                    format_texture(attachment.format),
+                    descriptor.sample_count,
+                    false,
+                )
+            })
             .collect();
         let mut depth: Option<sys::VkAttachmentReference> = None;
         if let Some(format) = descriptor.depth_format {
@@ -93,14 +106,23 @@ impl RenderPassObjects {
                 attachment: attachments.len() as u32,
                 layout: sys::VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
             });
-            attachments.push(self.attachment(format_texture(format), descriptor.sample_count, true));
+            attachments.push(self.attachment(
+                format_texture(format),
+                descriptor.sample_count,
+                true,
+            ));
         }
         // Resolve references are ignored for single-subpass compatibility, so the
         // same pipeline works with and without explicit color resolves.
         self.make_pass(&attachments, &colors, &[], depth)
     }
 
-    fn attachment(&self, format: u32, samples: usize, is_depth: bool) -> sys::VkAttachmentDescription {
+    fn attachment(
+        &self,
+        format: u32,
+        samples: usize,
+        is_depth: bool,
+    ) -> sys::VkAttachmentDescription {
         let layout = if is_depth {
             sys::VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
         } else {
@@ -150,7 +172,10 @@ impl RenderPassObjects {
                 finalLayout: shape.layout(),
             });
             if shape.is_depth {
-                rhi_require(depth.is_none(), "a render pass takes at most one depth attachment")?;
+                rhi_require(
+                    depth.is_none(),
+                    "a render pass takes at most one depth attachment",
+                )?;
                 depth = Some(sys::VkAttachmentReference {
                     attachment: index as u32,
                     layout: shape.layout(),
@@ -168,7 +193,10 @@ impl RenderPassObjects {
             .map(|shape| {
                 let mut value = sys::VkClearValue::default();
                 if shape.is_depth {
-                    value.depthStencil = sys::VkClearDepthStencilValue { depth: 1.0, stencil: 0 };
+                    value.depthStencil = sys::VkClearDepthStencilValue {
+                        depth: 1.0,
+                        stencil: 0,
+                    };
                 }
                 value
             })
@@ -196,7 +224,11 @@ impl RenderPassObjects {
             } else {
                 resolves.as_ptr()
             },
-            pDepthStencilAttachment: if depth.is_some() { &depth_storage } else { core::ptr::null() },
+            pDepthStencilAttachment: if depth.is_some() {
+                &depth_storage
+            } else {
+                core::ptr::null()
+            },
             preserveAttachmentCount: 0,
             pPreserveAttachments: core::ptr::null(),
         };
@@ -340,7 +372,11 @@ pub fn pass_is_reusable(shapes: &[AttachmentShape]) -> bool {
 }
 
 /// A begin-time clear value for one attachment, matching the pass's shape.
-pub fn clear_value(shape: &AttachmentShape, color: Option<[f32; 4]>, depth: Option<f64>) -> sys::VkClearValue {
+pub fn clear_value(
+    shape: &AttachmentShape,
+    color: Option<[f32; 4]>,
+    depth: Option<f64>,
+) -> sys::VkClearValue {
     let mut value = sys::VkClearValue::default();
     if shape.is_depth {
         value.depthStencil = sys::VkClearDepthStencilValue {
@@ -348,7 +384,9 @@ pub fn clear_value(shape: &AttachmentShape, color: Option<[f32; 4]>, depth: Opti
             stencil: 0,
         };
     } else {
-        value.color = sys::VkClearColorValue { float32: color.unwrap_or([0.0; 4]) };
+        value.color = sys::VkClearColorValue {
+            float32: color.unwrap_or([0.0; 4]),
+        };
     }
     value
 }
@@ -370,8 +408,14 @@ pub fn attachment_ops(load_clear: bool, store: bool) -> (u32, u32) {
 
 /// Errors if a pass has no attachments, which Vulkan cannot express.
 pub fn validate_shapes(shapes: &[AttachmentShape]) -> RhiResult<()> {
-    rhi_require(!shapes.is_empty(), "a render pass requires at least one attachment")?;
-    rhi_require(shapes.len() <= 9, "a render pass supports at most eight color targets and one depth target")
+    rhi_require(
+        !shapes.is_empty(),
+        "a render pass requires at least one attachment",
+    )?;
+    rhi_require(
+        shapes.len() <= 9,
+        "a render pass supports at most eight color targets and one depth target",
+    )
 }
 
 #[cfg(test)]
@@ -380,21 +424,41 @@ mod tests {
 
     #[test]
     fn attachment_layouts_follow_the_depth_flag() {
-        let color = AttachmentShape { format: sys::VK_FORMAT_R8G8B8A8_UNORM, samples: 1, is_depth: false };
-        let depth = AttachmentShape { format: sys::VK_FORMAT_D32_SFLOAT, samples: 1, is_depth: true };
-        assert_eq!(color.layout(), sys::VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-        assert_eq!(depth.layout(), sys::VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+        let color = AttachmentShape {
+            format: sys::VK_FORMAT_R8G8B8A8_UNORM,
+            samples: 1,
+            is_depth: false,
+        };
+        let depth = AttachmentShape {
+            format: sys::VK_FORMAT_D32_SFLOAT,
+            samples: 1,
+            is_depth: true,
+        };
+        assert_eq!(
+            color.layout(),
+            sys::VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+        );
+        assert_eq!(
+            depth.layout(),
+            sys::VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+        );
     }
 
     #[test]
     fn load_and_store_ops_reflect_the_request() {
         assert_eq!(
             attachment_ops(true, true),
-            (sys::VK_ATTACHMENT_LOAD_OP_CLEAR, sys::VK_ATTACHMENT_STORE_OP_STORE)
+            (
+                sys::VK_ATTACHMENT_LOAD_OP_CLEAR,
+                sys::VK_ATTACHMENT_STORE_OP_STORE
+            )
         );
         assert_eq!(
             attachment_ops(false, false),
-            (sys::VK_ATTACHMENT_LOAD_OP_LOAD, sys::VK_ATTACHMENT_STORE_OP_DONT_CARE)
+            (
+                sys::VK_ATTACHMENT_LOAD_OP_LOAD,
+                sys::VK_ATTACHMENT_STORE_OP_DONT_CARE
+            )
         );
     }
 
@@ -413,19 +477,44 @@ mod tests {
 
     #[test]
     fn clear_values_default_per_attachment_kind() {
-        let color = AttachmentShape { format: 0, samples: 1, is_depth: false };
-        let depth = AttachmentShape { format: 0, samples: 1, is_depth: true };
+        let color = AttachmentShape {
+            format: 0,
+            samples: 1,
+            is_depth: false,
+        };
+        let depth = AttachmentShape {
+            format: 0,
+            samples: 1,
+            is_depth: true,
+        };
         // SAFETY: reading the variant that matches the shape.
-        assert_eq!(unsafe { clear_value(&color, Some([0.5, 0.25, 0.125, 1.0]), None).color.float32 }[0], 0.5);
+        assert_eq!(
+            unsafe {
+                clear_value(&color, Some([0.5, 0.25, 0.125, 1.0]), None)
+                    .color
+                    .float32
+            }[0],
+            0.5
+        );
         // SAFETY: as above, the depth variant is the active one.
-        assert_eq!(unsafe { clear_value(&depth, None, Some(0.75)).depthStencil.depth }, 0.75);
+        assert_eq!(
+            unsafe { clear_value(&depth, None, Some(0.75)).depthStencil.depth },
+            0.75
+        );
         // SAFETY: the default depth clear is 1.0.
-        assert_eq!(unsafe { clear_value(&depth, None, None).depthStencil.depth }, 1.0);
+        assert_eq!(
+            unsafe { clear_value(&depth, None, None).depthStencil.depth },
+            1.0
+        );
     }
 
     #[test]
     fn a_pass_is_reusable_only_with_attachments() {
         assert!(!pass_is_reusable(&[]));
-        assert!(pass_is_reusable(&[AttachmentShape { format: 0, samples: 1, is_depth: false }]));
+        assert!(pass_is_reusable(&[AttachmentShape {
+            format: 0,
+            samples: 1,
+            is_depth: false
+        }]));
     }
 }

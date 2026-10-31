@@ -32,8 +32,13 @@ pub const VIRTUAL_LAST: usize = 9_999;
 /// The pull distance that starts a refresh.
 pub const REFRESH_THRESHOLD: f32 = 64.0;
 /// The list rows both list stories use.
-pub const SWIPE_ROWS: [&str; 5] =
-    ["Inbox", "Design review", "Release notes", "Billing", "Research"];
+pub const SWIPE_ROWS: [&str; 5] = [
+    "Inbox",
+    "Design review",
+    "Release notes",
+    "Billing",
+    "Research",
+];
 pub const REFRESH_ROWS: [&str; 6] = [
     "Inbox",
     "Design review",
@@ -53,33 +58,35 @@ pub struct SceneNode {
 
 impl SceneNode {
     fn leaf(id: &'static str, title: &'static str) -> Self {
-        Self { id, title, children: Vec::new() }
+        Self {
+            id,
+            title,
+            children: Vec::new(),
+        }
     }
 
     /// The authored hierarchy.
     pub fn gallery() -> Vec<SceneNode> {
-        vec![
-            SceneNode {
-                id: "scene",
-                title: "Scene",
-                children: vec![
-                    SceneNode {
-                        id: "lights",
-                        title: "Lights",
-                        children: vec![
-                            SceneNode::leaf("key", "Key Light"),
-                            SceneNode::leaf("fill", "Fill Light"),
-                        ],
-                    },
-                    SceneNode {
-                        id: "objects",
-                        title: "Objects",
-                        children: vec![SceneNode::leaf("sphere", "Sphere")],
-                    },
-                    SceneNode::leaf("camera", "Camera"),
-                ],
-            },
-        ]
+        vec![SceneNode {
+            id: "scene",
+            title: "Scene",
+            children: vec![
+                SceneNode {
+                    id: "lights",
+                    title: "Lights",
+                    children: vec![
+                        SceneNode::leaf("key", "Key Light"),
+                        SceneNode::leaf("fill", "Fill Light"),
+                    ],
+                },
+                SceneNode {
+                    id: "objects",
+                    title: "Objects",
+                    children: vec![SceneNode::leaf("sphere", "Sphere")],
+                },
+                SceneNode::leaf("camera", "Camera"),
+            ],
+        }]
     }
 
     pub fn is_expandable(&self) -> bool {
@@ -143,7 +150,9 @@ impl TreeStory {
             options,
             selection: State::new(Some("camera".to_owned())),
             expanded: State::new(
-                ["scene".to_owned(), "lights".to_owned()].into_iter().collect(),
+                ["scene".to_owned(), "lights".to_owned()]
+                    .into_iter()
+                    .collect(),
             ),
             selected_ids: State::new(["camera".to_owned()].into_iter().collect()),
             query: State::new(String::new()),
@@ -234,7 +243,9 @@ pub struct VirtualStackStory {
 
 impl VirtualStackStory {
     pub fn new() -> Self {
-        Self { target: State::new(VIRTUAL_FIRST) }
+        Self {
+            target: State::new(VIRTUAL_FIRST),
+        }
     }
 
     pub fn target(&self) -> usize {
@@ -290,7 +301,10 @@ pub struct SwipeListStory {
 
 impl SwipeListStory {
     pub fn new() -> Self {
-        Self { selection: State::new(Some(1)), log: State::new("No actions yet".to_owned()) }
+        Self {
+            selection: State::new(Some(1)),
+            log: State::new("No actions yet".to_owned()),
+        }
     }
 
     pub fn selection(&self) -> Option<usize> {
@@ -304,7 +318,8 @@ impl SwipeListStory {
     /// The two trailing actions for a row, in reveal order.
     pub fn actions(index: usize) -> Vec<(&'static str, &'static str, bool)> {
         // (id prefix, title, is_destructive)
-        vec![("archive", "Archive", false), ("delete", "Delete", true)].into_iter()
+        vec![("archive", "Archive", false), ("delete", "Delete", true)]
+            .into_iter()
             .map(|(prefix, title, danger)| {
                 let _ = index;
                 (prefix, title, danger)
@@ -326,7 +341,9 @@ impl SwipeListStory {
 
     /// Runs a trailing action.
     pub fn run_action(&self, index: usize, action: &str) -> bool {
-        let Some(row) = SWIPE_ROWS.get(index) else { return false };
+        let Some(row) = SWIPE_ROWS.get(index) else {
+            return false;
+        };
         let verb = match action {
             "archive" => "Archived",
             "delete" => "Deleted",
@@ -369,7 +386,10 @@ pub struct RefreshListStory {
 
 impl RefreshListStory {
     pub fn new() -> Self {
-        Self { is_refreshing: State::new(false), refreshes: State::new(0) }
+        Self {
+            is_refreshing: State::new(false),
+            refreshes: State::new(0),
+        }
     }
 
     pub fn is_refreshing(&self) -> bool {
@@ -438,7 +458,10 @@ pub struct DragAndDropStory {
 
 impl DragAndDropStory {
     pub fn new() -> Self {
-        Self { lane_a: State::new(None), lane_b: State::new(None) }
+        Self {
+            lane_a: State::new(None),
+            lane_b: State::new(None),
+        }
     }
 
     pub fn lane_a(&self) -> Option<String> {
@@ -501,7 +524,9 @@ pub struct SectionedListStory {
 
 impl SectionedListStory {
     pub fn new() -> Self {
-        Self { selection: State::new(Some(0)) }
+        Self {
+            selection: State::new(Some(0)),
+        }
     }
 
     pub fn selection(&self) -> Option<usize> {

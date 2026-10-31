@@ -91,7 +91,11 @@ impl NativeMenuAction {
         }
     }
 
-    pub fn with_shortcut(mut self, key: impl Into<String>, modifiers: NativeMenuKeyModifiers) -> Self {
+    pub fn with_shortcut(
+        mut self,
+        key: impl Into<String>,
+        modifiers: NativeMenuKeyModifiers,
+    ) -> Self {
         self.key_equivalent = key.into();
         self.key_modifiers = modifiers;
         self
@@ -108,7 +112,9 @@ impl NativeMenuAction {
     }
 
     pub fn resolved_is_enabled(&self) -> bool {
-        self.is_enabled_provider.as_ref().map_or(self.is_enabled, |provider| provider())
+        self.is_enabled_provider
+            .as_ref()
+            .map_or(self.is_enabled, |provider| provider())
     }
 }
 
@@ -125,7 +131,10 @@ pub struct NativeMenu {
 
 impl NativeMenu {
     pub fn new(title: impl Into<String>, items: Vec<NativeMenuItem>) -> Self {
-        Self { title: title.into(), items }
+        Self {
+            title: title.into(),
+            items,
+        }
     }
 }
 
@@ -146,7 +155,12 @@ impl NativeMenuBar {
     ) -> Self {
         let app_name = app_name.into();
         let application_titles = NativeApplicationMenuTitles::for_app_name(&app_name);
-        Self { app_name, application_items, application_titles, menus }
+        Self {
+            app_name,
+            application_items,
+            application_titles,
+            menus,
+        }
     }
 
     /// The `NSMenu`/Win32-neutral snapshot the shell consumes. Ids are assigned
@@ -242,9 +256,11 @@ pub mod installer {
         native_menu_bridge::set_actions(actions);
         cove_core::scene::NativeMenuPresenter::set_present(Some(std::rc::Rc::new(
             move |menu: &cove_platform::NativeMenuSnapshot, point: cove_core::Point| {
-                cove_shell::native_menu_popover::NativeMenuPopover::pop_up(menu, point.x, point.y, None)
-                    .ok()
-                    .flatten()
+                cove_shell::native_menu_popover::NativeMenuPopover::pop_up(
+                    menu, point.x, point.y, None,
+                )
+                .ok()
+                .flatten()
             },
         )));
     }
@@ -286,9 +302,9 @@ pub mod native_menu_bridge {
     /// Runs the action with `id`, honoring its live enabled state.
     pub fn invoke(id: usize) -> bool {
         let action = ACTIONS.with(|slot| {
-            slot.borrow().get(id).map(|action| {
-                (action.resolved_is_enabled(), action.action.clone())
-            })
+            slot.borrow()
+                .get(id)
+                .map(|action| (action.resolved_is_enabled(), action.action.clone()))
         });
         match action {
             Some((true, action)) => {

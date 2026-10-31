@@ -6,8 +6,8 @@
 
 use cove_examples::gallery_content::catalog::GalleryOptions;
 use cove_examples::gallery_content::stories::sidebar_story::{
-    destination_detail, DestinationIcon, SidebarStory, ACCESSORY_WIDTH, DEFAULT_SELECTION,
-    DISABLED_DESTINATION, SECTION_IDS,
+    ACCESSORY_WIDTH, DEFAULT_SELECTION, DISABLED_DESTINATION, DestinationIcon, SECTION_IDS,
+    SidebarStory, destination_detail,
 };
 
 fn story() -> SidebarStory {
@@ -38,7 +38,10 @@ fn every_destination_is_listed_but_one_is_not_navigable() {
     let story = story();
     let all = story.destination_ids();
     assert_eq!(all.len(), 7, "four workspace and three preference rows");
-    assert!(all.contains(&DISABLED_DESTINATION.to_owned()), "it stays listed");
+    assert!(
+        all.contains(&DISABLED_DESTINATION.to_owned()),
+        "it stays listed"
+    );
     assert!(
         !story.navigable().contains(&DISABLED_DESTINATION.to_owned()),
         "but the keyboard skips it"

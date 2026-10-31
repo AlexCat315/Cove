@@ -35,9 +35,14 @@ impl ImageTextures {
                 result.push((*placement, asset.clone()));
                 continue;
             }
-            let Some(image) = pixels(placement.image_id) else { continue };
-            let Ok(asset) = ImageAsset::new(image) else { continue };
-            self.assets.insert(placement.image_id, (placement.generation, asset.clone()));
+            let Some(image) = pixels(placement.image_id) else {
+                continue;
+            };
+            let Ok(asset) = ImageAsset::new(image) else {
+                continue;
+            };
+            self.assets
+                .insert(placement.image_id, (placement.generation, asset.clone()));
             result.push((*placement, asset));
         }
         self.assets.retain(|image_id, _| live.contains(image_id));

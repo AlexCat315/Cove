@@ -21,17 +21,18 @@ fn both_progress_controls_interpolate_values() {
         let scheduler = cove_core::scene::AnimatorScheduler::default();
         scheduler.with_current(|| {
             for circular in [false, true] {
-                let (initial, updated): (Box<dyn PrimitiveView>, Box<dyn PrimitiveView>) = if circular {
-                    (
-                        Box::new(ProgressCircle::new(Some(0.2))),
-                        Box::new(ProgressCircle::new(Some(0.8))),
-                    )
-                } else {
-                    (
-                        Box::new(ProgressView::new(Some(0.2))),
-                        Box::new(ProgressView::new(Some(0.8))),
-                    )
-                };
+                let (initial, updated): (Box<dyn PrimitiveView>, Box<dyn PrimitiveView>) =
+                    if circular {
+                        (
+                            Box::new(ProgressCircle::new(Some(0.2))),
+                            Box::new(ProgressCircle::new(Some(0.8))),
+                        )
+                    } else {
+                        (
+                            Box::new(ProgressView::new(Some(0.2))),
+                            Box::new(ProgressView::new(Some(0.8))),
+                        )
+                    };
 
                 let node = initial.make_node();
                 initial.update_node(&node);
@@ -101,10 +102,7 @@ fn disabled_animation_and_mode_changes_snap() {
             );
 
             // Reduced motion snaps.
-            node.set_composition_value(
-                &cove_core::scene::ReducedMotionEnvironment::key(),
-                true,
-            );
+            node.set_composition_value(&cove_core::scene::ReducedMotionEnvironment::key(), true);
             ProgressView::new(Some(0.7)).update_node(&node);
             assert_eq!(
                 presentation.value(),

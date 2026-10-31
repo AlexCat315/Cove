@@ -5,9 +5,9 @@
 //! cannot be tested for a second protocol, so the same routing decision is
 //! exposed through the object-safe capability methods `scope_apply` and
 //! `around_apply`.
+use crate::AnyView;
 use cove_core::scene::{LayoutNode, Node};
 use std::rc::Rc;
-use crate::AnyView;
 
 /// Modifies a view by setting node/layout properties or wrapping its content.
 pub trait ViewModifier {
@@ -47,10 +47,16 @@ pub struct ModifiedContent {
 }
 impl ModifiedContent {
     pub fn new(content: AnyView, modifier: impl ViewModifier + 'static) -> Self {
-        Self { content, applied: Rc::new(modifier) }
+        Self {
+            content,
+            applied: Rc::new(modifier),
+        }
     }
     pub fn new_boxed(content: AnyView, modifier: Rc<dyn ViewModifier>) -> Self {
-        Self { content, applied: modifier }
+        Self {
+            content,
+            applied: modifier,
+        }
     }
     pub fn content(&self) -> &AnyView {
         &self.content
@@ -64,7 +70,10 @@ impl ModifiedContent {
 
 impl Clone for ModifiedContent {
     fn clone(&self) -> Self {
-        Self { content: self.content.clone(), applied: self.applied.clone() }
+        Self {
+            content: self.content.clone(),
+            applied: self.applied.clone(),
+        }
     }
 }
 

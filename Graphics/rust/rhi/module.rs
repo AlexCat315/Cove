@@ -54,7 +54,11 @@ pub fn platform_default_surface_format() -> TextureFormat {
 pub fn is_compiled_in(api: GraphicsApi) -> bool {
     match api {
         GraphicsApi::Metal => cfg!(any(target_os = "macos", target_os = "ios")),
-        GraphicsApi::Vulkan => cfg!(any(target_os = "windows", target_os = "linux", target_os = "android")),
+        GraphicsApi::Vulkan => cfg!(any(
+            target_os = "windows",
+            target_os = "linux",
+            target_os = "android"
+        )),
         GraphicsApi::Dx12 => cfg!(target_os = "windows"),
     }
 }
@@ -75,6 +79,9 @@ mod tests {
         #[cfg(target_os = "android")]
         assert_eq!(platform_default_surface_format(), TextureFormat::Rgba8Unorm);
         #[cfg(not(target_os = "android"))]
-        assert_eq!(platform_default_surface_format(), TextureFormat::Bgra8UnormSrgb);
+        assert_eq!(
+            platform_default_surface_format(),
+            TextureFormat::Bgra8UnormSrgb
+        );
     }
 }

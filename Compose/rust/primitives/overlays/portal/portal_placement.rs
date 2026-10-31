@@ -40,7 +40,9 @@ impl PortalPlacement {
         {
             let left_space = anchor.x - bounds.x;
             let right_space = bounds.max_x() - anchor.max_x();
-            if left_space >= width || left_space > right_space { x = anchor.x - width; }
+            if left_space >= width || left_space > right_space {
+                x = anchor.x - width;
+            }
         }
         x = x.max(bounds.x).min(bounds.max_x() - width);
         if placement == PortalPlacementMode::BelowAnchor
@@ -57,13 +59,29 @@ impl PortalPlacement {
 
 pub fn portal_window_bounds(node: &Node) -> Rect {
     let mut root = node.clone();
-    while let Some(parent) = root.parent() { root = parent; }
+    while let Some(parent) = root.parent() {
+        root = parent;
+    }
     let frame = root.frame();
     let layout = root.layout_node();
     Rect::new(
         0.0,
         0.0,
-        if frame.width > 0.0 { frame.width } else { layout.as_ref().and_then(|layout| layout.width()).unwrap_or(1024.0) },
-        if frame.height > 0.0 { frame.height } else { layout.as_ref().and_then(|layout| layout.height()).unwrap_or(768.0) },
+        if frame.width > 0.0 {
+            frame.width
+        } else {
+            layout
+                .as_ref()
+                .and_then(|layout| layout.width())
+                .unwrap_or(1024.0)
+        },
+        if frame.height > 0.0 {
+            frame.height
+        } else {
+            layout
+                .as_ref()
+                .and_then(|layout| layout.height())
+                .unwrap_or(768.0)
+        },
     )
 }

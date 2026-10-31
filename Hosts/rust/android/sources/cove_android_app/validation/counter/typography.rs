@@ -6,16 +6,16 @@
 //! delegated through [`TypographyDriver`]'s painter so the counter product keeps
 //! ownership of its text styling.
 
-use crate::android::sources::cove_android_app::content::{
-    TypographyDriver, TypographyStatistics,
-};
+use crate::android::sources::cove_android_app::content::{TypographyDriver, TypographyStatistics};
 use cove_core::{Color, DrawList, Point};
 use cove_text::{FontAtlas, FontCollection};
 
 /// System faces Android always ships, in preference order. Roboto covers Latin
 /// and Noto Sans CJK covers the CJK fallback chain the gallery content uses.
-const SYSTEM_FACES: [&str; 2] =
-    ["/system/fonts/Roboto-Regular.ttf", "/system/fonts/NotoSansCJK-Regular.ttc"];
+const SYSTEM_FACES: [&str; 2] = [
+    "/system/fonts/Roboto-Regular.ttf",
+    "/system/fonts/NotoSansCJK-Regular.ttc",
+];
 
 /// One authored counter text run.
 #[derive(Clone, Debug, PartialEq)]
@@ -39,7 +39,9 @@ impl CounterTypography {
     pub fn new() -> Result<Self, String> {
         let mut fonts = FontCollection::new(2048, 2048);
         for path in SYSTEM_FACES {
-            let Ok(bytes) = std::fs::read(path) else { continue };
+            let Ok(bytes) = std::fs::read(path) else {
+                continue;
+            };
             let _ = fonts.append(bytes);
         }
         if fonts.font_count() == 0 {
@@ -51,7 +53,10 @@ impl CounterTypography {
         let font_count = fonts.font_count();
         Ok(Self {
             fonts,
-            statistics: TypographyStatistics { fonts: font_count, ..TypographyStatistics::default() },
+            statistics: TypographyStatistics {
+                fonts: font_count,
+                ..TypographyStatistics::default()
+            },
         })
     }
 
@@ -64,13 +69,14 @@ impl CounterTypography {
         self.fonts.configure(run.size, scale);
         let glyphs = self.fonts.shape(&run.text);
         self.statistics.glyphs += glyphs.len();
-        self.statistics.missing_glyphs +=
-            glyphs.iter().filter(|glyph| glyph.glyph_id == 0).count();
+        self.statistics.missing_glyphs += glyphs.iter().filter(|glyph| glyph.glyph_id == 0).count();
         let point = Point {
             x: origin.x + run.inset,
             y: origin.y + if run.inset > 0.0 { 10.0 } else { 2.0 },
         };
-        let _ = self.fonts.draw(&run.text, run.size, scale, list, point, run.color, 1);
+        let _ = self
+            .fonts
+            .draw(&run.text, run.size, scale, list, point, run.color, 1);
     }
 
     /// Occupancy changes only when glyph pixels change. The cached count is kept
@@ -80,8 +86,11 @@ impl CounterTypography {
         if !atlas.is_dirty() {
             return;
         }
-        self.statistics.atlas_pixels =
-            atlas.alpha_pixels().iter().filter(|&&value| value > 0).count();
+        self.statistics.atlas_pixels = atlas
+            .alpha_pixels()
+            .iter()
+            .filter(|&&value| value > 0)
+            .count();
     }
 
     fn font_collection_atlas(&self) -> FontAtlas {

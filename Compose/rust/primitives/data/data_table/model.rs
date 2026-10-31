@@ -150,7 +150,9 @@ impl<Record: 'static, Id: Eq + std::hash::Hash + Clone + 'static> DataTableModel
         {
             let mut storage = self.storage.borrow_mut();
             let id_fn = storage.id.clone();
-            let Some(record) = storage.records.get_mut(source) else { return false };
+            let Some(record) = storage.records.get_mut(source) else {
+                return false;
+            };
             update(record);
             let preserved = id_fn(record) == *id;
             assert!(preserved, "Editing a row must preserve its ID");
@@ -256,7 +258,12 @@ impl<Record, Id: Eq + std::hash::Hash + Clone> RowStorage<Record, Id> {
                 "DataTable row IDs must be unique"
             );
         }
-        Self { records, id, ids, positions }
+        Self {
+            records,
+            id,
+            ids,
+            positions,
+        }
     }
 }
 

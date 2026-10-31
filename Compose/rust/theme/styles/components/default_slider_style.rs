@@ -31,7 +31,11 @@ impl SliderStyle for DefaultSliderStyle {
             Color::WHITE.multiplied_alpha(0.7)
         };
         // The empty track darkens slightly while the knob is held.
-        let track_color = if configuration.is_pressed { theme.colors.border_strong } else { track };
+        let track_color = if configuration.is_pressed {
+            theme.colors.border_strong
+        } else {
+            track
+        };
         SliderAppearance::new(
             6.0,
             track_color,
@@ -40,7 +44,11 @@ impl SliderStyle for DefaultSliderStyle {
             Some(20.0),
             knob,
             // Keyboard focus draws a 2-px ring around the white capsule knob.
-            if configuration.is_focused { Some(theme.colors.focus_ring) } else { None },
+            if configuration.is_focused {
+                Some(theme.colors.focus_ring)
+            } else {
+                None
+            },
             if configuration.is_focused { 2.0 } else { 0.0 },
             Some(SurfaceShadow {
                 color: Some(Color::from_rgba8(0, 0, 0, 64)),

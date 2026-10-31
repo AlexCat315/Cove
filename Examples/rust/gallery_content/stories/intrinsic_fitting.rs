@@ -15,12 +15,10 @@ use cove_ui_compose::adaptive::ContainerSizeReader;
 use cove_ui_compose::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::primitives::controls::Button;
-use cove_ui_compose::primitives::layout::responsive::{
-    LayoutThatFits, StackAxis, StackLayout,
-};
+use cove_ui_compose::primitives::layout::responsive::{LayoutThatFits, StackAxis, StackLayout};
 use cove_ui_compose::primitives::text::Text;
-use cove_ui_compose::theme::styles::buttons::button_style::ButtonStyleViewExt;
 use cove_ui_compose::theme::styles::buttons::SecondaryButtonStyle;
+use cove_ui_compose::theme::styles::buttons::button_style::ButtonStyleViewExt;
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
 use cove_ui_compose::{Alignment, AnyView, BoxView, DynamicField, LayoutDebugExt, TupleView, View};
 use std::rc::Rc;
@@ -94,8 +92,16 @@ impl View for ViewThatFitsStory {
 
         // The candidate layouts: wide row first, compact column as the fallback.
         let candidates: Vec<Rc<dyn cove_ui_compose::Layout>> = vec![
-            Rc::new(StackLayout::new(StackAxis::Horizontal, 8.0, Alignment::TopLeading)),
-            Rc::new(StackLayout::new(StackAxis::Vertical, 8.0, Alignment::TopLeading)),
+            Rc::new(StackLayout::new(
+                StackAxis::Horizontal,
+                8.0,
+                Alignment::TopLeading,
+            )),
+            Rc::new(StackLayout::new(
+                StackAxis::Vertical,
+                8.0,
+                Alignment::TopLeading,
+            )),
         ];
         let fitting = LayoutThatFits::new(candidates);
 
@@ -104,48 +110,48 @@ impl View for ViewThatFitsStory {
         let narrow = self.narrow.clone();
         let branch = AnyView::new(
             AnyView::new(ContainerSizeReader::new(move |size| {
-            let wide = AnyView::new(BoxView::new(
-                FlexDirection::Row,
-                Align::Center,
-                Justify::FlexStart,
-                Wrap::NoWrap,
-                8.0,
-                AnyView::new(TupleView::new(vec![
-                    AnyView::new(
-                        Text::new("Intrinsic wide")
-                            .semantic_foreground(SemanticColorRef::on_surface_muted()),
-                    ),
-                    AnyView::new(FitChip::new(FIT_CHIPS[0])),
-                    AnyView::new(FitChip::new(FIT_CHIPS[1])),
-                    AnyView::new(FitChip::new(FIT_CHIPS[2])),
-                ])),
-            ));
-            let compact = AnyView::new(BoxView::new(
-                FlexDirection::Column,
-                Align::FlexStart,
-                Justify::FlexStart,
-                Wrap::NoWrap,
-                8.0,
-                AnyView::new(TupleView::new(vec![
-                    AnyView::new(
-                        Text::new("Intrinsic compact")
-                            .semantic_foreground(SemanticColorRef::on_surface_muted()),
-                    ),
-                    AnyView::new(FitChip::new(FIT_CHIPS[0])),
-                    AnyView::new(FitChip::new(FIT_CHIPS[1])),
-                    AnyView::new(FitChip::new(FIT_CHIPS[2])),
-                ])),
-            ));
-            let _ = &narrow;
-            let _ = &fitting;
-            // The container width decides the branch, exactly as the intrinsic
-            // proposal does in Swift.
-            if size.width < WIDE_WIDTH {
-                compact
-            } else {
-                wide
-            }
-        }))
+                let wide = AnyView::new(BoxView::new(
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    8.0,
+                    AnyView::new(TupleView::new(vec![
+                        AnyView::new(
+                            Text::new("Intrinsic wide")
+                                .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                        ),
+                        AnyView::new(FitChip::new(FIT_CHIPS[0])),
+                        AnyView::new(FitChip::new(FIT_CHIPS[1])),
+                        AnyView::new(FitChip::new(FIT_CHIPS[2])),
+                    ])),
+                ));
+                let compact = AnyView::new(BoxView::new(
+                    FlexDirection::Column,
+                    Align::FlexStart,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    8.0,
+                    AnyView::new(TupleView::new(vec![
+                        AnyView::new(
+                            Text::new("Intrinsic compact")
+                                .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                        ),
+                        AnyView::new(FitChip::new(FIT_CHIPS[0])),
+                        AnyView::new(FitChip::new(FIT_CHIPS[1])),
+                        AnyView::new(FitChip::new(FIT_CHIPS[2])),
+                    ])),
+                ));
+                let _ = &narrow;
+                let _ = &fitting;
+                // The container width decides the branch, exactly as the intrinsic
+                // proposal does in Swift.
+                if size.width < WIDE_WIDTH {
+                    compact
+                } else {
+                    wide
+                }
+            }))
             .frame_width(self.width())
             .debug_name("intrinsic-fit"),
         );
@@ -255,8 +261,16 @@ mod checks {
     fn layout_that_fits_keeps_the_last_candidate_as_fallback() {
         // The story relies on this contract: wide first, compact last.
         let fitting = LayoutThatFits::new(vec![
-            Rc::new(StackLayout::new(StackAxis::Horizontal, 8.0, Alignment::TopLeading)),
-            Rc::new(StackLayout::new(StackAxis::Vertical, 8.0, Alignment::TopLeading)),
+            Rc::new(StackLayout::new(
+                StackAxis::Horizontal,
+                8.0,
+                Alignment::TopLeading,
+            )),
+            Rc::new(StackLayout::new(
+                StackAxis::Vertical,
+                8.0,
+                Alignment::TopLeading,
+            )),
         ]);
         let _ = &fitting;
         let candidates = 2;

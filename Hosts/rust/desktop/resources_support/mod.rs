@@ -36,5 +36,8 @@ pub fn resource_bundle() -> io::Result<ResourceBundle> {
 /// `minimize`.
 pub fn window_chrome_icon(name: &str) -> io::Result<std::path::PathBuf> {
     let bundle = resource_bundle()?;
-    Ok(bundle.root().join("WindowChromeIcons").join(format!("{name}.svg")))
+    Ok(bundle
+        .root()
+        .join("WindowChromeIcons")
+        .join(format!("{name}.svg")))
 }

@@ -7,12 +7,12 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use cove_core::scene::{
-    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, Animation, Color, FocusChainHolder,
-    LayoutNode, Node, NodeResource, PointerCaptureHolder, Point, Rect, Size,
+    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, Animation, Color,
+    FocusChainHolder, LayoutNode, Node, NodeResource, Point, PointerCaptureHolder, Rect, Size,
 };
 
 use crate::theme::Theme;
-use crate::{impl_primitive_view, AnyView, Layout, LayoutContainer, PrimitiveView, View};
+use crate::{AnyView, Layout, LayoutContainer, PrimitiveView, View, impl_primitive_view};
 
 use super::axes::ChartValueAxes;
 use super::axis::{ChartFrame, ChartText};
@@ -20,15 +20,15 @@ use super::cache::ChartResolutionCache;
 use super::coordinates::{ChartGeometry, Mark, PieGeometry};
 use super::drawing::ChartPaint;
 use super::model::{
-    ChartAnnotation, ChartBand, ChartCallout, ChartCalloutRow, ChartMarker, ChartOrientation,
-    ChartPoint, ChartRange, ChartSeries, ChartSlice, ChartStyle, ChartThreshold, ChartValueAxis,
-    ChartXDomain, Axis as AxisConfig, Pie as PieConfig, Accessibility as AccessibilityConfig,
-    Viewport as ViewportConfig,
+    Accessibility as AccessibilityConfig, Axis as AxisConfig, ChartAnnotation, ChartBand,
+    ChartCallout, ChartCalloutRow, ChartMarker, ChartOrientation, ChartPoint, ChartRange,
+    ChartSeries, ChartSlice, ChartStyle, ChartThreshold, ChartValueAxis, ChartXDomain,
+    Pie as PieConfig, Viewport as ViewportConfig,
 };
 use super::morph::ChartTransition;
 use super::overlay::{
-    ChartOverlayItem, ChartOverlayKind, ChartOverlayLabel, ChartOverlayLayout, ChartOverlayPlacement,
-    ChartOverlaySlot,
+    ChartOverlayItem, ChartOverlayKind, ChartOverlayLabel, ChartOverlayLayout,
+    ChartOverlayPlacement, ChartOverlaySlot,
 };
 use super::scale::ChartScale;
 use super::viewport::ChartWindow;
@@ -59,8 +59,14 @@ impl ChartContent {
     }
     pub fn title(&self, index: usize) -> String {
         match self {
-            Self::Cartesian { series, .. } => series.get(index).map(|item| item.title.clone()).unwrap_or_default(),
-            Self::Pie(slices) => slices.get(index).map(|slice| slice.title.clone()).unwrap_or_default(),
+            Self::Cartesian { series, .. } => series
+                .get(index)
+                .map(|item| item.title.clone())
+                .unwrap_or_default(),
+            Self::Pie(slices) => slices
+                .get(index)
+                .map(|slice| slice.title.clone())
+                .unwrap_or_default(),
         }
     }
 }
@@ -74,7 +80,10 @@ pub struct ChartPlotInput {
 }
 impl Default for ChartPlotInput {
     fn default() -> Self {
-        Self { is_enabled: false, select: Rc::new(|_| {}) }
+        Self {
+            is_enabled: false,
+            select: Rc::new(|_| {}),
+        }
     }
 }
 
@@ -137,7 +146,9 @@ impl ChartPlot {
     }
 
     pub(crate) fn theme(&self, node: &Node) -> Theme {
-        self.theme.clone().unwrap_or_else(|| crate::theme::theme_for_node(node))
+        self.theme
+            .clone()
+            .unwrap_or_else(|| crate::theme::theme_for_node(node))
     }
 }
 
@@ -163,7 +174,9 @@ impl PrimitiveView for ChartPlot {
     }
 
     fn update_node(&self, node: &Node) {
-        let Some(session) = node.attachment::<Rc<ChartSession>>(ChartSession::KEY) else { return };
+        let Some(session) = node.attachment::<Rc<ChartSession>>(ChartSession::KEY) else {
+            return;
+        };
         // The session holds the live selection: several events can arrive
         // before the chart recomposes with the binding's new value.
         session.current.set(self.selection);
@@ -200,7 +213,9 @@ impl PrimitiveView for ChartPlot {
         let weak_node = node.downgrade();
         let identity = ChartPaintIdentity::new(self, &theme);
         node.update_draw(identity, move |list, origin: Point| {
-            let Some(node) = Node::upgrade(&weak_node) else { return };
+            let Some(node) = Node::upgrade(&weak_node) else {
+                return;
+            };
             snapshot.draw(&node, origin, list, &cache);
         });
         self.install_input(node, &session);
@@ -247,19 +262,31 @@ impl PrimitiveView for ChartOverlayHost {
         Some(layout)
     }
     fn update_layout(&self, layout: &LayoutNode) {
-        let algorithm = ChartOverlayLayout { plot: self.plot.clone(), theme: self.theme.clone(), cache: self.cache.clone() };
+        let algorithm = ChartOverlayLayout {
+            plot: self.plot.clone(),
+            theme: self.theme.clone(),
+            cache: self.cache.clone(),
+        };
         let measure = algorithm.clone();
         let place = algorithm;
         layout.set_custom_layout(
             Rc::new(move |width, height, children| {
-                let subviews: Vec<crate::LayoutSubview> =
-                    children.iter().map(crate::LayoutSubview::from_layout_node).collect();
+                let subviews: Vec<crate::LayoutSubview> = children
+                    .iter()
+                    .map(crate::LayoutSubview::from_layout_node)
+                    .collect();
                 measure.size_that_fits(crate::ProposedViewSize::new(width, height), &subviews)
             }),
             Rc::new(move |bounds, children| {
-                let subviews: Vec<crate::LayoutSubview> =
-                    children.iter().map(crate::LayoutSubview::from_layout_node).collect();
-                place.place_subviews(bounds, crate::ProposedViewSize::new(Some(bounds.width), Some(bounds.height)), &subviews);
+                let subviews: Vec<crate::LayoutSubview> = children
+                    .iter()
+                    .map(crate::LayoutSubview::from_layout_node)
+                    .collect();
+                place.place_subviews(
+                    bounds,
+                    crate::ProposedViewSize::new(Some(bounds.width), Some(bounds.height)),
+                    &subviews,
+                );
             }),
         );
     }
@@ -267,7 +294,10 @@ impl PrimitiveView for ChartOverlayHost {
         let text = ChartText::new(&self.theme);
         self.plot
             .overlay_slots(
-                Some(Size { width: 0.0, height: 0.0 }),
+                Some(Size {
+                    width: 0.0,
+                    height: 0.0,
+                }),
                 &text,
                 self.cache.clone(),
             )
@@ -294,51 +324,109 @@ impl ChartPlot {
         let resolution = size.map(|size| self.resolve(size, Point::new(0.0, 0.0), text, cache));
         let mut slots: Vec<ChartOverlaySlot> = Vec::new();
         let mut taken: Vec<Rect> = Vec::new();
-        let mut add = |item: ChartOverlayItem, placement: Option<ChartOverlayPlacement>, reserving: bool| {
-            let Some(placement) = placement else {
-                slots.push(ChartOverlaySlot { item, placement: None });
-                return;
-            };
-            if reserving {
-                let measured = text.size(if item.title.is_empty() { &item.subtitle } else { &item.title });
-                let box_rect = placement.box_rect(measured.width, measured.height);
-                let padded = Rect::new(box_rect.x - 2.0, box_rect.y - 2.0, box_rect.width + 4.0, box_rect.height + 4.0);
-                if taken.iter().any(|other| Self::intersects(*other, padded)) {
-                    slots.push(ChartOverlaySlot { item, placement: None });
+        let mut add =
+            |item: ChartOverlayItem, placement: Option<ChartOverlayPlacement>, reserving: bool| {
+                let Some(placement) = placement else {
+                    slots.push(ChartOverlaySlot {
+                        item,
+                        placement: None,
+                    });
                     return;
+                };
+                if reserving {
+                    let measured = text.size(if item.title.is_empty() {
+                        &item.subtitle
+                    } else {
+                        &item.title
+                    });
+                    let box_rect = placement.box_rect(measured.width, measured.height);
+                    let padded = Rect::new(
+                        box_rect.x - 2.0,
+                        box_rect.y - 2.0,
+                        box_rect.width + 4.0,
+                        box_rect.height + 4.0,
+                    );
+                    if taken.iter().any(|other| Self::intersects(*other, padded)) {
+                        slots.push(ChartOverlaySlot {
+                            item,
+                            placement: None,
+                        });
+                        return;
+                    }
+                    taken.push(box_rect);
                 }
-                taken.push(box_rect);
-            }
-            slots.push(ChartOverlaySlot { item, placement: Some(placement) });
-        };
+                slots.push(ChartOverlaySlot {
+                    item,
+                    placement: Some(placement),
+                });
+            };
 
         if let ChartContent::Cartesian { series, guides, .. } = &self.content {
-            let geometry = resolution.as_ref().and_then(|resolution| resolution.cartesian.as_ref());
-            for band in guides.bands.iter().filter(|band| !band.label.is_empty() && band.from.is_finite() && band.to.is_finite()) {
+            let geometry = resolution
+                .as_ref()
+                .and_then(|resolution| resolution.cartesian.as_ref());
+            for band in guides.bands.iter().filter(|band| {
+                !band.label.is_empty() && band.from.is_finite() && band.to.is_finite()
+            }) {
                 let placement = geometry.map(|geometry| {
                     let along = geometry.along_value(band.to, band.axis);
                     if geometry.orientation == ChartOrientation::Vertical {
-                        ChartOverlayPlacement::new(Point::new(geometry.plot.x + 4.0, along), 0.0, 0.0).gap(2.0)
+                        ChartOverlayPlacement::new(
+                            Point::new(geometry.plot.x + 4.0, along),
+                            0.0,
+                            0.0,
+                        )
+                        .gap(2.0)
                     } else {
-                        ChartOverlayPlacement::new(Point::new(along, geometry.plot.y + 4.0), 0.0, 0.0).gap(2.0)
+                        ChartOverlayPlacement::new(
+                            Point::new(along, geometry.plot.y + 4.0),
+                            0.0,
+                            0.0,
+                        )
+                        .gap(2.0)
                     }
                 });
-                add(ChartOverlayItem::new(ChartOverlayKind::Band, band.label.clone()), placement, true);
+                add(
+                    ChartOverlayItem::new(ChartOverlayKind::Band, band.label.clone()),
+                    placement,
+                    true,
+                );
             }
-            for threshold in guides.thresholds.iter().filter(|threshold| !threshold.label.is_empty() && threshold.value.is_finite()) {
+            for threshold in guides
+                .thresholds
+                .iter()
+                .filter(|threshold| !threshold.label.is_empty() && threshold.value.is_finite())
+            {
                 let placement = geometry.map(|geometry| {
                     let along = geometry.along_value(threshold.value, threshold.axis);
                     if geometry.orientation == ChartOrientation::Vertical {
-                        ChartOverlayPlacement::new(Point::new(geometry.plot.x + geometry.plot.width - 2.0, along), 1.0, 1.0).gap(2.0)
+                        ChartOverlayPlacement::new(
+                            Point::new(geometry.plot.x + geometry.plot.width - 2.0, along),
+                            1.0,
+                            1.0,
+                        )
+                        .gap(2.0)
                     } else {
-                        ChartOverlayPlacement::new(Point::new(along, geometry.plot.y), 0.0, 0.0).gap(2.0)
+                        ChartOverlayPlacement::new(Point::new(along, geometry.plot.y), 0.0, 0.0)
+                            .gap(2.0)
                     }
                 });
-                add(ChartOverlayItem::new(ChartOverlayKind::Threshold, threshold.label.clone()), placement, true);
+                add(
+                    ChartOverlayItem::new(ChartOverlayKind::Threshold, threshold.label.clone()),
+                    placement,
+                    true,
+                );
             }
             for note in &guides.annotations {
-                let Some(item) = series.get(note.series) else { continue };
-                if !item.data.get(note.index).map(|datum| datum.y.is_finite()).unwrap_or(false) {
+                let Some(item) = series.get(note.series) else {
+                    continue;
+                };
+                if !item
+                    .data
+                    .get(note.index)
+                    .map(|datum| datum.y.is_finite())
+                    .unwrap_or(false)
+                {
                     continue;
                 }
                 let placement = geometry.and_then(|geometry| {
@@ -349,12 +437,17 @@ impl ChartPlot {
                     self.end_placement(mark, geometry, 5.0)
                 });
                 add(
-                    ChartOverlayItem::new(ChartOverlayKind::Annotation, note.text.clone()).tint(note.color.clone()),
+                    ChartOverlayItem::new(ChartOverlayKind::Annotation, note.text.clone())
+                        .tint(note.color.clone()),
                     placement,
                     true,
                 );
             }
-            for (index, item) in series.iter().enumerate().filter(|(_, item)| item.style.shows_values) {
+            for (index, item) in series
+                .iter()
+                .enumerate()
+                .filter(|(_, item)| item.style.shows_values)
+            {
                 for i in 0..item.data.len() {
                     let datum = item.data[i];
                     if !datum.y.is_finite() {
@@ -367,13 +460,19 @@ impl ChartPlot {
                         }
                         self.end_placement(mark, geometry, 3.0)
                     });
-                    add(ChartOverlayItem::new(ChartOverlayKind::Value, (self.format)(datum.y)), placement, true);
+                    add(
+                        ChartOverlayItem::new(ChartOverlayKind::Value, (self.format)(datum.y)),
+                        placement,
+                        true,
+                    );
                 }
             }
         }
 
         if let ChartContent::Pie(slices) = &self.content {
-            let pie = resolution.as_ref().and_then(|resolution| resolution.pie.as_ref());
+            let pie = resolution
+                .as_ref()
+                .and_then(|resolution| resolution.pie.as_ref());
             if let Some(center) = &self.pie.center {
                 let placement = pie.and_then(|geometry| {
                     if geometry.inner_radius > 4.0 {
@@ -383,7 +482,8 @@ impl ChartPlot {
                     }
                 });
                 add(
-                    ChartOverlayItem::new(ChartOverlayKind::Center, center.value.clone()).subtitle(center.label.clone()),
+                    ChartOverlayItem::new(ChartOverlayKind::Center, center.value.clone())
+                        .subtitle(center.label.clone()),
                     placement,
                     false,
                 );
@@ -393,7 +493,9 @@ impl ChartPlot {
                     .iter()
                     .enumerate()
                     .map(|(index, slice)| {
-                        if self.visible.get(index).copied().unwrap_or(false) && slice.value.is_finite() {
+                        if self.visible.get(index).copied().unwrap_or(false)
+                            && slice.value.is_finite()
+                        {
                             slice.value.max(0.0)
                         } else {
                             0.0
@@ -411,12 +513,17 @@ impl ChartPlot {
                         let anchor = geometry.label_anchor(wedge);
                         Some(ChartOverlayPlacement::new(
                             anchor,
-                            if anchor.x >= geometry.center.x { 0.0 } else { 1.0 },
+                            if anchor.x >= geometry.center.x {
+                                0.0
+                            } else {
+                                1.0
+                            },
                             0.5,
                         ))
                     });
                     add(
-                        ChartOverlayItem::new(ChartOverlayKind::Slice, slice.title.clone()).subtitle(format!("{share}%")),
+                        ChartOverlayItem::new(ChartOverlayKind::Slice, slice.title.clone())
+                            .subtitle(format!("{share}%")),
                         placement,
                         true,
                     );
@@ -427,18 +534,33 @@ impl ChartPlot {
         if let Some(selection) = self.selection {
             if let Some(callout) = (self.callout)(selection) {
                 let mut placement = None;
-                if let Some(geometry) = resolution.as_ref().and_then(|resolution| resolution.cartesian.as_ref()) {
+                if let Some(geometry) = resolution
+                    .as_ref()
+                    .and_then(|resolution| resolution.cartesian.as_ref())
+                {
                     if let Some(mark) = geometry.mark(callout.point) {
                         placement = self.end_placement(mark, geometry, 10.0);
                     }
-                } else if let Some(pie) = resolution.as_ref().and_then(|resolution| resolution.pie.as_ref()) {
-                    if let Some(wedge) = pie.wedges.iter().find(|wedge| wedge.index == callout.point.index) {
+                } else if let Some(pie) = resolution
+                    .as_ref()
+                    .and_then(|resolution| resolution.pie.as_ref())
+                {
+                    if let Some(wedge) = pie
+                        .wedges
+                        .iter()
+                        .find(|wedge| wedge.index == callout.point.index)
+                    {
                         let anchor = pie.anchor(wedge);
-                        placement = Some(ChartOverlayPlacement::new(anchor, 0.5, 1.0).gap(10.0).flips(true));
+                        placement = Some(
+                            ChartOverlayPlacement::new(anchor, 0.5, 1.0)
+                                .gap(10.0)
+                                .flips(true),
+                        );
                     }
                 }
                 add(
-                    ChartOverlayItem::new(ChartOverlayKind::Callout, callout.title.clone()).rows(callout.rows.clone()),
+                    ChartOverlayItem::new(ChartOverlayKind::Callout, callout.title.clone())
+                        .rows(callout.rows.clone()),
                     placement,
                     false,
                 );
@@ -452,10 +574,18 @@ impl ChartPlot {
     }
 
     /// Where a label sits at the far end of a mark.
-    fn end_placement(&self, mark: &Mark, geometry: &ChartGeometry, gap: f32) -> Option<ChartOverlayPlacement> {
+    fn end_placement(
+        &self,
+        mark: &Mark,
+        geometry: &ChartGeometry,
+        gap: f32,
+    ) -> Option<ChartOverlayPlacement> {
         let across = geometry.across_mark(mark);
         let start = geometry.orientation.across_origin(geometry.plot);
-        if !across.is_finite() || across < start || across > start + geometry.orientation.breadth(geometry.plot) {
+        if !across.is_finite()
+            || across < start
+            || across > start + geometry.orientation.breadth(geometry.plot)
+        {
             return None;
         }
         match geometry.orientation {
@@ -466,9 +596,13 @@ impl ChartPlot {
                     .map(|bar| if below { bar.y + bar.height } else { bar.y })
                     .unwrap_or(mark.y);
                 Some(
-                    ChartOverlayPlacement::new(Point::new(mark.x, y), 0.5, if below { 0.0 } else { 1.0 })
-                        .gap(gap)
-                        .flips(true),
+                    ChartOverlayPlacement::new(
+                        Point::new(mark.x, y),
+                        0.5,
+                        if below { 0.0 } else { 1.0 },
+                    )
+                    .gap(gap)
+                    .flips(true),
                 )
             }
             ChartOrientation::Horizontal => {
@@ -478,9 +612,13 @@ impl ChartPlot {
                     .map(|bar| if negative { bar.x } else { bar.x + bar.width })
                     .unwrap_or(mark.x);
                 Some(
-                    ChartOverlayPlacement::new(Point::new(x, mark.y), if negative { 1.0 } else { 0.0 }, 0.5)
-                        .gap(gap)
-                        .flips(true),
+                    ChartOverlayPlacement::new(
+                        Point::new(x, mark.y),
+                        if negative { 1.0 } else { 0.0 },
+                        0.5,
+                    )
+                    .gap(gap)
+                    .flips(true),
                 )
             }
         }
@@ -509,10 +647,17 @@ impl ChartPlot {
         cached
     }
 
-    fn build_resolution(&self, size: Size, origin: Point, text: &ChartText, content: &ChartContent) -> ChartResolution {
+    fn build_resolution(
+        &self,
+        size: Size,
+        origin: Point,
+        text: &ChartText,
+        content: &ChartContent,
+    ) -> ChartResolution {
         match content {
             ChartContent::Cartesian { series, guides, x } => {
-                let axes = ChartValueAxes::resolve(series, &self.visible, &self.style, guides, &self.axis);
+                let axes =
+                    ChartValueAxes::resolve(series, &self.visible, &self.style, guides, &self.axis);
                 let full_scale = if x.is_numeric() {
                     let extent: Vec<f32> = axes
                         .shown()
@@ -520,7 +665,13 @@ impl ChartPlot {
                         .flat_map(|index| series[*index].data.iter().map(|datum| datum.x))
                         .filter(|value| value.is_finite())
                         .collect();
-                    Some(ChartScale::fit_extent(&extent, None, None, self.axis.x.tick_count, self.axis.x.kind))
+                    Some(ChartScale::fit_extent(
+                        &extent,
+                        None,
+                        None,
+                        self.axis.x.tick_count,
+                        self.axis.x.kind,
+                    ))
                 } else {
                     None
                 };
@@ -537,12 +688,18 @@ impl ChartPlot {
                 let minimum = if x.is_numeric() {
                     self.viewport.minimum_fraction
                 } else {
-                    self.viewport.minimum_fraction.max(1.0 / axes.sample_count.max(1) as f32)
+                    self.viewport
+                        .minimum_fraction
+                        .max(1.0 / axes.sample_count.max(1) as f32)
                 };
                 let window = ChartWindow::new(
                     full,
                     self.visible_range,
-                    if x.is_numeric() { self.axis.x.kind } else { super::model::ChartScaleKind::Linear },
+                    if x.is_numeric() {
+                        self.axis.x.kind
+                    } else {
+                        super::model::ChartScaleKind::Linear
+                    },
                     minimum,
                     !x.is_numeric(),
                 );
@@ -576,7 +733,11 @@ impl ChartPlot {
                     frame.plot,
                     Some(window),
                 );
-                ChartResolution { frame, cartesian: Some(geometry), pie: None }
+                ChartResolution {
+                    frame,
+                    cartesian: Some(geometry),
+                    pie: None,
+                }
             }
             ChartContent::Pie(slices) => {
                 let frame = ChartFrame::pie(&self.style, size, origin);
@@ -588,7 +749,11 @@ impl ChartPlot {
                     self.pie.sorts_by_value,
                     frame.plot,
                 );
-                ChartResolution { frame, cartesian: None, pie: Some(geometry) }
+                ChartResolution {
+                    frame,
+                    cartesian: None,
+                    pie: Some(geometry),
+                }
             }
         }
     }
@@ -598,17 +763,23 @@ impl ChartPlot {
         let session = node.attachment::<Rc<ChartSession>>(ChartSession::KEY);
         let frame = node.frame();
         let resolution = self.resolve(
-            Size { width: frame.width, height: frame.height },
+            Size {
+                width: frame.width,
+                height: frame.height,
+            },
             node.absolute_origin(),
             &text,
             session.map(|session| session.cache.clone()),
         );
         if let Some(geometry) = resolution.cartesian {
-            return geometry.nearest(x, y).map(|mark| ChartPoint::new(mark.series, mark.index));
+            return geometry
+                .nearest(x, y)
+                .map(|mark| ChartPoint::new(mark.series, mark.index));
         }
-        resolution
-            .pie
-            .and_then(|pie| pie.wedge_at(x, y).map(|wedge| ChartPoint::new(0, wedge.index)))
+        resolution.pie.and_then(|pie| {
+            pie.wedge_at(x, y)
+                .map(|wedge| ChartPoint::new(0, wedge.index))
+        })
     }
 
     /// Visible (series, count) pairs in order; a pie is one series of slices.
@@ -623,7 +794,11 @@ impl ChartPlot {
                 .map(|(index, item)| (index, item.data.len()))
                 .collect(),
             ChartContent::Pie(slices) => {
-                if slices.is_empty() { Vec::new() } else { vec![(0, slices.len())] }
+                if slices.is_empty() {
+                    Vec::new()
+                } else {
+                    vec![(0, slices.len())]
+                }
             }
         }
     }
@@ -637,14 +812,18 @@ impl ChartPlot {
                 .unwrap_or(false),
             ChartContent::Pie(slices) => slices
                 .get(point.index)
-                .map(|slice| self.visible.get(point.index).copied().unwrap_or(false) && slice.value > 0.0)
+                .map(|slice| {
+                    self.visible.get(point.index).copied().unwrap_or(false) && slice.value > 0.0
+                })
                 .unwrap_or(false),
         }
     }
 
     pub fn stepped_index(&self, delta: i32, from: Option<ChartPoint>) -> Option<ChartPoint> {
         let tracks = self.tracks();
-        let Some(first) = tracks.first().copied() else { return from };
+        let Some(first) = tracks.first().copied() else {
+            return from;
+        };
         let start = from.unwrap_or(ChartPoint::new(
             first.0,
             if delta > 0 { 0 } else { first.1 },
@@ -663,7 +842,11 @@ impl ChartPlot {
                 break;
             }
         }
-        if self.is_visible_point(next) { Some(next) } else { from }
+        if self.is_visible_point(next) {
+            Some(next)
+        } else {
+            from
+        }
     }
 
     pub fn stepped_series(&self, delta: i32, from: Option<ChartPoint>) -> Option<ChartPoint> {
@@ -675,12 +858,19 @@ impl ChartPlot {
             return from;
         }
         let position = from
-            .and_then(|point| tracks.iter().position(|(series, _)| *series == point.series))
+            .and_then(|point| {
+                tracks
+                    .iter()
+                    .position(|(series, _)| *series == point.series)
+            })
             .map(|index| index as i64)
             .unwrap_or(if delta > 0 { -1 } else { tracks.len() as i64 });
         let index = (position + delta as i64).clamp(0, tracks.len() as i64 - 1) as usize;
         let track = tracks[index];
-        Some(ChartPoint::new(track.0, from.map(|point| point.index.min(track.1 - 1)).unwrap_or(0)))
+        Some(ChartPoint::new(
+            track.0,
+            from.map(|point| point.index.min(track.1 - 1)).unwrap_or(0),
+        ))
     }
 
     pub fn jumped(&self, to_end: bool, from: Option<ChartPoint>) -> Option<ChartPoint> {
@@ -689,12 +879,16 @@ impl ChartPlot {
             .and_then(|point| tracks.iter().find(|(series, _)| *series == point.series))
             .or_else(|| tracks.first())
             .copied()?;
-        Some(ChartPoint::new(track.0, if to_end { track.1 - 1 } else { 0 }))
+        Some(ChartPoint::new(
+            track.0,
+            if to_end { track.1 - 1 } else { 0 },
+        ))
     }
 
     fn can_step(&self) -> bool {
         self.input.is_enabled
-            || (self.accessibility.exposes_values && self.tracks().iter().any(|(_, count)| *count > 0))
+            || (self.accessibility.exposes_values
+                && self.tracks().iter().any(|(_, count)| *count > 0))
     }
 
     fn publish_accessibility(&self, node: &Node, session: &ChartSession) {
@@ -732,7 +926,9 @@ impl ChartPlot {
     }
 
     fn step(&self, delta: i32, node: &Node) {
-        let Some(session) = node.attachment::<Rc<ChartSession>>(ChartSession::KEY) else { return };
+        let Some(session) = node.attachment::<Rc<ChartSession>>(ChartSession::KEY) else {
+            return;
+        };
         let next = self.stepped_index(delta, session.reading.get());
         session.reading.set(next);
         if self.input.is_enabled && next != session.current.get() {
@@ -751,39 +947,75 @@ impl ChartPlot {
         let values = callout
             .rows
             .iter()
-            .map(|row| if row.title.is_empty() { row.value.clone() } else { format!("{} {}", row.title, row.value) })
+            .map(|row| {
+                if row.title.is_empty() {
+                    row.value.clone()
+                } else {
+                    format!("{} {}", row.title, row.value)
+                }
+            })
             .collect::<Vec<_>>()
             .join(", ");
-        let head = if callout.title.is_empty() { values } else { format!("{}: {}", callout.title, values) };
+        let head = if callout.title.is_empty() {
+            values
+        } else {
+            format!("{}: {}", callout.title, values)
+        };
         let count = self.track_count(point);
         if count <= 1 || self.names_position_in_title(point) {
             return Some(head);
         }
-        Some(format!("{head}. {} {} of {count}", self.position_noun(), point.index + 1))
+        Some(format!(
+            "{head}. {} {} of {count}",
+            self.position_noun(),
+            point.index + 1
+        ))
     }
 
     fn names_position_in_title(&self, point: ChartPoint) -> bool {
         match &self.content {
-            ChartContent::Cartesian { x: ChartXDomain::Categorical(labels), .. } => labels.is_empty(),
-            ChartContent::Pie(slices) => slices.get(point.index).map(|slice| slice.title.is_empty()).unwrap_or(false),
+            ChartContent::Cartesian {
+                x: ChartXDomain::Categorical(labels),
+                ..
+            } => labels.is_empty(),
+            ChartContent::Pie(slices) => slices
+                .get(point.index)
+                .map(|slice| slice.title.is_empty())
+                .unwrap_or(false),
             _ => false,
         }
     }
 
     fn track_count(&self, point: ChartPoint) -> usize {
         match &self.content {
-            ChartContent::Cartesian { series, .. } => series.get(point.series).map(|item| item.data.len()).unwrap_or(1),
+            ChartContent::Cartesian { series, .. } => series
+                .get(point.series)
+                .map(|item| item.data.len())
+                .unwrap_or(1),
             ChartContent::Pie(slices) => slices.len(),
         }
     }
 
     fn position_noun(&self) -> &'static str {
-        if matches!(self.content, ChartContent::Pie(_)) { "Slice" } else { "Point" }
+        if matches!(self.content, ChartContent::Pie(_)) {
+            "Slice"
+        } else {
+            "Point"
+        }
     }
 
-    fn draw(&self, node: &Node, origin: Point, list: &mut cove_core::scene::DrawList, cache: &Rc<RefCell<ChartResolutionCache>>) {
+    fn draw(
+        &self,
+        node: &Node,
+        origin: Point,
+        list: &mut cove_core::scene::DrawList,
+        cache: &Rc<RefCell<ChartResolutionCache>>,
+    ) {
         let frame = node.frame();
-        let size = Size { width: frame.width, height: frame.height };
+        let size = Size {
+            width: frame.width,
+            height: frame.height,
+        };
         if size.width <= 0.0 || size.height <= 0.0 {
             return;
         }
@@ -798,7 +1030,10 @@ impl ChartPlot {
             text: &text,
         };
         paint.background(Rect::new(origin.x, origin.y, size.width, size.height), list);
-        let marks = resolution.cartesian.as_ref().filter(|geometry| geometry.plot.width > 0.0 && geometry.plot.height > 0.0);
+        let marks = resolution
+            .cartesian
+            .as_ref()
+            .filter(|geometry| geometry.plot.width > 0.0 && geometry.plot.height > 0.0);
         if let Some(geometry) = marks {
             list.push_clip_rect(geometry.plot);
         }
@@ -806,7 +1041,8 @@ impl ChartPlot {
             if let Some(geometry) = marks {
                 paint.bands(&guides.bands, geometry, list);
                 paint.grid(list);
-                if let (Some(range), Some(window)) = (self.brushed_range, geometry.window.as_ref()) {
+                if let (Some(range), Some(window)) = (self.brushed_range, geometry.window.as_ref())
+                {
                     paint.brush(range, window, list);
                 }
                 paint.thresholds(&guides.thresholds, geometry, list);
@@ -818,7 +1054,9 @@ impl ChartPlot {
         if marks.is_some() {
             list.pop_clip_rect();
         }
-        if let (Some(geometry), ChartContent::Pie(slices)) = (resolution.pie.as_ref(), &self.content) {
+        if let (Some(geometry), ChartContent::Pie(slices)) =
+            (resolution.pie.as_ref(), &self.content)
+        {
             if self.pie.shows_labels {
                 paint.pie_leaders(slices, geometry, list);
             }
@@ -826,7 +1064,12 @@ impl ChartPlot {
         }
         // Axis text is materialised by the overlay host (Text primitive gap).
         if let Some(focus) = FocusChainHolder::current() {
-            if focus.focused().map(|focused| focused.id() == node.id()).unwrap_or(false) && focus.is_focus_visible() {
+            if focus
+                .focused()
+                .map(|focused| focused.id() == node.id())
+                .unwrap_or(false)
+                && focus.is_focus_visible()
+            {
                 let _ = list.add_rounded_rect_stroke(
                     Rect::new(origin.x, origin.y, size.width, size.height),
                     theme.radius.sm,
@@ -913,9 +1156,24 @@ impl ChartPaintIdentity {
         match &plot.content {
             ChartContent::Cartesian { series, guides, .. } => {
                 colors.extend(series.iter().map(|item| item.color.resolve(theme).rgba8()));
-                colors.extend(guides.thresholds.iter().map(|item| item.color.resolve(theme).rgba8()));
-                colors.extend(guides.bands.iter().map(|item| item.color.resolve(theme).rgba8()));
-                colors.extend(guides.markers.iter().map(|item| item.color.resolve(theme).rgba8()));
+                colors.extend(
+                    guides
+                        .thresholds
+                        .iter()
+                        .map(|item| item.color.resolve(theme).rgba8()),
+                );
+                colors.extend(
+                    guides
+                        .bands
+                        .iter()
+                        .map(|item| item.color.resolve(theme).rgba8()),
+                );
+                colors.extend(
+                    guides
+                        .markers
+                        .iter()
+                        .map(|item| item.color.resolve(theme).rgba8()),
+                );
             }
             ChartContent::Pie(slices) => {
                 colors.extend(
@@ -926,7 +1184,13 @@ impl ChartPaintIdentity {
                 );
             }
         }
-        colors.push(plot.style.background.as_ref().map(|color| color.resolve(theme).rgba8()).unwrap_or(Color::CLEAR.rgba8()));
+        colors.push(
+            plot.style
+                .background
+                .as_ref()
+                .map(|color| color.resolve(theme).rgba8())
+                .unwrap_or(Color::CLEAR.rgba8()),
+        );
         colors.push(plot.style.grid_color.resolve(theme).rgba8());
         Self {
             geometry: ChartGeometrySignature::new(plot, theme),
@@ -941,8 +1205,12 @@ impl PartialEq for ChartPaintIdentity {
         self.geometry == other.geometry
             && self.colors == other.colors
             && self.selection == other.selection
-            && self.brush.map(|range| (range.lower.to_bits(), range.upper.to_bits()))
-                == other.brush.map(|range| (range.lower.to_bits(), range.upper.to_bits()))
+            && self
+                .brush
+                .map(|range| (range.lower.to_bits(), range.upper.to_bits()))
+                == other
+                    .brush
+                    .map(|range| (range.lower.to_bits(), range.upper.to_bits()))
     }
 }
 
@@ -999,7 +1267,9 @@ impl ChartGeometrySignature {
             marks: Vec::new(),
             visible: plot.visible.clone(),
             x_domain: None,
-            range: plot.visible_range.map(|range| (range.lower.to_bits(), range.upper.to_bits())),
+            range: plot
+                .visible_range
+                .map(|range| (range.lower.to_bits(), range.upper.to_bits())),
             style,
             axis,
             pie: [
@@ -1012,7 +1282,12 @@ impl ChartGeometrySignature {
             ChartContent::Cartesian { series, guides, x } => {
                 signature.data = series
                     .iter()
-                    .map(|item| item.data.iter().map(|datum| (datum.x.to_bits(), datum.y.to_bits())).collect())
+                    .map(|item| {
+                        item.data
+                            .iter()
+                            .map(|datum| (datum.x.to_bits(), datum.y.to_bits()))
+                            .collect()
+                    })
                     .collect();
                 signature.marks = series
                     .iter()
@@ -1025,7 +1300,11 @@ impl ChartGeometrySignature {
                     .collect();
                 signature.x_domain = Some(match x {
                     ChartXDomain::Categorical(labels) => {
-                        if labels.is_empty() { 1 } else { 2 }
+                        if labels.is_empty() {
+                            1
+                        } else {
+                            2
+                        }
                     }
                     ChartXDomain::Numeric => 3,
                 });
@@ -1071,7 +1350,9 @@ pub fn default_value_text(value: f32) -> String {
 }
 
 /// Builds the row list shared by the callout and accessibility readout.
-pub fn callout_rows(items: impl IntoIterator<Item = (String, String, Option<Color>)>) -> Vec<ChartCalloutRow> {
+pub fn callout_rows(
+    items: impl IntoIterator<Item = (String, String, Option<Color>)>,
+) -> Vec<ChartCalloutRow> {
     items
         .into_iter()
         .map(|(title, value, _color)| ChartCalloutRow::new(title, value))

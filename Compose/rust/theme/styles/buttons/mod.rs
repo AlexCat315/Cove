@@ -1,6 +1,6 @@
 //! Built-in button styles.
-pub mod button_style;
 pub mod builtin_button_chrome;
+pub mod button_style;
 pub mod destructive_button_style;
 pub mod ghost_button_style;
 pub mod plain_button_style;
@@ -12,8 +12,8 @@ pub mod tab_button_style;
 pub mod toggle_button_style;
 pub mod toolbar_toggle_button_style;
 
-pub use button_style::*;
 pub use builtin_button_chrome::*;
+pub use button_style::*;
 pub use destructive_button_style::*;
 pub use ghost_button_style::*;
 pub use plain_button_style::*;

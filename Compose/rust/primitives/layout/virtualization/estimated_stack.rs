@@ -7,13 +7,13 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cove_core::scene::{Align, FlexDirection, LayoutNode, Node};
-use cove_core::{Point, Size};
 use crate::primitives::layout::ScrollViewport;
 use crate::{AnyView, PrimitiveView, View};
+use cove_core::scene::{Align, FlexDirection, LayoutNode, Node};
+use cove_core::{Point, Size};
 
 use super::row_index::VariableRowIndex;
-use super::virtual_stack_body::{virtual_scroll, RowExtents};
+use super::virtual_stack_body::{RowExtents, virtual_scroll};
 use super::virtual_window::VirtualWindow;
 
 /// Per-row measured heights, keyed by row id so a reorder keeps its measurements.
@@ -24,7 +24,10 @@ pub struct EstimatedRowMetrics<Id: Ord + Clone> {
 
 impl<Id: Ord + Clone> Default for EstimatedRowMetrics<Id> {
     fn default() -> Self {
-        Self { measured: std::collections::BTreeMap::new(), revision: 0 }
+        Self {
+            measured: std::collections::BTreeMap::new(),
+            revision: 0,
+        }
     }
 }
 
@@ -81,10 +84,18 @@ pub struct EstimatedVirtualStack<Id: Ord + Clone + 'static> {
 }
 
 impl<Id: Ord + Clone + 'static> EstimatedVirtualStack<Id> {
-    pub fn new(ids: Vec<Id>, estimate: f32, row_content: impl Fn(&Id) -> AnyView + 'static) -> Self {
+    pub fn new(
+        ids: Vec<Id>,
+        estimate: f32,
+        row_content: impl Fn(&Id) -> AnyView + 'static,
+    ) -> Self {
         Self {
             ids,
-            estimate: if estimate.is_finite() { estimate.max(1.0) } else { 44.0 },
+            estimate: if estimate.is_finite() {
+                estimate.max(1.0)
+            } else {
+                44.0
+            },
             spacing: 0.0,
             overscan: 3,
             preload: 0.3,
@@ -103,7 +114,11 @@ impl<Id: Ord + Clone + 'static> EstimatedVirtualStack<Id> {
     }
 
     pub fn spacing(mut self, spacing: f32) -> Self {
-        self.spacing = if spacing.is_finite() { spacing.max(0.0) } else { 0.0 };
+        self.spacing = if spacing.is_finite() {
+            spacing.max(0.0)
+        } else {
+            0.0
+        };
         self
     }
 
@@ -150,17 +165,25 @@ impl<Id: Ord + Clone + 'static> View for EstimatedVirtualStack<Id> {
             && viewport.size.height > 0.0
             && !state.rows.is_empty()
         {
-            next_offset = state.rows.offset_for(&self.ids[target.min(self.ids.len() - 1)], viewport.size.height as f64);
+            next_offset = state.rows.offset_for(
+                &self.ids[target.min(self.ids.len() - 1)],
+                viewport.size.height as f64,
+            );
             state.previous_target = Some(target);
         }
         state.window.offset.y = next_offset as f32;
-        let visible = state.rows.visible_range(next_offset, viewport.size.height as f64);
+        let visible = state
+            .rows
+            .visible_range(next_offset, viewport.size.height as f64);
         let count = state.rows.len();
         state.window.record(
             visible.clone(),
             visible,
             count,
-            Size { width: viewport.size.width, height: viewport.size.height },
+            Size {
+                width: viewport.size.width,
+                height: viewport.size.height,
+            },
         );
         let rows = state.rows.clone();
         drop(state);
@@ -178,7 +201,9 @@ impl<Id: Ord + Clone + 'static> View for EstimatedVirtualStack<Id> {
             1,
             &self.row_content,
             Some(Rc::new(move |next: Point| offset_state.set(next))),
-            Some(Rc::new(move |next: ScrollViewport| viewport_state.set(next))),
+            Some(Rc::new(move |next: ScrollViewport| {
+                viewport_state.set(next)
+            })),
         )
     }
 }

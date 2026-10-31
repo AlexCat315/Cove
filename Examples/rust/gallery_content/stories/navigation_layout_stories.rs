@@ -7,12 +7,14 @@
 //! measurable behaviour (rail width, label visibility, disabled-item skipping and
 //! badge preservation) lives here as plain data the tests can assert against.
 
-use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::State;
+use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::Checkbox;
-use cove_ui_compose::primitives::layout::sidebar::drawer::{NavigationDrawer, NavigationDrawerOptions};
+use cove_ui_compose::primitives::layout::sidebar::drawer::{
+    NavigationDrawer, NavigationDrawerOptions,
+};
 use cove_ui_compose::primitives::layout::sidebar::presentation::SidebarPresentation;
 use cove_ui_compose::primitives::layout::sidebar::{SidebarItem, SidebarSection};
 use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
@@ -102,7 +104,10 @@ impl DrawerStory {
     pub fn selection_caption(&self) -> String {
         format!(
             "Selected destination: {}",
-            self.selection.get().map(|value| value.to_string()).unwrap_or_else(|| "none".to_owned())
+            self.selection
+                .get()
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "none".to_owned())
         )
     }
 
@@ -118,7 +123,11 @@ impl DrawerStory {
                         format!("Destination {index}")
                     },
                 )
-                .icon(if index % 2 == 0 { icons::file::folder() } else { icons::layout::dashboard() })
+                .icon(if index % 2 == 0 {
+                    icons::file::folder()
+                } else {
+                    icons::layout::dashboard()
+                })
                 // The disabled destination stays listed but cannot be chosen.
                 .enabled(enabled && index != DRAWER_DISABLED_INDEX);
                 if index == DRAWER_BADGED_INDEX {
@@ -251,7 +260,9 @@ impl RailStory {
 
     /// The presentation the toggle currently asks for.
     pub fn presentation(&self) -> SidebarPresentation {
-        SidebarPresentation::Rail { shows_labels: self.shows_labels.get() }
+        SidebarPresentation::Rail {
+            shows_labels: self.shows_labels.get(),
+        }
     }
 
     /// The rail's width in points: 72 with labels, 56 without.

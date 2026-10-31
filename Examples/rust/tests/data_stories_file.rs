@@ -6,9 +6,9 @@
 
 use cove_examples::gallery_content::catalog::GalleryOptions;
 use cove_examples::gallery_content::stories::data_stories_file::{
-    expandable_ids, node_matches, visible_ids, DragAndDropStory, RefreshListStory, SceneNode,
-    SectionedListStory, SwipeListStory, TreeStory, VirtualStackStory, REFRESH_ROWS,
-    REFRESH_THRESHOLD, SWIPE_ROWS, VIRTUAL_MIDDLE, VIRTUAL_STACK_COUNT,
+    DragAndDropStory, REFRESH_ROWS, REFRESH_THRESHOLD, RefreshListStory, SWIPE_ROWS, SceneNode,
+    SectionedListStory, SwipeListStory, TreeStory, VIRTUAL_MIDDLE, VIRTUAL_STACK_COUNT,
+    VirtualStackStory, expandable_ids, node_matches, visible_ids,
 };
 
 fn story() -> TreeStory {
@@ -38,7 +38,10 @@ fn a_deep_match_keeps_its_ancestors_visible() {
     assert!(visible.contains("sphere"), "the match itself");
     assert!(visible.contains("objects"), "its parent");
     assert!(visible.contains("scene"), "and the root");
-    assert!(!visible.contains("lights"), "unrelated siblings are filtered out");
+    assert!(
+        !visible.contains("lights"),
+        "unrelated siblings are filtered out"
+    );
     assert!(!visible.contains("camera"));
 }
 
@@ -51,7 +54,10 @@ fn a_parent_match_keeps_it_and_its_ancestors_but_not_its_children() {
     let visible = visible_ids(&SceneNode::gallery(), "lights");
     assert!(visible.contains("lights"), "the match");
     assert!(visible.contains("scene"), "its ancestor");
-    assert!(!visible.contains("key"), "a non-matching child is filtered out");
+    assert!(
+        !visible.contains("key"),
+        "a non-matching child is filtered out"
+    );
     assert!(!visible.contains("fill"));
 }
 
@@ -111,10 +117,18 @@ fn the_virtual_stack_jumps_to_the_declared_targets() {
     story.scroll_to_middle();
     assert_eq!(story.target(), VIRTUAL_MIDDLE);
     story.scroll_to_last();
-    assert_eq!(story.target(), VIRTUAL_STACK_COUNT - 1, "the last row, not past it");
+    assert_eq!(
+        story.target(),
+        VIRTUAL_STACK_COUNT - 1,
+        "the last row, not past it"
+    );
     story.scroll_to_first();
     assert_eq!(story.target(), 0);
-    assert_eq!(VirtualStackStory::row_label(0), "Record 1", "labels are one-based");
+    assert_eq!(
+        VirtualStackStory::row_label(0),
+        "Record 1",
+        "labels are one-based"
+    );
 }
 
 #[test]
@@ -128,7 +142,10 @@ fn the_swipe_log_records_activation_and_actions() {
     assert!(story.run_action(2, "delete"));
     assert_eq!(story.log(), "Deleted Release notes");
     assert!(!story.run_action(99, "delete"), "an unknown row is a no-op");
-    assert!(!story.run_action(0, "explode"), "an unknown action is a no-op");
+    assert!(
+        !story.run_action(0, "explode"),
+        "an unknown action is a no-op"
+    );
     assert_eq!(SWIPE_ROWS.len(), 5);
 }
 
@@ -147,7 +164,10 @@ fn a_refresh_cannot_re_enter() {
     assert!(!story.is_refreshing());
     assert!(story.start_refresh(), "the first pull starts");
     assert_eq!(story.refreshes(), 1);
-    assert!(!story.start_refresh(), "a second pull while in flight is ignored");
+    assert!(
+        !story.start_refresh(),
+        "a second pull while in flight is ignored"
+    );
     assert_eq!(story.refreshes(), 1, "the count does not advance");
 }
 

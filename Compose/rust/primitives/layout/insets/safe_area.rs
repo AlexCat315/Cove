@@ -4,9 +4,9 @@
 //! Nested safe-area containers receive only the remaining edges.
 use std::rc::Rc;
 
-use cove_core::scene::{CompositionLocal, Edge, Node};
 use crate::modifiers::layout::EdgeInsets;
 use crate::{AnyView, PrimitiveView, View, ViewExt};
+use cove_core::scene::{CompositionLocal, Edge, Node};
 
 /// Which logical edges consume the host inset.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -56,7 +56,10 @@ pub struct SafeArea {
 
 impl SafeArea {
     pub fn new(edges: SafeAreaEdges, content: impl View + 'static) -> Self {
-        Self { edges, content: AnyView::new(content) }
+        Self {
+            edges,
+            content: AnyView::new(content),
+        }
     }
 
     pub fn all(content: impl View + 'static) -> Self {
@@ -65,7 +68,11 @@ impl SafeArea {
 }
 
 fn valid(value: f32) -> f32 {
-    if value.is_finite() { value.max(0.0) } else { 0.0 }
+    if value.is_finite() {
+        value.max(0.0)
+    } else {
+        0.0
+    }
 }
 
 impl PrimitiveView for SafeArea {
@@ -77,33 +84,61 @@ impl PrimitiveView for SafeArea {
 
     fn update_node(&self, node: &Node) {
         let insets: EdgeInsets = node.composition_value(&SafeAreaEnvironment::insets());
-        let Some(layout) = node.layout_node() else { return };
+        let Some(layout) = node.layout_node() else {
+            return;
+        };
         layout.set_padding(
-            if self.edges.contains(SafeAreaEdges::TOP) { valid(insets.top) } else { 0.0 },
+            if self.edges.contains(SafeAreaEdges::TOP) {
+                valid(insets.top)
+            } else {
+                0.0
+            },
             Edge::Top,
         );
         layout.set_padding(
-            if self.edges.contains(SafeAreaEdges::LEADING) { valid(insets.leading) } else { 0.0 },
+            if self.edges.contains(SafeAreaEdges::LEADING) {
+                valid(insets.leading)
+            } else {
+                0.0
+            },
             Edge::Start,
         );
         layout.set_padding(
-            if self.edges.contains(SafeAreaEdges::BOTTOM) { valid(insets.bottom) } else { 0.0 },
+            if self.edges.contains(SafeAreaEdges::BOTTOM) {
+                valid(insets.bottom)
+            } else {
+                0.0
+            },
             Edge::Bottom,
         );
         layout.set_padding(
-            if self.edges.contains(SafeAreaEdges::TRAILING) { valid(insets.trailing) } else { 0.0 },
+            if self.edges.contains(SafeAreaEdges::TRAILING) {
+                valid(insets.trailing)
+            } else {
+                0.0
+            },
             Edge::End,
         );
     }
 
     fn children(&self, node: &Node) -> Vec<AnyView> {
         let mut remaining: EdgeInsets = node.composition_value(&SafeAreaEnvironment::insets());
-        if self.edges.contains(SafeAreaEdges::TOP) { remaining.top = 0.0; }
-        if self.edges.contains(SafeAreaEdges::LEADING) { remaining.leading = 0.0; }
-        if self.edges.contains(SafeAreaEdges::BOTTOM) { remaining.bottom = 0.0; }
-        if self.edges.contains(SafeAreaEdges::TRAILING) { remaining.trailing = 0.0; }
+        if self.edges.contains(SafeAreaEdges::TOP) {
+            remaining.top = 0.0;
+        }
+        if self.edges.contains(SafeAreaEdges::LEADING) {
+            remaining.leading = 0.0;
+        }
+        if self.edges.contains(SafeAreaEdges::BOTTOM) {
+            remaining.bottom = 0.0;
+        }
+        if self.edges.contains(SafeAreaEdges::TRAILING) {
+            remaining.trailing = 0.0;
+        }
         vec![AnyView::new(
-            self.content.clone().composition_local(SafeAreaEnvironment::insets(), remaining),
+            self.content
+                .clone()
+                .composition_local(SafeAreaEnvironment::insets(), remaining),
         )]
     }
 }

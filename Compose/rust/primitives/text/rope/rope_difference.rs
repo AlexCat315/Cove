@@ -79,8 +79,7 @@ pub fn common_bytes(
             }
             continue;
         }
-        let (RopeStorage::Leaf(la), RopeStorage::Leaf(lb)) = (&left.storage, &right.storage)
-        else {
+        let (RopeStorage::Leaf(la), RopeStorage::Leaf(lb)) = (&left.storage, &right.storage) else {
             break;
         };
         let count = (la.bytes.len() - a.byte_offset)

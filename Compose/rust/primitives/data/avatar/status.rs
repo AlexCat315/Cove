@@ -3,12 +3,10 @@
 //! Presence shown as a corner indicator. Each status pairs a hue with a
 //! distinct shape (filled, inset ring, bar, hollow ring) so presence stays
 //! readable without color.
-use cove_core::scene::{
-    Align, Color, Edge, LayoutNode, Node, Point, PositionType, Rect,
-};
-use crate::theme::tokens::SemanticColorRef;
 use crate::theme::theme_environment::theme_for_node;
-use crate::{impl_primitive_view, PrimitiveView};
+use crate::theme::tokens::SemanticColorRef;
+use crate::{PrimitiveView, impl_primitive_view};
+use cove_core::scene::{Align, Color, Edge, LayoutNode, Node, Point, PositionType, Rect};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum AvatarStatus {
@@ -53,7 +51,10 @@ impl AvatarStatusGeometry {
         let radius = shape.radius(diameter);
         // Distance from the bounding corner to the outline along the diagonal.
         let corner_gap = radius * (1.0 - 0.70710678);
-        Self { size, inset: corner_gap - size / 2.0 }
+        Self {
+            size,
+            inset: corner_gap - size / 2.0,
+        }
     }
 }
 
@@ -99,12 +100,7 @@ impl PrimitiveView for AvatarStatusIndicator {
         let ink = self.status.color().resolve(&theme);
         let size = self.geometry.size;
         let status = self.status;
-        let identity = (
-            ring.rgba8(),
-            ink.rgba8(),
-            size.to_bits(),
-            status as u8,
-        );
+        let identity = (ring.rgba8(), ink.rgba8(), size.to_bits(), status as u8);
         node.update_draw(identity, move |list, origin: Point| {
             let outer = Rect::new(origin.x, origin.y, size, size);
             let _ = list.add_rounded_rect(outer, size / 2.0, ring);

@@ -1,7 +1,9 @@
 //! Translation of CoveUIScene/Input/InteractionRegistry.swift.
 use crate::scene::Node;
 use crate::scene::NodeResource;
-use cove_platform::{KeyEvent, MouseButtonEvent, MouseMotionEvent, MouseWheelEvent, TextEditingEvent};
+use cove_platform::{
+    KeyEvent, MouseButtonEvent, MouseMotionEvent, MouseWheelEvent, TextEditingEvent,
+};
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::{Rc, Weak};
@@ -76,32 +78,72 @@ pub struct InputHandlerRoute {
     pub debug_name: String,
 }
 impl InputHandlerRoute {
-    pub fn new(role: InputHandlerRole, priority: InputRoutingPriority, debug_name: impl Into<String>) -> Self {
-        Self { role, priority, debug_name: debug_name.into() }
+    pub fn new(
+        role: InputHandlerRole,
+        priority: InputRoutingPriority,
+        debug_name: impl Into<String>,
+    ) -> Self {
+        Self {
+            role,
+            priority,
+            debug_name: debug_name.into(),
+        }
     }
     pub fn control() -> Self {
-        Self::new(InputHandlerRole::Control, InputRoutingPriority::NORMAL, "control")
+        Self::new(
+            InputHandlerRole::Control,
+            InputRoutingPriority::NORMAL,
+            "control",
+        )
     }
     pub fn scroll() -> Self {
-        Self::new(InputHandlerRole::Scroll, InputRoutingPriority::NORMAL, "scroll")
+        Self::new(
+            InputHandlerRole::Scroll,
+            InputRoutingPriority::NORMAL,
+            "scroll",
+        )
     }
     pub fn scroll_chrome() -> Self {
-        Self::new(InputHandlerRole::ScrollChrome, InputRoutingPriority::CHROME, "scroll.chrome")
+        Self::new(
+            InputHandlerRole::ScrollChrome,
+            InputRoutingPriority::CHROME,
+            "scroll.chrome",
+        )
     }
     pub fn text_input() -> Self {
-        Self::new(InputHandlerRole::TextInput, InputRoutingPriority::FOCUSED, "text.input")
+        Self::new(
+            InputHandlerRole::TextInput,
+            InputRoutingPriority::FOCUSED,
+            "text.input",
+        )
     }
     pub fn viewport() -> Self {
-        Self::new(InputHandlerRole::Viewport, InputRoutingPriority::FOCUSED, "viewport")
+        Self::new(
+            InputHandlerRole::Viewport,
+            InputRoutingPriority::FOCUSED,
+            "viewport",
+        )
     }
     pub fn workspace_drag() -> Self {
-        Self::new(InputHandlerRole::Workspace, InputRoutingPriority::CAPTURE, "workspace.drag")
+        Self::new(
+            InputHandlerRole::Workspace,
+            InputRoutingPriority::CAPTURE,
+            "workspace.drag",
+        )
     }
     pub fn overlay() -> Self {
-        Self::new(InputHandlerRole::Overlay, InputRoutingPriority::MODAL, "overlay")
+        Self::new(
+            InputHandlerRole::Overlay,
+            InputRoutingPriority::MODAL,
+            "overlay",
+        )
     }
     pub fn shortcut() -> Self {
-        Self::new(InputHandlerRole::Shortcut, InputRoutingPriority::SYSTEM, "shortcut")
+        Self::new(
+            InputHandlerRole::Shortcut,
+            InputRoutingPriority::SYSTEM,
+            "shortcut",
+        )
     }
 }
 impl Default for InputHandlerRoute {
@@ -211,10 +253,19 @@ struct RegistryInner {
     routed_index: RefCell<HashMap<RouteIndexKey, HashSet<Node>>>,
 }
 impl RegistryInner {
-    fn update_route_index(&self, node: &Node, slot: InputHandlerSlot, old_route: Option<InputHandlerRoute>, new_route: Option<InputHandlerRoute>) {
+    fn update_route_index(
+        &self,
+        node: &Node,
+        slot: InputHandlerSlot,
+        old_route: Option<InputHandlerRoute>,
+        new_route: Option<InputHandlerRoute>,
+    ) {
         let mut index = self.routed_index.borrow_mut();
         if let Some(old) = old_route {
-            let key = RouteIndexKey { slot, role: old.role };
+            let key = RouteIndexKey {
+                slot,
+                role: old.role,
+            };
             if let Some(nodes) = index.get_mut(&key) {
                 nodes.remove(node);
                 if nodes.is_empty() {
@@ -223,7 +274,13 @@ impl RegistryInner {
             }
         }
         if let Some(new) = new_route {
-            index.entry(RouteIndexKey { slot, role: new.role }).or_default().insert(node.clone());
+            index
+                .entry(RouteIndexKey {
+                    slot,
+                    role: new.role,
+                })
+                .or_default()
+                .insert(node.clone());
         }
     }
     fn remove(&self, node: &Node) {
@@ -246,7 +303,12 @@ impl InteractionRegistry {
         Self::default()
     }
     pub fn handlers(&self, node: &Node) -> Handlers {
-        self.inner.table.borrow().get(node).cloned().unwrap_or_default()
+        self.inner
+            .table
+            .borrow()
+            .get(node)
+            .cloned()
+            .unwrap_or_default()
     }
     fn update(&self, node: &Node, change: impl FnOnce(&mut Handlers)) {
         let mut table = self.inner.table.borrow_mut();
@@ -254,8 +316,13 @@ impl InteractionRegistry {
         change(entry);
     }
     fn bind_cleanup(&self, node: &Node) {
-        if node.first_resource::<InteractionCleanupResource>().is_none() {
-            node.add_resource(Rc::new(InteractionCleanupResource { registry: Rc::downgrade(&self.inner) }));
+        if node
+            .first_resource::<InteractionCleanupResource>()
+            .is_none()
+        {
+            node.add_resource(Rc::new(InteractionCleanupResource {
+                registry: Rc::downgrade(&self.inner),
+            }));
         }
     }
     pub fn set_pointer(&self, node: &Node, route: InputHandlerRoute, handler: PointerHandler) {
@@ -264,7 +331,8 @@ impl InteractionRegistry {
             entry.pointer = Some(handler);
             entry.pointer_route = Some(route.clone());
         });
-        self.inner.update_route_index(node, InputHandlerSlot::Pointer, old, Some(route));
+        self.inner
+            .update_route_index(node, InputHandlerSlot::Pointer, old, Some(route));
         self.bind_cleanup(node);
     }
     pub fn set_hover(&self, node: &Node, handler: HoverHandler) {
@@ -277,7 +345,8 @@ impl InteractionRegistry {
             entry.motion = Some(handler);
             entry.motion_route = Some(route.clone());
         });
-        self.inner.update_route_index(node, InputHandlerSlot::Motion, old, Some(route));
+        self.inner
+            .update_route_index(node, InputHandlerSlot::Motion, old, Some(route));
         self.bind_cleanup(node);
     }
     pub fn set_wheel(&self, node: &Node, route: InputHandlerRoute, handler: WheelHandler) {
@@ -286,7 +355,8 @@ impl InteractionRegistry {
             entry.wheel = Some(handler);
             entry.wheel_route = Some(route.clone());
         });
-        self.inner.update_route_index(node, InputHandlerSlot::Wheel, old, Some(route));
+        self.inner
+            .update_route_index(node, InputHandlerSlot::Wheel, old, Some(route));
         self.bind_cleanup(node);
     }
     pub fn set_key(&self, node: &Node, route: InputHandlerRoute, handler: KeyHandler) {
@@ -295,7 +365,8 @@ impl InteractionRegistry {
             entry.key = Some(handler);
             entry.key_route = Some(route.clone());
         });
-        self.inner.update_route_index(node, InputHandlerSlot::Key, old, Some(route));
+        self.inner
+            .update_route_index(node, InputHandlerSlot::Key, old, Some(route));
         self.bind_cleanup(node);
     }
     pub fn set_key_up(&self, node: &Node, route: InputHandlerRoute, handler: KeyHandler) {
@@ -304,7 +375,8 @@ impl InteractionRegistry {
             entry.key_up = Some(handler);
             entry.key_up_route = Some(route.clone());
         });
-        self.inner.update_route_index(node, InputHandlerSlot::KeyUp, old, Some(route));
+        self.inner
+            .update_route_index(node, InputHandlerSlot::KeyUp, old, Some(route));
         self.bind_cleanup(node);
     }
     pub fn set_editing(&self, node: &Node, route: InputHandlerRoute, handler: EditingHandler) {
@@ -313,7 +385,8 @@ impl InteractionRegistry {
             entry.editing = Some(handler);
             entry.editing_route = Some(route.clone());
         });
-        self.inner.update_route_index(node, InputHandlerSlot::Editing, old, Some(route));
+        self.inner
+            .update_route_index(node, InputHandlerSlot::Editing, old, Some(route));
         self.bind_cleanup(node);
     }
     pub fn set_text(&self, node: &Node, route: InputHandlerRoute, handler: TextHandler) {
@@ -322,7 +395,8 @@ impl InteractionRegistry {
             entry.text = Some(handler);
             entry.text_route = Some(route.clone());
         });
-        self.inner.update_route_index(node, InputHandlerSlot::Text, old, Some(route));
+        self.inner
+            .update_route_index(node, InputHandlerSlot::Text, old, Some(route));
         self.bind_cleanup(node);
     }
     pub fn remove(&self, node: &Node) {
@@ -331,16 +405,29 @@ impl InteractionRegistry {
     pub fn count(&self) -> usize {
         self.inner.table.borrow().len()
     }
-    pub(crate) fn routed_nodes(&self, slot: InputHandlerSlot, role: &InputHandlerRole, min_priority: InputRoutingPriority) -> Vec<RoutedInputNode> {
+    pub(crate) fn routed_nodes(
+        &self,
+        slot: InputHandlerSlot,
+        role: &InputHandlerRole,
+        min_priority: InputRoutingPriority,
+    ) -> Vec<RoutedInputNode> {
         let index = self.inner.routed_index.borrow();
-        let Some(nodes) = index.get(&RouteIndexKey { slot, role: role.clone() }) else { return Vec::new() };
+        let Some(nodes) = index.get(&RouteIndexKey {
+            slot,
+            role: role.clone(),
+        }) else {
+            return Vec::new();
+        };
         let table = self.inner.table.borrow();
         nodes
             .iter()
             .filter_map(|node| {
                 let handlers = table.get(node)?;
                 let route = handlers.route(slot)?;
-                (route.role == *role && route.priority >= min_priority).then(|| RoutedInputNode { node: node.clone(), route })
+                (route.role == *role && route.priority >= min_priority).then(|| RoutedInputNode {
+                    node: node.clone(),
+                    route,
+                })
             })
             .collect()
     }
@@ -373,7 +460,11 @@ mod tests {
         let parent = Node::new();
         let node = Node::new();
         parent.add_child(&node);
-        registry.set_pointer(&node, InputHandlerRoute::control(), Rc::new(|_, _, _| EventResult::Handled));
+        registry.set_pointer(
+            &node,
+            InputHandlerRoute::control(),
+            Rc::new(|_, _, _| EventResult::Handled),
+        );
         assert_eq!(registry.count(), 1);
         assert!(registry.handlers(&node).pointer.is_some());
         parent.remove_child(&node);
@@ -386,11 +477,32 @@ mod tests {
         let node = Node::new();
         let seen = Rc::new(Cell::new(0));
         let counter = seen.clone();
-        registry.set_key(&node, InputHandlerRoute::overlay(), Rc::new(move |_, _| {
-            counter.set(counter.get() + 1);
-            EventResult::Handled
-        }));
-        assert_eq!(registry.routed_nodes(InputHandlerSlot::Key, &InputHandlerRole::Overlay, InputRoutingPriority::MODAL).len(), 1);
-        assert!(registry.routed_nodes(InputHandlerSlot::Key, &InputHandlerRole::Overlay, InputRoutingPriority::SYSTEM).is_empty());
+        registry.set_key(
+            &node,
+            InputHandlerRoute::overlay(),
+            Rc::new(move |_, _| {
+                counter.set(counter.get() + 1);
+                EventResult::Handled
+            }),
+        );
+        assert_eq!(
+            registry
+                .routed_nodes(
+                    InputHandlerSlot::Key,
+                    &InputHandlerRole::Overlay,
+                    InputRoutingPriority::MODAL
+                )
+                .len(),
+            1
+        );
+        assert!(
+            registry
+                .routed_nodes(
+                    InputHandlerSlot::Key,
+                    &InputHandlerRole::Overlay,
+                    InputRoutingPriority::SYSTEM
+                )
+                .is_empty()
+        );
     }
 }

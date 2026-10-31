@@ -8,16 +8,22 @@
 //! composition + scene layers.
 use super::controller::{WorkspaceCommand, WorkspaceController};
 use super::drag::{self, DRAG_OVERLAY_ROOT_KEY, DRAG_OVERLAY_STATE_KEY, DRAG_THRESHOLD};
-use super::ids::{WorkspaceEdge, WorkspacePanelID, WorkspaceSlotID, WorkspaceSplitAxis, WorkspaceTabGroupID};
-use super::model::{WorkspaceDocument, WorkspaceLayoutNode, WorkspaceSlot, WorkspaceSlotKind, WorkspaceTabGroup};
+use super::ids::{
+    WorkspaceEdge, WorkspacePanelID, WorkspaceSlotID, WorkspaceSplitAxis, WorkspaceTabGroupID,
+};
+use super::model::{
+    WorkspaceDocument, WorkspaceLayoutNode, WorkspaceSlot, WorkspaceSlotKind, WorkspaceTabGroup,
+};
 use super::sizing::{WorkspaceLayoutMetrics, WorkspaceResolvedSplit, WorkspaceSizingResolver};
 use super::theme::{WorkspaceRegionSizing, WorkspaceTheme};
-use cove_composition::{impl_primitive_view, AnyView, LayoutDebugAttachmentKey, PrimitiveView, TupleView, View};
-use cove_core::scene::{
-    Align, FlexDirection, FocusChainHolder, InputHandlerRoute, InputRoutingPriority, Justify, LayoutNode, Node,
-    PointerCaptureHolder,
+use cove_composition::{
+    AnyView, LayoutDebugAttachmentKey, PrimitiveView, TupleView, View, impl_primitive_view,
 };
 use cove_core::Color;
+use cove_core::scene::{
+    Align, FlexDirection, FocusChainHolder, InputHandlerRoute, InputRoutingPriority, Justify,
+    LayoutNode, Node, PointerCaptureHolder,
+};
 use cove_platform::MouseButton;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
 use std::cell::RefCell;
@@ -58,7 +64,8 @@ pub struct WorkspaceResizeGeometry {
 }
 
 fn resolve_theme(node: &Node) -> WorkspaceTheme {
-    node.attachment::<WorkspaceTheme>(WorkspaceTheme::COMPOSITION_LOCAL_KEY).unwrap_or_default()
+    node.attachment::<WorkspaceTheme>(WorkspaceTheme::COMPOSITION_LOCAL_KEY)
+        .unwrap_or_default()
 }
 
 fn debug_name(node: &Node) -> Option<String> {
@@ -181,12 +188,22 @@ pub struct WorkspacePane {
 
 impl WorkspacePane {
     pub fn new(fill: Color) -> Self {
-        Self { fill, semantic_fill: None, children: Vec::new(), debug_name: None, layout_role: None, semantic_role: None }
+        Self {
+            fill,
+            semantic_fill: None,
+            children: Vec::new(),
+            debug_name: None,
+            layout_role: None,
+            semantic_role: None,
+        }
     }
 
     /// A pane whose fill resolves against the active theme at paint time.
     pub fn semantic(fill: SemanticColorRef) -> Self {
-        Self { semantic_fill: Some(fill), ..Self::new(Color::CLEAR) }
+        Self {
+            semantic_fill: Some(fill),
+            ..Self::new(Color::CLEAR)
+        }
     }
     pub fn child(mut self, child: AnyView) -> Self {
         self.children.push(child);
@@ -254,7 +271,8 @@ impl_primitive_view!(WorkspacePane);
 fn theme_radius_lg(node: &Node) -> f32 {
     // Swift reads `theme.radius.lg`; the Rust scene stores the resolved radius
     // on the node so a theme switch only has to re-run `update_node`.
-    node.attachment::<f32>("cove.workspace.pane.radius").unwrap_or(8.0)
+    node.attachment::<f32>("cove.workspace.pane.radius")
+        .unwrap_or(8.0)
 }
 
 /// Collapse/expand region. Holds its extent as a flex weight so a disappearing
@@ -271,8 +289,20 @@ pub struct WorkspaceRegionTransition {
 }
 
 impl WorkspaceRegionTransition {
-    pub fn new(is_visible: bool, horizontal: bool, sizing: WorkspaceRegionSizing, content: Option<AnyView>) -> Self {
-        Self { is_visible, horizontal, sizing, phase: vec![is_visible], content, animates: false }
+    pub fn new(
+        is_visible: bool,
+        horizontal: bool,
+        sizing: WorkspaceRegionSizing,
+        content: Option<AnyView>,
+    ) -> Self {
+        Self {
+            is_visible,
+            horizontal,
+            sizing,
+            phase: vec![is_visible],
+            content,
+            animates: false,
+        }
     }
     pub fn phase(mut self, phase: Vec<bool>) -> Self {
         self.phase = phase;
@@ -337,7 +367,11 @@ impl PrimitiveView for WorkspaceRegionTransition {
 
 impl WorkspaceRegionTransition {
     fn apply_extent(&self, layout: &LayoutNode) {
-        let target = if self.is_visible { self.sizing.extent(&WorkspaceTheme::default()) } else { 0.0 };
+        let target = if self.is_visible {
+            self.sizing.extent(&WorkspaceTheme::default())
+        } else {
+            0.0
+        };
         match self.sizing {
             WorkspaceRegionSizing::Fraction(_) => {
                 layout.set_flex_basis(0.0);
@@ -386,7 +420,12 @@ pub struct WorkspaceLabel {
 
 impl WorkspaceLabel {
     pub fn new(text: impl Into<String>, color: Color) -> Self {
-        Self { text: text.into(), color, size: 12.0, line_limit: Some(1) }
+        Self {
+            text: text.into(),
+            color,
+            size: 12.0,
+            line_limit: Some(1),
+        }
     }
     pub fn size(mut self, size: f32) -> Self {
         self.size = size;
@@ -430,7 +469,10 @@ pub struct WorkspaceVerticalTitle {
 
 impl WorkspaceVerticalTitle {
     pub fn new(title: impl Into<String>, color: Color) -> Self {
-        Self { title: title.into(), color }
+        Self {
+            title: title.into(),
+            color,
+        }
     }
     pub fn boxed(self) -> AnyView {
         AnyView::new(self)
@@ -438,7 +480,11 @@ impl WorkspaceVerticalTitle {
     fn clean_title(&self) -> String {
         let clean = self.title.replace('\n', " ");
         let clean = clean.trim();
-        if clean.is_empty() { "Panel".to_string() } else { clean.to_string() }
+        if clean.is_empty() {
+            "Panel".to_string()
+        } else {
+            clean.to_string()
+        }
     }
     fn is_short_latin(&self) -> bool {
         let title = self.clean_title();
@@ -529,66 +575,76 @@ impl PrimitiveView for WorkspaceTabButton {
         let press_document = document.clone();
         let press_group = group_id.clone();
         let press_panel = panel_id.clone();
-        registry.set_pointer(node, route.clone(), Rc::new(move |event, phase, _| {
-            if event.button != MouseButton::Left {
-                return cove_core::scene::EventResult::Ignored;
-            }
-            match phase {
-                cove_core::scene::PointerPhase::Down => {
-                    if let Some(chain) = FocusChainHolder::current() {
-                        chain.focus(Some(&press_node), false);
-                    }
-                    press_node.set_attachment(
-                        TAB_PRESS_KEY,
-                        TabPressState {
-                            down_x: event.x,
-                            down_y: event.y,
-                            last_x: event.x,
-                            last_y: event.y,
-                            did_drag: false,
-                        },
-                    );
-                    if let Some(capture) = PointerCaptureHolder::current() {
-                        capture.acquire(&press_node, false);
-                    }
-                    cove_core::scene::EventResult::Handled
+        registry.set_pointer(
+            node,
+            route.clone(),
+            Rc::new(move |event, phase, _| {
+                if event.button != MouseButton::Left {
+                    return cove_core::scene::EventResult::Ignored;
                 }
-                cove_core::scene::PointerPhase::Up => {
-                    let state = press_node.attachment::<TabPressState>(TAB_PRESS_KEY);
-                    press_node.remove_attachment(TAB_PRESS_KEY);
-                    press_node.set_cursor(Some(cove_platform::SystemCursor::Pointer));
-                    press_node.set_opacity(1.0);
-                    if let Some(root) = drag::workspace_root(&press_node) {
-                        drag::set_drag_overlay(None, &root);
-                    }
-                    if let Some(capture) = PointerCaptureHolder::current()
-                        && capture.target().as_ref() == Some(&press_node)
-                    {
-                        capture.release();
-                    }
-                    let Some(state) = state else {
-                        return cove_core::scene::EventResult::Ignored;
-                    };
-                    if state.did_drag {
-                        let resolution = drag::resolve_drag(
-                            event.x,
-                            event.y,
-                            &press_group,
-                            &press_panel,
-                            &press_document,
-                            &press_node,
+                match phase {
+                    cove_core::scene::PointerPhase::Down => {
+                        if let Some(chain) = FocusChainHolder::current() {
+                            chain.focus(Some(&press_node), false);
+                        }
+                        press_node.set_attachment(
+                            TAB_PRESS_KEY,
+                            TabPressState {
+                                down_x: event.x,
+                                down_y: event.y,
+                                last_x: event.x,
+                                last_y: event.y,
+                                did_drag: false,
+                            },
                         );
-                        drag::apply_resolution(resolution, &press_panel, &mut press_controller.borrow_mut());
-                        return cove_core::scene::EventResult::Handled;
+                        if let Some(capture) = PointerCaptureHolder::current() {
+                            capture.acquire(&press_node, false);
+                        }
+                        cove_core::scene::EventResult::Handled
                     }
-                    press_controller.borrow_mut().dispatch(WorkspaceCommand::SetActivePanel {
-                        group_id: press_group.clone(),
-                        panel_id: press_panel.clone(),
-                    });
-                    cove_core::scene::EventResult::Handled
+                    cove_core::scene::PointerPhase::Up => {
+                        let state = press_node.attachment::<TabPressState>(TAB_PRESS_KEY);
+                        press_node.remove_attachment(TAB_PRESS_KEY);
+                        press_node.set_cursor(Some(cove_platform::SystemCursor::Pointer));
+                        press_node.set_opacity(1.0);
+                        if let Some(root) = drag::workspace_root(&press_node) {
+                            drag::set_drag_overlay(None, &root);
+                        }
+                        if let Some(capture) = PointerCaptureHolder::current()
+                            && capture.target().as_ref() == Some(&press_node)
+                        {
+                            capture.release();
+                        }
+                        let Some(state) = state else {
+                            return cove_core::scene::EventResult::Ignored;
+                        };
+                        if state.did_drag {
+                            let resolution = drag::resolve_drag(
+                                event.x,
+                                event.y,
+                                &press_group,
+                                &press_panel,
+                                &press_document,
+                                &press_node,
+                            );
+                            drag::apply_resolution(
+                                resolution,
+                                &press_panel,
+                                &mut press_controller.borrow_mut(),
+                            );
+                            return cove_core::scene::EventResult::Handled;
+                        }
+                        press_controller
+                            .borrow_mut()
+                            .dispatch(WorkspaceCommand::SetActivePanel {
+                                group_id: press_group.clone(),
+                                panel_id: press_panel.clone(),
+                            });
+                        cove_core::scene::EventResult::Handled
+                    }
                 }
-            }
-        }));
+            }),
+        );
 
         let motion_node = node.clone();
         let motion_controller = controller.clone();
@@ -596,86 +652,111 @@ impl PrimitiveView for WorkspaceTabButton {
         let motion_group = group_id.clone();
         let motion_panel = panel_id.clone();
         let motion_title = title.clone();
-        registry.set_motion(node, route, Rc::new(move |event, _| {
-            if PointerCaptureHolder::current().and_then(|capture| capture.target()).as_ref() != Some(&motion_node) {
-                return cove_core::scene::EventResult::Ignored;
-            }
-            let Some(state) = motion_node.attachment::<TabPressState>(TAB_PRESS_KEY) else {
-                return cove_core::scene::EventResult::Ignored;
-            };
-            let dx = event.x - state.down_x;
-            let dy = event.y - state.down_y;
-            let draggable = motion_document.panels.get(&motion_panel).is_none_or(|panel| panel.is_draggable);
-            let mut did_drag = state.did_drag;
-            if !did_drag && draggable && dx.abs().max(dy.abs()) >= DRAG_THRESHOLD {
-                did_drag = true;
-                motion_node.set_cursor(Some(cove_platform::SystemCursor::Move));
-                motion_node.set_opacity(0.42);
-            }
-            motion_node.set_attachment(
-                TAB_PRESS_KEY,
-                TabPressState {
-                    down_x: state.down_x,
-                    down_y: state.down_y,
-                    last_x: event.x,
-                    last_y: event.y,
-                    did_drag,
-                },
-            );
-            if did_drag
-                && let Some(root) = drag::workspace_root(&motion_node)
-            {
-                let resolution = drag::resolve_drag(
-                    event.x,
-                    event.y,
-                    &motion_group,
-                    &motion_panel,
-                    &motion_document,
-                    &motion_node,
-                );
-                let overlay = drag::WorkspaceTabDragOverlayState {
-                    cursor_x: event.x,
-                    cursor_y: event.y,
-                    title: motion_title.clone(),
-                    resolution,
+        registry.set_motion(
+            node,
+            route,
+            Rc::new(move |event, _| {
+                if PointerCaptureHolder::current()
+                    .and_then(|capture| capture.target())
+                    .as_ref()
+                    != Some(&motion_node)
+                {
+                    return cove_core::scene::EventResult::Ignored;
+                }
+                let Some(state) = motion_node.attachment::<TabPressState>(TAB_PRESS_KEY) else {
+                    return cove_core::scene::EventResult::Ignored;
                 };
-                drag::set_drag_overlay(Some(&overlay), &root);
-            }
-            if did_drag {
-                cove_core::scene::EventResult::Handled
-            } else {
-                cove_core::scene::EventResult::Ignored
-            }
-        }));
+                let dx = event.x - state.down_x;
+                let dy = event.y - state.down_y;
+                let draggable = motion_document
+                    .panels
+                    .get(&motion_panel)
+                    .is_none_or(|panel| panel.is_draggable);
+                let mut did_drag = state.did_drag;
+                if !did_drag && draggable && dx.abs().max(dy.abs()) >= DRAG_THRESHOLD {
+                    did_drag = true;
+                    motion_node.set_cursor(Some(cove_platform::SystemCursor::Move));
+                    motion_node.set_opacity(0.42);
+                }
+                motion_node.set_attachment(
+                    TAB_PRESS_KEY,
+                    TabPressState {
+                        down_x: state.down_x,
+                        down_y: state.down_y,
+                        last_x: event.x,
+                        last_y: event.y,
+                        did_drag,
+                    },
+                );
+                if did_drag && let Some(root) = drag::workspace_root(&motion_node) {
+                    let resolution = drag::resolve_drag(
+                        event.x,
+                        event.y,
+                        &motion_group,
+                        &motion_panel,
+                        &motion_document,
+                        &motion_node,
+                    );
+                    let overlay = drag::WorkspaceTabDragOverlayState {
+                        cursor_x: event.x,
+                        cursor_y: event.y,
+                        title: motion_title.clone(),
+                        resolution,
+                    };
+                    drag::set_drag_overlay(Some(&overlay), &root);
+                }
+                if did_drag {
+                    cove_core::scene::EventResult::Handled
+                } else {
+                    cove_core::scene::EventResult::Ignored
+                }
+            }),
+        );
 
         let activate_controller = controller.clone();
         let activate_group = group_id.clone();
         let activate_panel = panel_id.clone();
         let style = node_handle;
-        registry.set_key(node, InputHandlerRoute::new(
-            cove_core::scene::InputHandlerRole::Workspace,
-            InputRoutingPriority::NORMAL,
-            "workspace.tab.key",
-        ), Rc::new(move |event, phase| {
-            if phase != cove_core::scene::EventPhase::Target {
-                return cove_core::scene::EventResult::Ignored;
-            }
-            if event.modifiers.has_ctrl() || event.modifiers.has_gui() || event.modifiers.has_alt() {
-                return cove_core::scene::EventResult::Ignored;
-            }
-            if event.scancode == cove_composition::Scancode::RETURN || event.scancode == cove_composition::Scancode::SPACE {
-                activate_controller.borrow_mut().dispatch(WorkspaceCommand::SetActivePanel {
-                    group_id: activate_group.clone(),
-                    panel_id: activate_panel.clone(),
-                });
-                return cove_core::scene::EventResult::Handled;
-            }
-            cove_core::scene::EventResult::Ignored
-        }));
+        registry.set_key(
+            node,
+            InputHandlerRoute::new(
+                cove_core::scene::InputHandlerRole::Workspace,
+                InputRoutingPriority::NORMAL,
+                "workspace.tab.key",
+            ),
+            Rc::new(move |event, phase| {
+                if phase != cove_core::scene::EventPhase::Target {
+                    return cove_core::scene::EventResult::Ignored;
+                }
+                if event.modifiers.has_ctrl()
+                    || event.modifiers.has_gui()
+                    || event.modifiers.has_alt()
+                {
+                    return cove_core::scene::EventResult::Ignored;
+                }
+                if event.scancode == cove_composition::Scancode::RETURN
+                    || event.scancode == cove_composition::Scancode::SPACE
+                {
+                    activate_controller
+                        .borrow_mut()
+                        .dispatch(WorkspaceCommand::SetActivePanel {
+                            group_id: activate_group.clone(),
+                            panel_id: activate_panel.clone(),
+                        });
+                    return cove_core::scene::EventResult::Handled;
+                }
+                cove_core::scene::EventResult::Ignored
+            }),
+        );
 
-        let mut accessibility = cove_core::scene::AccessibilitySemantics::new(cove_core::scene::AccessibilityRole::Tab);
+        let mut accessibility =
+            cove_core::scene::AccessibilitySemantics::new(cove_core::scene::AccessibilityRole::Tab);
         accessibility.label = title.clone();
-        accessibility.value = if is_pinned { "Pinned".to_string() } else { String::new() };
+        accessibility.value = if is_pinned {
+            "Pinned".to_string()
+        } else {
+            String::new()
+        };
         accessibility.identifier = panel_id.raw_value().to_string();
         accessibility.state.is_selected = is_active;
         accessibility.combines_children = true;
@@ -685,10 +766,12 @@ impl PrimitiveView for WorkspaceTabButton {
         let click_group = group_id.clone();
         let click_panel = panel_id.clone();
         actions.activate = Some(Rc::new(move || {
-            click_controller.borrow_mut().dispatch(WorkspaceCommand::SetActivePanel {
-                group_id: click_group.clone(),
-                panel_id: click_panel.clone(),
-            });
+            click_controller
+                .borrow_mut()
+                .dispatch(WorkspaceCommand::SetActivePanel {
+                    group_id: click_group.clone(),
+                    panel_id: click_panel.clone(),
+                });
         }));
         style.set_accessibility_actions(actions);
     }
@@ -708,7 +791,9 @@ impl PrimitiveView for WorkspaceTabButton {
         layout.set_flex_shrink(0.0);
     }
     fn children(&self, node: &Node) -> Vec<AnyView> {
-        let height = node.attachment::<f32>("cove.workspace.tabbar.height").unwrap_or(34.0);
+        let height = node
+            .attachment::<f32>("cove.workspace.tabbar.height")
+            .unwrap_or(34.0);
         let title_color = node
             .attachment::<Color>("cove.workspace.tabbar.activeColor")
             .unwrap_or(Color::WHITE);
@@ -716,7 +801,11 @@ impl PrimitiveView for WorkspaceTabButton {
         if self.is_pinned {
             row = row.child(WorkspaceLabel::new("•", title_color).size(6.0).boxed());
         }
-        row = row.child(WorkspaceLabel::new(self.title.clone(), title_color).size(11.0).boxed());
+        row = row.child(
+            WorkspaceLabel::new(self.title.clone(), title_color)
+                .size(11.0)
+                .boxed(),
+        );
         let mut children = vec![row.boxed()];
         // Keep the recorded height available to the host renderer.
         let _ = height;
@@ -741,8 +830,14 @@ impl PrimitiveView for WorkspaceTabBar {
     }
     fn update_node(&self, node: &Node) {
         let theme = resolve_theme(node);
-        node.set_attachment("cove.workspace.tabbar.height", theme.tab_bar_height.max(26.0));
-        node.set_attachment("cove.workspace.tabbar.activeColor", Color::from_rgba8(235, 235, 240, 255));
+        node.set_attachment(
+            "cove.workspace.tabbar.height",
+            theme.tab_bar_height.max(26.0),
+        );
+        node.set_attachment(
+            "cove.workspace.tabbar.activeColor",
+            Color::from_rgba8(235, 235, 240, 255),
+        );
     }
     fn make_layout_node(&self) -> Option<LayoutNode> {
         let layout = LayoutNode::new();
@@ -759,10 +854,16 @@ impl PrimitiveView for WorkspaceTabBar {
         layout.set_flex_shrink(0.0);
     }
     fn children(&self, _node: &Node) -> Vec<AnyView> {
-        let active = self.group.active_panel_id.clone().or_else(|| self.group.panels.first().cloned());
+        let active = self
+            .group
+            .active_panel_id
+            .clone()
+            .or_else(|| self.group.panels.first().cloned());
         let mut tabs = Vec::new();
         for panel_id in &self.group.panels {
-            let Some(panel) = self.document.panels.get(panel_id) else { continue };
+            let Some(panel) = self.document.panels.get(panel_id) else {
+                continue;
+            };
             let is_active = active.as_ref() == Some(panel_id);
             let button = WorkspaceTabButton {
                 group_id: self.group.id.clone(),
@@ -777,7 +878,12 @@ impl PrimitiveView for WorkspaceTabBar {
             let _ = &mut view;
             tabs.push(view);
         }
-        vec![WorkspaceBox::row().align(Align::Center).children(tabs).boxed()]
+        vec![
+            WorkspaceBox::row()
+                .align(Align::Center)
+                .children(tabs)
+                .boxed(),
+        ]
     }
 }
 impl_primitive_view!(WorkspaceTabBar);
@@ -826,10 +932,18 @@ impl PrimitiveView for WorkspaceTabGroupBody {
                 controller: self.controller.clone(),
             }));
         }
-        if let Some(active) = self.group.active_panel_id.clone().or_else(|| self.group.panels.first().cloned()) {
+        if let Some(active) = self
+            .group
+            .active_panel_id
+            .clone()
+            .or_else(|| self.group.panels.first().cloned())
+        {
             let panel = (self.content)(active.clone());
             let mut node_view = Node::new();
-            node_view.set_attachment(LayoutDebugAttachmentKey::DEBUG_NAME, format!("workspace-panel-{}", active.raw_value()));
+            node_view.set_attachment(
+                LayoutDebugAttachmentKey::DEBUG_NAME,
+                format!("workspace-panel-{}", active.raw_value()),
+            );
             let _ = node_view;
             // Swift wraps the panel in a vertical scroll view; the panel itself
             // is laid out at the region height and only overflow scrolls.
@@ -887,7 +1001,8 @@ impl PrimitiveView for WorkspaceLayoutNodeView {
         Some(layout)
     }
     fn update_layout(&self, layout: &LayoutNode) {
-        if matches!(self.node, WorkspaceLayoutNode::Split { axis, .. } if axis == WorkspaceSplitAxis::Vertical) {
+        if matches!(self.node, WorkspaceLayoutNode::Split { axis, .. } if axis == WorkspaceSplitAxis::Vertical)
+        {
             layout.set_flex_direction(FlexDirection::Column);
         } else {
             layout.set_flex_direction(FlexDirection::Row);
@@ -914,7 +1029,12 @@ impl WorkspaceLayoutNodeView {
                     self.surface,
                 )]
             }
-            WorkspaceLayoutNode::Split { axis, fraction, first, second } => {
+            WorkspaceLayoutNode::Split {
+                axis,
+                fraction,
+                first,
+                second,
+            } => {
                 let first_leaf = first.leaf_group_ids().into_iter().next();
                 let second_leaf = second.leaf_group_ids().into_iter().next();
                 let (Some(first_leaf), Some(second_leaf)) = (first_leaf, second_leaf) else {
@@ -962,11 +1082,13 @@ impl WorkspaceLayoutNodeView {
                     WorkspaceSplitAxis::Vertical => WorkspaceBox::column(),
                     WorkspaceSplitAxis::Horizontal => WorkspaceBox::row(),
                 };
-                vec![container
-                    .child(first_view)
-                    .child(AnyView::new(splitter))
-                    .child(second_view)
-                    .boxed()]
+                vec![
+                    container
+                        .child(first_view)
+                        .child(AnyView::new(splitter))
+                        .child(second_view)
+                        .boxed(),
+                ]
             }
         }
     }
@@ -995,7 +1117,14 @@ impl WorkspaceSplitDivider {
         address: Option<super::model::WorkspaceLayoutSplit>,
         hairline: f32,
     ) -> Self {
-        Self { debug_name, is_vertical_split, controller, address, split_id: None, hairline }
+        Self {
+            debug_name,
+            is_vertical_split,
+            controller,
+            address,
+            split_id: None,
+            hairline,
+        }
     }
 
     fn region(
@@ -1055,12 +1184,20 @@ impl PrimitiveView for WorkspaceSplitDivider {
             cove_platform::SystemCursor::ResizeVertical
         }));
         node.set_attachment("cove.workspace.split.hitSize", hit_size);
-        node.set_attachment(LayoutDebugAttachmentKey::DEBUG_NAME, self.debug_name.clone());
+        node.set_attachment(
+            LayoutDebugAttachmentKey::DEBUG_NAME,
+            self.debug_name.clone(),
+        );
         node.set_accessibility(Some({
-            let mut semantics = cove_core::scene::AccessibilitySemantics::new(cove_core::scene::AccessibilityRole::Slider);
+            let mut semantics = cove_core::scene::AccessibilitySemantics::new(
+                cove_core::scene::AccessibilityRole::Slider,
+            );
             semantics.label = format!(
                 "Resize {} workspace region",
-                self.split_id.as_ref().map(|id| id.raw_value().to_string()).unwrap_or_else(|| "split".into())
+                self.split_id
+                    .as_ref()
+                    .map(|id| id.raw_value().to_string())
+                    .unwrap_or_else(|| "split".into())
             );
             semantics
         }));
@@ -1074,29 +1211,33 @@ impl PrimitiveView for WorkspaceSplitDivider {
             "workspace.split",
         );
         let pointer_node = node.clone();
-        registry.set_pointer(node, route.clone(), Rc::new(move |event, phase, _| {
-            if event.button != MouseButton::Left {
-                return cove_core::scene::EventResult::Ignored;
-            }
-            match phase {
-                cove_core::scene::PointerPhase::Down => {
-                    if let Some(chain) = FocusChainHolder::current() {
-                        chain.focus(Some(&pointer_node), false);
+        registry.set_pointer(
+            node,
+            route.clone(),
+            Rc::new(move |event, phase, _| {
+                if event.button != MouseButton::Left {
+                    return cove_core::scene::EventResult::Ignored;
+                }
+                match phase {
+                    cove_core::scene::PointerPhase::Down => {
+                        if let Some(chain) = FocusChainHolder::current() {
+                            chain.focus(Some(&pointer_node), false);
+                        }
+                        if let Some(capture) = PointerCaptureHolder::current() {
+                            capture.acquire(&pointer_node, false);
+                        }
                     }
-                    if let Some(capture) = PointerCaptureHolder::current() {
-                        capture.acquire(&pointer_node, false);
+                    cove_core::scene::PointerPhase::Up => {
+                        if let Some(capture) = PointerCaptureHolder::current()
+                            && capture.target().as_ref() == Some(&pointer_node)
+                        {
+                            capture.release();
+                        }
                     }
                 }
-                cove_core::scene::PointerPhase::Up => {
-                    if let Some(capture) = PointerCaptureHolder::current()
-                        && capture.target().as_ref() == Some(&pointer_node)
-                    {
-                        capture.release();
-                    }
-                }
-            }
-            cove_core::scene::EventResult::Handled
-        }));
+                cove_core::scene::EventResult::Handled
+            }),
+        );
 
         let horizontal = self.is_vertical_split;
         let hairline = self.hairline;
@@ -1104,49 +1245,75 @@ impl PrimitiveView for WorkspaceSplitDivider {
         let address = self.address.clone();
         let split_id = self.split_id.clone();
         let motion_node = node.clone();
-        registry.set_motion(node, route, Rc::new(move |event, _| {
-            if PointerCaptureHolder::current().and_then(|capture| capture.target()).as_ref() != Some(&motion_node) {
-                return cove_core::scene::EventResult::Ignored;
-            }
-            let Some(geometry) = motion_node.attachment::<Vec<WorkspaceResizeGeometry>>(RESIZE_GEOMETRY_KEY) else {
-                return cove_core::scene::EventResult::Ignored;
-            };
-            let wanted = split_id.as_ref().map(|id| id.raw_value().to_string()).or_else(|| {
-                address
+        registry.set_motion(
+            node,
+            route,
+            Rc::new(move |event, _| {
+                if PointerCaptureHolder::current()
+                    .and_then(|capture| capture.target())
                     .as_ref()
-                    .map(|address| format!("layout-{}-{}", address.first_group.raw_value(), address.second_group.raw_value()))
-            });
-            let Some(wanted) = wanted else { return cove_core::scene::EventResult::Ignored };
-            let Some(geometry) = geometry.iter().find(|candidate| candidate.split_id == wanted) else {
-                return cove_core::scene::EventResult::Ignored;
-            };
-            if geometry.available <= 0.0 {
-                return cove_core::scene::EventResult::Ignored;
-            }
-            let position = if geometry.horizontal { event.x } else { event.y };
-            let value = (position - geometry.offset) / geometry.available;
-            let clamped = geometry.range.0.max(geometry.range.1.min(value));
-            let mut borrowed = controller.borrow_mut();
-            match &address {
-                Some(address) => {
-                    borrowed.dispatch(WorkspaceCommand::ResizeLayoutSplit {
-                        address: address.clone(),
-                        fraction: clamped,
-                    });
+                    != Some(&motion_node)
+                {
+                    return cove_core::scene::EventResult::Ignored;
                 }
-                None => {
-                    if let Some(split_id) = &split_id {
-                        borrowed.dispatch(WorkspaceCommand::ResizeSplit {
-                            split_id: split_id.clone(),
+                let Some(geometry) =
+                    motion_node.attachment::<Vec<WorkspaceResizeGeometry>>(RESIZE_GEOMETRY_KEY)
+                else {
+                    return cove_core::scene::EventResult::Ignored;
+                };
+                let wanted = split_id
+                    .as_ref()
+                    .map(|id| id.raw_value().to_string())
+                    .or_else(|| {
+                        address.as_ref().map(|address| {
+                            format!(
+                                "layout-{}-{}",
+                                address.first_group.raw_value(),
+                                address.second_group.raw_value()
+                            )
+                        })
+                    });
+                let Some(wanted) = wanted else {
+                    return cove_core::scene::EventResult::Ignored;
+                };
+                let Some(geometry) = geometry
+                    .iter()
+                    .find(|candidate| candidate.split_id == wanted)
+                else {
+                    return cove_core::scene::EventResult::Ignored;
+                };
+                if geometry.available <= 0.0 {
+                    return cove_core::scene::EventResult::Ignored;
+                }
+                let position = if geometry.horizontal {
+                    event.x
+                } else {
+                    event.y
+                };
+                let value = (position - geometry.offset) / geometry.available;
+                let clamped = geometry.range.0.max(geometry.range.1.min(value));
+                let mut borrowed = controller.borrow_mut();
+                match &address {
+                    Some(address) => {
+                        borrowed.dispatch(WorkspaceCommand::ResizeLayoutSplit {
+                            address: address.clone(),
                             fraction: clamped,
                         });
                     }
+                    None => {
+                        if let Some(split_id) = &split_id {
+                            borrowed.dispatch(WorkspaceCommand::ResizeSplit {
+                                split_id: split_id.clone(),
+                                fraction: clamped,
+                            });
+                        }
+                    }
                 }
-            }
-            let _ = horizontal;
-            let _ = hairline;
-            cove_core::scene::EventResult::Handled
-        }));
+                let _ = horizontal;
+                let _ = hairline;
+                cove_core::scene::EventResult::Handled
+            }),
+        );
     }
     fn make_layout_node(&self) -> Option<LayoutNode> {
         let layout = LayoutNode::new();
@@ -1211,7 +1378,9 @@ impl PrimitiveView for WorkspaceRailButton {
             borrowed.dispatch(WorkspaceCommand::Expand(group_id.clone()));
         }));
         node.set_accessibility_actions(actions);
-        let mut semantics = cove_core::scene::AccessibilitySemantics::new(cove_core::scene::AccessibilityRole::Button);
+        let mut semantics = cove_core::scene::AccessibilitySemantics::new(
+            cove_core::scene::AccessibilityRole::Button,
+        );
         semantics.label = self.title.clone();
         node.set_accessibility(Some(semantics));
     }
@@ -1227,7 +1396,11 @@ impl PrimitiveView for WorkspaceRailButton {
         Some(layout)
     }
     fn update_layout(&self, layout: &LayoutNode) {
-        layout.set_flex_direction(if self.horizontal { FlexDirection::Row } else { FlexDirection::Column });
+        layout.set_flex_direction(if self.horizontal {
+            FlexDirection::Row
+        } else {
+            FlexDirection::Column
+        });
         layout.set_align_items(Align::Center);
         layout.set_justify_content(Justify::Center);
     }
@@ -1236,7 +1409,11 @@ impl PrimitiveView for WorkspaceRailButton {
             .attachment::<Color>("cove.workspace.rail.labelColor")
             .unwrap_or(Color::from_rgba8(160, 160, 168, 255));
         if self.horizontal {
-            vec![WorkspaceLabel::new(self.title.clone(), color).size(11.0).boxed()]
+            vec![
+                WorkspaceLabel::new(self.title.clone(), color)
+                    .size(11.0)
+                    .boxed(),
+            ]
         } else {
             vec![WorkspaceVerticalTitle::new(self.title.clone(), color).boxed()]
         }
@@ -1261,15 +1438,29 @@ impl PrimitiveView for WorkspaceRail {
     }
     fn update_node(&self, node: &Node) {
         node.set_background_color(Some(Color::from_rgba8(24, 24, 27, 255)));
-        node.set_attachment("cove.workspace.rail.labelColor", Color::from_rgba8(160, 160, 168, 255));
+        node.set_attachment(
+            "cove.workspace.rail.labelColor",
+            Color::from_rgba8(160, 160, 168, 255),
+        );
     }
     fn make_layout_node(&self) -> Option<LayoutNode> {
         let edge = self.edge();
         let horizontal = matches!(edge, WorkspaceEdge::Top | WorkspaceEdge::Bottom);
         let layout = LayoutNode::new();
-        layout.set_flex_direction(if horizontal { FlexDirection::Row } else { FlexDirection::Column });
-        layout.set_align_items(if horizontal { Align::Center } else { Align::Center });
-        layout.set_gap(if horizontal { 6.0 } else { 4.0 }, cove_core::scene::Gutter::All);
+        layout.set_flex_direction(if horizontal {
+            FlexDirection::Row
+        } else {
+            FlexDirection::Column
+        });
+        layout.set_align_items(if horizontal {
+            Align::Center
+        } else {
+            Align::Center
+        });
+        layout.set_gap(
+            if horizontal { 6.0 } else { 4.0 },
+            cove_core::scene::Gutter::All,
+        );
         if horizontal {
             layout.set_height(Some(self.thickness));
             layout.set_width_percent(100.0);
@@ -1280,7 +1471,11 @@ impl PrimitiveView for WorkspaceRail {
     }
     fn update_layout(&self, layout: &LayoutNode) {
         let horizontal = matches!(self.edge(), WorkspaceEdge::Top | WorkspaceEdge::Bottom);
-        layout.set_flex_direction(if horizontal { FlexDirection::Row } else { FlexDirection::Column });
+        layout.set_flex_direction(if horizontal {
+            FlexDirection::Row
+        } else {
+            FlexDirection::Column
+        });
         if horizontal {
             layout.set_height(Some(self.thickness));
         } else {
@@ -1296,7 +1491,9 @@ impl PrimitiveView for WorkspaceRail {
         let mut buttons = Vec::new();
         for group in groups {
             for panel_id in &group.panels {
-                let Some(panel) = self.document.panels.get(panel_id) else { continue };
+                let Some(panel) = self.document.panels.get(panel_id) else {
+                    continue;
+                };
                 buttons.push(AnyView::new(WorkspaceRailButton {
                     group_id: group.id.clone(),
                     panel_id: panel_id.clone(),
@@ -1306,7 +1503,12 @@ impl PrimitiveView for WorkspaceRail {
                 }));
             }
         }
-        vec![WorkspaceBox::column().align(Align::Center).children(buttons).boxed()]
+        vec![
+            WorkspaceBox::column()
+                .align(Align::Center)
+                .children(buttons)
+                .boxed(),
+        ]
     }
 }
 impl_primitive_view!(WorkspaceRail);
@@ -1320,7 +1522,10 @@ impl WorkspaceRail {
 
 // MARK: - Document queries (Swift free functions)
 
-pub fn visible_groups(slot_id: &WorkspaceSlotID, document: &WorkspaceDocument) -> Vec<WorkspaceTabGroup> {
+pub fn visible_groups(
+    slot_id: &WorkspaceSlotID,
+    document: &WorkspaceDocument,
+) -> Vec<WorkspaceTabGroup> {
     document
         .slot(slot_id)
         .layout
@@ -1335,29 +1540,54 @@ pub fn visible_groups(slot_id: &WorkspaceSlotID, document: &WorkspaceDocument) -
 
 /// Drop collapsed, empty and missing groups so the renderer never sees a
 /// branch with nothing to draw.
-pub fn compact_layout(node: &WorkspaceLayoutNode, document: &WorkspaceDocument) -> Option<WorkspaceLayoutNode> {
+pub fn compact_layout(
+    node: &WorkspaceLayoutNode,
+    document: &WorkspaceDocument,
+) -> Option<WorkspaceLayoutNode> {
     match node {
         WorkspaceLayoutNode::Group(group_id) => {
             let group = document.groups.get(group_id)?;
-            (!group.is_collapsed && !group.panels.is_empty()).then(|| WorkspaceLayoutNode::Group(group_id.clone()))
+            (!group.is_collapsed && !group.panels.is_empty())
+                .then(|| WorkspaceLayoutNode::Group(group_id.clone()))
         }
-        WorkspaceLayoutNode::Split { axis, fraction, first, second } => {
-            match (compact_layout(first, document), compact_layout(second, document)) {
+        WorkspaceLayoutNode::Split {
+            axis,
+            fraction,
+            first,
+            second,
+        } => {
+            match (
+                compact_layout(first, document),
+                compact_layout(second, document),
+            ) {
                 (None, None) => None,
                 (Some(remaining), None) | (None, Some(remaining)) => Some(remaining),
-                (Some(next_first), Some(next_second)) => {
-                    Some(WorkspaceLayoutNode::split(*axis, *fraction, next_first, next_second))
-                }
+                (Some(next_first), Some(next_second)) => Some(WorkspaceLayoutNode::split(
+                    *axis,
+                    *fraction,
+                    next_first,
+                    next_second,
+                )),
             }
         }
     }
 }
 
-pub fn renderable_layout(slot_id: &WorkspaceSlotID, document: &WorkspaceDocument) -> Option<WorkspaceLayoutNode> {
-    document.slot(slot_id).layout.as_ref().and_then(|layout| compact_layout(layout, document))
+pub fn renderable_layout(
+    slot_id: &WorkspaceSlotID,
+    document: &WorkspaceDocument,
+) -> Option<WorkspaceLayoutNode> {
+    document
+        .slot(slot_id)
+        .layout
+        .as_ref()
+        .and_then(|layout| compact_layout(layout, document))
 }
 
-pub fn collapsed_groups_on(edge: WorkspaceEdge, document: &WorkspaceDocument) -> Vec<WorkspaceTabGroup> {
+pub fn collapsed_groups_on(
+    edge: WorkspaceEdge,
+    document: &WorkspaceDocument,
+) -> Vec<WorkspaceTabGroup> {
     document
         .collapsed
         .iter()
@@ -1367,7 +1597,11 @@ pub fn collapsed_groups_on(edge: WorkspaceEdge, document: &WorkspaceDocument) ->
         .collect()
 }
 
-pub fn rail_groups(slot_id: &WorkspaceSlotID, edge_override: Option<WorkspaceEdge>, document: &WorkspaceDocument) -> Vec<WorkspaceTabGroup> {
+pub fn rail_groups(
+    slot_id: &WorkspaceSlotID,
+    edge_override: Option<WorkspaceEdge>,
+    document: &WorkspaceDocument,
+) -> Vec<WorkspaceTabGroup> {
     if let Some(edge) = edge_override {
         return collapsed_groups_on(edge, document);
     }
@@ -1408,13 +1642,19 @@ pub fn chrome_thickness(slot: &WorkspaceSlot) -> f32 {
     RAIL_THICKNESS
 }
 
-pub fn chrome_rail_slots(edge: WorkspaceEdge, document: &WorkspaceDocument, shows_rails: bool) -> Vec<(WorkspaceSlotID, WorkspaceEdge, f32)> {
+pub fn chrome_rail_slots(
+    edge: WorkspaceEdge,
+    document: &WorkspaceDocument,
+    shows_rails: bool,
+) -> Vec<(WorkspaceSlotID, WorkspaceEdge, f32)> {
     let collapsed_on_edge = shows_rails && !collapsed_groups_on(edge, document).is_empty();
     let mut slots: Vec<&WorkspaceSlot> = document
         .slots
         .values()
         .filter(|slot| match slot.kind {
-            WorkspaceSlotKind::Chrome { edge: slot_edge, .. } => slot_edge == edge && (slot.layout.is_some() || collapsed_on_edge),
+            WorkspaceSlotKind::Chrome {
+                edge: slot_edge, ..
+            } => slot_edge == edge && (slot.layout.is_some() || collapsed_on_edge),
             _ => false,
         })
         .collect();
@@ -1431,7 +1671,9 @@ pub fn chrome_rail_slots(edge: WorkspaceEdge, document: &WorkspaceDocument, show
     let mapped: Vec<_> = slots
         .into_iter()
         .filter_map(|slot| match slot.kind {
-            WorkspaceSlotKind::Chrome { edge, .. } => Some((slot.id.clone(), edge, chrome_thickness(slot))),
+            WorkspaceSlotKind::Chrome { edge, .. } => {
+                Some((slot.id.clone(), edge, chrome_thickness(slot)))
+            }
             _ => None,
         })
         .collect();
@@ -1442,12 +1684,17 @@ pub fn chrome_rail_slots(edge: WorkspaceEdge, document: &WorkspaceDocument, show
     }
 }
 
-pub fn visible_chrome_rail_slots(edge: WorkspaceEdge, document: &WorkspaceDocument) -> Vec<(WorkspaceSlotID, WorkspaceEdge, f32)> {
+pub fn visible_chrome_rail_slots(
+    edge: WorkspaceEdge,
+    document: &WorkspaceDocument,
+) -> Vec<(WorkspaceSlotID, WorkspaceEdge, f32)> {
     let mut slots: Vec<&WorkspaceSlot> = document
         .slots
         .values()
         .filter(|slot| match slot.kind {
-            WorkspaceSlotKind::Chrome { edge: slot_edge, .. } => slot_edge == edge && slot.layout.is_some(),
+            WorkspaceSlotKind::Chrome {
+                edge: slot_edge, ..
+            } => slot_edge == edge && slot.layout.is_some(),
             _ => false,
         })
         .collect();
@@ -1455,13 +1702,19 @@ pub fn visible_chrome_rail_slots(edge: WorkspaceEdge, document: &WorkspaceDocume
     slots
         .into_iter()
         .filter_map(|slot| match slot.kind {
-            WorkspaceSlotKind::Chrome { edge, .. } => Some((slot.id.clone(), edge, chrome_thickness(slot))),
+            WorkspaceSlotKind::Chrome { edge, .. } => {
+                Some((slot.id.clone(), edge, chrome_thickness(slot)))
+            }
             _ => None,
         })
         .collect()
 }
 
-pub fn rail_plan(edge: WorkspaceEdge, document: &WorkspaceDocument, shows_rails: bool) -> Option<(WorkspaceSlotID, WorkspaceEdge, f32, Vec<WorkspaceTabGroup>)> {
+pub fn rail_plan(
+    edge: WorkspaceEdge,
+    document: &WorkspaceDocument,
+    shows_rails: bool,
+) -> Option<(WorkspaceSlotID, WorkspaceEdge, f32, Vec<WorkspaceTabGroup>)> {
     if !shows_rails {
         return None;
     }
@@ -1478,14 +1731,17 @@ pub fn rail_plan(edge: WorkspaceEdge, document: &WorkspaceDocument, shows_rails:
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::model::{WorkspacePanel, WorkspaceSlot};
+    use super::*;
 
     fn document() -> WorkspaceDocument {
         let mut panels = std::collections::BTreeMap::new();
         let panel = WorkspacePanel::new(WorkspacePanelID::new("viewport"), "Viewport");
         panels.insert(panel.id.clone(), panel);
-        let group = WorkspaceTabGroup::new(WorkspaceTabGroupID::new("center"), vec![WorkspacePanelID::new("viewport")]);
+        let group = WorkspaceTabGroup::new(
+            WorkspaceTabGroupID::new("center"),
+            vec![WorkspacePanelID::new("viewport")],
+        );
         let mut groups = std::collections::BTreeMap::new();
         groups.insert(group.id.clone(), group);
         let mut slots = std::collections::BTreeMap::new();
@@ -1494,7 +1750,9 @@ mod tests {
             WorkspaceSlot::new(
                 WorkspaceSlotID::center(),
                 WorkspaceSlotKind::Content,
-                Some(WorkspaceLayoutNode::Group(WorkspaceTabGroupID::new("center"))),
+                Some(WorkspaceLayoutNode::Group(WorkspaceTabGroupID::new(
+                    "center",
+                ))),
             ),
         );
         WorkspaceDocument::new(panels, groups, slots)
@@ -1515,12 +1773,18 @@ mod tests {
     fn center_slot_renders_its_group() {
         let document = document();
         let layout = renderable_layout(&WorkspaceSlotID::center(), &document).unwrap();
-        assert_eq!(layout.leaf_group_ids(), vec![WorkspaceTabGroupID::new("center")]);
+        assert_eq!(
+            layout.leaf_group_ids(),
+            vec![WorkspaceTabGroupID::new("center")]
+        );
     }
 
     #[test]
     fn chrome_rail_thickness_falls_back_for_non_chrome_slots() {
         let document = document();
-        assert_eq!(chrome_thickness(&document.slot(&WorkspaceSlotID::center())), RAIL_THICKNESS);
+        assert_eq!(
+            chrome_thickness(&document.slot(&WorkspaceSlotID::center())),
+            RAIL_THICKNESS
+        );
     }
 }

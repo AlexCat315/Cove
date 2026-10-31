@@ -26,7 +26,12 @@ fn translated_copy(count: usize) {
     };
     let mut source = DrawList::default();
     source
-        .load(points.clone(), triangles.clone(), batches.clone(), Default::default())
+        .load(
+            points.clone(),
+            triangles.clone(),
+            batches.clone(),
+            Default::default(),
+        )
         .unwrap();
     let mut destination = DrawList::default();
     // The first append shares the buffers; the translated append must detach.
@@ -53,15 +58,14 @@ fn translated_copy(count: usize) {
         assert_eq!(actual.v, original.v);
         assert_eq!(actual.color, original.color);
     }
-    assert!(
-        destination
-            .batches()
-            .iter()
-            .all(|batch| batch.scissor == batches.first().map(|b| b.scissor.unwrap())
-                && batch.texture_id == 42)
-    );
+    assert!(destination.batches().iter().all(|batch| batch.scissor
+        == batches.first().map(|b| b.scissor.unwrap())
+        && batch.texture_id == 42));
     if count > 0 {
-        assert_eq!(destination.batches().last().unwrap().index_offset, count as u32);
+        assert_eq!(
+            destination.batches().last().unwrap().index_offset,
+            count as u32
+        );
     }
 }
 

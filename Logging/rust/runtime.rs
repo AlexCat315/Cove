@@ -89,8 +89,10 @@ impl LogRuntime {
             file: Mutex::new(None),
             self_handle: Mutex::new(None),
         });
-        *runtime.self_handle.lock().unwrap_or_else(|error| error.into_inner()) =
-            Some(Arc::downgrade(&runtime));
+        *runtime
+            .self_handle
+            .lock()
+            .unwrap_or_else(|error| error.into_inner()) = Some(Arc::downgrade(&runtime));
         runtime
     }
 
@@ -134,10 +136,7 @@ impl LogRuntime {
         metadata: BTreeMap<String, LogValue>,
         location: Location,
     ) -> io::Result<Option<u64>> {
-        let handler = UnifiedLogHandler::new(
-            label,
-            self.clone_handle(),
-        );
+        let handler = UnifiedLogHandler::new(label, self.clone_handle());
         let mut event = LogEvent::new(level, message).with_location(location);
         if !metadata.is_empty() {
             event = event.with_metadata(metadata);
@@ -164,7 +163,9 @@ impl LogRuntime {
             capture.configured
                 && capture.configuration == configuration
                 && capture.identity.name == application
-                && run_id.as_ref().is_none_or(|run_id| capture.identity.run_id == *run_id)
+                && run_id
+                    .as_ref()
+                    .is_none_or(|run_id| capture.identity.run_id == *run_id)
         };
         if unchanged {
             return Ok(());
@@ -309,10 +310,7 @@ impl LogRuntime {
             }
         };
         if fallback {
-            crate::system::console_write(
-                5,
-                &format!("[Cove logging queue saturated] {message}"),
-            );
+            crate::system::console_write(5, &format!("[Cove logging queue saturated] {message}"));
         }
         if schedule {
             let this = self.clone_handle();
@@ -346,7 +344,10 @@ impl LogRuntime {
                 .dropped;
             let metadata = [
                 ("dropped".to_owned(), LogValue::from(drops.to_string())),
-                ("total_dropped".to_owned(), LogValue::from(total.to_string())),
+                (
+                    "total_dropped".to_owned(),
+                    LogValue::from(total.to_string()),
+                ),
             ]
             .into();
             let mut event = LogEvent::new(Level::Warning, "Log queue capacity exceeded");
@@ -416,16 +417,11 @@ impl LogRuntime {
         self.file.lock().unwrap_or_else(|e| e.into_inner()).take();
         self.write_failures.fetch_add(1, Ordering::Relaxed);
         let mut event = LogEvent::new(Level::Error, "Log file output failed");
-        event.metadata = Some(
-            [("error".to_owned(), LogValue::from(error.to_string()))]
-                .into(),
-        );
+        event.metadata = Some([("error".to_owned(), LogValue::from(error.to_string()))].into());
         self.clone_handle().logger("com.cove.logging").log(&event);
         crate::system::console_write(
             5,
-            &format!(
-                "Cove log file unavailable: {error}; console and history remain active"
-            ),
+            &format!("Cove log file unavailable: {error}; console and history remain active"),
         );
     }
 
@@ -553,7 +549,6 @@ impl LogRuntime {
     }
 }
 
-
 /// Retained for the bootstrap call in `system.rs`.
 ///
 /// It used to register the runtime in a thread-local so `&self` methods could
@@ -575,7 +570,11 @@ fn process_name() -> String {
 
 /// Opens the session file for a runtime configured by `LogSystem`.
 pub fn open_storage(root: &Path, application: &str, storage: Storage) -> io::Result<LogFile> {
-    if !storage.directory.as_ref().is_none_or(|path| path.starts_with(root)) {
+    if !storage
+        .directory
+        .as_ref()
+        .is_none_or(|path| path.starts_with(root))
+    {
         fs::create_dir_all(root)?;
     }
     LogFile::new(root, application, storage)

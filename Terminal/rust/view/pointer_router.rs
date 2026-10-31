@@ -11,10 +11,14 @@
 //! The wheel scrolls the scrollback, or is reported/turned into arrow keys for
 //! full-screen programs.
 
-use crate::engine::{MouseAction, MouseButton, SelectionPhase, TerminalMouseEvent, TerminalPointer};
+use crate::engine::{
+    MouseAction, MouseButton, SelectionPhase, TerminalMouseEvent, TerminalPointer,
+};
 use crate::session::TerminalSession;
 use crate::view::url_detector::{self, UrlMatch};
-use cove_platform::{MouseButton as PlatformButton, MouseButtonEvent, MouseMotionEvent, MouseWheelEvent};
+use cove_platform::{
+    MouseButton as PlatformButton, MouseButtonEvent, MouseMotionEvent, MouseWheelEvent,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Gesture {
@@ -70,7 +74,13 @@ impl PointerRouter {
     }
 
     /// Grid position under a window-space point, clamped to the grid.
-    pub fn pointer(&self, geometry: &PointerGeometry, x: f32, y: f32, nanoseconds: u64) -> Option<TerminalPointer> {
+    pub fn pointer(
+        &self,
+        geometry: &PointerGeometry,
+        x: f32,
+        y: f32,
+        nanoseconds: u64,
+    ) -> Option<TerminalPointer> {
         if geometry.cell.0 <= 0.0 || geometry.cell.1 <= 0.0 {
             return None;
         }
@@ -83,7 +93,13 @@ impl PointerRouter {
         // The engine measures in the integer cell size it was given.
         let scale_x = geometry.engine_cell.0 as f64 / geometry.cell.0.max(1.0) as f64;
         let scale_y = geometry.engine_cell.1 as f64 / geometry.cell.1.max(1.0) as f64;
-        Some(TerminalPointer { column, row, x: local_x * scale_x, y: local_y * scale_y, nanoseconds })
+        Some(TerminalPointer {
+            column,
+            row,
+            x: local_x * scale_x,
+            y: local_y * scale_y,
+            nanoseconds,
+        })
     }
 
     /// A press. Returns whether the terminal handled it.
@@ -115,7 +131,9 @@ impl PointerRouter {
         if event.button != PlatformButton::Left {
             return true;
         }
-        self.gesture.set(Gesture::Selecting { rectangle: event.modifiers.has_alt() });
+        self.gesture.set(Gesture::Selecting {
+            rectangle: event.modifiers.has_alt(),
+        });
         session.select(SelectionPhase::Press, &pointer, event.modifiers.has_alt());
         true
     }
@@ -152,7 +170,10 @@ impl PointerRouter {
                 } else {
                     let frame = session.frame();
                     let marked = frame
-                        .cell(pointer.row.min(frame.rows.saturating_sub(1)), pointer.column.min(frame.columns.saturating_sub(1)))
+                        .cell(
+                            pointer.row.min(frame.rows.saturating_sub(1)),
+                            pointer.column.min(frame.columns.saturating_sub(1)),
+                        )
                         .is_hyperlink;
                     *self.hovered.borrow_mut() = if marked {
                         None
@@ -166,7 +187,12 @@ impl PointerRouter {
     }
 
     /// A release. Returns whether the terminal handled it.
-    pub fn up(&self, event: &MouseButtonEvent, session: &TerminalSession, geometry: &PointerGeometry) -> bool {
+    pub fn up(
+        &self,
+        event: &MouseButtonEvent,
+        session: &TerminalSession,
+        geometry: &PointerGeometry,
+    ) -> bool {
         let gesture = self.gesture.replace(Gesture::None);
         let Some(pointer) = self.pointer(geometry, event.x, event.y, now_nanos()) else {
             return false;
@@ -185,7 +211,12 @@ impl PointerRouter {
     }
 
     /// Wheel input. Returns whether the terminal handled it.
-    pub fn wheel(&self, event: &MouseWheelEvent, session: &TerminalSession, line_step: f32) -> bool {
+    pub fn wheel(
+        &self,
+        event: &MouseWheelEvent,
+        session: &TerminalSession,
+        line_step: f32,
+    ) -> bool {
         if line_step <= 0.0 {
             return false;
         }
@@ -199,9 +230,18 @@ impl PointerRouter {
         let rows = rows as i32;
         let steps = rows.unsigned_abs().min(50);
         if session.is_mouse_tracking() {
-            let pointer = TerminalPointer::new(0, 0, event.mouse_x.unwrap_or(0.0) as f64, event.mouse_y.unwrap_or(0.0) as f64);
+            let pointer = TerminalPointer::new(
+                0,
+                0,
+                event.mouse_x.unwrap_or(0.0) as f64,
+                event.mouse_y.unwrap_or(0.0) as f64,
+            );
             for _ in 0..steps {
-                let button = if rows > 0 { MouseButton::WheelUp } else { MouseButton::WheelDown };
+                let button = if rows > 0 {
+                    MouseButton::WheelUp
+                } else {
+                    MouseButton::WheelDown
+                };
                 self.report(MouseAction::Press, Some(button), &pointer, session);
             }
         } else if session.is_alternate_screen() {
@@ -267,5 +307,8 @@ fn modifiers(modifiers: cove_platform::KeyModifiers) -> crate::engine::KeyModifi
 
 fn now_nanos() -> u64 {
     static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
-    START.get_or_init(std::time::Instant::now).elapsed().as_nanos() as u64
+    START
+        .get_or_init(std::time::Instant::now)
+        .elapsed()
+        .as_nanos() as u64
 }

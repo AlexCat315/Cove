@@ -1,7 +1,7 @@
 //! Translation of Theme/Tokens/ControlSize.swift.
+use crate::{AnyView, ProvideCompositionLocalModifier, View, ViewExt};
 use cove_core::scene::CompositionLocal;
 use std::rc::Rc;
-use crate::{AnyView, ProvideCompositionLocalModifier, View, ViewExt};
 
 /// Shared control density.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -58,12 +58,18 @@ impl ControlSizeEnvironment {
 
 pub trait ControlSizeViewExt: View + Sized + 'static {
     fn control_size(self, size: ControlSize) -> crate::ModifiedContent {
-        self.modifier(ProvideCompositionLocalModifier::new(ControlSizeEnvironment::key(), size))
+        self.modifier(ProvideCompositionLocalModifier::new(
+            ControlSizeEnvironment::key(),
+            size,
+        ))
     }
 }
 impl<T: View + Sized + 'static> ControlSizeViewExt for T {}
 
 /// Erased helper for call sites that build their body dynamically.
 pub fn control_size_environment<V: View + 'static>(view: V, size: ControlSize) -> AnyView {
-    AnyView::new(view.modifier(ProvideCompositionLocalModifier::new(ControlSizeEnvironment::key(), size)))
+    AnyView::new(view.modifier(ProvideCompositionLocalModifier::new(
+        ControlSizeEnvironment::key(),
+        size,
+    )))
 }

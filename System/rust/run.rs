@@ -7,8 +7,8 @@
 use super::command::{ProcessBudget, ProcessCommand, ProcessError, ProcessOutput};
 use super::event_buffer::ProcessFailure;
 use super::session::ProcessSession;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 pub enum ProcessRunner {}
 
@@ -29,8 +29,7 @@ impl ProcessRunner {
             match session.next_event(None) {
                 Ok(Some(event)) => {
                     result.append(&event);
-                    if result.stdout.len().saturating_add(result.stderr.len())
-                        > budget.output_bytes
+                    if result.stdout.len().saturating_add(result.stderr.len()) > budget.output_bytes
                     {
                         session.cancel();
                         return Err(ProcessFailure::Process(ProcessError::OutputLimit));
@@ -70,11 +69,11 @@ impl ProcessRunner {
             }
         };
         check()?;
-        if !input.is_empty() {
-            if let Err(error) = session.write(input) {
-                session.cancel();
-                return Err(error);
-            }
+        if !input.is_empty()
+            && let Err(error) = session.write(input)
+        {
+            session.cancel();
+            return Err(error);
         }
         session.close_input();
         let mut result = ProcessOutput::new();
@@ -101,8 +100,10 @@ impl ProcessRunner {
 /// runner reports an owned copy so callers get a plain `ProcessFailure`.
 fn shared_failure(failure: std::sync::Arc<ProcessFailure>) -> ProcessFailure {
     match failure.as_ref() {
-        ProcessFailure::Process(error) => ProcessFailure::Process(error.clone()),
-        ProcessFailure::Io(error) => ProcessFailure::Io(std::io::Error::new(error.kind(), error.to_string())),
+        ProcessFailure::Process(error) => ProcessFailure::Process(*error),
+        ProcessFailure::Io(error) => {
+            ProcessFailure::Io(std::io::Error::new(error.kind(), error.to_string()))
+        }
         ProcessFailure::Cancelled => ProcessFailure::Cancelled,
         ProcessFailure::Buffer(error) => ProcessFailure::Buffer(*error),
     }

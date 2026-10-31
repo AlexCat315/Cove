@@ -40,7 +40,11 @@ impl DateRangePreset {
         title: impl Into<String>,
         resolve: impl Fn(Date, &Calendar) -> Option<(Date, Date)> + 'static,
     ) -> Self {
-        Self { id: id.into(), title: title.into(), resolve: Rc::new(resolve) }
+        Self {
+            id: id.into(),
+            title: title.into(),
+            resolve: Rc::new(resolve),
+        }
     }
 
     /// The normalized range for `today`, or `None` when the resolver cannot
@@ -58,7 +62,9 @@ impl DateRangePreset {
 
     pub fn yesterday(title: impl Into<String>) -> Self {
         Self::new("yesterday", title, |today, calendar| {
-            calendar.date_by_adding(CalendarUnit::Day, -1, today).map(|day| (day, day))
+            calendar
+                .date_by_adding(CalendarUnit::Day, -1, today)
+                .map(|day| (day, day))
         })
     }
 
@@ -66,15 +72,21 @@ impl DateRangePreset {
     pub fn last_days(count: i32, title: Option<String>) -> Self {
         let count = count.max(1);
         let title = title.unwrap_or_else(|| format!("Last {count} days"));
-        Self::new(format!("last-{count}-days"), title, move |today, calendar| {
-            calendar
-                .date_by_adding(CalendarUnit::Day, 1 - count, today)
-                .map(|start| (start, today))
-        })
+        Self::new(
+            format!("last-{count}-days"),
+            title,
+            move |today, calendar| {
+                calendar
+                    .date_by_adding(CalendarUnit::Day, 1 - count, today)
+                    .map(|start| (start, today))
+            },
+        )
     }
 
     pub fn this_month(title: impl Into<String>) -> Self {
-        Self::new("this-month", title, |today, calendar| month_containing(today, calendar))
+        Self::new("this-month", title, |today, calendar| {
+            month_containing(today, calendar)
+        })
     }
 
     pub fn last_month(title: impl Into<String>) -> Self {

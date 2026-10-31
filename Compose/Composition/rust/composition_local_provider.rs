@@ -4,8 +4,8 @@
 //! by the wrapped content instead of pushing it into descendant layout/render
 //! targets. Composition locals must live on an ancestor of every consumer, so
 //! the wrapper node is the correct owner whether or not it has a layout node.
-use cove_core::scene::Node;
 use cove_core::CompositionLocal;
+use cove_core::scene::Node;
 use std::rc::Rc;
 
 /// Marker for modifiers whose effect must be applied to the wrapper node.
@@ -43,7 +43,9 @@ impl<Value> ProvideCompositionLocalModifier<Value> {
         Self { local, value }
     }
 }
-impl<Value: Clone + PartialEq + 'static> crate::ViewModifier for ProvideCompositionLocalModifier<Value> {
+impl<Value: Clone + PartialEq + 'static> crate::ViewModifier
+    for ProvideCompositionLocalModifier<Value>
+{
     fn scope_apply(&self, node: &Node) -> Option<bool> {
         if node.composition_value(&self.local) == self.value {
             return Some(false);
@@ -55,7 +57,9 @@ impl<Value: Clone + PartialEq + 'static> crate::ViewModifier for ProvideComposit
         true
     }
 }
-impl<Value: Clone + PartialEq + 'static> ScopeApplyingModifier for ProvideCompositionLocalModifier<Value> {
+impl<Value: Clone + PartialEq + 'static> ScopeApplyingModifier
+    for ProvideCompositionLocalModifier<Value>
+{
     fn _apply_scope(&self, node: &Node) -> bool {
         crate::ViewModifier::scope_apply(self, node).unwrap_or(false)
     }

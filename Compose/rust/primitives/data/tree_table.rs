@@ -20,10 +20,6 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::rc::Rc;
 
-use cove_composition::Scancode;
-use cove_core::scene::{AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, Justify, Wrap};
-use cove_core::{Binding, State};
-use cove_platform::KeyEvent;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::primitives::controls::button::{Button, ButtonIcon, ButtonIconSource};
@@ -31,11 +27,19 @@ use crate::primitives::data::data_table::{
     DataTable, DataTableModel, DataTableNavigation, DataTableOptions, DataTableSelection,
     DataTableSelectionMode,
 };
-use crate::primitives::data::lists::table::{ColumnVisibility, TableColumn, TableColumnLayout, TableLayout};
+use crate::primitives::data::lists::table::{
+    ColumnVisibility, TableColumn, TableColumnLayout, TableLayout,
+};
 use crate::primitives::media::ui_icon_catalog;
-use crate::theme::styles::buttons::{ButtonRole, ButtonStyleViewExt};
 use crate::theme::TextScalerReader;
+use crate::theme::styles::buttons::{ButtonRole, ButtonStyleViewExt};
 use crate::{AnyView, BoxView, TupleView, View};
+use cove_composition::Scancode;
+use cove_core::scene::{
+    AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, Justify, Wrap,
+};
+use cove_core::{Binding, State};
+use cove_platform::KeyEvent;
 
 /// One visible line of a `TreeTable`: the caller's record plus its place in the
 /// hierarchy. Rows are rebuilt from the roots whenever expansion changes.
@@ -49,7 +53,12 @@ pub struct TreeTableRow<Record> {
 
 impl<Record> TreeTableRow<Record> {
     pub fn new(record: Record, depth: usize, has_children: bool, is_expanded: bool) -> Self {
-        Self { record, depth, has_children, is_expanded }
+        Self {
+            record,
+            depth,
+            has_children,
+            is_expanded,
+        }
     }
 }
 
@@ -169,7 +178,12 @@ where
         for record in records {
             let kids = children(record);
             let is_expanded = kids.is_some() && expanded.contains(&id_of(record));
-            result.push(TreeTableRow::new(record.clone(), depth, kids.is_some(), is_expanded));
+            result.push(TreeTableRow::new(
+                record.clone(),
+                depth,
+                kids.is_some(),
+                is_expanded,
+            ));
             if is_expanded && let Some(kids) = kids {
                 visit(&kids, depth + 1, children, id_of, expanded, result);
             }
@@ -195,7 +209,13 @@ where
     local_expanded: State<BTreeSet<Id>>,
     local_selection: State<DataTableSelection<Id>>,
     navigation: State<DataTableNavigation<Id>>,
-    model: RefCell<Option<(Vec<Id>, Vec<bool>, Rc<DataTableModel<TreeTableRow<Record>, Id>>)>>,
+    model: RefCell<
+        Option<(
+            Vec<Id>,
+            Vec<bool>,
+            Rc<DataTableModel<TreeTableRow<Record>, Id>>,
+        )>,
+    >,
 }
 
 impl<Record, Id> TreeTable<Record, Id>
@@ -209,10 +229,16 @@ where
         children: impl Fn(&Record) -> Option<Vec<Record>> + 'static,
         columns: Vec<TreeTableColumn<Record>>,
     ) -> Self {
-        assert!(!columns.is_empty(), "TreeTable requires at least one column");
+        assert!(
+            !columns.is_empty(),
+            "TreeTable requires at least one column"
+        );
         let mut seen = HashSet::new();
         for column in &columns {
-            assert!(seen.insert(column.id.clone()), "TreeTable column IDs must be unique");
+            assert!(
+                seen.insert(column.id.clone()),
+                "TreeTable column IDs must be unique"
+            );
         }
         Self {
             roots,
@@ -303,103 +329,133 @@ where
                     let toggle_expanded = expanded_binding.clone();
                     let toggle_fallback = fallback.clone();
                     let toggle_id_of = id_of.clone();
-                    TableColumn::new(column.id.clone(), column.title.clone(), move |row: &TreeTableRow<Record>| {
-                        let depth = row.depth;
-                        let has_children = row.has_children;
-                        let is_expanded = row.is_expanded;
-                        let record = row.record.clone();
-                        let toggle_id = toggle_id_of(&row.record);
+                    TableColumn::new(
+                        column.id.clone(),
+                        column.title.clone(),
+                        move |row: &TreeTableRow<Record>| {
+                            let depth = row.depth;
+                            let has_children = row.has_children;
+                            let is_expanded = row.is_expanded;
+                            let record = row.record.clone();
+                            let toggle_id = toggle_id_of(&row.record);
 
-                        let toggle: Rc<dyn Fn()> = {
-                            let expanded_binding = toggle_expanded.clone();
-                            let fallback = toggle_fallback.clone();
-                            let toggle_id = toggle_id.clone();
-                            Rc::new(move || {
-                                let mut next = match &expanded_binding {
-                                    Some(binding) => binding.get(),
-                                    None => fallback.get(),
-                                };
-                                if !next.remove(&toggle_id) {
-                                    next.insert(toggle_id.clone());
-                                }
-                                match &expanded_binding {
-                                    Some(binding) => binding.set(next),
-                                    None => fallback.set(next),
-                                }
-                            })
-                        };
+                            let toggle: Rc<dyn Fn()> = {
+                                let expanded_binding = toggle_expanded.clone();
+                                let fallback = toggle_fallback.clone();
+                                let toggle_id = toggle_id.clone();
+                                Rc::new(move || {
+                                    let mut next = match &expanded_binding {
+                                        Some(binding) => binding.get(),
+                                        None => fallback.get(),
+                                    };
+                                    if !next.remove(&toggle_id) {
+                                        next.insert(toggle_id.clone());
+                                    }
+                                    match &expanded_binding {
+                                        Some(binding) => binding.set(next),
+                                        None => fallback.set(next),
+                                    }
+                                })
+                            };
 
-                        let content = content.clone();
-                        AnyView::new(TextScalerReader::new(move |scaler: crate::theme::TextScaler| {
-                            let indent = scaler.scale(indentation) * (depth.min(12) as f32);
-                            let mut children = vec![AnyView::new(
-                                AnyView::new(crate::EmptyView)
-                                    .frame_width(indent.max(0.0))
-                                    .flex_with(0.0, 0.0, None),
-                            )];
-                            if has_children {
-                                let icon = if is_expanded {
-                                    ButtonIconSource::resource(ui_icon_catalog::navigation::chevron_down())
-                                } else {
-                                    ButtonIconSource::resource(ui_icon_catalog::navigation::chevron_right())
-                                };
-                                let label = if is_expanded { "Collapse" } else { "Expand" };
-                                let action = toggle.clone();
-                                children.push(AnyView::new(
-                                    AnyView::new(
-                                        Button::new(ButtonIcon::new(icon, Some(12.0), None), move || action())
-                                            .role(ButtonRole::Normal),
-                                    )
-                                    .button_style(crate::theme::styles::buttons::secondary())
-                                    .flex_with(0.0, 0.0, None)
-                                    .accessibility({
-                                        let label = label.to_string();
-                                        move |semantics: &mut AccessibilitySemantics| {
-                                            semantics.label = label.clone();
-                                            semantics.state.is_expanded = Some(is_expanded);
-                                        }
-                                    }),
-                                ));
-                            } else {
-                                children.push(AnyView::new(
-                                    AnyView::new(crate::EmptyView)
-                                        .frame_width(20.0)
-                                        .flex_with(0.0, 0.0, None),
-                                ));
-                            }
-                            children.push(AnyView::new(
-                                AnyView::new(BoxView::new(
-                                    FlexDirection::Row,
-                                    Align::Center,
-                                    Justify::FlexStart,
-                                    Wrap::NoWrap,
-                                    0.0,
-                                    (content)(&record),
-                                ))
-                                .flex_with(1.0, 1.0, Some(0.0))
-                                .frame(None, None, Some(0.0), None, None, None),
-                            ));
-                            AnyView::new(BoxView::new(
-                                FlexDirection::Row,
-                                Align::Center,
-                                Justify::FlexStart,
-                                Wrap::NoWrap,
-                                2.0,
-                                AnyView::new(TupleView::new(children)),
+                            let content = content.clone();
+                            AnyView::new(TextScalerReader::new(
+                                move |scaler: crate::theme::TextScaler| {
+                                    let indent = scaler.scale(indentation) * (depth.min(12) as f32);
+                                    let mut children = vec![AnyView::new(
+                                        AnyView::new(crate::EmptyView)
+                                            .frame_width(indent.max(0.0))
+                                            .flex_with(0.0, 0.0, None),
+                                    )];
+                                    if has_children {
+                                        let icon = if is_expanded {
+                                            ButtonIconSource::resource(
+                                                ui_icon_catalog::navigation::chevron_down(),
+                                            )
+                                        } else {
+                                            ButtonIconSource::resource(
+                                                ui_icon_catalog::navigation::chevron_right(),
+                                            )
+                                        };
+                                        let label = if is_expanded { "Collapse" } else { "Expand" };
+                                        let action = toggle.clone();
+                                        children.push(
+                                            AnyView::new(
+                                                AnyView::new(
+                                                    Button::new(
+                                                        ButtonIcon::new(icon, Some(12.0), None),
+                                                        move || action(),
+                                                    )
+                                                    .role(ButtonRole::Normal),
+                                                )
+                                                .button_style(
+                                                    crate::theme::styles::buttons::secondary(),
+                                                )
+                                                .flex_with(0.0, 0.0, None)
+                                                .accessibility({
+                                                    let label = label.to_string();
+                                                    move |semantics: &mut AccessibilitySemantics| {
+                                                        semantics.label = label.clone();
+                                                        semantics.state.is_expanded =
+                                                            Some(is_expanded);
+                                                    }
+                                                }),
+                                            ),
+                                        );
+                                    } else {
+                                        children.push(AnyView::new(
+                                            AnyView::new(crate::EmptyView)
+                                                .frame_width(20.0)
+                                                .flex_with(0.0, 0.0, None),
+                                        ));
+                                    }
+                                    children.push(AnyView::new(
+                                        AnyView::new(BoxView::new(
+                                            FlexDirection::Row,
+                                            Align::Center,
+                                            Justify::FlexStart,
+                                            Wrap::NoWrap,
+                                            0.0,
+                                            (content)(&record),
+                                        ))
+                                        .flex_with(1.0, 1.0, Some(0.0))
+                                        .frame(
+                                            None,
+                                            None,
+                                            Some(0.0),
+                                            None,
+                                            None,
+                                            None,
+                                        ),
+                                    ));
+                                    AnyView::new(BoxView::new(
+                                        FlexDirection::Row,
+                                        Align::Center,
+                                        Justify::FlexStart,
+                                        Wrap::NoWrap,
+                                        2.0,
+                                        AnyView::new(TupleView::new(children)),
+                                    ))
+                                },
                             ))
-                        }))
-                    })
+                        },
+                    )
                 } else {
-                    TableColumn::new(column.id.clone(), column.title.clone(), move |row: &TreeTableRow<Record>| {
-                        (content)(&row.record)
-                    })
+                    TableColumn::new(
+                        column.id.clone(),
+                        column.title.clone(),
+                        move |row: &TreeTableRow<Record>| (content)(&row.record),
+                    )
                 };
-                let visibility = if index == 0 { ColumnVisibility::Required } else { column.visibility };
+                let visibility = if index == 0 {
+                    ColumnVisibility::Required
+                } else {
+                    column.visibility
+                };
                 mapped.layout(column.layout).visibility(visibility)
             })
             .collect()
     }
-
 }
 
 fn next_navigation_request_id() -> u64 {
@@ -439,10 +495,12 @@ where
         }
 
         table.row_key_handler = Some(self.key_handler(model));
-        AnyView::new(AnyView::new(table).accessibility(|semantics: &mut AccessibilitySemantics| {
-            semantics.role = AccessibilityRole::Tree;
-            semantics.label = "Tree table".to_string();
-        }))
+        AnyView::new(
+            AnyView::new(table).accessibility(|semantics: &mut AccessibilitySemantics| {
+                semantics.role = AccessibilityRole::Tree;
+                semantics.label = "Tree table".to_string();
+            }),
+        )
     }
 
     fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
@@ -461,7 +519,10 @@ where
 {
     /// The row-navigation handler. It owns clones of every store it may write,
     /// so it cannot borrow `self` for the node's lifetime.
-    fn key_handler(&self, model: Rc<DataTableModel<TreeTableRow<Record>, Id>>) -> Rc<dyn Fn(&KeyEvent, &Id) -> bool> {
+    fn key_handler(
+        &self,
+        model: Rc<DataTableModel<TreeTableRow<Record>, Id>>,
+    ) -> Rc<dyn Fn(&KeyEvent, &Id) -> bool> {
         let is_enabled = self.options.is_enabled;
         let expanded_binding = self.options.expanded.clone();
         let fallback = self.local_expanded.clone();
@@ -478,8 +539,12 @@ where
             {
                 return false;
             }
-            let Some(index) = model.index_for(row_id) else { return false };
-            let Some(row) = model.record_at(index) else { return false };
+            let Some(index) = model.index_for(row_id) else {
+                return false;
+            };
+            let Some(row) = model.record_at(index) else {
+                return false;
+            };
 
             let expanded = || match &expanded_binding {
                 Some(binding) => binding.get(),
@@ -537,13 +602,11 @@ where
                     if row.depth == 0 {
                         return false;
                     }
-                    let parent = (0..index)
-                        .rev()
-                        .find(|position| {
-                            model
-                                .record_at(*position)
-                                .is_some_and(|other| other.depth < row.depth)
-                        });
+                    let parent = (0..index).rev().find(|position| {
+                        model
+                            .record_at(*position)
+                            .is_some_and(|other| other.depth < row.depth)
+                    });
                     if let Some(parent) = parent
                         && let Some(parent_id) = model.row_id_at(parent)
                     {

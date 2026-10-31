@@ -82,7 +82,9 @@ impl<T: Clone + Send + 'static> ErasedState for StateField<T> {
     fn dev_tools_read(&self) -> Option<Rc<dyn Fn() -> String>> {
         let state = self.state.clone();
         state.inspection_summary()?;
-        Some(Rc::new(move || state.inspection_summary().unwrap_or_default()))
+        Some(Rc::new(move || {
+            state.inspection_summary().unwrap_or_default()
+        }))
     }
     fn wire(&self, invalidate: Rc<dyn Fn()>, precise: bool) {
         if precise {
@@ -115,7 +117,9 @@ impl<T: Clone + Send + 'static> ErasedState for StateField<T> {
         }
     }
     fn copy_value_from(&self, other: &dyn ErasedState) {
-        let Some(other) = other.as_any().downcast_ref::<Self>() else { return };
+        let Some(other) = other.as_any().downcast_ref::<Self>() else {
+            return;
+        };
         self.state.copy_runtime_value(&other.state);
     }
     fn as_any(&self) -> &dyn Any {

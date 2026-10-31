@@ -54,7 +54,11 @@ impl Default for Capabilities {
             ray_tracing: RayTracingCapabilities::default(),
             mesh_shading: MeshShadingCapabilities::default(),
             textures: TextureCapabilities::default(),
-            max_queues: QueueLimits { graphics: 0, compute: 0, transfer: 0 },
+            max_queues: QueueLimits {
+                graphics: 0,
+                compute: 0,
+                transfer: 0,
+            },
         }
     }
 }
@@ -80,6 +84,12 @@ mod tests {
         assert!(capabilities.graphics && capabilities.compute);
         assert!(!capabilities.indirect_draw);
         assert_eq!(capabilities.max_queues.graphics, 1);
-        assert_eq!(AdapterCapabilities::default(), AdapterCapabilities { ray_tracing: false, mesh_shading: false });
+        assert_eq!(
+            AdapterCapabilities::default(),
+            AdapterCapabilities {
+                ray_tracing: false,
+                mesh_shading: false
+            }
+        );
     }
 }

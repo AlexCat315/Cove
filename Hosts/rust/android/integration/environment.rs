@@ -1,11 +1,9 @@
 //! Translation of Android/Integration/Environment.swift.
 
 use cove_core::scene::UIWorkSchedulerHolder;
-use cove_core::{set_content_scale, Font, FontWeight};
+use cove_core::{Font, FontWeight, set_content_scale};
 use cove_imaging::{ImageAssetRegistry, ImageAssetRegistryHolder};
-use cove_text::{
-    SystemFontDefaults, TextBootstrapOptions, TextEnvironment, TextEnvironmentHolder,
-};
+use cove_text::{SystemFontDefaults, TextBootstrapOptions, TextEnvironment, TextEnvironmentHolder};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;

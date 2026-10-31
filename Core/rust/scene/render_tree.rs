@@ -127,7 +127,10 @@ impl RenderObject {
     }
     /// Drop the memoised z-order.
     pub fn invalidate_z_order(&self) {
-        let tree = { self.0.borrow_mut().cached_z_sorted_children = None; self.0.borrow().tree.upgrade() };
+        let tree = {
+            self.0.borrow_mut().cached_z_sorted_children = None;
+            self.0.borrow().tree.upgrade()
+        };
         if let Some(tree) = tree {
             tree.borrow_mut().flat_order_cache = None;
         }
@@ -143,7 +146,11 @@ impl RenderObject {
         indexed.sort_by(|(left_offset, left), (right_offset, right)| {
             let left_z = left.node().map_or(0.0, |node| node.z_index());
             let right_z = right.node().map_or(0.0, |node| node.z_index());
-            if left_z == right_z { left_offset.cmp(right_offset) } else { left_z.total_cmp(&right_z) }
+            if left_z == right_z {
+                left_offset.cmp(right_offset)
+            } else {
+                left_z.total_cmp(&right_z)
+            }
         });
         let sorted: Vec<RenderObject> = indexed.into_iter().map(|(_, object)| object).collect();
         self.0.borrow_mut().cached_z_sorted_children = Some(sorted.clone());
@@ -206,7 +213,9 @@ impl Default for RenderTree {
 }
 impl RenderTree {
     pub fn new() -> Self {
-        Self { data: Rc::new(RefCell::new(RenderTreeData::default())) }
+        Self {
+            data: Rc::new(RefCell::new(RenderTreeData::default())),
+        }
     }
     fn cell(&self) -> Weak<RefCell<RenderTreeData>> {
         Rc::downgrade(&self.data)
@@ -240,7 +249,9 @@ impl RenderTree {
     }
     /// Re-mirror the children of a node after a structural reconcile.
     pub fn reconcile_children(&self, parent_node: &Node) {
-        let Some(parent_object) = self.render_object(parent_node) else { return };
+        let Some(parent_object) = self.render_object(parent_node) else {
+            return;
+        };
         let existing: HashMap<Node, RenderObject> = parent_object
             .children()
             .into_iter()
@@ -256,7 +267,10 @@ impl RenderTree {
             } else {
                 let made = RenderObject::new(&child_node, self.cell());
                 made.set_parent(Some(&parent_object));
-                self.data.borrow_mut().by_node.insert(child_node.clone(), made.clone());
+                self.data
+                    .borrow_mut()
+                    .by_node
+                    .insert(child_node.clone(), made.clone());
                 rebuilt.push(made.clone());
                 self.rebuild_subtree(&made);
             }
@@ -277,7 +291,9 @@ impl RenderTree {
     }
     /// Drop a single node's render object (and its descendants).
     pub fn tear_down(&self, node: &Node) {
-        let Some(object) = self.render_object(node) else { return };
+        let Some(object) = self.render_object(node) else {
+            return;
+        };
         if let Some(parent) = object.parent() {
             let mut children = parent.children();
             children.retain(|child| child != &object);
@@ -335,7 +351,9 @@ impl RenderTree {
     }
     /// Snapshot of every layer-root render object in pre-order.
     pub fn layer_roots(&self) -> Vec<RenderObject> {
-        let Some(root) = self.root() else { return Vec::new() };
+        let Some(root) = self.root() else {
+            return Vec::new();
+        };
         let mut out = Vec::new();
         let mut pending = vec![root];
         while let Some(object) = pending.pop() {
@@ -373,7 +391,14 @@ impl RenderTree {
             plan.objects.push(object.clone());
             plan.parents.push(parent);
             plan.subtree_ends.push(index + 1);
-            let children = if object.node().is_some_and(|node| node.children_may_need_z_sort()) { object.render_ordered_children() } else { object.children() };
+            let children = if object
+                .node()
+                .is_some_and(|node| node.children_may_need_z_sort())
+            {
+                object.render_ordered_children()
+            } else {
+                object.children()
+            };
             if !children.is_empty() {
                 pending.push((object, parent, Some(index)));
                 for child in children.into_iter().rev() {
@@ -401,7 +426,9 @@ mod tests {
         assert!(tree.render_object(&root).unwrap().is_layer_root());
         assert!(!tree.render_object(&child).unwrap().is_layer_root());
         child.set_clips_to_bounds(true);
-        tree.render_object(&child).unwrap().refresh_layer_classification();
+        tree.render_object(&child)
+            .unwrap()
+            .refresh_layer_classification();
         assert!(tree.render_object(&child).unwrap().is_layer_root());
     }
 

@@ -13,28 +13,34 @@
 //! once and placed in each branch, which is what the Swift `wide`/`compact`
 //! builder pairs did.
 use cove_composition::{
-    impl_primitive_view, AnyView, LayoutDebugAttachmentKey, LayoutDebugExt, PrimitiveView, View,
-    ViewExt,
+    AnyView, LayoutDebugAttachmentKey, LayoutDebugExt, PrimitiveView, View, ViewExt,
+    impl_primitive_view,
 };
 use cove_core::scene::{Align, FlexDirection, Justify, LayoutNode, Node, Wrap};
 use cove_core::{Binding, State};
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use cove_ui_compose::modifiers::style::AppearanceExt;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::controls::fields::select::{Select, SelectOption};
 use cove_ui_compose::primitives::controls::toggle::Checkbox;
-use cove_ui_compose::primitives::controls::Button;
-use cove_ui_compose::primitives::layout::scroll_view::ScrollView;
-use cove_ui_compose::primitives::layout::sidebar::{Sidebar, SidebarItem, SidebarPresentation, SidebarSection};
 use cove_ui_compose::primitives::layout::responsive::view_that_fits::ViewThatFits;
-use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
-use cove_ui_compose::primitives::text::Text;
+use cove_ui_compose::primitives::layout::scroll_view::ScrollView;
+use cove_ui_compose::primitives::layout::sidebar::{
+    Sidebar, SidebarItem, SidebarPresentation, SidebarSection,
+};
 use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
+use cove_ui_compose::primitives::text::Text;
+use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::theme::styles::appearance_modifier::Appearance;
-use cove_ui_compose::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle, SecondaryButtonStyle};
+use cove_ui_compose::theme::styles::buttons::{
+    ButtonStyleViewExt, GhostButtonStyle, SecondaryButtonStyle,
+};
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticFontRef, SemanticStyleViewExt};
-use cove_ui_compose::theme::{theme_for_node, TextScalerReader};
+use cove_ui_compose::theme::{TextScalerReader, theme_for_node};
 
-use crate::gallery_content::catalog::{CowSize, GalleryCatalog, GalleryEntry, GalleryOptions, GalleryPage};
+use crate::gallery_content::catalog::{
+    CowSize, GalleryCatalog, GalleryEntry, GalleryOptions, GalleryPage,
+};
 use crate::gallery_content::routing::StoryDispatch;
 
 /// Erase any view so modifier chains can be stored or returned as `AnyView`.
@@ -45,7 +51,8 @@ fn erased(view: impl View + 'static) -> AnyView {
 /// Sidebar breakpoint between the docked and collapsed presentations.
 const NAVIGATION_RAIL_THRESHOLD: f32 = 120.0;
 /// Supplied text scale choices.
-const TEXT_SCALE_CHOICES: [(f64, &str); 4] = [(1.0, "100%"), (1.25, "125%"), (1.5, "150%"), (2.0, "200%")];
+const TEXT_SCALE_CHOICES: [(f64, &str); 4] =
+    [(1.0, "100%"), (1.25, "125%"), (1.5, "150%"), (2.0, "200%")];
 
 /// The gallery shell.
 ///
@@ -65,7 +72,11 @@ pub struct GalleryView {
 
 impl GalleryView {
     pub fn new(initial_page: GalleryPage, appearance: Appearance, text_scale: f64) -> Self {
-        let text_scale = if text_scale.is_finite() { text_scale.clamp(1.0, 2.0) } else { 1.0 };
+        let text_scale = if text_scale.is_finite() {
+            text_scale.clamp(1.0, 2.0)
+        } else {
+            1.0
+        };
         Self {
             page: State::new(initial_page),
             search: State::new(TextBuffer::default()),
@@ -109,7 +120,9 @@ impl GalleryView {
                 let items: Vec<SidebarItem<GalleryPage>> = matches
                     .iter()
                     .filter(|entry| entry.category == category)
-                    .map(|entry| SidebarItem::new(entry.page, entry.title).icon(entry.page.navigation_icon()))
+                    .map(|entry| {
+                        SidebarItem::new(entry.page, entry.title).icon(entry.page.navigation_icon())
+                    })
                     .collect();
                 (!items.is_empty()).then(|| SidebarSection::new(category, items).title(category))
             })
@@ -137,7 +150,6 @@ impl GalleryView {
             },
         )
     }
-
 }
 
 impl View for GalleryView {
@@ -158,27 +170,37 @@ impl View for GalleryView {
             .footer(footer.clone())
             .minimum_row_height(38.0);
         let rail = Sidebar::new(self.selection_binding(), sections)
-            .presentation(SidebarPresentation::Rail { shows_labels: false })
+            .presentation(SidebarPresentation::Rail {
+                shows_labels: false,
+            })
             .header(self.navigation_header_compact())
             .footer(self.navigation_footer_compact())
             .minimum_row_height(38.0);
 
         let shell = erased(
-            AnyView::new(ViewThatFits::threshold(NAVIGATION_RAIL_THRESHOLD, docked, rail))
-                .modifier(GallerySidebarFrame)
-                .debug_name("gallery-shell"),
+            AnyView::new(ViewThatFits::threshold(
+                NAVIGATION_RAIL_THRESHOLD,
+                docked,
+                rail,
+            ))
+            .modifier(GallerySidebarFrame)
+            .debug_name("gallery-shell"),
         );
-        let split = AnyView::new(WorkspaceSplitRow { sidebar: shell, content })
-            .flex_with(1.0, 1.0, Some(0.0))
-            .frame_min_width(0.0);
+        let split = AnyView::new(WorkspaceSplitRow {
+            sidebar: shell,
+            content,
+        })
+        .flex_with(1.0, 1.0, Some(0.0))
+        .frame_min_width(0.0);
 
-        let themed = AnyView::new(cove_ui_compose::primitives::overlays::portal::LayerRoot::new(split))
-            .flex_with(1.0, 1.0, Some(0.0));
-        erased(
-            AnyView::new(themed)
-                .modifier(GalleryShellFrame)
-                .modifier(WorkspaceAppearanceModifier { appearance: self.appearance.get() }),
-        )
+        let themed =
+            AnyView::new(cove_ui_compose::primitives::overlays::portal::LayerRoot::new(split))
+                .flex_with(1.0, 1.0, Some(0.0));
+        erased(AnyView::new(themed).modifier(GalleryShellFrame).modifier(
+            WorkspaceAppearanceModifier {
+                appearance: self.appearance.get(),
+            },
+        ))
     }
 }
 
@@ -197,21 +219,19 @@ impl GalleryView {
             .corner_radius(9.0)
             .semantic_background(SemanticColorRef::accent()),
         );
-        let titles = AnyView::new(
-            cove_ui_compose::BoxView::new(
-                FlexDirection::Column,
-                Align::Stretch,
-                Justify::FlexStart,
-                Wrap::NoWrap,
-                2.0,
+        let titles = AnyView::new(cove_ui_compose::BoxView::new(
+            FlexDirection::Column,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            2.0,
+            AnyView::new(cove_composition::TupleView::new(vec![
+                AnyView::new(Text::new("CoveUI").semantic_font(SemanticFontRef::body_strong())),
                 AnyView::new(
-                    cove_composition::TupleView::new(vec![
-                        AnyView::new(Text::new("CoveUI").semantic_font(SemanticFontRef::body_strong())),
-                        AnyView::new(Text::new("Component showcase").semantic_font(SemanticFontRef::caption())),
-                    ]),
+                    Text::new("Component showcase").semantic_font(SemanticFontRef::caption()),
                 ),
-            ),
-        );
+            ])),
+        ));
         let identity = AnyView::new(
             cove_ui_compose::BoxView::new(
                 FlexDirection::Row,
@@ -243,16 +263,14 @@ impl GalleryView {
                 .padding(16.0),
             ));
         }
-        AnyView::new(
-            cove_ui_compose::BoxView::new(
-                FlexDirection::Column,
-                Align::Stretch,
-                Justify::FlexStart,
-                Wrap::NoWrap,
-                0.0,
-                AnyView::new(cove_composition::TupleView::new(children)),
-            ),
-        )
+        AnyView::new(cove_ui_compose::BoxView::new(
+            FlexDirection::Column,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            0.0,
+            AnyView::new(cove_composition::TupleView::new(children)),
+        ))
     }
 
     fn navigation_header_compact(&self) -> AnyView {
@@ -309,7 +327,9 @@ impl GalleryView {
     /// A lightweight handle for closures that only need the theme toggle. State
     /// values are reference-counted, so this shares the same storage.
     fn clone_handle(&self) -> GalleryThemeToggle {
-        GalleryThemeToggle { appearance: self.appearance.clone() }
+        GalleryThemeToggle {
+            appearance: self.appearance.clone(),
+        }
     }
 }
 
@@ -375,7 +395,10 @@ impl cove_composition::ViewModifier for WorkspaceAppearanceModifier {
     fn apply_node(&self, node: &Node) {
         let theme = self.appearance.theme();
         node.set_background_color(Some(theme.colors.background));
-        node.set_attachment(LayoutDebugAttachmentKey::LAYOUT_ROLE, "gallery-shell".to_owned());
+        node.set_attachment(
+            LayoutDebugAttachmentKey::LAYOUT_ROLE,
+            "gallery-shell".to_owned(),
+        );
         node.set_composition_value(&cove_ui_compose::theme::ThemeEnvironment::key(), theme);
     }
 }
@@ -448,12 +471,17 @@ impl View for GalleryPagePane {
                 move |inherited| {
                     erased(
                         AnyView::new(story.clone())
-                            .modifier(GalleryStoryFrame { inherited: inherited.factor(), authored: scale })
+                            .modifier(GalleryStoryFrame {
+                                inherited: inherited.factor(),
+                                authored: scale,
+                            })
                             .debug_name(&format!("{}-{generation}", page.raw_value())),
                     )
                 }
             })),
-            None => AnyView::new(GalleryPendingStory { message: dispatch.pending_message() }),
+            None => AnyView::new(GalleryPendingStory {
+                message: dispatch.pending_message(),
+            }),
         };
         let outlet = erased(
             AnyView::new(ScrollView::vertical(story))
@@ -545,9 +573,13 @@ impl View for GalleryPendingStory {
     fn body(&self) -> AnyView {
         erased(
             AnyView::new(
-                Text::new(self.message.clone().unwrap_or_else(|| "Story unavailable".to_string()))
-                    .semantic_font(SemanticFontRef::body())
-                    .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                Text::new(
+                    self.message
+                        .clone()
+                        .unwrap_or_else(|| "Story unavailable".to_string()),
+                )
+                .semantic_font(SemanticFontRef::body())
+                .semantic_foreground(SemanticColorRef::on_surface_muted()),
             )
             .modifier(GalleryPendingFrame),
         )
@@ -571,19 +603,17 @@ impl GalleryPageHeader {
     fn view(&self) -> AnyView {
         let entry = self.page.entry();
         erased(
-            AnyView::new(
-                cove_ui_compose::BoxView::new(
-                    FlexDirection::Column,
-                    Align::Stretch,
-                    Justify::FlexStart,
-                    Wrap::NoWrap,
-                    6.0,
-                    AnyView::new(cove_composition::TupleView::new(vec![
-                        AnyView::new(Text::new(entry.title).semantic_font(SemanticFontRef::title())),
-                        AnyView::new(Text::new(entry.summary).semantic_font(SemanticFontRef::body())),
-                    ])),
-                ),
-            )
+            AnyView::new(cove_ui_compose::BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                6.0,
+                AnyView::new(cove_composition::TupleView::new(vec![
+                    AnyView::new(Text::new(entry.title).semantic_font(SemanticFontRef::title())),
+                    AnyView::new(Text::new(entry.summary).semantic_font(SemanticFontRef::body())),
+                ])),
+            ))
             .padding_edges(24.0, 20.0)
             .modifier(GalleryHeaderFrame),
         )
@@ -636,20 +666,18 @@ impl GalleryToolbar {
                 .collect(),
         )
         .width(86.0);
-        let disabled = Checkbox::from_boolean(
-            Binding::new(
-                {
-                    let options = self.options.clone();
-                    move || !options.get().is_enabled
-                },
-                {
-                    let options = self.options.clone();
-                    move |is_disabled: bool| {
-                        options.update(|current| current.is_enabled = !is_disabled);
-                    }
-                },
-            ),
-        );
+        let disabled = Checkbox::from_boolean(Binding::new(
+            {
+                let options = self.options.clone();
+                move || !options.get().is_enabled
+            },
+            {
+                let options = self.options.clone();
+                move |is_disabled: bool| {
+                    options.update(|current| current.is_enabled = !is_disabled);
+                }
+            },
+        ));
         let reset = {
             let reset_generation = self.reset_generation.clone();
             Button::title("Reset example", move || {
@@ -657,69 +685,61 @@ impl GalleryToolbar {
             })
         };
 
-        let row = AnyView::new(
-            cove_ui_compose::BoxView::new(
-                FlexDirection::Row,
-                Align::Center,
-                Justify::FlexStart,
-                Wrap::Wrap,
-                12.0,
-                AnyView::new(cove_composition::TupleView::new(vec![
-                    AnyView::new(
-                        cove_ui_compose::BoxView::new(
-                            FlexDirection::Row,
-                            Align::Center,
-                            Justify::FlexStart,
-                            Wrap::NoWrap,
-                            8.0,
-                            AnyView::new(cove_composition::TupleView::new(vec![
-                                AnyView::new(
-                                    Text::new("Size")
-                                        .semantic_font(SemanticFontRef::caption())
-                                        .semantic_foreground(SemanticColorRef::on_surface_muted()),
-                                ),
-                                AnyView::new(size_select),
-                            ])),
+        let row = AnyView::new(cove_ui_compose::BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::Wrap,
+            12.0,
+            AnyView::new(cove_composition::TupleView::new(vec![
+                AnyView::new(cove_ui_compose::BoxView::new(
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    8.0,
+                    AnyView::new(cove_composition::TupleView::new(vec![
+                        AnyView::new(
+                            Text::new("Size")
+                                .semantic_font(SemanticFontRef::caption())
+                                .semantic_foreground(SemanticColorRef::on_surface_muted()),
                         ),
-                    ),
-                    AnyView::new(
-                        cove_ui_compose::BoxView::new(
-                            FlexDirection::Row,
-                            Align::Center,
-                            Justify::FlexStart,
-                            Wrap::NoWrap,
-                            8.0,
-                            AnyView::new(cove_composition::TupleView::new(vec![
-                                AnyView::new(
-                                    Text::new("Scale")
-                                        .semantic_font(SemanticFontRef::caption())
-                                        .semantic_foreground(SemanticColorRef::on_surface_muted()),
-                                ),
-                                AnyView::new(scale_select),
-                            ])),
+                        AnyView::new(size_select),
+                    ])),
+                )),
+                AnyView::new(cove_ui_compose::BoxView::new(
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    8.0,
+                    AnyView::new(cove_composition::TupleView::new(vec![
+                        AnyView::new(
+                            Text::new("Scale")
+                                .semantic_font(SemanticFontRef::caption())
+                                .semantic_foreground(SemanticColorRef::on_surface_muted()),
                         ),
-                    ),
-                    AnyView::new(
-                        cove_ui_compose::BoxView::new(
-                            FlexDirection::Row,
-                            Align::Center,
-                            Justify::FlexStart,
-                            Wrap::NoWrap,
-                            8.0,
-                            AnyView::new(cove_composition::TupleView::new(vec![
-                                AnyView::new(disabled),
-                                AnyView::new(
-                                    Text::new("Disabled")
-                                        .semantic_font(SemanticFontRef::caption())
-                                        .semantic_foreground(SemanticColorRef::on_surface_variant()),
-                                ),
-                            ])),
+                        AnyView::new(scale_select),
+                    ])),
+                )),
+                AnyView::new(cove_ui_compose::BoxView::new(
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    8.0,
+                    AnyView::new(cove_composition::TupleView::new(vec![
+                        AnyView::new(disabled),
+                        AnyView::new(
+                            Text::new("Disabled")
+                                .semantic_font(SemanticFontRef::caption())
+                                .semantic_foreground(SemanticColorRef::on_surface_variant()),
                         ),
-                    ),
-                    erased(AnyView::new(reset).button_style(SecondaryButtonStyle)),
-                ])),
-            ),
-        )
+                    ])),
+                )),
+                erased(AnyView::new(reset).button_style(SecondaryButtonStyle)),
+            ])),
+        ))
         .padding_edges(24.0, 10.0)
         .modifier(GalleryToolbarFrame);
         let _ = options;
@@ -756,42 +776,50 @@ pub struct GalleryStorySection {
 }
 
 impl GalleryStorySection {
-    pub fn new(title: impl Into<String>, detail: impl Into<String>, content: impl View + 'static) -> Self {
-        Self { title: title.into(), detail: detail.into(), content: AnyView::new(content) }
+    pub fn new(
+        title: impl Into<String>,
+        detail: impl Into<String>,
+        content: impl View + 'static,
+    ) -> Self {
+        Self {
+            title: title.into(),
+            detail: detail.into(),
+            content: AnyView::new(content),
+        }
     }
 }
 
 impl View for GalleryStorySection {
     fn body(&self) -> AnyView {
         let card = erased(
-            AnyView::new(
-                cove_ui_compose::BoxView::new(
-                    FlexDirection::Column,
-                    Align::Stretch,
-                    Justify::FlexStart,
-                    Wrap::NoWrap,
-                    12.0,
-                    self.content.clone(),
-                ),
-            )
+            AnyView::new(cove_ui_compose::BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                12.0,
+                self.content.clone(),
+            ))
             .padding(18.0)
             .modifier(GalleryCardModifier),
         );
         erased(
-            AnyView::new(
-                cove_ui_compose::BoxView::new(
-                    FlexDirection::Column,
-                    Align::Stretch,
-                    Justify::FlexStart,
-                    Wrap::NoWrap,
-                    8.0,
-                    AnyView::new(cove_composition::TupleView::new(vec![
-                        AnyView::new(Text::new(self.title.clone()).semantic_font(SemanticFontRef::headline())),
-                        AnyView::new(Text::new(self.detail.clone()).semantic_font(SemanticFontRef::body())),
-                        card,
-                    ])),
-                ),
-            )
+            AnyView::new(cove_ui_compose::BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                8.0,
+                AnyView::new(cove_composition::TupleView::new(vec![
+                    AnyView::new(
+                        Text::new(self.title.clone()).semantic_font(SemanticFontRef::headline()),
+                    ),
+                    AnyView::new(
+                        Text::new(self.detail.clone()).semantic_font(SemanticFontRef::body()),
+                    ),
+                    card,
+                ])),
+            ))
             .flex_with(0.0, 0.0, None)
             .frame_min_width(0.0)
             .debug_name(&format!("story-section-{}", self.title)),
@@ -806,7 +834,12 @@ pub fn current_entry(page: GalleryPage) -> GalleryEntry {
 
 /// The size choices the toolbar offers, in declaration order.
 pub fn size_choices() -> [CowSize; 4] {
-    [CowSize::Mini, CowSize::Small, CowSize::Regular, CowSize::Large]
+    [
+        CowSize::Mini,
+        CowSize::Small,
+        CowSize::Regular,
+        CowSize::Large,
+    ]
 }
 
 #[cfg(test)]

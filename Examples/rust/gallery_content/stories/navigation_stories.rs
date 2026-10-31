@@ -11,9 +11,9 @@ use std::rc::Rc;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
+use cove_ui_compose::primitives::controls::Checkbox;
 use cove_ui_compose::primitives::controls::app_bar::{AppBar, AppBarOptions};
 use cove_ui_compose::primitives::controls::toolbar::{ToolbarItem, ToolbarItemPlacement};
-use cove_ui_compose::primitives::controls::Checkbox;
 use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use cove_ui_compose::primitives::overlays::menu::MenuItem;
 use cove_ui_compose::primitives::text::Text;
@@ -49,7 +49,11 @@ impl AppBarStory {
     }
 
     pub fn title(&self) -> &'static str {
-        if self.long_title.get() { LONG_TITLE } else { SHORT_TITLE }
+        if self.long_title.get() {
+            LONG_TITLE
+        } else {
+            SHORT_TITLE
+        }
     }
 
     pub fn last_action(&self) -> String {
@@ -76,18 +80,30 @@ impl AppBarStory {
             ToolbarItem::new(MenuItem::new(1, "Find in workspace", move || {
                 *record.borrow_mut() = "Find".to_owned();
             }))
-            .icon(cove_ui_compose::primitives::controls::button::ButtonIconSource::Resource(icons::action::search()))
+            .icon(
+                cove_ui_compose::primitives::controls::button::ButtonIconSource::Resource(
+                    icons::action::search(),
+                ),
+            )
             .placement(ToolbarItemPlacement::AutomaticWithPriority(10)),
             ToolbarItem::new(MenuItem::new(2, "Export project", {
                 let record = self.last_action.clone();
                 move || *record.borrow_mut() = "Exported".to_owned()
             }))
-            .icon(cove_ui_compose::primitives::controls::button::ButtonIconSource::Resource(icons::action::download())),
+            .icon(
+                cove_ui_compose::primitives::controls::button::ButtonIconSource::Resource(
+                    icons::action::download(),
+                ),
+            ),
             ToolbarItem::new(MenuItem::new(3, "Share project", {
                 let record = self.last_action.clone();
                 move || *record.borrow_mut() = "Shared".to_owned()
             }))
-            .icon(cove_ui_compose::primitives::controls::button::ButtonIconSource::Resource(icons::action::share())),
+            .icon(
+                cove_ui_compose::primitives::controls::button::ButtonIconSource::Resource(
+                    icons::action::share(),
+                ),
+            ),
             ToolbarItem::new(MenuItem::new(4, "Pinned", {
                 let record = self.last_action.clone();
                 move || *record.borrow_mut() = "Pinned".to_owned()
@@ -145,10 +161,17 @@ impl View for AppBarStory {
                 ToolbarItem::new(MenuItem::new(11, "Save workspace", move || {
                     *record_save.borrow_mut() = "Saved".to_owned();
                 }))
-                .icon(cove_ui_compose::primitives::controls::button::ButtonIconSource::Resource(icons::action::check())),
+                .icon(
+                    cove_ui_compose::primitives::controls::button::ButtonIconSource::Resource(
+                        icons::action::check(),
+                    ),
+                ),
             )
             .actions(self.actions())
-            .options(AppBarOptions { is_enabled: enabled, ..AppBarOptions::default() });
+            .options(AppBarOptions {
+                is_enabled: enabled,
+                ..AppBarOptions::default()
+            });
 
         let rows = AnyView::new(BoxView::new(
             FlexDirection::Column,
@@ -158,9 +181,7 @@ impl View for AppBarStory {
             10.0,
             AnyView::new(TupleView::new(vec![
                 toggles,
-                AnyView::new(
-                    AnyView::new(header).debug_name("gallery-appbar"),
-                ),
+                AnyView::new(AnyView::new(header).debug_name("gallery-appbar")),
                 AnyView::new(
                     Text::new(self.last_action())
                         .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())

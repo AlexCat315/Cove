@@ -9,13 +9,13 @@
 use cove_core::State;
 use cove_ui_compose::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::controls::toolbar::overflow_layout::{
     ToolbarArrangement, ToolbarOverflowLayout,
 };
 use cove_ui_compose::primitives::controls::toolbar::{
     Toolbar, ToolbarAxis, ToolbarDividerEdge, ToolbarItem, ToolbarItemPlacement, ToolbarOptions,
 };
-use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::overlays::menu::MenuItem;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
@@ -56,7 +56,11 @@ impl ToolbarStory {
 
     /// The run command's title flips with playback state.
     pub fn run_title(&self) -> &'static str {
-        if self.is_playing.get() { "Pause" } else { "Run" }
+        if self.is_playing.get() {
+            "Pause"
+        } else {
+            "Run"
+        }
     }
 
     /// The five commands the adaptive bar declares, in authored order.
@@ -78,9 +82,18 @@ impl ToolbarStory {
     /// The layout expects one extra subview for the overflow button, so a uniform
     /// row is `commands + 1` equal sizes.
     pub fn arrangement(&self, available_extent: f32, item_extent: f32) -> ToolbarArrangement {
-        let layout =
-            ToolbarOverflowLayout::new(available_extent, self.command_placements(), TOOLBAR_SPACING);
-        let sizes = vec![cove_core::Size { width: item_extent, height: 28.0 }; self.command_placements().len() + 1];
+        let layout = ToolbarOverflowLayout::new(
+            available_extent,
+            self.command_placements(),
+            TOOLBAR_SPACING,
+        );
+        let sizes = vec![
+            cove_core::Size {
+                width: item_extent,
+                height: 28.0
+            };
+            self.command_placements().len() + 1
+        ];
         layout.arrangement(&sizes)
     }
 
@@ -111,25 +124,27 @@ impl View for ToolbarStory {
     fn body(&self) -> AnyView {
         let enabled = self.options.is_enabled;
         let apply = self.applied_action.clone();
-        let note = Text::new("Resize this bar: Run stays visible; lower priority commands move into More actions.")
-            .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-            .semantic_foreground(SemanticColorRef::on_surface_muted());
-
-        let content_bar = Toolbar::new(
-            BoxView::new(
-                cove_core::scene::FlexDirection::Row,
-                cove_core::scene::Align::Center,
-                cove_core::scene::Justify::FlexStart,
-                cove_core::scene::Wrap::NoWrap,
-                TOOLBAR_SPACING,
-                AnyView::new(TupleView::new(vec![
-                    AnyView::new(Text::new("A bar below its content puts the divider on top.")),
-                    AnyView::new(Button::title("Apply", move || {
-                        apply.set("Applied".to_owned())
-                    })),
-                ])),
-            ),
+        let note = Text::new(
+            "Resize this bar: Run stays visible; lower priority commands move into More actions.",
         )
+        .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
+        .semantic_foreground(SemanticColorRef::on_surface_muted());
+
+        let content_bar = Toolbar::new(BoxView::new(
+            cove_core::scene::FlexDirection::Row,
+            cove_core::scene::Align::Center,
+            cove_core::scene::Justify::FlexStart,
+            cove_core::scene::Wrap::NoWrap,
+            TOOLBAR_SPACING,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(Text::new(
+                    "A bar below its content puts the divider on top.",
+                )),
+                AnyView::new(Button::title("Apply", move || {
+                    apply.set("Applied".to_owned())
+                })),
+            ])),
+        ))
         .options(ToolbarOptions {
             divider: ToolbarDividerEdge::Top,
             is_enabled: enabled,

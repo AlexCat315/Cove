@@ -15,14 +15,12 @@
 mod support;
 
 use cove_composition::{AnyView, View};
-use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
-use cove_ui_compose::theme::ThemeViewExt as _;
-use cove_core::scene::{
-    Align, DrawList, FlexDirection, Justify, Node, NodeRenderer, Wrap,
-};
-use cove_ui_compose::primitives::text::Text;
-use cove_ui_compose::theme::{Theme, ThemeViewExt};
+use cove_core::scene::{Align, DrawList, FlexDirection, Justify, Node, NodeRenderer, Wrap};
 use cove_ui_compose::BoxView;
+use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
+use cove_ui_compose::primitives::text::Text;
+use cove_ui_compose::theme::ThemeViewExt as _;
+use cove_ui_compose::theme::{Theme, ThemeViewExt};
 
 use support::GlobalTestLock;
 
@@ -56,14 +54,16 @@ fn heading_repaints_with_theme_ink() {
         support::with_test_text_environment(|| {
             let graph = support::graph();
             for dark in [false, true, false] {
-                let theme = if dark { Theme::default_dark() } else { Theme::default_light() };
+                let theme = if dark {
+                    Theme::default_dark()
+                } else {
+                    Theme::default_light()
+                };
                 let heading = AnyView::new(
                     Text::new("Your workspace, at a glance")
                         .semantic_font(cove_ui_compose::theme::SemanticFontRef::headline()),
                 );
-                let pinned = AnyView::new(
-                    Text::new("Pinned theme").theme(Theme::default_light()),
-                );
+                let pinned = AnyView::new(Text::new("Pinned theme").theme(Theme::default_light()));
                 let column = AnyView::new(
                     AnyView::new(BoxView::new(
                         FlexDirection::Column,
@@ -103,10 +103,7 @@ fn heading_repaints_with_theme_ink() {
                 let pinned_node = find_by_text(&root, "Pinned theme").expect("pinned node");
                 let pinned_expected = Theme::default_light().colors.on_surface.rgba8();
                 let pinned_colors = rendered_colors(&pinned_node);
-                assert!(
-                    !pinned_colors.is_empty(),
-                    "the pinned label renders glyphs"
-                );
+                assert!(!pinned_colors.is_empty(), "the pinned label renders glyphs");
                 assert!(
                     pinned_colors.iter().all(|color| *color == pinned_expected),
                     "a pinned theme keeps its own on_surface ink in {dark:?} mode"

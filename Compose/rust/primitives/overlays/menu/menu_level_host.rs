@@ -4,16 +4,18 @@
 //! frame, and the level reports it so sibling levels can anchor submenus.
 use std::rc::Rc;
 
+use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
+use crate::modifiers::style::{FloatingSurfaceElevation, SurfaceStyleExt};
+use crate::{AnyView, BoxView, PrimitiveView, View, ViewExt, impl_primitive_view};
+use cove_core::Point;
 use cove_core::scene::{
     Align, EventResult, FlexDirection, InputHandlerRoute, InteractionRegistryHolder, Justify, Node,
     Wrap,
 };
-use cove_core::Point;
-use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
-use crate::modifiers::style::{FloatingSurfaceElevation, SurfaceStyleExt};
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, View, ViewExt};
 
-use super::menu_navigation::{MenuSession, MENU_LEVEL_MARKER, MENU_SCROLL_INSET, MENU_SCROLL_MARKER};
+use super::menu_navigation::{
+    MENU_LEVEL_MARKER, MENU_SCROLL_INSET, MENU_SCROLL_MARKER, MenuSession,
+};
 
 /// The panel's content gutter: rows sit inside it, so their highlight bands keep
 /// an even edge on every side. Revealing a row preserves it.
@@ -43,52 +45,85 @@ impl PrimitiveView for MenuLevelHost {
     }
 
     fn update_node(&self, node: &Node) {
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         let on_key = self.on_key.clone();
         let on_text = self.on_text.clone();
         let key_node = node.downgrade();
-        registry.set_key(node, InputHandlerRoute::control(), Rc::new(move |event, phase| {
-            if phase == cove_core::scene::EventPhase::Capture {
-                return EventResult::Ignored;
-            }
-            let Some(owner) = Node::upgrade(&key_node) else { return EventResult::Ignored };
-            if on_key(event, &owner) { EventResult::Handled } else { EventResult::Ignored }
-        }));
+        registry.set_key(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, phase| {
+                if phase == cove_core::scene::EventPhase::Capture {
+                    return EventResult::Ignored;
+                }
+                let Some(owner) = Node::upgrade(&key_node) else {
+                    return EventResult::Ignored;
+                };
+                if on_key(event, &owner) {
+                    EventResult::Handled
+                } else {
+                    EventResult::Ignored
+                }
+            }),
+        );
         let text_node = node.downgrade();
-        registry.set_text(node, InputHandlerRoute::control(), Rc::new(move |text: &str, phase| {
-            if phase == cove_core::scene::EventPhase::Capture {
-                return EventResult::Ignored;
-            }
-            let Some(owner) = Node::upgrade(&text_node) else { return EventResult::Ignored };
-            if on_text(text, &owner) { EventResult::Handled } else { EventResult::Ignored }
-        }));
+        registry.set_text(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |text: &str, phase| {
+                if phase == cove_core::scene::EventPhase::Capture {
+                    return EventResult::Ignored;
+                }
+                let Some(owner) = Node::upgrade(&text_node) else {
+                    return EventResult::Ignored;
+                };
+                if on_text(text, &owner) {
+                    EventResult::Handled
+                } else {
+                    EventResult::Ignored
+                }
+            }),
+        );
         let pointer_session = self.session.clone();
-        registry.set_motion(node, InputHandlerRoute::control(), Rc::new(move |event, phase| {
-            if phase == cove_core::scene::EventPhase::Capture {
-                pointer_session.pointer.borrow_mut().record(Point::new(event.x, event.y));
-            }
-            EventResult::Ignored
-        }));
+        registry.set_motion(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, phase| {
+                if phase == cove_core::scene::EventPhase::Capture {
+                    pointer_session
+                        .pointer
+                        .borrow_mut()
+                        .record(Point::new(event.x, event.y));
+                }
+                EventResult::Ignored
+            }),
+        );
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         // Overlay, not `stable`: a reserved lane is a right-only inset, so every
         // row highlight would sit closer to one edge. Menus fill their panel
         // edge to edge and only need the bar while the pointer is over them.
-        let scroller = crate::primitives::layout::ScrollView::vertical(
-            AnyView::new(
-                BoxView::new(
-                    FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 1.0,
-                    self.rows.clone(),
-                )
-                .padding(PANEL_INSET),
-            ),
-        )
+        let scroller = crate::primitives::layout::ScrollView::vertical(AnyView::new(
+            BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                1.0,
+                self.rows.clone(),
+            )
+            .padding(PANEL_INSET),
+        ))
         .scrollbar_gutter(crate::primitives::layout::ScrollbarGutter::Overlay)
         .consume_policy(cove_core::scene::ScrollConsumePolicy::Always);
         let marked = scroller
             .modifier(MenuScrollMarker { inset: PANEL_INSET })
-            .modifier(MenuWindowBounds { max_visible_rows: self.max_visible_rows });
+            .modifier(MenuWindowBounds {
+                max_visible_rows: self.max_visible_rows,
+            });
         let panel = match self.width {
             Some(width) => AnyView::new(marked.frame_width(width.max(80.0))),
             None => AnyView::new(marked),
@@ -123,16 +158,23 @@ struct MenuWindowBounds {
 
 impl cove_composition::ViewModifier for MenuWindowBounds {
     fn apply_node(&self, node: &Node) {
-        let Some(layout) = node.layout_node() else { return };
+        let Some(layout) = node.layout_node() else {
+            return;
+        };
         let row_height = 30.0_f32.max(
-            node.composition_value(&crate::theme::ControlSizeEnvironment::key()).button_height(),
+            node.composition_value(&crate::theme::ControlSizeEnvironment::key())
+                .button_height(),
         );
         let preferred = self.max_visible_rows as f32 * row_height;
         let weak = node.downgrade();
         let max_visible_rows = self.max_visible_rows;
         node.set_layout_did_update(Some(Rc::new(move |owner: &Node| {
-            let Some(node) = Node::upgrade(&weak) else { return };
-            let Some(layout) = node.layout_node() else { return };
+            let Some(node) = Node::upgrade(&weak) else {
+                return;
+            };
+            let Some(layout) = node.layout_node() else {
+                return;
+            };
             let bounds = super::super::portal::portal_window_bounds(&node);
             let height = preferred.min((bounds.height - 12.0).max(0.0));
             if layout.max_height() != Some(height) {

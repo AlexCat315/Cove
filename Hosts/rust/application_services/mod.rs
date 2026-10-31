@@ -13,8 +13,9 @@ pub mod http;
 /// caller can log what it will be able to load.
 pub fn install_platform_services() -> http::TransportCapabilities {
     let capabilities = http::TransportCapabilities::PLATFORM;
-    let timeout = cove_ui_compose::primitives::media::image_data_download::ImageLoadingPolicy::default()
-        .timeout;
+    let timeout =
+        cove_ui_compose::primitives::media::image_data_download::ImageLoadingPolicy::default()
+            .timeout;
     let installed = http::install_image_transport(timeout);
     cove_logging::LogSystem::logger("com.cove.ui.host").log(&cove_logging::LogEvent::new(
         cove_logging::Level::Info,

@@ -13,7 +13,7 @@ use cove_core::scene::{
 };
 use cove_platform::KeyEvent;
 
-use crate::{impl_primitive_view, AnyView, PrimitiveView};
+use crate::{AnyView, PrimitiveView, impl_primitive_view};
 
 type KeyHandler = Rc<dyn Fn(&KeyEvent, cove_core::scene::EventPhase) -> EventResult>;
 
@@ -30,7 +30,11 @@ impl ShortcutHost {
         Self {
             route: InputHandlerRoute::shortcut(),
             on_key_down: Rc::new(move |event, _| {
-                if on_key_down(event) { EventResult::Handled } else { EventResult::Ignored }
+                if on_key_down(event) {
+                    EventResult::Handled
+                } else {
+                    EventResult::Ignored
+                }
             }),
             on_key_up: None,
         }
@@ -76,7 +80,9 @@ impl PrimitiveView for ShortcutHost {
     }
 
     fn update_node(&self, node: &Node) {
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         registry.remove(node);
         registry.set_key(node, self.route.clone(), self.on_key_down.clone());
         if let Some(on_key_up) = self.on_key_up.clone() {

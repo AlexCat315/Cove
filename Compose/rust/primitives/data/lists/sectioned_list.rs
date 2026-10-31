@@ -15,25 +15,25 @@
 
 use std::rc::Rc;
 
+use super::list::ListRowHost;
+use crate::adaptive::{ContainerSizeReader, SurfaceReader};
+use crate::modifiers::interaction::AccessibilityExt;
+use crate::modifiers::interaction::HitTestingExt;
+use crate::modifiers::layout::{
+    AbsolutePositionModifier, EdgeInsets, FlexExt, FrameDimension, LayoutFrameExt, PaddingExt,
+};
+use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
+use crate::primitives::layout::virtualization::FixedVirtualStack;
+use crate::primitives::overlays::selection_key_host::SelectionKeyHost;
+use crate::primitives::text::Text;
+use crate::theme::{SemanticColorRef, SemanticFontRef};
+use crate::{AnyView, BoxView, TupleView, View, ViewExt};
 use cove_composition::{LayoutDebugExt, Scancode};
 use cove_core::scene::{
     AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, Justify, Wrap,
 };
 use cove_core::{Binding, Environment, InputCapabilities, Point, Size};
 use cove_platform::KeyEvent;
-use crate::adaptive::{ContainerSizeReader, SurfaceReader};
-use crate::modifiers::interaction::AccessibilityExt;
-use crate::modifiers::layout::{
-    AbsolutePositionModifier, EdgeInsets, FlexExt, FrameDimension, LayoutFrameExt, PaddingExt,
-};
-use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
-use crate::modifiers::interaction::HitTestingExt;
-use crate::primitives::layout::virtualization::FixedVirtualStack;
-use crate::primitives::overlays::selection_key_host::SelectionKeyHost;
-use crate::primitives::text::Text;
-use crate::theme::{SemanticColorRef, SemanticFontRef};
-use crate::{AnyView, BoxView, TupleView, View, ViewExt};
-use super::list::ListRowHost;
 
 /// One flat section in a [`SectionedList`]. Headers and footers are optional;
 /// headers can be pinned while their section scrolls when `sticky_headers` is
@@ -48,7 +48,12 @@ pub struct ListSection<SectionId: Clone, Item: Clone> {
 
 impl<SectionId: Clone, Item: Clone> ListSection<SectionId, Item> {
     pub fn new(id: SectionId, items: Vec<Item>) -> Self {
-        Self { id, title: None, footer: None, items }
+        Self {
+            id,
+            title: None,
+            footer: None,
+            items,
+        }
     }
 
     pub fn title(mut self, title: impl Into<String>) -> Self {
@@ -121,7 +126,9 @@ fn resolve_sticky_header<SectionId, Item>(
     let mut active: Option<(usize, String)> = None;
     let mut next_top: Option<f32> = None;
     for (index, entry) in entries.iter().enumerate() {
-        let Entry::Header(_, title) = entry else { continue };
+        let Entry::Header(_, title) = entry else {
+            continue;
+        };
         let top = index as f32 * stride;
         if top <= offset + 0.5 {
             active = Some((index, title.clone()));
@@ -194,8 +201,13 @@ where
     }
 
     pub fn row_height(mut self, row_height: Option<f32>) -> Self {
-        self.row_height =
-            row_height.map(|value| if value.is_finite() { value.max(1.0) } else { 30.0 });
+        self.row_height = row_height.map(|value| {
+            if value.is_finite() {
+                value.max(1.0)
+            } else {
+                30.0
+            }
+        });
         self
     }
 
@@ -218,7 +230,6 @@ where
         self.on_activate = Some(Rc::new(handler));
         self
     }
-
 }
 
 impl<SectionId, Item, ItemId> View for SectionedList<SectionId, Item, ItemId>
@@ -260,9 +271,7 @@ where
                     let surface = surface.clone();
                     SurfaceReader::new({
                         let surface = surface;
-                        move |environment: &Environment| {
-                            surface.render(size, environment)
-                        }
+                        move |environment: &Environment| surface.render(size, environment)
                     })
                 }
             }),
@@ -327,8 +336,12 @@ where
             .or_else(|| self.selection.get().as_ref().and_then(position_of));
 
         if event.scancode == Scancode::RETURN || event.scancode == Scancode::KEYPAD_ENTER {
-            let Some(position) = current else { return false };
-            let Some(Entry::Item(item)) = self.entries.get(position) else { return false };
+            let Some(position) = current else {
+                return false;
+            };
+            let Some(Entry::Item(item)) = self.entries.get(position) else {
+                return false;
+            };
             let id = (self.id_of)(item);
             self.cursor.set(Some(id.clone()));
             self.selection.set(Some(id));
@@ -425,13 +438,19 @@ where
 
     fn cursor_index(&self) -> Option<usize> {
         let id = self.cursor.get()?;
-        self.ids.iter().position(|entry| *entry == SectionedEntryId::Item(id.clone()))
+        self.ids
+            .iter()
+            .position(|entry| *entry == SectionedEntryId::Item(id.clone()))
     }
 
     fn render(&self, size: Size, environment: &Environment) -> AnyView {
         let touch = environment.input.contains(InputCapabilities::TOUCH);
         let authored = self.row_height.unwrap_or(if touch { 56.0 } else { 30.0 });
-        let height = authored.max(if touch { environment.minimum_control_extent() } else { 0.0 });
+        let height = authored.max(if touch {
+            environment.minimum_control_extent()
+        } else {
+            0.0
+        });
         let spacing = self.row_spacing;
         let sticky = resolve_sticky_header(
             &self.entries,
@@ -449,22 +468,26 @@ where
         let id_of = self.id_of.clone();
         let on_activate = self.on_activate.clone();
 
-        let mut stack = FixedVirtualStack::new(ids.clone(), height, move |id: &SectionedEntryId<SectionId, ItemId>| {
-            let Some(position) = ids.iter().position(|entry| entry == id) else {
-                return AnyView::new(crate::EmptyView);
-            };
-            entry_view(
-                &rows,
-                position,
-                height,
-                touch,
-                &selection,
-                &cursor,
-                &id_of,
-                &content,
-                &on_activate,
-            )
-        })
+        let mut stack = FixedVirtualStack::new(
+            ids.clone(),
+            height,
+            move |id: &SectionedEntryId<SectionId, ItemId>| {
+                let Some(position) = ids.iter().position(|entry| entry == id) else {
+                    return AnyView::new(crate::EmptyView);
+                };
+                entry_view(
+                    &rows,
+                    position,
+                    height,
+                    touch,
+                    &selection,
+                    &cursor,
+                    &id_of,
+                    &content,
+                    &on_activate,
+                )
+            },
+        )
         .spacing(spacing);
         if let Some(index) = self.cursor_index() {
             stack = stack.scroll_to_index(index);
@@ -536,7 +559,11 @@ where
                     BoxView::new(
                         FlexDirection::Column,
                         Align::FlexStart,
-                        if touch { Justify::FlexEnd } else { Justify::Center },
+                        if touch {
+                            Justify::FlexEnd
+                        } else {
+                            Justify::Center
+                        },
                         Wrap::NoWrap,
                         0.0,
                         AnyView::new(

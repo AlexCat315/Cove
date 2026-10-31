@@ -7,9 +7,10 @@
 //! descriptor can still be written in one expression.
 use super::{
     AccelerationStructure, AttachmentBlendState, Buffer, BufferBindingLayout, CompareOp, CullMode,
-    FillMode, FrontWinding, PipelineLayout, PrimitiveType, RhiResult, Sampler, SamplerAddressMode, SamplerFilter, SamplerMipFilter, ShaderFormat,
-    ShaderModule, ShaderSpecializationConstant, ShaderStage, ShaderVisibility, Texture,
-    TextureDimension, TextureFormat, ThreadgroupSize, VertexFormat, VertexInputRate, rhi_require,
+    FillMode, FrontWinding, PipelineLayout, PrimitiveType, RhiResult, Sampler, SamplerAddressMode,
+    SamplerFilter, SamplerMipFilter, ShaderFormat, ShaderModule, ShaderSpecializationConstant,
+    ShaderStage, ShaderVisibility, Texture, TextureDimension, TextureFormat, ThreadgroupSize,
+    VertexFormat, VertexInputRate, rhi_require,
 };
 
 // MARK: - Device configuration
@@ -37,8 +38,14 @@ impl Default for DeviceConfig {
 }
 impl DeviceConfig {
     pub fn validate(&self) -> RhiResult<()> {
-        rhi_require(!self.preferred_backends.is_empty(), "choose at least one graphics backend")?;
-        rhi_require(self.frames_in_flight > 0, "frames in flight must be positive")
+        rhi_require(
+            !self.preferred_backends.is_empty(),
+            "choose at least one graphics backend",
+        )?;
+        rhi_require(
+            self.frames_in_flight > 0,
+            "frames in flight must be positive",
+        )
     }
 }
 
@@ -51,7 +58,11 @@ pub struct QueueLimits {
 }
 impl Default for QueueLimits {
     fn default() -> Self {
-        Self { graphics: 1, compute: 1, transfer: 1 }
+        Self {
+            graphics: 1,
+            compute: 1,
+            transfer: 1,
+        }
     }
 }
 
@@ -65,10 +76,18 @@ pub struct BufferDescriptor {
 }
 impl BufferDescriptor {
     pub const fn new(size: usize, usage: BufferUsage) -> Self {
-        Self { size, usage, label: None }
+        Self {
+            size,
+            usage,
+            label: None,
+        }
     }
     pub const fn labelled(size: usize, usage: BufferUsage, label: &'static str) -> Self {
-        Self { size, usage, label: Some(label) }
+        Self {
+            size,
+            usage,
+            label: Some(label),
+        }
     }
 }
 
@@ -262,11 +281,7 @@ pub struct BindingLayoutEntry {
     pub array_size: u32,
 }
 impl BindingLayoutEntry {
-    pub const fn new(
-        slot: u32,
-        binding_type: BindingType,
-        visibility: ShaderVisibility,
-    ) -> Self {
+    pub const fn new(slot: u32, binding_type: BindingType, visibility: ShaderVisibility) -> Self {
         Self {
             buffer: BufferBindingLayout::DEFAULT,
             slot,
@@ -292,7 +307,10 @@ pub struct BindingLayoutDescriptor {
 }
 impl BindingLayoutDescriptor {
     pub fn new(entries: Vec<BindingLayoutEntry>) -> Self {
-        Self { entries, label: None }
+        Self {
+            entries,
+            label: None,
+        }
     }
 }
 
@@ -304,13 +322,24 @@ pub enum BindingResource {
     StorageTexture(Texture),
     /// A bounded range is required when a large transient upload buffer is
     /// bound as a small uniform block. `None` exposes the remaining buffer.
-    UniformBuffer { buffer: Buffer, offset: usize, size: Option<usize> },
-    StorageBuffer { buffer: Buffer, offset: usize },
+    UniformBuffer {
+        buffer: Buffer,
+        offset: usize,
+        size: Option<usize>,
+    },
+    StorageBuffer {
+        buffer: Buffer,
+        offset: usize,
+    },
     AccelerationStructure(AccelerationStructure),
 }
 impl BindingResource {
     pub const fn uniform_buffer(buffer: Buffer) -> Self {
-        Self::UniformBuffer { buffer, offset: 0, size: None }
+        Self::UniformBuffer {
+            buffer,
+            offset: 0,
+            size: None,
+        }
     }
     pub const fn storage_buffer(buffer: Buffer) -> Self {
         Self::StorageBuffer { buffer, offset: 0 }
@@ -321,18 +350,22 @@ impl BindingResource {
     pub fn tracks_as(&self) -> Option<(super::ResourceRef, BindingType)> {
         match *self {
             Self::Sampler(_) => None,
-            Self::Texture(texture) => {
-                Some((super::ResourceRef::texture(texture.id()), BindingType::Texture))
-            }
-            Self::StorageTexture(texture) => {
-                Some((super::ResourceRef::texture(texture.id()), BindingType::StorageTexture))
-            }
-            Self::UniformBuffer { buffer, .. } => {
-                Some((super::ResourceRef::buffer(buffer.id()), BindingType::UniformBuffer))
-            }
-            Self::StorageBuffer { buffer, .. } => {
-                Some((super::ResourceRef::buffer(buffer.id()), BindingType::StorageBuffer))
-            }
+            Self::Texture(texture) => Some((
+                super::ResourceRef::texture(texture.id()),
+                BindingType::Texture,
+            )),
+            Self::StorageTexture(texture) => Some((
+                super::ResourceRef::texture(texture.id()),
+                BindingType::StorageTexture,
+            )),
+            Self::UniformBuffer { buffer, .. } => Some((
+                super::ResourceRef::buffer(buffer.id()),
+                BindingType::UniformBuffer,
+            )),
+            Self::StorageBuffer { buffer, .. } => Some((
+                super::ResourceRef::buffer(buffer.id()),
+                BindingType::StorageBuffer,
+            )),
             Self::AccelerationStructure(structure) => Some((
                 super::ResourceRef::acceleration_structure(structure.id()),
                 BindingType::AccelerationStructure,
@@ -369,9 +402,15 @@ impl BindingResource {
     /// keeps the binding-set cache key stable.
     pub fn normalized(self) -> Self {
         match self {
-            Self::UniformBuffer { buffer, offset: 0, size } => {
-                Self::UniformBuffer { buffer, offset: 0, size }
-            }
+            Self::UniformBuffer {
+                buffer,
+                offset: 0,
+                size,
+            } => Self::UniformBuffer {
+                buffer,
+                offset: 0,
+                size,
+            },
             Self::StorageBuffer { buffer, offset: 0 } => Self::StorageBuffer { buffer, offset: 0 },
             other => other,
         }
@@ -385,7 +424,10 @@ pub struct BindingSetEntry {
 }
 impl BindingSetEntry {
     pub fn new(slot: u32, resource: BindingResource) -> Self {
-        Self { slot, resource: resource.normalized() }
+        Self {
+            slot,
+            resource: resource.normalized(),
+        }
     }
 }
 
@@ -396,7 +438,10 @@ pub struct BindingSetDescriptor {
 }
 impl BindingSetDescriptor {
     pub fn new(entries: Vec<BindingSetEntry>) -> Self {
-        Self { entries, label: None }
+        Self {
+            entries,
+            label: None,
+        }
     }
 }
 
@@ -408,7 +453,11 @@ pub struct PipelineLayoutDescriptor {
 }
 impl PipelineLayoutDescriptor {
     pub fn new(set_layouts: Vec<super::BindingLayout>) -> Self {
-        Self { set_layouts, push_constants: Vec::new(), label: None }
+        Self {
+            set_layouts,
+            push_constants: Vec::new(),
+            label: None,
+        }
     }
 }
 
@@ -428,7 +477,12 @@ impl ResolvedBindingEntry {
         visibility: ShaderVisibility,
         resource: BindingResource,
     ) -> Self {
-        Self { slot, binding_type, visibility, resource }
+        Self {
+            slot,
+            binding_type,
+            visibility,
+            resource,
+        }
     }
 }
 
@@ -441,7 +495,10 @@ pub struct DepthStencilState {
 }
 impl Default for DepthStencilState {
     fn default() -> Self {
-        Self { depth_compare: CompareOp::Less, depth_write_enabled: true }
+        Self {
+            depth_compare: CompareOp::Less,
+            depth_write_enabled: true,
+        }
     }
 }
 
@@ -470,7 +527,10 @@ pub struct VertexSemantic {
 }
 impl VertexSemantic {
     pub const fn new(index: u32) -> Self {
-        Self { name: "TEXCOORD", index }
+        Self {
+            name: "TEXCOORD",
+            index,
+        }
     }
 }
 impl Default for VertexSemantic {
@@ -510,7 +570,10 @@ pub struct VertexBufferLayout {
 }
 impl VertexBufferLayout {
     pub const fn new(stride: usize) -> Self {
-        Self { stride, step_rate: VertexInputRate::PerVertex }
+        Self {
+            stride,
+            step_rate: VertexInputRate::PerVertex,
+        }
     }
 }
 
@@ -520,11 +583,11 @@ pub struct VertexLayoutDescriptor {
     pub buffer_layouts: Vec<VertexBufferLayout>,
 }
 impl VertexLayoutDescriptor {
-    pub fn new(
-        attributes: Vec<VertexAttribute>,
-        buffer_layouts: Vec<VertexBufferLayout>,
-    ) -> Self {
-        Self { attributes, buffer_layouts }
+    pub fn new(attributes: Vec<VertexAttribute>, buffer_layouts: Vec<VertexBufferLayout>) -> Self {
+        Self {
+            attributes,
+            buffer_layouts,
+        }
     }
 }
 
@@ -537,10 +600,16 @@ pub struct ColorAttachmentDescriptor {
 }
 impl ColorAttachmentDescriptor {
     pub const fn new(format: TextureFormat) -> Self {
-        Self { format, blend: AttachmentBlendState::OPAQUE }
+        Self {
+            format,
+            blend: AttachmentBlendState::OPAQUE,
+        }
     }
     pub const fn blended(format: TextureFormat) -> Self {
-        Self { format, blend: AttachmentBlendState::ALPHA_BLEND }
+        Self {
+            format,
+            blend: AttachmentBlendState::ALPHA_BLEND,
+        }
     }
 }
 
@@ -587,7 +656,11 @@ pub struct ComputePipelineDescriptor {
 }
 impl ComputePipelineDescriptor {
     pub fn new(layout: PipelineLayout, shader: ShaderModule) -> Self {
-        Self { layout, shader, label: None }
+        Self {
+            layout,
+            shader,
+            label: None,
+        }
     }
 }
 
@@ -755,7 +828,10 @@ mod tests {
         let mut config = DeviceConfig::default();
         config.preferred_backends.clear();
         assert!(config.validate().is_err());
-        let config = DeviceConfig { frames_in_flight: 0, ..DeviceConfig::default() };
+        let config = DeviceConfig {
+            frames_in_flight: 0,
+            ..DeviceConfig::default()
+        };
         assert!(config.validate().is_err());
     }
 
@@ -773,7 +849,11 @@ mod tests {
         let omitted = BindingSetEntry::new(0, BindingResource::uniform_buffer(buffer));
         let explicit = BindingSetEntry::new(
             0,
-            BindingResource::UniformBuffer { buffer, offset: 0, size: None },
+            BindingResource::UniformBuffer {
+                buffer,
+                offset: 0,
+                size: None,
+            },
         );
         assert_eq!(omitted, explicit);
         assert_eq!(omitted.resource.buffer_offset(), 0);
@@ -784,8 +864,9 @@ mod tests {
     #[test]
     fn tracked_resources_report_their_kind() {
         let texture = Texture::new(9);
-        let (reference, kind) =
-            BindingResource::StorageTexture(texture).tracks_as().expect("tracked");
+        let (reference, kind) = BindingResource::StorageTexture(texture)
+            .tracks_as()
+            .expect("tracked");
         assert_eq!(kind, BindingType::StorageTexture);
         assert_eq!(reference.kind, super::super::ResourceKind::Texture);
         assert_eq!(reference.id, 9);
@@ -794,7 +875,10 @@ mod tests {
     #[test]
     fn surface_descriptor_defaults_to_the_platform_format() {
         let surface = SurfaceDescriptor::new(0x1000);
-        assert_eq!(surface.color_format, super::super::platform_default_surface_format());
+        assert_eq!(
+            surface.color_format,
+            super::super::platform_default_surface_format()
+        );
         assert!(surface.vsync_enabled);
         assert_eq!(surface.kind, NativeSurfaceKind::platform_default());
     }

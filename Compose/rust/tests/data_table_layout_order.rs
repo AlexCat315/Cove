@@ -16,8 +16,8 @@
 mod support;
 
 use cove_ui_compose::primitives::data::data_table::{
-    variable_row_heights, DataTableColumnGeometry, DataTableColumnOrder, DataTableRowMetrics,
-    RowHeightKey, row_height_key_matches,
+    DataTableColumnGeometry, DataTableColumnOrder, DataTableRowMetrics, RowHeightKey,
+    row_height_key_matches, variable_row_heights,
 };
 
 #[derive(Clone, Debug)]
@@ -28,7 +28,10 @@ struct Asset {
 }
 
 fn columns() -> Vec<String> {
-    ["id", "name", "lines"].iter().map(|id| id.to_string()).collect()
+    ["id", "name", "lines"]
+        .iter()
+        .map(|id| id.to_string())
+        .collect()
 }
 
 #[test]
@@ -59,11 +62,7 @@ fn an_empty_saved_order_preserves_the_authored_order() {
 fn a_duplicated_saved_entry_does_not_shift_later_columns() {
     let ids = columns();
     let applied = DataTableColumnOrder::apply(
-        &[
-            "name".to_string(),
-            "name".to_string(),
-            "id".to_string(),
-        ],
+        &["name".to_string(), "name".to_string(), "id".to_string()],
         &ids,
     );
     assert_eq!(
@@ -129,7 +128,8 @@ fn variable_row_heights_drive_the_extent_and_offsets() {
 
     let expected_total: f32 = (0..count).map(|row| ((row % 3 + 1) * 36) as f32).sum();
     let metrics = DataTableRowMetrics::variable(count, 36.0, {
-        let mut index = cove_ui_compose::primitives::layout::virtualization::VariableRowIndex::new();
+        let mut index =
+            cove_ui_compose::primitives::layout::virtualization::VariableRowIndex::new();
         index.replace(&(0..count).collect::<Vec<_>>(), &heights, 0.0);
         index
     });
@@ -276,10 +276,7 @@ fn tree_table_flattening_visits_only_expanded_branches() {
         open[1].2 && open[1].3,
         "the nested branch reports both children and its own expansion"
     );
-    assert!(
-        !open[2].2,
-        "a leaf reports that it has no children"
-    );
+    assert!(!open[2].2, "a leaf reports that it has no children");
 }
 
 #[test]

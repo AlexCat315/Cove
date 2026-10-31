@@ -256,3 +256,35 @@ path = "rust/tests/nested_geometry_probe.rs"
 [[test]]
 name = "search_field"
 path = "rust/tests/search_field.rs"
+
+[[test]]
+name = "json_field"
+path = "rust/tests/json_field.rs"
+
+[[test]]
+name = "vec3_field"
+path = "rust/tests/vec3_field.rs"
+
+[[test]]
+name = "time_input"
+path = "rust/tests/time_input.rs"
+
+[[test]]
+name = "select_enumeration"
+path = "rust/tests/select_enumeration.rs"
+
+[[test]]
+name = "offscreen_reuse"
+path = "rust/tests/offscreen_reuse.rs"
+
+[[test]]
+name = "scratch_geometry"
+path = "rust/tests/scratch_geometry.rs"
+
+[[test]]
+name = "recomposition_paint"
+path = "rust/tests/recomposition_paint.rs"
+
+[[test]]
+name = "chrome_component"
+path = "rust/tests/chrome_component.rs"

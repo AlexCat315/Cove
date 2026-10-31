@@ -6,10 +6,6 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use cove_core::scene::{
-    AccessibilityRole, Align, Edge, FlexDirection, Justify, Node, PositionType, Wrap,
-};
-use cove_core::Binding;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
@@ -18,8 +14,12 @@ use crate::primitives::feedback::Badge;
 use crate::primitives::overlays::menu::MenuEntry;
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::ButtonStyleViewExt;
-use crate::theme::{theme_for_node, SemanticFontRef};
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, TupleView, View};
+use crate::theme::{SemanticFontRef, theme_for_node};
+use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_view};
+use cove_core::Binding;
+use cove_core::scene::{
+    AccessibilityRole, Align, Edge, FlexDirection, Justify, Node, PositionType, Wrap,
+};
 
 use super::hierarchy::SidebarEntry;
 use super::presentation::SidebarPresentation;
@@ -44,7 +44,8 @@ struct RevealState {
 }
 
 /// One navigation destination row.
-pub struct SidebarDestination<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> {
+pub struct SidebarDestination<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static>
+{
     pub entry: SidebarEntry<Id>,
     pub selection: Binding<Option<Id>>,
     pub expanded: Binding<std::collections::HashSet<Id>>,
@@ -62,7 +63,11 @@ pub struct SidebarDestination<Id: PartialEq + Eq + std::hash::Hash + Clone + Sen
 
 impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> SidebarDestination<Id> {
     fn actions_width(&self) -> f32 {
-        if self.entry.item.context_menu.is_empty() { 0.0 } else { ACTIONS_WIDTH }
+        if self.entry.item.context_menu.is_empty() {
+            0.0
+        } else {
+            ACTIONS_WIDTH
+        }
     }
 
     /// Title inset that keeps text clear of the absolutely placed accessory and
@@ -118,7 +123,9 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
         let weak = node.downgrade();
         let state_for_layout = state.clone();
         node.set_layout_did_update(Some(Rc::new(move |_owner: &Node| {
-            let Some(owner) = Node::upgrade(&weak) else { return };
+            let Some(owner) = Node::upgrade(&weak) else {
+                return;
+            };
             let mut state = state_for_layout.borrow_mut();
             if !state.signature.is_some_and(|(selected, _)| selected) {
                 return;
@@ -126,7 +133,9 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
             let mut pending = owner.children();
             while let Some(candidate) = pending.pop() {
                 if candidate.attachment::<bool>(BUTTON_HOST_MARKER) == Some(true) {
-                    let Some(scroll) = scroll_ancestor(&candidate) else { return };
+                    let Some(scroll) = scroll_ancestor(&candidate) else {
+                        return;
+                    };
                     let scroll_frame = scroll.frame();
                     if scroll_frame.height <= 0.0 || candidate.frame().height <= 0.0 {
                         return;
@@ -195,9 +204,16 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
                     AnyView::new(crate::EmptyView)
                 };
                 lanes.push(AnyView::new(
-                    BoxView::new(FlexDirection::Row, Align::Center, Justify::Center, Wrap::NoWrap, 0.0, glyph)
-                        .frame_width(16.0)
-                        .flex_with(0.0, 0.0, None),
+                    BoxView::new(
+                        FlexDirection::Row,
+                        Align::Center,
+                        Justify::Center,
+                        Wrap::NoWrap,
+                        0.0,
+                        glyph,
+                    )
+                    .frame_width(16.0)
+                    .flex_with(0.0, 0.0, None),
                 ));
             }
             if let Some(width) = self.icon_width {
@@ -210,9 +226,16 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
                     None => AnyView::new(crate::EmptyView),
                 };
                 lanes.push(AnyView::new(
-                    BoxView::new(FlexDirection::Row, Align::Center, Justify::Center, Wrap::NoWrap, 0.0, glyph)
-                        .frame_width(width)
-                        .flex_with(0.0, 0.0, None),
+                    BoxView::new(
+                        FlexDirection::Row,
+                        Align::Center,
+                        Justify::Center,
+                        Wrap::NoWrap,
+                        0.0,
+                        glyph,
+                    )
+                    .frame_width(width)
+                    .flex_with(0.0, 0.0, None),
                 ));
             }
             lanes.push(AnyView::new(
@@ -232,7 +255,11 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
             }
             AnyView::new(
                 BoxView::new(
-                    FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 10.0,
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    10.0,
                     AnyView::new(TupleView::new(lanes)),
                 )
                 .padding_insets(crate::modifiers::layout::EdgeInsets::new(
@@ -264,16 +291,18 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
             is_selected,
             None,
         )
-        .button_style(SidebarItemStyle { minimum_height: self.minimum_row_height });
+        .button_style(SidebarItemStyle {
+            minimum_height: self.minimum_row_height,
+        });
 
         let row_label = label.clone();
-        let mut column: Vec<AnyView> = vec![AnyView::new(
-            AnyView::new(button).with_modifier(SidebarRowIdentity {
+        let mut column: Vec<AnyView> = vec![AnyView::new(AnyView::new(button).with_modifier(
+            SidebarRowIdentity {
                 label: row_label,
                 value,
                 is_expanded: is_branch.then_some(is_expanded),
-            }),
-        )];
+            },
+        ))];
         // The accessory and actions menu sit outside the button so they never
         // shrink the destination's hover band.
         if !is_rail {
@@ -287,7 +316,11 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
         }
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Row, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                FlexDirection::Row,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(TupleView::new(column)),
             )
             .frame(None, None, Some(0.0), None, None, None),
@@ -301,7 +334,9 @@ fn presentation_code(presentation: SidebarPresentation) -> u8 {
     match presentation {
         SidebarPresentation::Expanded => 0,
         SidebarPresentation::Rail { shows_labels: true } => 1,
-        SidebarPresentation::Rail { shows_labels: false } => 2,
+        SidebarPresentation::Rail {
+            shows_labels: false,
+        } => 2,
     }
 }
 
@@ -319,7 +354,8 @@ fn scroll_ancestor(node: &Node) -> Option<Node> {
 
 impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
     for SidebarDestination<Id>
-{}
+{
+}
 
 /// Row semantics applied to the erased button.
 struct SidebarRowIdentity {
@@ -375,16 +411,23 @@ impl PrimitiveView for SidebarTrailingLane {
     fn update_node(&self, _node: &Node) {}
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
-        vec![AnyView::new(
-            BoxView::new(FlexDirection::Row, Align::Center, Justify::Center, Wrap::NoWrap, 0.0, self.content.clone()),
-        )]
+        vec![AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::Center,
+            Wrap::NoWrap,
+            0.0,
+            self.content.clone(),
+        ))]
     }
 }
 impl_primitive_view!(SidebarTrailingLane);
 
 /// Rail presentation of one destination: glyph, optional badge dot, optional
 /// expand marker and optional label.
-pub struct RailDestinationLabel<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> {
+pub struct RailDestinationLabel<
+    Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static,
+> {
     pub item: super::items::SidebarItem<Id>,
     pub shows_labels: bool,
     pub icon_extent: f32,
@@ -426,9 +469,16 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
             )),
         };
         let mut column: Vec<AnyView> = vec![AnyView::new(
-            BoxView::new(FlexDirection::Column, Align::Center, Justify::Center, Wrap::NoWrap, 0.0, glyph)
-                .frame_size(self.icon_extent, self.icon_extent)
-                .flex_with(0.0, 0.0, None),
+            BoxView::new(
+                FlexDirection::Column,
+                Align::Center,
+                Justify::Center,
+                Wrap::NoWrap,
+                0.0,
+                glyph,
+            )
+            .frame_size(self.icon_extent, self.icon_extent)
+            .flex_with(0.0, 0.0, None),
         )];
         if self.shows_labels {
             column.push(AnyView::new(
@@ -442,7 +492,11 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
         let _ = self.is_expanded;
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Center, Justify::FlexStart, Wrap::NoWrap, 4.0,
+                FlexDirection::Column,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                4.0,
                 AnyView::new(TupleView::new(column)),
             )
             .frame(None, None, Some(0.0), None, None, None),
@@ -451,4 +505,5 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
 }
 impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
     for RailDestinationLabel<Id>
-{}
+{
+}

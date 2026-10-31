@@ -1,5 +1,5 @@
 //! Translation of CoveUIScene/NodeGeometry.swift.
-use super::{placement_step, Affine2D, Node};
+use super::{Affine2D, Node, placement_step};
 use crate::{Point, Rect};
 
 impl Node {
@@ -18,18 +18,29 @@ impl Node {
     pub fn absolute_frame(&self) -> Rect {
         let transform = self.absolute_transform();
         let frame = self.frame();
-        Rect::new(transform.e, transform.f, frame.width * transform.a.abs(), frame.height * transform.d.abs())
+        Rect::new(
+            transform.e,
+            transform.f,
+            frame.width * transform.a.abs(),
+            frame.height * transform.d.abs(),
+        )
     }
     /// Convert a window-space point into this node's local coordinates.
     pub fn convert_from_window(&self, point: Point) -> Point {
-        self.absolute_transform().inverted().applied(point.x, point.y)
+        self.absolute_transform()
+            .inverted()
+            .applied(point.x, point.y)
     }
     /// Maps this node's local coordinates into window space.
     pub fn absolute_transform(&self) -> Affine2D {
         let mut transform = placement_step(self.frame(), self.transform(), Point::default());
         let mut ancestor = self.parent();
         while let Some(current) = ancestor {
-            transform = transform.followed(placement_step(current.frame(), current.transform(), current.content_offset()));
+            transform = transform.followed(placement_step(
+                current.frame(),
+                current.transform(),
+                current.content_offset(),
+            ));
             ancestor = current.parent();
         }
         transform

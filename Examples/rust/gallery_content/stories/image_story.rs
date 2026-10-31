@@ -10,9 +10,7 @@ use cove_core::State;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::button::Button;
-use cove_ui_compose::primitives::media::{
-    AsyncImage, AsyncImagePhase, ImageContentMode,
-};
+use cove_ui_compose::primitives::media::{AsyncImage, AsyncImagePhase, ImageContentMode};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
 use cove_ui_compose::{AnyView, BoxView, TupleView, View, ViewExt};
@@ -90,7 +88,10 @@ pub enum ImageSurface {
 ///
 /// `Empty` and `Failure` share a layout but not their copy: a failure explains
 /// itself through the error description, an empty slot prompts for a source.
-pub fn surface_for(phase: &AsyncImagePhase, error_description: impl FnOnce() -> String) -> ImageSurface {
+pub fn surface_for(
+    phase: &AsyncImagePhase,
+    error_description: impl FnOnce() -> String,
+) -> ImageSurface {
     match phase {
         AsyncImagePhase::Success(_) => ImageSurface::Loaded,
         AsyncImagePhase::Loading => ImageSurface::Loading,
@@ -187,7 +188,11 @@ impl ImageStory {
     }
 
     pub fn content_modes(&self) -> [ImageContentMode; 3] {
-        [ImageContentMode::Fit, ImageContentMode::Fill, ImageContentMode::Stretch]
+        [
+            ImageContentMode::Fit,
+            ImageContentMode::Fill,
+            ImageContentMode::Stretch,
+        ]
     }
 }
 

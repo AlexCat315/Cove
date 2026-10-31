@@ -20,18 +20,21 @@ use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt, SurfaceStyleExt};
 use crate::primitives::controls::button::{Button, ButtonIcon, ButtonIconSource, ButtonRole};
 use crate::primitives::controls::fields::combobox_model::{
-    results_presentation, too_short_prompt, ComboboxResultsPresentation, ComboboxSearchPhase,
-    ComboboxSearchSession,
+    ComboboxResultsPresentation, ComboboxSearchPhase, ComboboxSearchSession, results_presentation,
+    too_short_prompt,
 };
 use crate::primitives::controls::fields::select::SelectOption;
 use crate::primitives::feedback::Spinner;
+use crate::primitives::overlays::anchored::{PopoverOverflow, PopoverSurface};
 use crate::primitives::overlays::popover::{Popover, PopoverSizing, PopoverTriggerDescription};
 use crate::primitives::overlays::roving_focus::SelectionNavigation;
-use crate::primitives::overlays::anchored::{PopoverOverflow, PopoverSurface};
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
-use crate::theme::{theme_for_node, SemanticColorRef, SemanticFontRef};
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View, ViewKind};
+use crate::theme::{SemanticColorRef, SemanticFontRef, theme_for_node};
+use crate::{
+    AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View, ViewKind,
+    impl_primitive_view,
+};
 
 /// `impl_primitive_view!` cannot name a generic host, so the same impl is
 /// written once here.
@@ -138,7 +141,11 @@ impl<Value> ComboboxSearch<Value> {
     pub fn new(
         results: impl Fn(&str) -> Result<Vec<SelectOption<Value>>, String> + Send + Sync + 'static,
     ) -> Self {
-        Self { delay_ms: 250, minimum_query_length: 0, results: Arc::new(results) }
+        Self {
+            delay_ms: 250,
+            minimum_query_length: 0,
+            results: Arc::new(results),
+        }
     }
 
     /// Minimal validation: a minimum below zero becomes zero, and a negative
@@ -162,7 +169,12 @@ struct ComboboxSession<Value> {
 
 impl<Value> Default for ComboboxSession<Value> {
     fn default() -> Self {
-        Self { is_presented: false, query: String::new(), highlighted: None, chosen: None }
+        Self {
+            is_presented: false,
+            query: String::new(),
+            highlighted: None,
+            chosen: None,
+        }
     }
 }
 
@@ -170,7 +182,10 @@ impl<Value> Default for ComboboxSession<Value> {
 #[derive(Clone)]
 enum ComboboxSource<Value> {
     Options(Vec<SelectOption<Value>>),
-    Search { search: ComboboxSearch<Value>, selected_label: Option<String> },
+    Search {
+        search: ComboboxSearch<Value>,
+        selected_label: Option<String>,
+    },
 }
 
 /// Searchable typed selection.
@@ -190,7 +205,10 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Combobox<Value> {
     pub fn new(selection: Binding<Option<Value>>, options: Vec<SelectOption<Value>>) -> Self {
         for (index, option) in options.iter().enumerate() {
             assert!(
-                options.iter().enumerate().all(|(other, candidate)| other == index || candidate.value != option.value),
+                options
+                    .iter()
+                    .enumerate()
+                    .all(|(other, candidate)| other == index || candidate.value != option.value),
                 "Combobox values must be unique"
             );
         }
@@ -214,7 +232,10 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Combobox<Value> {
         Self {
             selection,
             presentation: ComboboxPresentation::default(),
-            source: ComboboxSource::Search { search: search.validated(), selected_label },
+            source: ComboboxSource::Search {
+                search: search.validated(),
+                selected_label,
+            },
             session: Arc::new(Mutex::new(ComboboxSession::default())),
             remote: Arc::new(Mutex::new(ComboboxSearchSession::new())),
             remote_options: Arc::new(Mutex::new(Vec::new())),
@@ -257,14 +278,23 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Combobox<Value> {
     fn matches(&self, query: &str) -> Vec<SelectOption<Value>> {
         match &self.source {
             ComboboxSource::Options(options) => Self::matching(options, query),
-            ComboboxSource::Search { .. } => self.remote_options.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clone(),
+            ComboboxSource::Search { .. } => self
+                .remote_options
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .clone(),
         }
     }
 
     fn phase(&self) -> ComboboxSearchPhase {
         match &self.source {
             ComboboxSource::Options(_) => ComboboxSearchPhase::Loaded,
-            ComboboxSource::Search { .. } => self.remote.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).phase().clone(),
+            ComboboxSource::Search { .. } => self
+                .remote
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .phase()
+                .clone(),
         }
     }
 
@@ -273,18 +303,21 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Combobox<Value> {
     fn selected_label(&self) -> Option<String> {
         let value = self.selection.get()?;
         match &self.source {
-            ComboboxSource::Options(options) => {
-                options.iter().find(|option| option.value == value).map(|option| option.label.clone())
-            }
+            ComboboxSource::Options(options) => options
+                .iter()
+                .find(|option| option.value == value)
+                .map(|option| option.label.clone()),
             ComboboxSource::Search { selected_label, .. } => self
                 .remote_options
-                .lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
                 .iter()
                 .find(|option| option.value == value)
                 .map(|option| option.label.clone())
                 .or_else(|| {
                     self.session
-                        .lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner())
                         .chosen
                         .as_ref()
                         .filter(|chosen| chosen.value == value)
@@ -296,10 +329,13 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Combobox<Value> {
 
     /// Starts a remote request, if this combobox has one.
     fn request(&self, query: &str, force: bool) -> Option<u64> {
-        let ComboboxSource::Search { search, .. } = &self.source else { return None };
+        let ComboboxSource::Search { search, .. } = &self.source else {
+            return None;
+        };
         let generation = self
             .remote
-            .lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
             .begin(query, search.minimum_query_length, force)?;
         // The reply is applied through `deliver`, which drops a superseded
         // generation.
@@ -312,7 +348,14 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Combobox<Value> {
         if !self.presentation.is_enabled {
             return;
         }
-        let matches = self.matches(&self.session.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).query.clone());
+        let matches = self.matches(
+            &self
+                .session
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .query
+                .clone(),
+        );
         let Some(option) = matches
             .iter()
             .find(|option| &option.value == value && option.is_enabled)
@@ -321,7 +364,10 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Combobox<Value> {
         };
         let option = option.clone();
         {
-            let mut session = self.session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            let mut session = self
+                .session
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
             session.chosen = Some(option);
             session.is_presented = false;
         }
@@ -330,20 +376,33 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Combobox<Value> {
 
     /// Moves the highlight over the enabled values only.
     fn navigate(&self, command: SelectionNavigation) {
-        let matches = self.matches(&self.session.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).query.clone());
+        let matches = self.matches(
+            &self
+                .session
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .query
+                .clone(),
+        );
         let enabled: Vec<Value> = matches
             .iter()
             .filter(|option| option.is_enabled)
             .map(|option| option.value.clone())
             .collect();
-        let mut session = self.session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut session = self
+            .session
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         session.highlighted = command.destination(&enabled, session.highlighted.as_ref(), false);
     }
 
     /// Opens the popover, resetting the query and seeding the highlight.
     fn open(&self) {
         {
-            let mut session = self.session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            let mut session = self
+                .session
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
             session.query.clear();
             session.highlighted = self.selection.get();
         }
@@ -353,7 +412,10 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Combobox<Value> {
     }
 
     fn close(&self) {
-        self.remote.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).cancel();
+        self.remote
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .cancel();
     }
 }
 
@@ -361,24 +423,40 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> View for Combobox<Value> 
     fn body(&self) -> AnyView {
         let field = self.snapshot();
         let selected_label = self.selected_label();
-        let title = selected_label.clone().unwrap_or_else(|| self.presentation.placeholder.clone());
+        let title = selected_label
+            .clone()
+            .unwrap_or_else(|| self.presentation.placeholder.clone());
 
         let presented = Binding::new(
             {
                 let field = field.clone();
-                move || field.session.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).is_presented
+                move || {
+                    field
+                        .session
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner())
+                        .is_presented
+                }
             },
             {
                 let field = field.clone();
                 move |open: bool| {
-                    let was_open = field.session.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).is_presented;
+                    let was_open = field
+                        .session
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner())
+                        .is_presented;
                     if open && !was_open {
                         field.open();
                     }
                     if !open && was_open {
                         field.close();
                     }
-                    field.session.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).is_presented = open;
+                    field
+                        .session
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner())
+                        .is_presented = open;
                 }
             },
         );
@@ -389,7 +467,9 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> View for Combobox<Value> 
             is_placeholder: selected_label.is_none(),
         });
 
-        let content = AnyView::new(ComboboxContent { field: field.clone() });
+        let content = AnyView::new(ComboboxContent {
+            field: field.clone(),
+        });
 
         let popover = Popover::new(trigger, content)
             .is_presented(presented)
@@ -405,7 +485,10 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> View for Combobox<Value> 
             });
 
         AnyView::new(
-            ComboboxRole { content: AnyView::new(popover) }.frame_width(self.presentation.width),
+            ComboboxRole {
+                content: AnyView::new(popover),
+            }
+            .frame_width(self.presentation.width),
         )
     }
 }
@@ -482,7 +565,9 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView for Combobo
             let selection = field.selection.clone();
             row.push(AnyView::new(
                 Button::icon_with_options(
-                    ButtonIconSource::resource(crate::primitives::media::ui_icon_catalog::action::x()),
+                    ButtonIconSource::resource(
+                        crate::primitives::media::ui_icon_catalog::action::x(),
+                    ),
                     Some(12.0),
                     None,
                     ButtonRole::Normal,
@@ -495,18 +580,20 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView for Combobo
                 .button_style(GhostButtonStyle),
             ));
         }
-        row.push(AnyView::new(
-            ButtonIcon::new(
-                ButtonIconSource::resource(
-                    crate::primitives::media::ui_icon_catalog::navigation::dropdown_chevron_down(),
-                ),
-                Some(12.0),
-                None,
+        row.push(AnyView::new(ButtonIcon::new(
+            ButtonIconSource::resource(
+                crate::primitives::media::ui_icon_catalog::navigation::dropdown_chevron_down(),
             ),
-        ));
+            Some(12.0),
+            None,
+        )));
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 8.0,
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                8.0,
                 AnyView::new(TupleView::new(row)),
             )
             .padding_edges(10.0, 4.0)
@@ -539,13 +626,27 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView for Combobo
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         let field = self.field.clone();
-        let version = field.session.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).query.clone();
+        let version = field
+            .session
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .query
+            .clone();
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 6.0,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                6.0,
                 AnyView::new(TupleView::new(vec![
-                    AnyView::new(ComboboxSearchInput { field: field.clone(), version }),
-                    AnyView::new(ComboboxResultsArea { field: field.clone() }),
+                    AnyView::new(ComboboxSearchInput {
+                        field: field.clone(),
+                        version,
+                    }),
+                    AnyView::new(ComboboxResultsArea {
+                        field: field.clone(),
+                    }),
                 ])),
             )
             .padding(4.0)
@@ -561,7 +662,9 @@ struct ComboboxSearchInput<Value: PartialEq + Clone + Send + Sync + 'static> {
     version: String,
 }
 
-impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView for ComboboxSearchInput<Value> {
+impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView
+    for ComboboxSearchInput<Value>
+{
     fn make_node(&self) -> Node {
         let node = Node::new();
         node.set_is_hit_testable(false);
@@ -579,16 +682,35 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView for Combobo
         let field_for_get = field.clone();
         let field_for_set = field.clone();
         let text = Binding::new(
-            move || crate::primitives::text::text_buffer::TextBuffer::new(&field_for_get.session.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).query.clone()),
+            move || {
+                crate::primitives::text::text_buffer::TextBuffer::new(
+                    &field_for_get
+                        .session
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner())
+                        .query
+                        .clone(),
+                )
+            },
             move |buffer: crate::primitives::text::text_buffer::TextBuffer| {
                 let query = buffer.string_value();
                 {
-                    let mut session = field_for_set.session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                    let mut session = field_for_set
+                        .session
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner());
                     session.query = query.clone();
                 }
                 let matches = field_for_set.matches(&query);
-                let first_enabled = matches.iter().find(|option| option.is_enabled).map(|option| option.value.clone());
-                field_for_set.session.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).highlighted = first_enabled;
+                let first_enabled = matches
+                    .iter()
+                    .find(|option| option.is_enabled)
+                    .map(|option| option.value.clone());
+                field_for_set
+                    .session
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .highlighted = first_enabled;
                 field_for_set.request(&query, false);
             },
         );
@@ -604,10 +726,26 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView for Combobo
         })
         .events(crate::primitives::text::text_field::TextFieldEvents {
             on_submit: Some(Rc::new(move || {
-                let matches = submit_field.matches(&submit_field.session.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).query.clone());
-                let highlighted = submit_field.session.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).highlighted.clone();
+                let matches = submit_field.matches(
+                    &submit_field
+                        .session
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner())
+                        .query
+                        .clone(),
+                );
+                let highlighted = submit_field
+                    .session
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .highlighted
+                    .clone();
                 match highlighted {
-                    Some(value) if matches.iter().any(|option| option.value == value && option.is_enabled) => {
+                    Some(value)
+                        if matches
+                            .iter()
+                            .any(|option| option.value == value && option.is_enabled) =>
+                    {
                         submit_field.choose(&value)
                     }
                     _ => {
@@ -642,7 +780,9 @@ struct ComboboxResultsArea<Value: PartialEq + Clone + Send + Sync + 'static> {
     field: Combobox<Value>,
 }
 
-impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView for ComboboxResultsArea<Value> {
+impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView
+    for ComboboxResultsArea<Value>
+{
     fn make_node(&self) -> Node {
         let node = Node::new();
         node.set_is_hit_testable(false);
@@ -657,7 +797,14 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView for Combobo
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         let field = &self.field;
-        let matches = field.matches(&field.session.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).query.clone());
+        let matches = field.matches(
+            &field
+                .session
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .query
+                .clone(),
+        );
         let phase = field.phase();
         let count = matches.len();
         let presentation = results_presentation(&phase, count, &field.presentation.empty_text);
@@ -677,9 +824,16 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView for Combobo
                     tone: SemanticColorRef::error(),
                     accessory: Some(AnyView::new(
                         Button::with_options(
-                            AnyView::new(Text::new("Retry").semantic_font(SemanticFontRef::label())),
+                            AnyView::new(
+                                Text::new("Retry").semantic_font(SemanticFontRef::label()),
+                            ),
                             move || {
-                                let query = retry_field.session.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).query.clone();
+                                let query = retry_field
+                                    .session
+                                    .lock()
+                                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                                    .query
+                                    .clone();
                                 retry_field.request(&query, true);
                             },
                             ButtonRole::Normal,
@@ -706,14 +860,26 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView for Combobo
             })],
             ComboboxResultsPresentation::List { dimmed } => {
                 let row_height = 32.0_f32.max(matches.len() as f32 * 0.0);
-                let visible = matches.len().min(field.presentation.max_visible_rows).max(1);
+                let visible = matches
+                    .len()
+                    .min(field.presentation.max_visible_rows)
+                    .max(1);
                 vec![AnyView::new(
                     ComboboxList {
                         field: field.clone(),
                         matches,
                         row_height,
                     }
-                    .frame(None, Some(crate::modifiers::layout::FrameDimension::Points(row_height * visible as f32)), None, None, None, None)
+                    .frame(
+                        None,
+                        Some(crate::modifiers::layout::FrameDimension::Points(
+                            row_height * visible as f32,
+                        )),
+                        None,
+                        None,
+                        None,
+                        None,
+                    )
                     .opacity(if dimmed { 0.55 } else { 1.0 }),
                 )]
             }
@@ -770,8 +936,12 @@ impl PrimitiveView for ComboboxStatus {
             row.push(accessory);
         }
         vec![AnyView::new(
-            Row::new(VerticalAlignment::Center, 8.0, AnyView::new(TupleView::new(row)))
-                .padding_edges(STATUS_PADDING_HORIZONTAL, STATUS_PADDING_VERTICAL),
+            Row::new(
+                VerticalAlignment::Center,
+                8.0,
+                AnyView::new(TupleView::new(row)),
+            )
+            .padding_edges(STATUS_PADDING_HORIZONTAL, STATUS_PADDING_VERTICAL),
         )]
     }
 }
@@ -799,7 +969,12 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView for Combobo
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         let field = &self.field;
-        let highlighted = field.session.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).highlighted.clone();
+        let highlighted = field
+            .session
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .highlighted
+            .clone();
         let selected = field.selection.get();
         self.matches
             .iter()
@@ -820,7 +995,9 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView for Combobo
                 if selected.as_ref() == Some(&option.value) {
                     row.push(AnyView::new(
                         ButtonIcon::new(
-                            ButtonIconSource::resource(crate::primitives::media::ui_icon_catalog::action::check()),
+                            ButtonIconSource::resource(
+                                crate::primitives::media::ui_icon_catalog::action::check(),
+                            ),
                             Some(12.0),
                             None,
                         )
@@ -835,7 +1012,11 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> PrimitiveView for Combobo
                     Button::with_options(
                         AnyView::new(
                             BoxView::new(
-                                FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 8.0,
+                                FlexDirection::Row,
+                                Align::Center,
+                                Justify::FlexStart,
+                                Wrap::NoWrap,
+                                8.0,
                                 AnyView::new(TupleView::new(row)),
                             )
                             .padding_edges(8.0, 4.0)
@@ -864,7 +1045,10 @@ impl_generic_view!(ComboboxList);
 struct ComboboxRowStyle;
 
 impl crate::theme::styles::buttons::ButtonStyle for ComboboxRowStyle {
-    fn make_body(&self, configuration: crate::theme::styles::buttons::ButtonStyleConfiguration) -> AnyView {
+    fn make_body(
+        &self,
+        configuration: crate::theme::styles::buttons::ButtonStyleConfiguration,
+    ) -> AnyView {
         let theme = configuration.theme.clone();
         let fill = if configuration.is_selected {
             theme.colors.state_layer_selected
@@ -875,7 +1059,11 @@ impl crate::theme::styles::buttons::ButtonStyle for ComboboxRowStyle {
         };
         AnyView::new(
             BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(configuration.label.clone()),
             )
             .background_color(fill)

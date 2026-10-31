@@ -1,10 +1,4 @@
 //! Translation of Primitives/Feedback/Badge.swift.
-use cove_core::scene::{
-    AccessibilityRole, AccessibilitySemantics, AccessibilityState, Align, FlexDirection, Justify,
-    LayoutNode, Node, Wrap,
-};
-use cove_core::Color;
-use cove_imaging::BundleImageResource;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
@@ -12,9 +6,15 @@ use crate::primitives::controls::button::{ButtonIcon, ButtonIconSource};
 use crate::primitives::feedback::StatusTone;
 use crate::primitives::text::Text;
 use crate::theme::{
-    theme_for_node, ControlSize, ControlSizeEnvironment, SemanticColorRef, SemanticFontRef,
+    ControlSize, ControlSizeEnvironment, SemanticColorRef, SemanticFontRef, theme_for_node,
 };
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, TupleView, View};
+use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_view};
+use cove_core::Color;
+use cove_core::scene::{
+    AccessibilityRole, AccessibilitySemantics, AccessibilityState, Align, FlexDirection, Justify,
+    LayoutNode, Node, Wrap,
+};
+use cove_imaging::BundleImageResource;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum BadgeVariant {
@@ -95,7 +95,11 @@ impl Badge {
                 stroke_width: 0.0,
             },
             BadgeVariant::Solid => BadgeStyle {
-                ink: if self.is_enabled { self.tone.ink_on_solid(theme) } else { disabled_ink },
+                ink: if self.is_enabled {
+                    self.tone.ink_on_solid(theme)
+                } else {
+                    disabled_ink
+                },
                 fill: base.multiplied_alpha(if self.is_enabled { 1.0 } else { 0.4 }),
                 stroke: Color::CLEAR,
                 stroke_width: 0.0,
@@ -149,7 +153,10 @@ impl PrimitiveView for Badge {
             role: AccessibilityRole::StaticText,
             label: self.title.clone(),
             value: tone_label(self.tone).to_string(),
-            state: AccessibilityState { is_enabled: self.is_enabled, ..Default::default() },
+            state: AccessibilityState {
+                is_enabled: self.is_enabled,
+                ..Default::default()
+            },
             combines_children: true,
             ..Default::default()
         }));
@@ -169,7 +176,11 @@ impl PrimitiveView for Badge {
             let color = if self.is_enabled { base } else { disabled_ink };
             return vec![AnyView::new(
                 BoxView::new(
-                    FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    0.0,
                     AnyView::new(crate::EmptyView),
                 )
                 .frame_size(size, size)
@@ -181,15 +192,23 @@ impl PrimitiveView for Badge {
         let mut row: Vec<AnyView> = Vec::new();
         if let Some(icon) = self.icon.clone() {
             row.push(AnyView::new(
-                ButtonIcon::new(ButtonIconSource::resource(icon), Some(metrics.icon_size), Some(style.ink))
-                    .flex(0.0)
-                    .shrink(0.0),
+                ButtonIcon::new(
+                    ButtonIconSource::resource(icon),
+                    Some(metrics.icon_size),
+                    Some(style.ink),
+                )
+                .flex(0.0)
+                .shrink(0.0),
             ));
         } else if self.shows_dot {
             // A drawn disc: the dot glyph fills only a fraction of its icon box.
             row.push(AnyView::new(
                 BoxView::new(
-                    FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    0.0,
                     AnyView::new(crate::EmptyView),
                 )
                 .frame_size(metrics.dot_size, metrics.dot_size)
@@ -211,7 +230,11 @@ impl PrimitiveView for Badge {
 
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, metrics.gap,
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                metrics.gap,
                 AnyView::new(TupleView::new(row)),
             )
             .padding_edges(metrics.padding_x, metrics.padding_y)
@@ -237,20 +260,36 @@ impl BadgeMetrics {
     fn new(control_size: ControlSize) -> Self {
         match control_size {
             ControlSize::Mini => Self {
-                font: SemanticFontRef::caption(), padding_x: 5.0, padding_y: 1.5,
-                gap: 3.0, icon_size: 10.0, dot_size: 5.0,
+                font: SemanticFontRef::caption(),
+                padding_x: 5.0,
+                padding_y: 1.5,
+                gap: 3.0,
+                icon_size: 10.0,
+                dot_size: 5.0,
             },
             ControlSize::Small => Self {
-                font: SemanticFontRef::caption(), padding_x: 6.0, padding_y: 2.0,
-                gap: 4.0, icon_size: 11.0, dot_size: 5.0,
+                font: SemanticFontRef::caption(),
+                padding_x: 6.0,
+                padding_y: 2.0,
+                gap: 4.0,
+                icon_size: 11.0,
+                dot_size: 5.0,
             },
             ControlSize::Regular => Self {
-                font: SemanticFontRef::label(), padding_x: 8.0, padding_y: 3.0,
-                gap: 5.0, icon_size: 13.0, dot_size: 6.0,
+                font: SemanticFontRef::label(),
+                padding_x: 8.0,
+                padding_y: 3.0,
+                gap: 5.0,
+                icon_size: 13.0,
+                dot_size: 6.0,
             },
             ControlSize::Large => Self {
-                font: SemanticFontRef::label(), padding_x: 10.0, padding_y: 4.5,
-                gap: 6.0, icon_size: 15.0, dot_size: 7.0,
+                font: SemanticFontRef::label(),
+                padding_x: 10.0,
+                padding_y: 4.5,
+                gap: 6.0,
+                icon_size: 15.0,
+                dot_size: 7.0,
             },
         }
     }

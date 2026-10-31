@@ -13,13 +13,13 @@
 //!   only when the badge fits inside the field
 use std::collections::BTreeSet;
 
-use cove_core::{DrawList, Font, Point, Rect};
 use crate::primitives::text::code::gutter_geometry::{
     TextGutterControl, TextGutterControlKind, TextGutterGeometry,
 };
 use crate::primitives::text::code::gutter_options::{TextBreakpointState, TextEditorGutter};
 use crate::primitives::text::code::gutter_session::TextGutterSession;
 use crate::theme::Theme;
+use cove_core::{DrawList, Font, Point, Rect};
 
 /// One laid-out visual row, as the gutter addresses it.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -105,7 +105,12 @@ pub fn update_gutter_controls(
 
         if inputs.gutter.execution_line == Some(line) {
             let _ = list.add_rect(
-                Rect::new(origin.x, origin.y + y, inputs.field_width, inputs.line_height),
+                Rect::new(
+                    origin.x,
+                    origin.y + y,
+                    inputs.field_width,
+                    inputs.line_height,
+                ),
                 inputs.theme.colors.warning.multiplied_alpha(0.10),
             );
             let _ = list.add_rect(
@@ -136,9 +141,7 @@ pub fn update_gutter_controls(
         let has_markers = markers.get(&line).map(|m| !m.is_empty()).unwrap_or(false);
         let has_fold = session.folds().region(line).is_some();
 
-        if geometry.combined
-            && (inputs.gutter.breakpoints.is_some() || has_fold || has_markers)
-        {
+        if geometry.combined && (inputs.gutter.breakpoints.is_some() || has_fold || has_markers) {
             controls.push(TextGutterControl::new(
                 line,
                 TextGutterControlKind::Combined,
@@ -195,7 +198,10 @@ pub fn update_gutter_controls(
             && let Some(last_row) = rows.iter().rev().find(|row| row.line == line)
         {
             let badge_x = text_origin_x - origin.x + last_row.width + 8.0;
-            let width = 80.0_f32.max(64.0).min(80.0).min(inputs.field_width - badge_x - 8.0);
+            let width = 80.0_f32
+                .max(64.0)
+                .min(80.0)
+                .min(inputs.field_width - badge_x - 8.0);
             if badge_x >= text_origin_x - origin.x && badge_x + width <= inputs.field_width {
                 controls.push(TextGutterControl::new(
                     line,
@@ -217,7 +223,9 @@ pub fn update_gutter_controls(
 /// Whether any breakpoint inside a collapsed region is still enabled, so the
 /// summary badge can carry an error tone.
 pub fn folded_breakpoints(gutter: &TextEditorGutter, header: usize, region_last: usize) -> usize {
-    let Some(binding) = &gutter.breakpoints else { return 0 };
+    let Some(binding) = &gutter.breakpoints else {
+        return 0;
+    };
     binding
         .get()
         .iter()
@@ -232,9 +240,13 @@ pub fn folded_breakpoint_is_active(
     header: usize,
     region_last: usize,
 ) -> bool {
-    let Some(binding) = &gutter.breakpoints else { return false };
+    let Some(binding) = &gutter.breakpoints else {
+        return false;
+    };
     binding.get().iter().any(|point| {
-        point.line > header && point.line <= region_last && point.state != TextBreakpointState::Disabled
+        point.line > header
+            && point.line <= region_last
+            && point.state != TextBreakpointState::Disabled
     })
 }
 

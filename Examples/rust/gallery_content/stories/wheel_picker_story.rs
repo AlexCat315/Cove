@@ -8,8 +8,8 @@
 use cove_core::State;
 use cove_ui_compose::modifiers::layout::FlexExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
-use cove_ui_compose::primitives::controls::fields::{WheelPicker, WheelPickerOption};
 use cove_ui_compose::primitives::controls::Checkbox;
+use cove_ui_compose::primitives::controls::fields::{WheelPicker, WheelPickerOption};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
 use cove_ui_compose::{AnyView, BoxView, TupleView, View, ViewExt};
@@ -28,12 +28,18 @@ pub fn hour_options() -> Vec<WheelPickerOption<i32>> {
 
 /// The minute wheel steps in fives.
 pub fn minute_options() -> Vec<WheelPickerOption<i32>> {
-    (0..60).step_by(5).map(|minute| WheelPickerOption::new(minute, format!("{minute:02}"))).collect()
+    (0..60)
+        .step_by(5)
+        .map(|minute| WheelPickerOption::new(minute, format!("{minute:02}")))
+        .collect()
 }
 
 /// The half-day wheel.
 pub fn period_options() -> Vec<WheelPickerOption<i32>> {
-    vec![WheelPickerOption::new(0, "AM"), WheelPickerOption::new(1, "PM")]
+    vec![
+        WheelPickerOption::new(0, "AM"),
+        WheelPickerOption::new(1, "PM"),
+    ]
 }
 
 /// The volume wheel, 0…10, with the top row disabled.
@@ -46,7 +52,10 @@ pub fn volume_options() -> Vec<WheelPickerOption<i32>> {
 /// The time label the story's badge shows.
 pub fn time_label(hour: i32, minute: i32, period: i32) -> String {
     let hour = if hour == 0 { 12 } else { hour };
-    format!("{hour:02}:{minute:02} {}", if period == 0 { "AM" } else { "PM" })
+    format!(
+        "{hour:02}:{minute:02} {}",
+        if period == 0 { "AM" } else { "PM" }
+    )
 }
 
 /// `WheelPickerStory`: three time wheels and a volume wheel.
@@ -146,9 +155,10 @@ impl View for WheelPickerStory {
             cove_core::scene::Wrap::NoWrap,
             8.0,
             AnyView::new(TupleView::new(vec![
-                AnyView::new(Text::new("Start time").semantic_font(
-                    cove_ui_compose::theme::SemanticFontRef::body_strong(),
-                )),
+                AnyView::new(
+                    Text::new("Start time")
+                        .semantic_font(cove_ui_compose::theme::SemanticFontRef::body_strong()),
+                ),
                 AnyView::new(AnyView::new(Text::new("")).flex(1.0)),
                 AnyView::new(badge),
             ])),

@@ -1,7 +1,8 @@
 //! Pet state machine and one-clock entrance/jump timelines.
-use super::{clamp01, JumpArc, PetPose, PetRenderState, PetSpriteSheet, PetTrip};
+use super::{JumpArc, PetPose, PetRenderState, PetSpriteSheet, PetTrip, clamp01};
 use cove_core::scene::{
-    AnimationCurve, AnimatorScheduler, AnyAnimationController, ObservableObject, ObservablePublisher,
+    AnimationCurve, AnimatorScheduler, AnyAnimationController, ObservableObject,
+    ObservablePublisher,
 };
 use cove_core::{Point, Rect};
 use std::any::Any;
@@ -10,7 +11,9 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Clone, Copy)]
-struct Entrance { duration: f64 }
+struct Entrance {
+    duration: f64,
+}
 
 /// Owns the pet's current anchors, intent and deterministic animation state.
 pub struct PetWorld {
@@ -37,7 +40,11 @@ impl PetWorld {
         Self::with_pose(sprite_sheet, initial_anchor_id, PetPose::Idle)
     }
 
-    pub fn with_pose(sprite_sheet: PetSpriteSheet, initial_anchor_id: impl Into<String>, perch_pose: PetPose) -> Rc<Self> {
+    pub fn with_pose(
+        sprite_sheet: PetSpriteSheet,
+        initial_anchor_id: impl Into<String>,
+        perch_pose: PetPose,
+    ) -> Rc<Self> {
         Rc::new(Self {
             sprite_sheet,
             travel_speed: Cell::new(430.0),
@@ -51,45 +58,88 @@ impl PetWorld {
             has_entered: Cell::new(false),
             trip: RefCell::new(None),
             trip_elapsed: Cell::new(0.0),
-            render: Cell::new(PetRenderState::new(Point::default(), perch_pose, 1.0, 1.0, 1.0, 0.0)),
+            render: Cell::new(PetRenderState::new(
+                Point::default(),
+                perch_pose,
+                1.0,
+                1.0,
+                1.0,
+                0.0,
+            )),
             finished: Cell::new(true),
             random_state: Cell::new(0x9e37_79b9_7f4a_7c15),
             publisher: ObservablePublisher::default(),
         })
     }
 
-    pub fn sprite_sheet(&self) -> &PetSpriteSheet { &self.sprite_sheet }
+    pub fn sprite_sheet(&self) -> &PetSpriteSheet {
+        &self.sprite_sheet
+    }
     pub fn set_travel_speed(&self, points_per_second: f64) {
-        if points_per_second.is_finite() && points_per_second > 0.0 { self.travel_speed.set(points_per_second); }
+        if points_per_second.is_finite() && points_per_second > 0.0 {
+            self.travel_speed.set(points_per_second);
+        }
     }
     pub fn set_minimum_jump_duration(&self, seconds: f64) {
-        if seconds.is_finite() && seconds > 0.0 { self.minimum_jump_duration.set(seconds); }
+        if seconds.is_finite() && seconds > 0.0 {
+            self.minimum_jump_duration.set(seconds);
+        }
     }
-    pub fn anchors(&self) -> HashMap<String, Rect> { self.anchors.borrow().clone() }
-    pub fn current_anchor_id(&self) -> String { self.current_anchor_id.borrow().clone() }
-    pub fn perch_pose(&self) -> PetPose { self.perch_pose.get() }
-    pub fn render(&self) -> PetRenderState { self.render.get() }
-    pub fn is_busy(&self) -> bool { self.trip.borrow().is_some() || self.entrance.get().is_some() }
+    pub fn anchors(&self) -> HashMap<String, Rect> {
+        self.anchors.borrow().clone()
+    }
+    pub fn current_anchor_id(&self) -> String {
+        self.current_anchor_id.borrow().clone()
+    }
+    pub fn perch_pose(&self) -> PetPose {
+        self.perch_pose.get()
+    }
+    pub fn render(&self) -> PetRenderState {
+        self.render.get()
+    }
+    pub fn is_busy(&self) -> bool {
+        self.trip.borrow().is_some() || self.entrance.get().is_some()
+    }
 
     pub fn go(self: &Rc<Self>, target_id: &str) -> bool {
         let current_id = self.current_anchor_id.borrow().clone();
-        if self.is_busy() || target_id == current_id { return false; }
-        let (Some(start), Some(end)) = (self.perch_point(&current_id), self.perch_point(target_id)) else { return false };
+        if self.is_busy() || target_id == current_id {
+            return false;
+        }
+        let (Some(start), Some(end)) = (self.perch_point(&current_id), self.perch_point(target_id))
+        else {
+            return false;
+        };
         let dx = end.x - start.x;
         let dy = end.y - start.y;
         let distance = dx.hypot(dy).max(1.0);
         let peak = 64.0_f32.max(distance * 0.34 + dy.abs() * 0.15);
         let facing = if dx >= 0.0 { 1.0 } else { -1.0 };
-        let duration = self.minimum_jump_duration.get().max(f64::from(distance) / self.travel_speed.get());
-        *self.trip.borrow_mut() = Some(PetTrip::new(current_id, target_id, JumpArc::new(start, end, peak), duration, facing));
+        let duration = self
+            .minimum_jump_duration
+            .get()
+            .max(f64::from(distance) / self.travel_speed.get());
+        *self.trip.borrow_mut() = Some(PetTrip::new(
+            current_id,
+            target_id,
+            JumpArc::new(start, end, peak),
+            duration,
+            facing,
+        ));
         self.trip_elapsed.set(0.0);
         self.start_clock();
         true
     }
 
     pub fn toggle_rest(&self) {
-        if self.is_busy() { return; }
-        let pose = if self.perch_pose.get() == PetPose::Sit { PetPose::Idle } else { PetPose::Sit };
+        if self.is_busy() {
+            return;
+        }
+        let pose = if self.perch_pose.get() == PetPose::Sit {
+            PetPose::Idle
+        } else {
+            PetPose::Sit
+        };
         self.perch_pose.set(pose);
         let mut render = self.render.get();
         render.pose = pose;
@@ -99,8 +149,16 @@ impl PetWorld {
 
     pub fn wander(self: &Rc<Self>) -> Option<String> {
         let current = self.current_anchor_id.borrow().clone();
-        let candidates: Vec<String> = self.anchors.borrow().keys().filter(|key| **key != current).cloned().collect();
-        if candidates.is_empty() { return None; }
+        let candidates: Vec<String> = self
+            .anchors
+            .borrow()
+            .keys()
+            .filter(|key| **key != current)
+            .cloned()
+            .collect();
+        if candidates.is_empty() {
+            return None;
+        }
         let mut state = self.random_state.get();
         state ^= state << 13;
         state ^= state >> 7;
@@ -115,11 +173,16 @@ impl PetWorld {
         let id = id.into();
         let changed = self.anchors.borrow().get(&id).copied() != Some(frame);
         self.anchors.borrow_mut().insert(id.clone(), frame);
-        if !self.has_entered.get() && id == *self.current_anchor_id.borrow() && frame != Rect::default() {
+        if !self.has_entered.get()
+            && id == *self.current_anchor_id.borrow()
+            && frame != Rect::default()
+        {
             self.begin_entrance(id);
             return;
         }
-        if !self.is_busy() && id == *self.current_anchor_id.borrow() && changed
+        if !self.is_busy()
+            && id == *self.current_anchor_id.borrow()
+            && changed
             && let Some(point) = self.perch_point(&id)
         {
             let mut render = self.render.get();
@@ -129,19 +192,29 @@ impl PetWorld {
         }
     }
 
-    pub fn remove_anchor(&self, id: &str) { self.anchors.borrow_mut().remove(id); }
+    pub fn remove_anchor(&self, id: &str) {
+        self.anchors.borrow_mut().remove(id);
+    }
 
     pub fn tick_world(&self, delta_time: f64) {
         let mut changed = false;
         if let Some(entrance) = self.entrance.get() {
-            self.entrance_elapsed.set(self.entrance_elapsed.get() + delta_time);
+            self.entrance_elapsed
+                .set(self.entrance_elapsed.get() + delta_time);
             let normalized = (self.entrance_elapsed.get() / entrance.duration) as f32;
             if normalized >= 1.0 {
                 self.finish_entrance();
             } else {
                 let anchor_id = self.entrance_anchor.borrow().clone();
-                let point = anchor_id.as_deref().and_then(|id| self.perch_point(id)).unwrap_or(self.render.get().position);
-                self.render.set(Self::evaluate_entrance(normalized, point, self.perch_pose.get()));
+                let point = anchor_id
+                    .as_deref()
+                    .and_then(|id| self.perch_point(id))
+                    .unwrap_or(self.render.get().position);
+                self.render.set(Self::evaluate_entrance(
+                    normalized,
+                    point,
+                    self.perch_pose.get(),
+                ));
             }
             changed = true;
         } else if let Some(trip) = self.trip.borrow().clone() {
@@ -154,13 +227,19 @@ impl PetWorld {
             }
             changed = true;
         }
-        if changed { self.publisher.send(); }
+        if changed {
+            self.publisher.send();
+        }
         self.stop_clock_if_idle();
     }
 
     pub fn finish_immediately(&self) {
-        if self.entrance.get().is_some() { self.finish_entrance(); }
-        if let Some(trip) = self.trip.borrow().clone() { self.finish_trip(&trip); }
+        if self.entrance.get().is_some() {
+            self.finish_entrance();
+        }
+        if let Some(trip) = self.trip.borrow().clone() {
+            self.finish_trip(&trip);
+        }
         self.publisher.send();
         self.stop_clock_if_idle();
     }
@@ -173,12 +252,16 @@ impl PetWorld {
     }
 
     fn start_clock(self: &Rc<Self>) {
-        if !self.finished.replace(false) { return; }
+        if !self.finished.replace(false) {
+            return;
+        }
         let controller: Rc<dyn AnyAnimationController> = self.clone();
         AnimatorScheduler::current().register(controller);
     }
     fn stop_clock_if_idle(&self) {
-        if !self.is_busy() { self.finished.set(true); }
+        if !self.is_busy() {
+            self.finished.set(true);
+        }
     }
     fn begin_entrance(self: &Rc<Self>, anchor_id: String) {
         self.has_entered.set(true);
@@ -194,7 +277,9 @@ impl PetWorld {
         self.entrance.set(None);
         let anchor_id = self.entrance_anchor.borrow_mut().take();
         let mut render = self.render.get();
-        if let Some(point) = anchor_id.as_deref().and_then(|id| self.perch_point(id)) { render.position = point; }
+        if let Some(point) = anchor_id.as_deref().and_then(|id| self.perch_point(id)) {
+            render.position = point;
+        }
         render.scale_x = 1.0;
         render.scale_y = 1.0;
         render.presence = 1.0;
@@ -211,7 +296,9 @@ impl PetWorld {
         render.scale_y = 1.0;
         render.facing = trip.facing;
         render.presence = 1.0;
-        if let Some(point) = self.perch_point(&trip.to_anchor) { render.position = point; }
+        if let Some(point) = self.perch_point(&trip.to_anchor) {
+            render.position = point;
+        }
         self.render.set(render);
     }
     fn perch_point(&self, anchor_id: &str) -> Option<Point> {
@@ -233,39 +320,91 @@ impl PetWorld {
             let eased = AnimationCurve::EaseIn.evaluate(windup);
             let x_scale = 1.0 + 0.26 * eased;
             let y_scale = 1.0 - 0.26 * eased;
-            return PetRenderState::new(arc.start, PetPose::Windup, x_scale, y_scale, trip.facing, 1.0);
+            return PetRenderState::new(
+                arc.start,
+                PetPose::Windup,
+                x_scale,
+                y_scale,
+                trip.facing,
+                1.0,
+            );
         }
         if time < PetTrip::AIRBORNE_END {
             let progress = trip.air_progress(time).unwrap_or(1.0);
             let point = arc.position(progress);
             let velocity = arc.vertical_velocity(progress);
-            let maximum_velocity = arc.vertical_velocity(0.0).abs().max(arc.vertical_velocity(1.0).abs()).max(1.0);
+            let maximum_velocity = arc
+                .vertical_velocity(0.0)
+                .abs()
+                .max(arc.vertical_velocity(1.0).abs())
+                .max(1.0);
             let stretch = clamp01(velocity.abs() / maximum_velocity);
-            let pose = if velocity < -0.18 * maximum_velocity { PetPose::Rise }
-                else if velocity > 0.18 * maximum_velocity { PetPose::Fall }
-                else { PetPose::Apex };
-            return PetRenderState::new(point, pose, 1.0 - 0.10 * stretch, 1.0 + 0.13 * stretch, trip.facing, 1.0);
+            let pose = if velocity < -0.18 * maximum_velocity {
+                PetPose::Rise
+            } else if velocity > 0.18 * maximum_velocity {
+                PetPose::Fall
+            } else {
+                PetPose::Apex
+            };
+            return PetRenderState::new(
+                point,
+                pose,
+                1.0 - 0.10 * stretch,
+                1.0 + 0.13 * stretch,
+                trip.facing,
+                1.0,
+            );
         }
         if time < PetTrip::LAND_END {
-            let progress = clamp01((time - PetTrip::AIRBORNE_END) / (PetTrip::LAND_END - PetTrip::AIRBORNE_END));
+            let progress = clamp01(
+                (time - PetTrip::AIRBORNE_END) / (PetTrip::LAND_END - PetTrip::AIRBORNE_END),
+            );
             let amount = 1.0 - 0.25 * AnimationCurve::EaseOut.evaluate(progress);
-            return PetRenderState::new(arc.end, PetPose::Land, 1.0 + 0.30 * amount, 1.0 - 0.30 * amount, trip.facing, 1.0);
+            return PetRenderState::new(
+                arc.end,
+                PetPose::Land,
+                1.0 + 0.30 * amount,
+                1.0 - 0.30 * amount,
+                trip.facing,
+                1.0,
+            );
         }
         let settle = clamp01((time - PetTrip::LAND_END) / (1.0 - PetTrip::LAND_END));
         let envelope = (-5.5 * settle).exp() * (7.5 * settle).cos();
-        PetRenderState::new(arc.end, PetPose::Sit, 1.0 + 0.30 * envelope, 1.0 - 0.30 * envelope, trip.facing, 1.0)
+        PetRenderState::new(
+            arc.end,
+            PetPose::Sit,
+            1.0 + 0.30 * envelope,
+            1.0 - 0.30 * envelope,
+            trip.facing,
+            1.0,
+        )
     }
 }
 
 impl ObservableObject for PetWorld {
-    fn register_observer(&self, handler: Rc<dyn Fn()>) -> u64 { self.publisher.register_observer(handler) }
-    fn unregister_observer(&self, token: u64) { self.publisher.unregister_observer(token); }
+    fn register_observer(&self, handler: Rc<dyn Fn()>) -> u64 {
+        self.publisher.register_observer(handler)
+    }
+    fn unregister_observer(&self, token: u64) {
+        self.publisher.unregister_observer(token);
+    }
 }
 
 impl AnyAnimationController for PetWorld {
-    fn is_finished(&self) -> bool { self.finished.get() }
-    fn tick(&self, delta_time: f64) { self.tick_world(delta_time); }
-    fn finish_immediately(&self) { PetWorld::finish_immediately(self); }
-    fn cancel(&self) { PetWorld::cancel(self); }
-    fn as_any(&self) -> &dyn Any { self }
+    fn is_finished(&self) -> bool {
+        self.finished.get()
+    }
+    fn tick(&self, delta_time: f64) {
+        self.tick_world(delta_time);
+    }
+    fn finish_immediately(&self) {
+        PetWorld::finish_immediately(self);
+    }
+    fn cancel(&self) {
+        PetWorld::cancel(self);
+    }
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }

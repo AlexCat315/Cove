@@ -7,13 +7,6 @@ use std::cell::{Cell, RefCell};
 use std::hash::Hash;
 use std::rc::Rc;
 
-use cove_core::scene::{
-    Align, Direction, EventResult, FlexDirection, FocusChainHolder, InputHandlerRole,
-    InputHandlerRoute, InputRoutingPriority, InteractionRegistryHolder, LayoutNode, Node,
-    PointerCaptureHolder, PointerPhase,
-};
-use cove_core::{Binding, Point, Rect};
-use cove_platform::MouseButton;
 use crate::adaptive::{ContainerSizeReader, SurfaceEnvironment};
 use crate::animation::content::AnimatedVisibility;
 use crate::animation::transition::Transition;
@@ -22,7 +15,14 @@ use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::modifiers::style::AppearanceExt;
 use crate::primitives::layout::ResolvedLayoutDirection;
 use crate::theme::{Theme, ThemeReader};
-use crate::{impl_primitive_view, AnyView, PrimitiveView, View};
+use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
+use cove_core::scene::{
+    Align, Direction, EventResult, FlexDirection, FocusChainHolder, InputHandlerRole,
+    InputHandlerRoute, InputRoutingPriority, InteractionRegistryHolder, LayoutNode, Node,
+    PointerCaptureHolder, PointerPhase,
+};
+use cove_core::{Binding, Point, Rect};
+use cove_platform::MouseButton;
 
 const PATH_COUNT: &str = "navigation.path.count";
 const PAGE_IS_TOP: &str = "navigation.page.isTop";
@@ -118,7 +118,11 @@ impl<Route: Hash + Clone + PartialEq + Send + Sync + 'static> NavigationStack<Ro
     }
 
     pub fn transition_distance(mut self, distance: f32) -> Self {
-        self.transition_distance = if distance.is_finite() { distance.max(0.0) } else { 32.0 };
+        self.transition_distance = if distance.is_finite() {
+            distance.max(0.0)
+        } else {
+            32.0
+        };
         self
     }
 
@@ -167,7 +171,13 @@ impl<Route: Hash + Clone + PartialEq + Send + Sync + 'static> NavigationStack<Ro
         AnyView::new(crate::animation::geometry::offset(page, shift * sign, 0.0))
     }
 
-    fn page_content(&self, route: Option<Route>, theme: &Theme, width: f32, height: f32) -> AnyView {
+    fn page_content(
+        &self,
+        route: Option<Route>,
+        theme: &Theme,
+        width: f32,
+        height: f32,
+    ) -> AnyView {
         let content = match route {
             Some(route) => (self.destination)(route),
             None => (self.root)(),
@@ -175,8 +185,12 @@ impl<Route: Hash + Clone + PartialEq + Send + Sync + 'static> NavigationStack<Ro
         AnyView::new(
             content
                 .frame(
-                    Some(crate::modifiers::layout::FrameDimension::Points(width.max(1.0))),
-                    Some(crate::modifiers::layout::FrameDimension::Points(height.max(1.0))),
+                    Some(crate::modifiers::layout::FrameDimension::Points(
+                        width.max(1.0),
+                    )),
+                    Some(crate::modifiers::layout::FrameDimension::Points(
+                        height.max(1.0),
+                    )),
                     None,
                     None,
                     None,
@@ -310,7 +324,11 @@ impl<Route: Hash + Clone + PartialEq + Send + Sync + 'static> View for Navigatio
     fn body(&self) -> AnyView {
         let width = self.width;
         let height = self.height;
-        let sign = if self.direction == Direction::Rtl { -1.0 } else { 1.0 };
+        let sign = if self.direction == Direction::Rtl {
+            -1.0
+        } else {
+            1.0
+        };
         let stack = self.stack.clone();
         let inner = AnyView::new(ThemeReader::new(move |theme: &Theme| {
             stack.stack_pages(sign, width, height, theme)
@@ -372,11 +390,7 @@ struct NavigationEdgeSwipe {
 }
 
 impl NavigationEdgeSwipe {
-    fn with_callbacks(
-        mut self,
-        on_change: Rc<dyn Fn(f32)>,
-        on_end: Rc<dyn Fn(bool)>,
-    ) -> Self {
+    fn with_callbacks(mut self, on_change: Rc<dyn Fn(f32)>, on_end: Rc<dyn Fn(bool)>) -> Self {
         self.on_change = Some(on_change);
         self.on_end = Some(on_end);
         self
@@ -403,18 +417,20 @@ impl PrimitiveView for NavigationEdgeSwipe {
     }
 
     fn update_node(&self, node: &Node) {
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         let route = InputHandlerRoute::new(
-            InputHandlerRole::ScrollChrome, InputRoutingPriority::CAPTURE, "navigation.edge",
+            InputHandlerRole::ScrollChrome,
+            InputRoutingPriority::CAPTURE,
+            "navigation.edge",
         );
         let is_enabled = self.is_enabled;
         let sign = self.sign;
         let width = self.width;
         let on_change = self.on_change.clone();
         let on_end = self.on_end.clone();
-        if !is_enabled
-            && let Some(track) = node.attachment::<Rc<RefCell<EdgeTrack>>>(EDGE_TRACK)
-        {
+        if !is_enabled && let Some(track) = node.attachment::<Rc<RefCell<EdgeTrack>>>(EDGE_TRACK) {
             let dragging = track.borrow().dragging.get();
             node.remove_attachment(EDGE_TRACK);
             if dragging {
@@ -431,95 +447,115 @@ impl PrimitiveView for NavigationEdgeSwipe {
             }
         }
         let pointer_node = node.downgrade();
-        registry.set_pointer(node, route.clone(), Rc::new(move |event, phase, event_phase| {
-            if event.button != MouseButton::Left {
-                return EventResult::Ignored;
-            }
-            let Some(owner) = Node::upgrade(&pointer_node) else { return EventResult::Ignored };
-            match phase {
-                PointerPhase::Down => {
-                    if event_phase != cove_core::scene::EventPhase::Capture {
-                        return EventResult::Ignored;
-                    }
-                    owner.remove_attachment(EDGE_TRACK);
-                    if !is_enabled {
-                        return EventResult::Ignored;
-                    }
-                    let supports_touch = owner
-                        .composition_value(&SurfaceEnvironment::key())
-                        .input
-                        .contains(cove_core::InputCapabilities::TOUCH);
-                    if !supports_touch {
-                        return EventResult::Ignored;
-                    }
-                    let local = owner.convert_from_window(Point::new(event.x, event.y));
-                    let inset = if sign < 0.0 { owner.frame().width - local.x } else { local.x };
-                    if inset < 0.0 || inset > EDGE_WIDTH {
-                        return EventResult::Ignored;
-                    }
-                    owner.set_attachment(EDGE_TRACK, Rc::new(RefCell::new(EdgeTrack::new(local))));
-                    EventResult::Ignored
+        registry.set_pointer(
+            node,
+            route.clone(),
+            Rc::new(move |event, phase, event_phase| {
+                if event.button != MouseButton::Left {
+                    return EventResult::Ignored;
                 }
-                PointerPhase::Up => {
-                    let Some(track) = owner.attachment::<Rc<RefCell<EdgeTrack>>>(EDGE_TRACK) else {
-                        return EventResult::Ignored;
-                    };
-                    owner.remove_attachment(EDGE_TRACK);
-                    if !track.borrow().dragging.get() {
-                        return EventResult::Ignored;
+                let Some(owner) = Node::upgrade(&pointer_node) else {
+                    return EventResult::Ignored;
+                };
+                match phase {
+                    PointerPhase::Down => {
+                        if event_phase != cove_core::scene::EventPhase::Capture {
+                            return EventResult::Ignored;
+                        }
+                        owner.remove_attachment(EDGE_TRACK);
+                        if !is_enabled {
+                            return EventResult::Ignored;
+                        }
+                        let supports_touch = owner
+                            .composition_value(&SurfaceEnvironment::key())
+                            .input
+                            .contains(cove_core::InputCapabilities::TOUCH);
+                        if !supports_touch {
+                            return EventResult::Ignored;
+                        }
+                        let local = owner.convert_from_window(Point::new(event.x, event.y));
+                        let inset = if sign < 0.0 {
+                            owner.frame().width - local.x
+                        } else {
+                            local.x
+                        };
+                        if inset < 0.0 || inset > EDGE_WIDTH {
+                            return EventResult::Ignored;
+                        }
+                        owner.set_attachment(
+                            EDGE_TRACK,
+                            Rc::new(RefCell::new(EdgeTrack::new(local))),
+                        );
+                        EventResult::Ignored
                     }
-                    if PointerCaptureHolder::current()
-                        .and_then(|capture| capture.target())
-                        .is_some_and(|target| target == owner)
-                        && let Some(capture) = PointerCaptureHolder::current()
-                    {
-                        capture.release();
+                    PointerPhase::Up => {
+                        let Some(track) = owner.attachment::<Rc<RefCell<EdgeTrack>>>(EDGE_TRACK)
+                        else {
+                            return EventResult::Ignored;
+                        };
+                        owner.remove_attachment(EDGE_TRACK);
+                        if !track.borrow().dragging.get() {
+                            return EventResult::Ignored;
+                        }
+                        if PointerCaptureHolder::current()
+                            .and_then(|capture| capture.target())
+                            .is_some_and(|target| target == owner)
+                            && let Some(capture) = PointerCaptureHolder::current()
+                        {
+                            capture.release();
+                        }
+                        let local = owner.convert_from_window(Point::new(event.x, event.y));
+                        let start_x = track.borrow().start_x;
+                        let travel = (local.x - start_x) * sign;
+                        track.borrow_mut().record(local.x, sign);
+                        let velocity = track.borrow().velocity;
+                        let commit = travel > width / 3.0 || (travel > 0.0 && velocity > 600.0);
+                        if let Some(on_end) = on_end.as_ref() {
+                            on_end(commit);
+                        }
+                        EventResult::Handled
                     }
-                    let local = owner.convert_from_window(Point::new(event.x, event.y));
-                    let start_x = track.borrow().start_x;
-                    let travel = (local.x - start_x) * sign;
-                    track.borrow_mut().record(local.x, sign);
-                    let velocity = track.borrow().velocity;
-                    let commit = travel > width / 3.0 || (travel > 0.0 && velocity > 600.0);
-                    if let Some(on_end) = on_end.as_ref() {
-                        on_end(commit);
-                    }
-                    EventResult::Handled
                 }
-            }
-        }));
+            }),
+        );
         let motion_node = node.downgrade();
-        registry.set_motion(node, route, Rc::new(move |event, _phase| {
-            let Some(owner) = Node::upgrade(&motion_node) else { return EventResult::Ignored };
-            let Some(track) = owner.attachment::<Rc<RefCell<EdgeTrack>>>(EDGE_TRACK) else {
-                return EventResult::Ignored;
-            };
-            let local = owner.convert_from_window(Point::new(event.x, event.y));
-            let (start_x, start_y) = {
-                let track = track.borrow();
-                (track.start_x, track.start_y)
-            };
-            let dx = (local.x - start_x) * sign;
-            let dy = local.y - start_y;
-            if !track.borrow().dragging.get() {
-                if dy.abs() > 10.0 && dy.abs() > dx {
-                    owner.remove_attachment(EDGE_TRACK);
+        registry.set_motion(
+            node,
+            route,
+            Rc::new(move |event, _phase| {
+                let Some(owner) = Node::upgrade(&motion_node) else {
                     return EventResult::Ignored;
-                }
-                if !(dx >= 8.0 && dx > dy.abs() * 1.5) {
+                };
+                let Some(track) = owner.attachment::<Rc<RefCell<EdgeTrack>>>(EDGE_TRACK) else {
                     return EventResult::Ignored;
+                };
+                let local = owner.convert_from_window(Point::new(event.x, event.y));
+                let (start_x, start_y) = {
+                    let track = track.borrow();
+                    (track.start_x, track.start_y)
+                };
+                let dx = (local.x - start_x) * sign;
+                let dy = local.y - start_y;
+                if !track.borrow().dragging.get() {
+                    if dy.abs() > 10.0 && dy.abs() > dx {
+                        owner.remove_attachment(EDGE_TRACK);
+                        return EventResult::Ignored;
+                    }
+                    if !(dx >= 8.0 && dx > dy.abs() * 1.5) {
+                        return EventResult::Ignored;
+                    }
+                    track.borrow().dragging.set(true);
+                    if let Some(capture) = PointerCaptureHolder::current() {
+                        capture.acquire(&owner, true);
+                    }
                 }
-                track.borrow().dragging.set(true);
-                if let Some(capture) = PointerCaptureHolder::current() {
-                    capture.acquire(&owner, true);
+                track.borrow_mut().record(local.x, sign);
+                if let Some(on_change) = on_change.as_ref() {
+                    on_change(dx.max(0.0));
                 }
-            }
-            track.borrow_mut().record(local.x, sign);
-            if let Some(on_change) = on_change.as_ref() {
-                on_change(dx.max(0.0));
-            }
-            EventResult::Handled
-        }));
+                EventResult::Handled
+            }),
+        );
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
@@ -597,8 +633,12 @@ impl PrimitiveView for NavigationPageFocusHost {
             if owner.attachment::<bool>(PAGE_TITLE_FOCUSED) == Some(true) {
                 return;
             }
-            let Some(title) = find_title(owner) else { return };
-            let Some(chain) = FocusChainHolder::current() else { return };
+            let Some(title) = find_title(owner) else {
+                return;
+            };
+            let Some(chain) = FocusChainHolder::current() else {
+                return;
+            };
             owner.set_attachment(PAGE_TITLE_FOCUSED, true);
             chain.focus(Some(&title), false);
             let _ = &weak;
@@ -631,11 +671,9 @@ fn find_title(node: &Node) -> Option<Node> {
 /// ordinary keyboard traversal continues from there.
 pub fn navigation_title(title: impl Into<String>, content: impl View + 'static) -> AnyView {
     let title = title.into();
-    AnyView::new(
-        content.accessibility(move |semantics| {
-            semantics.role = cove_core::scene::AccessibilityRole::Heading;
-            semantics.label = title.clone();
-            semantics.identifier = "navigation.title".to_string();
-        }),
-    )
+    AnyView::new(content.accessibility(move |semantics| {
+        semantics.role = cove_core::scene::AccessibilityRole::Heading;
+        semantics.label = title.clone();
+        semantics.identifier = "navigation.title".to_string();
+    }))
 }

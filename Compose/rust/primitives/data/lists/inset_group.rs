@@ -6,14 +6,14 @@
 //! and rounder corners.
 use std::rc::Rc;
 
-use cove_core::scene::{Align, FlexDirection, Justify, LayoutNode, Node, Rect, Wrap};
-use cove_core::Color;
-use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
-use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use crate::ViewExt;
+use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
+use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::text::Text;
-use crate::theme::{theme_for_node, SemanticFontRef, SemanticColorRef, Theme, ThemeReader};
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, View};
+use crate::theme::{SemanticColorRef, SemanticFontRef, Theme, ThemeReader, theme_for_node};
+use crate::{AnyView, BoxView, PrimitiveView, View, impl_primitive_view};
+use cove_core::Color;
+use cove_core::scene::{Align, FlexDirection, Justify, LayoutNode, Node, Rect, Wrap};
 
 /// Hairline inset from the row content edges.
 const ROW_INSET: f32 = 16.0;
@@ -27,7 +27,11 @@ pub struct ListGroup {
 
 impl ListGroup {
     pub fn new(content: impl View + 'static) -> Self {
-        Self { title: None, footer: None, content: AnyView::new(content) }
+        Self {
+            title: None,
+            footer: None,
+            content: AnyView::new(content),
+        }
     }
 
     pub fn title(mut self, title: impl Into<String>) -> Self {
@@ -61,10 +65,12 @@ impl View for ListGroup {
             // The surface sits on its own node: the rows node paints the
             // separators.
             column.push(AnyView::new(
-                GroupRows { content: content.clone() }
-                    .frame(None, None, Some(0.0), None, None, None)
-                    .background_color(theme.colors.surface_raised)
-                    .corner_radius(theme.radius.md),
+                GroupRows {
+                    content: content.clone(),
+                }
+                .frame(None, None, Some(0.0), None, None, None)
+                .background_color(theme.colors.surface_raised)
+                .corner_radius(theme.radius.md),
             ));
             if let Some(footer) = footer.clone() {
                 column.push(AnyView::new(
@@ -78,7 +84,11 @@ impl View for ListGroup {
             }
             AnyView::new(
                 BoxView::new(
-                    FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 6.0,
+                    FlexDirection::Column,
+                    Align::Stretch,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    6.0,
                     AnyView::new(crate::TupleView::new(column)),
                 )
                 .frame(None, None, Some(0.0), None, None, None),
@@ -115,7 +125,9 @@ impl PrimitiveView for GroupRows {
         // them repaints when rows move, appear or change height.
         let weak = node.downgrade();
         node.set_layout_did_update(Some(Rc::new(move |owner: &Node| {
-            let Some(node) = Node::upgrade(&weak) else { return };
+            let Some(node) = Node::upgrade(&weak) else {
+                return;
+            };
             let origin = node.absolute_frame();
             let children: Vec<Node> = owner.children();
             let visible: Vec<Node> = children
@@ -133,8 +145,13 @@ impl PrimitiveView for GroupRows {
             let draw_weak = weak.clone();
             let identity = bottoms.clone();
             node.update_overlay_draw(identity, move |list, draw_origin| {
-                let Some(inner) = Node::upgrade(&draw_weak) else { return };
-                let color = theme_for_node(&inner).colors.divider.multiplied_alpha(inner.opacity());
+                let Some(inner) = Node::upgrade(&draw_weak) else {
+                    return;
+                };
+                let color = theme_for_node(&inner)
+                    .colors
+                    .divider
+                    .multiplied_alpha(inner.opacity());
                 let width = (inner.frame().width - ROW_INSET).max(0.0);
                 let _ = draw_bottoms(list, draw_origin, &bottoms, ROW_INSET, width, color);
             });
@@ -157,7 +174,10 @@ fn draw_bottoms(
 ) -> Result<(), cove_core::DrawError> {
     for bottom in bottoms {
         let y = f32::from_bits(*bottom);
-        list.add_rect(Rect::new(origin.x + inset, origin.y + y - 0.5, width, 0.5), color)?;
+        list.add_rect(
+            Rect::new(origin.x + inset, origin.y + y - 0.5, width, 0.5),
+            color,
+        )?;
     }
     Ok(())
 }

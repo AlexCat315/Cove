@@ -1,9 +1,9 @@
 //! Translation of CoveUIComposeCore/Adaptive/ViewportTraits.swift.
-use cove_core::{Environment, Orientation, SizeClass};
-use cove_core::scene::{LayoutNode, Node};
-use std::rc::Rc;
-use crate::{AnyView, PrimitiveView, View, ViewKind};
 use super::SurfaceEnvironment;
+use crate::{AnyView, PrimitiveView, View, ViewKind};
+use cove_core::scene::{LayoutNode, Node};
+use cove_core::{Environment, Orientation, SizeClass};
+use std::rc::Rc;
 
 macro_rules! viewport_reader {
     ($reader:ident, $value:ty, $select:expr, $doc:literal) => {
@@ -13,7 +13,9 @@ macro_rules! viewport_reader {
         }
         impl<Content: View> $reader<Content> {
             pub fn new(content: impl Fn($value) -> Content + 'static) -> Self {
-                Self { content: Rc::new(content) }
+                Self {
+                    content: Rc::new(content),
+                }
             }
         }
         impl<Content: View + 'static> PrimitiveView for $reader<Content> {
@@ -43,9 +45,21 @@ macro_rules! viewport_reader {
     };
 }
 
-viewport_reader!(HeightClassReader, SizeClass, |environment: &Environment| environment.viewport.height_class(),
-    "Reads only the surface height class into application content.");
-viewport_reader!(WidthClassReader, SizeClass, |environment: &Environment| environment.viewport.width_class(),
-    "Reads only the surface width class into application content.");
-viewport_reader!(OrientationReader, Orientation, |environment: &Environment| environment.viewport.orientation(),
-    "Reads whether the surface is portrait or landscape. Square counts as landscape.");
+viewport_reader!(
+    HeightClassReader,
+    SizeClass,
+    |environment: &Environment| environment.viewport.height_class(),
+    "Reads only the surface height class into application content."
+);
+viewport_reader!(
+    WidthClassReader,
+    SizeClass,
+    |environment: &Environment| environment.viewport.width_class(),
+    "Reads only the surface width class into application content."
+);
+viewport_reader!(
+    OrientationReader,
+    Orientation,
+    |environment: &Environment| environment.viewport.orientation(),
+    "Reads whether the surface is portrait or landscape. Square counts as landscape."
+);

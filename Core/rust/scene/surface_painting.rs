@@ -22,8 +22,22 @@ impl DrawList {
         frosted_rect: Option<Rect>,
         occluded_rect: Option<Rect>,
     ) {
-        self.add_shadow_layer(layers.ambient, rect, corner_radius, opacity, frosted_rect, occluded_rect);
-        self.add_shadow_layer(layers.key, rect, corner_radius, opacity, frosted_rect, occluded_rect);
+        self.add_shadow_layer(
+            layers.ambient,
+            rect,
+            corner_radius,
+            opacity,
+            frosted_rect,
+            occluded_rect,
+        );
+        self.add_shadow_layer(
+            layers.key,
+            rect,
+            corner_radius,
+            opacity,
+            frosted_rect,
+            occluded_rect,
+        );
     }
 
     /// Paint one shadow layer as a stack of expanded translucent rounded rects.
@@ -75,7 +89,15 @@ impl DrawList {
                 (covered.width > 0.0 && covered.height > 0.0).then_some(covered)
             })
         };
-        self.paint_steps(layer, rect, corner_radius, opacity, step_count(layer), frost, occluded);
+        self.paint_steps(
+            layer,
+            rect,
+            corner_radius,
+            opacity,
+            step_count(layer),
+            frost,
+            occluded,
+        );
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -98,9 +120,18 @@ impl DrawList {
             let inset = -blur * (1.0 - t);
             // Largest rect is the faint outer edge; smaller rects build density
             // towards the surface, not the other way around.
-            let weight = if blur > 0.0 { (t + 0.15) * (t + 0.15) } else { 1.0 };
+            let weight = if blur > 0.0 {
+                (t + 0.15) * (t + 0.15)
+            } else {
+                1.0
+            };
             let alpha = color.a * weight / count as f32;
-            let step_color = Color { r: color.r, g: color.g, b: color.b, a: alpha.min(1.0) * opacity };
+            let step_color = Color {
+                r: color.r,
+                g: color.g,
+                b: color.b,
+                a: alpha.min(1.0) * opacity,
+            };
             // Vertices store 8-bit alpha. Many faint blur steps round to zero;
             // they cannot affect compositing but still cost a full rounded
             // mesh, its upload and validation if recorded.
@@ -153,10 +184,26 @@ impl DrawList {
         // Corner arc centres, paired with the two bounding edges their arc
         // sweeps between, as unit vectors.
         let corners: [(f32, f32, (f32, f32, f32, f32)); 4] = [
-            (step.x + step_radius, step.y + step_radius, (-1.0, 0.0, 0.0, -1.0)),
-            (step.max_x() - step_radius, step.y + step_radius, (0.0, -1.0, 1.0, 0.0)),
-            (step.x + step_radius, step.max_y() - step_radius, (-1.0, 0.0, 0.0, 1.0)),
-            (step.max_x() - step_radius, step.max_y() - step_radius, (0.0, 1.0, 1.0, 0.0)),
+            (
+                step.x + step_radius,
+                step.y + step_radius,
+                (-1.0, 0.0, 0.0, -1.0),
+            ),
+            (
+                step.max_x() - step_radius,
+                step.y + step_radius,
+                (0.0, -1.0, 1.0, 0.0),
+            ),
+            (
+                step.x + step_radius,
+                step.max_y() - step_radius,
+                (-1.0, 0.0, 0.0, 1.0),
+            ),
+            (
+                step.max_x() - step_radius,
+                step.max_y() - step_radius,
+                (0.0, 1.0, 1.0, 0.0),
+            ),
         ];
         for (cx, cy, (ax, ay, bx, by)) in corners {
             let mut previous = Point::new(cx + ax * step_radius, cy + ay * step_radius);
@@ -226,11 +273,21 @@ fn fringe_edges(hole: Rect, outer: Rect, radius: f32) -> Vec<Rect> {
     let mut edges: Vec<Rect> = Vec::new();
     if top < bottom {
         edges.push(Rect::new(mid_x0, outer.y, mid_x1 - mid_x0, top - outer.y));
-        edges.push(Rect::new(mid_x0, bottom, mid_x1 - mid_x0, outer.max_y() - bottom));
+        edges.push(Rect::new(
+            mid_x0,
+            bottom,
+            mid_x1 - mid_x0,
+            outer.max_y() - bottom,
+        ));
     }
     if left < right {
         edges.push(Rect::new(outer.x, mid_y0, left - outer.x, mid_y1 - mid_y0));
-        edges.push(Rect::new(right, mid_y0, outer.max_x() - right, mid_y1 - mid_y0));
+        edges.push(Rect::new(
+            right,
+            mid_y0,
+            outer.max_x() - right,
+            mid_y1 - mid_y0,
+        ));
     }
     edges.retain(|rect| rect.width > 0.0 && rect.height > 0.0);
     edges
@@ -242,11 +299,29 @@ fn bands_around(hole: Rect, outer: Rect) -> Vec<Rect> {
     let bottom = top.max(outer.max_y().min(hole.max_y()));
     let bands = [
         Rect::new(outer.x, outer.y, outer.width, (top - outer.y).max(0.0)),
-        Rect::new(outer.x, bottom, outer.width, (outer.max_y() - bottom).max(0.0)),
-        Rect::new(outer.x, top, (hole.x - outer.x).max(0.0), (bottom - top).max(0.0)),
-        Rect::new(hole.max_x(), top, (outer.max_x() - hole.max_x()).max(0.0), (bottom - top).max(0.0)),
+        Rect::new(
+            outer.x,
+            bottom,
+            outer.width,
+            (outer.max_y() - bottom).max(0.0),
+        ),
+        Rect::new(
+            outer.x,
+            top,
+            (hole.x - outer.x).max(0.0),
+            (bottom - top).max(0.0),
+        ),
+        Rect::new(
+            hole.max_x(),
+            top,
+            (outer.max_x() - hole.max_x()).max(0.0),
+            (bottom - top).max(0.0),
+        ),
     ];
-    bands.into_iter().filter(|rect| rect.width > 0.0 && rect.height > 0.0).collect()
+    bands
+        .into_iter()
+        .filter(|rect| rect.width > 0.0 && rect.height > 0.0)
+        .collect()
 }
 
 /// Errors from shadow geometry are dropped: a full draw buffer already surfaces
@@ -259,7 +334,12 @@ mod tests {
     use super::*;
 
     fn shadow(color: Color, blur: f32) -> SurfaceShadow {
-        SurfaceShadow { color: Some(color), offset_x: 0.0, offset_y: 2.0, blur }
+        SurfaceShadow {
+            color: Some(color),
+            offset_x: 0.0,
+            offset_y: 2.0,
+            blur,
+        }
     }
 
     #[test]
@@ -273,14 +353,28 @@ mod tests {
     #[test]
     fn empty_layers_emit_nothing() {
         let mut list = DrawList::default();
-        list.add_shadow_layer(SurfaceShadow::NONE, Rect::new(0.0, 0.0, 10.0, 10.0), 0.0, 1.0, None, None);
+        list.add_shadow_layer(
+            SurfaceShadow::NONE,
+            Rect::new(0.0, 0.0, 10.0, 10.0),
+            0.0,
+            1.0,
+            None,
+            None,
+        );
         assert!(list.vertices().is_empty());
     }
 
     #[test]
     fn opaque_surface_clips_the_shadow_interior() {
         let mut unclipped = DrawList::default();
-        unclipped.add_shadow_layer(shadow(Color::BLACK, 8.0), Rect::new(0.0, 0.0, 40.0, 40.0), 6.0, 1.0, None, None);
+        unclipped.add_shadow_layer(
+            shadow(Color::BLACK, 8.0),
+            Rect::new(0.0, 0.0, 40.0, 40.0),
+            6.0,
+            1.0,
+            None,
+            None,
+        );
         let mut clipped = DrawList::default();
         clipped.add_shadow_layer(
             shadow(Color::BLACK, 8.0),

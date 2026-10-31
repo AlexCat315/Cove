@@ -13,8 +13,8 @@ use crate::theme::Theme;
 use super::axis::{ChartFrame, ChartText};
 use super::coordinates::{ChartGeometry, Mark, PieGeometry};
 use super::model::{
-    ChartBand, ChartDatum, ChartMarker, ChartOrientation, ChartPoint, ChartSeries, ChartSeriesStyle,
-    ChartSlice, ChartStyle, ChartThreshold, ChartValueAxis,
+    ChartBand, ChartDatum, ChartMarker, ChartOrientation, ChartPoint, ChartSeries,
+    ChartSeriesStyle, ChartSlice, ChartStyle, ChartThreshold, ChartValueAxis,
 };
 use super::viewport::ChartWindow;
 
@@ -41,7 +41,12 @@ impl<'a> ChartPaint<'a> {
         }
     }
 
-    pub fn brush(&self, range: super::model::ChartRange, window: &ChartWindow, list: &mut DrawList) {
+    pub fn brush(
+        &self,
+        range: super::model::ChartRange,
+        window: &ChartWindow,
+        list: &mut DrawList,
+    ) {
         if !range.lower.is_finite() || !range.upper.is_finite() {
             return;
         }
@@ -51,9 +56,19 @@ impl<'a> ChartPaint<'a> {
             return;
         }
         let rect = if self.frame.orientation == ChartOrientation::Vertical {
-            Rect::new(a.min(b), self.frame.plot.y, (b - a).abs(), self.frame.plot.height)
+            Rect::new(
+                a.min(b),
+                self.frame.plot.y,
+                (b - a).abs(),
+                self.frame.plot.height,
+            )
         } else {
-            Rect::new(self.frame.plot.x, a.min(b), self.frame.plot.width, (b - a).abs())
+            Rect::new(
+                self.frame.plot.x,
+                a.min(b),
+                self.frame.plot.width,
+                (b - a).abs(),
+            )
         };
         let _ = list.add_rect(rect, self.theme.colors.accent.multiplied_alpha(0.14));
         let _ = list.add_rounded_rect_stroke(rect, 0.0, 1.0, self.theme.colors.accent);
@@ -66,7 +81,11 @@ impl<'a> ChartPaint<'a> {
             return;
         }
         let plot = self.frame.plot;
-        let color = self.style.grid_color.resolve(self.theme).multiplied_alpha(0.55);
+        let color = self
+            .style
+            .grid_color
+            .resolve(self.theme)
+            .multiplied_alpha(0.55);
         for tick in &self.frame.value_ticks {
             match self.frame.orientation {
                 ChartOrientation::Vertical => {
@@ -91,7 +110,10 @@ impl<'a> ChartPaint<'a> {
             Point::new(plot.x, plot.y + plot.height),
             Point::new(plot.x + plot.width, plot.y + plot.height),
             1.0,
-            self.style.grid_color.resolve(self.theme).multiplied_alpha(0.9),
+            self.style
+                .grid_color
+                .resolve(self.theme)
+                .multiplied_alpha(0.9),
         );
     }
 
@@ -105,33 +127,54 @@ impl<'a> ChartPaint<'a> {
         let plot = self.frame.plot;
         let vertical = self.frame.orientation == ChartOrientation::Vertical;
         let size = |text: &str| self.text.size(text);
-        for tick in self.frame.value_ticks.iter().filter(|tick| !tick.label.is_empty()) {
+        for tick in self
+            .frame
+            .value_ticks
+            .iter()
+            .filter(|tick| !tick.label.is_empty())
+        {
             let measured = size(&tick.label);
             if vertical {
                 result.push((
                     tick.label.clone(),
                     Point::new(
-                        bounds.x.max(plot.x - ChartFrame::LABEL_GAP - measured.width),
-                        bounds.y.max(tick.position - measured.height / 2.0).min(bounds.y + bounds.height - measured.height),
+                        bounds
+                            .x
+                            .max(plot.x - ChartFrame::LABEL_GAP - measured.width),
+                        bounds
+                            .y
+                            .max(tick.position - measured.height / 2.0)
+                            .min(bounds.y + bounds.height - measured.height),
                     ),
                 ));
             } else {
                 result.push((
                     tick.label.clone(),
                     Point::new(
-                        bounds.x.max(tick.position - measured.width / 2.0).min(bounds.x + bounds.width - measured.width),
+                        bounds
+                            .x
+                            .max(tick.position - measured.width / 2.0)
+                            .min(bounds.x + bounds.width - measured.width),
                         plot.y + plot.height + 4.0,
                     ),
                 ));
             }
         }
-        for tick in self.frame.category_ticks.iter().filter(|tick| !tick.label.is_empty()) {
+        for tick in self
+            .frame
+            .category_ticks
+            .iter()
+            .filter(|tick| !tick.label.is_empty())
+        {
             let measured = size(&tick.label);
             if vertical {
                 result.push((
                     tick.label.clone(),
                     Point::new(
-                        bounds.x.max(tick.position - measured.width / 2.0).min(bounds.x + bounds.width - measured.width),
+                        bounds
+                            .x
+                            .max(tick.position - measured.width / 2.0)
+                            .min(bounds.x + bounds.width - measured.width),
                         plot.y + plot.height + 4.0,
                     ),
                 ));
@@ -139,27 +182,44 @@ impl<'a> ChartPaint<'a> {
                 result.push((
                     tick.label.clone(),
                     Point::new(
-                        bounds.x.max(plot.x - ChartFrame::LABEL_GAP - measured.width),
-                        bounds.y.max(tick.position - measured.height / 2.0).min(bounds.y + bounds.height - measured.height),
+                        bounds
+                            .x
+                            .max(plot.x - ChartFrame::LABEL_GAP - measured.width),
+                        bounds
+                            .y
+                            .max(tick.position - measured.height / 2.0)
+                            .min(bounds.y + bounds.height - measured.height),
                     ),
                 ));
             }
         }
-        for tick in self.frame.secondary_ticks.iter().filter(|tick| !tick.label.is_empty()) {
+        for tick in self
+            .frame
+            .secondary_ticks
+            .iter()
+            .filter(|tick| !tick.label.is_empty())
+        {
             let measured = size(&tick.label);
             if vertical {
                 result.push((
                     tick.label.clone(),
                     Point::new(
-                        (plot.x + plot.width + ChartFrame::LABEL_GAP).min(bounds.x + bounds.width - measured.width),
-                        bounds.y.max(tick.position - measured.height / 2.0).min(bounds.y + bounds.height - measured.height),
+                        (plot.x + plot.width + ChartFrame::LABEL_GAP)
+                            .min(bounds.x + bounds.width - measured.width),
+                        bounds
+                            .y
+                            .max(tick.position - measured.height / 2.0)
+                            .min(bounds.y + bounds.height - measured.height),
                     ),
                 ));
             } else {
                 result.push((
                     tick.label.clone(),
                     Point::new(
-                        bounds.x.max(tick.position - measured.width / 2.0).min(bounds.x + bounds.width - measured.width),
+                        bounds
+                            .x
+                            .max(tick.position - measured.width / 2.0)
+                            .min(bounds.x + bounds.width - measured.width),
                         bounds.y,
                     ),
                 ));
@@ -172,20 +232,29 @@ impl<'a> ChartPaint<'a> {
                 if vertical {
                     Point::new(bounds.x, bounds.y)
                 } else {
-                    Point::new(plot.x + (plot.width - measured.width) / 2.0, bounds.y + bounds.height - measured.height)
+                    Point::new(
+                        plot.x + (plot.width - measured.width) / 2.0,
+                        bounds.y + bounds.height - measured.height,
+                    )
                 },
             ));
         }
         if !self.frame.secondary_title.is_empty() {
             let measured = size(&self.frame.secondary_title);
-            result.push((self.frame.secondary_title.clone(), Point::new(bounds.x + bounds.width - measured.width, bounds.y)));
+            result.push((
+                self.frame.secondary_title.clone(),
+                Point::new(bounds.x + bounds.width - measured.width, bounds.y),
+            ));
         }
         if !self.frame.category_title.is_empty() {
             let measured = size(&self.frame.category_title);
             result.push((
                 self.frame.category_title.clone(),
                 if vertical {
-                    Point::new(plot.x + (plot.width - measured.width) / 2.0, bounds.y + bounds.height - measured.height)
+                    Point::new(
+                        plot.x + (plot.width - measured.width) / 2.0,
+                        bounds.y + bounds.height - measured.height,
+                    )
                 } else {
                     Point::new(bounds.x, bounds.y)
                 },
@@ -194,17 +263,32 @@ impl<'a> ChartPaint<'a> {
         result
     }
 
-    pub fn thresholds(&self, thresholds: &[ChartThreshold], geometry: &ChartGeometry, list: &mut DrawList) {
+    pub fn thresholds(
+        &self,
+        thresholds: &[ChartThreshold],
+        geometry: &ChartGeometry,
+        list: &mut DrawList,
+    ) {
         let plot = geometry.plot;
         for threshold in thresholds.iter().filter(|item| item.value.is_finite()) {
             let at = geometry.along_value(threshold.value, threshold.axis);
             let color = threshold.color.resolve(self.theme).multiplied_alpha(0.8);
             match geometry.orientation {
                 ChartOrientation::Vertical => {
-                    let _ = list.add_line(Point::new(plot.x, at), Point::new(plot.x + plot.width, at), 1.0, color);
+                    let _ = list.add_line(
+                        Point::new(plot.x, at),
+                        Point::new(plot.x + plot.width, at),
+                        1.0,
+                        color,
+                    );
                 }
                 ChartOrientation::Horizontal => {
-                    let _ = list.add_line(Point::new(at, plot.y), Point::new(at, plot.y + plot.height), 1.0, color);
+                    let _ = list.add_line(
+                        Point::new(at, plot.y),
+                        Point::new(at, plot.y + plot.height),
+                        1.0,
+                        color,
+                    );
                 }
             }
         }
@@ -213,7 +297,10 @@ impl<'a> ChartPaint<'a> {
     /// A shaded corridor, under the grid so the grid stays the top rule.
     pub fn bands(&self, bands: &[ChartBand], geometry: &ChartGeometry, list: &mut DrawList) {
         let plot = geometry.plot;
-        for band in bands.iter().filter(|band| band.from.is_finite() && band.to.is_finite()) {
+        for band in bands
+            .iter()
+            .filter(|band| band.from.is_finite() && band.to.is_finite())
+        {
             let a = geometry.along_value(band.to, band.axis);
             let b = geometry.along_value(band.from, band.axis);
             let low = a.min(b);
@@ -236,7 +323,10 @@ impl<'a> ChartPaint<'a> {
         }
         let color = self.theme.colors.on_surface_muted.multiplied_alpha(0.4);
         for wedge in geometry.wedges.iter().filter(|wedge| {
-            slices.get(wedge.index).map(|slice| !slice.title.is_empty()).unwrap_or(false)
+            slices
+                .get(wedge.index)
+                .map(|slice| !slice.title.is_empty())
+                .unwrap_or(false)
         }) {
             let from = geometry.ring_point(wedge);
             let to = geometry.label_anchor(wedge);
@@ -246,24 +336,60 @@ impl<'a> ChartPaint<'a> {
 
     pub fn series(&self, series: &[ChartSeries], geometry: &ChartGeometry, list: &mut DrawList) {
         // Fills first, so lines and points of every series stay on top.
-        for (index, item) in series.iter().enumerate().filter(|(_, item)| item.mark == super::model::ChartMark::Area) {
-            self.area(&geometry.marks[index], item.color.resolve(self.theme), &item.style, geometry, list);
+        for (index, item) in series
+            .iter()
+            .enumerate()
+            .filter(|(_, item)| item.mark == super::model::ChartMark::Area)
+        {
+            self.area(
+                &geometry.marks[index],
+                item.color.resolve(self.theme),
+                &item.style,
+                geometry,
+                list,
+            );
         }
-        for (index, item) in series.iter().enumerate().filter(|(_, item)| item.mark == super::model::ChartMark::Bar) {
+        for (index, item) in series
+            .iter()
+            .enumerate()
+            .filter(|(_, item)| item.mark == super::model::ChartMark::Bar)
+        {
             self.bars(&geometry.marks[index], item.color.resolve(self.theme), list);
         }
         for (index, item) in series.iter().enumerate().filter(|(_, item)| {
-            matches!(item.mark, super::model::ChartMark::Line | super::model::ChartMark::Area)
+            matches!(
+                item.mark,
+                super::model::ChartMark::Line | super::model::ChartMark::Area
+            )
         }) {
-            self.line(&geometry.marks[index], item.color.resolve(self.theme), &item.style, geometry, list);
+            self.line(
+                &geometry.marks[index],
+                item.color.resolve(self.theme),
+                &item.style,
+                geometry,
+                list,
+            );
         }
-        for (index, item) in series.iter().enumerate().filter(|(_, item)| item.mark == super::model::ChartMark::Point) {
+        for (index, item) in series
+            .iter()
+            .enumerate()
+            .filter(|(_, item)| item.mark == super::model::ChartMark::Point)
+        {
             let mut drawn = HashSet::new();
-            for mark in geometry.marks[index].iter().filter(|mark| mark.y.is_finite()) {
+            for mark in geometry.marks[index]
+                .iter()
+                .filter(|mark| mark.y.is_finite())
+            {
                 if !drawn.insert(Self::pixel(mark.x, mark.y)) {
                     continue;
                 }
-                self.dot(mark.x, mark.y, item.style.point_radius, item.color.resolve(self.theme).multiplied_alpha(0.85), list);
+                self.dot(
+                    mark.x,
+                    mark.y,
+                    item.style.point_radius,
+                    item.color.resolve(self.theme).multiplied_alpha(0.85),
+                    list,
+                );
             }
         }
     }
@@ -275,13 +401,25 @@ impl<'a> ChartPaint<'a> {
         let plot = geometry.plot;
         for marker in markers {
             let index = marker.index.min(geometry.sample_count - 1);
-            let Some(at) = geometry.across_at(index) else { continue };
+            let Some(at) = geometry.across_at(index) else {
+                continue;
+            };
             match geometry.orientation {
                 ChartOrientation::Vertical => {
-                    let _ = list.add_line(Point::new(at, plot.y), Point::new(at, plot.y + plot.height), marker.width, marker.color.resolve(self.theme));
+                    let _ = list.add_line(
+                        Point::new(at, plot.y),
+                        Point::new(at, plot.y + plot.height),
+                        marker.width,
+                        marker.color.resolve(self.theme),
+                    );
                 }
                 ChartOrientation::Horizontal => {
-                    let _ = list.add_line(Point::new(plot.x, at), Point::new(plot.x + plot.width, at), marker.width, marker.color.resolve(self.theme));
+                    let _ = list.add_line(
+                        Point::new(plot.x, at),
+                        Point::new(plot.x + plot.width, at),
+                        marker.width,
+                        marker.color.resolve(self.theme),
+                    );
                 }
             }
         }
@@ -289,24 +427,44 @@ impl<'a> ChartPaint<'a> {
 
     /// A rule through the selected column and a ringed dot on the value.
     pub fn selection(&self, series: &[ChartSeries], geometry: &ChartGeometry, list: &mut DrawList) {
-        let Some(selection) = self.selection else { return };
-        let Some(mark) = geometry.mark(selection) else { return };
+        let Some(selection) = self.selection else {
+            return;
+        };
+        let Some(mark) = geometry.mark(selection) else {
+            return;
+        };
         let plot = geometry.plot;
         let rule = self.theme.colors.on_surface_muted.multiplied_alpha(0.35);
         let at = geometry.across_mark(mark);
         match geometry.orientation {
             ChartOrientation::Vertical => {
-                let _ = list.add_line(Point::new(at, plot.y), Point::new(at, plot.y + plot.height), 1.0, rule);
+                let _ = list.add_line(
+                    Point::new(at, plot.y),
+                    Point::new(at, plot.y + plot.height),
+                    1.0,
+                    rule,
+                );
             }
             ChartOrientation::Horizontal => {
-                let _ = list.add_line(Point::new(plot.x, at), Point::new(plot.x + plot.width, at), 1.0, rule);
+                let _ = list.add_line(
+                    Point::new(plot.x, at),
+                    Point::new(plot.x + plot.width, at),
+                    1.0,
+                    rule,
+                );
             }
         }
         if mark.bar.is_some() || !mark.y.is_finite() {
             return;
         }
         self.dot(mark.x, mark.y, 6.0, self.theme.colors.surface, list);
-        self.dot(mark.x, mark.y, 4.0, series[mark.series].color.resolve(self.theme), list);
+        self.dot(
+            mark.x,
+            mark.y,
+            4.0,
+            series[mark.series].color.resolve(self.theme),
+            list,
+        );
     }
 
     pub fn pie(&self, slices: &[ChartSlice], geometry: &PieGeometry, list: &mut DrawList) {
@@ -315,22 +473,45 @@ impl<'a> ChartPaint<'a> {
         }
         let gap = if geometry.wedges.len() > 1 { 1.5 } else { 0.0 };
         for wedge in &geometry.wedges {
-            let selected = self.selection.map(|selection| selection.index == wedge.index).unwrap_or(false);
+            let selected = self
+                .selection
+                .map(|selection| selection.index == wedge.index)
+                .unwrap_or(false);
             let dimmed = self.selection.is_some() && !selected;
-            let mut color = slices[wedge.index].resolved_color(wedge.index).resolve(self.theme);
+            let mut color = slices[wedge.index]
+                .resolved_color(wedge.index)
+                .resolve(self.theme);
             if dimmed {
                 color = color.multiplied_alpha(0.55);
             }
-            self.ring(geometry, wedge, geometry.radius + if selected { 4.0 } else { 0.0 }, gap, color, list);
+            self.ring(
+                geometry,
+                wedge,
+                geometry.radius + if selected { 4.0 } else { 0.0 },
+                gap,
+                color,
+                list,
+            );
         }
     }
 
-    fn line(&self, marks: &[Mark], color: Color, series_style: &ChartSeriesStyle, geometry: &ChartGeometry, list: &mut DrawList) {
+    fn line(
+        &self,
+        marks: &[Mark],
+        color: Color,
+        series_style: &ChartSeriesStyle,
+        geometry: &ChartGeometry,
+        list: &mut DrawList,
+    ) {
         let width = series_style.line_width.unwrap_or(self.style.line_width);
         let length = geometry.orientation.breadth(geometry.plot);
         for run in Self::runs(marks) {
             let points = self.sampled(
-                &ChartGeometry::decimated(&geometry.visible_run(&run), geometry.orientation, length),
+                &ChartGeometry::decimated(
+                    &geometry.visible_run(&run),
+                    geometry.orientation,
+                    length,
+                ),
                 series_style.curve,
                 geometry,
             );
@@ -338,12 +519,23 @@ impl<'a> ChartPaint<'a> {
         }
     }
 
-    fn area(&self, marks: &[Mark], color: Color, series_style: &ChartSeriesStyle, geometry: &ChartGeometry, list: &mut DrawList) {
+    fn area(
+        &self,
+        marks: &[Mark],
+        color: Color,
+        series_style: &ChartSeriesStyle,
+        geometry: &ChartGeometry,
+        list: &mut DrawList,
+    ) {
         let fill = color.multiplied_alpha(series_style.fill_opacity);
         let length = geometry.orientation.breadth(geometry.plot);
         for run in Self::runs(marks) {
             let points = self.sampled_area(
-                &ChartGeometry::decimated(&geometry.visible_run(&run), geometry.orientation, length),
+                &ChartGeometry::decimated(
+                    &geometry.visible_run(&run),
+                    geometry.orientation,
+                    length,
+                ),
                 series_style.curve,
                 geometry,
             );
@@ -373,7 +565,14 @@ impl<'a> ChartPaint<'a> {
     }
 
     /// Emits a polyline, split into on/off runs when a dash pattern is set.
-    fn stroke(&self, points: &[Point], color: Color, width: f32, dash: &[f32], list: &mut DrawList) {
+    fn stroke(
+        &self,
+        points: &[Point],
+        color: Color,
+        width: f32,
+        dash: &[f32],
+        list: &mut DrawList,
+    ) {
         if points.len() <= 1 {
             if let Some(point) = points.first() {
                 self.dot(point.x, point.y, width, color, list);
@@ -469,13 +668,21 @@ impl<'a> ChartPaint<'a> {
         result
     }
 
-    fn sampled_area(&self, marks: &[Mark], curved: bool, geometry: &ChartGeometry) -> Vec<FillPoint> {
+    fn sampled_area(
+        &self,
+        marks: &[Mark],
+        curved: bool,
+        geometry: &ChartGeometry,
+    ) -> Vec<FillPoint> {
         let points = self.sampled(marks, curved, geometry);
         if points.len() <= marks.len() {
             return marks
                 .iter()
                 .zip(points)
-                .map(|(mark, point)| FillPoint { value: point, base: geometry.base_point(mark) })
+                .map(|(mark, point)| FillPoint {
+                    value: point,
+                    base: geometry.base_point(mark),
+                })
                 .collect();
         }
         let orientation = geometry.orientation;
@@ -483,7 +690,9 @@ impl<'a> ChartPaint<'a> {
         let mut segment = 0;
         for point in points {
             let (across, _) = orientation.axes(point);
-            while segment < marks.len().saturating_sub(2) && across > geometry.across_mark(&marks[segment + 1]) {
+            while segment < marks.len().saturating_sub(2)
+                && across > geometry.across_mark(&marks[segment + 1])
+            {
                 segment += 1;
             }
             let a = &marks[segment];
@@ -550,7 +759,11 @@ impl<'a> ChartPaint<'a> {
                 .selection
                 .map(|selection| selection != ChartPoint::new(mark.series, mark.index))
                 .unwrap_or(false);
-            let fill = if dimmed { color.multiplied_alpha(0.45) } else { color };
+            let fill = if dimmed {
+                color.multiplied_alpha(0.45)
+            } else {
+                color
+            };
             if !mark.is_outer_end {
                 let _ = list.add_rect(rect, fill);
                 continue;
@@ -576,7 +789,11 @@ impl<'a> ChartPaint<'a> {
                 let toward_base = base >= rect.y + rect.height / 2.0;
                 Some(Rect::new(
                     rect.x,
-                    if toward_base { rect.y + rect.height - radius } else { rect.y },
+                    if toward_base {
+                        rect.y + rect.height - radius
+                    } else {
+                        rect.y
+                    },
                     rect.width,
                     radius,
                 ))
@@ -584,7 +801,11 @@ impl<'a> ChartPaint<'a> {
             ChartOrientation::Horizontal => {
                 let toward_base = base <= rect.x + rect.width / 2.0;
                 Some(Rect::new(
-                    if toward_base { rect.x } else { rect.x + rect.width - radius },
+                    if toward_base {
+                        rect.x
+                    } else {
+                        rect.x + rect.width - radius
+                    },
                     rect.y,
                     radius,
                     rect.height,
@@ -612,11 +833,23 @@ impl<'a> ChartPaint<'a> {
         packed(x) << 32 | packed(y)
     }
 
-    fn ring(&self, geometry: &PieGeometry, wedge: &super::coordinates::PieWedge, outer: f32, gap: f32, color: Color, list: &mut DrawList) {
+    fn ring(
+        &self,
+        geometry: &PieGeometry,
+        wedge: &super::coordinates::PieWedge,
+        outer: f32,
+        gap: f32,
+        color: Color,
+        list: &mut DrawList,
+    ) {
         let inner = geometry.inner_radius;
-        let steps = (2).max((((wedge.end - wedge.start) / (2.0 * std::f32::consts::PI)) * 96.0) as usize);
+        let steps =
+            (2).max((((wedge.end - wedge.start) / (2.0 * std::f32::consts::PI)) * 96.0) as usize);
         let point = |angle: f32, radius: f32| {
-            Point::new(geometry.center.x + angle.cos() * radius, geometry.center.y + angle.sin() * radius)
+            Point::new(
+                geometry.center.x + angle.cos() * radius,
+                geometry.center.y + angle.sin() * radius,
+            )
         };
         for step in 0..steps {
             let t0 = step as f32 / steps as f32;

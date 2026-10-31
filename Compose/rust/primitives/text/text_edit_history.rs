@@ -72,14 +72,12 @@ impl TextEditHistory {
     }
 
     pub fn can_undo(&self) -> bool {
-        self.registrar
-            .access(StateAccessKey::text("undo"));
+        self.registrar.access(StateAccessKey::text("undo"));
         !self.undo_stack.is_empty()
     }
 
     pub fn can_redo(&self) -> bool {
-        self.registrar
-            .access(StateAccessKey::text("redo"));
+        self.registrar.access(StateAccessKey::text("redo"));
         !self.redo_stack.is_empty()
     }
 
@@ -121,17 +119,14 @@ impl TextEditHistory {
             return;
         }
         self.redo_stack.clear();
-        let coalesced = self
-            .undo_stack
-            .back()
-            .is_some_and(|last| {
-                kind != TextEditKind::Atomic
-                    && last.kind == kind
-                    && time - last.time < 0.75
-                    && last.after == before
-                    && before.anchor.is_none()
-                    && after.anchor.is_none()
-            });
+        let coalesced = self.undo_stack.back().is_some_and(|last| {
+            kind != TextEditKind::Atomic
+                && last.kind == kind
+                && time - last.time < 0.75
+                && last.after == before
+                && before.anchor.is_none()
+                && after.anchor.is_none()
+        });
         if coalesced {
             if let Some(last) = self.undo_stack.back_mut() {
                 last.after = after.clone();

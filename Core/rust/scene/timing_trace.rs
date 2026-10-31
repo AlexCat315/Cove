@@ -27,7 +27,12 @@ pub struct TimingTrace {
 impl TimingTrace {
     pub fn new(label: impl Into<String>) -> Self {
         let now = Self::now();
-        Self { label: label.into(), started_at: now, last_mark: now, samples: Vec::new() }
+        Self {
+            label: label.into(),
+            started_at: now,
+            last_mark: now,
+            samples: Vec::new(),
+        }
     }
     #[inline(always)]
     pub fn now() -> f64 {
@@ -35,7 +40,10 @@ impl TimingTrace {
     }
     pub fn mark(&mut self, stage: impl Into<String>) {
         let now = Self::now();
-        self.samples.push(Sample { stage: stage.into(), milliseconds: (now - self.last_mark) * 1000.0 });
+        self.samples.push(Sample {
+            stage: stage.into(),
+            milliseconds: (now - self.last_mark) * 1000.0,
+        });
         self.last_mark = now;
     }
     pub fn summary(&self) -> String {
@@ -43,9 +51,23 @@ impl TimingTrace {
     }
     pub fn summary_with(&self, extra: &[&str]) -> String {
         let mut parts = vec![self.label.clone()];
-        parts.extend(self.samples.iter().map(|sample| format!("{}={}", sample.stage, format_milliseconds(sample.milliseconds))));
-        parts.push(format!("total={}", format_milliseconds((Self::now() - self.started_at) * 1000.0)));
-        parts.extend(extra.iter().filter(|text| !text.is_empty()).map(|text| (*text).to_owned()));
+        parts.extend(self.samples.iter().map(|sample| {
+            format!(
+                "{}={}",
+                sample.stage,
+                format_milliseconds(sample.milliseconds)
+            )
+        }));
+        parts.push(format!(
+            "total={}",
+            format_milliseconds((Self::now() - self.started_at) * 1000.0)
+        ));
+        parts.extend(
+            extra
+                .iter()
+                .filter(|text| !text.is_empty())
+                .map(|text| (*text).to_owned()),
+        );
         parts.join(" ")
     }
     pub fn label(&self) -> &str {

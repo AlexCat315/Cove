@@ -19,14 +19,14 @@
 //! paragraphs.
 use std::rc::Rc;
 
-use cove_core::scene::Node;
-use cove_core::{Font, TextAlignment};
 use crate::modifiers::style::{text_style_font, text_style_line_height};
 use crate::primitives::text::rich::flow::{RichParagraph, RichParagraphSpan};
 use crate::primitives::text::rich::run::RichTextRun;
 use crate::{AnyView, PrimitiveView, View};
+use cove_core::scene::Node;
+use cove_core::{Font, TextAlignment};
 
-use super::paragraph::{link_anchors, RichTextRole, RichTextSurface};
+use super::paragraph::{RichTextRole, RichTextSurface, link_anchors};
 
 /// A paragraph of styled runs that wrap together.
 pub struct RichText {
@@ -167,20 +167,19 @@ impl RichTextReader {
     fn resolve(&self, node: &Node) -> RichParagraph {
         let (font, line_height) = resolve_style(node);
         let destinations = destinations_of(&self.runs);
-        let spans: Vec<RichParagraphSpan> = self
-            .runs
-            .iter()
-            .map(|run| RichParagraphSpan {
-                text: run.text.clone(),
-                font: font.clone(),
-                line_height,
-                traits: run.traits,
-                link: run
-                    .link
-                    .as_ref()
-                    .and_then(|link| destinations.iter().position(|candidate| candidate == link)),
-            })
-            .collect();
+        let spans: Vec<RichParagraphSpan> =
+            self.runs
+                .iter()
+                .map(|run| RichParagraphSpan {
+                    text: run.text.clone(),
+                    font: font.clone(),
+                    line_height,
+                    traits: run.traits,
+                    link: run.link.as_ref().and_then(|link| {
+                        destinations.iter().position(|candidate| candidate == link)
+                    }),
+                })
+                .collect();
         RichParagraph {
             spans,
             alignment: self.alignment,

@@ -1,13 +1,13 @@
 //! Translation of Primitives/Controls/KeyCap.swift.
-use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
-use crate::{AnyView, BoxView, TupleView, View};
-use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::interaction::AccessibilityExt;
+use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::fields::select::{KeyboardShortcut, KeyboardShortcutPlatform};
 use crate::primitives::text::Text;
 use crate::theme::{SemanticColorRef, SemanticFontRef, ThemeMetric};
+use crate::{AnyView, BoxView, TupleView, View};
 use cove_core::scene::AccessibilityRole;
+use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 
 /// Keyboard hint drawn as one cap per key.
 ///
@@ -22,7 +22,11 @@ pub struct KeyCap {
 
 impl KeyCap {
     pub fn new(keys: impl IntoIterator<Item = impl Into<String>>) -> Self {
-        Self { keys: keys.into_iter().map(Into::into).collect(), platform: KeyboardShortcutPlatform::current(), is_enabled: true }
+        Self {
+            keys: keys.into_iter().map(Into::into).collect(),
+            platform: KeyboardShortcutPlatform::current(),
+            is_enabled: true,
+        }
     }
 
     pub fn title(title: impl Into<String>) -> Self {
@@ -31,7 +35,11 @@ impl KeyCap {
 
     pub fn shortcut(shortcut: KeyboardShortcut, platform: KeyboardShortcutPlatform) -> Self {
         let keys = shortcut.caps(platform);
-        Self { keys, platform, is_enabled: true }
+        Self {
+            keys,
+            platform,
+            is_enabled: true,
+        }
     }
 
     pub fn configure(mut self, configure: impl FnOnce(&mut Self)) -> Self {
@@ -40,7 +48,11 @@ impl KeyCap {
     }
 
     fn cap(&self, key: &str) -> AnyView {
-        let ink = if self.is_enabled { SemanticColorRef::on_surface_variant() } else { SemanticColorRef::on_surface_disabled() };
+        let ink = if self.is_enabled {
+            SemanticColorRef::on_surface_variant()
+        } else {
+            SemanticColorRef::on_surface_disabled()
+        };
         AnyView::new(
             Text::new(key)
                 .semantic_font(SemanticFontRef::caption())
@@ -81,12 +93,19 @@ impl View for KeyCap {
         let caps: Vec<AnyView> = self.keys.iter().map(|key| self.cap(key)).collect();
         let spoken = self.spoken_form();
         AnyView::new(
-            BoxView::new(FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::Wrap, 2.0, AnyView::new(TupleView::new(caps)))
-                .accessibility(move |semantics| {
-                    semantics.role = AccessibilityRole::StaticText;
-                    semantics.label = spoken.clone();
-                    semantics.combines_children = true;
-                }),
+            BoxView::new(
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::Wrap,
+                2.0,
+                AnyView::new(TupleView::new(caps)),
+            )
+            .accessibility(move |semantics| {
+                semantics.role = AccessibilityRole::StaticText;
+                semantics.label = spoken.clone();
+                semantics.combines_children = true;
+            }),
         )
     }
 }

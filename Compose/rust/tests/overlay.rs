@@ -12,9 +12,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use cove_composition::{AnyView, LayoutDebugExt, View, ViewExt};
-use cove_core::scene::{
-    Align, EventDispatcher, FlexDirection, Justify, Node, Wrap,
-};
+use cove_core::scene::{Align, EventDispatcher, FlexDirection, Justify, Node, Wrap};
 use cove_platform::{InputEvent, MouseButton, MouseButtonEvent, WindowId};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::controls::button::Button;
@@ -249,9 +247,21 @@ impl OverlayLayoutProbe {
     ) -> f32 {
         let _ = layout;
         match alignment {
-            cove_composition::HorizontalAlignment::Leading => if rtl { available } else { 0.0 },
+            cove_composition::HorizontalAlignment::Leading => {
+                if rtl {
+                    available
+                } else {
+                    0.0
+                }
+            }
             cove_composition::HorizontalAlignment::Center => available / 2.0,
-            cove_composition::HorizontalAlignment::Trailing => if rtl { 0.0 } else { available },
+            cove_composition::HorizontalAlignment::Trailing => {
+                if rtl {
+                    0.0
+                } else {
+                    available
+                }
+            }
         }
     }
 

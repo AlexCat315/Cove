@@ -68,7 +68,9 @@ impl LoadingAnimationClock {
         let animation = Animation::new(duration, cove_core::scene::AnimationCurve::Linear)
             .repeat_forever(false);
         let controller = AnimationController::new(0.0_f64, 1.0, animation, 0.0, move |value| {
-            let Some(node) = Node::upgrade(&weak_node) else { return };
+            let Some(node) = Node::upgrade(&weak_node) else {
+                return;
+            };
             if let Some(clock) = node.first_resource::<LoadingAnimationClock>() {
                 clock.phase.set(value);
             }

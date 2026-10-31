@@ -56,14 +56,20 @@ impl ImageLoadRequest {
     }
 
     fn bounds(&self) -> PixelSize {
-        PixelSize { width: self.pixel_width, height: self.pixel_height }
+        PixelSize {
+            width: self.pixel_width,
+            height: self.pixel_height,
+        }
     }
 
     /// Registry key for the aspect-preserving thumbnail this request decodes.
     pub fn cache_key(&self) -> Option<String> {
         ImageAssetRegistryHolder::current()?;
         self.url.as_ref().map(|url| {
-            format!("{url}#{}x{}#aspect-thumbnail", self.pixel_width, self.pixel_height)
+            format!(
+                "{url}#{}x{}#aspect-thumbnail",
+                self.pixel_width, self.pixel_height
+            )
         })
     }
 }
@@ -72,7 +78,9 @@ impl ImageLoadRequest {
 /// publication.
 pub struct ImageLoadServices {
     pub cached: Rc<dyn Fn(&str) -> Option<Arc<ImageAsset>>>,
-    pub decode: Rc<dyn Fn(&ImageLoadRequest, Option<ImageProgress>) -> Result<ImagePayload, AsyncImageError>>,
+    pub decode: Rc<
+        dyn Fn(&ImageLoadRequest, Option<ImageProgress>) -> Result<ImagePayload, AsyncImageError>,
+    >,
     pub register: Rc<dyn Fn(&str, DecodedImage) -> Result<Arc<ImageAsset>, String>>,
     pub enqueue: Rc<dyn Fn(Rc<dyn Fn()>)>,
 }
@@ -80,11 +88,21 @@ pub struct ImageLoadServices {
 impl ImageLoadServices {
     pub fn new(
         cached: Rc<dyn Fn(&str) -> Option<Arc<ImageAsset>>>,
-        decode: Rc<dyn Fn(&ImageLoadRequest, Option<ImageProgress>) -> Result<ImagePayload, AsyncImageError>>,
+        decode: Rc<
+            dyn Fn(
+                &ImageLoadRequest,
+                Option<ImageProgress>,
+            ) -> Result<ImagePayload, AsyncImageError>,
+        >,
         register: Rc<dyn Fn(&str, DecodedImage) -> Result<Arc<ImageAsset>, String>>,
         enqueue: Rc<dyn Fn(Rc<dyn Fn()>)>,
     ) -> Self {
-        Self { cached, decode, register, enqueue }
+        Self {
+            cached,
+            decode,
+            register,
+            enqueue,
+        }
     }
 
     /// Services backed by the installed image registry and UI work scheduler.
@@ -98,7 +116,9 @@ impl ImageLoadServices {
             register: Rc::new(|key, decoded| {
                 let registry = ImageAssetRegistryHolder::current()
                     .ok_or_else(|| AsyncImageError::HostUnavailable.to_string())?;
-                registry.register(key, decoded).map_err(|error| error.to_string())
+                registry
+                    .register(key, decoded)
+                    .map_err(|error| error.to_string())
             }),
             enqueue: Rc::new(|work| {
                 let scheduler: Rc<dyn Fn(Rc<dyn Fn()>)> =
@@ -113,12 +133,16 @@ fn decode_request(
     request: &ImageLoadRequest,
     progress: Option<ImageProgress>,
 ) -> Result<ImagePayload, AsyncImageError> {
-    let Some(url) = request.url.as_deref() else { return Err(AsyncImageError::UnsupportedUrl) };
+    let Some(url) = request.url.as_deref() else {
+        return Err(AsyncImageError::UnsupportedUrl);
+    };
     let bounds = request.bounds();
     let maximum_source_pixels = request.policy.maximum_source_pixels;
     let preview: Option<super::image_data_download::DownloadProgress> = progress.map(|progress| {
         Rc::new(move |partial: &[u8]| {
-            if let Some(image) = ImageDecoder::decode_partial(partial, bounds, maximum_source_pixels) {
+            if let Some(image) =
+                ImageDecoder::decode_partial(partial, bounds, maximum_source_pixels)
+            {
                 progress(image);
             }
         }) as super::image_data_download::DownloadProgress
@@ -128,7 +152,10 @@ fn decode_request(
         return Ok(ImagePayload::Animation(animation));
     }
     let still = ImageDecoder::decode_thumbnail(
-        &download.data, &download.format_hint, bounds, maximum_source_pixels,
+        &download.data,
+        &download.format_hint,
+        bounds,
+        maximum_source_pixels,
     )
     .map_err(|error| AsyncImageError::DecodeFailed(error.to_string()))?;
     Ok(ImagePayload::Still(still))
@@ -140,7 +167,11 @@ fn decode_animation(
     maximum_source_pixels: u64,
 ) -> Result<Option<DecodedAnimation>, AsyncImageError> {
     ImageDecoder::decode_animation(
-        &download.data, &download.format_hint, bounds, maximum_source_pixels, MAXIMUM_FRAMES,
+        &download.data,
+        &download.format_hint,
+        bounds,
+        maximum_source_pixels,
+        MAXIMUM_FRAMES,
     )
     .map_err(|error| AsyncImageError::DecodeFailed(error.to_string()))
 }
@@ -224,7 +255,9 @@ thread_local! {
 
 impl ImageInflightLoads {
     fn new() -> Self {
-        Self { loads: RefCell::new(HashMap::new()) }
+        Self {
+            loads: RefCell::new(HashMap::new()),
+        }
     }
 
     pub fn shared() -> Rc<Self> {
@@ -244,7 +277,13 @@ impl ImageInflightLoads {
         if let Some(payload) = self.join(key) {
             return payload;
         }
-        self.loads.borrow_mut().insert(key.to_string(), InflightLoad { payload: None, waiters: 1 });
+        self.loads.borrow_mut().insert(
+            key.to_string(),
+            InflightLoad {
+                payload: None,
+                waiters: 1,
+            },
+        );
         let result = start();
         if let Ok(payload) = &result
             && let Some(load) = self.loads.borrow_mut().get_mut(key)

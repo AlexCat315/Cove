@@ -18,7 +18,12 @@ pub struct RefreshOptions {
 
 impl RefreshOptions {
     pub fn new(on_refresh: impl Fn() + 'static) -> Self {
-        Self { is_refreshing: false, on_refresh: Rc::new(on_refresh), threshold: 64.0, label: None }
+        Self {
+            is_refreshing: false,
+            on_refresh: Rc::new(on_refresh),
+            threshold: 64.0,
+            label: None,
+        }
     }
 
     pub fn refreshing(mut self, is_refreshing: bool) -> Self {
@@ -27,7 +32,11 @@ impl RefreshOptions {
     }
 
     pub fn threshold(mut self, threshold: f32) -> Self {
-        self.threshold = if threshold.is_finite() { threshold.max(0.0) } else { 64.0 };
+        self.threshold = if threshold.is_finite() {
+            threshold.max(0.0)
+        } else {
+            64.0
+        };
         self
     }
 

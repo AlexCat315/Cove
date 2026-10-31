@@ -20,7 +20,10 @@ enum GridRowHeightStorage {
 impl GridRowHeights {
     /// Every row has this height. Fixed rows need no per-row allocation.
     pub fn fixed(height: f32) -> Self {
-        Self { storage: GridRowHeightStorage::Fixed(Self::normalized_height(height)), scale: 1.0 }
+        Self {
+            storage: GridRowHeightStorage::Fixed(Self::normalized_height(height)),
+            scale: 1.0,
+        }
     }
 
     /// One known height per row, including the last partial row. Heights must
@@ -32,13 +35,19 @@ impl GridRowHeights {
         for height in heights {
             offsets.push(offsets[offsets.len() - 1] + Self::normalized_height(*height));
         }
-        Self { storage: GridRowHeightStorage::Variable(offsets), scale: 1.0 }
+        Self {
+            storage: GridRowHeightStorage::Variable(offsets),
+            scale: 1.0,
+        }
     }
 
     pub fn validate(&self, row_count: usize) {
         if let GridRowHeightStorage::Variable(offsets) = &self.storage {
-            assert_eq!(offsets.len(), row_count + 1,
-                "LazyGrid requires one variable height per row, including the last partial row");
+            assert_eq!(
+                offsets.len(),
+                row_count + 1,
+                "LazyGrid requires one variable height per row, including the last partial row"
+            );
         }
     }
 
@@ -52,7 +61,9 @@ impl GridRowHeights {
     pub fn height(&self, row: usize) -> f32 {
         match &self.storage {
             GridRowHeightStorage::Fixed(height) => height * self.scale,
-            GridRowHeightStorage::Variable(offsets) => (offsets[row + 1] - offsets[row]) * self.scale,
+            GridRowHeightStorage::Variable(offsets) => {
+                (offsets[row + 1] - offsets[row]) * self.scale
+            }
         }
     }
 
@@ -71,25 +82,34 @@ impl GridRowHeights {
         self.offset(row_count - 1, spacing) + self.height(row_count - 1)
     }
 
-    pub fn visible_rows(&self, count: usize, offset: f32, viewport_height: f32,
-                        spacing: f32, overscan: usize) -> Range<usize> {
+    pub fn visible_rows(
+        &self,
+        count: usize,
+        offset: f32,
+        viewport_height: f32,
+        spacing: f32,
+        overscan: usize,
+    ) -> Range<usize> {
         if count == 0 {
             return 0..0;
         }
         let gap = GridTrackResolver::finite_nonnegative(spacing);
         let viewport = 1.0f32.max(GridTrackResolver::finite_nonnegative(viewport_height));
         let total = self.total_height(count, gap);
-        let start = GridTrackResolver::finite_nonnegative(offset)
-            .min((total - viewport).max(0.0));
+        let start = GridTrackResolver::finite_nonnegative(offset).min((total - viewport).max(0.0));
         let end = start + viewport;
         let (lower, upper) = match &self.storage {
             GridRowHeightStorage::Fixed(height) => {
                 let stride = height * self.scale + gap;
-                (Self::bounded_index((start + gap) / stride, count),
-                 Self::bounded_index((end / stride).ceil(), count))
+                (
+                    Self::bounded_index((start + gap) / stride, count),
+                    Self::bounded_index((end / stride).ceil(), count),
+                )
             }
             GridRowHeightStorage::Variable(_) => {
-                let lower = self.first_index(count, |row| self.offset(row, gap) + self.height(row) > start);
+                let lower = self.first_index(count, |row| {
+                    self.offset(row, gap) + self.height(row) > start
+                });
                 let upper = self.first_index(count, |row| self.offset(row, gap) >= end);
                 (lower, upper)
             }

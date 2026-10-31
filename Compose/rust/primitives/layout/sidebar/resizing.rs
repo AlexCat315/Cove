@@ -12,10 +12,19 @@ pub use super::presentation::SidebarResizeOptions;
 /// minimum content width.
 pub fn clamp_width(options: &SidebarResizeOptions, proposed: f32, width: f32, handle: f32) -> f32 {
     let (low, high) = options.range(width, handle);
-    if proposed.is_finite() { proposed.clamp(low, high) } else { low }
+    if proposed.is_finite() {
+        proposed.clamp(low, high)
+    } else {
+        low
+    }
 }
 
 /// The width a resolved option set settles on for a container.
-pub fn resolved_width(options: &SidebarResizeOptions, requested: f32, width: f32, handle: f32) -> f32 {
+pub fn resolved_width(
+    options: &SidebarResizeOptions,
+    requested: f32,
+    width: f32,
+    handle: f32,
+) -> f32 {
     clamp_width(options, requested, width, handle)
 }

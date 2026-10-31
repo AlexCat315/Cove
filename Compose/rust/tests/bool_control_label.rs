@@ -10,15 +10,15 @@
 
 mod support;
 
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use cove_composition::{AnyView, View};
-use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
 use cove_core::Binding;
-use cove_ui_compose::primitives::controls::toggle::{Checkbox, CheckboxState, Toggle};
+use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
 use cove_ui_compose::BoxView;
+use cove_ui_compose::modifiers::layout::LayoutFrameExt;
+use cove_ui_compose::primitives::controls::toggle::{Checkbox, CheckboxState, Toggle};
 
 use support::GlobalTestLock;
 
@@ -59,9 +59,15 @@ fn toggle_and_checkbox_expose_label_slot_with_one_control_each() {
                 let set = checked.clone();
                 Binding::new(
                     move || {
-                        if get.load(Ordering::SeqCst) { CheckboxState::On } else { CheckboxState::Off }
+                        if get.load(Ordering::SeqCst) {
+                            CheckboxState::On
+                        } else {
+                            CheckboxState::Off
+                        }
                     },
-                    move |state: CheckboxState| set.store(state == CheckboxState::On, Ordering::SeqCst),
+                    move |state: CheckboxState| {
+                        set.store(state == CheckboxState::On, Ordering::SeqCst)
+                    },
                 )
             });
 
@@ -130,7 +136,10 @@ fn toggle_and_checkbox_expose_label_slot_with_one_control_each() {
                 })
             };
             assert!(has_text("Notifications"), "the Toggle label materialises");
-            assert!(has_text("Accept the terms"), "the Checkbox label materialises");
+            assert!(
+                has_text("Accept the terms"),
+                "the Checkbox label materialises"
+            );
 
             // One accessible control per widget, not a wrapper plus an inner node.
             let toggle_count = nodes
@@ -161,8 +170,14 @@ fn toggle_and_checkbox_expose_label_slot_with_one_control_each() {
             if let Some(activate) = checkbox_node.accessibility_actions().activate {
                 activate();
             }
-            assert!(toggle_on.load(Ordering::SeqCst), "the Toggle action switched it on");
-            assert!(checked.load(Ordering::SeqCst), "the Checkbox action switched it on");
+            assert!(
+                toggle_on.load(Ordering::SeqCst),
+                "the Toggle action switched it on"
+            );
+            assert!(
+                checked.load(Ordering::SeqCst),
+                "the Checkbox action switched it on"
+            );
         });
     });
 }

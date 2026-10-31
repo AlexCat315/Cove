@@ -6,22 +6,22 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use cove_core::scene::{AnimatorScheduler, AnyAnimationController, LayoutNode, Node, NodeResource};
-use cove_core::{Point, Rect};
 use crate::animation::content::AnimatedVisibility;
 use crate::animation::transition::{Transition, TransitionEdge};
+use crate::modifiers::layout::{FlexExt, PaddingExt};
+use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{Button, ButtonIconSource};
 use crate::primitives::overlays::portal::portal_registry::PortalResource;
 use crate::primitives::overlays::portal::{
-    portal_window_bounds, PortalPlacementMode, PortalStoreEnvironment, PortalStoreHolder,
+    PortalPlacementMode, PortalStoreEnvironment, PortalStoreHolder, portal_window_bounds,
 };
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonRole, ButtonStyleViewExt, GhostButtonStyle};
 use crate::theme::{ControlSizeViewExt, SemanticFontRef, ThemeReader};
-use crate::modifiers::layout::{FlexExt, PaddingExt};
-use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, View};
+use crate::{AnyView, BoxView, PrimitiveView, View, impl_primitive_view};
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
+use cove_core::scene::{AnimatorScheduler, AnyAnimationController, LayoutNode, Node, NodeResource};
+use cove_core::{Point, Rect};
 
 use super::controller::{ToastAction, ToastController, ToastNotification};
 use super::exit_retention::{ToastPresentation, ToastPresentationEntry};
@@ -60,8 +60,16 @@ impl ToastPosition {
     /// Top-left origin passed to the portal. A bottom anchor uses the window
     /// height and lets the fit pass clamp to the content's real height.
     pub fn origin(self, bounds: Rect, width: f32) -> Point {
-        let x = if self.is_trailing() { bounds.width - width - WINDOW_MARGIN } else { WINDOW_MARGIN };
-        let y = if self.is_bottom() { bounds.height } else { WINDOW_MARGIN };
+        let x = if self.is_trailing() {
+            bounds.width - width - WINDOW_MARGIN
+        } else {
+            WINDOW_MARGIN
+        };
+        let y = if self.is_bottom() {
+            bounds.height
+        } else {
+            WINDOW_MARGIN
+        };
         Point::new(x.max(WINDOW_MARGIN), y.max(WINDOW_MARGIN))
     }
 }
@@ -76,7 +84,12 @@ pub struct NotificationHost {
 
 impl NotificationHost {
     pub fn new(controller: Rc<ToastController>) -> Self {
-        Self { controller, width: 360.0, position: ToastPosition::Automatic, presentation: ToastPresentation::new() }
+        Self {
+            controller,
+            width: 360.0,
+            position: ToastPosition::Automatic,
+            presentation: ToastPresentation::new(),
+        }
     }
 
     pub fn width(mut self, width: f32) -> Self {
@@ -92,7 +105,10 @@ impl NotificationHost {
 
 impl View for NotificationHost {
     fn body(&self) -> AnyView {
-        let entries = self.presentation.update(&self.controller.notifications(), self.controller.max_visible);
+        let entries = self.presentation.update(
+            &self.controller.notifications(),
+            self.controller.max_visible,
+        );
         AnyView::new(ToastPresenter {
             controller: self.controller.clone(),
             entries,
@@ -132,7 +148,14 @@ impl PrimitiveView for ToastPresenter {
         if let Some(clock) = node.first_resource::<ToastClock>() {
             clock.configure(self.controller.clone());
         }
-        present(node, &self.controller, &self.entries, self.width, self.position, &self.presentation);
+        present(
+            node,
+            &self.controller,
+            &self.entries,
+            self.width,
+            self.position,
+            &self.presentation,
+        );
         let controller = self.controller.clone();
         let entries = self.entries.clone();
         let width = self.width;
@@ -140,7 +163,9 @@ impl PrimitiveView for ToastPresenter {
         let presentation = self.presentation.clone();
         let weak = node.downgrade();
         node.set_layout_did_update(Some(Rc::new(move |_owner: &Node| {
-            let Some(node) = Node::upgrade(&weak) else { return };
+            let Some(node) = Node::upgrade(&weak) else {
+                return;
+            };
             if node.attachment::<Rect>(WINDOW_BOUNDS) == Some(portal_window_bounds(&node)) {
                 return;
             }
@@ -176,7 +201,11 @@ fn present(
         node.composition_value(&PortalStoreEnvironment::key())
             .unwrap_or_else(PortalStoreHolder::current),
     );
-    let edge = if position.is_bottom() { TransitionEdge::Bottom } else { TransitionEdge::Top };
+    let edge = if position.is_bottom() {
+        TransitionEdge::Bottom
+    } else {
+        TransitionEdge::Top
+    };
     let mut cards: Vec<AnyView> = Vec::new();
     for entry in entries {
         let presentation = presentation.clone();
@@ -202,12 +231,14 @@ fn present(
         ));
         cards.push(card);
     }
-    let stack = AnyView::new(
-        BoxView::new(
-            FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 10.0,
-            AnyView::new(crate::TupleView::new(cards)),
-        ),
-    );
+    let stack = AnyView::new(BoxView::new(
+        FlexDirection::Column,
+        Align::Stretch,
+        Justify::FlexStart,
+        Wrap::NoWrap,
+        10.0,
+        AnyView::new(crate::TupleView::new(cards)),
+    ));
     if let Some(resource) = resource.as_ref() {
         resource.present(
             store,
@@ -276,21 +307,30 @@ impl View for ToastCard {
                 ));
             }
             if !notification.actions.is_empty() {
-                let card = ToastCard { notification: notification.clone(), controller: controller.clone() };
+                let card = ToastCard {
+                    notification: notification.clone(),
+                    controller: controller.clone(),
+                };
                 let mut actions: Vec<AnyView> = vec![card.action_button(&notification.actions[0])];
                 if notification.actions.len() > 1 {
                     actions.push(card.action_button(&notification.actions[1]));
                 }
-                lines.push(AnyView::new(
-                    BoxView::new(
-                        FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::Wrap, 8.0,
-                        AnyView::new(crate::TupleView::new(actions)),
-                    ),
-                ));
+                lines.push(AnyView::new(BoxView::new(
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::Wrap,
+                    8.0,
+                    AnyView::new(crate::TupleView::new(actions)),
+                )));
             }
             let mut row: Vec<AnyView> = vec![AnyView::new(
                 BoxView::new(
-                    FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 5.0,
+                    FlexDirection::Column,
+                    Align::Stretch,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    5.0,
                     AnyView::new(crate::TupleView::new(lines)),
                 )
                 .flex_with(1.0, 1.0, Some(0.0)),
@@ -300,7 +340,9 @@ impl View for ToastCard {
                 let id = notification.id.clone();
                 row.push(AnyView::new(
                     Button::icon_with_options(
-                        ButtonIconSource::resource(crate::primitives::media::ui_icon_catalog::action::x()),
+                        ButtonIconSource::resource(
+                            crate::primitives::media::ui_icon_catalog::action::x(),
+                        ),
                         Some(12.0),
                         None,
                         ButtonRole::Normal,
@@ -320,7 +362,11 @@ impl View for ToastCard {
             // it.
             AnyView::new(
                 BoxView::new(
-                    FlexDirection::Row, Align::FlexStart, Justify::FlexStart, Wrap::NoWrap, 10.0,
+                    FlexDirection::Row,
+                    Align::FlexStart,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    10.0,
                     AnyView::new(crate::TupleView::new(row)),
                 )
                 .foreground_color(on_chip)
@@ -360,7 +406,9 @@ impl AnyAnimationController for ToastClockState {
         if self.is_finished.get() {
             return;
         }
-        let Some(controller) = self.controller.borrow().clone() else { return };
+        let Some(controller) = self.controller.borrow().clone() else {
+            return;
+        };
         controller.advance(delta_time);
         if !controller.needs_clock() {
             self.is_finished.set(true);
@@ -396,9 +444,10 @@ impl ToastClock {
         self.state.is_finished.set(!controller.needs_clock());
         *self.state.controller.borrow_mut() = Some(controller.clone());
         if self.state.is_finished.get() {
-            if let (Some(scheduler), Some(existing)) =
-                (self.scheduler.borrow().as_ref(), self.controller.borrow().as_ref())
-            {
+            if let (Some(scheduler), Some(existing)) = (
+                self.scheduler.borrow().as_ref(),
+                self.controller.borrow().as_ref(),
+            ) {
                 scheduler.unregister(existing);
             }
             self.controller.borrow_mut().take();

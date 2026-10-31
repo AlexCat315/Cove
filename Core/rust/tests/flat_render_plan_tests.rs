@@ -18,8 +18,8 @@ use std::rc::Rc;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use cove_core::scene::{
-    DrawHook, ElementId, InvalidationSource, LayerAwareNodeRenderer, Node, NodeResource, NodeRenderer,
-    NodeTransform, NodeTree, PaintPlan, RenderTree,
+    DrawHook, ElementId, InvalidationSource, LayerAwareNodeRenderer, Node, NodeRenderer,
+    NodeResource, NodeTransform, NodeTree, PaintPlan, RenderTree,
 };
 use cove_core::{Color, DrawList, Point, Rect};
 
@@ -61,7 +61,10 @@ fn framed(x: f32, y: f32, width: f32, height: f32) -> Node {
 }
 
 fn order(tree: &RenderTree) -> Vec<ElementId> {
-    tree.flat_draw_order().iter().map(|object| object.element_id()).collect()
+    tree.flat_draw_order()
+        .iter()
+        .map(|object| object.element_id())
+        .collect()
 }
 
 fn plan(tree: &RenderTree) -> PaintPlan {
@@ -124,7 +127,11 @@ fn deep_tree() {
         for pass in 0..3 {
             let mut list = DrawList::default();
             renderer.render(&tree, &mut list);
-            assert_eq!(list.vertices().len(), 4, "pass {pass} paints the leaf quad once");
+            assert_eq!(
+                list.vertices().len(),
+                4,
+                "pass {pass} paints the leaf quad once"
+            );
         }
 
         let mut scene = NodeTree::new();
@@ -132,20 +139,35 @@ fn deep_tree() {
         scene.flush();
         leaf.mark_dirty(InvalidationSource::Unknown);
         assert!(
-            nodes.iter().all(|node| node.is_dirty() && node.render_dirty()),
+            nodes
+                .iter()
+                .all(|node| node.is_dirty() && node.render_dirty()),
             "the dirty flag reaches every ancestor",
         );
         scene.flush();
         assert!(
-            nodes.iter().all(|node| !node.is_dirty() && !node.render_dirty()),
+            nodes
+                .iter()
+                .all(|node| !node.is_dirty() && !node.render_dirty()),
             "flush clears the whole chain iteratively",
         );
 
         tree.install(&root);
-        assert_eq!(tree.flat_draw_order().len(), count, "the flat order covers every node");
+        assert_eq!(
+            tree.flat_draw_order().len(),
+            count,
+            "the flat order covers every node"
+        );
         tree.tear_down(&root);
-        assert!(tree.flat_draw_order().is_empty(), "teardown empties the flat order");
-        assert_eq!(tree.object_count(), 0, "teardown releases every render object");
+        assert!(
+            tree.flat_draw_order().is_empty(),
+            "teardown empties the flat order"
+        );
+        assert_eq!(
+            tree.object_count(),
+            0,
+            "teardown releases every render object"
+        );
 
         // Release scene ownership from the top, keeping every node alive until
         // it is detached.
@@ -177,13 +199,25 @@ fn z_order_invalidation() {
         let b_id = b.id();
         let grandchild_id = grandchild.id();
 
-        assert_eq!(order(&tree), [root_id, a_id, grandchild_id, b_id], "default order is tree order");
+        assert_eq!(
+            order(&tree),
+            [root_id, a_id, grandchild_id, b_id],
+            "default order is tree order"
+        );
 
         a.set_z_index(1.0);
-        assert_eq!(order(&tree), [root_id, b_id, a_id, grandchild_id], "a raised child paints last with its subtree");
+        assert_eq!(
+            order(&tree),
+            [root_id, b_id, a_id, grandchild_id],
+            "a raised child paints last with its subtree"
+        );
 
         a.set_z_index(0.0);
-        assert_eq!(order(&tree), [root_id, a_id, grandchild_id, b_id], "returning to zero restores tree order");
+        assert_eq!(
+            order(&tree),
+            [root_id, a_id, grandchild_id, b_id],
+            "returning to zero restores tree order"
+        );
 
         for z in [1.0_f32, -1.0, 0.0] {
             a.set_z_index(z);
@@ -192,8 +226,16 @@ fn z_order_invalidation() {
             LayerAwareNodeRenderer::new().render(&tree, &mut actual);
             NodeRenderer.render(&root, &mut expected);
             assert_eq!(
-                actual.vertices().iter().map(|v| v.color).collect::<Vec<_>>(),
-                expected.vertices().iter().map(|v| v.color).collect::<Vec<_>>(),
+                actual
+                    .vertices()
+                    .iter()
+                    .map(|v| v.color)
+                    .collect::<Vec<_>>(),
+                expected
+                    .vertices()
+                    .iter()
+                    .map(|v| v.color)
+                    .collect::<Vec<_>>(),
                 "z_index {z} matches the uncached render",
             );
         }
@@ -213,23 +255,46 @@ fn structural_invalidation() {
 
         let tree = RenderTree::new();
         tree.install(&root);
-        assert_eq!(plan(&tree).subtree_ends, [4, 3, 3, 4], "initial ranges are depth-first exclusive ends");
+        assert_eq!(
+            plan(&tree).subtree_ends,
+            [4, 3, 3, 4],
+            "initial ranges are depth-first exclusive ends"
+        );
 
         root.reorder_children(&[b.clone(), a.clone()]);
         tree.reconcile_children(&root);
-        assert_eq!(order(&tree), [root.id(), b.id(), a.id(), child.id()], "the reorder is reflected");
-        assert_eq!(plan(&tree).subtree_ends, [4, 2, 4, 4], "ranges follow the new order");
+        assert_eq!(
+            order(&tree),
+            [root.id(), b.id(), a.id(), child.id()],
+            "the reorder is reflected"
+        );
+        assert_eq!(
+            plan(&tree).subtree_ends,
+            [4, 2, 4, 4],
+            "ranges follow the new order"
+        );
 
         root.remove_child(&a);
         tree.reconcile_children(&root);
-        assert_eq!(plan(&tree).subtree_ends, [2, 2], "removal shrinks the ranges");
-        assert!(tree.render_object(&child).is_none(), "the orphaned subtree is dropped");
+        assert_eq!(
+            plan(&tree).subtree_ends,
+            [2, 2],
+            "removal shrinks the ranges"
+        );
+        assert!(
+            tree.render_object(&child).is_none(),
+            "the orphaned subtree is dropped"
+        );
 
         tree.tear_down(&b);
         assert_eq!(order(&tree), [root.id()], "teardown drops the branch");
 
         tree.install(&child);
-        assert_eq!(order(&tree), [child.id()], "a replacement root installs cleanly");
+        assert_eq!(
+            order(&tree),
+            [child.id()],
+            "a replacement root installs cleanly"
+        );
     });
 }
 
@@ -249,7 +314,10 @@ fn painter_parity() {
             let _ = list.add_rect(Rect::new(origin.x, origin.y, 120.0, 120.0), Color::BLACK);
         }) as DrawHook));
         clipped.set_overlay_draw(Some(Rc::new(|list: &mut DrawList, origin: Point| {
-            let _ = list.add_rect(Rect::new(origin.x + 20.0, origin.y + 20.0, 10.0, 10.0), Color::WHITE);
+            let _ = list.add_rect(
+                Rect::new(origin.x + 20.0, origin.y + 20.0, 10.0, 10.0),
+                Color::WHITE,
+            );
         })));
         let sibling = framed(200.0, 20.0, 40.0, 40.0);
         sibling.set_background_color(Some(Color::BLACK));
@@ -268,19 +336,47 @@ fn painter_parity() {
                 renderer.render(&tree, &mut actual);
                 NodeRenderer.render(&root, &mut expected);
                 assert_eq!(
-                    actual.vertices().iter().map(|v| (v.x, v.y, v.u, v.v)).collect::<Vec<_>>(),
-                    expected.vertices().iter().map(|v| (v.x, v.y, v.u, v.v)).collect::<Vec<_>>(),
+                    actual
+                        .vertices()
+                        .iter()
+                        .map(|v| (v.x, v.y, v.u, v.v))
+                        .collect::<Vec<_>>(),
+                    expected
+                        .vertices()
+                        .iter()
+                        .map(|v| (v.x, v.y, v.u, v.v))
+                        .collect::<Vec<_>>(),
                     "scale {scale} pass {pass} agrees on geometry",
                 );
                 assert_eq!(
-                    actual.vertices().iter().map(|v| v.color).collect::<Vec<_>>(),
-                    expected.vertices().iter().map(|v| v.color).collect::<Vec<_>>(),
+                    actual
+                        .vertices()
+                        .iter()
+                        .map(|v| v.color)
+                        .collect::<Vec<_>>(),
+                    expected
+                        .vertices()
+                        .iter()
+                        .map(|v| v.color)
+                        .collect::<Vec<_>>(),
                     "scale {scale} pass {pass} agrees on colour",
                 );
-                assert_eq!(actual.indices(), expected.indices(), "scale {scale} pass {pass} agrees on indices");
                 assert_eq!(
-                    actual.batches().iter().filter_map(|batch| batch.backdrop).collect::<Vec<_>>(),
-                    expected.batches().iter().filter_map(|batch| batch.backdrop).collect::<Vec<_>>(),
+                    actual.indices(),
+                    expected.indices(),
+                    "scale {scale} pass {pass} agrees on indices"
+                );
+                assert_eq!(
+                    actual
+                        .batches()
+                        .iter()
+                        .filter_map(|batch| batch.backdrop)
+                        .collect::<Vec<_>>(),
+                    expected
+                        .batches()
+                        .iter()
+                        .filter_map(|batch| batch.backdrop)
+                        .collect::<Vec<_>>(),
                     "scale {scale} pass {pass} agrees on backdrops",
                 );
             }

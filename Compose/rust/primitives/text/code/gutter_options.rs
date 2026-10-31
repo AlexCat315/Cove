@@ -6,9 +6,9 @@
 use std::collections::BTreeSet;
 use std::rc::Rc;
 
+use crate::primitives::text::text_buffer::TextBuffer;
 use cove_core::{Binding, Color};
 use cove_imaging::BundleImageResource;
-use crate::primitives::text::text_buffer::TextBuffer;
 
 use super::folding_options::TextLineRebase;
 
@@ -39,7 +39,10 @@ pub struct TextBreakpoint {
 
 impl TextBreakpoint {
     pub fn new(line: usize) -> Self {
-        Self { line, state: TextBreakpointState::Enabled }
+        Self {
+            line,
+            state: TextBreakpointState::Enabled,
+        }
     }
 
     pub fn with_state(line: usize, state: TextBreakpointState) -> Self {
@@ -76,7 +79,14 @@ impl TextEditorAnnotations {
             .iter()
             .filter_map(|point| {
                 let line = change.line(point.line)?;
-                if line >= line_count { None } else { Some(TextBreakpoint { line, state: point.state }) }
+                if line >= line_count {
+                    None
+                } else {
+                    Some(TextBreakpoint {
+                        line,
+                        state: point.state,
+                    })
+                }
             })
             .collect();
         self.collapsed_lines = self
@@ -108,7 +118,14 @@ impl TextGutterMarker {
         color: Option<Color>,
         action: impl Fn() + 'static,
     ) -> Self {
-        Self { id: id.into(), line, label: label.into(), icon, color, action: Rc::new(action) }
+        Self {
+            id: id.into(),
+            line,
+            label: label.into(),
+            icon,
+            color,
+            action: Rc::new(action),
+        }
     }
 }
 
@@ -150,7 +167,10 @@ pub struct TextEditorGutter {
 
 impl TextEditorGutter {
     pub fn new() -> Self {
-        Self { labels: Rc::new(TextGutterLabels::default()), ..Self::default() }
+        Self {
+            labels: Rc::new(TextGutterLabels::default()),
+            ..Self::default()
+        }
     }
 
     pub fn is_enabled(&self) -> bool {

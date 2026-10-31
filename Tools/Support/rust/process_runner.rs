@@ -51,25 +51,13 @@ impl ProcessOutput {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct ProcessOptions<'a> {
     pub directory: Option<&'a Path>,
     pub input: Option<&'a [u8]>,
     pub timeout: Option<Duration>,
     pub merge_error: bool,
     pub stream: bool,
-}
-
-impl Default for ProcessOptions<'_> {
-    fn default() -> Self {
-        Self {
-            directory: None,
-            input: None,
-            timeout: None,
-            merge_error: false,
-            stream: false,
-        }
-    }
 }
 
 struct Sink {
@@ -80,7 +68,10 @@ struct Sink {
 
 impl Sink {
     fn append(&self, data: &[u8]) {
-        let mut buffer = self.collected.lock().unwrap_or_else(|error| error.into_inner());
+        let mut buffer = self
+            .collected
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         if buffer.len() + data.len() > self.limit {
             let remaining = self.limit.saturating_sub(buffer.len());
             buffer.extend_from_slice(&data[..remaining.min(data.len())]);
@@ -98,13 +89,14 @@ pub fn run(
     environment: &BTreeMap<String, String>,
     options: ProcessOptions<'_>,
 ) -> Result<ProcessOutput, ProcessError> {
-    let executable = arguments
-        .first()
-        .ok_or_else(|| ProcessError::Io(io::Error::new(io::ErrorKind::InvalidInput, "Empty command")))?;
-    if let Some(timeout) = options.timeout {
-        if !timeout.is_zero() && timeout > Duration::from_secs(86_400) {
-            return Err(ProcessError::InvalidBudget);
-        }
+    let executable = arguments.first().ok_or_else(|| {
+        ProcessError::Io(io::Error::new(io::ErrorKind::InvalidInput, "Empty command"))
+    })?;
+    if let Some(timeout) = options.timeout
+        && !timeout.is_zero()
+        && timeout > Duration::from_secs(86_400)
+    {
+        return Err(ProcessError::InvalidBudget);
     }
     let resolved = shell::require(executable, environment).map_err(|error| {
         ProcessError::Io(io::Error::new(io::ErrorKind::NotFound, error.to_string()))
@@ -187,16 +179,16 @@ pub fn run(
             }
             return Err(ProcessError::OutputLimit);
         }
-        if let Some(deadline) = deadline {
-            if Instant::now() >= deadline {
-                let _ = child.kill();
-                let _ = child.wait();
-                let _ = status;
-                for reader in readers {
-                    let _ = reader.join();
-                }
-                return Err(ProcessError::InvalidBudget);
+        if let Some(deadline) = deadline
+            && Instant::now() >= deadline
+        {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = status;
+            for reader in readers {
+                let _ = reader.join();
             }
+            return Err(ProcessError::InvalidBudget);
         }
         std::thread::sleep(Duration::from_millis(4));
     }

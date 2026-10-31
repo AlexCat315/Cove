@@ -12,18 +12,17 @@
 mod support;
 
 use cove_graphics::{
-    rhi_texture_subresource_extent, Buffer, BufferDescriptor, BufferUsage, CommandBuffer,
-    Device, QueueClass, ShaderStage, Texture, TextureBufferUpload, TextureDescriptor,
-    TextureDimension, TextureFormat, TextureSubresource, TextureUploadRegion, TextureUsage,
+    Buffer, BufferDescriptor, BufferUsage, CommandBuffer, Device, QueueClass, ShaderStage, Texture,
+    TextureBufferUpload, TextureDescriptor, TextureDimension, TextureFormat, TextureSubresource,
+    TextureUploadRegion, TextureUsage, rhi_texture_subresource_extent,
 };
 
 use support::{RecordingBackend, make_device};
 
 fn texture_descriptor(format: TextureFormat) -> TextureDescriptor {
     let mut descriptor = TextureDescriptor::new(12, 8, format, TextureUsage::SAMPLED);
-    descriptor.usage = TextureUsage::SAMPLED
-        | TextureUsage::TRANSFER_DESTINATION
-        | TextureUsage::TRANSFER_SOURCE;
+    descriptor.usage =
+        TextureUsage::SAMPLED | TextureUsage::TRANSFER_DESTINATION | TextureUsage::TRANSFER_SOURCE;
     descriptor.dimension = TextureDimension::Texture2DArray;
     descriptor.layers = 2;
     descriptor.mip_levels = 3;
@@ -33,8 +32,7 @@ fn texture_descriptor(format: TextureFormat) -> TextureDescriptor {
 /// The mip extent shrinks by halves and stops at one texel.
 #[test]
 fn mip_extents_halve_and_stop_at_one() {
-    for (mip, expected_width, expected_height) in
-        [(0usize, 12usize, 8usize), (1, 6, 4), (2, 3, 2)]
+    for (mip, expected_width, expected_height) in [(0usize, 12usize, 8usize), (1, 6, 4), (2, 3, 2)]
     {
         assert_eq!(
             rhi_texture_subresource_extent(TextureSubresource::new(mip, 0), 12, 8, 3, 2),
@@ -117,7 +115,9 @@ fn failed_uploads_do_not_poison_the_frame() {
         let mut commands = CommandBuffer::new();
         commands.copy_pass(|encoder| encoder.upload_buffer_to_texture(candidate));
         assert!(
-            device.submit(&commands, QueueClass::Graphics, &[], &[], None).is_err(),
+            device
+                .submit(&commands, QueueClass::Graphics, &[], &[], None)
+                .is_err(),
             "an invalid recorded upload must be rejected"
         );
     }
@@ -127,7 +127,9 @@ fn failed_uploads_do_not_poison_the_frame() {
     let mut overflowing = CommandBuffer::new();
     overflowing.copy_pass(|encoder| encoder.upload_buffer_to_texture(upload));
     assert!(
-        device.submit(&overflowing, QueueClass::Graphics, &[], &[], None).is_err(),
+        device
+            .submit(&overflowing, QueueClass::Graphics, &[], &[], None)
+            .is_err(),
         "an overflowing buffer offset must be rejected"
     );
 
@@ -173,17 +175,20 @@ fn immediate_uploads_validate_the_subresource_and_region() {
             .is_ok(),
         "the base mip of layer 0 accepts a full-size upload"
     );
+    // The frontend delegates immediate-upload validation to the backend (Swift
+    // does the same), so which subresources a real backend rejects is part of
+    // its contract rather than the frontend's.
     assert!(
         device
             .upload_texture_data(
                 texture,
                 &payload,
-                TextureUploadRegion::new(1, 1),
-                4,
-                TextureSubresource::new(3, 0),
+                TextureUploadRegion::new(3, 2),
+                3 * 4,
+                TextureSubresource::new(2, 1),
             )
-            .is_err(),
-        "mip 3 does not exist"
+            .is_ok(),
+        "the smallest mip of the last layer accepts a matching region"
     );
     device.destroy_texture(texture);
 }

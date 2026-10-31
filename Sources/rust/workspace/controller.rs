@@ -4,12 +4,12 @@
 //! reconciliation and persistence dirtiness stay in a single place. Commands
 //! that would not change the document return `unchanged` and never notify.
 use super::ids::{
-    WorkspaceEdge, WorkspaceFloatingWindowID, WorkspacePanelID, WorkspacePlacementKind, WorkspaceSlotID,
-    WorkspaceSplitAxis, WorkspaceSplitID, WorkspaceTabGroupID,
+    WorkspaceEdge, WorkspaceFloatingWindowID, WorkspacePanelID, WorkspacePlacementKind,
+    WorkspaceSlotID, WorkspaceSplitAxis, WorkspaceSplitID, WorkspaceTabGroupID,
 };
 use super::model::{
-    WorkspaceClosedPanel, WorkspaceCollapsedItem, WorkspaceDocument, WorkspaceFloatingWindow, WorkspaceLayoutNode,
-    WorkspaceLayoutSplit, WorkspaceSlot, WorkspaceTabGroup,
+    WorkspaceClosedPanel, WorkspaceCollapsedItem, WorkspaceDocument, WorkspaceFloatingWindow,
+    WorkspaceLayoutNode, WorkspaceLayoutSplit, WorkspaceSlot, WorkspaceTabGroup,
 };
 use super::sizing::{WorkspaceRect, WorkspaceSizingResolver, WorkspaceSplitFractions};
 use std::collections::{BTreeMap, BTreeSet};
@@ -43,15 +43,32 @@ impl WorkspaceTarget {
         self
     }
 
-    pub fn tab_group(slot: WorkspaceSlotID, group_id: WorkspaceTabGroupID, tab_index: Option<usize>) -> Self {
-        Self { group_id: Some(group_id), tab_index, ..Self::new(slot) }
+    pub fn tab_group(
+        slot: WorkspaceSlotID,
+        group_id: WorkspaceTabGroupID,
+        tab_index: Option<usize>,
+    ) -> Self {
+        Self {
+            group_id: Some(group_id),
+            tab_index,
+            ..Self::new(slot)
+        }
     }
 
     pub fn slot_target(slot: WorkspaceSlotID, index: Option<usize>) -> Self {
-        Self { placement: WorkspacePlacementKind::Slot, slot_index: index, ..Self::new(slot) }
+        Self {
+            placement: WorkspacePlacementKind::Slot,
+            slot_index: index,
+            ..Self::new(slot)
+        }
     }
 
-    pub fn split(slot: WorkspaceSlotID, anchor_group_id: WorkspaceTabGroupID, edge: WorkspaceEdge, fraction: f32) -> Self {
+    pub fn split(
+        slot: WorkspaceSlotID,
+        anchor_group_id: WorkspaceTabGroupID,
+        edge: WorkspaceEdge,
+        fraction: f32,
+    ) -> Self {
         Self {
             group_id: Some(anchor_group_id),
             placement: WorkspacePlacementKind::Split,
@@ -77,21 +94,56 @@ pub enum WorkspaceCommand {
     Collapse(WorkspaceTabGroupID),
     Expand(WorkspaceTabGroupID),
     ToggleCollapse(WorkspaceTabGroupID),
-    SetActivePanel { group_id: WorkspaceTabGroupID, panel_id: WorkspacePanelID },
-    ReorderPanel { panel_id: WorkspacePanelID, group_id: WorkspaceTabGroupID, index: usize },
-    MovePanel { panel_id: WorkspacePanelID, target: WorkspaceTarget },
+    SetActivePanel {
+        group_id: WorkspaceTabGroupID,
+        panel_id: WorkspacePanelID,
+    },
+    ReorderPanel {
+        panel_id: WorkspacePanelID,
+        group_id: WorkspaceTabGroupID,
+        index: usize,
+    },
+    MovePanel {
+        panel_id: WorkspacePanelID,
+        target: WorkspaceTarget,
+    },
     ClosePanel(WorkspacePanelID),
-    CloseOthers { group_id: WorkspaceTabGroupID, keeping: WorkspacePanelID },
-    CloseToTheRight { group_id: WorkspaceTabGroupID, of: WorkspacePanelID },
+    CloseOthers {
+        group_id: WorkspaceTabGroupID,
+        keeping: WorkspacePanelID,
+    },
+    CloseToTheRight {
+        group_id: WorkspaceTabGroupID,
+        of: WorkspacePanelID,
+    },
     ReopenLastClosed,
     ReopenPanel(WorkspacePanelID),
-    SetPinned { panel_id: WorkspacePanelID, is_pinned: bool },
-    FloatGroup { group_id: WorkspaceTabGroupID, window_id: WorkspaceFloatingWindowID, frame: WorkspaceRect },
-    RedockFloatingWindow { window_id: WorkspaceFloatingWindowID, target: WorkspaceTarget },
-    MoveFloatingWindow { window_id: WorkspaceFloatingWindowID, frame: WorkspaceRect },
+    SetPinned {
+        panel_id: WorkspacePanelID,
+        is_pinned: bool,
+    },
+    FloatGroup {
+        group_id: WorkspaceTabGroupID,
+        window_id: WorkspaceFloatingWindowID,
+        frame: WorkspaceRect,
+    },
+    RedockFloatingWindow {
+        window_id: WorkspaceFloatingWindowID,
+        target: WorkspaceTarget,
+    },
+    MoveFloatingWindow {
+        window_id: WorkspaceFloatingWindowID,
+        frame: WorkspaceRect,
+    },
     FocusFloatingWindow(WorkspaceFloatingWindowID),
-    ResizeSplit { split_id: WorkspaceSplitID, fraction: f32 },
-    ResizeLayoutSplit { address: WorkspaceLayoutSplit, fraction: f32 },
+    ResizeSplit {
+        split_id: WorkspaceSplitID,
+        fraction: f32,
+    },
+    ResizeLayoutSplit {
+        address: WorkspaceLayoutSplit,
+        fraction: f32,
+    },
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -106,11 +158,25 @@ impl WorkspaceTransactionResult {
     pub fn unchanged() -> Self {
         Self::default()
     }
-    fn changed(changed_slots: impl IntoIterator<Item = WorkspaceSlotID>, focus: Option<WorkspacePanelID>, persistence_dirty: bool) -> Self {
-        Self { did_change: true, changed_slots: changed_slots.into_iter().collect(), focus_panel_id: focus, persistence_dirty }
+    fn changed(
+        changed_slots: impl IntoIterator<Item = WorkspaceSlotID>,
+        focus: Option<WorkspacePanelID>,
+        persistence_dirty: bool,
+    ) -> Self {
+        Self {
+            did_change: true,
+            changed_slots: changed_slots.into_iter().collect(),
+            focus_panel_id: focus,
+            persistence_dirty,
+        }
     }
     fn visual_only(focus: Option<WorkspacePanelID>) -> Self {
-        Self { did_change: true, changed_slots: BTreeSet::new(), focus_panel_id: focus, persistence_dirty: false }
+        Self {
+            did_change: true,
+            changed_slots: BTreeSet::new(),
+            focus_panel_id: focus,
+            persistence_dirty: false,
+        }
     }
 }
 
@@ -170,7 +236,10 @@ impl WorkspaceController {
         self.version
     }
 
-    pub fn subscribe(&mut self, handler: impl FnMut(&WorkspaceController) + 'static) -> SubscriptionToken {
+    pub fn subscribe(
+        &mut self,
+        handler: impl FnMut(&WorkspaceController) + 'static,
+    ) -> SubscriptionToken {
         self.next_subscriber_id = self.next_subscriber_id.wrapping_add(1);
         let token = SubscriptionToken(self.next_subscriber_id);
         self.subscribers.insert(token, Box::new(handler));
@@ -215,7 +284,8 @@ impl WorkspaceController {
                 if self.document.group_containing(&panel_id).is_none() {
                     return WorkspaceTransactionResult::unchanged();
                 }
-                self.maximized_panel_id = (self.maximized_panel_id.as_ref() != Some(&panel_id)).then(|| panel_id.clone());
+                self.maximized_panel_id =
+                    (self.maximized_panel_id.as_ref() != Some(&panel_id)).then(|| panel_id.clone());
                 WorkspaceTransactionResult::visual_only(Some(panel_id))
             }
             WorkspaceCommand::RestoreMaximized => {
@@ -247,7 +317,8 @@ impl WorkspaceController {
                     return WorkspaceTransactionResult::unchanged();
                 };
                 if !group.panels.contains(&panel_id)
-                    || (group.active_panel_id.as_ref() == Some(&panel_id) && self.focused_panel_id.as_ref() == Some(&panel_id))
+                    || (group.active_panel_id.as_ref() == Some(&panel_id)
+                        && self.focused_panel_id.as_ref() == Some(&panel_id))
                 {
                     return WorkspaceTransactionResult::unchanged();
                 }
@@ -256,32 +327,63 @@ impl WorkspaceController {
                 let mut group = group.clone();
                 group.active_panel_id = Some(panel_id.clone());
                 self.document.groups.insert(group_id, group);
-                let slots: Vec<_> = if document_changed { slot.into_iter().collect() } else { Vec::new() };
+                let slots: Vec<_> = if document_changed {
+                    slot.into_iter().collect()
+                } else {
+                    Vec::new()
+                };
                 if document_changed {
                     WorkspaceTransactionResult::changed(slots, Some(panel_id), true)
                 } else {
                     WorkspaceTransactionResult::visual_only(Some(panel_id))
                 }
             }
-            WorkspaceCommand::ReorderPanel { panel_id, group_id, index } => self.reorder_panel(&panel_id, &group_id, index),
+            WorkspaceCommand::ReorderPanel {
+                panel_id,
+                group_id,
+                index,
+            } => self.reorder_panel(&panel_id, &group_id, index),
             WorkspaceCommand::MovePanel { panel_id, target } => self.move_panel(&panel_id, target),
             WorkspaceCommand::ClosePanel(panel_id) => self.close_panel(&panel_id),
-            WorkspaceCommand::CloseOthers { group_id, keeping } => self.close_others(&group_id, &keeping),
-            WorkspaceCommand::CloseToTheRight { group_id, of } => self.close_to_the_right(&group_id, &of),
+            WorkspaceCommand::CloseOthers { group_id, keeping } => {
+                self.close_others(&group_id, &keeping)
+            }
+            WorkspaceCommand::CloseToTheRight { group_id, of } => {
+                self.close_to_the_right(&group_id, &of)
+            }
             WorkspaceCommand::ReopenLastClosed => self.reopen_last_closed(),
             WorkspaceCommand::ReopenPanel(panel_id) => self.reopen_panel(&panel_id),
-            WorkspaceCommand::SetPinned { panel_id, is_pinned } => self.set_pinned(&panel_id, is_pinned),
-            WorkspaceCommand::FloatGroup { group_id, window_id, frame } => self.float_group(&group_id, window_id, frame),
-            WorkspaceCommand::RedockFloatingWindow { window_id, target } => self.redock_floating_window(&window_id, target),
-            WorkspaceCommand::MoveFloatingWindow { window_id, frame } => self.move_floating_window(&window_id, frame),
-            WorkspaceCommand::FocusFloatingWindow(window_id) => self.focus_floating_window(&window_id),
-            WorkspaceCommand::ResizeSplit { split_id, fraction } => self.resize_split(&split_id, fraction),
+            WorkspaceCommand::SetPinned {
+                panel_id,
+                is_pinned,
+            } => self.set_pinned(&panel_id, is_pinned),
+            WorkspaceCommand::FloatGroup {
+                group_id,
+                window_id,
+                frame,
+            } => self.float_group(&group_id, window_id, frame),
+            WorkspaceCommand::RedockFloatingWindow { window_id, target } => {
+                self.redock_floating_window(&window_id, target)
+            }
+            WorkspaceCommand::MoveFloatingWindow { window_id, frame } => {
+                self.move_floating_window(&window_id, frame)
+            }
+            WorkspaceCommand::FocusFloatingWindow(window_id) => {
+                self.focus_floating_window(&window_id)
+            }
+            WorkspaceCommand::ResizeSplit { split_id, fraction } => {
+                self.resize_split(&split_id, fraction)
+            }
             WorkspaceCommand::ResizeLayoutSplit { address, fraction } => {
                 let mut slot = self.document.slot(&address.slot);
                 if !fraction.is_finite() {
                     return WorkspaceTransactionResult::unchanged();
                 }
-                let Some(next) = slot.layout.as_ref().and_then(|layout| layout.resizing(&address, fraction)) else {
+                let Some(next) = slot
+                    .layout
+                    .as_ref()
+                    .and_then(|layout| layout.resizing(&address, fraction))
+                else {
                     return WorkspaceTransactionResult::unchanged();
                 };
                 slot.layout = Some(next);
@@ -292,7 +394,11 @@ impl WorkspaceController {
         }
     }
 
-    fn set_collapsed(&mut self, group_id: &WorkspaceTabGroupID, collapsed: bool) -> WorkspaceTransactionResult {
+    fn set_collapsed(
+        &mut self,
+        group_id: &WorkspaceTabGroupID,
+        collapsed: bool,
+    ) -> WorkspaceTransactionResult {
         let Some(group) = self.document.groups.get(group_id) else {
             return WorkspaceTransactionResult::unchanged();
         };
@@ -305,7 +411,14 @@ impl WorkspaceController {
         if slot_id == WorkspaceSlotID::center() {
             return WorkspaceTransactionResult::unchanged();
         }
-        if collapsed && !group.panels.iter().any(|id| self.document.panels.get(id).is_some_and(|panel| panel.is_collapsible)) {
+        if collapsed
+            && !group.panels.iter().any(|id| {
+                self.document
+                    .panels
+                    .get(id)
+                    .is_some_and(|panel| panel.is_collapsible)
+            })
+        {
             return WorkspaceTransactionResult::unchanged();
         }
         let active = group.active_panel_id.clone();
@@ -314,17 +427,32 @@ impl WorkspaceController {
         self.document.groups.insert(group_id.clone(), group);
         if collapsed {
             let edge = self.collapsed_edge(&slot_id);
-            if !self.document.collapsed.iter().any(|item| &item.group_id == group_id) {
-                self.document.collapsed.push(WorkspaceCollapsedItem { group_id: group_id.clone(), slot_id: slot_id.clone(), edge });
+            if !self
+                .document
+                .collapsed
+                .iter()
+                .any(|item| &item.group_id == group_id)
+            {
+                self.document.collapsed.push(WorkspaceCollapsedItem {
+                    group_id: group_id.clone(),
+                    slot_id: slot_id.clone(),
+                    edge,
+                });
             }
         } else {
-            self.document.collapsed.retain(|item| &item.group_id != group_id);
+            self.document
+                .collapsed
+                .retain(|item| &item.group_id != group_id);
         }
         let focus = if collapsed { None } else { active };
         WorkspaceTransactionResult::changed(vec![slot_id], focus, true)
     }
 
-    fn move_panel(&mut self, panel_id: &WorkspacePanelID, target: WorkspaceTarget) -> WorkspaceTransactionResult {
+    fn move_panel(
+        &mut self,
+        panel_id: &WorkspacePanelID,
+        target: WorkspaceTarget,
+    ) -> WorkspaceTransactionResult {
         if !self.document.panels.contains_key(panel_id) {
             return WorkspaceTransactionResult::unchanged();
         }
@@ -352,17 +480,28 @@ impl WorkspaceController {
             if !did_change {
                 return WorkspaceTransactionResult::unchanged();
             }
-            return WorkspaceTransactionResult::changed(changed_slots, Some(panel_id.clone()), true);
+            return WorkspaceTransactionResult::changed(
+                changed_slots,
+                Some(panel_id.clone()),
+                true,
+            );
         }
 
         if let Some(source) = &source_group_id {
             self.remove(panel_id, source);
         }
 
-        let target_group_id = match (destination.placement, destination.split_edge, destination.anchor_group_id.clone()) {
-            (WorkspacePlacementKind::Split, Some(edge), Some(anchor)) => {
-                self.make_group(&destination.slot, Some(anchor), Some(edge), destination.fraction)
-            }
+        let target_group_id = match (
+            destination.placement,
+            destination.split_edge,
+            destination.anchor_group_id.clone(),
+        ) {
+            (WorkspacePlacementKind::Split, Some(edge), Some(anchor)) => self.make_group(
+                &destination.slot,
+                Some(anchor),
+                Some(edge),
+                destination.fraction,
+            ),
             (_, _, Some(anchor)) if self.document.groups.contains_key(&anchor) => {
                 self.ensure_group(&anchor, &destination.slot);
                 anchor
@@ -411,7 +550,11 @@ impl WorkspaceController {
         let clamped = index.clamp(low, high);
         let mut next = group.panels.clone();
         next.remove(old_index);
-        let adjusted = if old_index < clamped { clamped - 1 } else { clamped };
+        let adjusted = if old_index < clamped {
+            clamped - 1
+        } else {
+            clamped
+        };
         let insert_index = adjusted.min(next.len());
         next.insert(insert_index, panel_id.clone());
         if next == group.panels {
@@ -419,7 +562,9 @@ impl WorkspaceController {
         }
         let mut group = group.clone();
         group.panels = next;
-        group.pinned_panel_ids.retain(|id| group.panels.contains(id));
+        group
+            .pinned_panel_ids
+            .retain(|id| group.panels.contains(id));
         let slot = self.document.slot_containing(group_id);
         self.document.groups.insert(group_id.clone(), group);
         if let Some(slot) = slot {
@@ -430,7 +575,12 @@ impl WorkspaceController {
     }
 
     fn close_panel(&mut self, panel_id: &WorkspacePanelID) -> WorkspaceTransactionResult {
-        if !self.document.panels.get(panel_id).is_some_and(|panel| panel.is_closable) {
+        if !self
+            .document
+            .panels
+            .get(panel_id)
+            .is_some_and(|panel| panel.is_closable)
+        {
             return WorkspaceTransactionResult::unchanged();
         }
         let Some(located) = self.locate(panel_id) else {
@@ -444,14 +594,22 @@ impl WorkspaceController {
             located.index,
         );
         self.remove(panel_id, &located.group.id);
-        let focus = self.document.groups.get(&located.group.id).and_then(|group| group.active_panel_id.clone());
+        let focus = self
+            .document
+            .groups
+            .get(&located.group.id)
+            .and_then(|group| group.active_panel_id.clone());
         match located.slot_id {
             Some(slot) => WorkspaceTransactionResult::changed(vec![slot], focus, true),
             None => WorkspaceTransactionResult::visual_only(focus),
         }
     }
 
-    fn close_others(&mut self, group_id: &WorkspaceTabGroupID, keep: &WorkspacePanelID) -> WorkspaceTransactionResult {
+    fn close_others(
+        &mut self,
+        group_id: &WorkspaceTabGroupID,
+        keep: &WorkspacePanelID,
+    ) -> WorkspaceTransactionResult {
         let Some(group) = self.document.groups.get(group_id).cloned() else {
             return WorkspaceTransactionResult::unchanged();
         };
@@ -461,30 +619,50 @@ impl WorkspaceController {
         let Some(slot_id) = self.document.slot_containing(group_id) else {
             return WorkspaceTransactionResult::unchanged();
         };
-        let mut keep_set: BTreeSet<WorkspacePanelID> = group.pinned_panel_ids.iter().cloned().collect();
+        let mut keep_set: BTreeSet<WorkspacePanelID> =
+            group.pinned_panel_ids.iter().cloned().collect();
         keep_set.insert(keep.clone());
         let victims: Vec<(usize, WorkspacePanelID)> = group
             .panels
             .iter()
             .enumerate()
-            .filter(|(_, id)| !keep_set.contains(*id) && self.document.panels.get(*id).is_some_and(|panel| panel.is_closable))
+            .filter(|(_, id)| {
+                !keep_set.contains(*id)
+                    && self
+                        .document
+                        .panels
+                        .get(*id)
+                        .is_some_and(|panel| panel.is_closable)
+            })
             .map(|(index, id)| (index, id.clone()))
             .collect();
         if victims.is_empty() {
             return WorkspaceTransactionResult::unchanged();
         }
         for (index, victim) in &victims {
-            self.record_closed(victim.clone(), group_id.clone(), Some(slot_id.clone()), None, *index);
+            self.record_closed(
+                victim.clone(),
+                group_id.clone(),
+                Some(slot_id.clone()),
+                None,
+                *index,
+            );
         }
         let mut group = group.clone();
         group.panels.retain(|id| keep_set.contains(id));
         group.active_panel_id = Some(keep.clone());
-        group.pinned_panel_ids.retain(|id| group.panels.contains(id));
+        group
+            .pinned_panel_ids
+            .retain(|id| group.panels.contains(id));
         self.document.groups.insert(group_id.clone(), group);
         WorkspaceTransactionResult::changed(vec![slot_id], Some(keep.clone()), true)
     }
 
-    fn close_to_the_right(&mut self, group_id: &WorkspaceTabGroupID, pivot_panel_id: &WorkspacePanelID) -> WorkspaceTransactionResult {
+    fn close_to_the_right(
+        &mut self,
+        group_id: &WorkspaceTabGroupID,
+        pivot_panel_id: &WorkspacePanelID,
+    ) -> WorkspaceTransactionResult {
         let Some(group) = self.document.groups.get(group_id).cloned() else {
             return WorkspaceTransactionResult::unchanged();
         };
@@ -501,7 +679,11 @@ impl WorkspaceController {
             .filter(|(index, id)| {
                 *index > pivot
                     && !group.is_pinned(id)
-                    && self.document.panels.get(*id).is_some_and(|panel| panel.is_closable)
+                    && self
+                        .document
+                        .panels
+                        .get(*id)
+                        .is_some_and(|panel| panel.is_closable)
             })
             .map(|(index, id)| (index, id.clone()))
             .collect();
@@ -509,15 +691,27 @@ impl WorkspaceController {
             return WorkspaceTransactionResult::unchanged();
         }
         for (index, victim) in &victims {
-            self.record_closed(victim.clone(), group_id.clone(), Some(slot_id.clone()), None, *index);
+            self.record_closed(
+                victim.clone(),
+                group_id.clone(),
+                Some(slot_id.clone()),
+                None,
+                *index,
+            );
         }
         let removed: BTreeSet<_> = victims.into_iter().map(|(_, id)| id).collect();
         let mut group = group.clone();
         group.panels.retain(|id| !removed.contains(id));
-        if group.active_panel_id.as_ref().is_some_and(|active| removed.contains(active)) {
+        if group
+            .active_panel_id
+            .as_ref()
+            .is_some_and(|active| removed.contains(active))
+        {
             group.active_panel_id = Some(pivot_panel_id.clone());
         }
-        group.pinned_panel_ids.retain(|id| group.panels.contains(id));
+        group
+            .pinned_panel_ids
+            .retain(|id| group.panels.contains(id));
         let focus = group.active_panel_id.clone();
         self.document.groups.insert(group_id.clone(), group);
         WorkspaceTransactionResult::changed(vec![slot_id], focus, true)
@@ -525,7 +719,9 @@ impl WorkspaceController {
 
     fn reopen_last_closed(&mut self) -> WorkspaceTransactionResult {
         while let Some(closed) = self.document.closed_history.pop() {
-            if !self.document.panels.contains_key(&closed.panel_id) || self.locate(&closed.panel_id).is_some() {
+            if !self.document.panels.contains_key(&closed.panel_id)
+                || self.locate(&closed.panel_id).is_some()
+            {
                 continue;
             }
             return self.restore_closed_panel(closed);
@@ -537,7 +733,12 @@ impl WorkspaceController {
         if self.locate(panel_id).is_some() || !self.document.panels.contains_key(panel_id) {
             return WorkspaceTransactionResult::unchanged();
         }
-        let Some(index) = self.document.closed_history.iter().rposition(|closed| &closed.panel_id == panel_id) else {
+        let Some(index) = self
+            .document
+            .closed_history
+            .iter()
+            .rposition(|closed| &closed.panel_id == panel_id)
+        else {
             return WorkspaceTransactionResult::unchanged();
         };
         let closed = self.document.closed_history.remove(index);
@@ -546,9 +747,15 @@ impl WorkspaceController {
 
     fn restore_closed_panel(&mut self, closed: WorkspaceClosedPanel) -> WorkspaceTransactionResult {
         let group_id = closed.group_id.clone();
-        let restore_slot = closed.slot_id.clone().unwrap_or_else(WorkspaceSlotID::center);
+        let restore_slot = closed
+            .slot_id
+            .clone()
+            .unwrap_or_else(WorkspaceSlotID::center);
         if !self.document.groups.contains_key(&group_id) {
-            self.document.groups.insert(group_id.clone(), WorkspaceTabGroup::new(group_id.clone(), Vec::new()));
+            self.document.groups.insert(
+                group_id.clone(),
+                WorkspaceTabGroup::new(group_id.clone(), Vec::new()),
+            );
         }
         self.ensure_group(&group_id, &restore_slot);
         let mut group = self
@@ -564,7 +771,11 @@ impl WorkspaceController {
         WorkspaceTransactionResult::changed(vec![restore_slot], Some(closed.panel_id), true)
     }
 
-    fn set_pinned(&mut self, panel_id: &WorkspacePanelID, is_pinned: bool) -> WorkspaceTransactionResult {
+    fn set_pinned(
+        &mut self,
+        panel_id: &WorkspacePanelID,
+        is_pinned: bool,
+    ) -> WorkspaceTransactionResult {
         let Some(located) = self.locate(panel_id) else {
             return WorkspaceTransactionResult::unchanged();
         };
@@ -589,7 +800,9 @@ impl WorkspaceController {
         let group_id = group.id.clone();
         self.document.groups.insert(group_id.clone(), group);
         match located.slot_id {
-            Some(slot) => WorkspaceTransactionResult::changed(vec![slot], Some(panel_id.clone()), true),
+            Some(slot) => {
+                WorkspaceTransactionResult::changed(vec![slot], Some(panel_id.clone()), true)
+            }
             None => WorkspaceTransactionResult::visual_only(Some(panel_id.clone())),
         }
     }
@@ -614,22 +827,31 @@ impl WorkspaceController {
         let first = group.panels.first().cloned();
         let group_id_owned = group_id.clone();
         self.remove_group_from_all_slots(group_id);
-        self.document.collapsed.retain(|item| &item.group_id != group_id);
+        self.document
+            .collapsed
+            .retain(|item| &item.group_id != group_id);
         let z_index = self.next_floating_z_index();
         let title = active
             .as_ref()
             .and_then(|id| self.document.panels.get(id))
             .map(|panel| panel.title.clone())
-            .or_else(|| first.and_then(|id| self.document.panels.get(&id)).map(|panel| panel.title.clone()))
+            .or_else(|| {
+                first
+                    .and_then(|id| self.document.panels.get(&id))
+                    .map(|panel| panel.title.clone())
+            })
             .unwrap_or_else(|| group_id.raw_value().to_string());
-        let frame = WorkspaceSizingResolver::new(&self.document).floating_frame(frame, group_id, 30.0);
-        self.document.floating_windows.push(WorkspaceFloatingWindow::new(
-            window_id,
-            group_id_owned,
-            title,
-            frame,
-            z_index,
-        ));
+        let frame =
+            WorkspaceSizingResolver::new(&self.document).floating_frame(frame, group_id, 30.0);
+        self.document
+            .floating_windows
+            .push(WorkspaceFloatingWindow::new(
+                window_id,
+                group_id_owned,
+                title,
+                frame,
+                z_index,
+            ));
         match slot_id {
             Some(slot) => WorkspaceTransactionResult::changed(vec![slot], active, true),
             None => WorkspaceTransactionResult::visual_only(active),
@@ -641,7 +863,12 @@ impl WorkspaceController {
         window_id: &WorkspaceFloatingWindowID,
         target: WorkspaceTarget,
     ) -> WorkspaceTransactionResult {
-        let Some(index) = self.document.floating_windows.iter().position(|window| &window.id == window_id) else {
+        let Some(index) = self
+            .document
+            .floating_windows
+            .iter()
+            .position(|window| &window.id == window_id)
+        else {
             return WorkspaceTransactionResult::unchanged();
         };
         let window = self.document.floating_windows.remove(index);
@@ -653,26 +880,52 @@ impl WorkspaceController {
         if let Some(group) = self.document.groups.get_mut(&window.group_id) {
             group.is_collapsed = false;
         }
-        let focus = self.document.groups.get(&window.group_id).and_then(|group| group.active_panel_id.clone());
+        let focus = self
+            .document
+            .groups
+            .get(&window.group_id)
+            .and_then(|group| group.active_panel_id.clone());
         WorkspaceTransactionResult::changed(vec![destination.slot], focus, true)
     }
 
-    fn move_floating_window(&mut self, window_id: &WorkspaceFloatingWindowID, frame: WorkspaceRect) -> WorkspaceTransactionResult {
-        let Some(index) = self.document.floating_windows.iter().position(|window| &window.id == window_id) else {
+    fn move_floating_window(
+        &mut self,
+        window_id: &WorkspaceFloatingWindowID,
+        frame: WorkspaceRect,
+    ) -> WorkspaceTransactionResult {
+        let Some(index) = self
+            .document
+            .floating_windows
+            .iter()
+            .position(|window| &window.id == window_id)
+        else {
             return WorkspaceTransactionResult::unchanged();
         };
         let group_id = self.document.floating_windows[index].group_id.clone();
-        let frame = WorkspaceSizingResolver::new(&self.document).floating_frame(frame, &group_id, 30.0);
+        let frame =
+            WorkspaceSizingResolver::new(&self.document).floating_frame(frame, &group_id, 30.0);
         if self.document.floating_windows[index].frame == frame {
             return WorkspaceTransactionResult::unchanged();
         }
         self.document.floating_windows[index].frame = frame;
-        let focus = self.document.groups.get(&group_id).and_then(|group| group.active_panel_id.clone());
+        let focus = self
+            .document
+            .groups
+            .get(&group_id)
+            .and_then(|group| group.active_panel_id.clone());
         WorkspaceTransactionResult::visual_only(focus)
     }
 
-    fn focus_floating_window(&mut self, window_id: &WorkspaceFloatingWindowID) -> WorkspaceTransactionResult {
-        let Some(index) = self.document.floating_windows.iter().position(|window| &window.id == window_id) else {
+    fn focus_floating_window(
+        &mut self,
+        window_id: &WorkspaceFloatingWindowID,
+    ) -> WorkspaceTransactionResult {
+        let Some(index) = self
+            .document
+            .floating_windows
+            .iter()
+            .position(|window| &window.id == window_id)
+        else {
             return WorkspaceTransactionResult::unchanged();
         };
         let z_index = self.next_floating_z_index();
@@ -681,11 +934,19 @@ impl WorkspaceController {
         }
         self.document.floating_windows[index].z_index = z_index;
         let group_id = self.document.floating_windows[index].group_id.clone();
-        let focus = self.document.groups.get(&group_id).and_then(|group| group.active_panel_id.clone());
+        let focus = self
+            .document
+            .groups
+            .get(&group_id)
+            .and_then(|group| group.active_panel_id.clone());
         WorkspaceTransactionResult::visual_only(focus)
     }
 
-    fn resize_split(&mut self, split_id: &WorkspaceSplitID, fraction: f32) -> WorkspaceTransactionResult {
+    fn resize_split(
+        &mut self,
+        split_id: &WorkspaceSplitID,
+        fraction: f32,
+    ) -> WorkspaceTransactionResult {
         if !fraction.is_finite() {
             return WorkspaceTransactionResult::unchanged();
         }
@@ -725,8 +986,12 @@ impl WorkspaceController {
         if group.panels.is_empty() {
             self.document.groups.remove(group_id);
             self.remove_group_from_all_slots(group_id);
-            self.document.collapsed.retain(|item| &item.group_id != group_id);
-            self.document.floating_windows.retain(|window| &window.group_id != group_id);
+            self.document
+                .collapsed
+                .retain(|item| &item.group_id != group_id);
+            self.document
+                .floating_windows
+                .retain(|window| &window.group_id != group_id);
             return;
         }
         if group.active_panel_id.as_ref() == Some(panel_id) {
@@ -739,7 +1004,9 @@ impl WorkspaceController {
         for slot in self.document.slots.values() {
             let Some(layout) = &slot.layout else { continue };
             for group_id in layout.leaf_group_ids() {
-                let Some(group) = self.document.groups.get(&group_id) else { continue };
+                let Some(group) = self.document.groups.get(&group_id) else {
+                    continue;
+                };
                 if let Some(index) = group.panels.iter().position(|id| id == panel_id) {
                     return Some(LocatedPanel {
                         slot_id: Some(slot.id.clone()),
@@ -751,7 +1018,9 @@ impl WorkspaceController {
             }
         }
         for window in &self.document.floating_windows {
-            let Some(group) = self.document.groups.get(&window.group_id) else { continue };
+            let Some(group) = self.document.groups.get(&window.group_id) else {
+                continue;
+            };
             if let Some(index) = group.panels.iter().position(|id| id == panel_id) {
                 return Some(LocatedPanel {
                     slot_id: None,
@@ -772,7 +1041,9 @@ impl WorkspaceController {
         floating_window_id: Option<WorkspaceFloatingWindowID>,
         index: usize,
     ) {
-        self.document.closed_history.retain(|closed| closed.panel_id != panel_id);
+        self.document
+            .closed_history
+            .retain(|closed| closed.panel_id != panel_id);
         self.document.closed_history.push(WorkspaceClosedPanel::new(
             panel_id,
             group_id,
@@ -787,7 +1058,11 @@ impl WorkspaceController {
     }
 
     fn first_group_id(&self, slot_id: &WorkspaceSlotID) -> Option<WorkspaceTabGroupID> {
-        self.document.slot(slot_id).layout.as_ref().and_then(|layout| layout.leaf_group_ids().into_iter().next())
+        self.document
+            .slot(slot_id)
+            .layout
+            .as_ref()
+            .and_then(|layout| layout.leaf_group_ids().into_iter().next())
     }
 
     fn make_group(
@@ -798,7 +1073,9 @@ impl WorkspaceController {
         fraction: f32,
     ) -> WorkspaceTabGroupID {
         let id = WorkspaceTabGroupID::new(format!("{}-{}", slot_id.raw_value(), unique_suffix()));
-        self.document.groups.insert(id.clone(), WorkspaceTabGroup::new(id.clone(), Vec::new()));
+        self.document
+            .groups
+            .insert(id.clone(), WorkspaceTabGroup::new(id.clone(), Vec::new()));
         self.insert_group(&id, slot_id, anchor_id, edge, fraction);
         id
     }
@@ -809,7 +1086,9 @@ impl WorkspaceController {
             self.ensure_group(&id, slot_id);
             return id;
         }
-        self.document.groups.insert(id.clone(), WorkspaceTabGroup::new(id.clone(), Vec::new()));
+        self.document
+            .groups
+            .insert(id.clone(), WorkspaceTabGroup::new(id.clone(), Vec::new()));
         self.ensure_group(&id, slot_id);
         id
     }
@@ -832,9 +1111,17 @@ impl WorkspaceController {
         fraction: f32,
     ) {
         let mut slot = self.document.slot(slot_id);
-        slot.layout = slot.layout.as_ref().and_then(|layout| layout.removing(group_id));
+        slot.layout = slot
+            .layout
+            .as_ref()
+            .and_then(|layout| layout.removing(group_id));
         match (&anchor_id, edge) {
-            (Some(anchor), Some(edge)) if slot.layout.as_ref().is_some_and(|layout| layout.contains_group(anchor)) => {
+            (Some(anchor), Some(edge))
+                if slot
+                    .layout
+                    .as_ref()
+                    .is_some_and(|layout| layout.contains_group(anchor)) =>
+            {
                 slot.layout = Some(split_at_anchor(
                     slot.layout.take(),
                     anchor,
@@ -850,12 +1137,22 @@ impl WorkspaceController {
 
     fn insert_existing_group(&mut self, group_id: &WorkspaceTabGroupID, destination: &Destination) {
         self.remove_group_from_all_slots(group_id);
-        self.document.collapsed.retain(|item| &item.group_id != group_id);
+        self.document
+            .collapsed
+            .retain(|item| &item.group_id != group_id);
         let (anchor, edge) = match destination.placement {
-            WorkspacePlacementKind::Split => (destination.anchor_group_id.clone(), destination.split_edge),
+            WorkspacePlacementKind::Split => {
+                (destination.anchor_group_id.clone(), destination.split_edge)
+            }
             _ => (None, None),
         };
-        self.insert_group(group_id, &destination.slot, anchor, edge, destination.fraction);
+        self.insert_group(
+            group_id,
+            &destination.slot,
+            anchor,
+            edge,
+            destination.fraction,
+        );
     }
 
     fn next_floating_z_index(&self) -> i32 {
@@ -872,7 +1169,10 @@ impl WorkspaceController {
         let slot_ids: Vec<_> = self.document.slots.keys().cloned().collect();
         for slot_id in slot_ids {
             if let Some(slot) = self.document.slots.get_mut(&slot_id) {
-                slot.layout = slot.layout.as_ref().and_then(|layout| layout.removing(group_id));
+                slot.layout = slot
+                    .layout
+                    .as_ref()
+                    .and_then(|layout| layout.removing(group_id));
             }
         }
     }
@@ -885,11 +1185,18 @@ impl WorkspaceController {
             .map(|layout| layout.leaf_group_ids())
             .unwrap_or_default()
             .into_iter()
-            .find_map(|id| self.document.groups.get(&id).and_then(|group| group.active_panel_id.clone()))
+            .find_map(|id| {
+                self.document
+                    .groups
+                    .get(&id)
+                    .and_then(|group| group.active_panel_id.clone())
+            })
     }
 
     fn collapsed_edge(&self, slot_id: &WorkspaceSlotID) -> WorkspaceEdge {
-        if let super::model::WorkspaceSlotKind::Chrome { edge, .. } = self.document.slot(slot_id).kind {
+        if let super::model::WorkspaceSlotKind::Chrome { edge, .. } =
+            self.document.slot(slot_id).kind
+        {
             return edge;
         }
         if slot_id == &WorkspaceSlotID::leading() {
@@ -951,11 +1258,28 @@ fn split_at_anchor(
             }
         }
         other @ WorkspaceLayoutNode::Group(_) => other,
-        WorkspaceLayoutNode::Split { axis, fraction: current, first, second } => WorkspaceLayoutNode::split(
+        WorkspaceLayoutNode::Split {
+            axis,
+            fraction: current,
+            first,
+            second,
+        } => WorkspaceLayoutNode::split(
             axis,
             current,
-            split_at_anchor(Some(*first), anchor_group_id, inserted_group_id, edge, fraction),
-            split_at_anchor(Some(*second), anchor_group_id, inserted_group_id, edge, fraction),
+            split_at_anchor(
+                Some(*first),
+                anchor_group_id,
+                inserted_group_id,
+                edge,
+                fraction,
+            ),
+            split_at_anchor(
+                Some(*second),
+                anchor_group_id,
+                inserted_group_id,
+                edge,
+                fraction,
+            ),
         ),
     }
 }
@@ -971,14 +1295,17 @@ fn unique_suffix() -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::model::WorkspacePanel;
+    use super::*;
 
     fn controller() -> WorkspaceController {
         let panel = WorkspacePanel::new(WorkspacePanelID::new("viewport"), "Viewport");
         let mut panels = BTreeMap::new();
         panels.insert(panel.id.clone(), panel);
-        let group = WorkspaceTabGroup::new(WorkspaceTabGroupID::new("center"), vec![WorkspacePanelID::new("viewport")]);
+        let group = WorkspaceTabGroup::new(
+            WorkspaceTabGroupID::new("center"),
+            vec![WorkspacePanelID::new("viewport")],
+        );
         let mut groups = BTreeMap::new();
         groups.insert(group.id.clone(), group);
         let mut slots = BTreeMap::new();
@@ -987,7 +1314,9 @@ mod tests {
             WorkspaceSlot::new(
                 WorkspaceSlotID::center(),
                 super::super::model::WorkspaceSlotKind::Content,
-                Some(WorkspaceLayoutNode::Group(WorkspaceTabGroupID::new("center"))),
+                Some(WorkspaceLayoutNode::Group(WorkspaceTabGroupID::new(
+                    "center",
+                ))),
             ),
         );
         WorkspaceController::new(WorkspaceDocument::new(panels, groups, slots))
@@ -997,7 +1326,9 @@ mod tests {
     fn center_cannot_collapse() {
         let mut controller = controller();
         assert_eq!(
-            controller.dispatch(WorkspaceCommand::Collapse(WorkspaceTabGroupID::new("center"))),
+            controller.dispatch(WorkspaceCommand::Collapse(WorkspaceTabGroupID::new(
+                "center"
+            ))),
             WorkspaceTransactionResult::unchanged()
         );
         assert_eq!(controller.version(), 0);
@@ -1018,13 +1349,26 @@ mod tests {
     #[test]
     fn closing_the_last_panel_removes_the_group_and_slot_reference() {
         let mut controller = controller();
-        let result = controller.dispatch(WorkspaceCommand::ClosePanel(WorkspacePanelID::new("viewport")));
+        let result = controller.dispatch(WorkspaceCommand::ClosePanel(WorkspacePanelID::new(
+            "viewport",
+        )));
         assert!(result.did_change);
         assert!(controller.document().groups.is_empty());
-        assert!(controller.document().slot(&WorkspaceSlotID::center()).layout.is_none());
+        assert!(
+            controller
+                .document()
+                .slot(&WorkspaceSlotID::center())
+                .layout
+                .is_none()
+        );
         assert_eq!(controller.document().closed_history.len(), 1);
         controller.dispatch(WorkspaceCommand::ReopenLastClosed);
-        assert!(controller.document().groups.contains_key(&WorkspaceTabGroupID::new("center")));
+        assert!(
+            controller
+                .document()
+                .groups
+                .contains_key(&WorkspaceTabGroupID::new("center"))
+        );
     }
 
     #[test]
@@ -1035,9 +1379,13 @@ mod tests {
         let hits = Rc::new(Cell::new(0));
         let counter = hits.clone();
         controller.subscribe(move |_| counter.set(counter.get() + 1));
-        controller.dispatch(WorkspaceCommand::Collapse(WorkspaceTabGroupID::new("center")));
+        controller.dispatch(WorkspaceCommand::Collapse(WorkspaceTabGroupID::new(
+            "center",
+        )));
         assert_eq!(hits.get(), 0);
-        controller.dispatch(WorkspaceCommand::ToggleMaximize(WorkspacePanelID::new("viewport")));
+        controller.dispatch(WorkspaceCommand::ToggleMaximize(WorkspacePanelID::new(
+            "viewport",
+        )));
         assert_eq!(hits.get(), 1);
     }
 }

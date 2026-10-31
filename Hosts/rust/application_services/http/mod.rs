@@ -35,11 +35,21 @@ impl TransportCapabilities {
     const fn for_current_platform() -> Self {
         #[cfg(any(target_os = "macos", target_os = "ios"))]
         {
-            Self { http: true, https: true, file: true, limitation: None }
+            Self {
+                http: true,
+                https: true,
+                file: true,
+                limitation: None,
+            }
         }
         #[cfg(target_os = "windows")]
         {
-            Self { http: true, https: true, file: true, limitation: None }
+            Self {
+                http: true,
+                https: true,
+                file: true,
+                limitation: None,
+            }
         }
         #[cfg(target_os = "linux")]
         {
@@ -75,7 +85,9 @@ pub fn platform_transport(timeout_seconds: f64) -> Option<Rc<dyn ImageDownloadTr
 
 #[cfg(target_os = "windows")]
 pub fn platform_transport(timeout_seconds: f64) -> Option<Rc<dyn ImageDownloadTransport>> {
-    Some(Rc::new(windows::WindowsImageTransport::new(timeout_seconds)))
+    Some(Rc::new(windows::WindowsImageTransport::new(
+        timeout_seconds,
+    )))
 }
 
 #[cfg(target_os = "linux")]
@@ -83,7 +95,12 @@ pub fn platform_transport(timeout_seconds: f64) -> Option<Rc<dyn ImageDownloadTr
     Some(Rc::new(linux::LinuxImageTransport::new(timeout_seconds)))
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "windows", target_os = "linux")))]
+#[cfg(not(any(
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "windows",
+    target_os = "linux"
+)))]
 pub fn platform_transport(_timeout_seconds: f64) -> Option<Rc<dyn ImageDownloadTransport>> {
     None
 }

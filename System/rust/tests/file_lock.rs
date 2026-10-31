@@ -35,8 +35,12 @@ fn independent_file_handles_serialize_shared_writes() {
                 .parse()
                 .expect("counter is a number");
             std::thread::sleep(std::time::Duration::from_millis(1));
-            atomic_write(&value, (count + 1).to_string().as_bytes(), Access::OwnerOnly)
-                .expect("write counter");
+            atomic_write(
+                &value,
+                (count + 1).to_string().as_bytes(),
+                Access::OwnerOnly,
+            )
+            .expect("write counter");
         }));
     }
     for handle in handles {

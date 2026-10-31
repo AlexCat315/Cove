@@ -11,8 +11,8 @@ use super::ids::{WorkspaceEdge, WorkspacePanelID, WorkspaceSlotID, WorkspaceTabG
 use super::model::{WorkspaceDocument, WorkspaceTabGroup};
 use super::theme::WorkspaceTheme;
 use cove_composition::LayoutDebugAttachmentKey;
-use cove_core::scene::Node;
 use cove_core::Rect;
+use cove_core::scene::Node;
 
 pub const DRAG_OVERLAY_ROOT_KEY: &str = "__workspace_drag_overlay_root";
 pub const DRAG_OVERLAY_STATE_KEY: &str = "__workspace_tab_drag_overlay";
@@ -76,7 +76,9 @@ pub fn first_node(rooted_at: &Node, debug_name: &str) -> Option<Node> {
 }
 
 fn root_has_debug_name(node: &Node, debug_name: &str) -> bool {
-    node.attachment::<String>(LayoutDebugAttachmentKey::DEBUG_NAME).as_deref() == Some(debug_name)
+    node.attachment::<String>(LayoutDebugAttachmentKey::DEBUG_NAME)
+        .as_deref()
+        == Some(debug_name)
 }
 
 /// Union of a group's tab frames widened by a forgiving band. A drop inside the
@@ -96,7 +98,10 @@ pub fn tab_frames(group: &WorkspaceTabGroup, rooted_at: &Node) -> Vec<(Workspace
         .panels
         .iter()
         .filter_map(|panel_id| {
-            let node = first_node(rooted_at, &format!("workspace-tab-{}", panel_id.raw_value()))?;
+            let node = first_node(
+                rooted_at,
+                &format!("workspace-tab-{}", panel_id.raw_value()),
+            )?;
             let frame = node.absolute_frame();
             (frame.width > 0.0 && frame.height > 0.0).then(|| (panel_id.clone(), frame))
         })
@@ -104,7 +109,12 @@ pub fn tab_frames(group: &WorkspaceTabGroup, rooted_at: &Node) -> Vec<(Workspace
 }
 
 fn inset(rect: Rect, dx: f32, dy: f32) -> Rect {
-    Rect::new(rect.x - dx, rect.y - dy, (rect.width - dx * 2.0).max(0.0), (rect.height - dy * 2.0).max(0.0))
+    Rect::new(
+        rect.x - dx,
+        rect.y - dy,
+        (rect.width - dx * 2.0).max(0.0),
+        (rect.height - dy * 2.0).max(0.0),
+    )
 }
 
 fn inset_by(rect: Rect, fraction_x: f32, fraction_y: f32) -> Rect {
@@ -119,10 +129,13 @@ pub fn resolve_drag(
     document: &WorkspaceDocument,
     from: &Node,
 ) -> Option<WorkspaceDragResolution> {
-    if let Some(resolution) = resolve_tab_reorder(x, y, source_group_id, source_panel_id, document, from) {
+    if let Some(resolution) =
+        resolve_tab_reorder(x, y, source_group_id, source_panel_id, document, from)
+    {
         return Some(resolution);
     }
-    resolve_drop_preview(x, y, source_group_id, source_panel_id, document, from).map(WorkspaceDragResolution::Drop)
+    resolve_drop_preview(x, y, source_group_id, source_panel_id, document, from)
+        .map(WorkspaceDragResolution::Drop)
 }
 
 fn resolve_tab_reorder(
@@ -135,8 +148,14 @@ fn resolve_tab_reorder(
 ) -> Option<WorkspaceDragResolution> {
     let root = workspace_root(from)?;
     let group = document.groups.get(source_group_id)?;
-    let group_node = first_node(&root, &format!("workspace-group-{}", source_group_id.raw_value()))?;
-    if !group_node.absolute_frame().contains(cove_core::Point { x, y }) {
+    let group_node = first_node(
+        &root,
+        &format!("workspace-group-{}", source_group_id.raw_value()),
+    )?;
+    if !group_node
+        .absolute_frame()
+        .contains(cove_core::Point { x, y })
+    {
         return None;
     }
     let frames = tab_frames(group, &root);
@@ -172,7 +191,12 @@ fn resolve_tab_reorder(
     Some(WorkspaceDragResolution::Reorder(WorkspaceReorderPreview {
         group_id: source_group_id.clone(),
         target_index,
-        line_frame: Rect::new(line_x - 1.5, band.y + 5.0, 3.0, (band.height - 10.0).max(12.0)),
+        line_frame: Rect::new(
+            line_x - 1.5,
+            band.y + 5.0,
+            3.0,
+            (band.height - 10.0).max(12.0),
+        ),
     }))
 }
 
@@ -195,11 +219,18 @@ fn resolve_drop_preview(
                 .map(|layout| layout.leaf_group_ids())
                 .unwrap_or_default()
                 .into_iter()
-                .filter(|id| document.groups.get(id).is_some_and(|group| !group.is_collapsed))
+                .filter(|id| {
+                    document
+                        .groups
+                        .get(id)
+                        .is_some_and(|group| !group.is_collapsed)
+                })
         })
         .collect();
     for group_id in visible_group_ids {
-        let Some(group_node) = first_node(&root, &format!("workspace-group-{}", group_id.raw_value())) else {
+        let Some(group_node) =
+            first_node(&root, &format!("workspace-group-{}", group_id.raw_value()))
+        else {
             continue;
         };
         let frame = group_node.absolute_frame();
@@ -227,11 +258,16 @@ fn resolve_drop_preview(
         return Some(preview);
     }
     for slot_id in document.slots.keys() {
-        let draggable = document.panels.get(source_panel_id).is_none_or(|panel| panel.is_draggable);
+        let draggable = document
+            .panels
+            .get(source_panel_id)
+            .is_none_or(|panel| panel.is_draggable);
         if slot_id != &WorkspaceSlotID::center() && !draggable {
             continue;
         }
-        let Some(slot_node) = first_node(&root, &format!("workspace-region-{}", slot_id.raw_value())) else {
+        let Some(slot_node) =
+            first_node(&root, &format!("workspace-region-{}", slot_id.raw_value()))
+        else {
             continue;
         };
         let frame = slot_node.absolute_frame();
@@ -245,12 +281,22 @@ fn resolve_drop_preview(
     None
 }
 
-fn drop_preview(frame: Rect, point: cove_core::Point, slot_id: WorkspaceSlotID, group_id: WorkspaceTabGroupID) -> WorkspaceDropPreview {
+fn drop_preview(
+    frame: Rect,
+    point: cove_core::Point,
+    slot_id: WorkspaceSlotID,
+    group_id: WorkspaceTabGroupID,
+) -> WorkspaceDropPreview {
     let local_x = (point.x - frame.x) / frame.width.max(1.0);
     let local_y = (point.y - frame.y) / frame.height.max(1.0);
     let edge = 0.24_f32;
     let split = |edge_kind: WorkspaceEdge, preview_frame: Rect| WorkspaceDropPreview {
-        target: super::controller::WorkspaceTarget::split(slot_id.clone(), group_id.clone(), edge_kind, 0.5),
+        target: super::controller::WorkspaceTarget::split(
+            slot_id.clone(),
+            group_id.clone(),
+            edge_kind,
+            0.5,
+        ),
         frame: preview_frame,
     };
     if local_x < edge {
@@ -267,13 +313,21 @@ fn drop_preview(frame: Rect, point: cove_core::Point, slot_id: WorkspaceSlotID, 
         );
     }
     if local_y < edge {
-        return split(WorkspaceEdge::Top, Rect::new(frame.x, frame.y, frame.width, frame.height * edge));
+        return split(
+            WorkspaceEdge::Top,
+            Rect::new(frame.x, frame.y, frame.width, frame.height * edge),
+        );
     }
     if local_y > 1.0 - edge {
         let height = frame.height * edge;
         return split(
             WorkspaceEdge::Bottom,
-            Rect::new(frame.x, frame.y + frame.height - height, frame.width, height),
+            Rect::new(
+                frame.x,
+                frame.y + frame.height - height,
+                frame.width,
+                height,
+            ),
         );
     }
     WorkspaceDropPreview {
@@ -288,7 +342,9 @@ pub fn set_drag_overlay(state: Option<&WorkspaceTabDragOverlayState>, root: &Nod
         Some(state) => root.set_attachment(DRAG_OVERLAY_STATE_KEY, state.clone()),
         None => root.remove_attachment(DRAG_OVERLAY_STATE_KEY),
     }
-    root.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("workspaceTabDragOverlay"));
+    root.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+        "workspaceTabDragOverlay",
+    ));
 }
 
 pub fn drag_overlay(root: &Node) -> Option<WorkspaceTabDragOverlayState> {
@@ -314,7 +370,10 @@ pub fn apply_resolution(
             });
         }
         WorkspaceDragResolution::Drop(preview) => {
-            controller.dispatch(WorkspaceCommand::MovePanel { panel_id: panel_id.clone(), target: preview.target });
+            controller.dispatch(WorkspaceCommand::MovePanel {
+                panel_id: panel_id.clone(),
+                target: preview.target,
+            });
         }
     }
 }
@@ -335,38 +394,87 @@ pub fn draw_overlay(
         Some(WorkspaceDragResolution::Drop(preview)) => draw_drop(preview, accent, list),
         Some(WorkspaceDragResolution::Noop) | None => {}
     }
-    draw_ghost(state, root, theme, accent, surface_floating, on_surface, list);
+    draw_ghost(
+        state,
+        root,
+        theme,
+        accent,
+        surface_floating,
+        on_surface,
+        list,
+    );
 }
 
-fn draw_reorder(preview: &WorkspaceReorderPreview, accent: cove_core::Color, list: &mut cove_core::DrawList) {
+fn draw_reorder(
+    preview: &WorkspaceReorderPreview,
+    accent: cove_core::Color,
+    list: &mut cove_core::DrawList,
+) {
     let rect = preview.line_frame;
     if rect.width <= 0.0 || rect.height <= 0.0 {
         return;
     }
     let _ = list.add_rounded_rect(rect, 1.5, accent.multiplied_alpha(0.98));
-    let _ = list.add_rounded_rect(Rect::new(rect.x - 3.0, rect.y, rect.width + 6.0, 3.0), 1.5, accent);
-    let _ = list.add_rounded_rect(Rect::new(rect.x - 3.0, rect.y + rect.height - 3.0, rect.width + 6.0, 3.0), 1.5, accent);
+    let _ = list.add_rounded_rect(
+        Rect::new(rect.x - 3.0, rect.y, rect.width + 6.0, 3.0),
+        1.5,
+        accent,
+    );
+    let _ = list.add_rounded_rect(
+        Rect::new(
+            rect.x - 3.0,
+            rect.y + rect.height - 3.0,
+            rect.width + 6.0,
+            3.0,
+        ),
+        1.5,
+        accent,
+    );
 }
 
-fn draw_drop(preview: &WorkspaceDropPreview, accent: cove_core::Color, list: &mut cove_core::DrawList) {
-    let inset_amount = if preview.target.placement == super::ids::WorkspacePlacementKind::Slot { 5.0 } else { 3.0 };
+fn draw_drop(
+    preview: &WorkspaceDropPreview,
+    accent: cove_core::Color,
+    list: &mut cove_core::DrawList,
+) {
+    let inset_amount = if preview.target.placement == super::ids::WorkspacePlacementKind::Slot {
+        5.0
+    } else {
+        3.0
+    };
     let rect = inset(preview.frame, inset_amount, inset_amount);
     if rect.width <= 2.0 || rect.height <= 2.0 {
         return;
     }
-    let fill_alpha = if preview.target.placement == super::ids::WorkspacePlacementKind::TabGroup { 0.10 } else { 0.16 };
+    let fill_alpha = if preview.target.placement == super::ids::WorkspacePlacementKind::TabGroup {
+        0.10
+    } else {
+        0.16
+    };
     let _ = list.add_rounded_rect(rect, 7.0, accent.multiplied_alpha(fill_alpha));
     add_border(rect, accent.multiplied_alpha(0.92), 2.0, list);
     if preview.target.placement != super::ids::WorkspacePlacementKind::Split {
         return;
     }
-    let Some(edge) = preview.target.edge else { return };
+    let Some(edge) = preview.target.edge else {
+        return;
+    };
     let thickness = 5.0;
     let bar = match edge {
         WorkspaceEdge::Leading => Rect::new(rect.x, rect.y, thickness, rect.height),
-        WorkspaceEdge::Trailing => Rect::new(rect.x + rect.width - thickness, rect.y, thickness, rect.height),
+        WorkspaceEdge::Trailing => Rect::new(
+            rect.x + rect.width - thickness,
+            rect.y,
+            thickness,
+            rect.height,
+        ),
         WorkspaceEdge::Top => Rect::new(rect.x, rect.y, rect.width, thickness),
-        WorkspaceEdge::Bottom => Rect::new(rect.x, rect.y + rect.height - thickness, rect.width, thickness),
+        WorkspaceEdge::Bottom => Rect::new(
+            rect.x,
+            rect.y + rect.height - thickness,
+            rect.width,
+            thickness,
+        ),
     };
     let _ = list.add_rounded_rect(bar, 2.5, accent.multiplied_alpha(0.98));
 }
@@ -374,15 +482,25 @@ fn draw_drop(preview: &WorkspaceDropPreview, accent: cove_core::Color, list: &mu
 fn add_border(rect: Rect, color: cove_core::Color, thickness: f32, list: &mut cove_core::DrawList) {
     let t = thickness.max(1.0);
     let _ = list.add_rect(Rect::new(rect.x, rect.y, rect.width, t), color);
-    let _ = list.add_rect(Rect::new(rect.x, rect.y + rect.height - t, rect.width, t), color);
+    let _ = list.add_rect(
+        Rect::new(rect.x, rect.y + rect.height - t, rect.width, t),
+        color,
+    );
     let _ = list.add_rect(Rect::new(rect.x, rect.y, t, rect.height), color);
-    let _ = list.add_rect(Rect::new(rect.x + rect.width - t, rect.y, t, rect.height), color);
+    let _ = list.add_rect(
+        Rect::new(rect.x + rect.width - t, rect.y, t, rect.height),
+        color,
+    );
 }
 
 fn cleaned_title(title: &str) -> String {
     let clean = title.replace('\n', " ");
     let clean = clean.trim();
-    if clean.is_empty() { "Panel".to_string() } else { clean.to_string() }
+    if clean.is_empty() {
+        "Panel".to_string()
+    } else {
+        clean.to_string()
+    }
 }
 
 fn draw_ghost(
@@ -412,7 +530,11 @@ fn draw_ghost(
 
     let _ = list.add_rounded_rect(rect, 6.0, surface_floating.multiplied_alpha(0.96));
     add_border(rect, accent.multiplied_alpha(0.55), 1.0, list);
-    let _ = list.add_rounded_rect(Rect::new(rect.x + 7.0, rect.y + 6.0, 3.0, rect.height - 12.0), 1.5, accent.multiplied_alpha(0.95));
+    let _ = list.add_rounded_rect(
+        Rect::new(rect.x + 7.0, rect.y + 6.0, 3.0, rect.height - 12.0),
+        1.5,
+        accent.multiplied_alpha(0.95),
+    );
     let _ = on_surface;
 }
 

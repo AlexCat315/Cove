@@ -21,6 +21,7 @@ use cove_core::scene::{
     Justify, Node, PlatformInputContext, Wrap,
 };
 use cove_core::{Environment, InputCapabilities};
+use cove_ui_compose::BoxView;
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
@@ -28,11 +29,10 @@ use cove_ui_compose::primitives::controls::field_label::FieldLabel;
 use cove_ui_compose::primitives::controls::key_cap::KeyCap;
 use cove_ui_compose::primitives::controls::tag::Tag;
 use cove_ui_compose::primitives::feedback::{Badge, StatusTone};
-use cove_ui_compose::theme::{Theme, ThemeViewExt};
-use cove_ui_compose::theme::TextScalerViewExt;
-use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::primitives::text::TextField;
-use cove_ui_compose::BoxView;
+use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
+use cove_ui_compose::theme::TextScalerViewExt;
+use cove_ui_compose::theme::{Theme, ThemeViewExt};
 
 use support::GlobalTestLock;
 

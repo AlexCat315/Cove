@@ -168,7 +168,11 @@ pub fn resource_dimension(dimension: TextureDimension) -> u32 {
 /// D3D12 array size encoding: `DepthOrArraySize` is the layer count, except for a
 /// cube, whose six faces are its layers.
 pub fn array_size(dimension: TextureDimension, layers: usize) -> u16 {
-    let count = if dimension == TextureDimension::Cube { 6 } else { layers.max(1) };
+    let count = if dimension == TextureDimension::Cube {
+        6
+    } else {
+        layers.max(1)
+    };
     count as u16
 }
 
@@ -264,7 +268,10 @@ mod tests {
         ] {
             assert_ne!(dxgi_format(format), sys::DXGI_FORMAT_UNKNOWN, "{format:?}");
         }
-        assert_eq!(dxgi_format(TextureFormat::Invalid), sys::DXGI_FORMAT_UNKNOWN);
+        assert_eq!(
+            dxgi_format(TextureFormat::Invalid),
+            sys::DXGI_FORMAT_UNKNOWN
+        );
     }
 
     #[test]
@@ -283,7 +290,10 @@ mod tests {
             assert_eq!(texture_format(dxgi_format(format)), format, "{format:?}");
         }
         // depth24Unorm has no distinct DXGI format, so it reports the combined one.
-        assert_eq!(dxgi_format(TextureFormat::Depth24Unorm), sys::DXGI_FORMAT_D24_UNORM_S8_UINT);
+        assert_eq!(
+            dxgi_format(TextureFormat::Depth24Unorm),
+            sys::DXGI_FORMAT_D24_UNORM_S8_UINT
+        );
         assert_eq!(
             texture_format(sys::DXGI_FORMAT_D24_UNORM_S8_UINT),
             TextureFormat::Depth24UnormStencil8
@@ -304,7 +314,10 @@ mod tests {
 
     #[test]
     fn resource_states_fold_into_the_matching_bits() {
-        assert_eq!(resource_state(ResourceState::EMPTY), sys::D3D12_RESOURCE_STATE_COMMON);
+        assert_eq!(
+            resource_state(ResourceState::EMPTY),
+            sys::D3D12_RESOURCE_STATE_COMMON
+        );
         assert_eq!(
             resource_state(ResourceState::RENDER_TARGET),
             sys::D3D12_RESOURCE_STATE_RENDER_TARGET
@@ -320,7 +333,10 @@ mod tests {
         );
         let shader = resource_state(ResourceState::SHADER_RESOURCE);
         assert_ne!(shader & sys::D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, 0);
-        assert_ne!(shader & sys::D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, 0);
+        assert_ne!(
+            shader & sys::D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+            0
+        );
     }
 
     #[test]
@@ -337,8 +353,14 @@ mod tests {
             swapchain_format(TextureFormat::Bgra8UnormSrgb),
             sys::DXGI_FORMAT_B8G8R8A8_UNORM
         );
-        assert_eq!(swapchain_format(TextureFormat::Rgba8UnormSrgb), sys::DXGI_FORMAT_R8G8B8A8_UNORM);
-        assert_eq!(swapchain_format(TextureFormat::Rgba8Unorm), sys::DXGI_FORMAT_R8G8B8A8_UNORM);
+        assert_eq!(
+            swapchain_format(TextureFormat::Rgba8UnormSrgb),
+            sys::DXGI_FORMAT_R8G8B8A8_UNORM
+        );
+        assert_eq!(
+            swapchain_format(TextureFormat::Rgba8Unorm),
+            sys::DXGI_FORMAT_R8G8B8A8_UNORM
+        );
         assert!(sample_count(3).is_err());
         assert_eq!(sample_count(4), Ok(4));
     }

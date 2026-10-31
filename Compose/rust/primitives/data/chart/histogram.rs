@@ -3,8 +3,8 @@
 //! Counts samples into even-width bins. Binning is a data concern, so it
 //! happens here and the chart just draws the bars. Samples outside an explicit
 //! range are ignored rather than folded into the tails.
-use super::model::{ChartMark, ChartRange, ChartSeries, ChartValueAxis};
 use super::model::ChartSeriesStyle;
+use super::model::{ChartMark, ChartRange, ChartSeries, ChartValueAxis};
 use super::scale::ChartScale;
 use crate::theme::tokens::SemanticColorRef;
 
@@ -17,7 +17,10 @@ pub struct ChartHistogram {
 }
 impl Default for ChartHistogram {
     fn default() -> Self {
-        Self { bin_count: 10, range: None }
+        Self {
+            bin_count: 10,
+            range: None,
+        }
     }
 }
 impl ChartHistogram {
@@ -25,7 +28,10 @@ impl ChartHistogram {
         let range = range.filter(|value| {
             value.lower.is_finite() && value.upper.is_finite() && value.lower < value.upper
         });
-        Self { bin_count: bin_count.clamp(1, 64), range }
+        Self {
+            bin_count: bin_count.clamp(1, 64),
+            range,
+        }
     }
 
     /// Bins the finite samples. Non-finite values never reach a bin.
@@ -35,7 +41,11 @@ impl ChartHistogram {
         color: SemanticColorRef,
         title: impl Into<String>,
     ) -> ChartHistogramResult {
-        let samples: Vec<f32> = values.iter().copied().filter(|value| value.is_finite()).collect();
+        let samples: Vec<f32> = values
+            .iter()
+            .copied()
+            .filter(|value| value.is_finite())
+            .collect();
         let domain = self.range.unwrap_or_else(|| Self::fitted(&samples));
         let count = self.bin_count.max(1);
         let width = domain.span() / count as f32;
@@ -67,7 +77,11 @@ impl ChartHistogram {
             ChartValueAxis::Left,
             ChartSeriesStyle::default(),
         );
-        ChartHistogramResult { series, labels, counts }
+        ChartHistogramResult {
+            series,
+            labels,
+            counts,
+        }
     }
 
     /// The samples' own span. Identical samples still need a width to divide.

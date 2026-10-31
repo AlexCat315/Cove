@@ -4,8 +4,16 @@ use cove_core::{Point, Rect, Size};
 pub struct OverlayPlacement;
 
 impl OverlayPlacement {
-    pub fn fit(position: Point, size: Size, bounds: Rect, anchor: Option<Rect>, margin: f32) -> Point {
-        if bounds.width <= 0.0 || bounds.height <= 0.0 { return position; }
+    pub fn fit(
+        position: Point,
+        size: Size,
+        bounds: Rect,
+        anchor: Option<Rect>,
+        margin: f32,
+    ) -> Point {
+        if bounds.width <= 0.0 || bounds.height <= 0.0 {
+            return position;
+        }
         let min_x = bounds.x + margin;
         let min_y = bounds.y + margin;
         let max_x = (bounds.max_x() - margin - size.width).max(min_x);

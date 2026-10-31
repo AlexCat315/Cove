@@ -1,6 +1,6 @@
 //! Persistent AVL join/split with grapheme-stable seams.
 
-use super::rope_storage::{empty_node, RopeHandle, RopeLeaf, RopeNode, RopeStorage};
+use super::rope_storage::{RopeHandle, RopeLeaf, RopeNode, RopeStorage, empty_node};
 use std::sync::Arc;
 
 /// Height-aware AVL join visits only the taller tree's boundary path.
@@ -89,7 +89,9 @@ pub fn concatenate(left: RopeHandle, right: RopeHandle) -> RopeHandle {
     }
     let (prefix, _) = split(
         left.clone(),
-        left.metrics.character_count.saturating_sub(left_edge.character_count()),
+        left.metrics
+            .character_count
+            .saturating_sub(left_edge.character_count()),
     );
     let mut text = left_edge.text.clone();
     let mut tail = right;

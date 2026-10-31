@@ -7,8 +7,8 @@
 //! per frame.
 
 use crate::engine::{
-    SelectionPhase, TerminalEngine, TerminalFrame, TerminalKey, TerminalMouseEvent, TerminalPointer,
-    TerminalRGB,
+    SelectionPhase, TerminalEngine, TerminalFrame, TerminalKey, TerminalMouseEvent,
+    TerminalPointer, TerminalRGB,
 };
 use crate::process::{PseudoTerminal, PseudoTerminalSize, TerminalCommand, TerminalError};
 use cove_core::scene::LocalInvalidationHandle;
@@ -57,21 +57,35 @@ struct InboxState {
 
 impl OutputInbox {
     fn append(&self, bytes: &[u8]) {
-        self.pending.lock().unwrap_or_else(|error| error.into_inner()).bytes.extend_from_slice(bytes);
+        self.pending
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .bytes
+            .extend_from_slice(bytes);
     }
 
     fn finish(&self, code: i32) {
-        self.pending.lock().unwrap_or_else(|error| error.into_inner()).exit_code = Some(code);
+        self.pending
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .exit_code = Some(code);
     }
 
     fn take(&self) -> (Vec<u8>, Option<i32>) {
-        let mut state = self.pending.lock().unwrap_or_else(|error| error.into_inner());
+        let mut state = self
+            .pending
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         let bytes = std::mem::take(&mut state.bytes);
         (bytes, state.exit_code.take())
     }
 
     fn len(&self) -> usize {
-        self.pending.lock().unwrap_or_else(|error| error.into_inner()).bytes.len()
+        self.pending
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .bytes
+            .len()
     }
 }
 
@@ -159,26 +173,38 @@ impl TerminalSession {
         // The engine answers queries and reports bells and titles synchronously,
         // inside `feed`, so these callbacks reach back through the same `Rc`.
         let weak = Rc::downgrade(&session.inner);
-        session.inner.engine.borrow_mut().set_reply_handler(Rc::new(move |bytes| {
-            if let Some(inner) = weak.upgrade() {
-                Session::write_reply(&inner, bytes);
-            }
-        }));
+        session
+            .inner
+            .engine
+            .borrow_mut()
+            .set_reply_handler(Rc::new(move |bytes| {
+                if let Some(inner) = weak.upgrade() {
+                    Session::write_reply(&inner, bytes);
+                }
+            }));
         let weak = Rc::downgrade(&session.inner);
-        session.inner.engine.borrow_mut().set_bell_handler(Rc::new(move || {
-            if let Some(inner) = weak.upgrade() {
-                Session::emit(&inner, SessionEvent::Bell);
-            }
-        }));
+        session
+            .inner
+            .engine
+            .borrow_mut()
+            .set_bell_handler(Rc::new(move || {
+                if let Some(inner) = weak.upgrade() {
+                    Session::emit(&inner, SessionEvent::Bell);
+                }
+            }));
         let weak = Rc::downgrade(&session.inner);
-        session.inner.engine.borrow_mut().set_title_handler(Rc::new(move |title| {
-            let Some(inner) = weak.upgrade() else { return };
-            if inner.title.borrow().as_str() == title {
-                return;
-            }
-            *inner.title.borrow_mut() = title.to_owned();
-            Session::emit(&inner, SessionEvent::TitleChanged(title.to_owned()));
-        }));
+        session
+            .inner
+            .engine
+            .borrow_mut()
+            .set_title_handler(Rc::new(move |title| {
+                let Some(inner) = weak.upgrade() else { return };
+                if inner.title.borrow().as_str() == title {
+                    return;
+                }
+                *inner.title.borrow_mut() = title.to_owned();
+                Session::emit(&inner, SessionEvent::TitleChanged(title.to_owned()));
+            }));
         session
     }
 
@@ -231,7 +257,9 @@ impl TerminalSession {
 
     /// Ends a display session with the program's exit status.
     pub fn show_exit(&self, code: i32) {
-        if self.inner.command.is_some() || *self.inner.status.borrow() == SessionStatus::Exited(code) {
+        if self.inner.command.is_some()
+            || *self.inner.status.borrow() == SessionStatus::Exited(code)
+        {
             return;
         }
         Session::finish(&self.inner, code);
@@ -355,9 +383,11 @@ impl TerminalSession {
             // Writing may block until the program reads; keep it off the caller's
             // thread so a busy program cannot stall the UI, as the Swift session
             // does with its write queue.
-            let _ = thread::Builder::new().name("cove.terminal.pty.write".into()).spawn(move || {
-                process.write(&owned);
-            });
+            let _ = thread::Builder::new()
+                .name("cove.terminal.pty.write".into())
+                .spawn(move || {
+                    process.write(&owned);
+                });
         }
     }
 
@@ -401,19 +431,30 @@ impl TerminalSession {
             return;
         }
         self.inner.cell_size.set((cell_width, cell_height));
-        self.inner.engine.borrow_mut().resize(columns, rows, cell_width, cell_height);
+        self.inner
+            .engine
+            .borrow_mut()
+            .resize(columns, rows, cell_width, cell_height);
         let (columns, rows) = {
             let engine = self.inner.engine.borrow();
             (engine.columns(), engine.rows())
         };
         if let Some(process) = self.inner.process.borrow().as_ref() {
-            process.resize(PseudoTerminalSize::new(columns, rows, cell_width, cell_height));
+            process.resize(PseudoTerminalSize::new(
+                columns,
+                rows,
+                cell_width,
+                cell_height,
+            ));
         }
         *self.inner.frame.borrow_mut() = None;
     }
 
     pub fn set_default_colors(&self, foreground: TerminalRGB, background: TerminalRGB) {
-        self.inner.engine.borrow_mut().set_default_colors(foreground, background);
+        self.inner
+            .engine
+            .borrow_mut()
+            .set_default_colors(foreground, background);
         *self.inner.frame.borrow_mut() = None;
     }
 
@@ -424,7 +465,10 @@ impl TerminalSession {
     pub fn observe(&self, on_change: impl Fn() + 'static) -> usize {
         let token = self.inner.next_observer.get() + 1;
         self.inner.next_observer.set(token);
-        self.inner.observers.borrow_mut().insert(token, Rc::new(on_change));
+        self.inner
+            .observers
+            .borrow_mut()
+            .insert(token, Rc::new(on_change));
         token
     }
 
@@ -457,8 +501,16 @@ impl TerminalSession {
         self.inner.engine.borrow().has_selection()
     }
 
-    pub fn select(&self, phase: SelectionPhase, pointer: &TerminalPointer, rectangle: bool) -> bool {
-        self.inner.engine.borrow_mut().select(phase, pointer, rectangle)
+    pub fn select(
+        &self,
+        phase: SelectionPhase,
+        pointer: &TerminalPointer,
+        rectangle: bool,
+    ) -> bool {
+        self.inner
+            .engine
+            .borrow_mut()
+            .select(phase, pointer, rectangle)
     }
 
     pub fn clear_selection(&self) -> bool {
@@ -492,7 +544,10 @@ impl Session {
     fn finish(inner: &Rc<SessionInner>, code: i32) {
         *inner.process.borrow_mut() = None;
         *inner.status.borrow_mut() = SessionStatus::Exited(code);
-        Self::feed(inner, format!("\r\n[Process exited with code {code}]\r\n").as_bytes());
+        Self::feed(
+            inner,
+            format!("\r\n[Process exited with code {code}]\r\n").as_bytes(),
+        );
         Self::emit(inner, SessionEvent::Exited(code));
     }
 

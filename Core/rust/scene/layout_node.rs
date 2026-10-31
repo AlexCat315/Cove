@@ -4,7 +4,8 @@
 //! the flexbox pass it provided is implemented here: the same style vocabulary,
 //! the same measure-callback contract, and the same readback surface.
 use super::{
-    Align, BoxSizing, Direction, Display, Edge, FlexDirection, Gutter, Justify, Overflow, PositionType, Wrap,
+    Align, BoxSizing, Direction, Display, Edge, FlexDirection, Gutter, Justify, Overflow,
+    PositionType, Wrap,
 };
 use crate::{Point, Rect, Size, TextLayoutCacheEntry, TextMeasureInputs};
 use std::any::Any;
@@ -22,7 +23,11 @@ pub enum LayoutStyleValue {
 impl LayoutStyleValue {
     /// Prefer an explicit physical value; fall back to the logical one.
     fn or_logical(self, logical: LayoutStyleValue) -> LayoutStyleValue {
-        if matches!(self, Self::Auto) { logical } else { self }
+        if matches!(self, Self::Auto) {
+            logical
+        } else {
+            self
+        }
     }
     fn resolve(self, basis: Option<f32>) -> Option<f32> {
         match self {
@@ -44,9 +49,19 @@ pub struct LayoutInsets {
     pub left: f32,
 }
 impl LayoutInsets {
-    pub const ZERO: Self = Self { top: 0.0, right: 0.0, bottom: 0.0, left: 0.0 };
+    pub const ZERO: Self = Self {
+        top: 0.0,
+        right: 0.0,
+        bottom: 0.0,
+        left: 0.0,
+    };
     pub const fn new(top: f32, right: f32, bottom: f32, left: f32) -> Self {
-        Self { top, right, bottom, left }
+        Self {
+            top,
+            right,
+            bottom,
+            left,
+        }
     }
     pub fn horizontal(self) -> f32 {
         self.left + self.right
@@ -113,10 +128,25 @@ impl StyleEdges {
     /// Percentages resolve against the containing block's width, as in CSS/Yoga.
     fn resolve(self, basis: Option<f32>) -> LayoutInsets {
         let axis = |value: LayoutStyleValue| value.resolve(basis).unwrap_or(0.0);
-        LayoutInsets { top: axis(self.top), right: axis(self.right), bottom: axis(self.bottom), left: axis(self.left) }
+        LayoutInsets {
+            top: axis(self.top),
+            right: axis(self.right),
+            bottom: axis(self.bottom),
+            left: axis(self.left),
+        }
     }
     fn resolve_axis(self, horizontal: bool, basis: Option<f32>) -> (f32, f32) {
-        if horizontal { (self.left.resolve(basis).unwrap_or(0.0), self.right.resolve(basis).unwrap_or(0.0)) } else { (self.top.resolve(basis).unwrap_or(0.0), self.bottom.resolve(basis).unwrap_or(0.0)) }
+        if horizontal {
+            (
+                self.left.resolve(basis).unwrap_or(0.0),
+                self.right.resolve(basis).unwrap_or(0.0),
+            )
+        } else {
+            (
+                self.top.resolve(basis).unwrap_or(0.0),
+                self.bottom.resolve(basis).unwrap_or(0.0),
+            )
+        }
     }
 }
 
@@ -151,7 +181,12 @@ impl StyleBorder {
         }
     }
     fn insets(self) -> LayoutInsets {
-        LayoutInsets { top: self.top, right: self.right, bottom: self.bottom, left: self.left }
+        LayoutInsets {
+            top: self.top,
+            right: self.right,
+            bottom: self.bottom,
+            left: self.left,
+        }
     }
 }
 
@@ -257,7 +292,11 @@ pub struct CustomLayoutState {
 }
 impl CustomLayoutState {
     pub fn new(measure: CustomMeasure, place: CustomPlace) -> Self {
-        Self { measure: RefCell::new(measure), place: RefCell::new(place), placement_bounds: RefCell::new(None) }
+        Self {
+            measure: RefCell::new(measure),
+            place: RefCell::new(place),
+            placement_bounds: RefCell::new(None),
+        }
     }
     pub fn invalidate(&self) {
         *self.placement_bounds.borrow_mut() = None;
@@ -379,9 +418,20 @@ impl LayoutNode {
     /// Reassign this node's children to `ordered`, which must be the same set.
     pub fn reorder_children(&self, ordered: &[LayoutNode]) {
         let current = self.children();
-        assert_eq!(ordered.len(), current.len(), "LayoutNode.reorderChildren: count mismatch");
-        assert!(current.iter().all(|node| ordered.contains(node)), "LayoutNode.reorderChildren: membership mismatch");
-        if current.iter().zip(ordered).all(|(left, right)| left == right) {
+        assert_eq!(
+            ordered.len(),
+            current.len(),
+            "LayoutNode.reorderChildren: count mismatch"
+        );
+        assert!(
+            current.iter().all(|node| ordered.contains(node)),
+            "LayoutNode.reorderChildren: membership mismatch"
+        );
+        if current
+            .iter()
+            .zip(ordered)
+            .all(|(left, right)| left == right)
+        {
             return;
         }
         self.0.borrow_mut().children = ordered.to_vec();
@@ -508,7 +558,9 @@ impl LayoutNode {
         }
     }
     pub fn set_width(&self, value: Option<f32>) {
-        self.update_style(|style| style.width = value.map_or(LayoutStyleValue::Auto, LayoutStyleValue::Points));
+        self.update_style(|style| {
+            style.width = value.map_or(LayoutStyleValue::Auto, LayoutStyleValue::Points)
+        });
     }
     pub fn set_width_percent(&self, value: f32) {
         self.update_style(|style| style.width = LayoutStyleValue::Percent(value));
@@ -520,7 +572,9 @@ impl LayoutNode {
         }
     }
     pub fn set_height(&self, value: Option<f32>) {
-        self.update_style(|style| style.height = value.map_or(LayoutStyleValue::Auto, LayoutStyleValue::Points));
+        self.update_style(|style| {
+            style.height = value.map_or(LayoutStyleValue::Auto, LayoutStyleValue::Points)
+        });
     }
     pub fn set_height_percent(&self, value: f32) {
         self.update_style(|style| style.height = LayoutStyleValue::Percent(value));
@@ -551,7 +605,12 @@ impl LayoutNode {
     }
     /// A transient layout floor, independent of authored minimum constraints.
     pub fn set_minimum_size_floor(&self, size: Option<Size>) {
-        let normalized = size.filter(|size| size.width.is_finite() && size.height.is_finite()).map(|size| Size { width: size.width.max(0.0), height: size.height.max(0.0) });
+        let normalized = size
+            .filter(|size| size.width.is_finite() && size.height.is_finite())
+            .map(|size| Size {
+                width: size.width.max(0.0),
+                height: size.height.max(0.0),
+            });
         let previous: Option<Size> = self.attachment("__minimumSizeFloor");
         if previous == normalized {
             return;
@@ -563,8 +622,12 @@ impl LayoutNode {
         let floor: Option<Size> = self.attachment("__minimumSizeFloor");
         let style = self.0.borrow().style;
         (
-            floor.map_or(style.min_width, |floor| Some(style.min_width.unwrap_or(0.0).max(floor.width))),
-            floor.map_or(style.min_height, |floor| Some(style.min_height.unwrap_or(0.0).max(floor.height))),
+            floor.map_or(style.min_width, |floor| {
+                Some(style.min_width.unwrap_or(0.0).max(floor.width))
+            }),
+            floor.map_or(style.min_height, |floor| {
+                Some(style.min_height.unwrap_or(0.0).max(floor.height))
+            }),
         )
     }
     fn apply_minimum_size(&self) {
@@ -605,11 +668,19 @@ impl LayoutNode {
     }
     pub fn set_position(&self, value: f32, edge: Edge) {
         let direction = self.edge_direction();
-        self.update_style(|style| style.position.set(edge, LayoutStyleValue::Points(value), direction));
+        self.update_style(|style| {
+            style
+                .position
+                .set(edge, LayoutStyleValue::Points(value), direction)
+        });
     }
     pub fn set_position_percent(&self, value: f32, edge: Edge) {
         let direction = self.edge_direction();
-        self.update_style(|style| style.position.set(edge, LayoutStyleValue::Percent(value), direction));
+        self.update_style(|style| {
+            style
+                .position
+                .set(edge, LayoutStyleValue::Percent(value), direction)
+        });
     }
     pub fn set_position_auto(&self, edge: Edge) {
         let direction = self.edge_direction();
@@ -617,11 +688,19 @@ impl LayoutNode {
     }
     pub fn set_margin(&self, value: f32, edge: Edge) {
         let direction = self.edge_direction();
-        self.update_style(|style| style.margin.set(edge, LayoutStyleValue::Points(value), direction));
+        self.update_style(|style| {
+            style
+                .margin
+                .set(edge, LayoutStyleValue::Points(value), direction)
+        });
     }
     pub fn set_margin_percent(&self, value: f32, edge: Edge) {
         let direction = self.edge_direction();
-        self.update_style(|style| style.margin.set(edge, LayoutStyleValue::Percent(value), direction));
+        self.update_style(|style| {
+            style
+                .margin
+                .set(edge, LayoutStyleValue::Percent(value), direction)
+        });
     }
     pub fn set_margin_auto(&self, edge: Edge) {
         let direction = self.edge_direction();
@@ -629,11 +708,19 @@ impl LayoutNode {
     }
     pub fn set_padding(&self, value: f32, edge: Edge) {
         let direction = self.edge_direction();
-        self.update_style(|style| style.padding.set(edge, LayoutStyleValue::Points(value), direction));
+        self.update_style(|style| {
+            style
+                .padding
+                .set(edge, LayoutStyleValue::Points(value), direction)
+        });
     }
     pub fn set_padding_percent(&self, value: f32, edge: Edge) {
         let direction = self.edge_direction();
-        self.update_style(|style| style.padding.set(edge, LayoutStyleValue::Percent(value), direction));
+        self.update_style(|style| {
+            style
+                .padding
+                .set(edge, LayoutStyleValue::Percent(value), direction)
+        });
     }
     pub fn set_border(&self, value: f32, edge: Edge) {
         self.update_style(|style| style.border.set(edge, value));
@@ -681,10 +768,17 @@ impl LayoutNode {
     // MARK: - Attachments and text measure slot
 
     pub fn attachment<T: Clone + 'static>(&self, key: &str) -> Option<T> {
-        self.0.borrow().attachments.get(key).and_then(|value| value.downcast_ref::<T>().cloned())
+        self.0
+            .borrow()
+            .attachments
+            .get(key)
+            .and_then(|value| value.downcast_ref::<T>().cloned())
     }
     pub fn set_attachment<T: 'static>(&self, key: &str, value: T) {
-        self.0.borrow_mut().attachments.insert(key.to_owned(), Rc::new(value));
+        self.0
+            .borrow_mut()
+            .attachments
+            .insert(key.to_owned(), Rc::new(value));
     }
     pub fn text_measure(&self) -> Option<TextLayoutCacheEntry> {
         self.0.borrow().text_measure.clone()
@@ -716,15 +810,28 @@ impl LayoutNode {
         self.0.borrow_mut().dirty = true;
         self.mark_layout_dirty_hint();
     }
-    fn measure_size(&self, width: f32, width_mode: MeasureMode, height: f32, height_mode: MeasureMode) -> Size {
+    fn measure_size(
+        &self,
+        width: f32,
+        width_mode: MeasureMode,
+        height: f32,
+        height_mode: MeasureMode,
+    ) -> Size {
         let measure = self.0.borrow().measure.clone();
-        measure.map_or(Size::default(), |measure| measure(width, width_mode, height, height_mode))
+        measure.map_or(Size::default(), |measure| {
+            measure(width, width_mode, height, height_mode)
+        })
     }
 
     // MARK: - Layout calculation
 
     /// Run flex layout from this node as the root.
-    pub fn calculate_layout(&self, available_width: Option<f32>, available_height: Option<f32>, direction: Direction) {
+    pub fn calculate_layout(
+        &self,
+        available_width: Option<f32>,
+        available_height: Option<f32>,
+        direction: Direction,
+    ) {
         self.prepare_custom_layouts();
         let size = self.measure(None, None, available_width, available_height, direction);
         self.arrange(0.0, 0.0, size.width, size.height, direction);
@@ -738,7 +845,10 @@ impl LayoutNode {
     }
     /// The computed rectangle. Valid only after `calculate_layout` has been called.
     pub fn frame(&self) -> Rect {
-        self.0.borrow().placed_frame.unwrap_or_else(|| self.0.borrow().computed.frame())
+        self.0
+            .borrow()
+            .placed_frame
+            .unwrap_or_else(|| self.0.borrow().computed.frame())
     }
     pub fn computed(&self) -> ComputedLayout {
         self.0.borrow().computed
@@ -772,9 +882,16 @@ impl LayoutNode {
 
     // MARK: - Flex pass
 
-    fn resolved_style_insets(&self, basis: Option<f32>) -> (LayoutInsets, LayoutInsets, LayoutInsets) {
+    fn resolved_style_insets(
+        &self,
+        basis: Option<f32>,
+    ) -> (LayoutInsets, LayoutInsets, LayoutInsets) {
         let style = self.0.borrow().style;
-        let padding = self.0.borrow().debug_padding.unwrap_or_else(|| style.padding.resolve(basis));
+        let padding = self
+            .0
+            .borrow()
+            .debug_padding
+            .unwrap_or_else(|| style.padding.resolve(basis));
         let border = style.border.insets();
         let margin = style.margin.resolve(basis);
         (padding, border, margin)
@@ -794,7 +911,14 @@ impl LayoutNode {
         }
     }
 
-    fn measure(&self, owner_width: Option<f32>, owner_height: Option<f32>, avail_width: Option<f32>, avail_height: Option<f32>, direction: Direction) -> Size {
+    fn measure(
+        &self,
+        owner_width: Option<f32>,
+        owner_height: Option<f32>,
+        avail_width: Option<f32>,
+        avail_height: Option<f32>,
+        direction: Direction,
+    ) -> Size {
         let direction = self.effective_direction(direction);
         let style = self.0.borrow().style;
         if style.display == Display::None {
@@ -834,22 +958,36 @@ impl LayoutNode {
             }
         } else if let Some(custom) = self.0.borrow().custom.as_ref() {
             let children = self.children();
-            let measured = (custom.measure.borrow())(avail_width.map(|width| width - inset_width), avail_height.map(|height| height - inset_height), &children);
+            let measured = (custom.measure.borrow())(
+                avail_width.map(|width| width - inset_width),
+                avail_height.map(|height| height - inset_height),
+                &children,
+            );
             Size {
                 width: definite_width.unwrap_or(measured.width + inset_width),
                 height: definite_height.unwrap_or(measured.height + inset_height),
             }
         } else {
             let row = style.flex_direction.is_row();
-            let content_width = definite_width.map(|width| (width - inset_width).max(0.0)).or(avail_width.map(|width| (width - inset_width).max(0.0)));
-            let content_height = definite_height.map(|height| (height - inset_height).max(0.0)).or(avail_height.map(|height| (height - inset_height).max(0.0)));
-            let gap = if row { style.gap_column.resolve(content_width).unwrap_or(0.0) } else { style.gap_row.resolve(content_height).unwrap_or(0.0) };
+            let content_width = definite_width
+                .map(|width| (width - inset_width).max(0.0))
+                .or(avail_width.map(|width| (width - inset_width).max(0.0)));
+            let content_height = definite_height
+                .map(|height| (height - inset_height).max(0.0))
+                .or(avail_height.map(|height| (height - inset_height).max(0.0)));
+            let gap = if row {
+                style.gap_column.resolve(content_width).unwrap_or(0.0)
+            } else {
+                style.gap_row.resolve(content_height).unwrap_or(0.0)
+            };
             let mut main = 0.0f32;
             let mut cross: f32 = 0.0;
             let mut count = 0usize;
             for child in self.children() {
                 let child_style = child.style();
-                if child_style.display == Display::None || child_style.position_type == PositionType::Absolute {
+                if child_style.display == Display::None
+                    || child_style.position_type == PositionType::Absolute
+                {
                     continue;
                 }
                 let (_, _, child_margin) = child.resolved_style_insets(content_width);
@@ -858,7 +996,13 @@ impl LayoutNode {
                 } else {
                     (content_width, None)
                 };
-                let measured = child.measure(content_width, content_height, child_width, child_height, direction);
+                let measured = child.measure(
+                    content_width,
+                    content_height,
+                    child_width,
+                    child_height,
+                    direction,
+                );
                 if row {
                     main += measured.width + child_margin.horizontal();
                     cross = cross.max(measured.height + child_margin.vertical());
@@ -883,7 +1027,11 @@ impl LayoutNode {
                 let child_style = child.style();
                 child_style.display != Display::None
                     && child_style.position_type != PositionType::Absolute
-                    && (if row { child_style.height.is_auto() } else { child_style.width.is_auto() })
+                    && (if row {
+                        child_style.height.is_auto()
+                    } else {
+                        child_style.width.is_auto()
+                    })
             });
             if style.align_items == Align::Stretch && any_auto_cross {
                 if row {
@@ -895,8 +1043,16 @@ impl LayoutNode {
                 }
             }
             Size {
-                width: definite_width.unwrap_or(if row { main + inset_width } else { cross + inset_width }),
-                height: definite_height.unwrap_or(if row { cross + inset_height } else { main + inset_height }),
+                width: definite_width.unwrap_or(if row {
+                    main + inset_width
+                } else {
+                    cross + inset_width
+                }),
+                height: definite_height.unwrap_or(if row {
+                    cross + inset_height
+                } else {
+                    main + inset_height
+                }),
             }
         };
 
@@ -916,13 +1072,27 @@ impl LayoutNode {
         let direction = self.effective_direction(direction);
         let style = self.0.borrow().style;
         if style.display == Display::None {
-            self.0.borrow_mut().computed = ComputedLayout { left, top, width: 0.0, height: 0.0, ..ComputedLayout::default() };
+            self.0.borrow_mut().computed = ComputedLayout {
+                left,
+                top,
+                width: 0.0,
+                height: 0.0,
+                ..ComputedLayout::default()
+            };
             return;
         }
         let (padding, border, margin) = self.resolved_style_insets(Some(width));
         {
             let mut data = self.0.borrow_mut();
-            data.computed = ComputedLayout { left, top, width, height, padding, margin, border };
+            data.computed = ComputedLayout {
+                left,
+                top,
+                width,
+                height,
+                padding,
+                margin,
+                border,
+            };
         }
         let content = Rect::new(
             left + padding.left + border.left,
@@ -933,7 +1103,10 @@ impl LayoutNode {
         if let Some(custom) = self.0.borrow().custom.as_ref() {
             let children = self.children();
             let mut placement = custom.placement_bounds.borrow_mut();
-            if placement.as_ref().is_none_or(|(bounds, previous)| *bounds != content || *previous != direction) {
+            if placement
+                .as_ref()
+                .is_none_or(|(bounds, previous)| *bounds != content || *previous != direction)
+            {
                 *placement = Some((content, direction));
                 (custom.place.borrow())(content, &children);
             }
@@ -952,7 +1125,11 @@ impl LayoutNode {
         let reverse = style.flex_direction.is_reverse();
         let main_extent = if row { content.width } else { content.height };
         let cross_extent = if row { content.height } else { content.width };
-        let gap = if row { style.gap_column.resolve(Some(content.width)).unwrap_or(0.0) } else { style.gap_row.resolve(Some(content.height)).unwrap_or(0.0) };
+        let gap = if row {
+            style.gap_column.resolve(Some(content.width)).unwrap_or(0.0)
+        } else {
+            style.gap_row.resolve(Some(content.height)).unwrap_or(0.0)
+        };
 
         let mut flow: Vec<LayoutNode> = Vec::new();
         for child in children {
@@ -975,12 +1152,22 @@ impl LayoutNode {
             let child_style = child.style();
             let (_, _, child_margin) = child.resolved_style_insets(Some(content.width));
             let basis_value = if child_style.flex_basis.is_auto() {
-                if row { child_style.width } else { child_style.height }
+                if row {
+                    child_style.width
+                } else {
+                    child_style.height
+                }
             } else {
                 child_style.flex_basis
             };
             let resolved = basis_value.resolve(Some(main_extent));
-            let measured = child.measure(Some(content.width), Some(content.height), Some(main_extent), Some(cross_extent), direction);
+            let measured = child.measure(
+                Some(content.width),
+                Some(content.height),
+                Some(main_extent),
+                Some(cross_extent),
+                direction,
+            );
             let main = resolved.unwrap_or(if row { measured.width } else { measured.height });
             base.push(main);
             cross_sizes.push(if row { measured.height } else { measured.width });
@@ -992,9 +1179,21 @@ impl LayoutNode {
         let mut current: Vec<usize> = Vec::new();
         let mut used = 0.0f32;
         for (index, size) in base.iter().enumerate() {
-            let outer = size + if row { margins[index].horizontal() } else { margins[index].vertical() };
-            let with_gap = if current.is_empty() { outer } else { outer + gap };
-            if style.flex_wrap != Wrap::NoWrap && !current.is_empty() && used + with_gap > main_extent {
+            let outer = size
+                + if row {
+                    margins[index].horizontal()
+                } else {
+                    margins[index].vertical()
+                };
+            let with_gap = if current.is_empty() {
+                outer
+            } else {
+                outer + gap
+            };
+            if style.flex_wrap != Wrap::NoWrap
+                && !current.is_empty()
+                && used + with_gap > main_extent
+            {
                 lines.push(std::mem::take(&mut current));
                 used = outer;
             } else {
@@ -1009,11 +1208,29 @@ impl LayoutNode {
         // Grow / shrink each line, then place.
         let mut cross_cursor = 0.0f32;
         for (line_index, line) in lines.iter().enumerate() {
-            let line_gap = if line.len() > 1 { gap * (line.len() - 1) as f32 } else { 0.0 };
-            let occupied: f32 = line.iter().map(|&index| base[index] + if row { margins[index].horizontal() } else { margins[index].vertical() }).sum::<f32>() + line_gap;
+            let line_gap = if line.len() > 1 {
+                gap * (line.len() - 1) as f32
+            } else {
+                0.0
+            };
+            let occupied: f32 = line
+                .iter()
+                .map(|&index| {
+                    base[index]
+                        + if row {
+                            margins[index].horizontal()
+                        } else {
+                            margins[index].vertical()
+                        }
+                })
+                .sum::<f32>()
+                + line_gap;
             let free = main_extent - occupied;
             let total_grow: f32 = line.iter().map(|&index| flow[index].flex_grow()).sum();
-            let total_shrink: f32 = line.iter().map(|&index| flow[index].flex_shrink() * base[index]).sum();
+            let total_shrink: f32 = line
+                .iter()
+                .map(|&index| flow[index].flex_shrink() * base[index])
+                .sum();
             let mut sizes = Vec::with_capacity(line.len());
             for &index in line {
                 let child = &flow[index];
@@ -1024,33 +1241,68 @@ impl LayoutNode {
                     size += free * ((child.flex_shrink() * base[index]) / total_shrink);
                 }
                 let child_style = child.style();
-                size = clamp(size, if row { child_style.min_width } else { child_style.min_height }, if row { child_style.max_width } else { child_style.max_height });
+                size = clamp(
+                    size,
+                    if row {
+                        child_style.min_width
+                    } else {
+                        child_style.min_height
+                    },
+                    if row {
+                        child_style.max_width
+                    } else {
+                        child_style.max_height
+                    },
+                );
                 sizes.push(size.max(0.0));
             }
-            let line_main: f32 = sizes.iter().enumerate().map(|(offset, size)| size + if row { margins[line[offset]].horizontal() } else { margins[line[offset]].vertical() }).sum::<f32>() + line_gap;
+            let line_main: f32 = sizes
+                .iter()
+                .enumerate()
+                .map(|(offset, size)| {
+                    size + if row {
+                        margins[line[offset]].horizontal()
+                    } else {
+                        margins[line[offset]].vertical()
+                    }
+                })
+                .sum::<f32>()
+                + line_gap;
             let line_cross = line
                 .iter()
                 .enumerate()
                 .map(|(offset, &index)| {
                     let child = &flow[index];
-                    let measured = if row { cross_sizes[index] } else { cross_sizes[index] };
+                    let measured = if row {
+                        cross_sizes[index]
+                    } else {
+                        cross_sizes[index]
+                    };
                     let _ = child;
-                    measured + if row { margins[index].vertical() } else { margins[index].horizontal() } + sizes[offset] * 0.0
+                    measured
+                        + if row {
+                            margins[index].vertical()
+                        } else {
+                            margins[index].horizontal()
+                        }
+                        + sizes[offset] * 0.0
                 })
                 .fold(0.0f32, f32::max);
 
-            let (mut cursor, spacing) = justify_offsets(style.justify_content, main_extent, line_main, line.len());
+            let (mut cursor, spacing) =
+                justify_offsets(style.justify_content, main_extent, line_main, line.len());
             if reverse {
                 cursor = main_extent - line_main - cursor;
             }
             // Yoga resolves a non-stretch child's cross extent against the
             // container, not against the tallest child on the line. Only the
             // wrapped multi-line case subtracts the consumed cross cursor.
-            let line_cross_extent = if style.align_items == Align::Stretch || style.flex_wrap == Wrap::NoWrap {
-                cross_extent - cross_cursor
-            } else {
-                line_cross
-            };
+            let line_cross_extent =
+                if style.align_items == Align::Stretch || style.flex_wrap == Wrap::NoWrap {
+                    cross_extent - cross_cursor
+                } else {
+                    line_cross
+                };
             let mut cross_offset = cross_cursor;
             if style.flex_wrap != Wrap::NoWrap {
                 cross_offset = match style.align_content {
@@ -1064,11 +1316,30 @@ impl LayoutNode {
                 let child_style = child.style();
                 let child_main = sizes[offset];
                 let child_margin = margins[index];
-                let align = if child_style.align_self == Align::Auto { style.align_items } else { child_style.align_self };
-                let stretch = align == Align::Stretch && (if row { child_style.height.is_auto() } else { child_style.width.is_auto() });
+                let align = if child_style.align_self == Align::Auto {
+                    style.align_items
+                } else {
+                    child_style.align_self
+                };
+                let stretch = align == Align::Stretch
+                    && (if row {
+                        child_style.height.is_auto()
+                    } else {
+                        child_style.width.is_auto()
+                    });
                 let measured_cross = cross_sizes[index];
-                let available_cross = (line_cross_extent - if row { child_margin.vertical() } else { child_margin.horizontal() }).max(0.0);
-                let child_cross = if stretch { available_cross } else { measured_cross };
+                let available_cross = (line_cross_extent
+                    - if row {
+                        child_margin.vertical()
+                    } else {
+                        child_margin.horizontal()
+                    })
+                .max(0.0);
+                let child_cross = if stretch {
+                    available_cross
+                } else {
+                    measured_cross
+                };
                 let cross_shift = if stretch {
                     0.0
                 } else {
@@ -1088,33 +1359,72 @@ impl LayoutNode {
                     } else {
                         cursor
                     };
-                    (left + child_margin.left, cross_offset + cross_shift + child_margin.top)
+                    (
+                        left + child_margin.left,
+                        cross_offset + cross_shift + child_margin.top,
+                    )
                 } else {
-                    (cross_offset + cross_shift + child_margin.left, cursor + child_margin.top)
+                    (
+                        cross_offset + cross_shift + child_margin.left,
+                        cursor + child_margin.top,
+                    )
                 };
-                let (child_width, child_height) = if row { (child_main, child_cross) } else { (child_cross, child_main) };
-                child.arrange(content.x + child_left, content.y + child_top, child_width, child_height, direction);
+                let (child_width, child_height) = if row {
+                    (child_main, child_cross)
+                } else {
+                    (child_cross, child_main)
+                };
+                child.arrange(
+                    content.x + child_left,
+                    content.y + child_top,
+                    child_width,
+                    child_height,
+                    direction,
+                );
                 // `line_main` already counted the gap between items, so the
                 // cursor must advance by it too — otherwise a gap shrinks the
                 // content without moving anything, and the trailing items
                 // overlap the leading edge.
                 cursor += child_main
-                    + if row { child_margin.horizontal() } else { child_margin.vertical() }
+                    + if row {
+                        child_margin.horizontal()
+                    } else {
+                        child_margin.vertical()
+                    }
                     + if offset + 1 < line.len() { gap } else { 0.0 }
                     + spacing;
             }
-            cross_cursor += line_cross + if line_index + 1 < lines.len() { gap } else { 0.0 };
+            cross_cursor += line_cross
+                + if line_index + 1 < lines.len() {
+                    gap
+                } else {
+                    0.0
+                };
         }
 
         // Absolutely positioned children resolve against the padding box.
         for child in self.children() {
             let child_style = child.style();
-            if child_style.display == Display::None || child_style.position_type != PositionType::Absolute {
+            if child_style.display == Display::None
+                || child_style.position_type != PositionType::Absolute
+            {
                 continue;
             }
-            let measured = child.measure(Some(content.width), Some(content.height), Some(content.width), Some(content.height), direction);
-            let width = child_style.width.resolve(Some(content.width)).unwrap_or(measured.width);
-            let height = child_style.height.resolve(Some(content.height)).unwrap_or(measured.height);
+            let measured = child.measure(
+                Some(content.width),
+                Some(content.height),
+                Some(content.width),
+                Some(content.height),
+                direction,
+            );
+            let width = child_style
+                .width
+                .resolve(Some(content.width))
+                .unwrap_or(measured.width);
+            let height = child_style
+                .height
+                .resolve(Some(content.height))
+                .unwrap_or(measured.height);
             // Resolve logical start/end with the direction actually in force at
             // layout time. The eager physical value written by `set` is only a
             // fallback for nodes created before their direction was known.
@@ -1162,7 +1472,8 @@ impl LayoutNode {
         if self.direction() != Direction::Inherit {
             return self.direction();
         }
-        self.parent().map_or(Direction::Ltr, |parent| parent.custom_layout_direction())
+        self.parent()
+            .map_or(Direction::Ltr, |parent| parent.custom_layout_direction())
     }
     pub fn measure_for_custom_layout(&self, width: Option<f32>, height: Option<f32>) -> Size {
         let direction = self.custom_layout_direction();
@@ -1175,17 +1486,30 @@ impl LayoutNode {
     pub fn custom_layout_is_visible(&self) -> bool {
         self.0.borrow().placement_is_visible
     }
-    pub fn place_for_custom_layout(&self, at: Point, width: Option<f32>, height: Option<f32>, is_visible: bool) {
+    pub fn place_for_custom_layout(
+        &self,
+        at: Point,
+        width: Option<f32>,
+        height: Option<f32>,
+        is_visible: bool,
+    ) {
         self.0.borrow_mut().placement_is_visible = is_visible;
         if !is_visible {
             self.0.borrow_mut().placed_frame = Some(Rect::default());
             return;
         }
         let size = self.measure_for_custom_layout(width, height);
-        self.arrange(at.x, at.y, size.width, size.height, self.custom_layout_direction());
+        self.arrange(
+            at.x,
+            at.y,
+            size.width,
+            size.height,
+            self.custom_layout_direction(),
+        );
         self.place_custom_layouts();
         let computed = self.0.borrow().computed;
-        self.0.borrow_mut().placed_frame = Some(Rect::new(at.x, at.y, computed.width, computed.height));
+        self.0.borrow_mut().placed_frame =
+            Some(Rect::new(at.x, at.y, computed.width, computed.height));
     }
     fn prepare_custom_layouts(&self) {
         if !self.subtree_is_dirty() {
@@ -1239,7 +1563,11 @@ fn justify_offsets(justify: Justify, available: f32, occupied: f32, count: usize
             (spacing / 2.0, spacing)
         }
         Justify::SpaceEvenly => {
-            let spacing = if count > 0 { free / (count + 1) as f32 } else { 0.0 };
+            let spacing = if count > 0 {
+                free / (count + 1) as f32
+            } else {
+                0.0
+            };
             (spacing, spacing)
         }
     }
@@ -1313,7 +1641,14 @@ mod tests {
         let leaf = LayoutNode::new();
         let measure: MeasureFunc = Rc::new(|width, width_mode, _height, _height_mode| {
             let natural: f32 = 80.0;
-            Size { width: if width_mode == MeasureMode::AtMost { natural.min(width) } else { natural }, height: 18.0 }
+            Size {
+                width: if width_mode == MeasureMode::AtMost {
+                    natural.min(width)
+                } else {
+                    natural
+                },
+                height: 18.0,
+            }
         });
         leaf.set_measure_func(Some(measure));
         root.add_child(&leaf);

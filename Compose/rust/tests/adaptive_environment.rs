@@ -15,8 +15,8 @@ use cove_composition::{AnyView, View, ViewExt};
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{Environment, InputCapabilities, Size};
 use cove_ui_compose::BoxView;
-use cove_ui_compose::modifiers::layout::{FrameDimension, LayoutFrameExt};
 use cove_ui_compose::adaptive::{SurfaceEnvironmentExt, WidthClassReader};
+use cove_ui_compose::modifiers::layout::{FrameDimension, LayoutFrameExt};
 
 use support::GlobalTestLock;
 
@@ -86,7 +86,10 @@ fn minimum_floor_preserves_authored_minima() {
             .expect("boxed node");
         let layout = node.layout_node().expect("layout node");
 
-        layout.set_minimum_size_floor(Some(Size { width: 44.0, height: 44.0 }));
+        layout.set_minimum_size_floor(Some(Size {
+            width: 44.0,
+            height: 44.0,
+        }));
         graph.compute_layout(300.0, 200.0);
         assert_eq!(
             (node.frame().width, node.frame().height),

@@ -9,8 +9,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 use cove_core::Binding;
+use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 
 use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
@@ -18,12 +18,12 @@ use crate::primitives::controls::button::{Button, ButtonRole};
 use crate::primitives::controls::fields::search_field_model::{
     SearchAction, SearchFieldState, SearchKey,
 };
+use crate::primitives::text::Text;
 use crate::primitives::text::text_buffer::TextBuffer;
 use crate::primitives::text::text_field::{TextField, TextFieldDecoration, TextFieldEvents};
-use crate::primitives::text::Text;
-use crate::theme::styles::buttons::{ButtonStyle, ButtonStyleConfiguration, ButtonStyleViewExt};
 use crate::theme::SemanticColorRef;
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, TupleView, View};
+use crate::theme::styles::buttons::{ButtonStyle, ButtonStyleConfiguration, ButtonStyleViewExt};
+use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_view};
 
 /// Gap between the field and the suggestion list.
 const LIST_SPACING: f32 = 4.0;
@@ -125,10 +125,12 @@ impl SearchField {
             _ => return false,
         };
         let current = self.text.get().string_value();
-        let action = self
-            .state
-            .borrow_mut()
-            .handle_key(key, &current, &self.suggestions, self.clears_on_escape);
+        let action = self.state.borrow_mut().handle_key(
+            key,
+            &current,
+            &self.suggestions,
+            self.clears_on_escape,
+        );
         match action {
             SearchAction::None => false,
             SearchAction::MoveHighlight => true,
@@ -186,7 +188,9 @@ impl View for SearchField {
                     let state = state.clone();
                     let suggestions = suggestions.clone();
                     Rc::new(move |buffer: &TextBuffer| {
-                        state.borrow_mut().on_change(&buffer.string_value(), &suggestions);
+                        state
+                            .borrow_mut()
+                            .on_change(&buffer.string_value(), &suggestions);
                     })
                 }),
                 on_focus: Some({
@@ -194,7 +198,9 @@ impl View for SearchField {
                     let suggestions = suggestions.clone();
                     let text = field.text.clone();
                     Rc::new(move || {
-                        state.borrow_mut().on_focus(&text.get().string_value(), &suggestions);
+                        state
+                            .borrow_mut()
+                            .on_focus(&text.get().string_value(), &suggestions);
                     })
                 }),
                 on_blur: Some({
@@ -226,7 +232,11 @@ impl View for SearchField {
         }
         AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, LIST_SPACING,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                LIST_SPACING,
                 AnyView::new(TupleView::new(column)),
             )
             .frame_min_width(0.0),
@@ -282,7 +292,11 @@ impl PrimitiveView for SuggestionList {
         }
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(TupleView::new(rows)),
             )
             .semantic_border(SemanticColorRef::border(), 1.0),
@@ -307,10 +321,21 @@ impl ButtonStyle for SuggestionRowStyle {
         };
         AnyView::new(
             BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(configuration.label.clone()),
             )
-            .frame(Some(crate::modifiers::layout::FrameDimension::Percent(100.0)), None, None, None, None, None)
+            .frame(
+                Some(crate::modifiers::layout::FrameDimension::Percent(100.0)),
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
             .padding_edges(ROW_PADDING_HORIZONTAL, ROW_PADDING_VERTICAL)
             .background_color(fill)
             .foreground_color(if configuration.is_enabled {

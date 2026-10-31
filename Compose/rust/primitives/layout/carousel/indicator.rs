@@ -4,9 +4,9 @@
 //! a "3 / 12" count beyond, where dots stop being countable.
 use std::rc::Rc;
 
+use cove_composition::{AnyView, PrimitiveView, View};
 use cove_core::scene::{LayoutNode, Node};
 use cove_core::{Color, Rect};
-use cove_composition::{AnyView, PrimitiveView, View};
 
 use super::autoplay::CarouselAutoplaySession;
 use crate::impl_primitive_view;
@@ -77,11 +77,7 @@ impl PrimitiveView for CarouselProgressDot {
                 let _ = list.add_rounded_rect(rect, rect.height / 2.0, accent);
                 return;
             };
-            let _ = list.add_rounded_rect(
-                rect,
-                rect.height / 2.0,
-                accent.multiplied_alpha(0.3),
-            );
+            let _ = list.add_rounded_rect(rect, rect.height / 2.0, accent.multiplied_alpha(0.3));
             let filled = rect.height.max(rect.width * session.progress(interval));
             let _ = list.add_rounded_rect(
                 Rect::new(rect.x, rect.y, filled, rect.height),

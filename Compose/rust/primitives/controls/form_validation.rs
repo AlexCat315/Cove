@@ -11,8 +11,16 @@ pub struct FormIssue {
 }
 
 impl FormIssue {
-    pub fn new(field_id: impl Into<String>, label: impl Into<String>, message: impl Into<String>) -> Self {
-        Self { field_id: field_id.into(), label: label.into(), message: message.into() }
+    pub fn new(
+        field_id: impl Into<String>,
+        label: impl Into<String>,
+        message: impl Into<String>,
+    ) -> Self {
+        Self {
+            field_id: field_id.into(),
+            label: label.into(),
+            message: message.into(),
+        }
     }
     pub fn id(&self) -> &str {
         &self.field_id
@@ -28,13 +36,29 @@ pub struct FormRule {
 }
 
 impl FormRule {
-    pub fn new(field_id: impl Into<String>, label: impl Into<String>, validate: impl Fn() -> Option<String> + 'static) -> Self {
-        Self { field_id: field_id.into(), label: label.into(), validate: Rc::new(validate) }
+    pub fn new(
+        field_id: impl Into<String>,
+        label: impl Into<String>,
+        validate: impl Fn() -> Option<String> + 'static,
+    ) -> Self {
+        Self {
+            field_id: field_id.into(),
+            label: label.into(),
+            validate: Rc::new(validate),
+        }
     }
 
-    pub fn required(field_id: impl Into<String>, label: impl Into<String>, value: impl Fn() -> String + 'static) -> Self {
+    pub fn required(
+        field_id: impl Into<String>,
+        label: impl Into<String>,
+        value: impl Fn() -> String + 'static,
+    ) -> Self {
         Self::new(field_id, label, move || {
-            if value().trim().is_empty() { Some("This field is required.".to_string()) } else { None }
+            if value().trim().is_empty() {
+                Some("This field is required.".to_string())
+            } else {
+                None
+            }
         })
     }
 }
@@ -56,7 +80,11 @@ struct FormSession {
 
 impl Default for FormSession {
     fn default() -> Self {
-        Self { issues: Vec::new(), submission: FormSubmissionState::Editing, submit_count: 0 }
+        Self {
+            issues: Vec::new(),
+            submission: FormSubmissionState::Editing,
+            submit_count: 0,
+        }
     }
 }
 
@@ -74,7 +102,10 @@ impl Default for FormController {
 
 impl FormController {
     pub fn new() -> Self {
-        Self { session: RefCell::new(FormSession::default()), registrar: ObservableStateRegistrar::new() }
+        Self {
+            session: RefCell::new(FormSession::default()),
+            registrar: ObservableStateRegistrar::new(),
+        }
     }
 
     pub fn issues(&self) -> Vec<FormIssue> {
@@ -97,11 +128,15 @@ impl FormController {
     }
 
     pub fn error(&self, field_id: &str) -> Option<String> {
-        self.issues().into_iter().find(|issue| issue.field_id == field_id).map(|issue| issue.message)
+        self.issues()
+            .into_iter()
+            .find(|issue| issue.field_id == field_id)
+            .map(|issue| issue.message)
     }
 
     pub fn validate(&self, rules: &[FormRule]) -> bool {
-        let unique: std::collections::HashSet<&str> = rules.iter().map(|rule| rule.field_id.as_str()).collect();
+        let unique: std::collections::HashSet<&str> =
+            rules.iter().map(|rule| rule.field_id.as_str()).collect();
         assert_eq!(unique.len(), rules.len(), "Form field IDs must be unique");
         let issues: Vec<FormIssue> = rules
             .iter()
@@ -110,7 +145,11 @@ impl FormController {
                 if message.is_empty() {
                     None
                 } else {
-                    Some(FormIssue::new(rule.field_id.clone(), rule.label.clone(), message))
+                    Some(FormIssue::new(
+                        rule.field_id.clone(),
+                        rule.label.clone(),
+                        message,
+                    ))
                 }
             })
             .collect();

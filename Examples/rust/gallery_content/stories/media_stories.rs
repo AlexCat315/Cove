@@ -2,8 +2,8 @@
 //!
 //! Swift sources: `GalleryContent/Stories/Feedback/{SkeletonStory,RatingSample}.swift`.
 
-use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::State;
+use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::fields::Slider;
@@ -13,9 +13,7 @@ use cove_ui_compose::primitives::data::avatar::Avatar;
 use cove_ui_compose::primitives::media::{Skeleton, SkeletonShape};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
-use cove_ui_compose::{
-    AnyView, BoxView, DynamicField, LayoutDebugExt, TupleView, View, ViewExt,
-};
+use cove_ui_compose::{AnyView, BoxView, DynamicField, LayoutDebugExt, TupleView, View, ViewExt};
 
 use super::feedback::StorySection;
 use crate::gallery_content::catalog::GalleryOptions;
@@ -23,19 +21,19 @@ use crate::gallery_content::catalog::GalleryOptions;
 /// A row of labelled checkboxes, matching the story's control cluster.
 fn toggle_row(label: &'static str, is_on: State<bool>, is_enabled: bool) -> AnyView {
     let binding = is_on.binding();
-    AnyView::new(
-        BoxView::new(
-            FlexDirection::Row,
-            Align::Center,
-            Justify::FlexStart,
-            Wrap::NoWrap,
-            8.0,
-            AnyView::new(TupleView::new(vec![
-                AnyView::new(Checkbox::from_boolean(binding).enabled(is_enabled)),
-                AnyView::new(Text::new(label).semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())),
-            ])),
-        ),
-    )
+    AnyView::new(BoxView::new(
+        FlexDirection::Row,
+        Align::Center,
+        Justify::FlexStart,
+        Wrap::NoWrap,
+        8.0,
+        AnyView::new(TupleView::new(vec![
+            AnyView::new(Checkbox::from_boolean(binding).enabled(is_enabled)),
+            AnyView::new(
+                Text::new(label).semantic_font(cove_ui_compose::theme::SemanticFontRef::caption()),
+            ),
+        ])),
+    ))
 }
 
 /// `SkeletonStory`: the placeholder preserves the content layout.
@@ -72,7 +70,11 @@ impl View for SkeletonStory {
         let loading = self.loading.get();
         let animated = self.animated.get();
         let toggle_state = self.loading.clone();
-        let label = if loading { "Show content" } else { "Load again" };
+        let label = if loading {
+            "Show content"
+        } else {
+            "Load again"
+        };
 
         let header_controls = AnyView::new(TupleView::new(vec![
             AnyView::new(
@@ -86,13 +88,11 @@ impl View for SkeletonStory {
 
         let profile = if loading {
             AnyView::new(TupleView::new(vec![
-                AnyView::new(
-                    Skeleton::new().configure(|skeleton| {
-                        skeleton.appearance.shape = SkeletonShape::Circle;
-                        skeleton.appearance.height = 48.0;
-                        skeleton.motion.is_animated = animated;
-                    }),
-                ),
+                AnyView::new(Skeleton::new().configure(|skeleton| {
+                    skeleton.appearance.shape = SkeletonShape::Circle;
+                    skeleton.appearance.height = 48.0;
+                    skeleton.motion.is_animated = animated;
+                })),
                 AnyView::new(
                     Skeleton::new()
                         .configure(|skeleton| {
@@ -114,8 +114,15 @@ impl View for SkeletonStory {
         } else {
             AnyView::new(TupleView::new(vec![
                 AnyView::new(Avatar::new("Ada Lovelace")),
-                AnyView::new(Text::new("Ada Lovelace").semantic_font(cove_ui_compose::theme::SemanticFontRef::body_strong())),
-                AnyView::new(Text::new("Analytical Engine · Maintainer").semantic_font(cove_ui_compose::theme::SemanticFontRef::caption()).semantic_foreground(SemanticColorRef::on_surface_muted())),
+                AnyView::new(
+                    Text::new("Ada Lovelace")
+                        .semantic_font(cove_ui_compose::theme::SemanticFontRef::body_strong()),
+                ),
+                AnyView::new(
+                    Text::new("Analytical Engine · Maintainer")
+                        .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
+                        .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                ),
             ]))
         };
 
@@ -190,7 +197,11 @@ pub struct RatingSample {
 
 impl RatingSample {
     pub fn new(options: GalleryOptions) -> Self {
-        Self { options, value: State::new(3.0), limit: State::new(5.0) }
+        Self {
+            options,
+            value: State::new(3.0),
+            limit: State::new(5.0),
+        }
     }
 
     pub fn value(&self) -> f64 {
@@ -226,7 +237,9 @@ impl View for RatingSample {
                             AnyView::new(limit),
                             AnyView::new(
                                 Text::new(format!("{value:.1} of {:.0}", self.limit.get()))
-                                    .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
+                                    .semantic_font(
+                                        cove_ui_compose::theme::SemanticFontRef::caption(),
+                                    )
                                     .semantic_foreground(SemanticColorRef::on_surface_muted()),
                             ),
                         ])),

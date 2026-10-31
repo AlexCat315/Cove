@@ -6,12 +6,14 @@
 
 use crate::desktop::application::composition::MainComposition;
 use crate::desktop::application::configuration::{
-    AppWindowRendering, ApplicationConfiguration, AppWindowTitleBarStyle,
+    AppWindowRendering, AppWindowTitleBarStyle, ApplicationConfiguration,
 };
 use crate::desktop::application::memory::AppWindowMemorySnapshot;
 use crate::desktop::application::typography::AdaptiveApplicationContent;
 use crate::desktop::rendering::context::AppRenderingContext;
-use crate::desktop::window::chrome::{self, AppWindowChromeContextHolder, WindowChromeHitTestCollector};
+use crate::desktop::window::chrome::{
+    self, AppWindowChromeContextHolder, WindowChromeHitTestCollector,
+};
 use crate::desktop::window::native_renderer::AppWindowRenderer;
 use cove_composition::{AnyView, ViewGraph};
 use cove_core::scene::{LayerAwareNodeRenderer, NodeRenderer, NodeTree, Recomposer};
@@ -19,7 +21,9 @@ use cove_core::{DrawList, Environment, State};
 use cove_platform::WindowId;
 use cove_runtime::{NativeAccessibility, PlatformWindowSession, Sdl3PlatformHost};
 use cove_shell::{NativeRenderSurface, WindowChromeHitTest};
-use cove_ui_compose::primitives::overlays::portal::portal_registry::{PortalStore, PortalStoreAmbient};
+use cove_ui_compose::primitives::overlays::portal::portal_registry::{
+    PortalStore, PortalStoreAmbient,
+};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -52,7 +56,10 @@ pub struct AuxiliaryAppWindow {
 }
 
 impl AuxiliaryAppWindow {
-    #[allow(clippy::too_many_arguments, reason = "translated window constructor carries the shared services and per-window rendering overrides")]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "translated window constructor carries the shared services and per-window rendering overrides"
+    )]
     pub fn new(
         session: Rc<PlatformWindowSession>,
         root_view: AnyView,
@@ -68,7 +75,10 @@ impl AuxiliaryAppWindow {
         draw_list.geometry_antialiasing = window_rendering
             .geometry_antialiasing
             .unwrap_or(config.rendering.geometry_antialiasing);
-        let graph = Rc::new(ViewGraph::new(session.tree.clone(), session.recomposer.clone()));
+        let graph = Rc::new(ViewGraph::new(
+            session.tree.clone(),
+            session.recomposer.clone(),
+        ));
         Self {
             session,
             graph,
@@ -137,9 +147,7 @@ impl AuxiliaryAppWindow {
         // Scope this window's overlay store for every consumer that reads the
         // process ambient, so one window's popover cannot paint into another's.
         let ambient: Rc<dyn cove_core::scene::ScopedAmbient> =
-            Rc::new(PortalStoreScope::new(
-                self.portal_store.clone(),
-            ));
+            Rc::new(PortalStoreScope::new(self.portal_store.clone()));
         session.input_context.add_scoped_ambient(ambient);
         session.with_current(|| {
             configure_text_environment(session.content_scale_factor());
@@ -176,13 +184,17 @@ impl AuxiliaryAppWindow {
 
     pub fn set_presentation_active(&mut self, active: bool) -> Result<(), String> {
         match &mut self.window_renderer {
-            Some(renderer) => renderer.set_presentation_active(active).map_err(|e| e.to_string()),
+            Some(renderer) => renderer
+                .set_presentation_active(active)
+                .map_err(|e| e.to_string()),
             None => Ok(()),
         }
     }
 
     pub fn memory_snapshot(&self) -> Option<AppWindowMemorySnapshot> {
-        self.window_renderer.as_ref().map(|renderer| renderer.memory_snapshot())
+        self.window_renderer
+            .as_ref()
+            .map(|renderer| renderer.memory_snapshot())
     }
 
     pub fn trim_memory(&self) {
@@ -225,7 +237,10 @@ impl AuxiliaryAppWindow {
     fn sync_window_chrome_hit_test(&self) {
         let tree = self.session.tree.borrow();
         let Some(root) = tree.root() else { return };
-        let next = self.window_chrome_hit_test_collector.borrow_mut().collect(&root);
+        let next = self
+            .window_chrome_hit_test_collector
+            .borrow_mut()
+            .collect(&root);
         let mut last = self.last_window_chrome_hit_test.borrow_mut();
         match next {
             Some(next) => {
@@ -250,13 +265,17 @@ impl AuxiliaryAppWindow {
         configure_text_environment: &dyn Fn(f32),
         upload_atlas_if_needed: &dyn Fn(bool) -> Result<(), String>,
     ) -> bool {
-        let Some(renderer) = &self.window_renderer else { return false };
+        let Some(renderer) = &self.window_renderer else {
+            return false;
+        };
         if !renderer.is_configured() {
             return false;
         }
         let (root, timeline) = {
             let tree = self.session.tree.borrow();
-            let Some(root) = tree.root() else { return false };
+            let Some(root) = tree.root() else {
+                return false;
+            };
             (root, tree.timeline.clone())
         };
 
@@ -278,7 +297,9 @@ impl AuxiliaryAppWindow {
             if use_legacy {
                 node_renderer.render(&root, &mut list);
             } else {
-                layer_renderer.borrow_mut().render(graph.render_tree(), &mut list);
+                layer_renderer
+                    .borrow_mut()
+                    .render(graph.render_tree(), &mut list);
             }
         });
 
@@ -287,7 +308,9 @@ impl AuxiliaryAppWindow {
         }
 
         let list = self.draw_list.borrow();
-        let Some(renderer) = &mut self.window_renderer else { return false };
+        let Some(renderer) = &mut self.window_renderer else {
+            return false;
+        };
         match renderer.draw(&list, (logical.0 as f32, logical.1 as f32)) {
             Ok(presented) => {
                 if !presented {
@@ -335,7 +358,11 @@ impl AuxiliaryWindowServices {
         rendering: Rc<AppRenderingContext>,
         config: ApplicationConfiguration,
     ) -> Self {
-        Self { composition, rendering, config }
+        Self {
+            composition,
+            rendering,
+            config,
+        }
     }
 
     /// Builds a fresh tree/recomposer/portal-store trio for a new window, as

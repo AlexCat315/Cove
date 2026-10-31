@@ -65,7 +65,12 @@ pub struct GUID {
 
 impl GUID {
     pub const fn new(data1: u32, data2: u16, data3: u16, data4: [u8; 8]) -> Self {
-        Self { data1, data2, data3, data4 }
+        Self {
+            data1,
+            data2,
+            data3,
+            data4,
+        }
     }
 
     pub fn is_null(&self) -> bool {
@@ -74,48 +79,92 @@ impl GUID {
 }
 
 /// `IUnknown`.
-pub const IID_IUNKNOWN: GUID =
-    GUID::new(0x0000_0000, 0x0000, 0x0000, [0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46]);
+pub const IID_IUNKNOWN: GUID = GUID::new(
+    0x0000_0000,
+    0x0000,
+    0x0000,
+    [0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46],
+);
 
 /// `ID3D12Device`.
-pub const IID_ID3D12_DEVICE: GUID =
-    GUID::new(0x1898_198E, 0xCAFE, 0x4A7F, [0xA1, 0x8B, 0x3E, 0x85, 0xD5, 0xB9, 0x6E, 0x3E]);
+pub const IID_ID3D12_DEVICE: GUID = GUID::new(
+    0x1898_198E,
+    0xCAFE,
+    0x4A7F,
+    [0xA1, 0x8B, 0x3E, 0x85, 0xD5, 0xB9, 0x6E, 0x3E],
+);
 
 /// `ID3D12CommandQueue`.
-pub const IID_ID3D12_COMMAND_QUEUE: GUID =
-    GUID::new(0x0EC8_706A, 0x05C0, 0x41EA, [0x88, 0x9B, 0x8A, 0xB8, 0x56, 0x8D, 0x1E, 0x42]);
+pub const IID_ID3D12_COMMAND_QUEUE: GUID = GUID::new(
+    0x0EC8_706A,
+    0x05C0,
+    0x41EA,
+    [0x88, 0x9B, 0x8A, 0xB8, 0x56, 0x8D, 0x1E, 0x42],
+);
 
 /// `ID3D12CommandAllocator`.
-pub const IID_ID3D12_COMMAND_ALLOCATOR: GUID =
-    GUID::new(0x6102_ACEE, 0x37A4, 0x4DCE, [0xA2, 0xC3, 0x5A, 0xF8, 0x42, 0x53, 0x32, 0x5F]);
+pub const IID_ID3D12_COMMAND_ALLOCATOR: GUID = GUID::new(
+    0x6102_ACEE,
+    0x37A4,
+    0x4DCE,
+    [0xA2, 0xC3, 0x5A, 0xF8, 0x42, 0x53, 0x32, 0x5F],
+);
 
 /// `ID3D12GraphicsCommandList`.
-pub const IID_ID3D12_GRAPHICS_COMMAND_LIST: GUID =
-    GUID::new(0x5B16_00F2, 0xBD9E, 0x4C04, [0x8C, 0x1E, 0x3E, 0x1E, 0x7E, 0x7C, 0x0F, 0x9B]);
+pub const IID_ID3D12_GRAPHICS_COMMAND_LIST: GUID = GUID::new(
+    0x5B16_00F2,
+    0xBD9E,
+    0x4C04,
+    [0x8C, 0x1E, 0x3E, 0x1E, 0x7E, 0x7C, 0x0F, 0x9B],
+);
 
 /// `ID3D12Fence`.
-pub const IID_ID3D12_FENCE: GUID =
-    GUID::new(0x0A75_3F7C, 0x8AFA, 0x4481, [0xA1, 0x24, 0x81, 0x09, 0x4D, 0x2D, 0x8F, 0x62]);
+pub const IID_ID3D12_FENCE: GUID = GUID::new(
+    0x0A75_3F7C,
+    0x8AFA,
+    0x4481,
+    [0xA1, 0x24, 0x81, 0x09, 0x4D, 0x2D, 0x8F, 0x62],
+);
 
 /// `IDXGIFactory4`.
-pub const IID_IDXGI_FACTORY4: GUID =
-    GUID::new(0x1BC6_EA46, 0x2EE5, 0x48B4, [0xB2, 0x9A, 0x24, 0x15, 0x2C, 0x66, 0xE6, 0x4C]);
+pub const IID_IDXGI_FACTORY4: GUID = GUID::new(
+    0x1BC6_EA46,
+    0x2EE5,
+    0x48B4,
+    [0xB2, 0x9A, 0x24, 0x15, 0x2C, 0x66, 0xE6, 0x4C],
+);
 
 /// `IDXGISwapChain3`.
-pub const IID_IDXGI_SWAP_CHAIN3: GUID =
-    GUID::new(0x94D9_9C4E, 0x9EA0, 0x4CD0, [0xA4, 0x29, 0x59, 0xB2, 0xBB, 0x6A, 0xB5, 0x52]);
+pub const IID_IDXGI_SWAP_CHAIN3: GUID = GUID::new(
+    0x94D9_9C4E,
+    0x9EA0,
+    0x4CD0,
+    [0xA4, 0x29, 0x59, 0xB2, 0xBB, 0x6A, 0xB5, 0x52],
+);
 
 /// `ID3D12RootSignature`.
-pub const IID_ID3D12_ROOT_SIGNATURE: GUID =
-    GUID::new(0xC54A_6DE6, 0x0D0D, 0x4D26, [0x88, 0x9E, 0x5C, 0x92, 0xDB, 0xFC, 0x0D, 0x0D]);
+pub const IID_ID3D12_ROOT_SIGNATURE: GUID = GUID::new(
+    0xC54A_6DE6,
+    0x0D0D,
+    0x4D26,
+    [0x88, 0x9E, 0x5C, 0x92, 0xDB, 0xFC, 0x0D, 0x0D],
+);
 
 /// `ID3D12PipelineState`.
-pub const IID_ID3D12_PIPELINE_STATE: GUID =
-    GUID::new(0x765A_30FD, 0x7A35, 0x453B, [0x8A, 0xA1, 0x90, 0x6B, 0x1D, 0x5C, 0x46, 0x0B]);
+pub const IID_ID3D12_PIPELINE_STATE: GUID = GUID::new(
+    0x765A_30FD,
+    0x7A35,
+    0x453B,
+    [0x8A, 0xA1, 0x90, 0x6B, 0x1D, 0x5C, 0x46, 0x0B],
+);
 
 /// `ID3D12Resource`.
-pub const IID_ID3D12_RESOURCE: GUID =
-    GUID::new(0x6964_420D, 0xD24B, 0x4BE1, [0x9C, 0x1C, 0xA0, 0x1B, 0x5B, 0x1C, 0xE8, 0x9A]);
+pub const IID_ID3D12_RESOURCE: GUID = GUID::new(
+    0x6964_420D,
+    0xD24B,
+    0x4BE1,
+    [0x9C, 0x1C, 0xA0, 0x1B, 0x5B, 0x1C, 0xE8, 0x9A],
+);
 
 // MARK: - Enumerations
 
@@ -777,12 +826,8 @@ pub struct ID3D12DeviceVtbl {
         *const GUID,
         *mut *mut c_void,
     ) -> HRESULT,
-    pub CreateCommandAllocator: unsafe extern "system" fn(
-        *mut c_void,
-        u32,
-        *const GUID,
-        *mut *mut c_void,
-    ) -> HRESULT,
+    pub CreateCommandAllocator:
+        unsafe extern "system" fn(*mut c_void, u32, *const GUID, *mut *mut c_void) -> HRESULT,
     pub CreateGraphicsPipelineState: unsafe extern "system" fn(
         *mut c_void,
         *const D3D12_GRAPHICS_PIPELINE_STATE_DESC,
@@ -805,7 +850,8 @@ pub struct ID3D12DeviceVtbl {
         *mut *mut c_void,
     ) -> HRESULT,
     /// `CheckFeatureSupport`.
-    pub CheckFeatureSupport: unsafe extern "system" fn(*mut c_void, u32, *mut c_void, u32) -> HRESULT,
+    pub CheckFeatureSupport:
+        unsafe extern "system" fn(*mut c_void, u32, *mut c_void, u32) -> HRESULT,
     /// The remaining methods are not called; their slots keep later offsets right.
     pub CreateDescriptorHeap: unsafe extern "system" fn(
         *mut c_void,
@@ -827,18 +873,16 @@ pub struct ID3D12DeviceVtbl {
     pub CreateUnorderedAccessView: usize,
     pub CreateRenderTargetView: usize,
     pub CreateDepthStencilView: usize,
-    pub CreateSampler:
-        unsafe extern "system" fn(*mut c_void, *const D3D12_SAMPLER_DESC, D3D12_CPU_DESCRIPTOR_HANDLE),
+    pub CreateSampler: unsafe extern "system" fn(
+        *mut c_void,
+        *const D3D12_SAMPLER_DESC,
+        D3D12_CPU_DESCRIPTOR_HANDLE,
+    ),
     pub CopyDescriptors: usize,
     pub CopyDescriptorsSimple: usize,
     /// `CreateFence`.
-    pub CreateFence: unsafe extern "system" fn(
-        *mut c_void,
-        u64,
-        u32,
-        *const GUID,
-        *mut *mut c_void,
-    ) -> HRESULT,
+    pub CreateFence:
+        unsafe extern "system" fn(*mut c_void, u64, u32, *const GUID, *mut *mut c_void) -> HRESULT,
 }
 
 /// `IUnknown`-derived interface pointer. Every COM pointer is stored as a raw
@@ -908,6 +952,9 @@ mod tests {
             },
         };
         assert_eq!(barrier.Transition.Subresource, u32::MAX);
-        assert_eq!(barrier.Transition.StateAfter, D3D12_RESOURCE_STATE_COPY_DEST);
+        assert_eq!(
+            barrier.Transition.StateAfter,
+            D3D12_RESOURCE_STATE_COPY_DEST
+        );
     }
 }

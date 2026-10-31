@@ -44,7 +44,13 @@ fn identity_is_transparent() {
 
     assert_point(parent.absolute_origin(), Point { x: 100.0, y: 50.0 });
     assert_point(child.absolute_origin(), Point { x: 110.0, y: 70.0 });
-    assert_eq!(child.absolute_frame().size(), Size { width: 50.0, height: 30.0 });
+    assert_eq!(
+        child.absolute_frame().size(),
+        Size {
+            width: 50.0,
+            height: 30.0
+        }
+    );
     assert_point(
         child.convert_from_window(Point { x: 125.0, y: 85.0 }),
         Point { x: 15.0, y: 15.0 },
@@ -59,7 +65,10 @@ fn scale_about_top_left_keeps_origin_and_shrinks_frame() {
     assert_point(child.absolute_origin(), Point { x: 100.0, y: 40.0 });
     assert_eq!(
         child.absolute_frame().size(),
-        Size { width: 100.0, height: 50.0 }
+        Size {
+            width: 100.0,
+            height: 50.0
+        }
     );
 }
 
@@ -73,9 +82,21 @@ fn scale_about_centre_pulls_origin_toward_centre() {
     // the near edges.
     assert_point(child.absolute_origin(), Point { x: 150.0, y: 65.0 });
     let frame = child.absolute_frame();
-    assert_eq!(frame.size(), Size { width: 100.0, height: 50.0 });
-    assert!((frame.x + frame.width / 2.0 - 200.0).abs() < 1e-6, "midX stays 200");
-    assert!((frame.y + frame.height / 2.0 - 90.0).abs() < 1e-6, "midY stays 90");
+    assert_eq!(
+        frame.size(),
+        Size {
+            width: 100.0,
+            height: 50.0
+        }
+    );
+    assert!(
+        (frame.x + frame.width / 2.0 - 200.0).abs() < 1e-6,
+        "midX stays 200"
+    );
+    assert!(
+        (frame.y + frame.height / 2.0 - 90.0).abs() < 1e-6,
+        "midY stays 90"
+    );
 }
 
 #[test]
@@ -133,7 +154,10 @@ fn scale_composes_down_the_tree() {
 
     // The group's own frame grows about its top-left, and the child sits at
     // that same point — scaled twice over, because it is inside it.
-    assert_eq!(group.absolute_frame(), Rect::new(100.0, 100.0, 400.0, 400.0));
+    assert_eq!(
+        group.absolute_frame(),
+        Rect::new(100.0, 100.0, 400.0, 400.0)
+    );
     assert_eq!(child.absolute_frame(), Rect::new(100.0, 100.0, 80.0, 80.0));
 }
 
@@ -149,7 +173,10 @@ fn nested_scales_multiply() {
 
     assert_eq!(
         inner.absolute_frame().size(),
-        Size { width: 600.0, height: 600.0 }
+        Size {
+            width: 600.0,
+            height: 600.0
+        }
     );
 }
 

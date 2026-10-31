@@ -1,9 +1,9 @@
 //! Translation of Android/CoveAndroidApp/SurfaceSession.swift.
 
+use super::AndroidApplication;
 use super::content::scene::HostedScene;
 use super::frame::gpu_timings::GpuTimingReporter;
 use super::frame::timings::{FrameTimings, Phase};
-use super::AndroidApplication;
 use crate::android::contract::frame_clock::DisplayFrameClock;
 use cove_core::DrawList;
 use cove_graphics::rhi::{
@@ -42,7 +42,9 @@ impl SurfaceSession {
         let swapchain = device
             .with_frame_session(|| {
                 device.make_swapchain(
-                    SurfaceDescriptor::new(window).with_size(width, height).with_vsync(vsync),
+                    SurfaceDescriptor::new(window)
+                        .with_size(width, height)
+                        .with_vsync(vsync),
                 )
             })
             .map_err(|error| error.to_string())?;
@@ -101,8 +103,8 @@ impl SurfaceSession {
 
     pub fn frame(&mut self, timestamp: u64) -> Result<bool, String> {
         let delta_time = self.clock.advance(timestamp);
-        let needs_frame = self.application.runtime().benchmark
-            || self.application.scene().borrow().needs_frame();
+        let needs_frame =
+            self.application.runtime().benchmark || self.application.scene().borrow().needs_frame();
         if !needs_frame {
             return Ok(false);
         }
@@ -132,7 +134,8 @@ impl SurfaceSession {
     fn present_frame(&mut self) -> RhiResult<bool> {
         let device: Arc<Device> = self.application.device();
         let renderer = self.application.renderer();
-        self.timings.measure_result(Phase::FrameSlot, || device.begin_frame())?;
+        self.timings
+            .measure_result(Phase::FrameSlot, || device.begin_frame())?;
         struct EndFrame<'a> {
             device: &'a Device,
         }
@@ -142,9 +145,9 @@ impl SurfaceSession {
             }
         }
         let _end = EndFrame { device: &device };
-        let image = self
-            .timings
-            .measure_result(Phase::DrawableAcquire, || device.acquire_swapchain_image(self.swapchain))?;
+        let image = self.timings.measure_result(Phase::DrawableAcquire, || {
+            device.acquire_swapchain_image(self.swapchain)
+        })?;
         let atlas = self.application.scene().borrow().font_atlas();
         self.timings.measure_result(Phase::AtlasUpload, || {
             renderer.borrow().upload_font_atlas(&atlas, 1)
@@ -180,28 +183,27 @@ impl SurfaceSession {
         let framebuffer_texture = self.framebuffer.as_ref().map(|buffer| buffer.texture());
         let target_texture = framebuffer_texture.unwrap_or(image.texture);
         let target = framebuffer_texture.is_some();
-        let record = self.timings.measure_result(Phase::CommandRecord, || -> RhiResult<_> {
-            let mut renderer = renderer.borrow_mut();
-            let frame = renderer.record(
-                &list,
-                &mut commands,
-                RenderColorTarget::clearing(
-                    target_texture,
-                    [0.025, 0.035, 0.06, 1.0],
-                ),
-                viewport,
-                framebuffer_texture,
-            )?;
-            if target {
-                renderer.record_blit(
-                    target_texture,
+        let record = self
+            .timings
+            .measure_result(Phase::CommandRecord, || -> RhiResult<_> {
+                let mut renderer = renderer.borrow_mut();
+                let frame = renderer.record(
+                    &list,
                     &mut commands,
-                    RenderColorTarget::new(image.texture),
-                    [image.width, image.height],
+                    RenderColorTarget::clearing(target_texture, [0.025, 0.035, 0.06, 1.0]),
+                    viewport,
+                    framebuffer_texture,
                 )?;
-            }
-            Ok(frame)
-        });
+                if target {
+                    renderer.record_blit(
+                        target_texture,
+                        &mut commands,
+                        RenderColorTarget::new(image.texture),
+                        [image.width, image.height],
+                    )?;
+                }
+                Ok(frame)
+            });
         let frame = record?;
         self.timings.measure_result(Phase::QueueSubmit, || {
             device.submit(&commands, QueueClass::Graphics, &[], &[], None)
@@ -209,7 +211,8 @@ impl SurfaceSession {
         let mut frame = frame;
         frame.did_submit();
         atlas.mark_clean();
-        self.timings.measure_result(Phase::Present, || device.present(image))?;
+        self.timings
+            .measure_result(Phase::Present, || device.present(image))?;
         self.application.scene().borrow_mut().did_present();
         Ok(true)
     }

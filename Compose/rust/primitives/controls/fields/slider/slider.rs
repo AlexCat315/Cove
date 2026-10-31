@@ -5,9 +5,9 @@
 //! hit testing and drawing live in a leaf primitive host.
 use std::rc::Rc;
 
-use cove_core::Binding;
 use crate::theme::ControlSizeEnvironment;
 use crate::{AnyView, View};
+use cove_core::Binding;
 
 use super::host::{SliderAxis, SliderHost};
 
@@ -42,7 +42,11 @@ impl Slider {
     }
 
     pub fn step(mut self, step: f64) -> Self {
-        self.step = if step.is_finite() && step > 0.0 { Some(step) } else { None };
+        self.step = if step.is_finite() && step > 0.0 {
+            Some(step)
+        } else {
+            None
+        };
         self
     }
 

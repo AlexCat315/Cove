@@ -1,7 +1,7 @@
 //! Immutable diagnostic intervals and their squiggle/decoration geometry.
 
-use cove_core::{DrawList, Point, TextLayoutResult};
 use crate::theme::Theme;
+use cove_core::{DrawList, Point, TextLayoutResult};
 use std::ops::Range;
 use std::rc::Rc;
 

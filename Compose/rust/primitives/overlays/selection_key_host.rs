@@ -1,11 +1,11 @@
 //! Keyboard boundary for collection controls; child inputs keep first refusal.
+use crate::{AnyView, PrimitiveView, View};
 use cove_core::scene::{
     Align, EventPhase, EventResult, FlexDirection, FocusChainHolder, InputHandlerRole,
-    InputHandlerRoute, InputRoutingPriority, InteractionRegistryHolder, LayoutNode,
-    Node, PointerCaptureHolder,
+    InputHandlerRoute, InputRoutingPriority, InteractionRegistryHolder, LayoutNode, Node,
+    PointerCaptureHolder,
 };
 use cove_platform::KeyEvent;
-use crate::{AnyView, PrimitiveView, View};
 use std::rc::Rc;
 
 pub struct SelectionKeyHost {
@@ -20,7 +20,11 @@ impl SelectionKeyHost {
         is_enabled: bool,
         on_key: impl Fn(&KeyEvent) -> bool + 'static,
     ) -> Self {
-        Self { is_enabled, on_key: Rc::new(on_key), content: AnyView::new(content) }
+        Self {
+            is_enabled,
+            on_key: Rc::new(on_key),
+            content: AnyView::new(content),
+        }
     }
 }
 
@@ -42,7 +46,9 @@ impl PrimitiveView for SelectionKeyHost {
                 PointerCaptureHolder::release_current();
             }
             if let Some(chain) = FocusChainHolder::current()
-                && chain.focused().is_some_and(|focused| chain.contains(&focused, node))
+                && chain
+                    .focused()
+                    .is_some_and(|focused| chain.contains(&focused, node))
             {
                 chain.clear();
             }
@@ -56,10 +62,20 @@ impl PrimitiveView for SelectionKeyHost {
                 InputRoutingPriority::NORMAL,
                 "selection-key-host",
             );
-            registry.set_key(node, route, Rc::new(move |event, phase| {
-                if !enabled || phase == EventPhase::Capture { return EventResult::Ignored; }
-                if on_key(event) { EventResult::Handled } else { EventResult::Ignored }
-            }));
+            registry.set_key(
+                node,
+                route,
+                Rc::new(move |event, phase| {
+                    if !enabled || phase == EventPhase::Capture {
+                        return EventResult::Ignored;
+                    }
+                    if on_key(event) {
+                        EventResult::Handled
+                    } else {
+                        EventResult::Ignored
+                    }
+                }),
+            );
         }
     }
 
@@ -72,9 +88,13 @@ impl PrimitiveView for SelectionKeyHost {
         Some(layout)
     }
 
-    fn children(&self, _node: &Node) -> Vec<AnyView> { vec![self.content.clone()] }
+    fn children(&self, _node: &Node) -> Vec<AnyView> {
+        vec![self.content.clone()]
+    }
 }
 
 impl View for SelectionKeyHost {
-    fn kind(&self) -> crate::ViewKind<'_> { crate::ViewKind::Primitive(self) }
+    fn kind(&self) -> crate::ViewKind<'_> {
+        crate::ViewKind::Primitive(self)
+    }
 }

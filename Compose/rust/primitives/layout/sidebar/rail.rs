@@ -3,13 +3,13 @@
 //! Narrow rail presentation: one glyph per destination, optional labels, and no
 //! trailing accessories. The rail keeps the same destination nodes as the
 //! expanded sidebar, so switching presentation preserves selection and drafts.
-use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{ButtonIcon, ButtonIconSource};
 use crate::primitives::text::Text;
-use crate::theme::{theme_for_node, SemanticFontRef};
+use crate::theme::{SemanticFontRef, theme_for_node};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
+use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 
 use super::items::SidebarItem;
 
@@ -24,7 +24,13 @@ pub struct SidebarRail {
 
 impl SidebarRail {
     pub fn new(items: Vec<SidebarItem<u64>>) -> Self {
-        Self { items, shows_labels: false, width: None, is_vertical: true, on_activate: None }
+        Self {
+            items,
+            shows_labels: false,
+            width: None,
+            is_vertical: true,
+            on_activate: None,
+        }
     }
 
     pub fn shows_labels(mut self, shows_labels: bool) -> Self {
@@ -97,16 +103,22 @@ impl View for SidebarRail {
                 on_activate,
             }));
         }
-        let content = AnyView::new(
-            BoxView::new(
-                if self.is_vertical { FlexDirection::Column } else { FlexDirection::Row },
-                if self.is_vertical { Align::Center } else { Align::Center },
-                Justify::FlexStart,
-                Wrap::NoWrap,
-                4.0,
-                AnyView::new(TupleView::new(children)),
-            ),
-        );
+        let content = AnyView::new(BoxView::new(
+            if self.is_vertical {
+                FlexDirection::Column
+            } else {
+                FlexDirection::Row
+            },
+            if self.is_vertical {
+                Align::Center
+            } else {
+                Align::Center
+            },
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            4.0,
+            AnyView::new(TupleView::new(children)),
+        ));
         let content = match self.width {
             Some(width) => AnyView::new(content.frame_width(width)),
             None => content,
@@ -155,7 +167,12 @@ impl PrimitiveView for RailDestination {
         };
         let mut column: Vec<AnyView> = vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::Center, Wrap::NoWrap, 0.0, glyph,
+                FlexDirection::Row,
+                Align::Center,
+                Justify::Center,
+                Wrap::NoWrap,
+                0.0,
+                glyph,
             )
             .frame_size(24.0, 24.0),
         )];
@@ -170,7 +187,11 @@ impl PrimitiveView for RailDestination {
         let _ = self.on_activate.as_ref().map(|handler| handler(self.id));
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Center, Justify::Center, Wrap::NoWrap, 2.0,
+                FlexDirection::Column,
+                Align::Center,
+                Justify::Center,
+                Wrap::NoWrap,
+                2.0,
                 AnyView::new(TupleView::new(column)),
             )
             .frame(None, None, Some(44.0), Some(44.0), None, None)

@@ -13,11 +13,11 @@
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
-use cove_core::scene::{
-    AnimatorScheduler, FocusChain, FocusChainHolder, InteractionRegistry, InteractionRegistryHolder,
-    Node, NodeTree, PointerCapture, PointerCaptureHolder, Recomposer,
-};
 use cove_composition::{LayoutDebugAttachmentKey, ViewGraph};
+use cove_core::scene::{
+    AnimatorScheduler, FocusChain, FocusChainHolder, InteractionRegistry,
+    InteractionRegistryHolder, Node, NodeTree, PointerCapture, PointerCaptureHolder, Recomposer,
+};
 use std::rc::Rc;
 
 use cove_core::{Font, FontWeight};
@@ -97,7 +97,12 @@ impl TestScene {
             std::rc::Rc::new(std::cell::RefCell::new(NodeTree::new())),
             std::rc::Rc::new(Recomposer::new()),
         ));
-        Self { graph, interactions, focus_chain, pointer_capture }
+        Self {
+            graph,
+            interactions,
+            focus_chain,
+            pointer_capture,
+        }
     }
 
     /// Runs `body` under the global lock with fresh holders and a fresh
@@ -106,7 +111,9 @@ impl TestScene {
         GlobalTestLock::with_scheduler(|| {
             let mut scene = Self::new();
             body(&mut scene);
-            scene.graph.install(cove_composition::EmptyView, Default::default());
+            scene
+                .graph
+                .install(cove_composition::EmptyView, Default::default());
             AnimatorScheduler::current().tick(1.0);
             InteractionRegistryHolder::set_current(None);
             FocusChainHolder::set_current(None);
@@ -125,7 +132,9 @@ impl TestScene {
 
     /// The node carrying `name` as its layout debug name.
     pub fn named(&self, name: &str) -> Option<Node> {
-        self.nodes().into_iter().find(|node| debug_name(node).as_deref() == Some(name))
+        self.nodes()
+            .into_iter()
+            .find(|node| debug_name(node).as_deref() == Some(name))
     }
 }
 
@@ -194,7 +203,9 @@ pub struct DebugNode {
 
 impl DebugNode {
     pub fn new(label: impl Into<String>) -> Self {
-        Self { label: label.into() }
+        Self {
+            label: label.into(),
+        }
     }
 }
 

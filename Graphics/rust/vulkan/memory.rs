@@ -88,7 +88,10 @@ impl VulkanMemoryAllocator {
         }
     }
 
-    pub fn new(context: &VulkanContext, memory_properties: sys::VkPhysicalDeviceMemoryProperties) -> Self {
+    pub fn new(
+        context: &VulkanContext,
+        memory_properties: sys::VkPhysicalDeviceMemoryProperties,
+    ) -> Self {
         Self {
             device: context.device,
             core: context.core,
@@ -104,11 +107,7 @@ impl VulkanMemoryAllocator {
 
     /// Resolves a memory type satisfying `memory_type_bits` and every required
     /// property bit, or `None`.
-    pub fn find_memory_type(
-        &self,
-        memory_type_bits: u32,
-        required_flags: u32,
-    ) -> Option<u32> {
+    pub fn find_memory_type(&self, memory_type_bits: u32, required_flags: u32) -> Option<u32> {
         for index in 0..self.memory_properties.memoryTypeCount {
             if memory_type_bits & (1 << index) == 0 {
                 continue;
@@ -147,18 +146,14 @@ impl VulkanMemoryAllocator {
 
         // Best fit over existing blocks of this type.
         for block_index in 0..self.blocks.len() {
-            let Some(block) = &mut self.blocks[block_index] else { continue };
+            let Some(block) = &mut self.blocks[block_index] else {
+                continue;
+            };
             if block.memory_type_index != type_index {
                 continue;
             }
             if let Some(offset) = take_free_region(block, size, alignment) {
-                return Ok(Self::commit(
-                    block_index,
-                    block,
-                    offset,
-                    size,
-                    self.device,
-                ));
+                return Ok(Self::commit(block_index, block, offset, size, self.device));
             }
         }
 
@@ -169,8 +164,10 @@ impl VulkanMemoryAllocator {
             self.block_size.max(Self::align(size, alignment))
         };
         let coherent = self.memory_properties.memoryTypes[type_index as usize].propertyFlags
-            & (sys::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | sys::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
-            == (sys::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | sys::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+            & (sys::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+                | sys::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+            == (sys::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+                | sys::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
         let block = self.create_block(block_size, type_index, coherent)?;
         let block_index = match self.blocks.iter().position(Option::is_none) {
             Some(index) => {
@@ -207,8 +204,12 @@ impl VulkanMemoryAllocator {
     /// that becomes wholly free is released, so retired presentation images do
     /// not pin memory for the process lifetime.
     pub fn free(&mut self, allocation: VulkanMemoryAllocation) {
-        let Some(Some(block)) = self.blocks.get_mut(allocation.block_index) else { return };
-        block.free_regions.push((allocation.offset, allocation.size));
+        let Some(Some(block)) = self.blocks.get_mut(allocation.block_index) else {
+            return;
+        };
+        block
+            .free_regions
+            .push((allocation.offset, allocation.size));
         block.free_regions.sort_by_key(|(offset, _)| *offset);
         let mut merged: Vec<(sys::VkDeviceSize, sys::VkDeviceSize)> = Vec::new();
         for (offset, size) in block.free_regions.drain(..) {
@@ -227,7 +228,9 @@ impl VulkanMemoryAllocator {
             && block.free_regions[0].0 == 0
             && block.free_regions[0].1 == block.size;
         if wholly_free {
-            let block = self.blocks[allocation.block_index].take().expect("checked above");
+            let block = self.blocks[allocation.block_index]
+                .take()
+                .expect("checked above");
             // SAFETY: the block is wholly unallocated, so nothing references its
             // memory; unmapping and freeing it here is the documented teardown.
             unsafe {
@@ -468,7 +471,10 @@ mod tests {
             block_size: DEFAULT_BLOCK_SIZE,
             acceleration_structures_enabled: false,
         };
-        assert_eq!(allocator.find_memory_type(0b11, sys::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT), Some(0));
+        assert_eq!(
+            allocator.find_memory_type(0b11, sys::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT),
+            Some(0)
+        );
         assert_eq!(
             allocator.find_memory_type(0b11, sys::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT),
             Some(1)

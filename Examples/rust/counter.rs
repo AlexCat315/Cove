@@ -9,14 +9,14 @@
 
 use cove_core::scene::{
     Align, CompositionLocal, EventPhase, EventResult, FlexDirection, FocusChainHolder, HoverPhase,
-    InputHandlerRoute, InteractionRegistryHolder, Justify, LayoutNode, Node,
-    PointerCaptureHolder, PointerPhase, Wrap,
+    InputHandlerRoute, InteractionRegistryHolder, Justify, LayoutNode, Node, PointerCaptureHolder,
+    PointerPhase, Wrap,
 };
 use cove_core::{Color, Point, State};
 use cove_platform::{MouseButton, SystemCursor};
 use cove_ui_compose::{
-    impl_primitive_view, AnyView, BoxView, DynamicField, LayoutDebugExt, PrimitiveView, TupleView,
-    View, ViewExt,
+    AnyView, BoxView, DynamicField, LayoutDebugExt, PrimitiveView, TupleView, View, ViewExt,
+    impl_primitive_view,
 };
 
 use std::collections::BTreeMap;
@@ -71,7 +71,9 @@ impl CounterText {
 pub struct ProvidedPainter(pub Rc<CounterTextPainter>);
 
 impl ProvidedPainter {
-    pub fn new(painter: impl Fn(&CounterTextRun, &mut cove_core::DrawList, Point) + 'static) -> Self {
+    pub fn new(
+        painter: impl Fn(&CounterTextRun, &mut cove_core::DrawList, Point) + 'static,
+    ) -> Self {
         Self(Rc::new(painter))
     }
 
@@ -146,7 +148,9 @@ impl CounterView {
 
     /// Applies a checkpoint, or leaves the state untouched and returns `false`.
     pub fn restore(&self, values: &BTreeMap<String, String>) -> bool {
-        let Some(count) = values.get("count").and_then(|value| value.parse::<i32>().ok())
+        let Some(count) = values
+            .get("count")
+            .and_then(|value| value.parse::<i32>().ok())
         else {
             return false;
         };
@@ -172,7 +176,8 @@ impl CounterView {
     }
 
     pub fn increment(&self) {
-        self.count.update(|count| *count = (*count + 1).min(MAXIMUM_COUNT));
+        self.count
+            .update(|count| *count = (*count + 1).min(MAXIMUM_COUNT));
     }
 
     pub fn reset(&self) {
@@ -260,13 +265,26 @@ impl View for CounterView {
                     1.0,
                     increment,
                 )),
-                AnyView::new(DemoButton::new("Reset", CounterDebugName::RESET, 1.0, reset)),
+                AnyView::new(DemoButton::new(
+                    "Reset",
+                    CounterDebugName::RESET,
+                    1.0,
+                    reset,
+                )),
             ])),
         ));
 
-        let theme_label = if dark.get() { "Light theme" } else { "Dark theme" };
-        let theme_button =
-            AnyView::new(DemoButton::new(theme_label, CounterDebugName::THEME, 0.0, toggle));
+        let theme_label = if dark.get() {
+            "Light theme"
+        } else {
+            "Dark theme"
+        };
+        let theme_button = AnyView::new(DemoButton::new(
+            theme_label,
+            CounterDebugName::THEME,
+            0.0,
+            toggle,
+        ));
 
         let note_field = AnyView::new(DemoNote::new(note, foreground));
 
@@ -378,7 +396,8 @@ impl DemoInsets {
 
 impl cove_ui_compose::ViewModifier for DemoInsets {
     fn scope_apply(&self, node: &Node) -> Option<bool> {
-        let environment = node.composition_value(&cove_ui_compose::adaptive::SurfaceEnvironment::key());
+        let environment =
+            node.composition_value(&cove_ui_compose::adaptive::SurfaceEnvironment::key());
         let safe_area = environment.safe_area.normalized();
         let Some(layout) = node.layout_node() else {
             return Some(false);
@@ -526,61 +545,70 @@ impl PrimitiveView for DemoButton {
         let press_node = node.downgrade();
         let capture_node = node.downgrade();
         let action = self.action.clone();
-        registry.set_pointer(node, InputHandlerRoute::control(), Rc::new(move |event, phase, delivery| {
-            if delivery != EventPhase::Target || event.button != MouseButton::Left {
-                return EventResult::Ignored;
-            }
-            let Some(node) = Node::upgrade(&press_node) else {
-                return EventResult::Ignored;
-            };
-            match phase {
-                PointerPhase::Down => {
-                    node.set_attachment(PRESSED, true);
-                    if let Some(capture) = PointerCaptureHolder::current() {
-                        if let Some(target) = Node::upgrade(&capture_node) {
-                            capture.acquire(&target, true);
+        registry.set_pointer(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, phase, delivery| {
+                if delivery != EventPhase::Target || event.button != MouseButton::Left {
+                    return EventResult::Ignored;
+                }
+                let Some(node) = Node::upgrade(&press_node) else {
+                    return EventResult::Ignored;
+                };
+                match phase {
+                    PointerPhase::Down => {
+                        node.set_attachment(PRESSED, true);
+                        if let Some(capture) = PointerCaptureHolder::current() {
+                            if let Some(target) = Node::upgrade(&capture_node) {
+                                capture.acquire(&target, true);
+                            }
                         }
+                        EventResult::Handled
                     }
-                    EventResult::Handled
+                    PointerPhase::Up => {
+                        let pressed = node.attachment::<bool>(PRESSED) == Some(true);
+                        node.remove_attachment(PRESSED);
+                        if let Some(capture) = PointerCaptureHolder::current() {
+                            capture.release();
+                        }
+                        let inside = node.absolute_frame().contains(Point::new(event.x, event.y));
+                        if pressed && inside {
+                            action();
+                        }
+                        EventResult::Handled
+                    }
                 }
-                PointerPhase::Up => {
-                    let pressed = node.attachment::<bool>(PRESSED) == Some(true);
-                    node.remove_attachment(PRESSED);
-                    if let Some(capture) = PointerCaptureHolder::current() {
-                        capture.release();
-                    }
-                    let inside = node
-                        .absolute_frame()
-                        .contains(Point::new(event.x, event.y));
-                    if pressed && inside {
-                        action();
-                    }
-                    EventResult::Handled
-                }
-            }
-        }));
+            }),
+        );
 
         let _key_node = node.downgrade();
         let key_action = self.action.clone();
-        registry.set_key(node, InputHandlerRoute::control(), Rc::new(move |event, delivery| {
-            if delivery != EventPhase::Target
-                || event.is_repeat
-                || !matches!(event.scancode, 40 | 44)
-            {
-                return EventResult::Ignored;
-            }
-            key_action();
-            EventResult::Handled
-        }));
+        registry.set_key(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, delivery| {
+                if delivery != EventPhase::Target
+                    || event.is_repeat
+                    || !matches!(event.scancode, 40 | 44)
+                {
+                    return EventResult::Ignored;
+                }
+                key_action();
+                EventResult::Handled
+            }),
+        );
 
         let hover_node = node.clone();
-        registry.set_hover(node, Rc::new(move |phase| {
-            hover_node.set_background_color(Some(if phase == HoverPhase::Enter {
-                BUTTON_BACKGROUND_HOVER
-            } else {
-                BUTTON_BACKGROUND
-            }));
-        }));
+        registry.set_hover(
+            node,
+            Rc::new(move |phase| {
+                hover_node.set_background_color(Some(if phase == HoverPhase::Enter {
+                    BUTTON_BACKGROUND_HOVER
+                } else {
+                    BUTTON_BACKGROUND
+                }));
+            }),
+        );
 
         // A focused button draws the theme's focus ring above its own chrome.
         let focus_node = node.downgrade();
@@ -588,8 +616,7 @@ impl PrimitiveView for DemoButton {
             let Some(node) = Node::upgrade(&focus_node) else {
                 return;
             };
-            let visible = FocusChainHolder::current()
-                .is_some_and(|chain| chain.is_focus_visible());
+            let visible = FocusChainHolder::current().is_some_and(|chain| chain.is_focus_visible());
             if !visible {
                 return;
             }
@@ -622,9 +649,24 @@ impl PrimitiveView for DemoButton {
 
 impl_primitive_view!(DemoButton);
 
-const BUTTON_BACKGROUND: Color = Color { r: 40.0 / 255.0, g: 130.0 / 255.0, b: 235.0 / 255.0, a: 1.0 };
-const BUTTON_BACKGROUND_HOVER: Color = Color { r: 29.0 / 255.0, g: 110.0 / 255.0, b: 210.0 / 255.0, a: 1.0 };
-const FOCUS_RING: Color = Color { r: 250.0 / 255.0, g: 180.0 / 255.0, b: 40.0 / 255.0, a: 1.0 };
+const BUTTON_BACKGROUND: Color = Color {
+    r: 40.0 / 255.0,
+    g: 130.0 / 255.0,
+    b: 235.0 / 255.0,
+    a: 1.0,
+};
+const BUTTON_BACKGROUND_HOVER: Color = Color {
+    r: 29.0 / 255.0,
+    g: 110.0 / 255.0,
+    b: 210.0 / 255.0,
+    a: 1.0,
+};
+const FOCUS_RING: Color = Color {
+    r: 250.0 / 255.0,
+    g: 180.0 / 255.0,
+    b: 40.0 / 255.0,
+    a: 1.0,
+};
 
 impl_primitive_view!(DemoNote);
 
@@ -698,42 +740,54 @@ impl PrimitiveView for DemoNote {
         };
         let text_value = self.value.clone();
         let text_node = node.downgrade();
-        registry.set_text(node, InputHandlerRoute::control(), Rc::new(move |text, phase| {
-            if phase != EventPhase::Target {
-                return EventResult::Ignored;
-            }
-            let mut next = text_value.get();
-            next.push_str(text);
-            text_value.set(next.graphemes(true).take(MAXIMUM_NOTE_LENGTH).collect());
-            if let Some(node) = Node::upgrade(&text_node) {
-                node.remove_attachment(PREEDIT);
-            }
-            EventResult::Handled
-        }));
+        registry.set_text(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |text, phase| {
+                if phase != EventPhase::Target {
+                    return EventResult::Ignored;
+                }
+                let mut next = text_value.get();
+                next.push_str(text);
+                text_value.set(next.graphemes(true).take(MAXIMUM_NOTE_LENGTH).collect());
+                if let Some(node) = Node::upgrade(&text_node) {
+                    node.remove_attachment(PREEDIT);
+                }
+                EventResult::Handled
+            }),
+        );
 
         let editing_node = node.downgrade();
-        registry.set_editing(node, InputHandlerRoute::control(), Rc::new(move |event, phase| {
-            if phase != EventPhase::Target {
-                return EventResult::Ignored;
-            }
-            let Some(node) = Node::upgrade(&editing_node) else {
-                return EventResult::Ignored;
-            };
-            node.set_attachment(PREEDIT, event.text.clone());
-            node.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("preedit"));
-            EventResult::Handled
-        }));
+        registry.set_editing(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, phase| {
+                if phase != EventPhase::Target {
+                    return EventResult::Ignored;
+                }
+                let Some(node) = Node::upgrade(&editing_node) else {
+                    return EventResult::Ignored;
+                };
+                node.set_attachment(PREEDIT, event.text.clone());
+                node.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("preedit"));
+                EventResult::Handled
+            }),
+        );
 
         let delete_value = self.value.clone();
-        registry.set_key(node, InputHandlerRoute::control(), Rc::new(move |event, phase| {
-            if phase != EventPhase::Target || event.scancode != 42 {
-                return EventResult::Ignored;
-            }
-            let mut current = delete_value.get();
-            current.pop();
-            delete_value.set(current);
-            EventResult::Handled
-        }));
+        registry.set_key(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, phase| {
+                if phase != EventPhase::Target || event.scancode != 42 {
+                    return EventResult::Ignored;
+                }
+                let mut current = delete_value.get();
+                current.pop();
+                delete_value.set(current);
+                EventResult::Handled
+            }),
+        );
     }
 
     fn update_layout(&self, layout: &LayoutNode) {

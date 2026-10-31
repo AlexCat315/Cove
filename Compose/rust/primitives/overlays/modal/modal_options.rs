@@ -1,7 +1,7 @@
 //! Translation of Primitives/Overlays/Modal/ModalOptions.swift.
-use cove_core::{Size, Viewport};
 use crate::animation::transition::Transition;
 use crate::theme::SemanticColorRef;
+use cove_core::{Size, Viewport};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum ModalPlacement {
@@ -24,7 +24,13 @@ pub struct ModalGeometry {
 
 impl Default for ModalGeometry {
     fn default() -> Self {
-        Self { width: 760.0, height: 560.0, inset: 16.0, corner_radius: 10.0, placement: ModalPlacement::Center }
+        Self {
+            width: 760.0,
+            height: 560.0,
+            inset: 16.0,
+            corner_radius: 10.0,
+            placement: ModalPlacement::Center,
+        }
     }
 }
 
@@ -34,10 +40,26 @@ impl ModalGeometry {
     }
 
     pub fn validate(&mut self) {
-        self.width = if self.width.is_finite() { self.width.max(64.0) } else { 760.0 };
-        self.height = if self.height.is_finite() { self.height.max(64.0) } else { 560.0 };
-        self.inset = if self.inset.is_finite() { self.inset.max(0.0) } else { 16.0 };
-        self.corner_radius = if self.corner_radius.is_finite() { self.corner_radius.max(0.0) } else { 10.0 };
+        self.width = if self.width.is_finite() {
+            self.width.max(64.0)
+        } else {
+            760.0
+        };
+        self.height = if self.height.is_finite() {
+            self.height.max(64.0)
+        } else {
+            560.0
+        };
+        self.inset = if self.inset.is_finite() {
+            self.inset.max(0.0)
+        } else {
+            16.0
+        };
+        self.corner_radius = if self.corner_radius.is_finite() {
+            self.corner_radius.max(0.0)
+        } else {
+            10.0
+        };
     }
 
     pub fn validated(mut self) -> Self {
@@ -47,7 +69,8 @@ impl ModalGeometry {
 
     /// Centered dialogs keep an 8 pt margin on a compact window.
     pub fn fit_compact_window(&mut self, size: Size) {
-        if self.placement != ModalPlacement::Center || size.width >= Viewport::COMPACT_MAXIMUM_WIDTH {
+        if self.placement != ModalPlacement::Center || size.width >= Viewport::COMPACT_MAXIMUM_WIDTH
+        {
             return;
         }
         self.inset = self.inset.min(8.0);
@@ -73,7 +96,10 @@ pub struct ModalDismissal {
 
 impl Default for ModalDismissal {
     fn default() -> Self {
-        Self { closes_on_backdrop: true, closes_on_escape: true }
+        Self {
+            closes_on_backdrop: true,
+            closes_on_escape: true,
+        }
     }
 }
 

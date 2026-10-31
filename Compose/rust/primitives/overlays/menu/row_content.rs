@@ -3,8 +3,8 @@
 //! Optional presentation for one menu row. `MenuItem::title` stays the
 //! accessible name and the type-ahead key, so rich titles never change how a row
 //! is found or announced.
-use cove_core::scene::Point;
 use cove_core::Rect;
+use cove_core::scene::Point;
 use cove_imaging::BundleImageResource;
 
 use crate::primitives::text::rich::run::RichTextRun;
@@ -64,7 +64,9 @@ impl MenuPointerIntent {
     }
 
     pub fn is_heading_to_submenu(&self) -> bool {
-        let (Some(apex), Some(point), Some(frame)) = (self.previous, self.current, self.submenu_frame) else {
+        let (Some(apex), Some(point), Some(frame)) =
+            (self.previous, self.current, self.submenu_frame)
+        else {
             return false;
         };
         if frame.width <= 0.0 || frame.height <= 0.0 {
@@ -94,7 +96,10 @@ impl MenuPointerIntent {
 }
 
 fn contains(rect: Rect, point: Point) -> bool {
-    point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height
+    point.x >= rect.x
+        && point.x <= rect.x + rect.width
+        && point.y >= rect.y
+        && point.y <= rect.y + rect.height
 }
 
 /// Half-plane test: the point is inside when it is not strictly on one side of

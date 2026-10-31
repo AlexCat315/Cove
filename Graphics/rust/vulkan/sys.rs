@@ -139,8 +139,7 @@ pub const VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2: u32 = 1_000_057_001;
 pub const VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO: u32 = 1_000_077_002;
 pub const VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO: u32 = 1_000_077_003;
 pub const VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES: u32 = 1_000_077_000;
-pub const VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES: u32 =
-    1_000_244_007;
+pub const VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES: u32 = 1_000_244_007;
 pub const VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO: u32 = 1_000_060_000;
 pub const VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO: u32 = 1_000_244_001;
 pub const VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR: u32 =
@@ -391,8 +390,10 @@ pub const VK_COLOR_COMPONENT_G_BIT: u32 = 0x2;
 pub const VK_COLOR_COMPONENT_B_BIT: u32 = 0x4;
 pub const VK_COLOR_COMPONENT_A_BIT: u32 = 0x8;
 /// All four channels, which is the write mask Swift passes.
-pub const VK_COLOR_COMPONENT_ALL: u32 =
-    VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+pub const VK_COLOR_COMPONENT_ALL: u32 = VK_COLOR_COMPONENT_R_BIT
+    | VK_COLOR_COMPONENT_G_BIT
+    | VK_COLOR_COMPONENT_B_BIT
+    | VK_COLOR_COMPONENT_A_BIT;
 
 pub const VK_PRESENT_MODE_IMMEDIATE_KHR: u32 = 0;
 pub const VK_PRESENT_MODE_MAILBOX_KHR: u32 = 1;
@@ -954,7 +955,12 @@ pub struct VkAccelerationStructureInstanceKHR {
 impl VkAccelerationStructureInstanceKHR {
     /// Builds one instance record. `flags` carries the cull-disable bit Swift
     /// sets, `custom_index` the instance ordinal.
-    pub fn new(transform: [f32; 12], custom_index: u32, mask: u32, address: VkDeviceAddress) -> Self {
+    pub fn new(
+        transform: [f32; 12],
+        custom_index: u32,
+        mask: u32,
+        address: VkDeviceAddress,
+    ) -> Self {
         Self {
             transform,
             // Bit 0 is `triangleFacingCullDisable`, bits 1-23 are the SBT
@@ -1012,7 +1018,9 @@ pub union VkAccelerationStructureGeometryDataKHR {
 
 impl Default for VkAccelerationStructureGeometryDataKHR {
     fn default() -> Self {
-        Self { instances: VkAccelerationStructureGeometryInstancesDataKHR::default() }
+        Self {
+            instances: VkAccelerationStructureGeometryInstancesDataKHR::default(),
+        }
     }
 }
 
@@ -1451,7 +1459,9 @@ pub union VkClearValue {
 
 impl Default for VkClearValue {
     fn default() -> Self {
-        Self { color: VkClearColorValue::default() }
+        Self {
+            color: VkClearColorValue::default(),
+        }
     }
 }
 
@@ -1953,115 +1963,383 @@ impl Default for VkPhysicalDeviceShaderDrawParametersFeatures {
 
 // MARK: - Function pointer types
 
-pub type PFN_vkGetInstanceProcAddr = unsafe extern "system" fn(VkInstance, *const c_char) -> PFN_vkVoidFunction;
-pub type PFN_vkGetDeviceProcAddr = unsafe extern "system" fn(VkDevice, *const c_char) -> PFN_vkVoidFunction;
-pub type PFN_vkCreateInstance = unsafe extern "system" fn(*const VkInstanceCreateInfo, *const VkAllocationCallbacks, *mut VkInstance) -> VkResult;
-pub type PFN_vkDestroyInstance = unsafe extern "system" fn(VkInstance, *const VkAllocationCallbacks);
+pub type PFN_vkGetInstanceProcAddr =
+    unsafe extern "system" fn(VkInstance, *const c_char) -> PFN_vkVoidFunction;
+pub type PFN_vkGetDeviceProcAddr =
+    unsafe extern "system" fn(VkDevice, *const c_char) -> PFN_vkVoidFunction;
+pub type PFN_vkCreateInstance = unsafe extern "system" fn(
+    *const VkInstanceCreateInfo,
+    *const VkAllocationCallbacks,
+    *mut VkInstance,
+) -> VkResult;
+pub type PFN_vkDestroyInstance =
+    unsafe extern "system" fn(VkInstance, *const VkAllocationCallbacks);
 pub type PFN_vkEnumerateInstanceVersion = unsafe extern "system" fn(*mut u32) -> VkResult;
-pub type PFN_vkEnumerateInstanceExtensionProperties = unsafe extern "system" fn(*const c_char, *mut u32, *mut VkExtensionProperties) -> VkResult;
-pub type PFN_vkEnumeratePhysicalDevices = unsafe extern "system" fn(VkInstance, *mut u32, *mut VkPhysicalDevice) -> VkResult;
-pub type PFN_vkGetPhysicalDeviceProperties = unsafe extern "system" fn(VkPhysicalDevice, *mut VkPhysicalDeviceProperties);
-pub type PFN_vkGetPhysicalDeviceProperties2 = unsafe extern "system" fn(VkPhysicalDevice, *mut VkPhysicalDeviceProperties2);
-pub type PFN_vkGetPhysicalDeviceFeatures2 = unsafe extern "system" fn(VkPhysicalDevice, *mut VkPhysicalDeviceFeatures2);
-pub type PFN_vkEnumerateDeviceExtensionProperties = unsafe extern "system" fn(VkPhysicalDevice, *const c_char, *mut u32, *mut VkExtensionProperties) -> VkResult;
-pub type PFN_vkGetPhysicalDeviceQueueFamilyProperties = unsafe extern "system" fn(VkPhysicalDevice, *mut u32, *mut VkQueueFamilyProperties);
-pub type PFN_vkGetPhysicalDeviceMemoryProperties = unsafe extern "system" fn(VkPhysicalDevice, *mut VkPhysicalDeviceMemoryProperties);
-pub type PFN_vkGetPhysicalDeviceImageFormatProperties = unsafe extern "system" fn(VkPhysicalDevice, u32, u32, u32, u32, u32, *mut VkImageFormatProperties) -> VkResult;
-pub type PFN_vkCreateDevice = unsafe extern "system" fn(VkPhysicalDevice, *const VkDeviceCreateInfo, *const VkAllocationCallbacks, *mut VkDevice) -> VkResult;
+pub type PFN_vkEnumerateInstanceExtensionProperties =
+    unsafe extern "system" fn(*const c_char, *mut u32, *mut VkExtensionProperties) -> VkResult;
+pub type PFN_vkEnumeratePhysicalDevices =
+    unsafe extern "system" fn(VkInstance, *mut u32, *mut VkPhysicalDevice) -> VkResult;
+pub type PFN_vkGetPhysicalDeviceProperties =
+    unsafe extern "system" fn(VkPhysicalDevice, *mut VkPhysicalDeviceProperties);
+pub type PFN_vkGetPhysicalDeviceProperties2 =
+    unsafe extern "system" fn(VkPhysicalDevice, *mut VkPhysicalDeviceProperties2);
+pub type PFN_vkGetPhysicalDeviceFeatures2 =
+    unsafe extern "system" fn(VkPhysicalDevice, *mut VkPhysicalDeviceFeatures2);
+pub type PFN_vkEnumerateDeviceExtensionProperties = unsafe extern "system" fn(
+    VkPhysicalDevice,
+    *const c_char,
+    *mut u32,
+    *mut VkExtensionProperties,
+) -> VkResult;
+pub type PFN_vkGetPhysicalDeviceQueueFamilyProperties =
+    unsafe extern "system" fn(VkPhysicalDevice, *mut u32, *mut VkQueueFamilyProperties);
+pub type PFN_vkGetPhysicalDeviceMemoryProperties =
+    unsafe extern "system" fn(VkPhysicalDevice, *mut VkPhysicalDeviceMemoryProperties);
+pub type PFN_vkGetPhysicalDeviceImageFormatProperties = unsafe extern "system" fn(
+    VkPhysicalDevice,
+    u32,
+    u32,
+    u32,
+    u32,
+    u32,
+    *mut VkImageFormatProperties,
+) -> VkResult;
+pub type PFN_vkCreateDevice = unsafe extern "system" fn(
+    VkPhysicalDevice,
+    *const VkDeviceCreateInfo,
+    *const VkAllocationCallbacks,
+    *mut VkDevice,
+) -> VkResult;
 pub type PFN_vkDestroyDevice = unsafe extern "system" fn(VkDevice, *const VkAllocationCallbacks);
 pub type PFN_vkGetDeviceQueue = unsafe extern "system" fn(VkDevice, u32, u32, *mut VkQueue);
 pub type PFN_vkDeviceWaitIdle = unsafe extern "system" fn(VkDevice) -> VkResult;
-pub type PFN_vkDestroySurfaceKHR = unsafe extern "system" fn(VkInstance, VkSurfaceKHR, *const VkAllocationCallbacks);
-pub type PFN_vkGetPhysicalDeviceSurfaceSupportKHR = unsafe extern "system" fn(VkPhysicalDevice, u32, VkSurfaceKHR, *mut VkBool32) -> VkResult;
-pub type PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR = unsafe extern "system" fn(VkPhysicalDevice, VkSurfaceKHR, *mut VkSurfaceCapabilitiesKHR) -> VkResult;
-pub type PFN_vkGetPhysicalDeviceSurfaceFormatsKHR = unsafe extern "system" fn(VkPhysicalDevice, VkSurfaceKHR, *mut u32, *mut VkSurfaceFormatKHR) -> VkResult;
-pub type PFN_vkGetPhysicalDeviceSurfacePresentModesKHR = unsafe extern "system" fn(VkPhysicalDevice, VkSurfaceKHR, *mut u32, *mut u32) -> VkResult;
-pub type PFN_vkCreateBuffer = unsafe extern "system" fn(VkDevice, *const VkBufferCreateInfo, *const VkAllocationCallbacks, *mut VkBuffer) -> VkResult;
-pub type PFN_vkDestroyBuffer = unsafe extern "system" fn(VkDevice, VkBuffer, *const VkAllocationCallbacks);
-pub type PFN_vkGetBufferMemoryRequirements = unsafe extern "system" fn(VkDevice, VkBuffer, *mut VkMemoryRequirements);
-pub type PFN_vkBindBufferMemory = unsafe extern "system" fn(VkDevice, VkBuffer, VkDeviceMemory, VkDeviceSize) -> VkResult;
-pub type PFN_vkCreateImage = unsafe extern "system" fn(VkDevice, *const VkImageCreateInfo, *const VkAllocationCallbacks, *mut VkImage) -> VkResult;
-pub type PFN_vkDestroyImage = unsafe extern "system" fn(VkDevice, VkImage, *const VkAllocationCallbacks);
-pub type PFN_vkGetImageMemoryRequirements = unsafe extern "system" fn(VkDevice, VkImage, *mut VkMemoryRequirements);
-pub type PFN_vkBindImageMemory = unsafe extern "system" fn(VkDevice, VkImage, VkDeviceMemory, VkDeviceSize) -> VkResult;
-pub type PFN_vkAllocateMemory = unsafe extern "system" fn(VkDevice, *const VkMemoryAllocateInfo, *const VkAllocationCallbacks, *mut VkDeviceMemory) -> VkResult;
-pub type PFN_vkFreeMemory = unsafe extern "system" fn(VkDevice, VkDeviceMemory, *const VkAllocationCallbacks);
-pub type PFN_vkMapMemory = unsafe extern "system" fn(VkDevice, VkDeviceMemory, VkDeviceSize, VkDeviceSize, u32, *mut *mut c_void) -> VkResult;
+pub type PFN_vkDestroySurfaceKHR =
+    unsafe extern "system" fn(VkInstance, VkSurfaceKHR, *const VkAllocationCallbacks);
+pub type PFN_vkGetPhysicalDeviceSurfaceSupportKHR =
+    unsafe extern "system" fn(VkPhysicalDevice, u32, VkSurfaceKHR, *mut VkBool32) -> VkResult;
+pub type PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR = unsafe extern "system" fn(
+    VkPhysicalDevice,
+    VkSurfaceKHR,
+    *mut VkSurfaceCapabilitiesKHR,
+) -> VkResult;
+pub type PFN_vkGetPhysicalDeviceSurfaceFormatsKHR = unsafe extern "system" fn(
+    VkPhysicalDevice,
+    VkSurfaceKHR,
+    *mut u32,
+    *mut VkSurfaceFormatKHR,
+) -> VkResult;
+pub type PFN_vkGetPhysicalDeviceSurfacePresentModesKHR =
+    unsafe extern "system" fn(VkPhysicalDevice, VkSurfaceKHR, *mut u32, *mut u32) -> VkResult;
+pub type PFN_vkCreateBuffer = unsafe extern "system" fn(
+    VkDevice,
+    *const VkBufferCreateInfo,
+    *const VkAllocationCallbacks,
+    *mut VkBuffer,
+) -> VkResult;
+pub type PFN_vkDestroyBuffer =
+    unsafe extern "system" fn(VkDevice, VkBuffer, *const VkAllocationCallbacks);
+pub type PFN_vkGetBufferMemoryRequirements =
+    unsafe extern "system" fn(VkDevice, VkBuffer, *mut VkMemoryRequirements);
+pub type PFN_vkBindBufferMemory =
+    unsafe extern "system" fn(VkDevice, VkBuffer, VkDeviceMemory, VkDeviceSize) -> VkResult;
+pub type PFN_vkCreateImage = unsafe extern "system" fn(
+    VkDevice,
+    *const VkImageCreateInfo,
+    *const VkAllocationCallbacks,
+    *mut VkImage,
+) -> VkResult;
+pub type PFN_vkDestroyImage =
+    unsafe extern "system" fn(VkDevice, VkImage, *const VkAllocationCallbacks);
+pub type PFN_vkGetImageMemoryRequirements =
+    unsafe extern "system" fn(VkDevice, VkImage, *mut VkMemoryRequirements);
+pub type PFN_vkBindImageMemory =
+    unsafe extern "system" fn(VkDevice, VkImage, VkDeviceMemory, VkDeviceSize) -> VkResult;
+pub type PFN_vkAllocateMemory = unsafe extern "system" fn(
+    VkDevice,
+    *const VkMemoryAllocateInfo,
+    *const VkAllocationCallbacks,
+    *mut VkDeviceMemory,
+) -> VkResult;
+pub type PFN_vkFreeMemory =
+    unsafe extern "system" fn(VkDevice, VkDeviceMemory, *const VkAllocationCallbacks);
+pub type PFN_vkMapMemory = unsafe extern "system" fn(
+    VkDevice,
+    VkDeviceMemory,
+    VkDeviceSize,
+    VkDeviceSize,
+    u32,
+    *mut *mut c_void,
+) -> VkResult;
 pub type PFN_vkUnmapMemory = unsafe extern "system" fn(VkDevice, VkDeviceMemory);
-pub type PFN_vkFlushMappedMemoryRanges = unsafe extern "system" fn(VkDevice, u32, *const VkMappedMemoryRange) -> VkResult;
-pub type PFN_vkCreateImageView = unsafe extern "system" fn(VkDevice, *const VkImageViewCreateInfo, *const VkAllocationCallbacks, *mut VkImageView) -> VkResult;
-pub type PFN_vkDestroyImageView = unsafe extern "system" fn(VkDevice, VkImageView, *const VkAllocationCallbacks);
-pub type PFN_vkCreateShaderModule = unsafe extern "system" fn(VkDevice, *const VkShaderModuleCreateInfo, *const VkAllocationCallbacks, *mut VkShaderModule) -> VkResult;
-pub type PFN_vkDestroyShaderModule = unsafe extern "system" fn(VkDevice, VkShaderModule, *const VkAllocationCallbacks);
-pub type PFN_vkCreateDescriptorPool = unsafe extern "system" fn(VkDevice, *const VkDescriptorPoolCreateInfo, *const VkAllocationCallbacks, *mut VkDescriptorPool) -> VkResult;
-pub type PFN_vkDestroyDescriptorPool = unsafe extern "system" fn(VkDevice, VkDescriptorPool, *const VkAllocationCallbacks);
-pub type PFN_vkCreateGraphicsPipelines = unsafe extern "system" fn(VkDevice, VkPipelineCache, u32, *const VkGraphicsPipelineCreateInfo, *const VkAllocationCallbacks, *mut VkPipeline) -> VkResult;
-pub type PFN_vkCreateComputePipelines = unsafe extern "system" fn(VkDevice, VkPipelineCache, u32, *const VkComputePipelineCreateInfo, *const VkAllocationCallbacks, *mut VkPipeline) -> VkResult;
-pub type PFN_vkDestroyPipeline = unsafe extern "system" fn(VkDevice, VkPipeline, *const VkAllocationCallbacks);
-pub type PFN_vkCreatePipelineLayout = unsafe extern "system" fn(VkDevice, *const VkPipelineLayoutCreateInfo, *const VkAllocationCallbacks, *mut VkPipelineLayout) -> VkResult;
-pub type PFN_vkDestroyPipelineLayout = unsafe extern "system" fn(VkDevice, VkPipelineLayout, *const VkAllocationCallbacks);
-pub type PFN_vkCreateDescriptorSetLayout = unsafe extern "system" fn(VkDevice, *const VkDescriptorSetLayoutCreateInfo, *const VkAllocationCallbacks, *mut VkDescriptorSetLayout) -> VkResult;
-pub type PFN_vkDestroyDescriptorSetLayout = unsafe extern "system" fn(VkDevice, VkDescriptorSetLayout, *const VkAllocationCallbacks);
-pub type PFN_vkAllocateDescriptorSets = unsafe extern "system" fn(VkDevice, *const VkDescriptorSetAllocateInfo, *mut VkDescriptorSet) -> VkResult;
-pub type PFN_vkFreeDescriptorSets = unsafe extern "system" fn(VkDevice, VkDescriptorPool, u32, *const VkDescriptorSet) -> VkResult;
-pub type PFN_vkUpdateDescriptorSets = unsafe extern "system" fn(VkDevice, u32, *const VkWriteDescriptorSet, u32, *const c_void);
-pub type PFN_vkCreateSampler = unsafe extern "system" fn(VkDevice, *const VkSamplerCreateInfo, *const VkAllocationCallbacks, *mut VkSampler) -> VkResult;
-pub type PFN_vkDestroySampler = unsafe extern "system" fn(VkDevice, VkSampler, *const VkAllocationCallbacks);
-pub type PFN_vkCreateRenderPass = unsafe extern "system" fn(VkDevice, *const VkRenderPassCreateInfo, *const VkAllocationCallbacks, *mut VkRenderPass) -> VkResult;
-pub type PFN_vkDestroyRenderPass = unsafe extern "system" fn(VkDevice, VkRenderPass, *const VkAllocationCallbacks);
-pub type PFN_vkCreateFramebuffer = unsafe extern "system" fn(VkDevice, *const VkFramebufferCreateInfo, *const VkAllocationCallbacks, *mut VkFramebuffer) -> VkResult;
-pub type PFN_vkDestroyFramebuffer = unsafe extern "system" fn(VkDevice, VkFramebuffer, *const VkAllocationCallbacks);
-pub type PFN_vkCreateCommandPool = unsafe extern "system" fn(VkDevice, *const VkCommandPoolCreateInfo, *const VkAllocationCallbacks, *mut VkCommandPool) -> VkResult;
-pub type PFN_vkDestroyCommandPool = unsafe extern "system" fn(VkDevice, VkCommandPool, *const VkAllocationCallbacks);
-pub type PFN_vkAllocateCommandBuffers = unsafe extern "system" fn(VkDevice, *const VkCommandBufferAllocateInfo, *mut VkCommandBuffer) -> VkResult;
-pub type PFN_vkFreeCommandBuffers = unsafe extern "system" fn(VkDevice, VkCommandPool, u32, *const VkCommandBuffer);
-pub type PFN_vkResetCommandPool = unsafe extern "system" fn(VkDevice, VkCommandPool, u32) -> VkResult;
-pub type PFN_vkBeginCommandBuffer = unsafe extern "system" fn(VkCommandBuffer, *const VkCommandBufferBeginInfo) -> VkResult;
+pub type PFN_vkFlushMappedMemoryRanges =
+    unsafe extern "system" fn(VkDevice, u32, *const VkMappedMemoryRange) -> VkResult;
+pub type PFN_vkCreateImageView = unsafe extern "system" fn(
+    VkDevice,
+    *const VkImageViewCreateInfo,
+    *const VkAllocationCallbacks,
+    *mut VkImageView,
+) -> VkResult;
+pub type PFN_vkDestroyImageView =
+    unsafe extern "system" fn(VkDevice, VkImageView, *const VkAllocationCallbacks);
+pub type PFN_vkCreateShaderModule = unsafe extern "system" fn(
+    VkDevice,
+    *const VkShaderModuleCreateInfo,
+    *const VkAllocationCallbacks,
+    *mut VkShaderModule,
+) -> VkResult;
+pub type PFN_vkDestroyShaderModule =
+    unsafe extern "system" fn(VkDevice, VkShaderModule, *const VkAllocationCallbacks);
+pub type PFN_vkCreateDescriptorPool = unsafe extern "system" fn(
+    VkDevice,
+    *const VkDescriptorPoolCreateInfo,
+    *const VkAllocationCallbacks,
+    *mut VkDescriptorPool,
+) -> VkResult;
+pub type PFN_vkDestroyDescriptorPool =
+    unsafe extern "system" fn(VkDevice, VkDescriptorPool, *const VkAllocationCallbacks);
+pub type PFN_vkCreateGraphicsPipelines = unsafe extern "system" fn(
+    VkDevice,
+    VkPipelineCache,
+    u32,
+    *const VkGraphicsPipelineCreateInfo,
+    *const VkAllocationCallbacks,
+    *mut VkPipeline,
+) -> VkResult;
+pub type PFN_vkCreateComputePipelines = unsafe extern "system" fn(
+    VkDevice,
+    VkPipelineCache,
+    u32,
+    *const VkComputePipelineCreateInfo,
+    *const VkAllocationCallbacks,
+    *mut VkPipeline,
+) -> VkResult;
+pub type PFN_vkDestroyPipeline =
+    unsafe extern "system" fn(VkDevice, VkPipeline, *const VkAllocationCallbacks);
+pub type PFN_vkCreatePipelineLayout = unsafe extern "system" fn(
+    VkDevice,
+    *const VkPipelineLayoutCreateInfo,
+    *const VkAllocationCallbacks,
+    *mut VkPipelineLayout,
+) -> VkResult;
+pub type PFN_vkDestroyPipelineLayout =
+    unsafe extern "system" fn(VkDevice, VkPipelineLayout, *const VkAllocationCallbacks);
+pub type PFN_vkCreateDescriptorSetLayout = unsafe extern "system" fn(
+    VkDevice,
+    *const VkDescriptorSetLayoutCreateInfo,
+    *const VkAllocationCallbacks,
+    *mut VkDescriptorSetLayout,
+) -> VkResult;
+pub type PFN_vkDestroyDescriptorSetLayout =
+    unsafe extern "system" fn(VkDevice, VkDescriptorSetLayout, *const VkAllocationCallbacks);
+pub type PFN_vkAllocateDescriptorSets = unsafe extern "system" fn(
+    VkDevice,
+    *const VkDescriptorSetAllocateInfo,
+    *mut VkDescriptorSet,
+) -> VkResult;
+pub type PFN_vkFreeDescriptorSets =
+    unsafe extern "system" fn(VkDevice, VkDescriptorPool, u32, *const VkDescriptorSet) -> VkResult;
+pub type PFN_vkUpdateDescriptorSets =
+    unsafe extern "system" fn(VkDevice, u32, *const VkWriteDescriptorSet, u32, *const c_void);
+pub type PFN_vkCreateSampler = unsafe extern "system" fn(
+    VkDevice,
+    *const VkSamplerCreateInfo,
+    *const VkAllocationCallbacks,
+    *mut VkSampler,
+) -> VkResult;
+pub type PFN_vkDestroySampler =
+    unsafe extern "system" fn(VkDevice, VkSampler, *const VkAllocationCallbacks);
+pub type PFN_vkCreateRenderPass = unsafe extern "system" fn(
+    VkDevice,
+    *const VkRenderPassCreateInfo,
+    *const VkAllocationCallbacks,
+    *mut VkRenderPass,
+) -> VkResult;
+pub type PFN_vkDestroyRenderPass =
+    unsafe extern "system" fn(VkDevice, VkRenderPass, *const VkAllocationCallbacks);
+pub type PFN_vkCreateFramebuffer = unsafe extern "system" fn(
+    VkDevice,
+    *const VkFramebufferCreateInfo,
+    *const VkAllocationCallbacks,
+    *mut VkFramebuffer,
+) -> VkResult;
+pub type PFN_vkDestroyFramebuffer =
+    unsafe extern "system" fn(VkDevice, VkFramebuffer, *const VkAllocationCallbacks);
+pub type PFN_vkCreateCommandPool = unsafe extern "system" fn(
+    VkDevice,
+    *const VkCommandPoolCreateInfo,
+    *const VkAllocationCallbacks,
+    *mut VkCommandPool,
+) -> VkResult;
+pub type PFN_vkDestroyCommandPool =
+    unsafe extern "system" fn(VkDevice, VkCommandPool, *const VkAllocationCallbacks);
+pub type PFN_vkAllocateCommandBuffers = unsafe extern "system" fn(
+    VkDevice,
+    *const VkCommandBufferAllocateInfo,
+    *mut VkCommandBuffer,
+) -> VkResult;
+pub type PFN_vkFreeCommandBuffers =
+    unsafe extern "system" fn(VkDevice, VkCommandPool, u32, *const VkCommandBuffer);
+pub type PFN_vkResetCommandPool =
+    unsafe extern "system" fn(VkDevice, VkCommandPool, u32) -> VkResult;
+pub type PFN_vkBeginCommandBuffer =
+    unsafe extern "system" fn(VkCommandBuffer, *const VkCommandBufferBeginInfo) -> VkResult;
 pub type PFN_vkEndCommandBuffer = unsafe extern "system" fn(VkCommandBuffer) -> VkResult;
-pub type PFN_vkCmdBeginRenderPass = unsafe extern "system" fn(VkCommandBuffer, *const VkRenderPassBeginInfo, u32);
+pub type PFN_vkCmdBeginRenderPass =
+    unsafe extern "system" fn(VkCommandBuffer, *const VkRenderPassBeginInfo, u32);
 pub type PFN_vkCmdEndRenderPass = unsafe extern "system" fn(VkCommandBuffer);
 pub type PFN_vkCmdBindPipeline = unsafe extern "system" fn(VkCommandBuffer, u32, VkPipeline);
-pub type PFN_vkCmdSetViewport = unsafe extern "system" fn(VkCommandBuffer, u32, u32, *const VkViewport);
-pub type PFN_vkCmdSetScissor = unsafe extern "system" fn(VkCommandBuffer, u32, u32, *const VkRect2D);
-pub type PFN_vkCmdBindVertexBuffers = unsafe extern "system" fn(VkCommandBuffer, u32, u32, *const VkBuffer, *const VkDeviceSize);
-pub type PFN_vkCmdBindIndexBuffer = unsafe extern "system" fn(VkCommandBuffer, VkBuffer, VkDeviceSize, u32);
+pub type PFN_vkCmdSetViewport =
+    unsafe extern "system" fn(VkCommandBuffer, u32, u32, *const VkViewport);
+pub type PFN_vkCmdSetScissor =
+    unsafe extern "system" fn(VkCommandBuffer, u32, u32, *const VkRect2D);
+pub type PFN_vkCmdBindVertexBuffers =
+    unsafe extern "system" fn(VkCommandBuffer, u32, u32, *const VkBuffer, *const VkDeviceSize);
+pub type PFN_vkCmdBindIndexBuffer =
+    unsafe extern "system" fn(VkCommandBuffer, VkBuffer, VkDeviceSize, u32);
 pub type PFN_vkCmdDraw = unsafe extern "system" fn(VkCommandBuffer, u32, u32, u32, u32);
 pub type PFN_vkCmdDrawIndexed = unsafe extern "system" fn(VkCommandBuffer, u32, u32, u32, i32, u32);
-pub type PFN_vkCmdDrawIndirect = unsafe extern "system" fn(VkCommandBuffer, VkBuffer, VkDeviceSize, u32, u32);
+pub type PFN_vkCmdDrawIndirect =
+    unsafe extern "system" fn(VkCommandBuffer, VkBuffer, VkDeviceSize, u32, u32);
 pub type PFN_vkCmdDrawMeshTasksEXT = unsafe extern "system" fn(VkCommandBuffer, u32, u32, u32);
-pub type PFN_vkCmdBindDescriptorSets = unsafe extern "system" fn(VkCommandBuffer, u32, VkPipelineLayout, u32, u32, *const VkDescriptorSet, u32, *const u32);
-pub type PFN_vkCmdPushConstants = unsafe extern "system" fn(VkCommandBuffer, VkPipelineLayout, u32, u32, u32, *const c_void);
+pub type PFN_vkCmdBindDescriptorSets = unsafe extern "system" fn(
+    VkCommandBuffer,
+    u32,
+    VkPipelineLayout,
+    u32,
+    u32,
+    *const VkDescriptorSet,
+    u32,
+    *const u32,
+);
+pub type PFN_vkCmdPushConstants =
+    unsafe extern "system" fn(VkCommandBuffer, VkPipelineLayout, u32, u32, u32, *const c_void);
 pub type PFN_vkCmdDispatch = unsafe extern "system" fn(VkCommandBuffer, u32, u32, u32);
-pub type PFN_vkCmdDispatchIndirect = unsafe extern "system" fn(VkCommandBuffer, VkBuffer, VkDeviceSize);
-pub type PFN_vkCmdCopyBuffer = unsafe extern "system" fn(VkCommandBuffer, VkBuffer, VkBuffer, u32, *const VkBufferCopy);
-pub type PFN_vkCmdCopyImage = unsafe extern "system" fn(VkCommandBuffer, VkImage, u32, VkImage, u32, u32, *const VkImageCopy);
-pub type PFN_vkCmdCopyBufferToImage = unsafe extern "system" fn(VkCommandBuffer, VkBuffer, VkImage, u32, u32, *const VkBufferImageCopy);
-pub type PFN_vkCmdCopyImageToBuffer = unsafe extern "system" fn(VkCommandBuffer, VkImage, u32, VkBuffer, u32, *const VkBufferImageCopy);
-pub type PFN_vkCmdPipelineBarrier = unsafe extern "system" fn(VkCommandBuffer, u32, u32, u32, u32, *const VkMemoryBarrier, u32, *const VkBufferMemoryBarrier, u32, *const VkImageMemoryBarrier);
-pub type PFN_vkCreateFence = unsafe extern "system" fn(VkDevice, *const VkFenceCreateInfo, *const VkAllocationCallbacks, *mut VkFence) -> VkResult;
-pub type PFN_vkDestroyFence = unsafe extern "system" fn(VkDevice, VkFence, *const VkAllocationCallbacks);
-pub type PFN_vkWaitForFences = unsafe extern "system" fn(VkDevice, u32, *const VkFence, u32, u64) -> VkResult;
+pub type PFN_vkCmdDispatchIndirect =
+    unsafe extern "system" fn(VkCommandBuffer, VkBuffer, VkDeviceSize);
+pub type PFN_vkCmdCopyBuffer =
+    unsafe extern "system" fn(VkCommandBuffer, VkBuffer, VkBuffer, u32, *const VkBufferCopy);
+pub type PFN_vkCmdCopyImage =
+    unsafe extern "system" fn(VkCommandBuffer, VkImage, u32, VkImage, u32, u32, *const VkImageCopy);
+pub type PFN_vkCmdCopyBufferToImage = unsafe extern "system" fn(
+    VkCommandBuffer,
+    VkBuffer,
+    VkImage,
+    u32,
+    u32,
+    *const VkBufferImageCopy,
+);
+pub type PFN_vkCmdCopyImageToBuffer = unsafe extern "system" fn(
+    VkCommandBuffer,
+    VkImage,
+    u32,
+    VkBuffer,
+    u32,
+    *const VkBufferImageCopy,
+);
+pub type PFN_vkCmdPipelineBarrier = unsafe extern "system" fn(
+    VkCommandBuffer,
+    u32,
+    u32,
+    u32,
+    u32,
+    *const VkMemoryBarrier,
+    u32,
+    *const VkBufferMemoryBarrier,
+    u32,
+    *const VkImageMemoryBarrier,
+);
+pub type PFN_vkCreateFence = unsafe extern "system" fn(
+    VkDevice,
+    *const VkFenceCreateInfo,
+    *const VkAllocationCallbacks,
+    *mut VkFence,
+) -> VkResult;
+pub type PFN_vkDestroyFence =
+    unsafe extern "system" fn(VkDevice, VkFence, *const VkAllocationCallbacks);
+pub type PFN_vkWaitForFences =
+    unsafe extern "system" fn(VkDevice, u32, *const VkFence, u32, u64) -> VkResult;
 pub type PFN_vkResetFences = unsafe extern "system" fn(VkDevice, u32, *const VkFence) -> VkResult;
-pub type PFN_vkCreateSemaphore = unsafe extern "system" fn(VkDevice, *const VkSemaphoreCreateInfo, *const VkAllocationCallbacks, *mut VkSemaphore) -> VkResult;
-pub type PFN_vkDestroySemaphore = unsafe extern "system" fn(VkDevice, VkSemaphore, *const VkAllocationCallbacks);
-pub type PFN_vkQueueSubmit = unsafe extern "system" fn(VkQueue, u32, *const VkSubmitInfo, VkFence) -> VkResult;
-pub type PFN_vkQueuePresentKHR = unsafe extern "system" fn(VkQueue, *const VkPresentInfoKHR) -> VkResult;
+pub type PFN_vkCreateSemaphore = unsafe extern "system" fn(
+    VkDevice,
+    *const VkSemaphoreCreateInfo,
+    *const VkAllocationCallbacks,
+    *mut VkSemaphore,
+) -> VkResult;
+pub type PFN_vkDestroySemaphore =
+    unsafe extern "system" fn(VkDevice, VkSemaphore, *const VkAllocationCallbacks);
+pub type PFN_vkQueueSubmit =
+    unsafe extern "system" fn(VkQueue, u32, *const VkSubmitInfo, VkFence) -> VkResult;
+pub type PFN_vkQueuePresentKHR =
+    unsafe extern "system" fn(VkQueue, *const VkPresentInfoKHR) -> VkResult;
 pub type PFN_vkQueueWaitIdle = unsafe extern "system" fn(VkQueue) -> VkResult;
-pub type PFN_vkCreateSwapchainKHR = unsafe extern "system" fn(VkDevice, *const VkSwapchainCreateInfoKHR, *const VkAllocationCallbacks, *mut VkSwapchainKHR) -> VkResult;
-pub type PFN_vkDestroySwapchainKHR = unsafe extern "system" fn(VkDevice, VkSwapchainKHR, *const VkAllocationCallbacks);
-pub type PFN_vkGetSwapchainImagesKHR = unsafe extern "system" fn(VkDevice, VkSwapchainKHR, *mut u32, *mut VkImage) -> VkResult;
-pub type PFN_vkAcquireNextImageKHR = unsafe extern "system" fn(VkDevice, VkSwapchainKHR, u64, VkSemaphore, VkFence, *mut u32) -> VkResult;
-pub type PFN_vkCreateQueryPool = unsafe extern "system" fn(VkDevice, *const VkQueryPoolCreateInfo, *const VkAllocationCallbacks, *mut VkQueryPool) -> VkResult;
-pub type PFN_vkDestroyQueryPool = unsafe extern "system" fn(VkDevice, VkQueryPool, *const VkAllocationCallbacks);
-pub type PFN_vkGetQueryPoolResults = unsafe extern "system" fn(VkDevice, VkQueryPool, u32, u32, usize, *mut c_void, VkDeviceSize, u32) -> VkResult;
-pub type PFN_vkCmdResetQueryPool = unsafe extern "system" fn(VkCommandBuffer, VkQueryPool, u32, u32);
-pub type PFN_vkCmdWriteTimestamp = unsafe extern "system" fn(VkCommandBuffer, u32, VkQueryPool, u32);
-pub type PFN_vkGetBufferDeviceAddress = unsafe extern "system" fn(VkDevice, *const VkBufferDeviceAddressInfo) -> VkDeviceAddress;
-pub type PFN_vkCreateAccelerationStructureKHR = unsafe extern "system" fn(VkDevice, *const VkAccelerationStructureCreateInfoKHR, *const VkAllocationCallbacks, *mut VkAccelerationStructureKHR) -> VkResult;
-pub type PFN_vkDestroyAccelerationStructureKHR = unsafe extern "system" fn(VkDevice, VkAccelerationStructureKHR, *const VkAllocationCallbacks);
-pub type PFN_vkGetAccelerationStructureBuildSizesKHR = unsafe extern "system" fn(VkDevice, u32, *const VkAccelerationStructureBuildGeometryInfoKHR, *const u32, *mut VkAccelerationStructureBuildSizesInfoKHR);
-pub type PFN_vkGetAccelerationStructureDeviceAddressKHR = unsafe extern "system" fn(VkDevice, *const VkAccelerationStructureDeviceAddressInfoKHR) -> VkDeviceAddress;
-pub type PFN_vkCmdBuildAccelerationStructuresKHR = unsafe extern "system" fn(VkCommandBuffer, u32, *const VkAccelerationStructureBuildGeometryInfoKHR, *const *const VkAccelerationStructureBuildRangeInfoKHR);
+pub type PFN_vkCreateSwapchainKHR = unsafe extern "system" fn(
+    VkDevice,
+    *const VkSwapchainCreateInfoKHR,
+    *const VkAllocationCallbacks,
+    *mut VkSwapchainKHR,
+) -> VkResult;
+pub type PFN_vkDestroySwapchainKHR =
+    unsafe extern "system" fn(VkDevice, VkSwapchainKHR, *const VkAllocationCallbacks);
+pub type PFN_vkGetSwapchainImagesKHR =
+    unsafe extern "system" fn(VkDevice, VkSwapchainKHR, *mut u32, *mut VkImage) -> VkResult;
+pub type PFN_vkAcquireNextImageKHR = unsafe extern "system" fn(
+    VkDevice,
+    VkSwapchainKHR,
+    u64,
+    VkSemaphore,
+    VkFence,
+    *mut u32,
+) -> VkResult;
+pub type PFN_vkCreateQueryPool = unsafe extern "system" fn(
+    VkDevice,
+    *const VkQueryPoolCreateInfo,
+    *const VkAllocationCallbacks,
+    *mut VkQueryPool,
+) -> VkResult;
+pub type PFN_vkDestroyQueryPool =
+    unsafe extern "system" fn(VkDevice, VkQueryPool, *const VkAllocationCallbacks);
+pub type PFN_vkGetQueryPoolResults = unsafe extern "system" fn(
+    VkDevice,
+    VkQueryPool,
+    u32,
+    u32,
+    usize,
+    *mut c_void,
+    VkDeviceSize,
+    u32,
+) -> VkResult;
+pub type PFN_vkCmdResetQueryPool =
+    unsafe extern "system" fn(VkCommandBuffer, VkQueryPool, u32, u32);
+pub type PFN_vkCmdWriteTimestamp =
+    unsafe extern "system" fn(VkCommandBuffer, u32, VkQueryPool, u32);
+pub type PFN_vkGetBufferDeviceAddress =
+    unsafe extern "system" fn(VkDevice, *const VkBufferDeviceAddressInfo) -> VkDeviceAddress;
+pub type PFN_vkCreateAccelerationStructureKHR = unsafe extern "system" fn(
+    VkDevice,
+    *const VkAccelerationStructureCreateInfoKHR,
+    *const VkAllocationCallbacks,
+    *mut VkAccelerationStructureKHR,
+) -> VkResult;
+pub type PFN_vkDestroyAccelerationStructureKHR =
+    unsafe extern "system" fn(VkDevice, VkAccelerationStructureKHR, *const VkAllocationCallbacks);
+pub type PFN_vkGetAccelerationStructureBuildSizesKHR = unsafe extern "system" fn(
+    VkDevice,
+    u32,
+    *const VkAccelerationStructureBuildGeometryInfoKHR,
+    *const u32,
+    *mut VkAccelerationStructureBuildSizesInfoKHR,
+);
+pub type PFN_vkGetAccelerationStructureDeviceAddressKHR =
+    unsafe extern "system" fn(
+        VkDevice,
+        *const VkAccelerationStructureDeviceAddressInfoKHR,
+    ) -> VkDeviceAddress;
+pub type PFN_vkCmdBuildAccelerationStructuresKHR = unsafe extern "system" fn(
+    VkCommandBuffer,
+    u32,
+    *const VkAccelerationStructureBuildGeometryInfoKHR,
+    *const *const VkAccelerationStructureBuildRangeInfoKHR,
+);
 
 pub type PFN_vkVoidFunction = *const c_void;
 
@@ -2101,7 +2379,9 @@ unsafe impl Sync for VulkanLoader {}
 
 impl core::fmt::Debug for VulkanLoader {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        formatter.debug_struct("VulkanLoader").finish_non_exhaustive()
+        formatter
+            .debug_struct("VulkanLoader")
+            .finish_non_exhaustive()
     }
 }
 
@@ -2119,7 +2399,10 @@ impl VulkanLoader {
         // loader returns exactly that function.
         let get_instance_proc_addr: PFN_vkGetInstanceProcAddr =
             unsafe { core::mem::transmute_copy(&symbol) };
-        Some(Self { get_instance_proc_addr, _library: library })
+        Some(Self {
+            get_instance_proc_addr,
+            _library: library,
+        })
     }
 
     /// Resolves an instance-level entry point through the driver loader.
@@ -2183,7 +2466,11 @@ impl LibraryHandle {
         let _ = CANDIDATES;
         // SAFETY: the name is a NUL-terminated C string.
         let handle = unsafe { LoadLibraryA(c"vulkan-1.dll".as_ptr().cast()) };
-        if handle.is_null() { None } else { Some(Self { handle }) }
+        if handle.is_null() {
+            None
+        } else {
+            Some(Self { handle })
+        }
     }
 
     #[cfg(not(any(unix, windows)))]
@@ -2200,7 +2487,11 @@ impl LibraryHandle {
         // SAFETY: the loader keeps the library mapped for its lifetime and the
         // name is NUL-terminated.
         let pointer = unsafe { dlsym(self.handle, name.as_ptr().cast()) };
-        if pointer.is_null() { None } else { Some(pointer.cast_const()) }
+        if pointer.is_null() {
+            None
+        } else {
+            Some(pointer.cast_const())
+        }
     }
 
     /// # Safety
@@ -2209,7 +2500,11 @@ impl LibraryHandle {
     unsafe fn symbol(&self, name: &[u8]) -> Option<*const c_void> {
         // SAFETY: the library handle is live and the name is NUL-terminated.
         let pointer = unsafe { GetProcAddress(self.handle, name.as_ptr().cast()) };
-        if pointer.is_null() { None } else { Some(pointer.cast_const()) }
+        if pointer.is_null() {
+            None
+        } else {
+            Some(pointer.cast_const())
+        }
     }
 
     /// # Safety
@@ -2318,7 +2613,8 @@ impl InstanceCommands {
                 get_device_queue: loader.load(instance, c"vkGetDeviceQueue")?,
                 device_wait_idle: loader.load(instance, c"vkDeviceWaitIdle")?,
                 destroy_surface: loader.load(instance, c"vkDestroySurfaceKHR")?,
-                get_surface_support: loader.load(instance, c"vkGetPhysicalDeviceSurfaceSupportKHR")?,
+                get_surface_support: loader
+                    .load(instance, c"vkGetPhysicalDeviceSurfaceSupportKHR")?,
                 get_surface_capabilities: loader
                     .load(instance, c"vkGetPhysicalDeviceSurfaceCapabilitiesKHR")?,
                 get_surface_formats: loader
@@ -2364,7 +2660,9 @@ impl CoreCommands {
                 let name = core::ffi::CStr::from_bytes_with_nul($name)
                     .expect("entry-point names are NUL-terminated");
                 let pointer = resolve(name);
-                if pointer.is_null() { return None; }
+                if pointer.is_null() {
+                    return None;
+                }
                 // SAFETY: the caller asserted the entry points belong to `device`.
                 unsafe { core::mem::transmute_copy(&pointer) }
             }};
@@ -2412,7 +2710,9 @@ impl QueryCommands {
                 let name = core::ffi::CStr::from_bytes_with_nul($name)
                     .expect("entry-point names are NUL-terminated");
                 let pointer = resolve(name);
-                if pointer.is_null() { return None; }
+                if pointer.is_null() {
+                    return None;
+                }
                 // SAFETY: the caller asserted these entry points belong to a
                 // live logical device.
                 unsafe { core::mem::transmute_copy(&pointer) }
@@ -2462,7 +2762,9 @@ impl ResourceCommands {
                 let name = core::ffi::CStr::from_bytes_with_nul($name)
                     .expect("entry-point names are NUL-terminated");
                 let pointer = resolve(name);
-                if pointer.is_null() { return None; }
+                if pointer.is_null() {
+                    return None;
+                }
                 // SAFETY: the caller asserted these entry points belong to a
                 // live logical device.
                 unsafe { core::mem::transmute_copy(&pointer) }
@@ -2532,7 +2834,9 @@ impl DrawCommands {
                 let name = core::ffi::CStr::from_bytes_with_nul($name)
                     .expect("entry-point names are NUL-terminated");
                 let pointer = resolve(name);
-                if pointer.is_null() { return None; }
+                if pointer.is_null() {
+                    return None;
+                }
                 // SAFETY: the caller asserted these entry points belong to a
                 // live logical device.
                 unsafe { core::mem::transmute_copy(&pointer) }
@@ -2594,7 +2898,9 @@ impl SyncCommands {
                 let name = core::ffi::CStr::from_bytes_with_nul($name)
                     .expect("entry-point names are NUL-terminated");
                 let pointer = resolve(name);
-                if pointer.is_null() { return None; }
+                if pointer.is_null() {
+                    return None;
+                }
                 // SAFETY: the caller asserted these entry points belong to a live
                 // logical device with the swapchain extension enabled.
                 unsafe { core::mem::transmute_copy(&pointer) }
@@ -2648,15 +2954,21 @@ impl AdvancedCommands {
         instance_commands: &InstanceCommands,
     ) -> Self {
         let optional = |name: &core::ffi::CStr, enabled: bool| -> Option<PFN_vkVoidFunction> {
-            if !enabled { return None; }
+            if !enabled {
+                return None;
+            }
             let pointer = resolve(name);
-            if pointer.is_null() { None } else { Some(pointer) }
+            if pointer.is_null() {
+                None
+            } else {
+                Some(pointer)
+            }
         };
         macro_rules! pick_optional {
             ($name:literal, $enabled:expr) => {{
                 let name = core::ffi::CStr::from_bytes_with_nul($name)
-                .expect("entry-point names are NUL-terminated");
-            let pointer = optional(name, $enabled);
+                    .expect("entry-point names are NUL-terminated");
+                let pointer = optional(name, $enabled);
                 // SAFETY: the caller asserted these entry points belong to a live
                 // logical device, and each name matches its declared type.
                 pointer.map(|pointer| unsafe { core::mem::transmute_copy(&pointer) })
@@ -2675,22 +2987,28 @@ impl AdvancedCommands {
         }
         let _ = (loader, instance);
         Self {
-            buffer_device_address: pick_optional!(b"vkGetBufferDeviceAddress\0",
+            buffer_device_address: pick_optional!(
+                b"vkGetBufferDeviceAddress\0",
                 features.acceleration_structures
             ),
-            create_acceleration_structure: pick_optional!(b"vkCreateAccelerationStructureKHR\0",
+            create_acceleration_structure: pick_optional!(
+                b"vkCreateAccelerationStructureKHR\0",
                 features.acceleration_structures
             ),
-            destroy_acceleration_structure: pick_optional!(b"vkDestroyAccelerationStructureKHR\0",
+            destroy_acceleration_structure: pick_optional!(
+                b"vkDestroyAccelerationStructureKHR\0",
                 features.acceleration_structures
             ),
-            acceleration_structure_build_sizes: pick_optional!(b"vkGetAccelerationStructureBuildSizesKHR\0",
+            acceleration_structure_build_sizes: pick_optional!(
+                b"vkGetAccelerationStructureBuildSizesKHR\0",
                 features.acceleration_structures
             ),
-            acceleration_structure_address: pick_optional!(b"vkGetAccelerationStructureDeviceAddressKHR\0",
+            acceleration_structure_address: pick_optional!(
+                b"vkGetAccelerationStructureDeviceAddressKHR\0",
                 features.acceleration_structures
             ),
-            build_acceleration_structures: pick_optional!(b"vkCmdBuildAccelerationStructuresKHR\0",
+            build_acceleration_structures: pick_optional!(
+                b"vkCmdBuildAccelerationStructuresKHR\0",
                 features.acceleration_structures
             ),
             draw_mesh_tasks: pick_optional!(b"vkCmdDrawMeshTasksEXT\0", features.mesh),

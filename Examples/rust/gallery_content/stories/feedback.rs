@@ -3,8 +3,9 @@
 //! Swift source: `GalleryContent/Stories/Feedback/FeedbackStories.swift`
 //! (`BadgeStory`, `AlertStory`, `ProgressStory`, `EmptyStory`).
 
-use cove_core::scene::animation::AnimationCurve;
 use cove_core::State;
+use cove_core::scene::animation::AnimationCurve;
+use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::layout::{FlexExt, PaddingExt};
 use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::primitives::feedback::{
@@ -14,10 +15,7 @@ use cove_ui_compose::primitives::feedback::{
 use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
-use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
-use cove_ui_compose::{
-    AnyView, BoxView, DynamicField, LayoutDebugExt, TupleView, View,
-};
+use cove_ui_compose::{AnyView, BoxView, DynamicField, LayoutDebugExt, TupleView, View};
 
 use crate::gallery_content::catalog::GalleryOptions;
 
@@ -97,8 +95,16 @@ impl View for BadgeStory {
                         .tone(StatusTone::Success)
                         .icon(icons::status::check_circle()),
                 ),
-                AnyView::new(Badge::new("3 failures").tone(StatusTone::Danger).shows_dot(true)),
-                AnyView::new(Badge::new("Unverified").tone(StatusTone::Neutral).enabled(false)),
+                AnyView::new(
+                    Badge::new("3 failures")
+                        .tone(StatusTone::Danger)
+                        .shows_dot(true),
+                ),
+                AnyView::new(
+                    Badge::new("Unverified")
+                        .tone(StatusTone::Neutral)
+                        .enabled(false),
+                ),
             ])),
         ));
 
@@ -192,7 +198,9 @@ impl View for StorySection {
                 Wrap::NoWrap,
                 8.0,
                 AnyView::new(TupleView::new(vec![
-                    AnyView::new(Text::new(title).semantic_foreground(SemanticColorRef::on_surface())),
+                    AnyView::new(
+                        Text::new(title).semantic_foreground(SemanticColorRef::on_surface()),
+                    ),
                     AnyView::new(
                         Text::new(detail).semantic_foreground(SemanticColorRef::on_surface_muted()),
                     ),
@@ -258,22 +266,30 @@ impl View for AlertStory {
                         Text::new(self.result.get())
                             .semantic_foreground(SemanticColorRef::on_surface_muted()),
                     ),
-                    AnyView::new(Alert::new("Project saved")
-                        .message("All changes are available in the workspace.")
-                        .tone(StatusTone::Success)
-                        .variant(AlertTone::Soft)),
-                    AnyView::new(Alert::new("Connection interrupted")
-                        .message("Retry when the connection is available.")
-                        .tone(StatusTone::Warning)
-                        .variant(AlertTone::Soft)),
-                    AnyView::new(Alert::new("Import failed")
-                        .message("The selected asset format is unsupported.")
-                        .tone(StatusTone::Danger)
-                        .variant(AlertTone::Soft)),
-                    AnyView::new(Alert::new("Update available")
-                        .message("Restart to use the new version.")
-                        .tone(StatusTone::Info)
-                        .variant(AlertTone::Soft)),
+                    AnyView::new(
+                        Alert::new("Project saved")
+                            .message("All changes are available in the workspace.")
+                            .tone(StatusTone::Success)
+                            .variant(AlertTone::Soft),
+                    ),
+                    AnyView::new(
+                        Alert::new("Connection interrupted")
+                            .message("Retry when the connection is available.")
+                            .tone(StatusTone::Warning)
+                            .variant(AlertTone::Soft),
+                    ),
+                    AnyView::new(
+                        Alert::new("Import failed")
+                            .message("The selected asset format is unsupported.")
+                            .tone(StatusTone::Danger)
+                            .variant(AlertTone::Soft),
+                    ),
+                    AnyView::new(
+                        Alert::new("Update available")
+                            .message("Restart to use the new version.")
+                            .tone(StatusTone::Info)
+                            .variant(AlertTone::Soft),
+                    ),
                 ])),
             )
             .debug_name("alert-story"),
@@ -479,10 +495,9 @@ impl View for EmptyStoryButton {
             AnyView::new(EmptyState::with_action(
                 "No projects yet",
                 "Create a project to get started.",
-                cove_ui_compose::primitives::controls::Button::title(
-                    "Create project",
-                    move || created.set(true),
-                ),
+                cove_ui_compose::primitives::controls::Button::title("Create project", move || {
+                    created.set(true)
+                }),
             ))
         } else {
             AnyView::new(
@@ -579,11 +594,7 @@ mod checks {
 
     #[test]
     fn story_section_debug_name_matches_the_gallery() {
-        let section = StorySection::new(
-            "Status tones",
-            "detail",
-            AnyView::new(Text::new("x")),
-        );
+        let section = StorySection::new("Status tones", "detail", AnyView::new(Text::new("x")));
         assert_eq!(section.debug_name_value(), "story-section-Status tones");
     }
 }

@@ -18,12 +18,14 @@ pub struct ChartSamples {
 impl ChartSamples {
     pub fn new(content: &ChartContent) -> Self {
         match content {
-            ChartContent::Cartesian { series, .. } => {
-                Self { series: series.iter().map(|item| item.data.clone()).collect(), slices: Vec::new() }
-            }
-            ChartContent::Pie(slices) => {
-                Self { series: Vec::new(), slices: slices.iter().map(|slice| slice.value).collect() }
-            }
+            ChartContent::Cartesian { series, .. } => Self {
+                series: series.iter().map(|item| item.data.clone()).collect(),
+                slices: Vec::new(),
+            },
+            ChartContent::Pie(slices) => Self {
+                series: Vec::new(),
+                slices: slices.iter().map(|slice| slice.value).collect(),
+            },
         }
     }
 
@@ -36,7 +38,11 @@ impl ChartSamples {
                         item.data = samples.clone();
                     }
                 }
-                ChartContent::Cartesian { series: items, guides: guides.clone(), x: x.clone() }
+                ChartContent::Cartesian {
+                    series: items,
+                    guides: guides.clone(),
+                    x: x.clone(),
+                }
             }
             ChartContent::Pie(slices) => {
                 let mut items = slices.clone();
@@ -65,11 +71,17 @@ impl ChartSamples {
 impl PartialEq for ChartSamples {
     fn eq(&self, other: &Self) -> bool {
         self.slices.len() == other.slices.len()
-            && self.slices.iter().zip(&other.slices).all(|(a, b)| Self::same(*a, *b))
+            && self
+                .slices
+                .iter()
+                .zip(&other.slices)
+                .all(|(a, b)| Self::same(*a, *b))
             && self.series.len() == other.series.len()
             && self.series.iter().zip(&other.series).all(|(a, b)| {
                 a.len() == b.len()
-                    && a.iter().zip(b).all(|(x, y)| Self::same(x.x, y.x) && Self::same(x.y, y.y))
+                    && a.iter()
+                        .zip(b)
+                        .all(|(x, y)| Self::same(x.x, y.x) && Self::same(x.y, y.y))
             })
     }
 }
@@ -124,7 +136,11 @@ impl ChartTransition {
         if self.target.as_ref() == Some(&next) || node.prefers_reduced_motion() {
             return;
         }
-        let previous = cache.borrow().samples.clone().unwrap_or_else(|| next.clone());
+        let previous = cache
+            .borrow()
+            .samples
+            .clone()
+            .unwrap_or_else(|| next.clone());
         self.target = Some(next.clone());
         let weak_node = node.downgrade();
         let apply = move |value: ChartSamples| {

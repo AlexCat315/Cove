@@ -19,9 +19,7 @@ fn composite_lifetime() {
         .unwrap();
     let mut frame = DrawList::default();
     frame.append(&cached, Point::default()).unwrap();
-    frame
-        .append(&cached, Point { x: 10.0, y: 20.0 })
-        .unwrap();
+    frame.append(&cached, Point { x: 10.0, y: 20.0 }).unwrap();
     assert_eq!(frame.resources.len(), 1);
     assert_eq!(frame.vertices().len(), 8);
     drop(owner.take());

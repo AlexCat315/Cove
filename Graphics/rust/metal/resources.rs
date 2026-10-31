@@ -14,32 +14,38 @@ use std::sync::{Arc, Mutex};
 
 use objc2::rc::Retained;
 use objc2::runtime::ProtocolObject;
-use objc2_metal::{
-    MTLAllocation, MTLComputePipelineState, MTLDataType, MTLDepthStencilDescriptor,
-    MTLDevice, MTLFunctionConstantValues, MTLLibrary, MTLRenderPipelineDescriptor,
-    MTLRenderPipelineState, MTLResource, MTLResourceOptions, MTLSamplerDescriptor, MTLStorageMode,
-    MTLTextureDescriptor, MTLVertexDescriptor,
-};
 use objc2_foundation::NSString;
+use objc2_metal::{
+    MTLAllocation, MTLComputePipelineState, MTLDataType, MTLDepthStencilDescriptor, MTLDevice,
+    MTLFunctionConstantValues, MTLLibrary, MTLRenderPipelineDescriptor, MTLRenderPipelineState,
+    MTLResource, MTLResourceOptions, MTLSamplerDescriptor, MTLStorageMode, MTLTextureDescriptor,
+    MTLVertexDescriptor,
+};
 
 use crate::rhi::{
     Buffer, BufferDescriptor, ComputePipeline, ComputePipelineDescriptor, GraphicsPipeline,
-    GraphicsPipelineDescriptor, MeshPipeline, MeshPipelineDescriptor, RhiCompiledObject,
-    RhiCompilationWork, RhiError, RhiResult, Sampler, SamplerDescriptor, ShaderConstantType,
-    ShaderModule, ShaderModuleDescriptor, ShaderStage, Texture, TextureAllocation, TextureDescriptor,
-    TextureDimension, ThreadgroupSize, VertexLayoutDescriptor, rhi_require,
+    GraphicsPipelineDescriptor, MeshPipeline, MeshPipelineDescriptor, RhiCompilationWork,
+    RhiCompiledObject, RhiError, RhiResult, Sampler, SamplerDescriptor, ShaderConstantType,
+    ShaderModule, ShaderModuleDescriptor, ShaderStage, Texture, TextureAllocation,
+    TextureDescriptor, TextureDimension, ThreadgroupSize, VertexLayoutDescriptor, rhi_require,
     rhi_validate_sample_count, rhi_validate_texture_samples,
 };
 
 use super::device::{MetalDeviceHandle, VERTEX_BUFFER_BASE_INDEX, label};
 use super::formats;
-use super::registries::{MetalGraphicsPipeline, MetalMeshPipeline, MetalRegistries, MetalShaderRecord};
+use super::registries::{
+    MetalGraphicsPipeline, MetalMeshPipeline, MetalRegistries, MetalShaderRecord,
+};
 
 /// Locks the shared registry. A poisoned lock only means another thread
 /// panicked while holding it; the registry itself stays consistent because
 /// every mutation is a single map operation.
-pub fn lock(registries: &Arc<Mutex<MetalRegistries>>) -> std::sync::MutexGuard<'_, MetalRegistries> {
-    registries.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+pub fn lock(
+    registries: &Arc<Mutex<MetalRegistries>>,
+) -> std::sync::MutexGuard<'_, MetalRegistries> {
+    registries
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
 // MARK: - Buffers
@@ -76,7 +82,7 @@ pub fn create_texture(
         device.supportsTextureSampleCount(descriptor.sample_count),
         "Metal adapter does not support the requested texture sample count",
     )?;
-    let native =  { MTLTextureDescriptor::new() };
+    let native = { MTLTextureDescriptor::new() };
     native.setPixelFormat(formats::pixel_format(descriptor.format));
     // SAFETY: every setter below takes an unsigned size the descriptor stores;
     // the frontend already validated the semantic combinations.
@@ -105,7 +111,9 @@ pub fn create_texture(
             objc2_metal::MTLStorageMode::Private
         },
     );
-    let texture = device.newTextureWithDescriptor(&native).ok_or(RhiError::OutOfMemory)?;
+    let texture = device
+        .newTextureWithDescriptor(&native)
+        .ok_or(RhiError::OutOfMemory)?;
     if let Some(text) = label(descriptor.label) {
         texture.setLabel(Some(&text));
     }
@@ -121,7 +129,7 @@ pub fn create_sampler(
     handle: Sampler,
     descriptor: SamplerDescriptor,
 ) -> RhiResult<()> {
-    let native =  { MTLSamplerDescriptor::new() };
+    let native = { MTLSamplerDescriptor::new() };
     native.setMinFilter(formats::sampler_min_mag_filter(descriptor.min_filter));
     native.setMagFilter(formats::sampler_min_mag_filter(descriptor.mag_filter));
     native.setMipFilter(formats::sampler_mip_filter(descriptor.mip_filter));
@@ -131,7 +139,9 @@ pub fn create_sampler(
     if descriptor.compare_enabled {
         native.setCompareFunction(formats::compare_function(descriptor.compare_op));
     }
-    let sampler = device.newSamplerStateWithDescriptor(&native).ok_or(RhiError::OutOfMemory)?;
+    let sampler = device
+        .newSamplerStateWithDescriptor(&native)
+        .ok_or(RhiError::OutOfMemory)?;
     lock(registries).samplers.insert(handle.id(), sampler);
     Ok(())
 }
@@ -164,7 +174,7 @@ pub fn prepare_shader_compilation(
         let function = if constants.is_empty() {
             library.newFunctionWithName(&name)
         } else {
-            let values =  { MTLFunctionConstantValues::new() };
+            let values = { MTLFunctionConstantValues::new() };
             for constant in &constants {
                 let data_type = match constant.value.constant_type() {
                     ShaderConstantType::Uint32 => MTLDataType::UInt,
@@ -191,7 +201,12 @@ pub fn prepare_shader_compilation(
                 "entry point '{entry_point}' not found in the compiled library"
             ))
         })?;
-        let record = MetalShaderRecord { function, library, stage, threadgroup_size };
+        let record = MetalShaderRecord {
+            function,
+            library,
+            stage,
+            threadgroup_size,
+        };
         Ok(RhiCompiledObject::new(
             move || {
                 lock(&registries).shaders.insert(handle.id(), record);
@@ -206,7 +221,7 @@ pub fn prepare_shader_compilation(
 /// Builds the native vertex descriptor for a backend-neutral layout. The
 /// caller enforces Metal's attribute and buffer-layout limits first.
 pub fn vertex_descriptor(layout: &VertexLayoutDescriptor) -> Retained<MTLVertexDescriptor> {
-    let descriptor =  { MTLVertexDescriptor::new() };
+    let descriptor = { MTLVertexDescriptor::new() };
     let attributes = descriptor.attributes();
     for attribute in layout.attributes.iter().take(32) {
         // SAFETY: the loop bound keeps the index inside the 31-entry array
@@ -225,9 +240,8 @@ pub fn vertex_descriptor(layout: &VertexLayoutDescriptor) -> Retained<MTLVertexD
     let layouts = descriptor.layouts();
     for (index, buffer_layout) in layout.buffer_layouts.iter().take(8).enumerate() {
         // SAFETY: `index` stays inside the eight-layout array Metal documents.
-        let native = unsafe {
-            layouts.objectAtIndexedSubscript(VERTEX_BUFFER_BASE_INDEX as usize + index)
-        };
+        let native =
+            unsafe { layouts.objectAtIndexedSubscript(VERTEX_BUFFER_BASE_INDEX as usize + index) };
         // SAFETY: the stride is a validated positive byte count and a step rate
         // of one is the value Swift passes.
         unsafe {
@@ -284,11 +298,13 @@ pub fn prepare_graphics_compilation(
 
     rhi_validate_sample_count(descriptor.sample_count)?;
     rhi_require(
-        device.device.supportsTextureSampleCount(descriptor.sample_count),
+        device
+            .device
+            .supportsTextureSampleCount(descriptor.sample_count),
         "Metal adapter does not support the requested pipeline sample count",
     )?;
 
-    let native =  { MTLRenderPipelineDescriptor::new() };
+    let native = { MTLRenderPipelineDescriptor::new() };
     native.setRasterSampleCount(descriptor.sample_count);
     native.setVertexFunction(Some(&vertex_function));
     native.setFragmentFunction(fragment_function.as_deref());
@@ -356,10 +372,9 @@ pub fn prepare_graphics_compilation(
                 ))
             })?;
         let depth_state = descriptor.depth_stencil.and_then(|depth_stencil| {
-            let native_state =  { MTLDepthStencilDescriptor::new() };
-            native_state.setDepthCompareFunction(formats::compare_function(
-                depth_stencil.depth_compare,
-            ));
+            let native_state = { MTLDepthStencilDescriptor::new() };
+            native_state
+                .setDepthCompareFunction(formats::compare_function(depth_stencil.depth_compare));
             native_state.setDepthWriteEnabled(depth_stencil.depth_write_enabled);
             native_device.newDepthStencilStateWithDescriptor(&native_state)
         });
@@ -370,10 +385,9 @@ pub fn prepare_graphics_compilation(
         Ok(RhiCompiledObject::new(
             move || {
                 let mut registries = lock(&registries);
-                registries.render_pipelines.insert(
-                    id,
-                    MetalGraphicsPipeline { state, descriptor },
-                );
+                registries
+                    .render_pipelines
+                    .insert(id, MetalGraphicsPipeline { state, descriptor });
                 registries.pipeline_raster_states.insert(id, rasterization);
                 registries.pipeline_primitives.insert(id, primitive);
                 if let Some(depth_state) = depth_state {
@@ -416,7 +430,7 @@ pub fn prepare_mesh_compilation(
         (record.function.clone(), record.threadgroup_size)
     };
 
-    let native =  { objc2_metal::MTLMeshRenderPipelineDescriptor::new() };
+    let native = { objc2_metal::MTLMeshRenderPipelineDescriptor::new() };
     // SAFETY: the mesh function comes from this device's registry and outlives
     // the descriptor, which Metal reads only during pipeline creation.
     unsafe { native.setMeshFunction(Some(&mesh_function)) };
@@ -459,7 +473,10 @@ pub fn prepare_mesh_compilation(
         unsafe { native.setFragmentFunction(Some(&function)) };
     }
 
-    rhi_require(descriptor.color_attachments.len() <= 8, "too many mesh color attachments")?;
+    rhi_require(
+        descriptor.color_attachments.len() <= 8,
+        "too many mesh color attachments",
+    )?;
     let color_attachments = native.colorAttachments();
     for (index, attachment) in descriptor.color_attachments.iter().enumerate() {
         // SAFETY: the count was capped at the eight slots Metal exposes.
@@ -494,7 +511,7 @@ pub fn prepare_mesh_compilation(
     let registries = Arc::clone(&device.registries);
     let rasterization = descriptor.rasterization;
     Ok(RhiCompilationWork::new(move || {
-        let state =  {
+        let state = {
             native_device.newRenderPipelineStateWithMeshDescriptor_options_reflection_error(
                 &native,
                 objc2_metal::MTLPipelineOption::empty(),
@@ -508,9 +525,12 @@ pub fn prepare_mesh_compilation(
             ))
         })?;
         let total = |size: ThreadgroupSize| size.x * size.y * size.z;
-        let mesh_limit =  { state.maxTotalThreadsPerMeshThreadgroup() } as i64;
-        let object_limit =  { state.maxTotalThreadsPerObjectThreadgroup() } as i64;
-        rhi_require(total(mesh_size) <= mesh_limit, "mesh workgroup exceeds pipeline limit")?;
+        let mesh_limit = { state.maxTotalThreadsPerMeshThreadgroup() } as i64;
+        let object_limit = { state.maxTotalThreadsPerObjectThreadgroup() } as i64;
+        rhi_require(
+            total(mesh_size) <= mesh_limit,
+            "mesh workgroup exceeds pipeline limit",
+        )?;
         if descriptor.task.is_some() {
             rhi_require(
                 total(task_size) <= object_limit,
@@ -573,7 +593,7 @@ pub fn prepare_compute_compilation(
                     error.localizedDescription()
                 ))
             })?;
-        let limit =  { state.maxTotalThreadsPerThreadgroup() } as i64;
+        let limit = { state.maxTotalThreadsPerThreadgroup() } as i64;
         rhi_require(
             size.x * size.y * size.z <= limit,
             "compute workgroup exceeds pipeline limit",
@@ -630,7 +650,10 @@ pub fn destroy_mesh_pipeline(device: &MetalDeviceHandle, handle: MeshPipeline) {
 }
 
 /// Backend-reported allocation for one texture, or `None` when unknown.
-pub fn texture_allocation(device: &MetalDeviceHandle, texture: Texture) -> Option<TextureAllocation> {
+pub fn texture_allocation(
+    device: &MetalDeviceHandle,
+    texture: Texture,
+) -> Option<TextureAllocation> {
     let registries = lock(&device.registries);
     let native = registries.textures.get(&texture.id())?;
     Some(TextureAllocation::new(

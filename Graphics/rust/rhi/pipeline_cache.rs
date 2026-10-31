@@ -100,7 +100,10 @@ pub struct ComputePipelineKey {
 }
 impl ComputePipelineKey {
     pub fn new(descriptor: &ComputePipelineDescriptor) -> Self {
-        Self { layout: descriptor.layout.id(), shader: descriptor.shader.id() }
+        Self {
+            layout: descriptor.layout.id(),
+            shader: descriptor.shader.id(),
+        }
     }
 }
 
@@ -142,10 +145,18 @@ pub struct PipelineLease<Handle> {
 }
 impl<Handle> PipelineLease<Handle> {
     pub const fn new(handle: Handle, created: bool) -> Self {
-        Self { handle, created, discarded: None }
+        Self {
+            handle,
+            created,
+            discarded: None,
+        }
     }
     pub const fn discarded(handle: Handle, duplicate: Handle) -> Self {
-        Self { handle, created: false, discarded: Some(duplicate) }
+        Self {
+            handle,
+            created: false,
+            discarded: Some(duplicate),
+        }
     }
 }
 
@@ -161,7 +172,11 @@ pub struct PipelineCache<Key, Handle> {
 }
 impl<Key: Hash + Eq + Clone, Handle: RhiHandle> PipelineCache<Key, Handle> {
     pub fn new() -> Self {
-        Self { entries: HashMap::new(), keys_by_handle: HashMap::new(), references: HashMap::new() }
+        Self {
+            entries: HashMap::new(),
+            keys_by_handle: HashMap::new(),
+            references: HashMap::new(),
+        }
     }
 
     pub fn count(&self) -> usize {
@@ -195,7 +210,9 @@ impl<Key: Hash + Eq + Clone, Handle: RhiHandle> PipelineCache<Key, Handle> {
 
     /// Returns true when the last owner released `handle`.
     pub fn release(&mut self, handle: Handle) -> bool {
-        let Some(&reference_count) = self.references.get(&handle.id()) else { return false };
+        let Some(&reference_count) = self.references.get(&handle.id()) else {
+            return false;
+        };
         if reference_count > 1 {
             self.references.insert(handle.id(), reference_count - 1);
             return false;
@@ -338,7 +355,9 @@ impl PipelineStore {
     }
 
     pub fn record_shader_module(&mut self, nanoseconds: u64, during_frame: bool) {
-        self.statistics.shader_modules.record(nanoseconds, during_frame);
+        self.statistics
+            .shader_modules
+            .record(nanoseconds, during_frame);
     }
 
     pub fn record_shader_cache_hit(&mut self) {
@@ -346,15 +365,21 @@ impl PipelineStore {
     }
 
     pub fn record_graphics(&mut self, nanoseconds: u64, created: bool, during_frame: bool) {
-        self.statistics.graphics.record(nanoseconds, created, during_frame);
+        self.statistics
+            .graphics
+            .record(nanoseconds, created, during_frame);
     }
 
     pub fn record_compute(&mut self, nanoseconds: u64, created: bool, during_frame: bool) {
-        self.statistics.compute.record(nanoseconds, created, during_frame);
+        self.statistics
+            .compute
+            .record(nanoseconds, created, during_frame);
     }
 
     pub fn record_mesh(&mut self, nanoseconds: u64, created: bool, during_frame: bool) {
-        self.statistics.mesh.record(nanoseconds, created, during_frame);
+        self.statistics
+            .mesh
+            .record(nanoseconds, created, during_frame);
     }
 
     pub fn reset_statistics(&mut self) {
@@ -374,17 +399,21 @@ mod tests {
 
     #[test]
     fn keys_ignore_labels_but_capture_state() {
-        let mut first = GraphicsPipelineDescriptor::new(
-            PipelineLayout::new(1),
-            ShaderModule::new(2),
-        );
+        let mut first =
+            GraphicsPipelineDescriptor::new(PipelineLayout::new(1), ShaderModule::new(2));
         first.label = Some("first");
         let mut second = first.clone();
         second.label = Some("second");
-        assert_eq!(GraphicsPipelineKey::new(&first), GraphicsPipelineKey::new(&second));
+        assert_eq!(
+            GraphicsPipelineKey::new(&first),
+            GraphicsPipelineKey::new(&second)
+        );
 
         second.sample_count = 4;
-        assert_ne!(GraphicsPipelineKey::new(&first), GraphicsPipelineKey::new(&second));
+        assert_ne!(
+            GraphicsPipelineKey::new(&first),
+            GraphicsPipelineKey::new(&second)
+        );
     }
 
     #[test]
@@ -398,7 +427,10 @@ mod tests {
     #[test]
     fn the_cache_refcounts_and_retires_on_the_last_release() {
         let mut cache: PipelineCache<ComputePipelineKey, ComputePipeline> = PipelineCache::new();
-        let key = ComputePipelineKey { layout: 1, shader: 2 };
+        let key = ComputePipelineKey {
+            layout: 1,
+            shader: 2,
+        };
         let mut created = 0;
         let first = cache
             .acquire(key, || {

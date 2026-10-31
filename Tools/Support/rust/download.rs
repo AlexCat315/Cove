@@ -80,12 +80,11 @@ pub fn verify(file: &Path, expected: &str) -> Result<(), ToolError> {
 
 /// Downloads `remote` to `destination` unless the cached file already matches.
 pub fn file(from: &str, to: &Path, sha256: &str) -> Result<(), ToolError> {
-    if to.is_file() {
-        if let Ok(actual) = sha256::hex_file(to) {
-            if actual.eq_ignore_ascii_case(sha256) {
-                return Ok(());
-            }
-        }
+    if to.is_file()
+        && let Ok(actual) = sha256::hex_file(to)
+        && actual.eq_ignore_ascii_case(sha256)
+    {
+        return Ok(());
     }
     if let Some(parent) = to.parent() {
         files::directory(parent).map_err(io_error)?;

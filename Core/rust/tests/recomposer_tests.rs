@@ -43,7 +43,9 @@ fn deduplication() {
 
     recomposer.invalidate(1, None, None, move || *counter.borrow_mut() += 1);
     // The same id is already queued, so this body is dropped.
-    recomposer.invalidate(1, None, None, || panic!("a duplicate scope must be dropped"));
+    recomposer.invalidate(1, None, None, || {
+        panic!("a duplicate scope must be dropped")
+    });
     recomposer.commit_all();
 
     assert_eq!(*calls.borrow(), 1);
@@ -73,7 +75,11 @@ fn commit_drains_nested_invalidations() {
     });
     recomposer.commit_all();
 
-    assert_eq!(*log.borrow(), [1, 2], "a child queued by the parent commits in the same frame");
+    assert_eq!(
+        *log.borrow(),
+        [1, 2],
+        "a child queued by the parent commits in the same frame"
+    );
     assert!(!recomposer.has_pending());
 }
 
@@ -94,12 +100,26 @@ fn commit_defers_self_invalidation() {
     });
     recomposer.commit_all();
 
-    assert_eq!(*calls.borrow(), 1, "the self-invalidation is deferred, not run inline");
-    assert!(recomposer.has_pending(), "the self-invalidation stays queued");
+    assert_eq!(
+        *calls.borrow(),
+        1,
+        "the self-invalidation is deferred, not run inline"
+    );
+    assert!(
+        recomposer.has_pending(),
+        "the self-invalidation stays queued"
+    );
 
     recomposer.commit_all();
-    assert_eq!(*calls.borrow(), 2, "the deferred body runs on the next frame");
-    assert!(!recomposer.has_pending(), "that deferred run queued nothing further");
+    assert_eq!(
+        *calls.borrow(),
+        2,
+        "the deferred body runs on the next frame"
+    );
+    assert!(
+        !recomposer.has_pending(),
+        "that deferred run queued nothing further"
+    );
 }
 
 #[test]
@@ -120,7 +140,11 @@ fn commit_drops_duplicate_for_already_queued_child() {
     recomposer.invalidate(2, None, None, move || skipped.borrow_mut().push(2));
     recomposer.commit_all();
 
-    assert_eq!(*log.borrow(), [1, 2], "the child keeps its first-registered body");
+    assert_eq!(
+        *log.borrow(),
+        [1, 2],
+        "the child keeps its first-registered body"
+    );
     assert!(!recomposer.has_pending());
 }
 
@@ -136,7 +160,11 @@ fn scope_reusable_across_frames() {
     recomposer.invalidate(1, None, None, move || *second.borrow_mut() += 1);
     recomposer.commit_all();
 
-    assert_eq!(*calls.borrow(), 2, "the same id is accepted again next frame");
+    assert_eq!(
+        *calls.borrow(),
+        2,
+        "the same id is accepted again next frame"
+    );
 }
 
 #[test]

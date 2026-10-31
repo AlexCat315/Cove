@@ -10,9 +10,9 @@
 use cove_core::State;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
+use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::markdown::markdown_view::MarkdownView;
 use cove_ui_compose::primitives::text::markdown::parse::blocks;
-use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
 use cove_ui_compose::{AnyView, BoxView, TupleView, View};
 

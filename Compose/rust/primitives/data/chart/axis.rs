@@ -13,9 +13,7 @@ use crate::theme::{TextStyleToken, Theme};
 
 use super::axes::ChartValueAxes;
 use super::coordinates::ChartGeometry;
-use super::model::{
-    Axis as AxisConfig, ChartOrientation, ChartRange, ChartStyle, ChartXDomain,
-};
+use super::model::{Axis as AxisConfig, ChartOrientation, ChartRange, ChartStyle, ChartXDomain};
 use super::scale::ChartScale;
 use super::viewport::ChartWindow;
 
@@ -25,12 +23,17 @@ pub struct ChartText {
 }
 impl ChartText {
     pub fn new(theme: &Theme) -> Self {
-        Self { token: theme.typography.caption.clone() }
+        Self {
+            token: theme.typography.caption.clone(),
+        }
     }
 
     pub fn size(&self, text: &str) -> Size {
         if text.is_empty() {
-            return Size { width: 0.0, height: 0.0 };
+            return Size {
+                width: 0.0,
+                height: 0.0,
+            };
         }
         Size {
             width: text.chars().count() as f32 * self.token.font.size() * 0.55,
@@ -77,11 +80,24 @@ impl ChartFrame {
     ) -> Self {
         let bounds = Self::inset(size, origin, style);
         let orientation = style.orientation;
-        let value_labels = Self::labels(&axes.primary_scale, axis.y.is_labeled, axis.y.format.as_deref(), axes.primary.is_percent);
+        let value_labels = Self::labels(
+            &axes.primary_scale,
+            axis.y.is_labeled,
+            axis.y.format.as_deref(),
+            axes.primary.is_percent,
+        );
         let has_secondary = axes.uses_secondary() && axis.secondary.is_labeled;
         let secondary_labels = if has_secondary {
             let scale = axes.scale(super::model::ChartValueAxis::Right);
-            Self::labels(scale, true, axis.secondary.format.as_deref(), axes.secondary.as_ref().map(|stack| stack.is_percent).unwrap_or(false))
+            Self::labels(
+                scale,
+                true,
+                axis.secondary.format.as_deref(),
+                axes.secondary
+                    .as_ref()
+                    .map(|stack| stack.is_percent)
+                    .unwrap_or(false),
+            )
         } else {
             Vec::new()
         };
@@ -93,10 +109,26 @@ impl ChartFrame {
         let has_categories = !category_texts.is_empty();
 
         let line_height = text.size("0").height;
-        let value_width = value_labels.iter().map(|label| text.size(label).width).reduce(f32::max).unwrap_or(0.0);
-        let secondary_width = secondary_labels.iter().map(|label| text.size(label).width).reduce(f32::max).unwrap_or(0.0);
-        let category_width = category_texts.iter().map(|label| text.size(label).width).reduce(f32::max).unwrap_or(0.0);
-        let value_title_height = if axis.y.title.is_empty() { 0.0 } else { text.size(&axis.y.title).height };
+        let value_width = value_labels
+            .iter()
+            .map(|label| text.size(label).width)
+            .reduce(f32::max)
+            .unwrap_or(0.0);
+        let secondary_width = secondary_labels
+            .iter()
+            .map(|label| text.size(label).width)
+            .reduce(f32::max)
+            .unwrap_or(0.0);
+        let category_width = category_texts
+            .iter()
+            .map(|label| text.size(label).width)
+            .reduce(f32::max)
+            .unwrap_or(0.0);
+        let value_title_height = if axis.y.title.is_empty() {
+            0.0
+        } else {
+            text.size(&axis.y.title).height
+        };
         let secondary_title_height = if has_secondary && !axis.secondary.title.is_empty() {
             text.size(&axis.secondary.title).height
         } else {
@@ -114,22 +146,58 @@ impl ChartFrame {
         let mut bottom = 0.0_f32;
         match orientation {
             ChartOrientation::Vertical => {
-                left = if axis.y.is_labeled { value_width + Self::LABEL_GAP } else { 0.0 };
-                right = if has_secondary { secondary_width + Self::LABEL_GAP } else { 0.0 };
-                let pad = if axis.y.is_labeled || has_secondary { line_height / 2.0 } else { 0.0 };
+                left = if axis.y.is_labeled {
+                    value_width + Self::LABEL_GAP
+                } else {
+                    0.0
+                };
+                right = if has_secondary {
+                    secondary_width + Self::LABEL_GAP
+                } else {
+                    0.0
+                };
+                let pad = if axis.y.is_labeled || has_secondary {
+                    line_height / 2.0
+                } else {
+                    0.0
+                };
                 let title = value_title_height.max(secondary_title_height);
                 top = if title > 0.0 { title + pad + 2.0 } else { pad };
-                bottom = (if has_categories { line_height + 4.0 } else { 0.0 })
-                    + if category_title_height > 0.0 { category_title_height + 2.0 } else { 0.0 };
+                bottom = (if has_categories {
+                    line_height + 4.0
+                } else {
+                    0.0
+                }) + if category_title_height > 0.0 {
+                    category_title_height + 2.0
+                } else {
+                    0.0
+                };
             }
             ChartOrientation::Horizontal => {
-                left = if has_categories { category_width + Self::LABEL_GAP } else { 0.0 };
-                bottom = (if axis.y.is_labeled { line_height + 4.0 } else { 0.0 })
-                    + if value_title_height > 0.0 { value_title_height + 2.0 } else { 0.0 }
-                    + if axis.y.is_labeled { line_height / 2.0 } else { 0.0 };
+                left = if has_categories {
+                    category_width + Self::LABEL_GAP
+                } else {
+                    0.0
+                };
+                bottom = (if axis.y.is_labeled {
+                    line_height + 4.0
+                } else {
+                    0.0
+                }) + if value_title_height > 0.0 {
+                    value_title_height + 2.0
+                } else {
+                    0.0
+                } + if axis.y.is_labeled {
+                    line_height / 2.0
+                } else {
+                    0.0
+                };
                 let title = category_title_height.max(secondary_title_height);
-                top = (if has_secondary { line_height / 2.0 + line_height + Self::LABEL_GAP } else { 0.0 })
-                    + if title > 0.0 { title + 2.0 } else { 0.0 };
+                top = (if has_secondary {
+                    line_height / 2.0 + line_height + Self::LABEL_GAP
+                } else {
+                    0.0
+                }) + if title > 0.0 { title + 2.0 } else { 0.0 };
             }
         }
         let left_inset = left.min(bounds.width * 0.4);
@@ -190,8 +258,16 @@ impl ChartFrame {
             secondary_ticks,
             category_ticks,
             value_title: axis.y.title.clone(),
-            secondary_title: if has_secondary { axis.secondary.title.clone() } else { String::new() },
-            category_title: if has_categories { axis.x.title.clone() } else { String::new() },
+            secondary_title: if has_secondary {
+                axis.secondary.title.clone()
+            } else {
+                String::new()
+            },
+            category_title: if has_categories {
+                axis.x.title.clone()
+            } else {
+                String::new()
+            },
             orientation,
         }
     }
@@ -205,7 +281,9 @@ impl ChartFrame {
         match domain {
             ChartXDomain::Categorical(labels) => labels.iter().take(count).cloned().collect(),
             ChartXDomain::Numeric => {
-                let Some(scale) = scale else { return Vec::new() };
+                let Some(scale) = scale else {
+                    return Vec::new();
+                };
                 scale
                     .ticks
                     .iter()
@@ -248,7 +326,9 @@ impl ChartFrame {
                     .collect();
             }
         }
-        let span = window.map(|window| window.range.span()).unwrap_or(count.max(1) as f32);
+        let span = window
+            .map(|window| window.range.span())
+            .unwrap_or(count.max(1) as f32);
         let step = Self::label_step(
             texts,
             orientation.breadth(plot) / span.max(1.0),
@@ -266,7 +346,10 @@ impl ChartFrame {
                     ChartGeometry::across_index(index, count, has_bars, plot, orientation)
                 });
             if position >= origin && position <= end {
-                ticks.push(ChartTick { position, label: texts[index].clone() });
+                ticks.push(ChartTick {
+                    position,
+                    label: texts[index].clone(),
+                });
             }
             index += step.max(1);
         }
@@ -312,12 +395,22 @@ impl ChartFrame {
         }
     }
 
-    fn label_step(texts: &[String], slot: f32, orientation: ChartOrientation, text: &ChartText) -> usize {
+    fn label_step(
+        texts: &[String],
+        slot: f32,
+        orientation: ChartOrientation,
+        text: &ChartText,
+    ) -> usize {
         if slot <= 0.0 {
             return texts.len().max(1);
         }
         let needed = if orientation == ChartOrientation::Vertical {
-            texts.iter().map(|label| text.size(label).width).reduce(f32::max).unwrap_or(0.0) + 8.0
+            texts
+                .iter()
+                .map(|label| text.size(label).width)
+                .reduce(f32::max)
+                .unwrap_or(0.0)
+                + 8.0
         } else {
             text.size("0").height + 2.0
         };

@@ -5,27 +5,29 @@
 //! selecting a step never changes another step's status.
 use std::rc::Rc;
 
-use cove_core::scene::{
-    AccessibilityRole, Align, FlexDirection, Justify, LayoutNode, Node, NodeResource, Wrap,
-};
-use cove_core::{Binding, Color};
-use cove_platform::KeyEvent;
+use crate::adaptive::ContainerSizeReader;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{Button, ButtonIcon, ButtonIconSource};
 use crate::primitives::feedback::Spinner;
-use crate::adaptive::ContainerSizeReader;
 use crate::primitives::overlays::roving_focus::{
-    roving_identity, RovingFocusHost, RovingItem, SelectionNavigation,
+    RovingFocusHost, RovingItem, SelectionNavigation, roving_identity,
 };
 use crate::primitives::text::Text;
-use crate::theme::styles::buttons::{ButtonRole, ButtonStyle, ButtonStyleConfiguration, ButtonStyleViewExt};
-use crate::theme::{
-    theme_for_node, ControlSizeEnvironment, IconMetrics, SemanticColorRef, SemanticFontRef, Theme,
-    ThemeReader,
+use crate::theme::styles::buttons::{
+    ButtonRole, ButtonStyle, ButtonStyleConfiguration, ButtonStyleViewExt,
 };
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, TupleView, View, ViewExt};
+use crate::theme::{
+    ControlSizeEnvironment, IconMetrics, SemanticColorRef, SemanticFontRef, Theme, ThemeReader,
+    theme_for_node,
+};
+use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, ViewExt, impl_primitive_view};
+use cove_core::scene::{
+    AccessibilityRole, Align, FlexDirection, Justify, LayoutNode, Node, NodeResource, Wrap,
+};
+use cove_core::{Binding, Color};
+use cove_platform::KeyEvent;
 
 use super::values::{StepStatus, StepperAxis, StepperItem, StepperOptions};
 
@@ -40,11 +42,18 @@ impl<Id: std::hash::Hash + PartialEq + Clone + 'static> Stepper<Id> {
     pub fn new(items: Vec<StepperItem<Id>>, selection: Binding<Option<Id>>) -> Self {
         assert!(
             items.iter().enumerate().all(|(index, item)| {
-                items.iter().enumerate().all(|(other, candidate)| other == index || candidate.id != item.id)
+                items
+                    .iter()
+                    .enumerate()
+                    .all(|(other, candidate)| other == index || candidate.id != item.id)
             }),
             "Stepper item IDs must be unique"
         );
-        Self { items, selection, options: StepperOptions::default() }
+        Self {
+            items,
+            selection,
+            options: StepperOptions::default(),
+        }
     }
 
     pub fn options(mut self, options: StepperOptions) -> Self {
@@ -54,7 +63,11 @@ impl<Id: std::hash::Hash + PartialEq + Clone + 'static> Stepper<Id> {
 
     fn enabled(&self) -> Vec<Id> {
         if self.options.is_enabled {
-            self.items.iter().filter(|item| item.is_enabled).map(|item| item.id.clone()).collect()
+            self.items
+                .iter()
+                .filter(|item| item.is_enabled)
+                .map(|item| item.id.clone())
+                .collect()
         } else {
             Vec::new()
         }
@@ -105,21 +118,25 @@ impl<Id: std::hash::Hash + PartialEq + Clone + 'static> Stepper<Id> {
             enabled.clone(),
             move || selection_for_host.get(),
             move |id: Id| {
-                if enabled_for_host.contains(&id) && selection_for_select.get().as_ref() != Some(&id) {
+                if enabled_for_host.contains(&id)
+                    && selection_for_select.get().as_ref() != Some(&id)
+                {
                     selection_for_select.set(Some(id));
                 }
             },
             move |id: &Id| identity_for_host(id),
-            AnyView::new(
-                BoxView::new(
-                    if vertical { FlexDirection::Column } else { FlexDirection::Row },
-                    Align::Stretch,
-                    Justify::FlexStart,
-                    Wrap::NoWrap,
-                    if vertical { 4.0 } else { 8.0 },
-                    AnyView::new(TupleView::new(rows)),
-                ),
-            ),
+            AnyView::new(BoxView::new(
+                if vertical {
+                    FlexDirection::Column
+                } else {
+                    FlexDirection::Row
+                },
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                if vertical { 4.0 } else { 8.0 },
+                AnyView::new(TupleView::new(rows)),
+            )),
         )
         .wraps(self.options.allows_wrap)
         .command({
@@ -155,16 +172,29 @@ impl<Id: std::hash::Hash + PartialEq + Clone + 'static> Stepper<Id> {
         })
     }
 
-    fn step(&self, item: &StepperItem<Id>, index: usize, vertical: bool, selected: bool) -> AnyView {
+    fn step(
+        &self,
+        item: &StepperItem<Id>,
+        index: usize,
+        vertical: bool,
+        selected: bool,
+    ) -> AnyView {
         let count = self.items.len();
         let is_enabled = self.options.is_enabled && item.is_enabled;
-        let tooltip = format!("Step {} of {} · {}", index + 1, count, item.status.description());
-        let marker = AnyView::new(AnyView::new(StepperMarker {
-            number: index + 1,
-            status: item.status,
-            is_selected: selected,
-        })
-        .accessibility_hidden(true));
+        let tooltip = format!(
+            "Step {} of {} · {}",
+            index + 1,
+            count,
+            item.status.description()
+        );
+        let marker = AnyView::new(
+            AnyView::new(StepperMarker {
+                number: index + 1,
+                status: item.status,
+                is_selected: selected,
+            })
+            .accessibility_hidden(true),
+        );
         let mut labels: Vec<AnyView> = vec![AnyView::new(
             Text::new(item.title.clone()).semantic_font(SemanticFontRef::body_strong()),
         )];
@@ -175,23 +205,28 @@ impl<Id: std::hash::Hash + PartialEq + Clone + 'static> Stepper<Id> {
                     .semantic_foreground(SemanticColorRef::on_surface_muted()),
             ));
         }
-        let label = AnyView::new(
-            BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 10.0,
-                AnyView::new(TupleView::new(vec![
-                    marker,
-                    AnyView::new(
-                        BoxView::new(
-                            FlexDirection::Column, Align::Stretch, Justify::FlexStart,
-                            Wrap::NoWrap, 3.0,
-                            AnyView::new(TupleView::new(labels)),
-                        )
-                        .flex_with(1.0, 1.0, Some(0.0))
-                        .frame_min_width(0.0),
-                    ),
-                ])),
-            ),
-        );
+        let label = AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            10.0,
+            AnyView::new(TupleView::new(vec![
+                marker,
+                AnyView::new(
+                    BoxView::new(
+                        FlexDirection::Column,
+                        Align::Stretch,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        3.0,
+                        AnyView::new(TupleView::new(labels)),
+                    )
+                    .flex_with(1.0, 1.0, Some(0.0))
+                    .frame_min_width(0.0),
+                ),
+            ])),
+        ));
         let id = item.id.clone();
         let selection = self.selection.clone();
         let enabled = self.enabled();
@@ -209,7 +244,12 @@ impl<Id: std::hash::Hash + PartialEq + Clone + 'static> Stepper<Id> {
             Some(tooltip.clone()),
         )
         .button_style(StepperButtonStyle);
-        let value = format!("Step {} of {} · {}", index + 1, count, item.status.description());
+        let value = format!(
+            "Step {} of {} · {}",
+            index + 1,
+            count,
+            item.status.description()
+        );
         let identity: Rc<dyn Fn(&Id) -> u64> = Rc::new(|id: &Id| roving_identity(id));
         let tab_stop = self
             .selection
@@ -222,27 +262,45 @@ impl<Id: std::hash::Hash + PartialEq + Clone + 'static> Stepper<Id> {
         let identity_for_item = identity.clone();
         AnyView::new(
             button
-            .modifier(RovingItem::new(item_id.clone(), tab_stop, identity_for_item))
-            .modifier(StepItemSemantics { value: value.clone() })
-            .flex_with(
-                if vertical { 0.0 } else { 1.0 },
-                if vertical { 0.0 } else { 1.0 },
-                if vertical { None } else { Some(0.0) },
-            ),
+                .modifier(RovingItem::new(
+                    item_id.clone(),
+                    tab_stop,
+                    identity_for_item,
+                ))
+                .modifier(StepItemSemantics {
+                    value: value.clone(),
+                })
+                .flex_with(
+                    if vertical { 0.0 } else { 1.0 },
+                    if vertical { 0.0 } else { 1.0 },
+                    if vertical { None } else { Some(0.0) },
+                ),
         )
     }
 
     fn connector(&self, item: &StepperItem<Id>, vertical: bool) -> AnyView {
         let status = item.status;
         AnyView::new(ThemeReader::new(move |theme: &Theme| {
-            let color = if status == StepStatus::Completed { theme.colors.success } else { theme.colors.border };
+            let color = if status == StepStatus::Completed {
+                theme.colors.success
+            } else {
+                theme.colors.border
+            };
             if !vertical {
                 AnyView::new(
                     BoxView::new(
-                        FlexDirection::Column, Align::Stretch, Justify::Center, Wrap::NoWrap, 0.0,
+                        FlexDirection::Column,
+                        Align::Stretch,
+                        Justify::Center,
+                        Wrap::NoWrap,
+                        0.0,
                         AnyView::new(
                             BoxView::new(
-                                FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                                FlexDirection::Row,
+                                Align::Center,
+                                Justify::FlexStart,
+                                Wrap::NoWrap,
+                                0.0,
                                 AnyView::new(crate::EmptyView),
                             )
                             .frame_size(24.0, 1.0)
@@ -252,7 +310,9 @@ impl<Id: std::hash::Hash + PartialEq + Clone + 'static> Stepper<Id> {
                     .accessibility_hidden(true),
                 )
             } else {
-                AnyView::new(AnyView::new(StepperVerticalConnector { color }).accessibility_hidden(true))
+                AnyView::new(
+                    AnyView::new(StepperVerticalConnector { color }).accessibility_hidden(true),
+                )
             }
         }))
     }
@@ -282,7 +342,11 @@ impl<Id: std::hash::Hash + PartialEq + Clone + 'static> View for Stepper<Id> {
         AnyView::new(
             ContainerSizeReader::new(move |size: cove_core::Size| {
                 let use_wide = width_allows_horizontal(size.width, budget);
-                AnyView::new(if use_wide { (*wide).clone() } else { (*compact).clone() })
+                AnyView::new(if use_wide {
+                    (*wide).clone()
+                } else {
+                    (*compact).clone()
+                })
             })
             .frame_min_width(0.0),
         )
@@ -311,18 +375,28 @@ impl ButtonStyle for StepperButtonStyle {
         };
         AnyView::new(
             BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 0.0,
-                AnyView::new(
-                    configuration.label.clone().flex_with(1.0, 1.0, Some(0.0)),
-                ),
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
+                AnyView::new(configuration.label.clone().flex_with(1.0, 1.0, Some(0.0))),
             )
             .flex_with(1.0, 1.0, Some(0.0))
             .padding(8.0)
             .background_color(fill)
             .corner_radius(configuration.theme.radius.md)
-            .foreground_color(if configuration.is_enabled { colors.on_surface } else { colors.on_surface_muted })
+            .foreground_color(if configuration.is_enabled {
+                colors.on_surface
+            } else {
+                colors.on_surface_muted
+            })
             .border_color(
-                if configuration.is_focused { colors.focus_ring } else { Color::CLEAR },
+                if configuration.is_focused {
+                    colors.focus_ring
+                } else {
+                    Color::CLEAR
+                },
                 1.0,
             )
             .opacity(if configuration.is_enabled { 1.0 } else { 0.5 }),
@@ -338,9 +412,9 @@ struct StepItemSemantics {
 
 impl cove_composition::ViewModifier for StepItemSemantics {
     fn apply_node(&self, node: &Node) {
-        let mut semantics = node
-            .accessibility()
-            .unwrap_or_else(|| cove_core::scene::AccessibilitySemantics::new(AccessibilityRole::ListItem));
+        let mut semantics = node.accessibility().unwrap_or_else(|| {
+            cove_core::scene::AccessibilitySemantics::new(AccessibilityRole::ListItem)
+        });
         semantics.role = AccessibilityRole::ListItem;
         semantics.value = self.value.clone();
         node.set_accessibility(Some(semantics));
@@ -416,7 +490,11 @@ impl PrimitiveView for StepperVerticalConnector {
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(crate::EmptyView),
             )
             .frame_size(1.0, 16.0)
@@ -470,7 +548,11 @@ impl PrimitiveView for StepperMarker {
             layout.set_justify_content(Justify::Center);
         }
         node.set_corner_radius(diameter / 2.0);
-        node.set_background_color(Some(color.multiplied_alpha(if self.is_selected { 0.16 } else { 0.09 })));
+        node.set_background_color(Some(color.multiplied_alpha(if self.is_selected {
+            0.16
+        } else {
+            0.09
+        })));
         node.set_border_color(Some(color));
         node.set_border_width(if self.is_selected { 1.5 } else { 1.0 });
     }
@@ -479,20 +561,18 @@ impl PrimitiveView for StepperMarker {
         let diameter = Self::diameter(node);
         let color = Self::color(node, self.status, self.is_selected);
         let content = match self.status {
-            StepStatus::Completed => AnyView::new(
-                ButtonIcon::new(
-                    ButtonIconSource::resource(crate::primitives::media::ui_icon_catalog::action::check()),
-                    Some(diameter * 0.5),
-                    Some(color),
+            StepStatus::Completed => AnyView::new(ButtonIcon::new(
+                ButtonIconSource::resource(
+                    crate::primitives::media::ui_icon_catalog::action::check(),
                 ),
-            ),
-            StepStatus::Failed => AnyView::new(
-                ButtonIcon::new(
-                    ButtonIconSource::resource(crate::primitives::media::ui_icon_catalog::action::x()),
-                    Some(diameter * 0.5),
-                    Some(color),
-                ),
-            ),
+                Some(diameter * 0.5),
+                Some(color),
+            )),
+            StepStatus::Failed => AnyView::new(ButtonIcon::new(
+                ButtonIconSource::resource(crate::primitives::media::ui_icon_catalog::action::x()),
+                Some(diameter * 0.5),
+                Some(color),
+            )),
             StepStatus::InProgress => {
                 AnyView::new(AnyView::new(Spinner::new(diameter * 0.55)).foreground_color(color))
             }
@@ -506,4 +586,3 @@ impl PrimitiveView for StepperMarker {
     }
 }
 impl_primitive_view!(StepperMarker);
-

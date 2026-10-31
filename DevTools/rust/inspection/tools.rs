@@ -57,11 +57,17 @@ impl Tool {
     /// host's frame inbox. Trace reads and comparisons stay on the asynchronous
     /// toolbox because they depend on retained capture state.
     pub fn is_immediate_read(self) -> bool {
-        !matches!(self, Self::CaptureUiTrace | Self::GetUiTrace | Self::CompareUiTraces)
+        !matches!(
+            self,
+            Self::CaptureUiTrace | Self::GetUiTrace | Self::CompareUiTraces
+        )
     }
 
     pub fn immediate_read_tools() -> Vec<Tool> {
-        Self::ALL.into_iter().filter(|tool| tool.is_immediate_read()).collect()
+        Self::ALL
+            .into_iter()
+            .filter(|tool| tool.is_immediate_read())
+            .collect()
     }
 
     /// The contract exposed to MCP clients, embedded agents and DevTools.
@@ -69,8 +75,14 @@ impl Tool {
         let text = || JsonSchema::string(Some(1), Some(256));
         let paging = || {
             let mut properties = BTreeMap::new();
-            properties.insert("offset".to_string(), JsonSchema::integer(Some(0.0), Some(1_000_000.0)));
-            properties.insert("limit".to_string(), JsonSchema::integer(Some(1.0), Some(100.0)));
+            properties.insert(
+                "offset".to_string(),
+                JsonSchema::integer(Some(0.0), Some(1_000_000.0)),
+            );
+            properties.insert(
+                "limit".to_string(),
+                JsonSchema::integer(Some(1.0), Some(100.0)),
+            );
             properties
         };
         let object = |properties: BTreeMap<String, JsonSchema>, required: Vec<String>| {
@@ -88,7 +100,10 @@ impl Tool {
                 self.name(),
                 "Read bounded diagnostic issues with evidence and data availability. Recommendations are hypotheses to verify.",
                 object(
-                    BTreeMap::from([("limit".to_string(), JsonSchema::integer(Some(1.0), Some(100.0)))]),
+                    BTreeMap::from([(
+                        "limit".to_string(),
+                        JsonSchema::integer(Some(1.0), Some(100.0)),
+                    )]),
                     Vec::new(),
                 ),
                 true,
@@ -123,7 +138,10 @@ impl Tool {
                 merge(
                     vec![
                         ("text", text()),
-                        ("minimum_count", JsonSchema::integer(Some(0.0), Some(1_000_000.0))),
+                        (
+                            "minimum_count",
+                            JsonSchema::integer(Some(0.0), Some(1_000_000.0)),
+                        ),
                     ],
                     Vec::new(),
                 ),
@@ -226,7 +244,8 @@ pub fn default_skill_library() -> AgentSkillLibrary {
 
 /// Build the portable toolbox that both `AgentSession` and `McpServer` accept.
 pub fn toolbox(
-    executor: impl Fn(&str, &serde_json::Value) -> Result<crate::agent::AgentToolResult, AgentError> + 'static,
+    executor: impl Fn(&str, &serde_json::Value) -> Result<crate::agent::AgentToolResult, AgentError>
+    + 'static,
 ) -> Result<crate::agent::AgentToolbox, AgentError> {
     crate::agent::AgentToolbox::new(Tools::tools(), std::rc::Rc::new(executor))
 }

@@ -4,8 +4,8 @@
 //! otherwise every axis gets a full-width row. Never splits two-and-one, which
 //! reads as a broken grid. Proposals are at-most, so axes fill them with a
 //! 100% width.
-use cove_core::{Point, Rect, Size};
 use crate::{Layout, LayoutSubview, ProposedViewSize};
+use cove_core::{Point, Rect, Size};
 
 /// Equal-width axis fields while they fit; stacked rows otherwise.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -19,9 +19,21 @@ pub struct AxisLayout {
 impl AxisLayout {
     pub fn new(spacing: f32, minimum_width: f32, ideal_width: f32) -> Self {
         Self {
-            spacing: if spacing.is_finite() { spacing.max(0.0) } else { 4.0 },
-            minimum_width: if minimum_width.is_finite() { minimum_width.max(0.0) } else { 0.0 },
-            ideal_width: if ideal_width.is_finite() { ideal_width.max(0.0) } else { 0.0 },
+            spacing: if spacing.is_finite() {
+                spacing.max(0.0)
+            } else {
+                4.0
+            },
+            minimum_width: if minimum_width.is_finite() {
+                minimum_width.max(0.0)
+            } else {
+                0.0
+            },
+            ideal_width: if ideal_width.is_finite() {
+                ideal_width.max(0.0)
+            } else {
+                0.0
+            },
         }
     }
 
@@ -38,7 +50,11 @@ impl AxisLayout {
             let column = (available - gaps) / count;
             let heights: Vec<f32> = subviews
                 .iter()
-                .map(|subview| subview.size_that_fits(ProposedViewSize::new(Some(column), None)).height)
+                .map(|subview| {
+                    subview
+                        .size_that_fits(ProposedViewSize::new(Some(column), None))
+                        .height
+                })
                 .collect();
             let height = heights.iter().copied().fold(0.0_f32, f32::max);
             let frames = subviews
@@ -48,20 +64,34 @@ impl AxisLayout {
                     Rect::new(index as f32 * (column + self.spacing), 0.0, column, height)
                 })
                 .collect();
-            return (frames, Size { width: available, height });
+            return (
+                frames,
+                Size {
+                    width: available,
+                    height,
+                },
+            );
         }
 
         let mut y = 0.0;
         let frames = subviews
             .iter()
             .map(|subview| {
-                let height = subview.size_that_fits(ProposedViewSize::new(Some(available), None)).height;
+                let height = subview
+                    .size_that_fits(ProposedViewSize::new(Some(available), None))
+                    .height;
                 let frame = Rect::new(0.0, y, available, height);
                 y += height + self.spacing;
                 frame
             })
             .collect();
-        (frames, Size { width: available, height: (y - self.spacing).max(0.0) })
+        (
+            frames,
+            Size {
+                width: available,
+                height: (y - self.spacing).max(0.0),
+            },
+        )
     }
 }
 
@@ -70,10 +100,17 @@ impl Layout for AxisLayout {
         self.arrangement(proposal.width, subviews).1
     }
 
-    fn place_subviews(&self, bounds: Rect, _proposal: ProposedViewSize, subviews: &[LayoutSubview]) {
+    fn place_subviews(
+        &self,
+        bounds: Rect,
+        _proposal: ProposedViewSize,
+        subviews: &[LayoutSubview],
+    ) {
         let (frames, _) = self.arrangement(Some(bounds.width), subviews);
         for (index, subview) in subviews.iter().enumerate() {
-            let Some(frame) = frames.get(index) else { continue };
+            let Some(frame) = frames.get(index) else {
+                continue;
+            };
             subview.place(
                 Point::new(bounds.x + frame.x, bounds.y + frame.y),
                 ProposedViewSize::new(Some(frame.width), Some(frame.height)),

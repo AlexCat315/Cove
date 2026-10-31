@@ -21,8 +21,18 @@ pub struct AgentTool {
 }
 
 impl AgentTool {
-    pub fn new(name: impl Into<String>, description: impl Into<String>, schema: JsonSchema, read_only: bool) -> Self {
-        Self { name: name.into(), description: description.into(), schema, read_only }
+    pub fn new(
+        name: impl Into<String>,
+        description: impl Into<String>,
+        schema: JsonSchema,
+        read_only: bool,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            description: description.into(),
+            schema,
+            read_only,
+        }
     }
 
     pub fn mcp_definition(&self) -> Value {
@@ -73,7 +83,10 @@ impl AgentToolResult {
     }
 
     pub fn encode(value: &Value, is_error: bool) -> Self {
-        Self { json: serde_json::to_vec(value).unwrap_or_else(|_| b"null".to_vec()), is_error }
+        Self {
+            json: serde_json::to_vec(value).unwrap_or_else(|_| b"null".to_vec()),
+            is_error,
+        }
     }
 
     pub fn value(&self) -> Option<Value> {
@@ -142,7 +155,8 @@ impl AgentToolbox {
                 || !names.insert(tool.name.clone())
             {
                 return Err(AgentError::InvalidConfiguration(
-                    "Tool names must be unique and bounded; at most 256 tools are supported.".into(),
+                    "Tool names must be unique and bounded; at most 256 tools are supported."
+                        .into(),
                 ));
             }
         }
@@ -155,12 +169,16 @@ impl AgentToolbox {
         };
         let input_bytes = serde_json::to_vec(input).map_err(|_| AgentError::InvalidResult)?;
         if input_bytes.len() > MAX_TOOL_INPUT_BYTES {
-            return Err(AgentError::InvalidConfiguration("Tool input exceeds 256 KiB.".into()));
+            return Err(AgentError::InvalidConfiguration(
+                "Tool input exceeds 256 KiB.".into(),
+            ));
         }
         JsonSchemaValidator::validate(input, &tool.schema)
             .map_err(|violation| AgentError::InvalidConfiguration(violation.to_string()))?;
         let result = (self.executor)(name, input)?;
-        if result.json.len() > MAX_TOOL_RESULT_BYTES || serde_json::from_slice::<Value>(&result.json).is_err() {
+        if result.json.len() > MAX_TOOL_RESULT_BYTES
+            || serde_json::from_slice::<Value>(&result.json).is_err()
+        {
             return Err(AgentError::InvalidResult);
         }
         Ok(result)
@@ -169,7 +187,10 @@ impl AgentToolbox {
 
 impl std::fmt::Debug for AgentToolbox {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.debug_struct("AgentToolbox").field("tools", &self.tools.len()).finish()
+        formatter
+            .debug_struct("AgentToolbox")
+            .field("tools", &self.tools.len())
+            .finish()
     }
 }
 
@@ -204,10 +225,19 @@ pub struct AgentMessage {
 
 impl AgentMessage {
     pub fn new(role: AgentRole) -> Self {
-        Self { role, text: String::new(), calls: Vec::new(), result_for: None, is_error: false }
+        Self {
+            role,
+            text: String::new(),
+            calls: Vec::new(),
+            result_for: None,
+            is_error: false,
+        }
     }
     pub fn text(role: AgentRole, text: impl Into<String>) -> Self {
-        Self { text: text.into(), ..Self::new(role) }
+        Self {
+            text: text.into(),
+            ..Self::new(role)
+        }
     }
     pub fn user(text: impl Into<String>) -> Self {
         Self::text(AgentRole::User, text)
@@ -255,11 +285,18 @@ impl AgentSession {
     pub fn run(&self, input: Vec<AgentMessage>) -> Result<AgentRun, AgentError> {
         let mut messages = input;
         if !self.instructions.is_empty() {
-            messages.insert(0, AgentMessage::text(AgentRole::System, self.instructions.clone()));
+            messages.insert(
+                0,
+                AgentMessage::text(AgentRole::System, self.instructions.clone()),
+            );
         }
         for round in 0..=self.maximum_tool_rounds {
             if messages.len() > 256
-                || messages.iter().map(|message| message.text.len()).sum::<usize>() > 1_048_576
+                || messages
+                    .iter()
+                    .map(|message| message.text.len())
+                    .sum::<usize>()
+                    > 1_048_576
             {
                 return Err(AgentError::InvalidConfiguration(
                     "Conversation exceeds the message or byte limit.".into(),
@@ -272,7 +309,11 @@ impl AgentSession {
                         return Err(AgentError::InvalidResult);
                     }
                     messages.push(AgentMessage::text(AgentRole::Assistant, text.clone()));
-                    return Ok(AgentRun { answer: text, messages, tool_rounds: round });
+                    return Ok(AgentRun {
+                        answer: text,
+                        messages,
+                        tool_rounds: round,
+                    });
                 }
                 AgentReply::Tools(calls) => {
                     if round == self.maximum_tool_rounds {
@@ -281,7 +322,9 @@ impl AgentSession {
                     let mut ids = std::collections::BTreeSet::new();
                     if calls.is_empty()
                         || calls.len() > 16
-                        || !calls.iter().all(|call| !call.id.is_empty() && call.id.len() <= 128)
+                        || !calls
+                            .iter()
+                            .all(|call| !call.id.is_empty() && call.id.len() <= 128)
                         || !calls.iter().all(|call| ids.insert(call.id.clone()))
                     {
                         return Err(AgentError::InvalidConfiguration(
@@ -322,36 +365,63 @@ mod tests {
 
     fn toolbox() -> AgentToolbox {
         let mut properties = std::collections::BTreeMap::new();
-        properties.insert("limit".to_string(), JsonSchema::integer(Some(1.0), Some(10.0)));
+        properties.insert(
+            "limit".to_string(),
+            JsonSchema::integer(Some(1.0), Some(10.0)),
+        );
         let tools = vec![AgentTool::new(
             "query",
             "a query",
             JsonSchema::object(properties, Vec::new()),
             true,
         )];
-        AgentToolbox::new(tools, Rc::new(|_name, _input| Ok(AgentToolResult::encode(&serde_json::json!({"ok": true}), false))))
-            .unwrap()
+        AgentToolbox::new(
+            tools,
+            Rc::new(|_name, _input| {
+                Ok(AgentToolResult::encode(
+                    &serde_json::json!({"ok": true}),
+                    false,
+                ))
+            }),
+        )
+        .unwrap()
     }
 
     #[test]
     fn duplicate_tool_names_are_rejected() {
         let tool = AgentTool::new("a", "d", JsonSchema::any(), true);
-        let result = AgentToolbox::new(vec![tool.clone(), tool], Rc::new(|_, _| {
-            Ok(AgentToolResult::encode(&serde_json::json!(null), false))
-        }));
+        let result = AgentToolbox::new(
+            vec![tool.clone(), tool],
+            Rc::new(|_, _| Ok(AgentToolResult::encode(&serde_json::json!(null), false))),
+        );
         assert!(result.is_err());
     }
 
     #[test]
     fn tool_input_is_validated_before_execution() {
         let toolbox = toolbox();
-        assert!(toolbox.execute("query", &serde_json::json!({"limit": 5})).is_ok());
+        assert!(
+            toolbox
+                .execute("query", &serde_json::json!({"limit": 5}))
+                .is_ok()
+        );
         // Out of range.
-        assert!(toolbox.execute("query", &serde_json::json!({"limit": 50})).is_err());
+        assert!(
+            toolbox
+                .execute("query", &serde_json::json!({"limit": 50}))
+                .is_err()
+        );
         // Unknown property.
-        assert!(toolbox.execute("query", &serde_json::json!({"nope": 1})).is_err());
+        assert!(
+            toolbox
+                .execute("query", &serde_json::json!({"nope": 1}))
+                .is_err()
+        );
         // Unknown tool.
-        assert!(matches!(toolbox.execute("nope", &serde_json::json!({})), Err(AgentError::UnknownTool(_))));
+        assert!(matches!(
+            toolbox.execute("nope", &serde_json::json!({})),
+            Err(AgentError::UnknownTool(_))
+        ));
     }
 
     #[test]
@@ -363,8 +433,16 @@ mod tests {
             4,
             Rc::new(|_messages, _tools| {
                 Ok(AgentReply::Tools(vec![
-                    AgentToolCall { id: "a".into(), name: "query".into(), arguments: serde_json::json!({}) },
-                    AgentToolCall { id: "a".into(), name: "query".into(), arguments: serde_json::json!({}) },
+                    AgentToolCall {
+                        id: "a".into(),
+                        name: "query".into(),
+                        arguments: serde_json::json!({}),
+                    },
+                    AgentToolCall {
+                        id: "a".into(),
+                        name: "query".into(),
+                        arguments: serde_json::json!({}),
+                    },
                 ]))
             }),
         )

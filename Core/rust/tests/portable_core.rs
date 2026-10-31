@@ -37,7 +37,10 @@ fn cached_geometry_keeps_clipping_when_translated() {
         .unwrap();
     assert_eq!(destination.vertices()[0].x, 19.0);
     assert_eq!(destination.vertices()[0].y, 9.0);
-    assert_eq!(destination.batches()[0].scissor, source.batches()[0].scissor);
+    assert_eq!(
+        destination.batches()[0].scissor,
+        source.batches()[0].scissor
+    );
     assert_eq!(destination.indices(), source.indices());
 }
 

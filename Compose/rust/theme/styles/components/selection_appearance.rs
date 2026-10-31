@@ -1,9 +1,9 @@
 //! Translation of Theme/Styles/Components/SelectionAppearance.swift.
-use cove_core::scene::{LayoutNode, Node};
 use cove_core::Color;
+use cove_core::scene::{LayoutNode, Node};
 
 use crate::theme::theme_for_node;
-use crate::{impl_primitive_view, AnyView, View};
+use crate::{AnyView, View, impl_primitive_view};
 
 /// One definition of "this row is selected", shared by every selectable
 /// surface.
@@ -50,7 +50,11 @@ impl SelectionAppearance {
         let colors = &theme.colors;
         let inset_role = role != SelectionRole::DataRow;
         Self {
-            fill: if role == SelectionRole::Sidebar { colors.surface_variant } else { colors.selection },
+            fill: if role == SelectionRole::Sidebar {
+                colors.surface_variant
+            } else {
+                colors.selection
+            },
             hover_fill: colors.state_layer_hover,
             pressed_fill: colors.state_layer_pressed,
             corner_radius: if inset_role { theme.radius.md } else { 0.0 },
@@ -63,10 +67,18 @@ impl SelectionAppearance {
     /// replacement for feedback: a selected row still answers hover and press.
     pub fn fill(&self, is_selected: bool, is_hovered: bool, is_pressed: bool) -> Color {
         if is_pressed {
-            return if is_selected { self.pressed_fill.composited(self.fill) } else { self.pressed_fill };
+            return if is_selected {
+                self.pressed_fill.composited(self.fill)
+            } else {
+                self.pressed_fill
+            };
         }
         if is_hovered {
-            return if is_selected { self.hover_fill.composited(self.fill) } else { self.hover_fill };
+            return if is_selected {
+                self.hover_fill.composited(self.fill)
+            } else {
+                self.hover_fill
+            };
         }
         if is_selected { self.fill } else { Color::CLEAR }
     }

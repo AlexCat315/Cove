@@ -24,13 +24,19 @@ struct Key {
 impl Key {
     fn new(width: f32, height: f32) -> Self {
         let scale = cove_core::content_scale();
-        let density = if scale.is_finite() { scale.max(1.0) } else { 1.0 };
+        let density = if scale.is_finite() {
+            scale.max(1.0)
+        } else {
+            1.0
+        };
         let registry = ImageAssetRegistryHolder::current();
         Self {
             width_bits: width.to_bits(),
             height_bits: height.to_bits(),
             density_bits: density.to_bits(),
-            registry: registry.as_ref().map(|registry| Arc::as_ptr(registry) as *const () as usize),
+            registry: registry
+                .as_ref()
+                .map(|registry| Arc::as_ptr(registry) as *const () as usize),
             revision: registry.as_ref().map_or(0, |registry| registry.revision()),
         }
     }

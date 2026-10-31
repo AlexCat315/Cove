@@ -1,7 +1,10 @@
 //! Translation of CoveUIComposeCore/ModifiedContent+Materialise.swift.
+use crate::{
+    AnyView, IdentifiedView, ModifiedContent, ModifierReplay, SourceLocatedView, View, ViewGraph,
+    ViewKind,
+};
 use cove_core::scene::{LayoutNode, Node, NodeKey};
 use std::rc::Rc;
-use crate::{AnyView, IdentifiedView, ModifierReplay, ModifiedContent, SourceLocatedView, View, ViewGraph, ViewKind};
 
 /// Type-erased helper that lets `ViewGraph` materialise (and update) a
 /// `ModifiedContent` without knowing its generic parameters at the call site.
@@ -13,12 +16,22 @@ pub trait AnyModifiedContent {
         None
     }
 
-    fn materialise_into(&self, parent: &Node, layout_parent: Option<&LayoutNode>, graph: &Rc<ViewGraph>) -> Vec<Node>;
+    fn materialise_into(
+        &self,
+        parent: &Node,
+        layout_parent: Option<&LayoutNode>,
+        graph: &Rc<ViewGraph>,
+    ) -> Vec<Node>;
 
     /// Re-apply this modifier to an already-existing node produced for this
     /// `ModifiedContent` slot. Reuses the node, recurses into the wrapped
     /// content, then re-applies the modifier (writes are idempotent setters).
-    fn update_in_place(&self, node: &Node, layout_parent: Option<&LayoutNode>, graph: &Rc<ViewGraph>);
+    fn update_in_place(
+        &self,
+        node: &Node,
+        layout_parent: Option<&LayoutNode>,
+        graph: &Rc<ViewGraph>,
+    );
 }
 
 /// Walks through erased/source wrappers without unwrapping user identity.
@@ -39,7 +52,10 @@ fn modifier_targets(node: &Node, graph: &ViewGraph) -> Vec<Node> {
     if graph.layout_node(node).is_some() || node.children().is_empty() {
         return vec![node.clone()];
     }
-    node.children().into_iter().flat_map(|child| modifier_targets(&child, graph)).collect()
+    node.children()
+        .into_iter()
+        .flat_map(|child| modifier_targets(&child, graph))
+        .collect()
 }
 
 fn apply_modifier(modifier: &Rc<dyn crate::ViewModifier>, node: &Node, graph: &Rc<ViewGraph>) {
@@ -65,10 +81,13 @@ fn retain_modifier(modifier: &Rc<dyn crate::ViewModifier>, node: &Node, graph: &
     let replay_target = node.clone();
     let graph = Rc::downgrade(graph);
     let modifier = modifier.clone();
-    ModifierReplay::install(&target, Rc::new(move || {
-        let Some(graph) = graph.upgrade() else { return };
-        apply_modifier(&modifier, &replay_target, &graph);
-    }));
+    ModifierReplay::install(
+        &target,
+        Rc::new(move || {
+            let Some(graph) = graph.upgrade() else { return };
+            apply_modifier(&modifier, &replay_target, &graph);
+        }),
+    );
 }
 
 impl ModifiedContent {
@@ -79,13 +98,21 @@ impl ModifiedContent {
 
 impl AnyModifiedContent for ModifiedContent {
     fn inherited_slot_key(&self) -> Option<NodeKey> {
-        if self.modifier_ref().is_scope_applying() || self.modifier_ref().is_around_applying() || has_structural_content(self.content_view()) {
+        if self.modifier_ref().is_scope_applying()
+            || self.modifier_ref().is_around_applying()
+            || has_structural_content(self.content_view())
+        {
             return None;
         }
         crate::view_graph::slot_key(self.content_view())
     }
 
-    fn materialise_into(&self, parent: &Node, layout_parent: Option<&LayoutNode>, graph: &Rc<ViewGraph>) -> Vec<Node> {
+    fn materialise_into(
+        &self,
+        parent: &Node,
+        layout_parent: Option<&LayoutNode>,
+        graph: &Rc<ViewGraph>,
+    ) -> Vec<Node> {
         // Scope-applying modifiers must expose their value to the content
         // during materialisation, not after, so descendants resolve against the
         // provided theme on first install. Wrap the content in a synthetic,
@@ -138,7 +165,12 @@ impl AnyModifiedContent for ModifiedContent {
         nodes
     }
 
-    fn update_in_place(&self, node: &Node, layout_parent: Option<&LayoutNode>, graph: &Rc<ViewGraph>) {
+    fn update_in_place(
+        &self,
+        node: &Node,
+        layout_parent: Option<&LayoutNode>,
+        graph: &Rc<ViewGraph>,
+    ) {
         // Mirror the materialise-time wrapping: scope-applying modifiers own a
         // synthetic anchor whose single child carries the wrapped content.
         if self.modifier_ref().is_scope_applying() {
@@ -152,7 +184,8 @@ impl AnyModifiedContent for ModifiedContent {
             let changed = self.modifier_ref().scope_apply(node).unwrap_or(false);
             let previous = graph.environment_reasons();
             if changed {
-                let mut reason = cove_core::scene::RecompositionReason::new("environment").with_detail("CompositionLocal");
+                let mut reason = cove_core::scene::RecompositionReason::new("environment")
+                    .with_detail("CompositionLocal");
                 if let Some(scope) = graph.active_recomposition_scope() {
                     reason = reason.with_origin_scope(scope);
                 }

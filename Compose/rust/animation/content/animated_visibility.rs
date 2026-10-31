@@ -1,18 +1,18 @@
 //! Retained insertion/removal lifecycle from Animation/AnimatedVisibility.swift.
-use crate::animation::transition::TransitionEffect;
 use super::super::Transition;
+use crate::animation::transition::TransitionEffect;
+use crate::modifiers::layout::FlexExt;
+use crate::theme::{SemanticMotionRef, theme_for_node};
+use crate::{AnyView, DynamicField, PrimitiveView, View, impl_primitive_view};
 use cove_core::scene::{
-    Animation, AnimationController, AnimatorScheduler, AnyAnimationController, Display, FocusChainHolder,
-    LayoutNode, LayoutUpdateHook, Node, NodeResource, PointerCaptureHolder,
+    Animation, AnimationController, AnimatorScheduler, AnyAnimationController, Display,
+    FocusChainHolder, LayoutNode, LayoutUpdateHook, Node, NodeResource, PointerCaptureHolder,
 };
 use cove_core::{Point, State};
 use std::any::Any;
 use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
 use std::time::Duration;
-use crate::theme::{theme_for_node, SemanticMotionRef};
-use crate::modifiers::layout::FlexExt;
-use crate::{impl_primitive_view, AnyView, DynamicField, PrimitiveView, View};
 
 enum AnimationChoice {
     Fixed(Option<Animation>),
@@ -56,7 +56,17 @@ impl AnimatedVisibility {
         on_visibility_settled: Option<Rc<dyn Fn(bool)>>,
         content: impl View + 'static,
     ) -> Self {
-        Self::build(is_visible, transition, AnimationChoice::Fixed(animation), animate_on_mount, false, 0, Duration::ZERO, on_visibility_settled, AnyView::new(content))
+        Self::build(
+            is_visible,
+            transition,
+            AnimationChoice::Fixed(animation),
+            animate_on_mount,
+            false,
+            0,
+            Duration::ZERO,
+            on_visibility_settled,
+            AnyView::new(content),
+        )
     }
 
     pub fn with_motion(
@@ -67,7 +77,17 @@ impl AnimatedVisibility {
         on_visibility_settled: Option<Rc<dyn Fn(bool)>>,
         content: impl View + 'static,
     ) -> Self {
-        Self::build(is_visible, transition, AnimationChoice::Motion(motion), animate_on_mount, false, 0, Duration::ZERO, on_visibility_settled, AnyView::new(content))
+        Self::build(
+            is_visible,
+            transition,
+            AnimationChoice::Motion(motion),
+            animate_on_mount,
+            false,
+            0,
+            Duration::ZERO,
+            on_visibility_settled,
+            AnyView::new(content),
+        )
     }
 
     pub fn retaining_content(mut self, retain: bool) -> Self {
@@ -114,7 +134,9 @@ impl View for AnimatedVisibility {
         let visible = self.is_visible;
         let on_finished: Rc<dyn Fn()> = Rc::new(move || {
             revision.set(revision.get().wrapping_add(1));
-            if let Some(settled) = &settled { settled(visible); }
+            if let Some(settled) = &settled {
+                settled(visible);
+            }
         });
         AnyView::new(VisibilityHost {
             is_visible: self.is_visible,
@@ -133,7 +155,10 @@ impl View for AnimatedVisibility {
     }
 
     fn dynamic_properties(&self) -> Vec<DynamicField> {
-        vec![DynamicField::state("completionRevision", &self.completion_revision)]
+        vec![DynamicField::state(
+            "completionRevision",
+            &self.completion_revision,
+        )]
     }
 }
 
@@ -174,7 +199,9 @@ impl VisibilityState {
         let controller = self.controller.borrow_mut().take();
         if let Some(controller) = controller {
             controller.cancel();
-            if let Some(scheduler) = self.scheduler.borrow().as_ref() { scheduler.unregister(&controller); }
+            if let Some(scheduler) = self.scheduler.borrow().as_ref() {
+                scheduler.unregister(&controller);
+            }
         }
     }
 
@@ -190,7 +217,9 @@ impl VisibilityState {
         let controller = self.controller.borrow().clone();
         if let Some(controller) = controller.filter(|controller| !controller.is_finished()) {
             controller.finish_immediately();
-            if let Some(scheduler) = self.scheduler.borrow().as_ref() { scheduler.unregister(&controller); }
+            if let Some(scheduler) = self.scheduler.borrow().as_ref() {
+                scheduler.unregister(&controller);
+            }
         }
         self.controller.borrow_mut().take();
     }
@@ -206,7 +235,9 @@ impl NodeResource for VisibilityState {
         *self.on_finished.borrow_mut() = Rc::new(|| {});
         self.scheduler.borrow_mut().take();
         if let Some(installed) = self.installed_layout.borrow_mut().take()
-            && node.layout_did_update().is_some_and(|current| Rc::ptr_eq(&current, &installed))
+            && node
+                .layout_did_update()
+                .is_some_and(|current| Rc::ptr_eq(&current, &installed))
         {
             node.set_layout_did_update(self.previous_layout.borrow_mut().take());
         } else {
@@ -215,7 +246,9 @@ impl NodeResource for VisibilityState {
         self.layout_hook_installed.set(false);
     }
 
-    fn as_any_rc(self: Rc<Self>) -> Rc<dyn Any> { self }
+    fn as_any_rc(self: Rc<Self>) -> Rc<dyn Any> {
+        self
+    }
 }
 
 struct VisibilityHost {
@@ -236,13 +269,19 @@ impl VisibilityHost {
     }
 
     fn install_layout_hook(node: &Node, state: &Rc<VisibilityState>) {
-        if state.layout_hook_installed.get() { return; }
+        if state.layout_hook_installed.get() {
+            return;
+        }
         let previous = node.layout_did_update();
         *state.previous_layout.borrow_mut() = previous.clone();
         let weak_state = Rc::downgrade(state);
         let hook: LayoutUpdateHook = Rc::new(move |node| {
-            if let Some(previous) = &previous { previous(node); }
-            let Some(state) = weak_state.upgrade() else { return };
+            if let Some(previous) = &previous {
+                previous(node);
+            }
+            let Some(state) = weak_state.upgrade() else {
+                return;
+            };
             if let Some(layout) = node.layout_node()
                 && let Some(child) = layout.children().first()
             {
@@ -258,9 +297,13 @@ impl VisibilityHost {
     fn resolve_animation(&self, node: &Node) -> Animation {
         match &self.animation {
             AnimationChoice::Fixed(Some(animation)) => animation.clone(),
-            AnimationChoice::Fixed(None) => SemanticMotionRef::medium().resolve(&theme_for_node(node)),
+            AnimationChoice::Fixed(None) => {
+                SemanticMotionRef::medium().resolve(&theme_for_node(node))
+            }
             AnimationChoice::Motion(Some(motion)) => motion.resolve(&theme_for_node(node)),
-            AnimationChoice::Motion(None) => SemanticMotionRef::medium().resolve(&theme_for_node(node)),
+            AnimationChoice::Motion(None) => {
+                SemanticMotionRef::medium().resolve(&theme_for_node(node))
+            }
         }
     }
 
@@ -276,7 +319,11 @@ impl VisibilityHost {
         if state.retains_content.get()
             && let Some(layout) = node.layout_node()
         {
-            layout.set_display(if target == Some(false) && progress == 0.0 { Display::None } else { Display::Flex });
+            layout.set_display(if target == Some(false) && progress == 0.0 {
+                Display::None
+            } else {
+                Display::Flex
+            });
         }
         let opacity = if state.retains_content.get() && target == Some(false) && progress == 0.0 {
             0.0
@@ -315,19 +362,25 @@ impl VisibilityHost {
 
         if !self.is_visible {
             if let Some(focus) = FocusChainHolder::current()
-                && focus.focused().is_some_and(|focused| !focused.accepts_subtree_input())
+                && focus
+                    .focused()
+                    .is_some_and(|focused| !focused.accepts_subtree_input())
             {
                 focus.clear();
             }
             if let Some(capture) = PointerCaptureHolder::current()
-                && capture.target().is_some_and(|target| !target.accepts_subtree_input())
+                && capture
+                    .target()
+                    .is_some_and(|target| !target.accepts_subtree_input())
             {
                 capture.release();
             }
         }
 
         if state.target.get() == Some(self.is_visible) {
-            if node.prefers_reduced_motion() || (self.retains_content && self.transition == Transition::IDENTITY) {
+            if node.prefers_reduced_motion()
+                || (self.retains_content && self.transition == Transition::IDENTITY)
+            {
                 state.settle_immediately();
             }
             return;
@@ -337,19 +390,39 @@ impl VisibilityHost {
         state.target.set(Some(self.is_visible));
         state.cancel();
         let target = if self.is_visible { 1.0 } else { 0.0 };
-        let goal = if self.is_visible { TransitionEffect::default() } else { self.transition.removal };
+        let goal = if self.is_visible {
+            TransitionEffect::default()
+        } else {
+            self.transition.removal
+        };
 
-        if node.prefers_reduced_motion() || (self.retains_content && self.transition == Transition::IDENTITY) {
+        if node.prefers_reduced_motion()
+            || (self.retains_content && self.transition == Transition::IDENTITY)
+        {
             state.progress.set(target);
             state.visual.set(goal);
             Self::apply_state(state, node);
-            if was_mounted || (self.animate_on_mount && self.is_visible) { Self::finish(state); }
+            if was_mounted || (self.animate_on_mount && self.is_visible) {
+                Self::finish(state);
+            }
             return;
         }
 
         if !was_mounted {
-            state.progress.set(if self.is_visible && self.animate_on_mount { 0.0 } else { target });
-            state.visual.set(if self.is_visible && self.animate_on_mount { self.transition.insertion } else { goal });
+            state
+                .progress
+                .set(if self.is_visible && self.animate_on_mount {
+                    0.0
+                } else {
+                    target
+                });
+            state
+                .visual
+                .set(if self.is_visible && self.animate_on_mount {
+                    self.transition.insertion
+                } else {
+                    goal
+                });
             if !self.animate_on_mount || !self.is_visible {
                 Self::apply_state(state, node);
                 return;
@@ -363,17 +436,26 @@ impl VisibilityHost {
         let from_progress = state.progress.get();
         let mut animation = self.resolve_animation(node);
         if self.is_visible && self.stagger_index > 0 {
-            animation.delay = animation.delay.max(0.0) + self.stagger_index as f64 * self.stagger_interval.as_secs_f64();
+            animation.delay = animation.delay.max(0.0)
+                + self.stagger_index as f64 * self.stagger_interval.as_secs_f64();
         }
         let weak_state: Weak<VisibilityState> = Rc::downgrade(state);
         let weak_node = node.downgrade();
-        let controller = AnimationController::new(from_progress, target, animation, 0.0, move |amount| {
-            let (Some(state), Some(node)) = (weak_state.upgrade(), Node::upgrade(&weak_node)) else { return };
-            state.progress.set(from_progress + (target - from_progress) * amount);
-            state.visual.set(from.interpolating(goal, amount));
-            Self::apply_state(&state, &node);
-            if amount == 1.0 { Self::finish(&state); }
-        });
+        let controller =
+            AnimationController::new(from_progress, target, animation, 0.0, move |amount| {
+                let (Some(state), Some(node)) = (weak_state.upgrade(), Node::upgrade(&weak_node))
+                else {
+                    return;
+                };
+                state
+                    .progress
+                    .set(from_progress + (target - from_progress) * amount);
+                state.visual.set(from.interpolating(goal, amount));
+                Self::apply_state(&state, &node);
+                if amount == 1.0 {
+                    Self::finish(&state);
+                }
+            });
         let controller: Rc<dyn AnyAnimationController> = controller;
         state.animate(controller);
         Self::apply_state(state, node);
@@ -394,7 +476,9 @@ impl PrimitiveView for VisibilityHost {
         }
     }
 
-    fn make_layout_node(&self) -> Option<LayoutNode> { Some(LayoutNode::new()) }
+    fn make_layout_node(&self) -> Option<LayoutNode> {
+        Some(LayoutNode::new())
+    }
 
     fn update_layout(&self, layout: &LayoutNode) {
         layout.set_flex_direction(cove_core::scene::FlexDirection::Column);
@@ -403,18 +487,26 @@ impl PrimitiveView for VisibilityHost {
     }
 
     fn children(&self, node: &Node) -> Vec<AnyView> {
-        let progress = node.first_resource::<VisibilityState>().map_or(0.0, |state| state.progress.get());
-        if !self.retains_content && !self.is_visible && progress == 0.0 { return Vec::new(); }
+        let progress = node
+            .first_resource::<VisibilityState>()
+            .map_or(0.0, |state| state.progress.get());
+        if !self.retains_content && !self.is_visible && progress == 0.0 {
+            return Vec::new();
+        }
         if self.collapses() {
             let content = self.content.clone();
-            vec![AnyView::new(crate::BoxView::new(
-                cove_core::scene::FlexDirection::Column,
-                cove_core::scene::Align::Stretch,
-                cove_core::scene::Justify::FlexStart,
-                cove_core::scene::Wrap::NoWrap,
-                0.0,
-                content,
-            ).flex(0.0).shrink(0.0))]
+            vec![AnyView::new(
+                crate::BoxView::new(
+                    cove_core::scene::FlexDirection::Column,
+                    cove_core::scene::Align::Stretch,
+                    cove_core::scene::Justify::FlexStart,
+                    cove_core::scene::Wrap::NoWrap,
+                    0.0,
+                    content,
+                )
+                .flex(0.0)
+                .shrink(0.0),
+            )]
         } else {
             vec![self.content.clone()]
         }

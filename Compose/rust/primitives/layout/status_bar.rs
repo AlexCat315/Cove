@@ -4,9 +4,9 @@
 //! height for every cell and leading/trailing slots that never fight for space.
 use std::rc::Rc;
 
-use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Point, Rect, Size, Wrap};
-use cove_composition::{AnyView, View};
 use crate::{Layout, LayoutContainer, LayoutSubview, ProposedViewSize};
+use cove_composition::{AnyView, View};
+use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Point, Rect, Size, Wrap};
 
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
@@ -15,9 +15,7 @@ use crate::primitives::feedback::StatusTone;
 use crate::primitives::media::Icon;
 use crate::primitives::text::{Divider, DividerAxis, Text};
 use crate::theme::styles::buttons::ButtonStyleViewExt;
-use crate::theme::{
-    theme_for_node, SemanticColorRef, SemanticFontRef, Theme, ThemeReader,
-};
+use crate::theme::{SemanticColorRef, SemanticFontRef, Theme, ThemeReader, theme_for_node};
 use crate::{BoxView, Row, TupleView};
 
 /// Shared height so swapping cells never changes the window's content height.
@@ -37,7 +35,12 @@ pub struct StatusBar {
 
 impl StatusBar {
     pub fn new(leading: AnyView, trailing: AnyView) -> Self {
-        Self { leading, trailing, shows_divider: true, is_enabled: true }
+        Self {
+            leading,
+            trailing,
+            shows_divider: true,
+            is_enabled: true,
+        }
     }
 
     pub fn leading_only(leading: AnyView) -> Self {
@@ -68,7 +71,11 @@ impl View for StatusBar {
         let content = ThemeReader::new(move |theme: &Theme| {
             let mut column_items: Vec<AnyView> = Vec::new();
             if shows_divider {
-                column_items.push(AnyView::new(Divider::new(None, 1.0, DividerAxis::Horizontal)));
+                column_items.push(AnyView::new(Divider::new(
+                    None,
+                    1.0,
+                    DividerAxis::Horizontal,
+                )));
             }
             let leading_row = Row::new(
                 crate::VerticalAlignment::Center,
@@ -83,7 +90,9 @@ impl View for StatusBar {
             )
             .frame_min_width(0.0);
             let layout = LayoutContainer::new(
-                StatusBarLayout { spacing: theme.spacing.md },
+                StatusBarLayout {
+                    spacing: theme.spacing.md,
+                },
                 AnyView::new(TupleView::new(vec![
                     AnyView::new(leading_row),
                     AnyView::new(trailing_row),
@@ -92,7 +101,9 @@ impl View for StatusBar {
             let bar = AnyView::new(layout)
                 .frame(
                     None,
-                    Some(crate::modifiers::layout::FrameDimension::Points(StatusBarMetrics::HEIGHT)),
+                    Some(crate::modifiers::layout::FrameDimension::Points(
+                        StatusBarMetrics::HEIGHT,
+                    )),
                     None,
                     None,
                     None,
@@ -166,11 +177,13 @@ impl View for StatusBarText {
         let tone = self.tone;
         let is_monospaced = self.is_monospaced;
         let content = ThemeReader::new(move |theme: &Theme| {
-            let ink = tone.map(|tone| tone.color()).unwrap_or_else(SemanticColorRef::on_surface_variant);
+            let ink = tone
+                .map(|tone| tone.color())
+                .unwrap_or_else(SemanticColorRef::on_surface_variant);
             let mut items: Vec<AnyView> = Vec::new();
             if let Some(icon) = &icon {
-                let icon_view = Icon::with_semantic(icon.clone(), 11.0, ink.clone())
-                    .accessibility_hidden(true);
+                let icon_view =
+                    Icon::with_semantic(icon.clone(), 11.0, ink.clone()).accessibility_hidden(true);
                 items.push(AnyView::new(icon_view));
             }
             let font = if is_monospaced {
@@ -199,14 +212,7 @@ impl View for StatusBarText {
                 4.0,
                 AnyView::new(TupleView::new(items)),
             )
-            .frame(
-                None,
-                None,
-                Some(0.0),
-                None,
-                None,
-                None,
-            )
+            .frame(None, None, Some(0.0), None, None, None)
             .accessibility({
                 let text = text.clone();
                 let detail = detail.clone();
@@ -241,18 +247,22 @@ const TRAILING_GAP: f32 = 12.0;
 impl StatusBarLayout {
     fn safe(size: Size) -> Size {
         Size {
-            width: if size.width.is_finite() { size.width.max(0.0) } else { 0.0 },
-            height: if size.height.is_finite() { size.height.max(0.0) } else { 0.0 },
+            width: if size.width.is_finite() {
+                size.width.max(0.0)
+            } else {
+                0.0
+            },
+            height: if size.height.is_finite() {
+                size.height.max(0.0)
+            } else {
+                0.0
+            },
         }
     }
 }
 
 impl Layout for StatusBarLayout {
-    fn size_that_fits(
-        &self,
-        proposal: ProposedViewSize,
-        subviews: &[LayoutSubview],
-    ) -> Size {
+    fn size_that_fits(&self, proposal: ProposedViewSize, subviews: &[LayoutSubview]) -> Size {
         if subviews.len() != 2 {
             return Size::default();
         }
@@ -286,8 +296,16 @@ impl Layout for StatusBarLayout {
         if subviews.len() != 2 {
             return;
         }
-        let width = if bounds.width.is_finite() { bounds.width.max(0.0) } else { 0.0 };
-        let height = if bounds.height.is_finite() { bounds.height.max(0.0) } else { 0.0 };
+        let width = if bounds.width.is_finite() {
+            bounds.width.max(0.0)
+        } else {
+            0.0
+        };
+        let height = if bounds.height.is_finite() {
+            bounds.height.max(0.0)
+        } else {
+            0.0
+        };
         let trailing = Self::safe(subviews[1].size_that_fits(ProposedViewSize::UNSPECIFIED));
         let leading_width = (width - trailing.width - self.spacing - TRAILING_GAP).max(0.0);
         let leading = if leading_width > 0.0 {

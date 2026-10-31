@@ -7,8 +7,8 @@
 
 use cove_examples::gallery_content::catalog::GalleryOptions;
 use cove_examples::gallery_content::stories::text_editor_story::{
-    folds, is_keyword, token_at, token_color, tokens, FoldRegion, TextEditorStory, TokenKind,
-    KEYWORDS, SAMPLE_SOURCE, STRESS_LINES, SYNTAX_LIMIT,
+    FoldRegion, KEYWORDS, SAMPLE_SOURCE, STRESS_LINES, SYNTAX_LIMIT, TextEditorStory, TokenKind,
+    folds, is_keyword, token_at, token_color, tokens,
 };
 
 fn kinds(source: &str) -> Vec<(String, TokenKind)> {
@@ -46,14 +46,23 @@ fn the_sample_document_tokenises_its_keywords_and_types() {
     // Capitalised identifiers are types; a lowercase non-keyword is not tokenised.
     assert!(found.contains(&("String".to_owned(), TokenKind::Type)));
     assert!(found.contains(&("Greeting".to_owned(), TokenKind::Type)));
-    assert!(!found.iter().any(|(text, _)| text == "name"), "plain identifiers are uncoloured");
+    assert!(
+        !found.iter().any(|(text, _)| text == "name"),
+        "plain identifiers are uncoloured"
+    );
 }
 
 #[test]
 fn a_line_comment_stops_before_the_newline() {
     let found = kinds("let a = 1 // note\nlet b = 2");
-    let comment = found.iter().find(|(_, kind)| *kind == TokenKind::Comment).unwrap();
-    assert_eq!(comment.0, "// note", "the newline is not part of the comment");
+    let comment = found
+        .iter()
+        .find(|(_, kind)| *kind == TokenKind::Comment)
+        .unwrap();
+    assert_eq!(
+        comment.0, "// note",
+        "the newline is not part of the comment"
+    );
 }
 
 #[test]
@@ -70,7 +79,10 @@ fn a_string_honours_backslash_escapes() {
 #[test]
 fn an_unterminated_string_runs_to_the_end() {
     let source = "let s = \"never closed";
-    let string = tokens(source).into_iter().find(|t| t.kind == TokenKind::String).unwrap();
+    let string = tokens(source)
+        .into_iter()
+        .find(|t| t.kind == TokenKind::String)
+        .unwrap();
     assert_eq!(string.end, source.len());
 }
 
@@ -78,7 +90,10 @@ fn an_unterminated_string_runs_to_the_end() {
 fn a_trailing_backslash_does_not_run_past_the_end() {
     // `min` keeps the escape skip inside the buffer.
     let source = "let s = \"tail\\";
-    let string = tokens(source).into_iter().find(|t| t.kind == TokenKind::String).unwrap();
+    let string = tokens(source)
+        .into_iter()
+        .find(|t| t.kind == TokenKind::String)
+        .unwrap();
     assert_eq!(string.end, source.len());
 }
 
@@ -104,14 +119,23 @@ fn braces_inside_strings_and_comments_do_not_fold() {
 fn a_comment_brace_does_not_fold() {
     let source = "// }\nlet a = 1\n";
     let token_list = tokens(source);
-    assert!(folds(source, &token_list).is_empty(), "the closing brace is inside a comment");
+    assert!(
+        folds(source, &token_list).is_empty(),
+        "the closing brace is inside a comment"
+    );
 }
 
 #[test]
 fn a_real_block_folds_across_its_lines() {
     let source = "struct A {\n  let x = 1\n}\n";
     let regions = folds(source, &tokens(source));
-    assert_eq!(regions, vec![FoldRegion { first_line: 0, last_line: 2 }]);
+    assert_eq!(
+        regions,
+        vec![FoldRegion {
+            first_line: 0,
+            last_line: 2
+        }]
+    );
 }
 
 #[test]
@@ -130,8 +154,14 @@ fn nested_blocks_fold_inside_out_but_are_sorted_by_start() {
     assert_eq!(
         regions,
         vec![
-            FoldRegion { first_line: 0, last_line: 4 },
-            FoldRegion { first_line: 1, last_line: 3 },
+            FoldRegion {
+                first_line: 0,
+                last_line: 4
+            },
+            FoldRegion {
+                first_line: 1,
+                last_line: 3
+            },
         ],
         "sorted by first line, so the outer block comes first"
     );
@@ -146,8 +176,14 @@ fn the_sample_document_produces_the_expected_two_regions() {
     assert_eq!(
         computed,
         vec![
-            FoldRegion { first_line: 0, last_line: 6 },
-            FoldRegion { first_line: 3, last_line: 5 },
+            FoldRegion {
+                first_line: 0,
+                last_line: 6
+            },
+            FoldRegion {
+                first_line: 3,
+                last_line: 5
+            },
         ]
     );
 }
@@ -170,12 +206,27 @@ fn token_at_finds_the_covering_token_by_binary_search() {
     assert_eq!(token_at(0, &list).map(|t| t.kind), Some(TokenKind::Keyword));
     // `let` covers bytes 0..3, so offset 2 is inside it and 3 is the gap.
     assert_eq!(token_at(2, &list).map(|t| t.kind), Some(TokenKind::Keyword));
-    assert_eq!(token_at(3, &list), None, "the gap between tokens is uncoloured");
-    assert_eq!(token_at(4, &list), None, "the space after `let` is uncoloured");
+    assert_eq!(
+        token_at(3, &list),
+        None,
+        "the gap between tokens is uncoloured"
+    );
+    assert_eq!(
+        token_at(4, &list),
+        None,
+        "the space after `let` is uncoloured"
+    );
     // The final byte is the digit, at index `len - 1`.
     let digit = source.len() - 1;
-    assert_eq!(token_at(digit, &list).map(|t| t.kind), Some(TokenKind::Number));
-    assert_eq!(token_at(source.len(), &list), None, "one past the end has no token");
+    assert_eq!(
+        token_at(digit, &list).map(|t| t.kind),
+        Some(TokenKind::Number)
+    );
+    assert_eq!(
+        token_at(source.len(), &list),
+        None,
+        "one past the end has no token"
+    );
 }
 
 #[test]
@@ -221,11 +272,20 @@ fn loading_the_stress_sample_clears_breakpoints_and_folds() {
     let story = TextEditorStory::new(GalleryOptions::default());
     story.load_lines(STRESS_LINES);
     assert_eq!(story.line_count(), STRESS_LINES);
-    assert!(story.breakpoints().is_empty(), "old line numbers are meaningless");
+    assert!(
+        story.breakpoints().is_empty(),
+        "old line numbers are meaningless"
+    );
     assert!(story.fold_regions().is_empty());
-    assert!(story.status().contains("100001"), "the caret reports line 100,001");
+    assert!(
+        story.status().contains("100001"),
+        "the caret reports line 100,001"
+    );
     // And the document is past the syntax limit, so no tokens were built.
-    assert!(story.tokens().is_empty(), "200k lines exceed the 300 KB guard");
+    assert!(
+        story.tokens().is_empty(),
+        "200k lines exceed the 300 KB guard"
+    );
 }
 
 #[test]

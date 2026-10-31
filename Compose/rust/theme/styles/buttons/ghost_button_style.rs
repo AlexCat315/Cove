@@ -1,6 +1,6 @@
 //! Translation of Theme/Styles/Buttons/GhostButtonStyle.swift.
-use crate::theme::SemanticColorRef;
 use crate::AnyView;
+use crate::theme::SemanticColorRef;
 
 use super::builtin_button_chrome::{BuiltinButtonChrome, BuiltinButtonChromeKind};
 use super::button_style::{ButtonStyle, ButtonStyleConfiguration};

@@ -1,6 +1,8 @@
 //! Translation of Primitives/Controls/Adaptive/LongPress.swift.
-use cove_core::scene::{AnimatorScheduler, AnyAnimationController, Node, NodeResource, PointerCaptureHolder};
 use cove_core::Point;
+use cove_core::scene::{
+    AnimatorScheduler, AnyAnimationController, Node, NodeResource, PointerCaptureHolder,
+};
 use std::any::Any;
 use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
@@ -40,7 +42,9 @@ impl TouchLongPress {
     }
 
     pub fn move_to(&self, point: Point) {
-        let Some(origin) = self.origin.get() else { return };
+        let Some(origin) = self.origin.get() else {
+            return;
+        };
         if ((point.x - origin.x).powi(2) + (point.y - origin.y).powi(2)).sqrt() > 10.0 {
             self.cancel();
         }
@@ -55,12 +59,15 @@ impl TouchLongPress {
         if self.is_finished.get() {
             return;
         }
-        let (Some(node), Some(origin)) = (self.node.borrow().clone(), self.origin.get()) else { return };
+        let (Some(node), Some(origin)) = (self.node.borrow().clone(), self.origin.get()) else {
+            return;
+        };
         if !node.accepts_subtree_input() {
             self.cancel();
             return;
         }
-        if let Some(captured) = PointerCaptureHolder::current().and_then(|capture| capture.target()) {
+        if let Some(captured) = PointerCaptureHolder::current().and_then(|capture| capture.target())
+        {
             let mut candidate = Some(captured);
             while let Some(current) = candidate.clone() {
                 if current.id() == node.id() {

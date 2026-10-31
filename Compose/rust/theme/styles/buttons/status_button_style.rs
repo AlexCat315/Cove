@@ -1,10 +1,10 @@
 //! Translation of Theme/Styles/Buttons/StatusButtonStyle.swift.
-use cove_core::scene::{Align, Edge, FlexDirection, LayoutNode, Node};
 use cove_core::Color;
+use cove_core::scene::{Align, Edge, FlexDirection, LayoutNode, Node};
 
 use crate::primitives::feedback::StatusTone;
 use crate::theme::{ControlSize, SemanticColorRef, SemanticFontRef, SemanticStyleViewExt, Theme};
-use crate::{impl_primitive_view, AnyView};
+use crate::{AnyView, impl_primitive_view};
 
 use super::button_style::{ButtonStyle, ButtonStyleConfiguration};
 
@@ -79,7 +79,11 @@ impl crate::PrimitiveView for StatusChrome {
         } else {
             accent.multiplied_alpha(0.12)
         };
-        let border = if self.is_focused { self.theme.colors.focus_ring } else { Color::CLEAR };
+        let border = if self.is_focused {
+            self.theme.colors.focus_ring
+        } else {
+            Color::CLEAR
+        };
         let border_width = if self.is_focused { 2.0 } else { 0.0 };
 
         node.set_background_color(Some(background));
@@ -93,10 +97,9 @@ impl crate::PrimitiveView for StatusChrome {
     }
 
     fn update_layout(&self, layout: &LayoutNode) {
-        let vertical_padding = ((self.control_size.button_height()
-            - self.theme.typography.label.line_height)
-            * 0.5)
-            .max(2.0);
+        let vertical_padding =
+            ((self.control_size.button_height() - self.theme.typography.label.line_height) * 0.5)
+                .max(2.0);
         layout.set_flex_direction(FlexDirection::Row);
         layout.set_align_items(Align::Center);
         layout.set_flex_grow(1.0);

@@ -1,6 +1,8 @@
 //! Translation of CoveUIScene/Input/FocusAccessoryResource.swift.
-use crate::scene::{FocusChain, FocusChainHolder, Node, NodeResource, PointerCapture, PointerCaptureHolder};
 use crate::scene::NodeWeak;
+use crate::scene::{
+    FocusChain, FocusChainHolder, Node, NodeResource, PointerCapture, PointerCaptureHolder,
+};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -12,20 +14,32 @@ pub struct FocusAccessoryResource {
 }
 impl FocusAccessoryResource {
     pub fn new(owner: &Node) -> Self {
-        Self { owner: owner.downgrade(), chain: RefCell::new(None), capture: RefCell::new(None) }
+        Self {
+            owner: owner.downgrade(),
+            chain: RefCell::new(None),
+            capture: RefCell::new(None),
+        }
     }
 }
 impl NodeResource for FocusAccessoryResource {
     fn mount(&self, node: &Node) {
         *self.chain.borrow_mut() = FocusChainHolder::current();
         *self.capture.borrow_mut() = PointerCaptureHolder::current();
-        if let (Some(owner), Some(chain)) = (self.owner.upgrade().map(Node::from_cell), self.chain.borrow().clone()) {
+        if let (Some(owner), Some(chain)) = (
+            self.owner.upgrade().map(Node::from_cell),
+            self.chain.borrow().clone(),
+        ) {
             chain.attach_accessory(node, &owner);
         }
     }
     fn unmount(&self, node: &Node) {
-        if let (Some(captured), Some(chain)) = (self.capture.borrow().as_ref().and_then(|capture| capture.target()), self.chain.borrow().clone())
-            && chain.contains(&captured, node)
+        if let (Some(captured), Some(chain)) = (
+            self.capture
+                .borrow()
+                .as_ref()
+                .and_then(|capture| capture.target()),
+            self.chain.borrow().clone(),
+        ) && chain.contains(&captured, node)
         {
             if let Some(capture) = self.capture.borrow().as_ref() {
                 capture.release();

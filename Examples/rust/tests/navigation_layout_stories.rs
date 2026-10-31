@@ -6,8 +6,8 @@
 
 use cove_examples::gallery_content::catalog::GalleryOptions;
 use cove_examples::gallery_content::stories::navigation_layout_stories::{
-    DrawerStory, RailStory, DRAWER_BADGED_INDEX, DRAWER_DEFAULT_SELECTION,
-    DRAWER_DESTINATION_COUNT, DRAWER_DISABLED_INDEX, RAIL_DESTINATIONS,
+    DRAWER_BADGED_INDEX, DRAWER_DEFAULT_SELECTION, DRAWER_DESTINATION_COUNT, DRAWER_DISABLED_INDEX,
+    DrawerStory, RAIL_DESTINATIONS, RailStory,
 };
 
 fn drawer() -> DrawerStory {
@@ -105,7 +105,11 @@ fn long_badges_keep_their_full_value() {
     let story = RailStory::new(GalleryOptions::default());
     let items = story.items();
     assert_eq!(items[1].badge.as_deref(), Some("12"));
-    assert_eq!(items[2].badge.as_deref(), Some("999"), "a four-digit badge is not truncated");
+    assert_eq!(
+        items[2].badge.as_deref(),
+        Some("999"),
+        "a four-digit badge is not truncated"
+    );
 }
 
 #[test]

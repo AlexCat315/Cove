@@ -1,10 +1,10 @@
 //! Translation of Theme/Styles/Buttons/ButtonStyle.swift.
+use std::any::TypeId;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::any::TypeId;
 
-use cove_core::scene::CompositionLocal;
 use cove_core::InputCapabilities;
+use cove_core::scene::CompositionLocal;
 
 use crate::theme::{ControlSize, Theme};
 use crate::{AnyView, ModifiedContent, View, ViewExt};
@@ -151,7 +151,10 @@ pub struct AnyButtonStyle {
 impl AnyButtonStyle {
     pub fn new<S: ButtonStyle + 'static>(style: S) -> Self {
         let style_id = TypeId::of::<S>();
-        let identity = ButtonStyleIdentity { style_id, value: Some(style.style_identity()) };
+        let identity = ButtonStyleIdentity {
+            style_id,
+            value: Some(style.style_identity()),
+        };
         let requires_interaction_recompose = !is_node_driven_interaction_style::<S>();
         let style = Rc::new(style);
         Self {

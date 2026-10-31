@@ -13,16 +13,14 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use cove_composition::{AnyView, LayoutDebugExt, View};
-use cove_core::scene::{
-    Align, FlexDirection, Justify, Node, Wrap,
-};
+use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
+use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::data::property_grid::{
-    PropertyGrid, PropertyGridRow, PropertyGridRowLayout, PropertyGridRowSizing, PropertyGridSection,
-    PropertyGridScrollAxes,
+    PropertyGrid, PropertyGridRow, PropertyGridRowLayout, PropertyGridRowSizing,
+    PropertyGridScrollAxes, PropertyGridSection,
 };
 use cove_ui_compose::primitives::text::Text;
-use cove_ui_compose::BoxView;
 
 use support::GlobalTestLock;
 
@@ -81,9 +79,7 @@ fn a_controlled_collapse_hides_and_reshows_the_section_body() {
         ])
         .scroll_axes(PropertyGridScrollAxes::Vertical)
         .on_section_collapse_changed(move |id, is_collapsed| {
-            recorder
-                .borrow_mut()
-                .push((id.to_string(), is_collapsed));
+            recorder.borrow_mut().push((id.to_string(), is_collapsed));
         })
         .controlled_collapsed(Default::default());
 
@@ -231,16 +227,18 @@ fn a_collapsed_section_keeps_its_header_visible() {
     GlobalTestLock::locked(|| {
         let mut controlled = std::collections::HashSet::new();
         controlled.insert("component".to_string());
-        let grid = PropertyGrid::new(vec![PropertyGridSection::new(
-            "component",
-            "Component",
-            vec![PropertyGridRow::new(
-                "row",
-                "Value",
-                AnyView::new(Text::new("Editable")).debug_name("hidden-value"),
-            )],
-        )
-        .collapsible(true)])
+        let grid = PropertyGrid::new(vec![
+            PropertyGridSection::new(
+                "component",
+                "Component",
+                vec![PropertyGridRow::new(
+                    "row",
+                    "Value",
+                    AnyView::new(Text::new("Editable")).debug_name("hidden-value"),
+                )],
+            )
+            .collapsible(true),
+        ])
         .scroll_axes(PropertyGridScrollAxes::Vertical)
         .controlled_collapsed(controlled);
 
@@ -264,7 +262,10 @@ fn a_collapsed_section_keeps_its_header_visible() {
 fn the_grid_reports_its_own_sizing_defaults() {
     let grid = PropertyGrid::new(Vec::new());
     assert_eq!(grid.label_width, 96.0, "the default label column is 96pt");
-    assert_eq!(grid.min_value_width, 220.0, "the default value floor is 220pt");
+    assert_eq!(
+        grid.min_value_width, 220.0,
+        "the default value floor is 220pt"
+    );
     assert_eq!(grid.row_height, 24.0, "rows are 24pt by default");
     assert_eq!(grid.row_spacing, 1.0, "rows are separated by 1pt");
     assert_eq!(grid.section_spacing, 10.0, "sections are separated by 10pt");
@@ -274,7 +275,10 @@ fn the_grid_reports_its_own_sizing_defaults() {
         PropertyGridScrollAxes::Both,
         "both axes scroll by default"
     );
-    assert_eq!(grid.empty_text, "No properties", "the empty state is authored");
+    assert_eq!(
+        grid.empty_text, "No properties",
+        "the empty state is authored"
+    );
 }
 
 #[test]
@@ -294,7 +298,10 @@ fn the_authored_sizing_overrides_the_defaults() {
         .label_width(f32::NAN)
         .min_value_width(f32::INFINITY)
         .row_height(f32::NAN);
-    assert_eq!(guarded.label_width, 96.0, "a non-finite label width reverts");
+    assert_eq!(
+        guarded.label_width, 96.0,
+        "a non-finite label width reverts"
+    );
     assert_eq!(
         guarded.min_value_width, 1.0,
         "a non-finite value width clamps to the floor"
@@ -308,8 +315,7 @@ fn an_empty_grid_renders_without_rows() {
         let graph = support::graph();
         graph.install_view(
             AnyView::new(
-                PropertyGrid::new(Vec::new())
-                    .scroll_axes(PropertyGridScrollAxes::Vertical),
+                PropertyGrid::new(Vec::new()).scroll_axes(PropertyGridScrollAxes::Vertical),
             ),
             Default::default(),
         );

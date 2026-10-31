@@ -79,8 +79,7 @@ pub fn granularity_start(of: CalendarGranularity, date: Date, calendar: &Calenda
 pub fn year_page(date: Date, calendar: &Calendar) -> (Date, Date) {
     let year = calendar.component(CalendarUnit::Year, date) as i64;
     let first = year - year.rem_euclid(12);
-    let start = calendar
-        .date(crate::foundation::DateParts::new(first as i32, 1, 1));
+    let start = calendar.date(crate::foundation::DateParts::new(first as i32, 1, 1));
     let end = calendar
         .date_by_adding(CalendarUnit::Year, 12, start)
         .unwrap_or(start);
@@ -109,7 +108,9 @@ pub fn has_available_day(
         if availability.contains(day, calendar) {
             return true;
         }
-        let Some(next) = calendar.date_by_adding(CalendarUnit::Day, 1, day) else { return false };
+        let Some(next) = calendar.date_by_adding(CalendarUnit::Day, 1, day) else {
+            return false;
+        };
         if next <= day {
             return false;
         }

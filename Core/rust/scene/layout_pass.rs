@@ -8,7 +8,12 @@ impl LayoutPass {
     ///
     /// Both trees must have the same structure (same child count and order at
     /// every level).
-    pub fn run(root_layout_node: &LayoutNode, root_node: &Node, available_width: Option<f32>, available_height: Option<f32>) {
+    pub fn run(
+        root_layout_node: &LayoutNode,
+        root_node: &Node,
+        available_width: Option<f32>,
+        available_height: Option<f32>,
+    ) {
         root_layout_node.calculate_layout(available_width, available_height, super::Direction::Ltr);
         apply(root_layout_node, root_node);
     }

@@ -16,16 +16,14 @@
 //!   selection or hover animates rather than snapping
 //! - no rules are drawn above or between tabs
 
-use cove_core::scene::{
-    with_animation, Align, Animation, Edge, FlexDirection, LayoutNode, Node,
-};
 use cove_core::Color;
+use cove_core::scene::{Align, Animation, Edge, FlexDirection, LayoutNode, Node, with_animation};
 
+use cove_composition::{AnyView, PrimitiveView, impl_primitive_view};
+use cove_ui_compose::theme::ColorScheme;
 use cove_ui_compose::theme::styles::buttons::button_style::{
     ButtonInteractionKey, ButtonStyle, ButtonStyleConfiguration,
 };
-use cove_ui_compose::theme::ColorScheme;
-use cove_composition::{impl_primitive_view, AnyView, PrimitiveView};
 
 /// Panel tab chrome for the workspace tab bar.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -111,7 +109,11 @@ impl PrimitiveView for WorkspaceTabChrome {
         } else {
             Color::CLEAR
         };
-        let border = if self.is_focused { self.colors.focus_ring } else { Color::CLEAR };
+        let border = if self.is_focused {
+            self.colors.focus_ring
+        } else {
+            Color::CLEAR
+        };
         let border_width = if self.is_focused { 1.0 } else { 0.0 };
 
         let animate = node

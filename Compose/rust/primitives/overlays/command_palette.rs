@@ -22,23 +22,21 @@ use cove_platform::KeyEvent;
 use crate::modifiers::interaction::{AccessibilityExt, HoverExt};
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
-use crate::primitives::controls::fields::select::{
-    KeyboardShortcut, KeyboardShortcutPlatform,
-};
 use crate::primitives::controls::button::{Button, ButtonRole};
+use crate::primitives::controls::fields::select::{KeyboardShortcut, KeyboardShortcutPlatform};
 use crate::primitives::controls::key_cap::KeyCap;
 use crate::primitives::feedback::{EmptyState, EmptyStateProminence};
 use crate::primitives::media::ui_icon_catalog::{action, navigation};
 use crate::primitives::overlays::command_palette_model::{
-    destination, display_entries, ranked, record_recent, CommandEntry, CommandItem,
+    CommandEntry, CommandItem, destination, display_entries, ranked, record_recent,
 };
 use crate::primitives::overlays::modal::{Modal, ModalGeometry, ModalOptions, ModalPlacement};
-use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
 use crate::primitives::text::text_buffer::TextBuffer;
 use crate::primitives::text::text_field::{
     TextField, TextFieldDecoration, TextFieldEvents, TextFieldSize,
 };
 use crate::primitives::text::{Divider, DividerAxis, Text};
+use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
 use crate::theme::{SemanticColorRef, SemanticFontRef};
 use crate::{AnyView, BoxView, Row, Spacer, TupleView, VerticalAlignment, View};
 
@@ -213,7 +211,10 @@ impl CommandPalette {
         ranked(&items, &self.trimmed_query())
             .into_iter()
             .filter_map(|ranked_item| {
-                self.items.iter().find(|item| item.id == ranked_item.id).cloned()
+                self.items
+                    .iter()
+                    .find(|item| item.id == ranked_item.id)
+                    .cloned()
             })
             .collect()
     }
@@ -278,7 +279,11 @@ impl View for CommandPalette {
             let binding = is_presented.clone();
             let items = items.clone();
             move || {
-                let next = if binding.get() { first_selectable(&items) } else { None };
+                let next = if binding.get() {
+                    first_selectable(&items)
+                } else {
+                    None
+                };
                 state.query.set(TextBuffer::empty());
                 state.highlighted_id.set(next);
                 let token = state.focus_token.get().wrapping_add(1);
@@ -351,8 +356,7 @@ impl View for CommandPalette {
             let items = items.clone();
             Rc::new(move |buffer: &TextBuffer| {
                 let query = buffer.string_value().trim().to_string();
-                let projected: Vec<CommandItem> =
-                    items.iter().map(PaletteCommand::item).collect();
+                let projected: Vec<CommandItem> = items.iter().map(PaletteCommand::item).collect();
                 let next = ranked(&projected, &query)
                     .into_iter()
                     .find(|item| item.is_enabled);
@@ -409,7 +413,10 @@ impl View for CommandPalette {
 }
 /// First enabled command's id, for the mount-time highlight.
 fn first_selectable(items: &[PaletteCommand]) -> Option<String> {
-    items.iter().find(|item| item.is_enabled).map(|item| item.id.clone())
+    items
+        .iter()
+        .find(|item| item.is_enabled)
+        .map(|item| item.id.clone())
 }
 
 /// All enabled commands, in authored order.
@@ -447,7 +454,9 @@ struct PaletteBody {
 impl View for PaletteBody {
     fn body(&self) -> AnyView {
         // Fires once per presentation so the palette resets its transient state.
-        let settled = PresentWatcher { on_present: self.on_present.clone() };
+        let settled = PresentWatcher {
+            on_present: self.on_present.clone(),
+        };
 
         let move_down = {
             let on_move = self.on_move.clone();
@@ -506,7 +515,8 @@ impl View for PaletteBody {
         behavior.clearable = true;
         let mut decoration = TextFieldDecoration::default();
         decoration.size = TextFieldSize::Large;
-        let mut navigation = crate::primitives::text::text_field::TextFieldNavigationRequest::default();
+        let mut navigation =
+            crate::primitives::text::text_field::TextFieldNavigationRequest::default();
         navigation.focus_request_id = Some(token as u64);
 
         let field = TextField::new(self.placeholder.clone(), self.query.binding())
@@ -649,18 +659,20 @@ impl View for PaletteResults {
             .entries
             .iter()
             .map(|entry| match entry {
-                CommandEntry::Header(title) => AnyView::new(AnyView::new(
+                CommandEntry::Header(title) => AnyView::new(
                     AnyView::new(
-                        Text::new(title.clone())
-                            .semantic_font(SemanticFontRef::caption())
-                            .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                        AnyView::new(
+                            Text::new(title.clone())
+                                .semantic_font(SemanticFontRef::caption())
+                                .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                        )
+                        .padding_edges(14.0, 0.0)
+                        .frame_height(CommandPalette::HEADER_HEIGHT),
                     )
-                    .padding_edges(14.0, 0.0)
-                    .frame_height(CommandPalette::HEADER_HEIGHT),
-                )
-                .accessibility(|semantics| {
-                    semantics.role = AccessibilityRole::StaticText;
-                })),
+                    .accessibility(|semantics| {
+                        semantics.role = AccessibilityRole::StaticText;
+                    }),
+                ),
                 CommandEntry::Item(item) => {
                     let is_highlighted = self.effective.as_ref() == Some(&item.id);
                     let command = self
@@ -676,10 +688,14 @@ impl View for PaletteResults {
                         on_run: self.on_run.clone(),
                         on_highlight: self.on_highlight.clone(),
                     };
-                    AnyView::new(
-                        AnyView::new(row)
-                            .frame(None, None, None, Some(CommandPalette::ROW_HEIGHT), None, None),
-                    )
+                    AnyView::new(AnyView::new(row).frame(
+                        None,
+                        None,
+                        None,
+                        Some(CommandPalette::ROW_HEIGHT),
+                        None,
+                        None,
+                    ))
                 }
             })
             .collect();

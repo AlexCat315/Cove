@@ -5,12 +5,15 @@
 
 use cove_examples::gallery_content::catalog::GalleryOptions;
 use cove_examples::gallery_content::stories::web_story::{
-    command_is_enabled, status_text, WebSample, WebStory,
+    WebSample, WebStory, command_is_enabled, status_text,
 };
 use cove_ui_addons::webview::{WebViewCommand, WebViewPhase, WebViewState};
 
 fn state(phase: WebViewPhase) -> WebViewState {
-    WebViewState { phase, ..WebViewState::default() }
+    WebViewState {
+        phase,
+        ..WebViewState::default()
+    }
 }
 
 #[test]
@@ -82,9 +85,18 @@ fn back_and_forward_follow_the_host_history() {
 
 #[test]
 fn reload_is_always_available_and_stop_only_while_loading() {
-    assert!(command_is_enabled(WebViewCommand::Reload, &state(WebViewPhase::Idle)));
-    assert!(!command_is_enabled(WebViewCommand::Stop, &state(WebViewPhase::Idle)));
-    assert!(command_is_enabled(WebViewCommand::Stop, &state(WebViewPhase::Loading)));
+    assert!(command_is_enabled(
+        WebViewCommand::Reload,
+        &state(WebViewPhase::Idle)
+    ));
+    assert!(!command_is_enabled(
+        WebViewCommand::Stop,
+        &state(WebViewPhase::Idle)
+    ));
+    assert!(command_is_enabled(
+        WebViewCommand::Stop,
+        &state(WebViewPhase::Loading)
+    ));
 }
 
 #[test]
@@ -103,7 +115,10 @@ fn the_local_page_is_real_html_with_a_title() {
     };
     assert!(page.contains("<!doctype html>"));
     assert!(page.contains("<title>CoveUI WebView</title>"));
-    assert!(page.contains("prefers-color-scheme: dark"), "the page follows the colour scheme");
+    assert!(
+        page.contains("prefers-color-scheme: dark"),
+        "the page follows the colour scheme"
+    );
 }
 
 #[test]

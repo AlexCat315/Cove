@@ -2,12 +2,12 @@
 
 use cove_core::GeometryAntialiasing;
 use cove_graphics::rhi::DeviceConfig;
-use cove_logging::LoggingConfiguration;
-use cove_text::SystemFontDefaults;
-use cove_ui_compose::theme::tokens::TextScaler;
-use cove_text::TextCacheLimits;
 use cove_imaging::ImageCacheLimits;
+use cove_logging::LoggingConfiguration;
 use cove_platform::WindowId;
+use cove_text::SystemFontDefaults;
+use cove_text::TextCacheLimits;
+use cove_ui_compose::theme::tokens::TextScaler;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum AppWindowTitleBarStyle {
@@ -48,7 +48,11 @@ impl AppWindowRendering {
         clear_color: Option<[f32; 4]>,
         geometry_antialiasing: Option<GeometryAntialiasing>,
     ) -> Self {
-        Self { sample_count, clear_color, geometry_antialiasing }
+        Self {
+            sample_count,
+            clear_color,
+            geometry_antialiasing,
+        }
     }
 }
 
@@ -67,7 +71,10 @@ impl Default for WindowConfiguration {
         Self {
             title: std::env::current_exe()
                 .ok()
-                .and_then(|path| path.file_stem().map(|stem| stem.to_string_lossy().into_owned()))
+                .and_then(|path| {
+                    path.file_stem()
+                        .map(|stem| stem.to_string_lossy().into_owned())
+                })
                 .unwrap_or_else(|| "CoveUI".to_owned()),
             width: 1280,
             height: 720,
@@ -126,7 +133,9 @@ pub struct FramesConfiguration {
 
 impl FramesConfiguration {
     pub fn validated_target_rate(&self) -> Option<f64> {
-        let target = self.target_rate.filter(|rate| rate.is_finite() && *rate > 0.0)?;
+        let target = self
+            .target_rate
+            .filter(|rate| rate.is_finite() && *rate > 0.0)?;
         Some(target.clamp(1.0, 240.0))
     }
 }
@@ -141,20 +150,27 @@ pub struct DiagnosticsConfiguration {
 impl DiagnosticsConfiguration {
     /// `DevToolsConfig.fromEnvironment(appTitle:)` in the Swift original: an
     /// absent `COVE_DEVTOOLS` leaves DevTools off.
-    pub fn from_environment(app_title: &str) -> Option<super::super::diagnostics::integration::DevToolsConfiguration> {
+    pub fn from_environment(
+        app_title: &str,
+    ) -> Option<super::super::diagnostics::integration::DevToolsConfiguration> {
         let value = std::env::var("COVE_DEVTOOLS").ok()?;
-        if matches!(value.to_ascii_lowercase().as_str(), "" | "0" | "false" | "no") {
+        if matches!(
+            value.to_ascii_lowercase().as_str(),
+            "" | "0" | "false" | "no"
+        ) {
             return None;
         }
         let port = std::env::var("COVE_DEVTOOLS_PORT")
             .ok()
             .and_then(|port| port.parse().ok())
             .unwrap_or(0);
-        Some(super::super::diagnostics::integration::DevToolsConfiguration {
-            port,
-            app_title: app_title.to_owned(),
-            launch: None,
-        })
+        Some(
+            super::super::diagnostics::integration::DevToolsConfiguration {
+                port,
+                app_title: app_title.to_owned(),
+                launch: None,
+            },
+        )
     }
 }
 
@@ -166,7 +182,10 @@ pub struct MemoryConfiguration {
 
 impl Default for MemoryConfiguration {
     fn default() -> Self {
-        Self { text: TextCacheLimits::default(), images: ImageCacheLimits::default() }
+        Self {
+            text: TextCacheLimits::default(),
+            images: ImageCacheLimits::default(),
+        }
     }
 }
 
@@ -208,8 +227,7 @@ impl ApplicationConfiguration {
         let mut configuration = Self::default();
         if let Some(title) = title {
             configuration.window.title = title.to_owned();
-            configuration.diagnostics.dev_tools =
-                DiagnosticsConfiguration::from_environment(title);
+            configuration.diagnostics.dev_tools = DiagnosticsConfiguration::from_environment(title);
         }
         configuration
     }

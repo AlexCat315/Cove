@@ -16,7 +16,12 @@ pub struct VariableRowIndex<Id: Ord + Clone> {
 
 impl<Id: Ord + Clone> VariableRowIndex<Id> {
     pub fn new() -> Self {
-        Self { ids: Vec::new(), heights: Vec::new(), prefix: Vec::new(), spacing: 0.0 }
+        Self {
+            ids: Vec::new(),
+            heights: Vec::new(),
+            prefix: Vec::new(),
+            spacing: 0.0,
+        }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -40,14 +45,30 @@ impl<Id: Ord + Clone> VariableRowIndex<Id> {
     }
 
     pub fn offset_of(&self, row: usize) -> f64 {
-        self.prefix.get(row).copied().unwrap_or_else(|| self.total_height())
+        self.prefix
+            .get(row)
+            .copied()
+            .unwrap_or_else(|| self.total_height())
     }
 
     /// Replace the whole index. `spacing` sits between adjacent rows.
     pub fn replace(&mut self, ids: &[Id], heights: &[f32], spacing: f32) {
-        self.spacing = if spacing.is_finite() { spacing.max(0.0) } else { 0.0 };
+        self.spacing = if spacing.is_finite() {
+            spacing.max(0.0)
+        } else {
+            0.0
+        };
         self.ids = ids.to_vec();
-        self.heights = heights.iter().map(|height| if height.is_finite() { height.max(0.0) } else { 0.0 }).collect();
+        self.heights = heights
+            .iter()
+            .map(|height| {
+                if height.is_finite() {
+                    height.max(0.0)
+                } else {
+                    0.0
+                }
+            })
+            .collect();
         self.prefix = Vec::with_capacity(self.heights.len() + 1);
         let mut cursor = 0.0_f64;
         for (index, height) in self.heights.iter().enumerate() {
@@ -72,7 +93,10 @@ impl<Id: Ord + Clone> VariableRowIndex<Id> {
             return 0..0;
         }
         let start = self.row_at(offset);
-        let end = self.row_at(offset + viewport.max(0.0)).min(self.ids.len() - 1) + 1;
+        let end = self
+            .row_at(offset + viewport.max(0.0))
+            .min(self.ids.len() - 1)
+            + 1;
         start..end.max(start)
     }
 

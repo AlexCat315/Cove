@@ -10,19 +10,17 @@ use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{Binding, Font, FontWeight, State};
 use cove_ui_compose::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use cove_ui_compose::modifiers::style::AppearanceExt;
+use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::controls::fields::select::{Select, SelectOption};
 use cove_ui_compose::primitives::controls::fields::slider::Slider;
 use cove_ui_compose::primitives::controls::toggle::Checkbox;
-use cove_ui_compose::primitives::controls::Button;
 use cove_ui_compose::primitives::feedback::Badge;
-use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use cove_ui_compose::primitives::media::Icon;
+use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use cove_ui_compose::primitives::text::Text;
-use cove_ui_compose::primitives::text::text_field::TextField;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
-use cove_ui_compose::theme::tokens::{
-    SemanticColorRef, SemanticStyleViewExt, TextStyleToken,
-};
+use cove_ui_compose::primitives::text::text_field::TextField;
+use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt, TextStyleToken};
 use cove_ui_compose::theme::{Theme, ThemeViewExt};
 use cove_ui_compose::{AnyView, BoxView, DynamicField, LayoutDebugExt, TupleView, View};
 use std::rc::Rc;
@@ -216,24 +214,22 @@ impl View for ThemeStory {
             Justify::FlexStart,
             Wrap::NoWrap,
             8.0,
-            AnyView::new(TupleView::new(vec![
-                AnyView::new(
-                    Checkbox::labeled_from_boolean(
-                        "Larger icons",
-                        Binding::new(
-                            {
-                                let larger = self.larger_icons.clone();
-                                move || larger.get()
-                            },
-                            {
-                                let larger = self.larger_icons.clone();
-                                move |value| larger.set(value)
-                            },
-                        ),
-                    )
-                    .debug_name("theme-larger-icons"),
-                ),
-            ])),
+            AnyView::new(TupleView::new(vec![AnyView::new(
+                Checkbox::labeled_from_boolean(
+                    "Larger icons",
+                    Binding::new(
+                        {
+                            let larger = self.larger_icons.clone();
+                            move || larger.get()
+                        },
+                        {
+                            let larger = self.larger_icons.clone();
+                            move |value| larger.set(value)
+                        },
+                    ),
+                )
+                .debug_name("theme-larger-icons"),
+            )])),
         ));
 
         let controls = AnyView::new(BoxView::new(
@@ -287,7 +283,8 @@ impl View for ThemeStory {
         ));
 
         // The preview: a local theme provider around the token-driven content.
-        let local = (self.local_theme())(&cove_ui_compose::theme::styles::default_light_theme::value());
+        let local =
+            (self.local_theme())(&cove_ui_compose::theme::styles::default_light_theme::value());
         let preview = AnyView::new(
             PreviewCard {
                 name: self.name.clone(),
@@ -428,8 +425,8 @@ impl View for PreviewCard {
 #[cfg(test)]
 mod checks {
     use super::*;
-    use cove_ui_compose::theme::styles::default_light_theme;
     use cove_ui_compose::theme::ThemeViewExt as _;
+    use cove_ui_compose::theme::styles::default_light_theme;
 
     fn base() -> Theme {
         default_light_theme::value()

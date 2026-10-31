@@ -18,7 +18,10 @@
 //! Swift guards the queue with an `NSLock`; the scene is single-threaded, so the
 //! port keeps the same re-entrancy contract with a `RefCell` whose borrow is
 //! always released before a scope body runs.
-use super::{ActiveAnimationContext, Animation, AnimationCompletionGroup, PerformanceTimeline, RecompositionReason};
+use super::{
+    ActiveAnimationContext, Animation, AnimationCompletionGroup, PerformanceTimeline,
+    RecompositionReason,
+};
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -132,7 +135,9 @@ impl Recomposer {
     /// layout/draw.
     pub fn commit_all(&self) -> bool {
         let timeline = self.timeline.borrow().clone();
-        let trace = timeline.as_ref().and_then(|timeline| timeline.borrow().begin());
+        let trace = timeline
+            .as_ref()
+            .and_then(|timeline| timeline.borrow().begin());
         let mut committed: HashSet<ScopeId> = HashSet::new();
         let mut did_commit = false;
 
@@ -161,14 +166,21 @@ impl Recomposer {
             committed.insert(scope.id);
             let body = scope.body.clone();
             let reasons = scope.reasons.clone();
-            ActiveAnimationContext::with(scope.animation, scope.completion.clone(), Some(scope.disables_animations), || {
-                body(&reasons);
-            });
+            ActiveAnimationContext::with(
+                scope.animation,
+                scope.completion.clone(),
+                Some(scope.disables_animations),
+                || {
+                    body(&reasons);
+                },
+            );
         }
 
         self.compact_pending_queue();
         if did_commit && let Some(timeline) = timeline {
-            timeline.borrow_mut().end(trace, "recomposition", "Commit pending scopes", None, &[]);
+            timeline
+                .borrow_mut()
+                .end(trace, "recomposition", "Commit pending scopes", None, &[]);
         }
         did_commit
     }

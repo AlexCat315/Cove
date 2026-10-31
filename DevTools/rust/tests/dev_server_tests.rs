@@ -26,8 +26,8 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use cove_devtools::protocol::{
-    decode_payload, Envelope, InputRecording, JsonValue, PROTOCOL_VERSION, StateDifference,
-    StateObservation, StateWatch, TimingFrame, TreeSnapshot, WindowResize,
+    Envelope, InputRecording, JsonValue, PROTOCOL_VERSION, StateDifference, StateObservation,
+    StateWatch, TimingFrame, TreeSnapshot, WindowResize, decode_payload,
 };
 use cove_devtools::server::{
     DevServer, DevToolsConfig, DevToolsConnection, DevToolsTransport, DevToolsTransportEvent,
@@ -77,7 +77,9 @@ struct TestTransport {
 
 impl TestTransport {
     fn new() -> Arc<Self> {
-        Arc::new(Self { on_event: Mutex::new(None) })
+        Arc::new(Self {
+            on_event: Mutex::new(None),
+        })
     }
 
     fn connect(&self, connection: &Arc<TestConnection>) {
@@ -131,14 +133,22 @@ fn server(transport: &Arc<TestTransport>) -> DevServer {
 fn receive(server: &mut DevServer, kind: &str, connection: &Arc<TestConnection>) -> Envelope {
     for _ in 0..8 {
         server.pump();
-        if let Some(message) = connection.take().into_iter().find(|message| message.r#type == kind) {
+        if let Some(message) = connection
+            .take()
+            .into_iter()
+            .find(|message| message.r#type == kind)
+        {
             return message;
         }
     }
     panic!("timed out waiting for {kind}");
 }
 
-fn connect(server: &mut DevServer, transport: &Arc<TestTransport>, connection: &Arc<TestConnection>) {
+fn connect(
+    server: &mut DevServer,
+    transport: &Arc<TestTransport>,
+    connection: &Arc<TestConnection>,
+) {
     transport.connect(connection);
     let hello = receive(server, "hello", connection);
     assert!(hello.payload.is_some(), "hello carries the host payload");
@@ -183,7 +193,10 @@ fn diagnostic_reads_use_the_host_adapter_without_taking_the_inspection_lease() {
     let read = receive(&mut server, "diagnostics.call.ok", &reader);
     assert_eq!(*calls.borrow(), 1, "the reader's call reached the adapter");
     assert_eq!(
-        read.payload.as_ref().and_then(|payload| payload.get("count")).and_then(JsonValue::as_f64),
+        read.payload
+            .as_ref()
+            .and_then(|payload| payload.get("count"))
+            .and_then(JsonValue::as_f64),
         Some(1.0)
     );
     // The reader's diagnostic call did not take the inspection lease.
@@ -222,7 +235,10 @@ fn diagnostic_reads_report_unavailable_hosts() {
     server.start().expect("restart");
     transport.request("diagnostics.call", None, &connection);
     server.pump();
-    assert!(connection.take().is_empty(), "an unknown connection gets no answer");
+    assert!(
+        connection.take().is_empty(),
+        "an unknown connection gets no answer"
+    );
     assert_eq!(*calls.borrow(), 1);
 
     connect(&mut server, &transport, &connection);
@@ -232,13 +248,21 @@ fn diagnostic_reads_report_unavailable_hosts() {
     server.stop();
 }
 
-fn node(id: &str, children: Vec<cove_devtools::protocol::NodeSummary>) -> cove_devtools::protocol::NodeSummary {
+fn node(
+    id: &str,
+    children: Vec<cove_devtools::protocol::NodeSummary>,
+) -> cove_devtools::protocol::NodeSummary {
     use cove_devtools::protocol::{NodeFlags, NodeFrame, NodeSummary};
     NodeSummary {
         id: id.into(),
         view_tag: None,
         debug_name: None,
-        frame: NodeFrame { x: 0.0, y: 0.0, w: 1.0, h: 1.0 },
+        frame: NodeFrame {
+            x: 0.0,
+            y: 0.0,
+            w: 1.0,
+            h: 1.0,
+        },
         absolute_frame: None,
         content_offset: None,
         z_index: None,
@@ -307,7 +331,13 @@ fn large_tree_broadcast_coalesces_bursts_and_delivers_final_idle_change() {
     let root = snapshot.root.expect("root");
     assert_eq!(initial.id, Some(1));
     assert_eq!(root.children.len(), 1_036);
-    assert_eq!(root.children.last().and_then(|child| child.source.as_ref()).map(|s| s.line), Some(1_036));
+    assert_eq!(
+        root.children
+            .last()
+            .and_then(|child| child.source.as_ref())
+            .map(|s| s.line),
+        Some(1_036)
+    );
 
     *name.borrow_mut() = "first".into();
     server.broadcast_tree_delta();
@@ -321,12 +351,21 @@ fn large_tree_broadcast_coalesces_bursts_and_delivers_final_idle_change() {
     let first = receive(&mut server, "tree.delta", &connection);
     assert_eq!(first.id, None, "a broadcast is a notification");
     let first_payload: TreeSnapshot = decode_payload(&first.payload).expect("tree payload");
-    assert_eq!(first_payload.root.and_then(|root| root.debug_name).as_deref(), Some("first"));
+    assert_eq!(
+        first_payload
+            .root
+            .and_then(|root| root.debug_name)
+            .as_deref(),
+        Some("first")
+    );
 
     let final_message = receive(&mut server, "tree.delta", &connection);
     let final_payload: TreeSnapshot = decode_payload(&final_message.payload).expect("tree payload");
     assert_eq!(
-        final_payload.root.and_then(|root| root.debug_name).as_deref(),
+        final_payload
+            .root
+            .and_then(|root| root.debug_name)
+            .as_deref(),
         Some("change.99")
     );
 
@@ -344,11 +383,12 @@ fn deeply_nested_tree_round_trips_through_json() {
     let mut server = server(&transport);
     let connection = Arc::new(TestConnection::default());
 
-    // serde_json's default recursion limit is 128, so the translated tree uses
-    // 96 wrappers (97 levels) — deep enough to catch a stack-unsafe encoder,
-    // shallow enough to stay inside the decoder's budget. See the module note.
+    // serde_json counts one level per object *and* per array, and the default
+    // limit is 128, so each NodeSummary costs two levels. 60 wrappers (122
+    // levels) is the same stress the Swift 128-wrapper tree applied — deep
+    // enough to catch a stack-unsafe encoder — while staying under the limit.
     let mut root = node("leaf", Vec::new());
-    for index in 0..96 {
+    for index in 0..60 {
         root = node(&format!("wrapper.{index}"), vec![root]);
     }
     let expected = root.id.clone();
@@ -367,7 +407,7 @@ fn deeply_nested_tree_round_trips_through_json() {
     let initial = receive(&mut server, "tree.snapshot", &connection);
     let payload: TreeSnapshot = decode_payload(&initial.payload).expect("tree payload");
     let mut current = payload.root.expect("root");
-    for _ in 0..96 {
+    for _ in 0..60 {
         current = current.children.into_iter().next().expect("nested child");
     }
     assert_eq!(current.id, "leaf");
@@ -440,17 +480,22 @@ fn subscriptions_state_and_disconnect_use_shared_protocol() {
             inspection: None,
         }
     }));
-    server.host.checkpoint.capture = Some(Rc::new(|| BTreeMap::from([("count".to_string(), "7".to_string())])));
+    server.host.checkpoint.capture = Some(Rc::new(|| {
+        BTreeMap::from([("count".to_string(), "7".to_string())])
+    }));
     let restore_slot = restored.clone();
     server.host.checkpoint.restore = Some(Rc::new(move |state: &BTreeMap<String, String>| {
         *restore_slot.borrow_mut() = Some(state.clone());
         true
     }));
     let select_slot = selections.clone();
-    server.host.scene.select = Some(Rc::new(move |id: &str| select_slot.borrow_mut().push(id.to_string())));
+    server.host.scene.select = Some(Rc::new(move |id: &str| {
+        select_slot.borrow_mut().push(id.to_string())
+    }));
     let clear_slot = selections.clone();
-    server.host.scene.clear_selection =
-        Some(Rc::new(move || clear_slot.borrow_mut().push("clear".to_string())));
+    server.host.scene.clear_selection = Some(Rc::new(move || {
+        clear_slot.borrow_mut().push("clear".to_string())
+    }));
     let stops = mirror_stops.clone();
     server.host.mirror.stop = Some(Rc::new(move || *stops.borrow_mut() += 1));
 
@@ -511,7 +556,10 @@ fn subscriptions_state_and_disconnect_use_shared_protocol() {
 
     transport.disconnect(&connection);
     server.pump();
-    assert_eq!(*selections.borrow(), vec!["42".to_string(), "clear".to_string()]);
+    assert_eq!(
+        *selections.borrow(),
+        vec!["42".to_string(), "clear".to_string()]
+    );
     assert_eq!(*mirror_stops.borrow(), 1, "the last mirror subscriber left");
     server.stop();
 }
@@ -530,8 +578,12 @@ fn state_diff_restore_result_and_recording_ownership() {
     }));
     let restore_value = value.clone();
     server.host.checkpoint.restore = Some(Rc::new(move |state: &BTreeMap<String, String>| {
-        let Some(next) = state.get("count") else { return false };
-        let Ok(integer) = next.parse::<i64>() else { return false };
+        let Some(next) = state.get("count") else {
+            return false;
+        };
+        let Ok(integer) = next.parse::<i64>() else {
+            return false;
+        };
         if integer < 0 {
             return false;
         }
@@ -572,7 +624,10 @@ fn state_diff_restore_result_and_recording_ownership() {
     let difference = receive(&mut server, "state.diff.ok", &owner);
     let difference: StateDifference = decode_payload(&difference.payload).expect("diff payload");
     assert_eq!(
-        difference.changed.get("count").map(|change| change.after.as_str()),
+        difference
+            .changed
+            .get("count")
+            .map(|change| change.after.as_str()),
         Some("2")
     );
 
@@ -582,7 +637,11 @@ fn state_diff_restore_result_and_recording_ownership() {
         &owner,
     );
     let _ = receive(&mut server, "state.restore.err", &owner);
-    assert_eq!(*value.borrow(), "2", "rejected restores leave the value alone");
+    assert_eq!(
+        *value.borrow(),
+        "2",
+        "rejected restores leave the value alone"
+    );
 
     transport.request("input.record.start", None, &owner);
     let _ = receive(&mut server, "input.record.start.ok", &owner);
@@ -593,7 +652,11 @@ fn state_diff_restore_result_and_recording_ownership() {
 
     transport.request("select.clear", None, &owner);
     let _ = receive(&mut server, "select.clear.ok", &owner);
-    assert_eq!(*stops.borrow(), 0, "an unrelated command does not stop recording");
+    assert_eq!(
+        *stops.borrow(),
+        0,
+        "an unrelated command does not stop recording"
+    );
 
     transport.request("input.record.stop", None, &owner);
     let recording = receive(&mut server, "input.record.stop.ok", &owner);
@@ -687,18 +750,22 @@ fn observation_streams_are_independent_and_timeline_stops_after_last_disconnect(
         }
     }));
     let capture_flag = capture.clone();
-    server.host.observation.capture = Some(Rc::new(move |enabled: bool| *capture_flag.borrow_mut() = enabled));
-    server.host.observation.timeline = Some(Rc::new(|_after: u64| cove_devtools::protocol::TimelineSnapshot {
-        events: vec![cove_devtools::protocol::TimelineEvent {
-            sequence: 1,
-            phase: "draw".into(),
-            name: "Draw".into(),
-            scope_id: None,
-            start_ms: 1.0,
-            duration_ms: 2.0,
-            reasons: Vec::new(),
-        }],
-        dropped: 0,
+    server.host.observation.capture = Some(Rc::new(move |enabled: bool| {
+        *capture_flag.borrow_mut() = enabled
+    }));
+    server.host.observation.timeline = Some(Rc::new(|_after: u64| {
+        cove_devtools::protocol::TimelineSnapshot {
+            events: vec![cove_devtools::protocol::TimelineEvent {
+                sequence: 1,
+                phase: "draw".into(),
+                name: "Draw".into(),
+                scope_id: None,
+                start_ms: 1.0,
+                duration_ms: 2.0,
+                reasons: Vec::new(),
+            }],
+            dropped: 0,
+        }
     }));
 
     server.start().expect("start");
@@ -712,12 +779,20 @@ fn observation_streams_are_independent_and_timeline_stops_after_last_disconnect(
     transport.request("state.list", None, &one);
     let metadata = receive(&mut server, "state.list.ok", &one);
     let observation: StateObservation = decode_payload(&metadata.payload).expect("state payload");
-    assert!(observation.values.is_empty(), "state.list reads metadata only");
+    assert!(
+        observation.values.is_empty(),
+        "state.list reads metadata only"
+    );
     assert_eq!(reads.borrow().as_slice(), &[Vec::<String>::new()]);
 
     transport.request(
         "state.subscribe",
-        Some(serde_json::to_value(StateWatch { ids: vec!["count".into()] }).expect("watch")),
+        Some(
+            serde_json::to_value(StateWatch {
+                ids: vec!["count".into()],
+            })
+            .expect("watch"),
+        ),
         &one,
     );
     let _ = receive(&mut server, "state.subscribe.ok", &one);
@@ -725,7 +800,13 @@ fn observation_streams_are_independent_and_timeline_stops_after_last_disconnect(
     server.broadcast_observations();
     let updated = receive(&mut server, "state.observation", &one);
     let observation: StateObservation = decode_payload(&updated.payload).expect("state payload");
-    assert_eq!(observation.values.first().map(|value| value.summary.as_str()), Some("2"));
+    assert_eq!(
+        observation
+            .values
+            .first()
+            .map(|value| value.summary.as_str()),
+        Some("2")
+    );
     // The other connection never subscribed, so it saw nothing.
     assert!(two.take().is_empty());
 
@@ -733,7 +814,11 @@ fn observation_streams_are_independent_and_timeline_stops_after_last_disconnect(
     let _ = receive(&mut server, "state.unsubscribe.ok", &one);
     let before = reads.borrow().len();
     server.broadcast_observations();
-    assert_eq!(reads.borrow().len(), before, "unsubscribing stops the reads");
+    assert_eq!(
+        reads.borrow().len(),
+        before,
+        "unsubscribing stops the reads"
+    );
 
     transport.request("timeline.subscribe", None, &one);
     let _ = receive(&mut server, "timeline.events", &one);
@@ -743,7 +828,10 @@ fn observation_streams_are_independent_and_timeline_stops_after_last_disconnect(
 
     transport.request("timeline.unsubscribe", None, &one);
     let _ = receive(&mut server, "timeline.unsubscribe.ok", &one);
-    assert!(*capture.borrow(), "one subscriber remains, so capture continues");
+    assert!(
+        *capture.borrow(),
+        "one subscriber remains, so capture continues"
+    );
 
     transport.disconnect(&two);
     server.pump();
@@ -778,7 +866,12 @@ fn timing_frames_stream_only_to_subscribed_clients() {
     // Silence before anyone subscribes: the publisher queues no work.
     server.broadcast_timing(frame(1));
     server.pump();
-    assert!(!subscriber.take().iter().any(|message| message.r#type == "timing.frame"));
+    assert!(
+        !subscriber
+            .take()
+            .iter()
+            .any(|message| message.r#type == "timing.frame")
+    );
 
     transport.request("timing.subscribe", None, &subscriber);
     let _ = receive(&mut server, "timing.subscribe.ok", &subscriber);
@@ -789,7 +882,12 @@ fn timing_frames_stream_only_to_subscribed_clients() {
     assert_eq!(payload.total_ms, 6.0);
     assert_eq!(payload.presented, Some(true));
     // The observer only receives frames after its own subscribe.
-    assert!(!observer.take().iter().any(|message| message.r#type == "timing.frame"));
+    assert!(
+        !observer
+            .take()
+            .iter()
+            .any(|message| message.r#type == "timing.frame")
+    );
     server.stop();
 }
 
@@ -829,11 +927,19 @@ fn logs_replay_before_connection_filter_and_report_slow_consumer_loss() {
         after_sequence: None,
     };
     let mut query_payload = serde_json::to_value(&query).expect("query");
-    query_payload.as_object_mut().expect("object").remove("text");
+    query_payload
+        .as_object_mut()
+        .expect("object")
+        .remove("text");
     transport.request("log.subscribe", Some(query_payload), &connection);
     let response = receive(&mut server, "log.snapshot", &connection);
-    let snapshot: cove_logging::LogSnapshot = decode_payload(&response.payload).expect("log snapshot");
-    assert_eq!(snapshot.records.len(), 1, "the info record is below the threshold");
+    let snapshot: cove_logging::LogSnapshot =
+        decode_payload(&response.payload).expect("log snapshot");
+    assert_eq!(
+        snapshot.records.len(),
+        1,
+        "the info record is below the threshold"
+    );
     assert_eq!(snapshot.records[0].message, "before connection");
     assert_eq!(
         snapshot.records[0].metadata.get("structured"),
@@ -844,7 +950,10 @@ fn logs_replay_before_connection_filter_and_report_slow_consumer_loss() {
     );
     let last_sequence = snapshot.records.last().expect("record").sequence;
 
-    logger.log(&cove_logging::LogEvent::new(cove_logging::Level::Warning, "live"));
+    logger.log(&cove_logging::LogEvent::new(
+        cove_logging::Level::Warning,
+        "live",
+    ));
     cove_logging::LogSystem::flush();
     server.pump();
     let messages = connection.take();
@@ -858,11 +967,17 @@ fn logs_replay_before_connection_filter_and_report_slow_consumer_loss() {
 
     transport.request("log.unsubscribe", None, &connection);
     let _ = receive(&mut server, "log.unsubscribe.ok", &connection);
-    logger.log(&cove_logging::LogEvent::new(cove_logging::Level::Warning, "after unsubscribe"));
+    logger.log(&cove_logging::LogEvent::new(
+        cove_logging::Level::Warning,
+        "after unsubscribe",
+    ));
     cove_logging::LogSystem::flush();
     server.pump();
     assert!(
-        !connection.take().iter().any(|message| message.r#type == "log.entry"),
+        !connection
+            .take()
+            .iter()
+            .any(|message| message.r#type == "log.entry"),
         "an unsubscribed client receives no entries"
     );
     server.stop();
@@ -897,7 +1012,10 @@ fn window_resize_validates_and_reaches_the_host() {
         &connection,
     );
     let _ = receive(&mut server, "window.resize.err", &connection);
-    assert!(sizes.borrow().is_empty(), "an out-of-range size never reaches the host");
+    assert!(
+        sizes.borrow().is_empty(),
+        "an out-of-range size never reaches the host"
+    );
 
     transport.request(
         "window.resize",

@@ -3,14 +3,14 @@
 //! Themed square icon: the asset's alpha channel is used as coverage and the
 //! foreground color as fill, so icons follow theme tokens instead of their
 //! source colors.
-use cove_core::Color;
-use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
-use cove_imaging::BundleImageResource;
 use crate::primitives::media::{Image, ImageContentMode, ImageRenderingMode};
 use crate::theme::{
     IconMetrics, IconMetricsReader, SemanticColorRef, SemanticIconSize, Theme, ThemeReader,
 };
 use crate::{AnyView, BoxView, View};
+use cove_core::Color;
+use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
+use cove_imaging::BundleImageResource;
 
 #[derive(Clone)]
 enum IconFill {
@@ -34,27 +34,63 @@ pub struct Icon {
 
 impl Icon {
     pub fn new(resource: BundleImageResource, size: f32) -> Self {
-        Self { resource, size: IconSize::Points(size), fill: IconFill::Inherited }
+        Self {
+            resource,
+            size: IconSize::Points(size),
+            fill: IconFill::Inherited,
+        }
     }
 
     pub fn with_color(resource: BundleImageResource, size: f32, color: Color) -> Self {
-        Self { resource, size: IconSize::Points(size), fill: IconFill::Concrete(color) }
+        Self {
+            resource,
+            size: IconSize::Points(size),
+            fill: IconFill::Concrete(color),
+        }
     }
 
-    pub fn with_semantic(resource: BundleImageResource, size: f32, color: SemanticColorRef) -> Self {
-        Self { resource, size: IconSize::Points(size), fill: IconFill::Semantic(color) }
+    pub fn with_semantic(
+        resource: BundleImageResource,
+        size: f32,
+        color: SemanticColorRef,
+    ) -> Self {
+        Self {
+            resource,
+            size: IconSize::Points(size),
+            fill: IconFill::Semantic(color),
+        }
     }
 
     pub fn semantic(resource: BundleImageResource, size: SemanticIconSize) -> Self {
-        Self { resource, size: IconSize::Semantic(size), fill: IconFill::Inherited }
+        Self {
+            resource,
+            size: IconSize::Semantic(size),
+            fill: IconFill::Inherited,
+        }
     }
 
-    pub fn semantic_with_color(resource: BundleImageResource, size: SemanticIconSize, color: Color) -> Self {
-        Self { resource, size: IconSize::Semantic(size), fill: IconFill::Concrete(color) }
+    pub fn semantic_with_color(
+        resource: BundleImageResource,
+        size: SemanticIconSize,
+        color: Color,
+    ) -> Self {
+        Self {
+            resource,
+            size: IconSize::Semantic(size),
+            fill: IconFill::Concrete(color),
+        }
     }
 
-    pub fn semantic_with_ref(resource: BundleImageResource, size: SemanticIconSize, color: SemanticColorRef) -> Self {
-        Self { resource, size: IconSize::Semantic(size), fill: IconFill::Semantic(color) }
+    pub fn semantic_with_ref(
+        resource: BundleImageResource,
+        size: SemanticIconSize,
+        color: SemanticColorRef,
+    ) -> Self {
+        Self {
+            resource,
+            size: IconSize::Semantic(size),
+            fill: IconFill::Semantic(color),
+        }
     }
 
     fn resolved_fill(&self, theme: &Theme) -> Option<Color> {
@@ -84,7 +120,11 @@ impl View for Icon {
                 };
                 let themed = theme.icons.resolve(&resource);
                 let image = Image::from_resource(
-                    &themed, resolved, resolved, Color::WHITE, ImageContentMode::Fit,
+                    &themed,
+                    resolved,
+                    resolved,
+                    Color::WHITE,
+                    ImageContentMode::Fit,
                     ImageRenderingMode::AlphaMask,
                 );
                 let image = match &fill {
@@ -95,7 +135,11 @@ impl View for Icon {
                 // Keep layout slots/padding separate from the SVG's own size.
                 // A surrounding frame is a container, not a glyph resize.
                 BoxView::new(
-                    FlexDirection::Row, Align::Center, Justify::Center, Wrap::NoWrap, 0.0,
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::Center,
+                    Wrap::NoWrap,
+                    0.0,
                     AnyView::new(image),
                 )
             })

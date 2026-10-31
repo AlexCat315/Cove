@@ -7,9 +7,9 @@
 use std::collections::HashMap;
 
 use crate::rhi::{
-    Buffer, BufferUsage, ComputePipelineDescriptor, GraphicsPipelineDescriptor, MeshPipelineDescriptor,
-    PushConstantRange, ShaderSpecializationConstant, ShaderStage, TextureDimension, TextureFormat,
-    TextureUsage,
+    Buffer, BufferUsage, ComputePipelineDescriptor, GraphicsPipelineDescriptor,
+    MeshPipelineDescriptor, PushConstantRange, ShaderSpecializationConstant, ShaderStage,
+    TextureDimension, TextureFormat, TextureUsage,
 };
 
 use super::memory::VulkanMemoryAllocation;
@@ -126,7 +126,10 @@ pub const INTERNAL_ID_BASE: u32 = 0x8000_0000;
 
 impl VulkanRegistries {
     pub fn new() -> Self {
-        Self { internal_id: INTERNAL_ID_BASE, ..Self::default() }
+        Self {
+            internal_id: INTERNAL_ID_BASE,
+            ..Self::default()
+        }
     }
 
     pub fn next_internal_id(&mut self) -> u32 {
@@ -174,7 +177,10 @@ mod tests {
         };
         let registries = VulkanRegistries::new();
         assert_eq!(registries.attachment_view(&texture), 11);
-        let single_mip = VulkanTextureRecord { attachment_view: None, ..texture };
+        let single_mip = VulkanTextureRecord {
+            attachment_view: None,
+            ..texture
+        };
         assert_eq!(registries.attachment_view(&single_mip), 10);
     }
 }

@@ -6,8 +6,8 @@
 //! painting and hit testing, so the story's limit/overflow/overlap controls drive
 //! it directly and the tests assert against it.
 
-use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::State;
+use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::fields::Slider;
@@ -23,12 +23,25 @@ use super::feedback::StorySection;
 use crate::gallery_content::catalog::GalleryOptions;
 
 /// The six members the story lists, in authored order.
-pub const MEMBER_NAMES: [&str; 6] =
-    ["Jason Lee", "Alice Johnson", "陈珊", "Diana Prince", "Émile Zola", "Bob Smith"];
+pub const MEMBER_NAMES: [&str; 6] = [
+    "Jason Lee",
+    "Alice Johnson",
+    "陈珊",
+    "Diana Prince",
+    "Émile Zola",
+    "Bob Smith",
+];
 
 /// The names whose initials the story checks against Unicode corner cases.
-pub const INITIAL_CASES: [&str; 7] =
-    ["Jason Lee", "huacnlee", "李 小龙", "陈珊", "Émile Zola", "👩🏽‍💻 coder", ""];
+pub const INITIAL_CASES: [&str; 7] = [
+    "Jason Lee",
+    "huacnlee",
+    "李 小龙",
+    "陈珊",
+    "Émile Zola",
+    "👩🏽‍💻 coder",
+    "",
+];
 
 /// The sources the image/fallback switch offers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -40,8 +53,7 @@ pub enum AvatarImageSource {
 }
 
 impl AvatarImageSource {
-    pub const ALL: [Self; 4] =
-        [Self::Bundled, Self::Remote, Self::Missing, Self::Initials];
+    pub const ALL: [Self; 4] = [Self::Bundled, Self::Remote, Self::Missing, Self::Initials];
 
     pub fn id(self) -> &'static str {
         match self {
@@ -171,9 +183,7 @@ impl View for AvatarStory {
                 INITIAL_CASES
                     .iter()
                     .map(|name| {
-                        AnyView::new(
-                            Text::new(if name.is_empty() { "Anonymous" } else { name }),
-                        )
+                        AnyView::new(Text::new(if name.is_empty() { "Anonymous" } else { name }))
                     })
                     .collect(),
             )),
@@ -190,9 +200,10 @@ impl View for AvatarStory {
                 AvatarStatus::ALL
                     .iter()
                     .map(|status| {
-                        AnyView::new(Text::new(status.label()).semantic_font(
-                            cove_ui_compose::theme::SemanticFontRef::caption(),
-                        ))
+                        AnyView::new(
+                            Text::new(status.label())
+                                .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption()),
+                        )
                     })
                     .collect(),
             )),

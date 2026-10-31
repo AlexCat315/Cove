@@ -1,13 +1,15 @@
 //! Layout-driven pet perch registration.
 use super::PetWorld;
-use crate::{impl_primitive_view, AnyView, PrimitiveView, View, ViewExt};
+use crate::{AnyView, PrimitiveView, View, ViewExt, impl_primitive_view};
 use cove_core::scene::{CompositionLocal, LayoutNode, Node};
 use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct PetWorldHandle(pub Rc<PetWorld>);
 impl PartialEq for PetWorldHandle {
-    fn eq(&self, other: &Self) -> bool { Rc::ptr_eq(&self.0, &other.0) }
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
 }
 
 thread_local! {
@@ -28,7 +30,10 @@ pub struct PetAnchorNode {
 }
 impl PetAnchorNode {
     pub fn new(id: impl Into<String>, content: AnyView) -> Self {
-        Self { id: id.into(), content }
+        Self {
+            id: id.into(),
+            content,
+        }
     }
 
     fn hook(&self, node: &Node) {
@@ -47,9 +52,15 @@ impl PrimitiveView for PetAnchorNode {
         self.hook(&node);
         node
     }
-    fn update_node(&self, node: &Node) { self.hook(node); }
-    fn make_layout_node(&self) -> Option<LayoutNode> { Some(LayoutNode::new()) }
-    fn children(&self, _node: &Node) -> Vec<AnyView> { vec![self.content.clone()] }
+    fn update_node(&self, node: &Node) {
+        self.hook(node);
+    }
+    fn make_layout_node(&self) -> Option<LayoutNode> {
+        Some(LayoutNode::new())
+    }
+    fn children(&self, _node: &Node) -> Vec<AnyView> {
+        vec![self.content.clone()]
+    }
 }
 impl_primitive_view!(PetAnchorNode);
 
@@ -62,6 +73,9 @@ pub trait PetAnchorExt: View + Sized + 'static {
 impl<T: View + Sized + 'static> PetAnchorExt for T {}
 
 /// Apply the active pet world to a subtree.
-pub fn provide_pet_world<V: View + Sized + 'static>(view: V, world: Rc<PetWorld>) -> crate::ModifiedContent {
+pub fn provide_pet_world<V: View + Sized + 'static>(
+    view: V,
+    world: Rc<PetWorld>,
+) -> crate::ModifiedContent {
     view.composition_local(pet_world_local(), Some(PetWorldHandle(world)))
 }

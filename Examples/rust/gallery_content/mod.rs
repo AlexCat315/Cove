@@ -11,7 +11,9 @@ pub mod icons;
 pub mod routing;
 pub mod stories;
 
-pub use catalog::{CowSize, GalleryCatalog, GalleryEntry, GalleryOptions, GalleryPage, StorySection};
+pub use catalog::{
+    CowSize, GalleryCatalog, GalleryEntry, GalleryOptions, GalleryPage, StorySection,
+};
 pub use counter_content::CounterContent;
-pub use gallery_view::{current_entry, size_choices, GalleryStorySection, GalleryView};
+pub use gallery_view::{GalleryStorySection, GalleryView, current_entry, size_choices};
 pub use routing::{MigrationPending, StoryDispatch};

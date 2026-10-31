@@ -10,23 +10,25 @@
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 use cove_core::Binding;
+use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
-use crate::theme::tokens::SemanticStyleViewExt;
 use crate::primitives::controls::button::{Button, ButtonIconSource, ButtonRole};
 use crate::primitives::controls::fields::json_field_model::{
     JsonFieldLabels, JsonFieldValidation, normalized_commit_text, pretty_printed, validate,
 };
 use crate::primitives::layout::resizable_text_area::ResizableTextArea;
 use crate::primitives::overlays::modal::Modal;
+use crate::primitives::text::Text;
 use crate::primitives::text::text_buffer::TextBuffer;
 use crate::primitives::text::text_field::TextFieldCodeEditing;
-use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
-use crate::theme::{theme_for_node, SemanticColorRef, SemanticFontRef};
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View};
+use crate::theme::tokens::SemanticStyleViewExt;
+use crate::theme::{SemanticColorRef, SemanticFontRef, theme_for_node};
+use crate::{
+    AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View, impl_primitive_view,
+};
 
 /// Toolbar spacing.
 const TOOLBAR_SPACING: f32 = 2.0;
@@ -43,11 +45,21 @@ struct JsonDraft {
 
 impl JsonDraft {
     fn new(baseline: TextBuffer) -> Self {
-        Self { text: baseline.clone(), has_draft: false, baseline, expanded: TextBuffer::empty(), is_expanded: false }
+        Self {
+            text: baseline.clone(),
+            has_draft: false,
+            baseline,
+            expanded: TextBuffer::empty(),
+            is_expanded: false,
+        }
     }
 
     fn current(&self) -> &TextBuffer {
-        if self.has_draft { &self.text } else { &self.baseline }
+        if self.has_draft {
+            &self.text
+        } else {
+            &self.baseline
+        }
     }
 }
 
@@ -116,7 +128,10 @@ impl JsonField {
     /// The text the field currently shows: the draft while editing, else the
     /// bound value.
     fn current_text(&self) -> TextBuffer {
-        let draft = self.draft.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let draft = self
+            .draft
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         draft.current().clone()
     }
 
@@ -126,13 +141,20 @@ impl JsonField {
 
     /// Starts editing from the bound value, seeding `{}` for an empty field.
     fn begin_editing(&self) {
-        let mut draft = self.draft.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut draft = self
+            .draft
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         if draft.has_draft {
             return;
         }
         let authored = self.text.get();
         draft.baseline = authored.clone();
-        draft.text = if authored.is_empty() { TextBuffer::new("{}") } else { authored };
+        draft.text = if authored.is_empty() {
+            TextBuffer::new("{}")
+        } else {
+            authored
+        };
         draft.has_draft = true;
     }
 
@@ -157,7 +179,10 @@ impl JsonField {
                 handler(normalized.clone());
             }
         }
-        let mut draft = self.draft.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut draft = self
+            .draft
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         draft.text = normalized;
         draft.has_draft = false;
         true
@@ -166,7 +191,10 @@ impl JsonField {
     /// Restores the edit baseline.
     fn revert_draft(&self) {
         {
-            let mut draft = self.draft.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            let mut draft = self
+                .draft
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
             draft.text = draft.baseline.clone();
             draft.has_draft = true;
         }
@@ -176,7 +204,10 @@ impl JsonField {
     /// Pretty-prints the current text when it is valid.
     fn format_draft(&self) {
         if let Some(pretty) = pretty_printed(&self.current_text().string_value()) {
-            let mut draft = self.draft.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            let mut draft = self
+                .draft
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
             draft.text = TextBuffer::new(&pretty);
             draft.has_draft = true;
         }
@@ -184,17 +215,28 @@ impl JsonField {
 
     /// Applies the expanded modal's text and closes it.
     fn apply_expanded(&self) {
-        let expanded = self.draft.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).expanded.clone();
+        let expanded = self
+            .draft
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .expanded
+            .clone();
         if !validate(&expanded.string_value()).is_acceptable() {
             return;
         }
         {
-            let mut draft = self.draft.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            let mut draft = self
+                .draft
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
             draft.text = expanded;
             draft.has_draft = true;
         }
         if self.commit_draft() {
-            self.draft.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).is_expanded = false;
+            self.draft
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .is_expanded = false;
         }
     }
 
@@ -203,14 +245,18 @@ impl JsonField {
             {
                 let draft = self.draft.clone();
                 move || {
-                    let draft = draft.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                    let draft = draft
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner());
                     draft.current().clone()
                 }
             },
             {
                 let draft = self.draft.clone();
                 move |value: TextBuffer| {
-                    let mut draft = draft.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                    let mut draft = draft
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner());
                     draft.text = value;
                     draft.has_draft = true;
                 }
@@ -227,7 +273,9 @@ impl View for JsonField {
         let format = {
             let field = field.clone();
             Button::icon_with_options(
-                ButtonIconSource::resource(crate::primitives::media::ui_icon_catalog::action::format()),
+                ButtonIconSource::resource(
+                    crate::primitives::media::ui_icon_catalog::action::format(),
+                ),
                 Some(12.0),
                 None,
                 ButtonRole::Normal,
@@ -242,11 +290,16 @@ impl View for JsonField {
         let revert = {
             let field = field.clone();
             let dirty = {
-                let draft = self.draft.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                let draft = self
+                    .draft
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
                 draft.current() != &draft.baseline
             };
             Button::icon_with_options(
-                ButtonIconSource::resource(crate::primitives::media::ui_icon_catalog::action::reset()),
+                ButtonIconSource::resource(
+                    crate::primitives::media::ui_icon_catalog::action::reset(),
+                ),
                 Some(12.0),
                 None,
                 ButtonRole::Normal,
@@ -261,7 +314,9 @@ impl View for JsonField {
         let expand = {
             let field = field.clone();
             Button::icon_with_options(
-                ButtonIconSource::resource(crate::primitives::media::ui_icon_catalog::navigation::expand()),
+                ButtonIconSource::resource(
+                    crate::primitives::media::ui_icon_catalog::navigation::expand(),
+                ),
                 Some(12.0),
                 None,
                 ButtonRole::Normal,
@@ -271,7 +326,10 @@ impl View for JsonField {
                 Some(self.labels.expand.clone()),
                 move || {
                     let current = field.current_text();
-                    let mut draft = field.draft.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                    let mut draft = field
+                        .draft
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner());
                     draft.expanded = current;
                     draft.is_expanded = true;
                 },
@@ -311,7 +369,10 @@ impl View for JsonField {
             let field = field.clone();
             let draft = draft.clone();
             Rc::new(move || {
-                let expanded = draft.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).is_expanded;
+                let expanded = draft
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .is_expanded;
                 if !expanded {
                     field.commit_draft();
                 }
@@ -325,14 +386,22 @@ impl View for JsonField {
             520.0,
             !self.is_enabled,
             self.labels.resize.clone(),
-            TextFieldCodeEditing { shows_line_numbers: true, indentation_width: Some(2), ..Default::default() },
+            TextFieldCodeEditing {
+                shows_line_numbers: true,
+                indentation_width: Some(2),
+                ..Default::default()
+            },
             Some(submit),
             Some(focus),
             Some(blur),
         );
 
         let mut column: Vec<AnyView> = vec![
-            AnyView::new(Row::new(VerticalAlignment::Center, TOOLBAR_SPACING, AnyView::new(TupleView::new(header)))),
+            AnyView::new(Row::new(
+                VerticalAlignment::Center,
+                TOOLBAR_SPACING,
+                AnyView::new(TupleView::new(header)),
+            )),
             AnyView::new(RestorableEditor {
                 is_enabled: self.is_enabled,
                 is_acceptable: validation.is_acceptable(),
@@ -348,16 +417,28 @@ impl View for JsonField {
             ));
         }
 
-        let is_expanded = self.draft.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).is_expanded;
+        let is_expanded = self
+            .draft
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .is_expanded;
         let expanded_binding = Binding::new(
             {
                 let draft = self.draft.clone();
-                move || draft.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).is_expanded
+                move || {
+                    draft
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner())
+                        .is_expanded
+                }
             },
             {
                 let draft = self.draft.clone();
                 move |value: bool| {
-                    draft.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).is_expanded = value;
+                    draft
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner())
+                        .is_expanded = value;
                 }
             },
         );
@@ -366,12 +447,21 @@ impl View for JsonField {
         let expanded_text = Binding::new(
             {
                 let draft = self.draft.clone();
-                move || draft.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).expanded.clone()
+                move || {
+                    draft
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner())
+                        .expanded
+                        .clone()
+                }
             },
             {
                 let draft = self.draft.clone();
                 move |value: TextBuffer| {
-                    draft.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).expanded = value;
+                    draft
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner())
+                        .expanded = value;
                 }
             },
         );
@@ -388,7 +478,11 @@ impl View for JsonField {
                 cancel: {
                     let field = modal_field.clone();
                     Rc::new(move || {
-                        field.draft.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).is_expanded = false;
+                        field
+                            .draft
+                            .lock()
+                            .unwrap_or_else(|poisoned| poisoned.into_inner())
+                            .is_expanded = false;
                     })
                 },
             }),
@@ -397,7 +491,11 @@ impl View for JsonField {
         column.push(AnyView::new(modal));
         AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 4.0,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                4.0,
                 AnyView::new(TupleView::new(column)),
             )
             .frame_min_width(0.0),
@@ -486,7 +584,11 @@ impl PrimitiveView for JsonExpandedEditor {
             720.0,
             false,
             self.labels.resize.clone(),
-            TextFieldCodeEditing { shows_line_numbers: true, indentation_width: Some(2), ..Default::default() },
+            TextFieldCodeEditing {
+                shows_line_numbers: true,
+                indentation_width: Some(2),
+                ..Default::default()
+            },
             None,
             None,
             None,
@@ -495,7 +597,11 @@ impl PrimitiveView for JsonExpandedEditor {
         let cancel = self.cancel.clone();
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 8.0,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                8.0,
                 AnyView::new(TupleView::new(vec![
                     AnyView::new(AnyView::new(editor).flex(1.0)),
                     AnyView::new(Row::new(

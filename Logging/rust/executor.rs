@@ -34,24 +34,33 @@ impl LogExecutor {
         let worker_shared = shared.clone();
         let worker = std::thread::Builder::new()
             .name("com.cove.logging".into())
-            .spawn(move || loop {
-                let job = {
-                    let mut queue = worker_shared.queue.lock().unwrap_or_else(|e| e.into_inner());
-                    while queue.is_empty() {
-                        if *worker_shared.stopped.lock().unwrap_or_else(|e| e.into_inner()) {
-                            return;
-                        }
-                        queue = worker_shared
-                            .signal
-                            .wait(queue)
+            .spawn(move || {
+                loop {
+                    let job = {
+                        let mut queue = worker_shared
+                            .queue
+                            .lock()
                             .unwrap_or_else(|e| e.into_inner());
+                        while queue.is_empty() {
+                            if *worker_shared
+                                .stopped
+                                .lock()
+                                .unwrap_or_else(|e| e.into_inner())
+                            {
+                                return;
+                            }
+                            queue = worker_shared
+                                .signal
+                                .wait(queue)
+                                .unwrap_or_else(|e| e.into_inner());
+                        }
+                        queue.pop_front()
+                    };
+                    if let Some(job) = job {
+                        IS_CURRENT.with(|current| current.set(true));
+                        job();
+                        IS_CURRENT.with(|current| current.set(false));
                     }
-                    queue.pop_front()
-                };
-                if let Some(job) = job {
-                    IS_CURRENT.with(|current| current.set(true));
-                    job();
-                    IS_CURRENT.with(|current| current.set(false));
                 }
             })
             .ok();
@@ -115,14 +124,13 @@ impl Drop for LogExecutor {
     fn drop(&mut self) {
         // The worker drains jobs queued before teardown; the runtime owns this
         // executor, so no caller can enqueue concurrently after Drop starts.
-        *self.shared.stopped.lock().unwrap_or_else(|e| e.into_inner()) = true;
-        self.shared.signal.notify_all();
-        if let Some(worker) = self
-            .worker
+        *self
+            .shared
+            .stopped
             .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .take()
-        {
+            .unwrap_or_else(|e| e.into_inner()) = true;
+        self.shared.signal.notify_all();
+        if let Some(worker) = self.worker.lock().unwrap_or_else(|e| e.into_inner()).take() {
             let _ = worker.join();
         }
     }

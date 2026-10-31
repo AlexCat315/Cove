@@ -7,9 +7,7 @@
 //! retained single panes when the container is smaller than its threshold.
 use std::rc::Rc;
 
-use cove_core::scene::{
-    Align, FlexDirection, FocusChainHolder, Justify, LayoutNode, Node, Wrap,
-};
+use cove_core::scene::{Align, FlexDirection, FocusChainHolder, Justify, LayoutNode, Node, Wrap};
 use cove_core::{Binding, Color};
 use cove_platform::SystemCursor;
 
@@ -18,12 +16,12 @@ use crate::primitives::layout::split_compact::{
     SplitCompactPresentation, SplitPane, SplitPaneSelector,
 };
 use crate::primitives::text::{Divider, DividerAxis};
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, TupleView, View};
+use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_view};
 
 use super::constraints::SplitConstraints;
 use super::handle::SplitHandle;
 use super::retention::{
-    SplitFocusHandoff, SplitFocusTransfer, SplitRetainedRegion, CONTAINER_MARKER,
+    CONTAINER_MARKER, SplitFocusHandoff, SplitFocusTransfer, SplitRetainedRegion,
 };
 
 /// Orientation of a [`SplitView`].
@@ -120,12 +118,20 @@ impl SplitView {
     }
 
     pub fn spacing(mut self, spacing: f32) -> Self {
-        self.spacing = if spacing.is_finite() { spacing.max(0.0) } else { 0.0 };
+        self.spacing = if spacing.is_finite() {
+            spacing.max(0.0)
+        } else {
+            0.0
+        };
         self
     }
 
     pub fn divider_thickness(mut self, thickness: f32) -> Self {
-        self.divider_thickness = if thickness.is_finite() { thickness.max(0.0) } else { 1.0 };
+        self.divider_thickness = if thickness.is_finite() {
+            thickness.max(0.0)
+        } else {
+            1.0
+        };
         self
     }
 
@@ -145,7 +151,11 @@ impl SplitView {
     }
 
     fn clamp_unit(value: f32) -> f32 {
-        if value.is_finite() { value.clamp(0.0, 1.0) } else { 0.5 }
+        if value.is_finite() {
+            value.clamp(0.0, 1.0)
+        } else {
+            0.5
+        }
     }
 
     fn fraction(&self) -> f32 {
@@ -176,10 +186,9 @@ impl View for SplitView {
             Some(_) => self.divider_thickness.max(7.0),
         };
         let fraction = self.clamped_fraction(thickness);
-        let is_compact = self
-            .compact
-            .as_ref()
-            .is_some_and(|presentation| self.measured_extent.get() < presentation.resolved_threshold());
+        let is_compact = self.compact.as_ref().is_some_and(|presentation| {
+            self.measured_extent.get() < presentation.resolved_threshold()
+        });
         let selection = self.selection();
         let focus = self.focus_transfer.clone();
 
@@ -216,14 +225,16 @@ impl View for SplitView {
             .frame(None, None, Some(0.0), Some(0.0), None, None),
         );
 
-        let divider = AnyView::new(SplitRetainedRegion::new(
-            !is_compact,
-            focus.clone(),
-            None,
-            self.axis.flex_direction(),
-            self.divider(thickness),
-        )
-        .flex_with(0.0, 0.0, Some(0.0)));
+        let divider = AnyView::new(
+            SplitRetainedRegion::new(
+                !is_compact,
+                focus.clone(),
+                None,
+                self.axis.flex_direction(),
+                self.divider(thickness),
+            )
+            .flex_with(0.0, 0.0, Some(0.0)),
+        );
 
         let second = AnyView::new(
             SplitRetainedRegion::new(
@@ -235,20 +246,22 @@ impl View for SplitView {
                     .flex_with(1.0, 1.0, Some(0.0))
                     .frame(None, None, Some(0.0), Some(0.0), None, None),
             )
-            .flex_with(if is_compact { 1.0 } else { 1.0 - fraction }, 1.0, Some(0.0))
+            .flex_with(
+                if is_compact { 1.0 } else { 1.0 - fraction },
+                1.0,
+                Some(0.0),
+            )
             .frame(None, None, Some(0.0), Some(0.0), None, None),
         );
 
-        let panes = AnyView::new(
-            BoxView::new(
-                self.axis.flex_direction(),
-                Align::Stretch,
-                Justify::FlexStart,
-                Wrap::NoWrap,
-                self.spacing,
-                AnyView::new(TupleView::new(vec![first, divider, second])),
-            ),
-        );
+        let panes = AnyView::new(BoxView::new(
+            self.axis.flex_direction(),
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            self.spacing,
+            AnyView::new(TupleView::new(vec![first, divider, second])),
+        ));
 
         column.push(AnyView::new(
             AnyView::new(SplitContainerMarker { content: panes })
@@ -421,7 +434,9 @@ impl PrimitiveView for SplitFocusHandoffHost {
         let is_compact = self.is_compact;
         let selection = self.selection;
         node.set_layout_did_update(Some(Rc::new(move |node: &Node| {
-            let Some(visible) = *focus.pending_visibility.borrow() else { return };
+            let Some(visible) = *focus.pending_visibility.borrow() else {
+                return;
+            };
             *focus.pending_visibility.borrow_mut() = None;
             let handoff = SplitFocusHandoff::new(focus.clone(), is_compact, selection);
             let target = handoff

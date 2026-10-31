@@ -279,14 +279,20 @@ mod tests {
 
     #[test]
     fn depth_formats_use_the_apple_silicon_substitutes() {
-        assert_eq!(pixel_format(TextureFormat::Depth24Unorm), MTLPixelFormat::Depth32Float);
+        assert_eq!(
+            pixel_format(TextureFormat::Depth24Unorm),
+            MTLPixelFormat::Depth32Float
+        );
         assert_eq!(
             pixel_format(TextureFormat::Depth24UnormStencil8),
             MTLPixelFormat::Depth32Float_Stencil8
         );
         // Depth formats are not valid color targets, so the reverse map reports
         // invalid rather than silently reusing them.
-        assert_eq!(color_format(MTLPixelFormat::Depth32Float), TextureFormat::Invalid);
+        assert_eq!(
+            color_format(MTLPixelFormat::Depth32Float),
+            TextureFormat::Invalid
+        );
     }
 
     #[test]
@@ -314,9 +320,18 @@ mod tests {
 
     #[test]
     fn load_actions_only_clear_for_explicit_clears() {
-        assert_eq!(load_action(ColorLoadAction::DontCare), MTLLoadAction::DontCare);
+        assert_eq!(
+            load_action(ColorLoadAction::DontCare),
+            MTLLoadAction::DontCare
+        );
         assert_eq!(load_action(ColorLoadAction::Load), MTLLoadAction::Load);
-        assert_eq!(load_action(ColorLoadAction::Clear([0.0; 4])), MTLLoadAction::Clear);
-        assert_eq!(depth_load_action(DepthLoadAction::Clear(1.0)), MTLLoadAction::Clear);
+        assert_eq!(
+            load_action(ColorLoadAction::Clear([0.0; 4])),
+            MTLLoadAction::Clear
+        );
+        assert_eq!(
+            depth_load_action(DepthLoadAction::Clear(1.0)),
+            MTLLoadAction::Clear
+        );
     }
 }

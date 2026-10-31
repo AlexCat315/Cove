@@ -291,7 +291,8 @@ pub const ALL_PAGES: [GalleryPage; 98] = [
 
 /// The frame height for a sample, including the label padding.
 pub fn frame_height(page: GalleryPage) -> Option<f32> {
-    page.adaptive_sample_height().map(|height| height + FRAME_PADDING)
+    page.adaptive_sample_height()
+        .map(|height| height + FRAME_PADDING)
 }
 
 /// `AdaptiveControlExamples`: the two fixed-width previews.
@@ -332,8 +333,7 @@ impl cove_ui_compose::View for AdaptiveControlExamples {
             .semantic_foreground(SemanticColorRef::on_surface_muted());
 
         cove_ui_compose::AnyView::new(
-            cove_ui_compose::AnyView::new(caption)
-                .debug_name("adaptive-preview-caption"),
+            cove_ui_compose::AnyView::new(caption).debug_name("adaptive-preview-caption"),
         )
     }
 

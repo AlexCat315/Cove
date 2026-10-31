@@ -6,8 +6,8 @@
 //! under the name the Swift source used and adds the pieces a client needs that
 //! are not part of the wire schema.
 pub use cove_devtools_protocol::{
-    decode_payload, state as decode_state_map, Envelope, HelloHostInfo, HelloPayload, Session,
-    Subscription, PROTOCOL_VERSION,
+    Envelope, HelloHostInfo, HelloPayload, PROTOCOL_VERSION, Session, Subscription, decode_payload,
+    state as decode_state_map,
 };
 
 /// Per-connection state. The Swift type was `DevToolsSession`; it is the same
@@ -56,7 +56,9 @@ mod tests {
 
     #[test]
     fn payload_round_trips_through_the_envelope() {
-        let watch = cove_devtools_protocol::StateWatch { ids: vec!["a".into()] };
+        let watch = cove_devtools_protocol::StateWatch {
+            ids: vec!["a".into()],
+        };
         let request = Envelope::new("state.subscribe", Some(7), encode_payload(&watch));
         let decoded: Option<cove_devtools_protocol::StateWatch> = decode_payload(&request.payload);
         assert_eq!(decoded, Some(watch));

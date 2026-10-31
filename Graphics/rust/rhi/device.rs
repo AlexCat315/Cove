@@ -15,23 +15,23 @@ use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use cove_logging::{Level, LogRuntime, LogValue, Location};
+use cove_logging::{Level, Location, LogRuntime, LogValue};
 
 use super::{
     AccelerationStructure, AccelerationStructureBuild, AccelerationStructureDescriptor,
-    ResourcePreparationContext, ResourcePreparationProgress,
-    AdapterCapabilities, BindingLayout, BindingLayoutDescriptor, BindingLayoutEntry, BindingResource,
-    BindingSet, BindingSetDescriptor, Buffer, BufferDescriptor, CacheStats, Capabilities,
-    CommandBuffer, ComputePipeline, ComputePipelineDescriptor, DeviceCaches, DeviceConfig,
-    FrameRing, FrameUploader, GraphicsPipeline, GraphicsPipelineDescriptor, GraphicsPipelineKey,
-    GpuTimestampProfile, MeshPipeline, MeshPipelineDescriptor, MeshPipelineKey, PipelineInterfaces,
-    PipelineLayout, PipelineLayoutDescriptor, PipelineStatistics, PipelineStore, PipelineUse,
-    PipelineKind, PresentationMode, QueueClass, RhiBackend, RhiError, RhiResult, Sampler,
-    SamplerDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderModuleKey, SubmissionCpuProfile,
-    SubmissionPlanner, SubmitDescriptor, SurfaceDescriptor, Swapchain, SwapchainImage, Texture,
-    TextureAllocation, TextureDescriptor, TextureSubresource, TextureUploadRegion,
-    TimelineSemaphore, UploadLocation, ComputePipelineKey, rhi_require,
-    rhi_validate_sample_count, rhi_validate_texture_samples,
+    AdapterCapabilities, BindingLayout, BindingLayoutDescriptor, BindingLayoutEntry,
+    BindingResource, BindingSet, BindingSetDescriptor, Buffer, BufferDescriptor, CacheStats,
+    Capabilities, CommandBuffer, ComputePipeline, ComputePipelineDescriptor, ComputePipelineKey,
+    DeviceCaches, DeviceConfig, FrameRing, FrameUploader, GpuTimestampProfile, GraphicsPipeline,
+    GraphicsPipelineDescriptor, GraphicsPipelineKey, MeshPipeline, MeshPipelineDescriptor,
+    MeshPipelineKey, PipelineInterfaces, PipelineKind, PipelineLayout, PipelineLayoutDescriptor,
+    PipelineStatistics, PipelineStore, PipelineUse, PresentationMode, QueueClass,
+    ResourcePreparationContext, ResourcePreparationProgress, RhiBackend, RhiError, RhiResult,
+    Sampler, SamplerDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderModuleKey,
+    SubmissionCpuProfile, SubmissionPlanner, SubmitDescriptor, SurfaceDescriptor, Swapchain,
+    SwapchainImage, Texture, TextureAllocation, TextureDescriptor, TextureSubresource,
+    TextureUploadRegion, TimelineSemaphore, UploadLocation, rhi_require, rhi_validate_sample_count,
+    rhi_validate_texture_samples,
 };
 
 /// Monotonic handle allocator. A single counter across all resource kinds
@@ -47,7 +47,9 @@ impl Default for IdentifierPool {
 }
 impl IdentifierPool {
     pub fn new() -> Self {
-        Self { next_id: AtomicU32::new(1) }
+        Self {
+            next_id: AtomicU32::new(1),
+        }
     }
 
     pub fn next(&self) -> u32 {
@@ -100,11 +102,15 @@ pub struct Device {
 }
 impl Device {
     fn lock(&self) -> MutexGuard<'_, DeviceState> {
-        self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+        self.state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     fn backend(&self) -> MutexGuard<'_, Box<dyn RhiBackend>> {
-        self.backend.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+        self.backend
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     pub fn new(backend: Box<dyn RhiBackend>, config: DeviceConfig) -> RhiResult<Self> {
@@ -173,7 +179,8 @@ impl Device {
                 }
             }
         }
-        Err(last_error.unwrap_or_else(|| RhiError::unsupported_backend("no usable graphics backend")))
+        Err(last_error
+            .unwrap_or_else(|| RhiError::unsupported_backend("no usable graphics backend")))
     }
 
     pub fn identity(&self) -> u64 {
@@ -203,14 +210,20 @@ impl Device {
 
     /// Installs the logger used for pipeline-creation diagnostics.
     pub fn set_logger(&self, logger: Option<LogRuntime>) {
-        *self.logger.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = logger;
+        *self
+            .logger
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = logger;
     }
 
     // MARK: Surface
 
     pub fn make_swapchain(&self, descriptor: SurfaceDescriptor) -> RhiResult<Swapchain> {
         let mut state = self.lock();
-        rhi_require(state.current_slot.is_none(), "create a swapchain outside a frame")?;
+        rhi_require(
+            state.current_slot.is_none(),
+            "create a swapchain outside a frame",
+        )?;
         Self::validate_surface(&descriptor)?;
         Self::validate_unique_surface(&state, &descriptor, None)?;
         let handle = Swapchain::new(self.identifiers.next());
@@ -235,9 +248,14 @@ impl Device {
     ) -> RhiResult<()> {
         let mut state = self.lock();
         let Some(previous) = state.swapchains.get(&handle.id()) else {
-            return Err(RhiError::invalid_argument("resize a live swapchain outside a frame"));
+            return Err(RhiError::invalid_argument(
+                "resize a live swapchain outside a frame",
+            ));
         };
-        rhi_require(state.current_slot.is_none(), "resize a live swapchain outside a frame")?;
+        rhi_require(
+            state.current_slot.is_none(),
+            "resize a live swapchain outside a frame",
+        )?;
         let stale: Vec<Texture> = previous.textures.iter().copied().collect();
         Self::validate_surface(&descriptor)?;
         Self::validate_unique_surface(&state, &descriptor, Some(handle))?;
@@ -245,7 +263,9 @@ impl Device {
         self.backend().wait_until_idle()?;
         self.backend().configure_swapchain(handle, descriptor)?;
         for texture in stale {
-            state.planner.forget_resource(super::ResourceRef::texture(texture.id()));
+            state
+                .planner
+                .forget_resource(super::ResourceRef::texture(texture.id()));
         }
         state.swapchains.insert(
             handle.id(),
@@ -270,14 +290,21 @@ impl Device {
     /// recreation.
     pub fn presentation_mode(&self, handle: Swapchain) -> RhiResult<PresentationMode> {
         let state = self.lock();
-        rhi_require(state.swapchains.contains_key(&handle.id()), "query a live swapchain")?;
+        rhi_require(
+            state.swapchains.contains_key(&handle.id()),
+            "query a live swapchain",
+        )?;
         self.backend().presentation_mode(handle)
     }
 
     fn destroy_swapchain_locked(&self, state: &mut DeviceState, handle: Swapchain) {
-        let Some(previous) = state.swapchains.remove(&handle.id()) else { return };
+        let Some(previous) = state.swapchains.remove(&handle.id()) else {
+            return;
+        };
         for texture in &previous.textures {
-            state.planner.forget_resource(super::ResourceRef::texture(texture.id()));
+            state
+                .planner
+                .forget_resource(super::ResourceRef::texture(texture.id()));
         }
         let backend = Arc::clone(&self.backend);
         self.retire_current(Box::new(move || {
@@ -295,7 +322,10 @@ impl Device {
         if !state.swapchains.contains_key(&handle.id()) {
             return Ok(());
         }
-        rhi_require(state.current_slot.is_none(), "close a swapchain outside a frame")?;
+        rhi_require(
+            state.current_slot.is_none(),
+            "close a swapchain outside a frame",
+        )?;
         self.drain_retirements(self.frame_ring.wait_until_idle());
         self.backend().wait_until_idle()?;
         self.destroy_swapchain_locked(&mut state, handle);
@@ -325,14 +355,20 @@ impl Device {
                 && window.descriptor.native_handle == descriptor.native_handle
                 && window.descriptor.display == descriptor.display
         });
-        rhi_require(!duplicate, "a native window already has a swapchain on this device")
+        rhi_require(
+            !duplicate,
+            "a native window already has a swapchain on this device",
+        )
     }
 
     /// Serializes a complete host operation, including resource preparation,
     /// begin_frame, submissions, presentation and end_frame, on a shared device.
     /// Low-level frame methods still require balanced begin/end on their caller.
     pub fn with_frame_session<T>(&self, body: impl FnOnce() -> RhiResult<T>) -> RhiResult<T> {
-        let _guard = self.session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let _guard = self
+            .session
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         body()
     }
 
@@ -358,12 +394,21 @@ impl Device {
             "texture dimensions, layers, mips and samples must be positive",
         )?;
         if descriptor.dimension == super::TextureDimension::Texture3D {
-            rhi_require(descriptor.layers == 1, "3D textures cannot have array layers")?;
+            rhi_require(
+                descriptor.layers == 1,
+                "3D textures cannot have array layers",
+            )?;
         } else {
-            rhi_require(descriptor.depth == 1, "2D and cube textures require depth one")?;
+            rhi_require(
+                descriptor.depth == 1,
+                "2D and cube textures require depth one",
+            )?;
         }
         if descriptor.dimension == super::TextureDimension::Texture2D {
-            rhi_require(descriptor.layers == 1, "use texture2DArray for array layers")?;
+            rhi_require(
+                descriptor.layers == 1,
+                "use texture2DArray for array layers",
+            )?;
         }
         if descriptor.dimension == super::TextureDimension::Cube {
             rhi_require(
@@ -394,11 +439,17 @@ impl Device {
         Ok(handle)
     }
 
-    pub fn make_shader_module(&self, descriptor: ShaderModuleDescriptor) -> RhiResult<ShaderModule> {
+    pub fn make_shader_module(
+        &self,
+        descriptor: ShaderModuleDescriptor,
+    ) -> RhiResult<ShaderModule> {
         let mut state = self.lock();
         descriptor.threadgroup_size.validate()?;
-        let mut ids: Vec<u32> =
-            descriptor.specialization_constants.iter().map(|constant| constant.id).collect();
+        let mut ids: Vec<u32> = descriptor
+            .specialization_constants
+            .iter()
+            .map(|constant| constant.id)
+            .collect();
         let requested = ids.len();
         ids.sort_unstable();
         ids.dedup();
@@ -412,7 +463,8 @@ impl Device {
                 "task shaders are not implemented by this backend",
             ));
         }
-        if descriptor.stage == super::ShaderStage::Mesh || descriptor.stage == super::ShaderStage::Task
+        if descriptor.stage == super::ShaderStage::Mesh
+            || descriptor.stage == super::ShaderStage::Task
         {
             if !self.capabilities.mesh_shading.mesh {
                 return Err(RhiError::unsupported_feature(
@@ -436,7 +488,9 @@ impl Device {
             self.backend().destroy_shader_module(duplicate);
         }
         if lease.created || lease.discarded.is_some() {
-            state.pipeline_store.record_shader_module(nanoseconds, during_frame);
+            state
+                .pipeline_store
+                .record_shader_module(nanoseconds, during_frame);
             self.log_pipeline_creation("shader module", Some(&label), nanoseconds);
             if during_frame {
                 self.warn_pipeline_creation_during_frame("shader module", Some(&label));
@@ -479,16 +533,21 @@ impl Device {
                         && instances.len() <= 0x100_0000
                         && instances.iter().all(|instance| {
                             instance.mask <= 255
-                                && [instance.transform.x, instance.transform.y, instance.transform.z]
-                                    .into_iter()
-                                    .all(|row| row.into_iter().all(f32::is_finite))
+                                && [
+                                    instance.transform.x,
+                                    instance.transform.y,
+                                    instance.transform.z,
+                                ]
+                                .into_iter()
+                                .all(|row| row.into_iter().all(f32::is_finite))
                         }),
                     "invalid acceleration instance",
                 )?;
             }
         }
         let handle = AccelerationStructure::new(self.identifiers.next());
-        self.backend().create_acceleration_structure(handle, descriptor.clone())?;
+        self.backend()
+            .create_acceleration_structure(handle, descriptor.clone())?;
         let inputs = match &descriptor {
             AccelerationStructureDescriptor::BottomLevel(geometries) => geometries
                 .iter()
@@ -538,19 +597,29 @@ impl Device {
 
     pub fn destroy_buffer(&self, buffer: Buffer) {
         let mut state = self.lock();
-        state.planner.forget_resource(super::ResourceRef::buffer(buffer.id()));
+        state
+            .planner
+            .forget_resource(super::ResourceRef::buffer(buffer.id()));
         let backend = Arc::clone(&self.backend);
         self.retire_current(Box::new(move || {
-            backend.lock().unwrap_or_else(std::sync::PoisonError::into_inner).destroy_buffer(buffer);
+            backend
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .destroy_buffer(buffer);
         }));
     }
 
     pub fn destroy_texture(&self, texture: Texture) {
         let mut state = self.lock();
-        state.planner.forget_resource(super::ResourceRef::texture(texture.id()));
+        state
+            .planner
+            .forget_resource(super::ResourceRef::texture(texture.id()));
         let backend = Arc::clone(&self.backend);
         self.retire_current(Box::new(move || {
-            backend.lock().unwrap_or_else(std::sync::PoisonError::into_inner).destroy_texture(texture);
+            backend
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .destroy_texture(texture);
         }));
     }
 
@@ -558,7 +627,10 @@ impl Device {
         let _state = self.lock();
         let backend = Arc::clone(&self.backend);
         self.retire_current(Box::new(move || {
-            backend.lock().unwrap_or_else(std::sync::PoisonError::into_inner).destroy_sampler(sampler);
+            backend
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .destroy_sampler(sampler);
         }));
     }
 
@@ -589,7 +661,10 @@ impl Device {
             ));
         }
         rhi_require(
-            state.interfaces.pipelines.contains_key(&descriptor.layout.id()),
+            state
+                .interfaces
+                .pipelines
+                .contains_key(&descriptor.layout.id()),
             "unknown pipeline layout",
         )?;
         if descriptor.stencil_format.is_some() {
@@ -631,7 +706,10 @@ impl Device {
         Ok(lease.handle)
     }
 
-    pub fn make_mesh_pipeline(&self, descriptor: MeshPipelineDescriptor) -> RhiResult<MeshPipeline> {
+    pub fn make_mesh_pipeline(
+        &self,
+        descriptor: MeshPipelineDescriptor,
+    ) -> RhiResult<MeshPipeline> {
         let mut state = self.lock();
         if !self.capabilities.mesh_shading.mesh {
             return Err(RhiError::unsupported_feature(
@@ -639,7 +717,10 @@ impl Device {
             ));
         }
         rhi_require(
-            state.interfaces.pipelines.contains_key(&descriptor.layout.id()),
+            state
+                .interfaces
+                .pipelines
+                .contains_key(&descriptor.layout.id()),
             "unknown pipeline layout",
         )?;
         let during_frame = state.current_slot.is_some();
@@ -686,7 +767,10 @@ impl Device {
             ));
         }
         rhi_require(
-            state.interfaces.pipelines.contains_key(&descriptor.layout.id()),
+            state
+                .interfaces
+                .pipelines
+                .contains_key(&descriptor.layout.id()),
             "unknown pipeline layout",
         )?;
         let during_frame = state.current_slot.is_some();
@@ -778,9 +862,14 @@ impl Device {
         let count = slots.len();
         slots.sort_unstable();
         slots.dedup();
-        rhi_require(count == slots.len(), "binding layout contains duplicate slots")?;
+        rhi_require(
+            count == slots.len(),
+            "binding layout contains duplicate slots",
+        )?;
         if descriptor.entries.iter().any(|entry| entry.array_size != 1) {
-            return Err(RhiError::unsupported_feature("binding arrays are not implemented"));
+            return Err(RhiError::unsupported_feature(
+                "binding arrays are not implemented",
+            ));
         }
         rhi_require(
             descriptor.entries.iter().all(|entry| {
@@ -812,7 +901,9 @@ impl Device {
             .any(|entry| entry.visibility.contains(super::ShaderVisibility::MESH))
             && !self.capabilities.mesh_shading.mesh
         {
-            return Err(RhiError::unsupported_feature("mesh visibility is unavailable"));
+            return Err(RhiError::unsupported_feature(
+                "mesh visibility is unavailable",
+            ));
         }
         if descriptor
             .entries
@@ -820,15 +911,23 @@ impl Device {
             .any(|entry| entry.visibility.contains(super::ShaderVisibility::TASK))
             && !self.capabilities.mesh_shading.task
         {
-            return Err(RhiError::unsupported_feature("task visibility is unavailable"));
+            return Err(RhiError::unsupported_feature(
+                "task visibility is unavailable",
+            ));
         }
         rhi_require(
-            descriptor.entries.iter().all(|entry| entry.buffer.element_stride >= 0),
+            descriptor
+                .entries
+                .iter()
+                .all(|entry| entry.buffer.element_stride >= 0),
             "negative storage element stride",
         )?;
         let handle = BindingLayout::new(self.identifiers.next());
-        self.backend().register_binding_layout(handle, descriptor.clone())?;
-        state.caches.store_binding_layout(handle.id(), descriptor.entries.clone());
+        self.backend()
+            .register_binding_layout(handle, descriptor.clone())?;
+        state
+            .caches
+            .store_binding_layout(handle.id(), descriptor.entries.clone());
         state.interfaces.bindings.insert(handle.id(), descriptor);
         Ok(handle)
     }
@@ -839,7 +938,11 @@ impl Device {
     ) -> RhiResult<PipelineLayout> {
         let mut state = self.lock();
         state.interfaces.validate(&descriptor)?;
-        let set_ids: Vec<u32> = descriptor.set_layouts.iter().map(|layout| layout.id()).collect();
+        let set_ids: Vec<u32> = descriptor
+            .set_layouts
+            .iter()
+            .map(|layout| layout.id())
+            .collect();
         for set_id in &set_ids {
             if state.caches.binding_layout_entries(*set_id).is_none() {
                 return Err(RhiError::invalid_argument(
@@ -855,10 +958,13 @@ impl Device {
             return Ok(PipelineLayout::new(existing));
         }
         let handle = PipelineLayout::new(self.identifiers.next());
-        self.backend().register_pipeline_layout(handle, descriptor.clone())?;
+        self.backend()
+            .register_pipeline_layout(handle, descriptor.clone())?;
         state.interfaces.pipelines.insert(handle.id(), descriptor);
         state.caches.pipeline_layouts.insert(handle.id(), key);
-        state.caches.store_pipeline_layout_definition(handle.id(), set_ids);
+        state
+            .caches
+            .store_pipeline_layout_definition(handle.id(), set_ids);
         Ok(handle)
     }
 
@@ -868,11 +974,18 @@ impl Device {
         descriptor: BindingSetDescriptor,
     ) -> RhiResult<BindingSet> {
         let mut state = self.lock();
-        let Some(layout_entries) = state.caches.binding_layout_entries(layout.id()).map(<[_]>::to_vec)
+        let Some(layout_entries) = state
+            .caches
+            .binding_layout_entries(layout.id())
+            .map(<[_]>::to_vec)
         else {
             return Err(RhiError::invalid_argument("unknown binding layout"));
         };
-        if let Some(existing) = state.caches.binding_sets.existing(layout.id(), &descriptor.entries) {
+        if let Some(existing) = state
+            .caches
+            .binding_sets
+            .existing(layout.id(), &descriptor.entries)
+        {
             return Ok(BindingSet::new(existing));
         }
         // Layouts and cached sets are immutable. A full-value cache hit already
@@ -883,14 +996,19 @@ impl Device {
         }
 
         let handle = BindingSet::new(self.identifiers.next());
-        state.caches.binding_sets.insert(handle.id(), layout.id(), &descriptor.entries);
+        state
+            .caches
+            .binding_sets
+            .insert(handle.id(), layout.id(), &descriptor.entries);
         state.caches.store_binding_set(handle.id(), layout.id());
         let read_only: HashSet<u32> = layout_entries
             .iter()
             .filter(|entry| entry.buffer.read_only)
             .map(|entry| entry.slot)
             .collect();
-        state.planner.register_binding_set_entries(handle.id(), &descriptor.entries, &read_only);
+        state
+            .planner
+            .register_binding_set_entries(handle.id(), &descriptor.entries, &read_only);
 
         if let Err(error) = self.backend().register_binding_set(
             handle,
@@ -900,7 +1018,10 @@ impl Device {
         ) {
             // Roll back the frontend so we never hold a set the backend lacks
             // (the Zig prototype silently swallowed this and mis-bound).
-            state.caches.binding_sets.remove(layout.id(), &descriptor.entries);
+            state
+                .caches
+                .binding_sets
+                .remove(layout.id(), &descriptor.entries);
             state.caches.remove_binding_set_owner(handle.id());
             state.planner.remove_binding_set_entries(handle.id());
             return Err(error);
@@ -933,7 +1054,10 @@ impl Device {
             )));
         }
         for layout_entry in layout_entries {
-            let Some(entry) = descriptor.entries.iter().find(|entry| entry.slot == layout_entry.slot)
+            let Some(entry) = descriptor
+                .entries
+                .iter()
+                .find(|entry| entry.slot == layout_entry.slot)
             else {
                 return Err(RhiError::layout_mismatch(format!(
                     "binding set is missing entry for slot {}",
@@ -987,8 +1111,11 @@ impl Device {
         let mut state = self.lock();
         // Returning abandoned acquisitions consumes Vulkan's binary wait and
         // prevents a failed recording from stranding a window image.
-        let abandoned: Vec<SwapchainImage> =
-            state.swapchains.values().filter_map(|window| window.acquired).collect();
+        let abandoned: Vec<SwapchainImage> = state
+            .swapchains
+            .values()
+            .filter_map(|window| window.acquired)
+            .collect();
         for image in abandoned {
             if let Err(error) = self.present_locked(&mut state, image) {
                 state.submission_fault = Some(RhiError::present_failed(format!(
@@ -1063,7 +1190,9 @@ impl Device {
     ) -> RhiResult<GraphicsPipeline> {
         let label = descriptor.label.unwrap_or("Graphics pipeline").to_string();
         self.prepare_resources(label, Some(1), on_progress, |context| {
-            context.step("Graphics pipeline", || self.make_graphics_pipeline(descriptor))
+            context.step("Graphics pipeline", || {
+                self.make_graphics_pipeline(descriptor)
+            })
         })
     }
 
@@ -1075,7 +1204,9 @@ impl Device {
     ) -> RhiResult<ComputePipeline> {
         let label = descriptor.label.unwrap_or("Compute pipeline").to_string();
         self.prepare_resources(label, Some(1), on_progress, |context| {
-            context.step("Compute pipeline", || self.make_compute_pipeline(descriptor))
+            context.step("Compute pipeline", || {
+                self.make_compute_pipeline(descriptor)
+            })
         })
     }
 
@@ -1117,7 +1248,9 @@ impl Device {
         mut cpu_profile: Option<&mut SubmissionCpuProfile>,
     ) -> RhiResult<()> {
         let mut state = self.lock();
-        let Some(slot) = state.current_slot else { return Err(RhiError::FrameNotActive) };
+        let Some(slot) = state.current_slot else {
+            return Err(RhiError::FrameNotActive);
+        };
         if let Some(fault) = state.submission_fault.clone() {
             return Err(fault);
         }
@@ -1127,7 +1260,9 @@ impl Device {
             QueueClass::Transfer => self.capabilities.max_queues.transfer,
         };
         if queue_count == 0 {
-            return Err(RhiError::unsupported_feature("requested queue is unavailable"));
+            return Err(RhiError::unsupported_feature(
+                "requested queue is unavailable",
+            ));
         }
 
         let validation_start = cpu_profile.as_deref().and_then(SubmissionCpuProfile::begin);
@@ -1142,7 +1277,10 @@ impl Device {
             wait_semaphores: waits.to_vec(),
             signal_semaphores: signals.to_vec(),
         };
-        let plan = match state.planner.build_plan(queue, command_buffer.commands(), &external) {
+        let plan = match state
+            .planner
+            .build_plan(queue, command_buffer.commands(), &external)
+        {
             Ok(plan) => plan,
             Err(error) => {
                 state.planner.restore(rollback.clone());
@@ -1160,9 +1298,15 @@ impl Device {
             let ready = Arc::clone(&self.ready_retirements);
             let completion: super::Completion = Box::new(move || {
                 let completed = frame_ring.command_buffer_completed(slot);
-                ready.lock().unwrap_or_else(std::sync::PoisonError::into_inner).extend(completed);
+                ready
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .extend(completed);
             });
-            match self.backend().submit(planned_submit, cpu_profile.as_deref_mut(), completion) {
+            match self
+                .backend()
+                .submit(planned_submit, cpu_profile.as_deref_mut(), completion)
+            {
                 Ok(()) => submitted = true,
                 Err(error) => {
                     self.drain_retirements(self.frame_ring.unregister_command_buffer(slot));
@@ -1215,7 +1359,10 @@ impl Device {
                     }
                 }
                 super::RecordedCommand::RenderPass(_) => {
-                    rhi_require(queue == QueueClass::Graphics, "render passes require the graphics queue")?;
+                    rhi_require(
+                        queue == QueueClass::Graphics,
+                        "render passes require the graphics queue",
+                    )?;
                     if !self.capabilities.graphics {
                         return Err(RhiError::unsupported_feature(
                             "graphics commands are not implemented by this backend",
@@ -1259,10 +1406,15 @@ impl Device {
                 && image.height > 0,
             "backend returned an invalid swapchain image",
         )?;
-        let mut window = state.swapchains.remove(&handle.id()).expect("checked above");
+        let mut window = state
+            .swapchains
+            .remove(&handle.id())
+            .expect("checked above");
         if window.generation != Some(image.generation) {
             for texture in &window.textures {
-                state.planner.forget_resource(super::ResourceRef::texture(texture.id()));
+                state
+                    .planner
+                    .forget_resource(super::ResourceRef::texture(texture.id()));
             }
             window.textures.clear();
             window.generation = Some(image.generation);
@@ -1280,8 +1432,13 @@ impl Device {
     }
 
     fn present_locked(&self, state: &mut DeviceState, image: SwapchainImage) -> RhiResult<()> {
-        let Some(slot) = state.current_slot else { return Err(RhiError::FrameNotActive) };
-        let current = state.swapchains.get(&image.swapchain.id()).and_then(|window| window.acquired);
+        let Some(slot) = state.current_slot else {
+            return Err(RhiError::FrameNotActive);
+        };
+        let current = state
+            .swapchains
+            .get(&image.swapchain.id())
+            .and_then(|window| window.acquired);
         if current != Some(image) {
             return Err(RhiError::present_failed(
                 "image is stale, already presented or belongs to another swapchain",
@@ -1292,7 +1449,10 @@ impl Device {
         let ready = Arc::clone(&self.ready_retirements);
         let completion: super::Completion = Box::new(move || {
             let completed = frame_ring.command_buffer_completed(slot);
-            ready.lock().unwrap_or_else(std::sync::PoisonError::into_inner).extend(completed);
+            ready
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .extend(completed);
         });
         if let Err(error) = self.backend().present(image, completion) {
             self.drain_retirements(self.frame_ring.unregister_command_buffer(slot));
@@ -1301,7 +1461,9 @@ impl Device {
         if let Some(window) = state.swapchains.get_mut(&image.swapchain.id()) {
             window.acquired = None;
         }
-        state.planner.record_presentation(super::ResourceRef::texture(image.texture.id()));
+        state
+            .planner
+            .record_presentation(super::ResourceRef::texture(image.texture.id()));
         Ok(())
     }
 
@@ -1311,7 +1473,9 @@ impl Device {
         let mut state = self.lock();
         self.backend().upload_buffer_data(buffer, offset, data)?;
         if !data.is_empty() {
-            state.planner.record_immediate_write(super::ResourceRef::buffer(buffer.id()));
+            state
+                .planner
+                .record_immediate_write(super::ResourceRef::buffer(buffer.id()));
         }
         Ok(())
     }
@@ -1339,8 +1503,11 @@ impl Device {
         subresource: TextureSubresource,
     ) -> RhiResult<()> {
         let mut state = self.lock();
-        self.backend().upload_texture_data(texture, data, region, bytes_per_row, subresource)?;
-        state.planner.record_immediate_write(super::ResourceRef::texture(texture.id()));
+        self.backend()
+            .upload_texture_data(texture, data, region, bytes_per_row, subresource)?;
+        state
+            .planner
+            .record_immediate_write(super::ResourceRef::texture(texture.id()));
         Ok(())
     }
 
@@ -1395,18 +1562,34 @@ impl Device {
     fn retire_current(&self, action: super::Completion) {
         let id = self.next_retirement.fetch_add(1, Ordering::Relaxed);
         assert!(id != 0 && id != u64::MAX, "retirement sequence exhausted");
-        self.retirements.lock().unwrap_or_else(std::sync::PoisonError::into_inner).insert(id, action);
+        self.retirements
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .insert(id, action);
         self.drain_retirements(self.frame_ring.register_retirement(id));
     }
 
     /// GPU callbacks only enqueue identifiers; native destruction stays on the API thread.
     fn drain_retirements(&self, mut ready: Vec<u64>) {
-        ready.extend(std::mem::take(&mut *self.ready_retirements.lock().unwrap_or_else(std::sync::PoisonError::into_inner)));
+        ready.extend(std::mem::take(
+            &mut *self
+                .ready_retirements
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+        ));
         let actions = {
-            let mut pending = self.retirements.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-            ready.into_iter().filter_map(|id| pending.remove(&id)).collect::<Vec<_>>()
+            let mut pending = self
+                .retirements
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            ready
+                .into_iter()
+                .filter_map(|id| pending.remove(&id))
+                .collect::<Vec<_>>()
         };
-        for action in actions { action(); }
+        for action in actions {
+            action();
+        }
     }
 
     // MARK: Diagnostics
@@ -1439,8 +1622,13 @@ impl Device {
     }
 
     fn log<const N: usize>(&self, level: Level, message: &str, metadata: [(&str, String); N]) {
-        let logger = self.logger.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-        let Some(logger) = logger.as_ref() else { return };
+        let logger = self
+            .logger
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Some(logger) = logger.as_ref() else {
+            return;
+        };
         let metadata: std::collections::BTreeMap<String, LogValue> = metadata
             .into_iter()
             .map(|(key, value)| (key.to_owned(), LogValue::from(value.as_str())))
@@ -1463,7 +1651,9 @@ impl Device {
 impl Drop for Device {
     fn drop(&mut self) {
         let active = { self.lock().current_slot.is_some() };
-        if active { self.end_frame(); }
+        if active {
+            self.end_frame();
+        }
         let _ = self.wait_until_idle();
         self.drain_retirements(Vec::new());
     }
@@ -1475,10 +1665,22 @@ fn resource_matches(resource: &BindingResource, binding_type: super::BindingType
         (resource, binding_type),
         (BindingResource::Sampler(_), BindingType::Sampler)
             | (BindingResource::Texture(_), BindingType::Texture)
-            | (BindingResource::StorageTexture(_), BindingType::StorageTexture)
-            | (BindingResource::UniformBuffer { .. }, BindingType::UniformBuffer)
-            | (BindingResource::StorageBuffer { .. }, BindingType::StorageBuffer)
-            | (BindingResource::AccelerationStructure(_), BindingType::AccelerationStructure)
+            | (
+                BindingResource::StorageTexture(_),
+                BindingType::StorageTexture
+            )
+            | (
+                BindingResource::UniformBuffer { .. },
+                BindingType::UniformBuffer
+            )
+            | (
+                BindingResource::StorageBuffer { .. },
+                BindingType::StorageBuffer
+            )
+            | (
+                BindingResource::AccelerationStructure(_),
+                BindingType::AccelerationStructure
+            )
     )
 }
 

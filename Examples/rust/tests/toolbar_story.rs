@@ -28,10 +28,18 @@ fn a_wide_bar_keeps_every_automatic_command_inline() {
     let arrangement = story.arrangement(600.0, 40.0);
     // Settings is declared `Overflow`, so it is always in the menu regardless of
     // width; the other four stay inline when there is room.
-    assert_eq!(arrangement.hidden, vec![4], "only the overflow-only command hides");
+    assert_eq!(
+        arrangement.hidden,
+        vec![4],
+        "only the overflow-only command hides"
+    );
     let mut visible = arrangement.visible.clone();
     visible.sort_unstable();
-    assert_eq!(visible, vec![0, 1, 2, 3, 5], "commands 0..3 plus the More button");
+    assert_eq!(
+        visible,
+        vec![0, 1, 2, 3, 5],
+        "commands 0..3 plus the More button"
+    );
 }
 
 #[test]
@@ -57,7 +65,10 @@ fn a_narrow_bar_moves_overflow_only_commands_out_first() {
 fn a_very_narrow_bar_still_keeps_the_always_command() {
     let story = story();
     let arrangement = story.arrangement(40.0, 40.0);
-    assert!(arrangement.visible.contains(&0), "always-visible commands survive");
+    assert!(
+        arrangement.visible.contains(&0),
+        "always-visible commands survive"
+    );
 }
 
 #[test]

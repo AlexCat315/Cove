@@ -10,15 +10,23 @@ use cove_graphics::{
     BarrierCommand, BarrierSyncAction, BindingResource, BindingSet, BindingSetEntry, Buffer,
     ComputeCommand, ComputePassRecord, PlannedCommand, PlannedSubmit, QueueClass, RecordedCommand,
     RenderColorTarget, RenderCommand, RenderPassDescriptor, RenderPassRecord, ResourceKind,
-    ResourceRef, ResourceState, Sampler, SubmitDescriptor, SubmissionPlanner, Texture,
+    ResourceRef, ResourceState, Sampler, SubmissionPlanner, SubmitDescriptor, Texture,
 };
 
 fn set_entries(set: BindingSet, entries: &[BindingSetEntry]) -> RenderCommand {
-    RenderCommand::SetBindingSet { slot: 0, set, dynamic_offsets: vec![] }
+    RenderCommand::SetBindingSet {
+        slot: 0,
+        set,
+        dynamic_offsets: vec![],
+    }
 }
 
 fn compute_binding(set: BindingSet) -> ComputeCommand {
-    ComputeCommand::SetBindingSet { slot: 0, set, dynamic_offsets: vec![] }
+    ComputeCommand::SetBindingSet {
+        slot: 0,
+        set,
+        dynamic_offsets: vec![],
+    }
 }
 
 fn render_pass(target: Option<Texture>, body: Vec<RenderCommand>) -> RenderPassRecord {
@@ -70,11 +78,7 @@ fn register_read_only(
     entries: &[BindingSetEntry],
     read_only: &[u32],
 ) {
-    planner.register_binding_set_entries(
-        set.id(),
-        entries,
-        &read_only.iter().copied().collect(),
-    );
+    planner.register_binding_set_entries(set.id(), entries, &read_only.iter().copied().collect());
 }
 
 #[test]
@@ -105,15 +109,25 @@ fn cached_read_dependencies_keep_upload_queue_write_and_forget_boundaries() {
 
     // The first read after an upload must barrier every written resource.
     let first = planner
-        .build_plan(QueueClass::Graphics, &[render.clone()], &SubmitDescriptor::default())
+        .build_plan(
+            QueueClass::Graphics,
+            &[render.clone()],
+            &SubmitDescriptor::default(),
+        )
         .expect("plan");
-    let first_resources: HashSet<ResourceRef> =
-        commands(&first.submits[0]).into_iter().map(|b| b.resource).collect();
+    let first_resources: HashSet<ResourceRef> = commands(&first.submits[0])
+        .into_iter()
+        .map(|b| b.resource)
+        .collect();
     assert_eq!(first_resources, resources.into_iter().collect());
 
     // Cached reads emit nothing.
     let steady = planner
-        .build_plan(QueueClass::Graphics, &[render.clone()], &SubmitDescriptor::default())
+        .build_plan(
+            QueueClass::Graphics,
+            &[render.clone()],
+            &SubmitDescriptor::default(),
+        )
         .expect("plan");
     assert!(
         barrier_blocks(&steady.submits[0]).is_empty(),
@@ -123,16 +137,26 @@ fn cached_read_dependencies_keep_upload_queue_write_and_forget_boundaries() {
     // Re-writing one resource re-emits exactly that resource.
     planner.record_immediate_write(resources[2]);
     let uploaded = planner
-        .build_plan(QueueClass::Graphics, &[render], &SubmitDescriptor::default())
+        .build_plan(
+            QueueClass::Graphics,
+            &[render],
+            &SubmitDescriptor::default(),
+        )
         .expect("plan");
-    let uploaded_resources: Vec<ResourceRef> =
-        commands(&uploaded.submits[0]).into_iter().map(|b| b.resource).collect();
+    let uploaded_resources: Vec<ResourceRef> = commands(&uploaded.submits[0])
+        .into_iter()
+        .map(|b| b.resource)
+        .collect();
     assert_eq!(uploaded_resources, vec![resources[2]]);
 
     // Crossing to the compute queue splits release from acquire.
     let compute = RecordedCommand::ComputePass(compute_pass(vec![compute_binding(set)]));
     let handoff = planner
-        .build_plan(QueueClass::Compute, &[compute.clone()], &SubmitDescriptor::default())
+        .build_plan(
+            QueueClass::Compute,
+            &[compute.clone()],
+            &SubmitDescriptor::default(),
+        )
         .expect("plan");
     assert_eq!(handoff.submits.len(), 2, "cross-queue work must split");
     assert_eq!(
@@ -145,17 +169,25 @@ fn cached_read_dependencies_keep_upload_queue_write_and_forget_boundaries() {
         resources.into_iter().collect()
     );
     assert!(
-        acquired.iter().all(|b| b.sync_action == BarrierSyncAction::Acquire),
+        acquired
+            .iter()
+            .all(|b| b.sync_action == BarrierSyncAction::Acquire),
         "every cross-queue barrier is an acquire"
     );
 
     // Forgetting a resource makes the next reader re-establish its barrier.
     planner.forget_resource(resources[0]);
     let forgotten = planner
-        .build_plan(QueueClass::Compute, &[compute], &SubmitDescriptor::default())
+        .build_plan(
+            QueueClass::Compute,
+            &[compute],
+            &SubmitDescriptor::default(),
+        )
         .expect("plan");
-    let forgotten_resources: Vec<ResourceRef> =
-        commands(&forgotten.submits[0]).into_iter().map(|b| b.resource).collect();
+    let forgotten_resources: Vec<ResourceRef> = commands(&forgotten.submits[0])
+        .into_iter()
+        .map(|b| b.resource)
+        .collect();
     assert_eq!(forgotten_resources, vec![resources[0]]);
 }
 
@@ -166,7 +198,11 @@ fn presentation_restores_external_state_before_image_reuse() {
     let pass = RecordedCommand::RenderPass(render_pass(Some(target), vec![]));
 
     planner
-        .build_plan(QueueClass::Graphics, &[pass.clone()], &SubmitDescriptor::default())
+        .build_plan(
+            QueueClass::Graphics,
+            &[pass.clone()],
+            &SubmitDescriptor::default(),
+        )
         .expect("first plan");
     planner.record_presentation(ResourceRef::new(ResourceKind::Texture, target.id()));
 
@@ -201,23 +237,36 @@ fn repeated_render_bindings_preserve_pass_and_queue_dependencies() {
     let body: Vec<RenderCommand> = (0..100).map(|_| set_entries(set, &[])).collect();
     let pass = RecordedCommand::RenderPass(render_pass(Some(Texture::new(1)), body));
     let result = planner
-        .build_plan(QueueClass::Graphics, &[pass.clone(), pass], &SubmitDescriptor::default())
+        .build_plan(
+            QueueClass::Graphics,
+            &[pass.clone(), pass],
+            &SubmitDescriptor::default(),
+        )
         .expect("plan");
 
     let blocks = barrier_blocks(&result.submits[0]);
     assert_eq!(blocks.len(), 2, "one barrier block per render pass");
     assert_eq!(
-        blocks[0].iter().map(|b| b.resource.id).collect::<HashSet<u32>>(),
+        blocks[0]
+            .iter()
+            .map(|b| b.resource.id)
+            .collect::<HashSet<u32>>(),
         [1u32, 2, 3, 4].into_iter().collect(),
         "the pass covers its target and its bindings"
     );
     assert_eq!(
-        blocks[0].iter().filter(|b| b.resource.id == storage.id()).count(),
+        blocks[0]
+            .iter()
+            .filter(|b| b.resource.id == storage.id())
+            .count(),
         1,
         "duplicate transitions to one resource merge"
     );
     assert_eq!(
-        blocks[1].iter().filter(|b| b.resource.id == storage.id()).count(),
+        blocks[1]
+            .iter()
+            .filter(|b| b.resource.id == storage.id())
+            .count(),
         1,
         "each pass re-establishes its own storage dependency"
     );
@@ -232,7 +281,9 @@ fn repeated_render_bindings_preserve_pass_and_queue_dependencies() {
     let compute = planner
         .build_plan(
             QueueClass::Compute,
-            &[RecordedCommand::ComputePass(compute_pass(vec![compute_binding(set)]))],
+            &[RecordedCommand::ComputePass(compute_pass(vec![
+                compute_binding(set),
+            ]))],
             &SubmitDescriptor::default(),
         )
         .expect("compute plan");
@@ -294,8 +345,7 @@ fn distinct_sets_sharing_reads_keep_upload_and_queue_handoffs() {
     assert_eq!(upload.source_state, ResourceState::COPY_DESTINATION);
     assert_eq!(upload.destination_state, ResourceState::CONSTANT_BUFFER);
 
-    let compute_body: Vec<ComputeCommand> =
-        sets.iter().map(|set| compute_binding(*set)).collect();
+    let compute_body: Vec<ComputeCommand> = sets.iter().map(|set| compute_binding(*set)).collect();
     let compute = planner
         .build_plan(
             QueueClass::Compute,
@@ -310,19 +360,28 @@ fn distinct_sets_sharing_reads_keep_upload_and_queue_handoffs() {
     );
     let acquired = commands(&compute.submits[1]);
     assert_eq!(acquired.len(), 97);
-    assert!(acquired.iter().all(|b| b.sync_action == BarrierSyncAction::Acquire));
+    assert!(
+        acquired
+            .iter()
+            .all(|b| b.sync_action == BarrierSyncAction::Acquire)
+    );
 
     // A writer on the same buffer demands unordered access.
     let writer = BindingSet::new(200);
     register(
         &mut planner,
         writer,
-        &[BindingSetEntry::new(0, BindingResource::storage_buffer(buffer))],
+        &[BindingSetEntry::new(
+            0,
+            BindingResource::storage_buffer(buffer),
+        )],
     );
     let write = planner
         .build_plan(
             QueueClass::Compute,
-            &[RecordedCommand::ComputePass(compute_pass(vec![compute_binding(writer)]))],
+            &[RecordedCommand::ComputePass(compute_pass(vec![
+                compute_binding(writer),
+            ]))],
             &SubmitDescriptor::default(),
         )
         .expect("write plan");

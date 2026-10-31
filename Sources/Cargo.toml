@@ -38,3 +38,7 @@ path = "rust/tests/panel_registry.rs"
 [[test]]
 name = "panel_sizing"
 path = "rust/tests/panel_sizing.rs"
+
+[[test]]
+name = "bug_probe"
+path = "rust/tests/bug_probe.rs"

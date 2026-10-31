@@ -13,7 +13,11 @@ pub struct LogLaunch {
     pub application: String,
 }
 impl LogLaunch {
-    pub fn new(configuration: LoggingConfiguration, run_id: impl Into<String>, application: impl Into<String>) -> Self {
+    pub fn new(
+        configuration: LoggingConfiguration,
+        run_id: impl Into<String>,
+        application: impl Into<String>,
+    ) -> Self {
         Self {
             configuration,
             run_id: run_id.into(),
@@ -25,12 +29,17 @@ impl LogLaunch {
 impl LoggingConfiguration {
     /// Environment overrides are process-local and never mutate authored
     /// configuration. `environment` mirrors `ProcessInfo.processInfo.environment`.
-    pub fn apply_environment(&mut self, environment: &BTreeMap<String, String>) -> Result<(), LoggingError> {
+    pub fn apply_environment(
+        &mut self,
+        environment: &BTreeMap<String, String>,
+    ) -> Result<(), LoggingError> {
         if let Some(value) = environment.get("COVE_LOG_LEVEL") {
-            self.filtering.minimum = Level::parse(value).ok_or(LoggingError::InvalidConfiguration)?;
+            self.filtering.minimum =
+                Level::parse(value).ok_or(LoggingError::InvalidConfiguration)?;
         }
         if let Some(value) = environment.get("COVE_LOG_MODULES") {
-            self.filtering.modules = serde_json::from_str(value).map_err(|_| LoggingError::InvalidConfiguration)?;
+            self.filtering.modules =
+                serde_json::from_str(value).map_err(|_| LoggingError::InvalidConfiguration)?;
         }
         if let Some(value) = environment.get("COVE_LOG_CONSOLE") {
             self.console.enabled = parse_flag(value)?;

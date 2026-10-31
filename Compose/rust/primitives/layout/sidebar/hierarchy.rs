@@ -19,7 +19,9 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone> SidebarEntry<Id> {
     }
 
     pub fn is_visible(&self, expanded: &HashSet<Id>) -> bool {
-        self.ancestors.iter().all(|ancestor| expanded.contains(ancestor))
+        self.ancestors
+            .iter()
+            .all(|ancestor| expanded.contains(ancestor))
     }
 }
 
@@ -64,7 +66,9 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone> SidebarHierarchy<Id> {
     }
 
     pub fn entry(&self, id: &Id) -> Option<SidebarEntry<Id>> {
-        self.entries().into_iter().find(|entry| &entry.item.id == id)
+        self.entries()
+            .into_iter()
+            .find(|entry| &entry.item.id == id)
     }
 
     /// Ancestor path plus the id itself.
@@ -92,13 +96,10 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone> SidebarHierarchy<Id> {
 
     /// Where focus should go when `id` disappears: the nearest visible enabled
     /// ancestor, else the first visible enabled entry.
-    pub fn fallback(
-        &self,
-        id: &Id,
-        expanded: &HashSet<Id>,
-        previous: Option<&Self>,
-    ) -> Option<Id> {
-        let entry = self.entry(id).or_else(|| previous.and_then(|previous| previous.entry(id)));
+    pub fn fallback(&self, id: &Id, expanded: &HashSet<Id>, previous: Option<&Self>) -> Option<Id> {
+        let entry = self
+            .entry(id)
+            .or_else(|| previous.and_then(|previous| previous.entry(id)));
         if let Some(entry) = entry {
             for parent in entry.ancestors.iter().rev() {
                 if let Some(found) = self.entry(parent)

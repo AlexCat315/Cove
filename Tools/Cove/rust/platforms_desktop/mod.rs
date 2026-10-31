@@ -1,4 +1,4 @@
-//! Desktop build backend: SwiftPM invocation, app bundle assembly and signing.
+//! Desktop build backend: Cargo invocation, app bundle assembly and signing.
 //!
 //! Swift sources: `Platforms/Desktop/Build.swift`,
 //! `Platforms/Desktop/Bundle.swift`, `Platforms/Desktop/Launcher.swift`,
@@ -6,16 +6,21 @@
 
 use crate::cli::{AppPlatform, Arguments, BuildConfiguration, OptionKey};
 use crate::project::AppProject;
-use crate::support::{environment, Files, Shell, StdoutTarget, ToolError};
+use crate::support::{Files, Shell, StdoutTarget, ToolError, environment};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-/// SwiftPM invocation shared by the desktop, task and test flows.
-pub struct SwiftPackage;
+/// The Cargo executable; `COVE_CARGO_EXECUTABLE` mirrors the wrapper scripts.
+pub fn cargo() -> String {
+    std::env::var("COVE_CARGO_EXECUTABLE").unwrap_or_else(|_| "cargo".into())
+}
 
-impl SwiftPackage {
-    /// Environment override so SwiftPM and the built application resolve the
-    /// same SDK checkout and native libraries.
+/// Cargo invocation shared by the desktop, task and test flows.
+pub struct CargoPackage;
+
+impl CargoPackage {
+    /// Environment override so the built application resolves the same SDK
+    /// checkout and native libraries.
     pub fn environment(root: &Path) -> Result<BTreeMap<String, String>, ToolError> {
         let mut environment = environment();
         environment.insert("COVE_SDK_ROOT".into(), root.display().to_string());
@@ -35,29 +40,36 @@ impl SwiftPackage {
         scratch_path: Option<&Path>,
     ) -> Vec<String> {
         let mut command: Vec<String> = vec![
-            crate::project_sdk::CoveSDK::swift(),
+            cargo(),
             verb.into(),
-            "--package-path".into(),
-            directory.display().to_string(),
-            "--configuration".into(),
-            configuration.swift_configuration().into(),
-            "--jobs".into(),
-            "4".into(),
+            "--manifest-path".into(),
+            directory.join("Cargo.toml").display().to_string(),
         ];
-        command.extend(configuration.swift_flags());
-        command.extend([
-            "--build-system".into(),
-            if cfg!(target_os = "macos") {
-                "swiftbuild".into()
-            } else {
-                "native".into()
-            },
-        ]);
+        if configuration != BuildConfiguration::Debug {
+            command.push("--release".into());
+        }
         if let Some(scratch_path) = scratch_path {
-            command.push("--scratch-path".into());
+            command.push("--target-dir".into());
             command.push(scratch_path.display().to_string());
         }
         command
+    }
+
+    /// The directory holding the binaries of the last build with this target
+    /// directory and configuration.
+    pub fn products(
+        directory: &Path,
+        configuration: BuildConfiguration,
+        scratch_path: Option<&Path>,
+    ) -> PathBuf {
+        let target = scratch_path
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| directory.join("target"));
+        if configuration == BuildConfiguration::Debug {
+            target.join("debug")
+        } else {
+            target.join("release")
+        }
     }
 }
 
@@ -79,11 +91,12 @@ impl DesktopBuild {
 
     pub fn run(&self) -> Result<(), ToolError> {
         let binaries = self.compile()?;
-        let artifact = DesktopPackage::new(self.project.clone(), self.arguments.platform).assemble(
-            &binaries,
-            self.arguments.configuration,
-            self.arguments.url(OptionKey::Output).as_deref(),
-        )?;
+        let artifact = DesktopPackage::new(self.project.clone(), self.arguments.platform)
+            .assemble(
+                &binaries,
+                self.arguments.configuration,
+                self.arguments.url(OptionKey::Output).as_deref(),
+            )?;
         NativeDesktopResources::new(self.project.clone(), self.arguments.platform)
             .sign(&artifact, self.arguments.configuration)?;
         println!(
@@ -104,17 +117,17 @@ impl DesktopBuild {
     }
 
     fn compile(&self) -> Result<PathBuf, ToolError> {
-        crate::toolchains::NativeSDK::prepare(&self.root, None, false)?;
-        let package = DesktopLauncher::new(self.project.clone(), self.root.clone()).prepare()?;
-        let command = SwiftPackage::command(
+        let package = DesktopLauncher::new(self.project.clone()).prepare()?;
+        let scratch = self.project.build_directory();
+        let command = CargoPackage::command(
             &package,
             self.arguments.configuration,
             "build",
-            Some(&self.project.build_directory()),
+            Some(&scratch),
         );
-        let build_environment = SwiftPackage::environment(&self.root)?;
+        let build_environment = CargoPackage::environment(&self.root)?;
         let mut product = command.clone();
-        product.push("--product".into());
+        product.push("--bin".into());
         product.push(self.project.desktop_product());
         Shell::run(
             &product,
@@ -126,7 +139,7 @@ impl DesktopBuild {
         )?;
         for helper in &self.project.configuration.targets.desktop_helpers {
             let mut build = command.clone();
-            build.push("--product".into());
+            build.push("--bin".into());
             build.push(helper.clone());
             Shell::run(
                 &build,
@@ -137,17 +150,11 @@ impl DesktopBuild {
                 StdoutTarget::StandardOutput,
             )?;
         }
-        let mut paths = command;
-        paths.push("--show-bin-path".into());
-        let output = Shell::run(
-            &paths,
-            None,
-            &build_environment,
-            true,
-            false,
-            StdoutTarget::StandardOutput,
-        )?;
-        Ok(PathBuf::from(output.trim()))
+        Ok(CargoPackage::products(
+            &package,
+            self.arguments.configuration,
+            Some(&scratch),
+        ))
     }
 }
 
@@ -176,23 +183,22 @@ impl DesktopPackage {
     ) -> Result<DesktopArtifact, ToolError> {
         let product = self.project.desktop_product();
         let is_mac = self.platform == AppPlatform::Mac;
-        let destination = output
-            .map(Path::to_path_buf)
-            .unwrap_or_else(|| {
-                self.project.build_directory().join(self.platform.raw_value()).join(
-                    configuration.raw_value(),
-                ).join(format!(
-                    "{product}{}",
-                    if is_mac { ".app" } else { "" }
-                ))
-            });
+        let destination = output.map(Path::to_path_buf).unwrap_or_else(|| {
+            self.project
+                .build_directory()
+                .join(self.platform.raw_value())
+                .join(configuration.raw_value())
+                .join(format!("{product}{}", if is_mac { ".app" } else { "" }))
+        });
         if is_mac
             && destination
                 .extension()
                 .map(|extension| extension != "app")
                 .unwrap_or(true)
         {
-            return Err(ToolError::invalid("macOS --output must name an .app directory"));
+            return Err(ToolError::invalid(
+                "macOS --output must name an .app directory",
+            ));
         }
         // Custom outputs must not replace a project, sources, or an arbitrary
         // existing directory.
@@ -242,10 +248,7 @@ impl DesktopPackage {
         };
         for helper in &self.project.configuration.targets.desktop_helpers {
             let name = format!("{helper}{suffix}");
-            Files::copy(
-                &binaries.join(&name),
-                &helper_directory.join(&name),
-            )?;
+            Files::copy(&binaries.join(&name), &helper_directory.join(&name))?;
         }
         for child in Files::children(binaries)? {
             let extension = child
@@ -258,7 +261,8 @@ impl DesktopPackage {
                 .unwrap_or_default();
             if ["bundle", "resources"].contains(&extension.as_str()) {
                 Files::copy(&child, &resource_directory.join(&name))?;
-            } else if ["dylib", "dll", "so"].contains(&extension.as_str()) || name.contains(".so.") {
+            } else if ["dylib", "dll", "so"].contains(&extension.as_str()) || name.contains(".so.")
+            {
                 Files::copy(&child, &executable_directory.join(&name))?;
             }
         }
@@ -272,33 +276,26 @@ impl DesktopPackage {
     }
 }
 
-/// Ordinary UI projects supply AppContent. A custom executable is an explicit
-/// opt-in.
+/// The Cargo package that supplies the desktop executable. A generated
+/// launcher package is no longer needed: the application crate is itself a
+/// binary target named after `targets.desktopExecutable`.
 pub struct DesktopLauncher {
     pub project: AppProject,
-    pub root: PathBuf,
 }
 
 impl DesktopLauncher {
-    pub fn new(project: AppProject, root: PathBuf) -> Self {
-        Self { project, root }
+    pub fn new(project: AppProject) -> Self {
+        Self { project }
     }
 
     pub fn prepare(&self) -> Result<PathBuf, ToolError> {
-        if self.project.configuration.targets.desktop_executable.is_some() {
-            return Ok(self.project.directory.clone());
+        let directory = self.project.directory.clone();
+        if !directory.join("Cargo.toml").is_file() {
+            return Err(ToolError::invalid(format!(
+                "{} must contain Cargo.toml; run cove create app",
+                directory.display()
+            )));
         }
-        let directory = self.project.build_directory().join("desktop/launcher");
-        let package = format!(
-            "// swift-tools-version: 6.4\nimport PackageDescription\nlet package = Package(name: \"CoveLauncher\", platforms: [.macOS(.v26), .iOS(.v26)],\n    dependencies: [.package(name: \"Content\", path: {}),\n                   .package(name: \"CoveUI\", path: {})],\n    targets: [.executableTarget(name: \"Application\", dependencies: [\n        .product(name: \"AppContent\", package: \"Content\"),\n        .product(name: \"CoveUI\", package: \"CoveUI\")])])\n",
-            Files::swift_literal(&self.project.directory.display().to_string()),
-            Files::swift_literal(&self.root.display().to_string())
-        );
-        Files::text(&package, &directory.join("Package.swift"))?;
-        Files::text(
-            "import CoveUI\nimport AppContent\ntry Application.run { makeApplicationContent() }\n",
-            &directory.join("Sources/Application/main.swift"),
-        )?;
         Ok(directory)
     }
 }
@@ -515,8 +512,9 @@ impl NativeDesktopResources {
         let file = self.directory().join(name);
         let contents = std::fs::read_to_string(&file)
             .map_err(|error| ToolError::invalid(format!("{}: {error}", file.display())))?;
-        let value = parse_plist(&contents)
-            .ok_or_else(|| ToolError::invalid(format!("{name} must contain a property-list dictionary")))?;
+        let value = parse_plist(&contents).ok_or_else(|| {
+            ToolError::invalid(format!("{name} must contain a property-list dictionary"))
+        })?;
         Ok(value)
     }
 }
@@ -592,10 +590,7 @@ fn decode_entities(value: &str) -> String {
         .replace("&amp;", "&")
 }
 
-fn write_plist(
-    value: &BTreeMap<String, serde_json::Value>,
-    file: &Path,
-) -> Result<(), ToolError> {
+fn write_plist(value: &BTreeMap<String, serde_json::Value>, file: &Path) -> Result<(), ToolError> {
     let mut body = String::new();
     for (key, item) in value {
         body.push_str(&format!("\t<key>{}</key>\n", encode_entities(key)));

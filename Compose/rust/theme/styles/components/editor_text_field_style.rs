@@ -13,11 +13,12 @@ pub struct EditorTextFieldStyle;
 
 impl TextFieldStyle for EditorTextFieldStyle {
     fn make_body(&self, configuration: TextFieldStyleConfiguration) -> AnyView {
-        let alpha = if configuration.is_enabled || configuration.theme.text_emphasis.disabled.is_some() {
-            1.0
-        } else {
-            0.55
-        };
+        let alpha =
+            if configuration.is_enabled || configuration.theme.text_emphasis.disabled.is_some() {
+                1.0
+            } else {
+                0.55
+            };
         AnyView::new(
             configuration
                 .content

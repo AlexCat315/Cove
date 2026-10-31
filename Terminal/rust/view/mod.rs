@@ -12,7 +12,7 @@ pub mod terminal_view;
 pub mod url_detector;
 
 pub use blink_timer::BlinkTimer;
-pub use box_drawing::{arms, Arms};
+pub use box_drawing::{Arms, arms};
 pub use cell_metrics::CellMetrics;
 pub use image_textures::ImageTextures;
 pub use key_routing::KeyRouting;
@@ -20,4 +20,4 @@ pub use painter::TerminalPainter;
 pub use pointer_router::{PointerGeometry, PointerRouter};
 pub use surface_state::SurfaceState;
 pub use terminal_view::TerminalView;
-pub use url_detector::{find as detect_url, UrlMatch};
+pub use url_detector::{UrlMatch, find as detect_url};

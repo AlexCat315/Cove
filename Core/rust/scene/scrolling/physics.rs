@@ -15,7 +15,11 @@ pub struct ScrollRubberBandSettings {
 }
 impl Default for ScrollRubberBandSettings {
     fn default() -> Self {
-        Self { is_enabled: true, compliance: 0.55, maximum_raw_overscroll: 2.0 }
+        Self {
+            is_enabled: true,
+            compliance: 0.55,
+            maximum_raw_overscroll: 2.0,
+        }
     }
 }
 
@@ -34,7 +38,12 @@ pub struct ScrollSettleSettings {
 }
 impl Default for ScrollSettleSettings {
     fn default() -> Self {
-        Self { response: 0.34, damping_fraction: 1.0, position_tolerance: 0.05, velocity_tolerance: 1.0 }
+        Self {
+            response: 0.34,
+            damping_fraction: 1.0,
+            position_tolerance: 0.05,
+            velocity_tolerance: 1.0,
+        }
     }
 }
 
@@ -84,31 +93,76 @@ pub struct ScrollPhysics {
     pub momentum: ScrollMomentumSettings,
 }
 impl ScrollPhysics {
-    pub const DEFAULT: Self = Self { rubber_band: ScrollRubberBandSettings { is_enabled: true, compliance: 0.55, maximum_raw_overscroll: 2.0 },
-        settle: ScrollSettleSettings { response: 0.34, damping_fraction: 1.0, position_tolerance: 0.05, velocity_tolerance: 1.0 },
-        momentum: ScrollMomentumSettings { is_enabled: true, deceleration: 4.2, minimum_velocity: 50.0, rest_velocity: 2.0,
-            maximum_velocity: 1_100.0, minimum_sample_count: 3, idle_window: 0.09, tracking_window: 0.1, stale_window: 0.25 } };
+    pub const DEFAULT: Self = Self {
+        rubber_band: ScrollRubberBandSettings {
+            is_enabled: true,
+            compliance: 0.55,
+            maximum_raw_overscroll: 2.0,
+        },
+        settle: ScrollSettleSettings {
+            response: 0.34,
+            damping_fraction: 1.0,
+            position_tolerance: 0.05,
+            velocity_tolerance: 1.0,
+        },
+        momentum: ScrollMomentumSettings {
+            is_enabled: true,
+            deceleration: 4.2,
+            minimum_velocity: 50.0,
+            rest_velocity: 2.0,
+            maximum_velocity: 1_100.0,
+            minimum_sample_count: 3,
+            idle_window: 0.09,
+            tracking_window: 0.1,
+            stale_window: 0.25,
+        },
+    };
     /// Hard clamping at both bounds: content stops dead instead of stretching.
     pub fn clamped() -> Self {
-        Self { rubber_band: ScrollRubberBandSettings { is_enabled: false, ..ScrollRubberBandSettings::default() }, ..Self::default() }
+        Self {
+            rubber_band: ScrollRubberBandSettings {
+                is_enabled: false,
+                ..ScrollRubberBandSettings::default()
+            },
+            ..Self::default()
+        }
     }
     /// Stretch plus a visible bounce at the bound on release.
     pub fn bouncy() -> Self {
-        Self { settle: ScrollSettleSettings { response: 0.42, damping_fraction: 0.62, ..ScrollSettleSettings::default() }, ..Self::default() }
+        Self {
+            settle: ScrollSettleSettings {
+                response: 0.42,
+                damping_fraction: 0.62,
+                ..ScrollSettleSettings::default()
+            },
+            ..Self::default()
+        }
     }
     /// Stiff early curve, slow return, no bounce.
     pub fn firm() -> Self {
         Self {
-            rubber_band: ScrollRubberBandSettings { compliance: 0.25, ..ScrollRubberBandSettings::default() },
-            settle: ScrollSettleSettings { response: 0.5, ..ScrollSettleSettings::default() },
+            rubber_band: ScrollRubberBandSettings {
+                compliance: 0.25,
+                ..ScrollRubberBandSettings::default()
+            },
+            settle: ScrollSettleSettings {
+                response: 0.5,
+                ..ScrollSettleSettings::default()
+            },
             ..Self::default()
         }
     }
     /// Nothing that was not asked for: no stretching, no coasting.
     pub fn precise() -> Self {
         Self {
-            rubber_band: ScrollRubberBandSettings { is_enabled: false, ..ScrollRubberBandSettings::default() },
-            momentum: ScrollMomentumSettings { is_enabled: false, ..ScrollMomentumSettings::default() },
+            rubber_band: ScrollRubberBandSettings {
+                is_enabled: false,
+                ..ScrollRubberBandSettings::default()
+            },
+            momentum: ScrollMomentumSettings {
+                is_enabled: false,
+                ..ScrollMomentumSettings::default()
+            },
             ..Self::default()
         }
     }
@@ -130,7 +184,11 @@ impl RubberBand {
         let distance = overscroll.abs();
         let resilience = compliance * distance * extent;
         let projected = resilience / (extent + compliance * distance);
-        if overscroll < 0.0 { -projected } else { projected }
+        if overscroll < 0.0 {
+            -projected
+        } else {
+            projected
+        }
     }
     /// Signed overscroll of `value` against the closed range `0...maximum`.
     pub fn excess(value: f32, maximum: f32) -> f32 {
@@ -165,7 +223,12 @@ pub struct ScrollSpring {
 }
 impl ScrollSpring {
     pub fn new(value: f32, velocity: f32, target: f32, settings: ScrollSettleSettings) -> Self {
-        Self { value, velocity, target, settings }
+        Self {
+            value,
+            velocity,
+            target,
+            settings,
+        }
     }
     pub fn is_at_rest(&self) -> bool {
         (self.value - self.target).abs() <= self.settings.position_tolerance.max(0.0)
@@ -187,21 +250,31 @@ impl ScrollSpring {
         let (next, next_speed) = if (ratio - 1.0).abs() < 0.00001 {
             let b = speed + omega * displacement;
             let decay = (-omega * time).exp();
-            ((displacement + b * time) * decay, (speed - omega * b * time) * decay)
+            (
+                (displacement + b * time) * decay,
+                (speed - omega * b * time) * decay,
+            )
         } else if ratio < 1.0 {
             let damped = omega * (1.0 - ratio * ratio).sqrt();
             let decay = (-ratio * omega * time).exp();
             let b = (speed + ratio * omega * displacement) / damped;
             let phase = damped * time;
             let next = decay * (displacement * phase.cos() + b * phase.sin());
-            (next, -ratio * omega * next + decay * damped * (-displacement * phase.sin() + b * phase.cos()))
+            (
+                next,
+                -ratio * omega * next
+                    + decay * damped * (-displacement * phase.sin() + b * phase.cos()),
+            )
         } else {
             let root = (ratio * ratio - 1.0).sqrt();
             let slow = -omega / (ratio + root);
             let fast = -omega * (ratio + root);
             let a = (speed - fast * displacement) / (slow - fast);
             let b = displacement - a;
-            (a * (slow * time).exp() + b * (fast * time).exp(), slow * a * (slow * time).exp() + fast * b * (fast * time).exp())
+            (
+                a * (slow * time).exp() + b * (fast * time).exp(),
+                slow * a * (slow * time).exp() + fast * b * (fast * time).exp(),
+            )
         };
         self.value = self.target + next as f32;
         self.velocity = next_speed as f32;
@@ -225,7 +298,10 @@ pub struct ScrollVelocityTracker {
 impl ScrollVelocityTracker {
     const MAXIMUM_SAMPLE_COUNT: usize = 16;
     pub fn new(window: f64) -> Self {
-        Self { window, samples: Vec::new() }
+        Self {
+            window,
+            samples: Vec::new(),
+        }
     }
     pub fn sample_count(&self) -> usize {
         self.samples.len()
@@ -247,7 +323,9 @@ impl ScrollVelocityTracker {
     }
     /// Least-squares slope of the retained samples, in points per second.
     pub fn velocity(&mut self, time: Option<f64>, stale_after: Option<f64>) -> f32 {
-        let Some((newest, _)) = self.samples.last().copied() else { return 0.0 };
+        let Some((newest, _)) = self.samples.last().copied() else {
+            return 0.0;
+        };
         if let (Some(stale_after), Some(now)) = (stale_after, time)
             && now - newest > stale_after
         {
@@ -259,7 +337,12 @@ impl ScrollVelocityTracker {
         }
         let count = self.samples.len() as f64;
         let mean_time = self.samples.iter().map(|(time, _)| *time).sum::<f64>() / count;
-        let mean_value = self.samples.iter().map(|(_, value)| f64::from(*value)).sum::<f64>() / count;
+        let mean_value = self
+            .samples
+            .iter()
+            .map(|(_, value)| f64::from(*value))
+            .sum::<f64>()
+            / count;
         let mut numerator = 0.0;
         let mut denominator = 0.0;
         for (time, value) in &self.samples {
@@ -278,9 +361,11 @@ impl ScrollVelocityTracker {
             return;
         }
         let cutoff = time - self.window.max(0.0);
-        self.samples.retain(|(sample_time, _)| *sample_time >= cutoff);
+        self.samples
+            .retain(|(sample_time, _)| *sample_time >= cutoff);
         if self.samples.len() > Self::MAXIMUM_SAMPLE_COUNT {
-            self.samples.drain(..self.samples.len() - Self::MAXIMUM_SAMPLE_COUNT);
+            self.samples
+                .drain(..self.samples.len() - Self::MAXIMUM_SAMPLE_COUNT);
         }
     }
 }
@@ -303,7 +388,14 @@ impl ScrollAxisMotion {
         self.spring = None;
     }
     /// Returns `(raw position, visible offset)`.
-    pub fn advance(&mut self, position: f32, maximum: f32, extent: f32, physics: ScrollPhysics, duration: f32) -> (f32, f32) {
+    pub fn advance(
+        &mut self,
+        position: f32,
+        maximum: f32,
+        extent: f32,
+        physics: ScrollPhysics,
+        duration: f32,
+    ) -> (f32, f32) {
         if self.spring.is_some() {
             let (visible, at_rest) = {
                 let spring = self.spring.as_mut().expect("checked above");
@@ -322,7 +414,9 @@ impl ScrollAxisMotion {
             };
             return (raw, visible);
         }
-        let Some(speed) = self.glide else { return (position, position) };
+        let Some(speed) = self.glide else {
+            return (position, position);
+        };
         let rate = physics.momentum.deceleration.max(0.1);
         let floor = physics.momentum.rest_velocity.max(0.01);
         let rest_time = ((floor.max(speed.abs()) / floor).ln() / rate).max(0.0);
@@ -337,20 +431,41 @@ impl ScrollAxisMotion {
             if !physics.rubber_band.is_enabled {
                 return (edge, edge);
             }
-            self.spring = Some(ScrollSpring::new(edge, speed * (-rate * hit_time).exp(), edge, physics.settle));
-            return self.advance(edge, maximum, extent, physics, (duration - hit_time).max(0.0));
+            self.spring = Some(ScrollSpring::new(
+                edge,
+                speed * (-rate * hit_time).exp(),
+                edge,
+                physics.settle,
+            ));
+            return self.advance(
+                edge,
+                maximum,
+                extent,
+                physics,
+                (duration - hit_time).max(0.0),
+            );
         }
-        self.glide = if duration >= rest_time { None } else { Some(speed * (-rate * duration).exp()) };
+        self.glide = if duration >= rest_time {
+            None
+        } else {
+            Some(speed * (-rate * duration).exp())
+        };
         (next, next)
     }
 }
 
 /// Window-space rectangle helpers shared by the animator.
 pub(crate) fn constrain(value: Point, maximum: Point) -> Point {
-    Point { x: value.x.clamp(0.0, maximum.x.max(0.0)), y: value.y.clamp(0.0, maximum.y.max(0.0)) }
+    Point {
+        x: value.x.clamp(0.0, maximum.x.max(0.0)),
+        y: value.y.clamp(0.0, maximum.y.max(0.0)),
+    }
 }
 pub(crate) fn size_of(point: Point) -> Size {
-    Size { width: point.x, height: point.y }
+    Size {
+        width: point.x,
+        height: point.y,
+    }
 }
 
 #[cfg(test)]
@@ -401,7 +516,10 @@ mod tests {
 
     #[test]
     fn glide_stops_at_the_edge_and_hands_over_to_the_spring() {
-        let mut motion = ScrollAxisMotion { glide: Some(1_000.0), spring: None };
+        let mut motion = ScrollAxisMotion {
+            glide: Some(1_000.0),
+            spring: None,
+        };
         let (raw, visible) = motion.advance(90.0, 100.0, 50.0, ScrollPhysics::DEFAULT, 1.0 / 60.0);
         assert!(raw >= 100.0 || visible >= 100.0);
         assert!(motion.glide.is_none() || motion.spring.is_some());

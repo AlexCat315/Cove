@@ -6,10 +6,10 @@
 //! simpler single-extent form used for inspector panels and settings trays.
 use cove_core::Binding;
 
+use crate::primitives::overlays::modal::Modal;
 use crate::primitives::overlays::modal::modal_options::{
     ModalDismissal, ModalGeometry, ModalOptions, ModalPlacement,
 };
-use crate::primitives::overlays::modal::Modal;
 use crate::{AnyView, View};
 
 /// Edge, extent and chrome for an edge sheet.
@@ -66,10 +66,21 @@ impl SheetOptions {
     }
 
     pub fn validate(&mut self) {
-        self.extent = if self.extent.is_finite() { self.extent.max(64.0) } else { 400.0 };
-        self.inset = if self.inset.is_finite() { self.inset.max(0.0) } else { 12.0 };
-        self.corner_radius =
-            if self.corner_radius.is_finite() { self.corner_radius.max(0.0) } else { 14.0 };
+        self.extent = if self.extent.is_finite() {
+            self.extent.max(64.0)
+        } else {
+            400.0
+        };
+        self.inset = if self.inset.is_finite() {
+            self.inset.max(0.0)
+        } else {
+            12.0
+        };
+        self.corner_radius = if self.corner_radius.is_finite() {
+            self.corner_radius.max(0.0)
+        } else {
+            14.0
+        };
         // A centered sheet has no edge to slide from.
         if self.edge == ModalPlacement::Center {
             self.edge = ModalPlacement::Trailing;
@@ -83,11 +94,18 @@ impl SheetOptions {
 
     /// The modal geometry this sheet presents with.
     pub fn geometry(&self) -> ModalGeometry {
-        let horizontal_edge =
-            matches!(self.edge, ModalPlacement::Top | ModalPlacement::Bottom);
+        let horizontal_edge = matches!(self.edge, ModalPlacement::Top | ModalPlacement::Bottom);
         ModalGeometry {
-            width: if horizontal_edge { f32::MAX } else { self.extent },
-            height: if horizontal_edge { self.extent } else { f32::MAX },
+            width: if horizontal_edge {
+                f32::MAX
+            } else {
+                self.extent
+            },
+            height: if horizontal_edge {
+                self.extent
+            } else {
+                f32::MAX
+            },
             inset: self.inset,
             corner_radius: self.corner_radius,
             placement: self.edge,

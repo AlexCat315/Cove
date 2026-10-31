@@ -2,11 +2,11 @@
 use std::collections::HashSet;
 use std::rc::Rc;
 
-use cove_core::Binding;
 use cove_composition::AnyView;
+use cove_core::Binding;
 use cove_platform::KeyEvent;
 
-use super::{TreeNodeKey, TreeDropPosition};
+use super::{TreeDropPosition, TreeNodeKey};
 use crate::theme::TextScaler;
 
 /// Caller-owned selection and expansion, independent of transient pointer/drag state.
@@ -87,8 +87,9 @@ impl TreeLayout {
         if environment.is_touch {
             result.row_height = result.row_height.max(environment.minimum_control_extent);
             if result.disclosure_width > 0.0 {
-                result.disclosure_width =
-                    result.disclosure_width.max(environment.minimum_control_extent);
+                result.disclosure_width = result
+                    .disclosure_width
+                    .max(environment.minimum_control_extent);
             }
         }
         result
@@ -113,7 +114,10 @@ pub struct TreeSlots<Element: 'static> {
 
 impl<Element: 'static> Default for TreeSlots<Element> {
     fn default() -> Self {
-        Self { disclosure: None, trailing: None }
+        Self {
+            disclosure: None,
+            trailing: None,
+        }
     }
 }
 
@@ -142,7 +146,10 @@ pub struct TreeEvents<Element: 'static, ID: std::hash::Hash + Eq + 'static> {
 
 impl<Element: 'static, ID: std::hash::Hash + Eq + 'static> Default for TreeEvents<Element, ID> {
     fn default() -> Self {
-        Self { on_key_command: None, on_select: None }
+        Self {
+            on_key_command: None,
+            on_select: None,
+        }
     }
 }
 
@@ -154,13 +161,18 @@ pub struct TreeDragOperations<Element: Clone + 'static> {
 
 impl<Element: Clone + 'static> Default for TreeDragOperations<Element> {
     fn default() -> Self {
-        Self { can_drop: None, on_drop: None }
+        Self {
+            can_drop: None,
+            on_drop: None,
+        }
     }
 }
 
 /// Configuration consists of independently reusable groups.
-pub struct TreeOptions<Element: Clone + 'static, ID: std::hash::Hash + Eq + Clone + Send + Sync + 'static>
-{
+pub struct TreeOptions<
+    Element: Clone + 'static,
+    ID: std::hash::Hash + Eq + Clone + Send + Sync + 'static,
+> {
     pub is_enabled: bool,
     pub selection: TreeSelection<ID>,
     pub layout: TreeLayout,

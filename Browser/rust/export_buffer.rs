@@ -17,7 +17,11 @@ pub struct ExportBuffer {
 
 impl ExportBuffer {
     pub fn new() -> Self {
-        Self { pointer: std::ptr::NonNull::<u8>::dangling().as_ptr(), capacity: 0, count: 0 }
+        Self {
+            pointer: std::ptr::NonNull::<u8>::dangling().as_ptr(),
+            capacity: 0,
+            count: 0,
+        }
     }
 
     /// Copies `bytes` into a fresh allocation, then frees the previous one.

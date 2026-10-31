@@ -12,6 +12,13 @@ pub struct RadiusScale {
 }
 impl RadiusScale {
     pub fn new(none: f32, sm: f32, md: f32, lg: f32, xl: f32, pill: f32) -> Self {
-        Self { none, sm, md, lg, xl, pill }
+        Self {
+            none,
+            sm,
+            md,
+            lg,
+            xl,
+            pill,
+        }
     }
 }

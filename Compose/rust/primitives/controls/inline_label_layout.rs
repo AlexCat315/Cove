@@ -1,6 +1,6 @@
 //! Translation of Primitives/Controls/InlineLabelLayout.swift.
-use cove_core::scene::{Direction, Point, Rect, Size};
 use crate::{Layout, LayoutSubview, ProposedViewSize};
+use cove_core::scene::{Direction, Point, Rect, Size};
 use std::rc::Rc;
 
 /// Three retained slots: leading glyph, flexible title, trailing controls.
@@ -15,20 +15,38 @@ pub struct InlineLabelLayout {
 
 impl InlineLabelLayout {
     pub fn new(spacing: f32, on_minimum_width: impl Fn(f32) + 'static) -> Self {
-        Self { spacing, on_minimum_width: Rc::new(on_minimum_width) }
+        Self {
+            spacing,
+            on_minimum_width: Rc::new(on_minimum_width),
+        }
     }
 
     fn arrangement(&self, proposal: ProposedViewSize, subviews: &[LayoutSubview]) -> Plan {
         if subviews.len() != 3 {
-            return Plan { slots: Vec::new(), minimum_width: 0.0, size: Size::default() };
+            return Plan {
+                slots: Vec::new(),
+                minimum_width: 0.0,
+                size: Size::default(),
+            };
         }
         let leading = subviews[0].size_that_fits(ProposedViewSize::UNSPECIFIED);
         let trailing = subviews[2].size_that_fits(ProposedViewSize::UNSPECIFIED);
         let minimum = leading.width
             + trailing.width
-            + if leading.width > 0.0 { self.spacing } else { 0.0 }
-            + if trailing.width > 0.0 { self.spacing } else { 0.0 };
-        let title = subviews[1].size_that_fits(ProposedViewSize::new(proposal.width.map(|width| (width - minimum).max(0.0)), None));
+            + if leading.width > 0.0 {
+                self.spacing
+            } else {
+                0.0
+            }
+            + if trailing.width > 0.0 {
+                self.spacing
+            } else {
+                0.0
+            };
+        let title = subviews[1].size_that_fits(ProposedViewSize::new(
+            proposal.width.map(|width| (width - minimum).max(0.0)),
+            None,
+        ));
         Plan {
             slots: vec![leading, title, trailing],
             minimum_width: minimum,
@@ -45,12 +63,20 @@ impl Layout for InlineLabelLayout {
         self.arrangement(proposal, subviews).size
     }
 
-    fn place_subviews(&self, bounds: Rect, _proposal: ProposedViewSize, subviews: &[LayoutSubview]) {
+    fn place_subviews(
+        &self,
+        bounds: Rect,
+        _proposal: ProposedViewSize,
+        subviews: &[LayoutSubview],
+    ) {
         if subviews.len() != 3 {
             return;
         }
         let plan = self.arrangement(ProposedViewSize::new(Some(bounds.width), None), subviews);
-        let rtl = subviews.first().map(|subview| subview.layout_direction == Direction::Rtl).unwrap_or(false);
+        let rtl = subviews
+            .first()
+            .map(|subview| subview.layout_direction == Direction::Rtl)
+            .unwrap_or(false);
         let mut cursor = if rtl { bounds.max_x() } else { bounds.x };
         for index in 0..subviews.len() {
             let mut size = plan.slots[index];

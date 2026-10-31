@@ -30,16 +30,32 @@ pub struct MinimapGeometry {
 impl MinimapGeometry {
     pub fn new(width: f32, height: f32, content_height: f32) -> Self {
         Self {
-            width: if width.is_finite() { width.max(0.0) } else { 0.0 },
-            height: if height.is_finite() { height.max(0.0) } else { 0.0 },
-            content_height: if content_height.is_finite() { content_height.max(0.0) } else { 0.0 },
+            width: if width.is_finite() {
+                width.max(0.0)
+            } else {
+                0.0
+            },
+            height: if height.is_finite() {
+                height.max(0.0)
+            } else {
+                0.0
+            },
+            content_height: if content_height.is_finite() {
+                content_height.max(0.0)
+            } else {
+                0.0
+            },
             offset: 0.0,
             viewport_height: 0.0,
         }
     }
 
     pub fn scrolled(mut self, offset: f32, viewport_height: f32) -> Self {
-        self.offset = if offset.is_finite() { offset.max(0.0) } else { 0.0 };
+        self.offset = if offset.is_finite() {
+            offset.max(0.0)
+        } else {
+            0.0
+        };
         self.viewport_height = if viewport_height.is_finite() {
             viewport_height.max(0.0)
         } else {
@@ -50,7 +66,11 @@ impl MinimapGeometry {
 
     /// Document points to minimap points.
     pub fn scale(&self) -> f32 {
-        if self.content_height <= 0.0 { 0.0 } else { self.height / self.content_height }
+        if self.content_height <= 0.0 {
+            0.0
+        } else {
+            self.height / self.content_height
+        }
     }
 
     /// The visible region, clamped to the minimap.
@@ -60,7 +80,9 @@ impl MinimapGeometry {
             return None;
         }
         let top = (self.offset * scale).clamp(0.0, self.height);
-        let height = (self.viewport_height * scale).min(self.height - top).max(1.0);
+        let height = (self.viewport_height * scale)
+            .min(self.height - top)
+            .max(1.0);
         Some(Rect::new(0.0, top, self.width, height))
     }
 
@@ -96,13 +118,23 @@ pub fn draw(
 ) {
     for band in geometry.visible_rows(rows) {
         let _ = list.add_rect(
-            Rect::new(origin.x + band.x, origin.y + band.y, band.width, band.height),
+            Rect::new(
+                origin.x + band.x,
+                origin.y + band.y,
+                band.width,
+                band.height,
+            ),
             ink.multiplied_alpha(opacity),
         );
     }
     if let Some(region) = geometry.visible_band() {
         let _ = list.add_rect(
-            Rect::new(origin.x, origin.y + region.y, region.width.max(geometry.width), region.height),
+            Rect::new(
+                origin.x,
+                origin.y + region.y,
+                region.width.max(geometry.width),
+                region.height,
+            ),
             marker.multiplied_alpha(opacity * 0.18),
         );
     }
@@ -115,5 +147,8 @@ pub fn offset_at(geometry: &MinimapGeometry, local_y: f32) -> f32 {
     }
     let fraction = (local_y / geometry.height).clamp(0.0, 1.0);
     let target = fraction * geometry.content_height - geometry.viewport_height / 2.0;
-    target.clamp(0.0, (geometry.content_height - geometry.viewport_height).max(0.0))
+    target.clamp(
+        0.0,
+        (geometry.content_height - geometry.viewport_height).max(0.0),
+    )
 }

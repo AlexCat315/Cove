@@ -1,8 +1,8 @@
 //! Full-scene assembly for content and its software-pet overlay.
-use super::{pet_anchor::provide_pet_world, PetOverlay, PetWorld};
-use crate::{AnyView, TupleView, View};
-use crate::primitives::layout::ZStack;
+use super::{PetOverlay, PetWorld, pet_anchor::provide_pet_world};
 use crate::Alignment;
+use crate::primitives::layout::ZStack;
+use crate::{AnyView, TupleView, View};
 use std::rc::Rc;
 
 pub struct PetScene {
@@ -11,7 +11,10 @@ pub struct PetScene {
 }
 impl PetScene {
     pub fn new<Content: View + 'static>(world: Rc<PetWorld>, content: Content) -> Self {
-        Self { world, content: AnyView::new(content) }
+        Self {
+            world,
+            content: AnyView::new(content),
+        }
     }
 }
 impl View for PetScene {

@@ -16,7 +16,11 @@ pub struct SwapchainResource {
 impl SwapchainResource {
     pub fn new(device: Arc<Device>, descriptor: SurfaceDescriptor) -> RhiResult<Self> {
         let swapchain = device.make_swapchain(descriptor)?;
-        Ok(Self { device, swapchain, closed: false })
+        Ok(Self {
+            device,
+            swapchain,
+            closed: false,
+        })
     }
 
     pub fn swapchain(&self) -> Swapchain {
@@ -34,7 +38,8 @@ impl SwapchainResource {
             return Ok(());
         }
         self.closed = true;
-        self.device.with_frame_session(|| self.device.close_swapchain(self.swapchain))
+        self.device
+            .with_frame_session(|| self.device.close_swapchain(self.swapchain))
     }
 }
 impl Drop for SwapchainResource {
@@ -58,7 +63,12 @@ impl TextureResource {
     pub fn new(device: Arc<Device>, descriptor: TextureDescriptor) -> RhiResult<Self> {
         let texture = device.make_texture(descriptor)?;
         let allocation = device.texture_allocation(texture);
-        Ok(Self { device, descriptor, texture, allocation })
+        Ok(Self {
+            device,
+            descriptor,
+            texture,
+            allocation,
+        })
     }
 
     pub fn texture(&self) -> Texture {
@@ -98,9 +108,11 @@ mod tests {
             )
             .expect("null device"),
         );
-        let mut resource =
-            SwapchainResource::new(Arc::clone(&device), SurfaceDescriptor::new(0x1000).with_size(64, 64))
-                .expect("swapchain");
+        let mut resource = SwapchainResource::new(
+            Arc::clone(&device),
+            SurfaceDescriptor::new(0x1000).with_size(64, 64),
+        )
+        .expect("swapchain");
         assert!(resource.close().is_ok());
         assert!(resource.close().is_ok());
     }

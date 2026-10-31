@@ -10,9 +10,15 @@ pub struct GridSpan {
     pub rows: usize,
 }
 impl GridSpan {
-    pub const SINGLE: Self = Self { columns: 1, rows: 1 };
+    pub const SINGLE: Self = Self {
+        columns: 1,
+        rows: 1,
+    };
     pub fn new(columns: usize, rows: usize) -> Self {
-        Self { columns: columns.max(1), rows: rows.max(1) }
+        Self {
+            columns: columns.max(1),
+            rows: rows.max(1),
+        }
     }
 }
 impl Default for GridSpan {
@@ -99,7 +105,10 @@ impl GridSpanPlacement {
                 row += 1;
             }
         }
-        Self { cells, row_count: occupied.len() }
+        Self {
+            cells,
+            row_count: occupied.len(),
+        }
     }
 
     /// Single-row cells set row heights first; a taller multi-row cell then

@@ -109,7 +109,9 @@ fn first_resource_lookup() {
     let node = Node::new();
     let (probe, resource) = probe();
     node.add_resource(resource);
-    let found = node.first_resource::<ProbeResource>().expect("resource is attached");
+    let found = node
+        .first_resource::<ProbeResource>()
+        .expect("resource is attached");
     assert!(
         Rc::ptr_eq(&found, &probe),
         "first_resource returns the same instance that was attached"

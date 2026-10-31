@@ -5,21 +5,19 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
-use cove_core::scene::{AccessibilityRole, AccessibilitySemantics};
 use crate::foundation::{CalendarUnit, Date};
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{Button, ButtonIcon, ButtonIconSource, ButtonRole};
-use crate::primitives::controls::calendar::{
-    CalendarGranularity, CalendarOptions, CalendarView,
-};
+use crate::primitives::controls::calendar::{CalendarGranularity, CalendarOptions, CalendarView};
 use crate::primitives::overlays::anchored::{PopoverOverflow, PopoverSurface};
 use crate::primitives::overlays::popover::Popover;
 use crate::primitives::text::Text;
-use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
 use crate::theme::SemanticFontRef;
+use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
 use crate::{AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View};
+use cove_core::scene::{AccessibilityRole, AccessibilitySemantics};
+use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 
 /// Trigger presentation values.
 #[derive(Clone, Debug, PartialEq)]
@@ -109,7 +107,11 @@ impl DatePicker {
     /// Label for the selected period, or the placeholder.
     fn label(&self) -> String {
         match (self.selection)() {
-            Some(date) => period_label(self.options.calendar.granularity, date, &self.options.calendar.calendar),
+            Some(date) => period_label(
+                self.options.calendar.granularity,
+                date,
+                &self.options.calendar.calendar,
+            ),
             None => self.options.presentation.placeholder.clone(),
         }
     }
@@ -123,12 +125,9 @@ fn period_label(
 ) -> String {
     let parts = calendar.parts(date);
     match granularity {
-        CalendarGranularity::Day => format!(
-            "{} {}, {}",
-            month_name(parts.month),
-            parts.day,
-            parts.year
-        ),
+        CalendarGranularity::Day => {
+            format!("{} {}, {}", month_name(parts.month), parts.day, parts.year)
+        }
         CalendarGranularity::Week => {
             let (year, week) = crate::foundation::iso_week_of(
                 crate::foundation::DateParts::new(parts.year, parts.month, parts.day).epoch_day(),
@@ -160,7 +159,9 @@ fn month_name(month: u32) -> &'static str {
 
 impl View for DatePicker {
     fn body(&self) -> AnyView {
-        AnyView::new(DatePickerBody { picker: self.snapshot() })
+        AnyView::new(DatePickerBody {
+            picker: self.snapshot(),
+        })
     }
 }
 
@@ -229,7 +230,9 @@ impl PrimitiveView for DatePickerBody {
             let set_selection = picker.set_selection.clone();
             trigger.push(AnyView::new(
                 Button::icon_with_options(
-                    ButtonIconSource::resource(crate::primitives::media::ui_icon_catalog::action::x()),
+                    ButtonIconSource::resource(
+                        crate::primitives::media::ui_icon_catalog::action::x(),
+                    ),
                     Some(12.0),
                     None,
                     ButtonRole::Normal,
@@ -242,15 +245,13 @@ impl PrimitiveView for DatePickerBody {
                 .button_style(GhostButtonStyle),
             ));
         }
-        trigger.push(AnyView::new(
-            ButtonIcon::new(
-                ButtonIconSource::resource(
-                    crate::primitives::media::ui_icon_catalog::navigation::dropdown_chevron_down(),
-                ),
-                Some(12.0),
-                None,
+        trigger.push(AnyView::new(ButtonIcon::new(
+            ButtonIconSource::resource(
+                crate::primitives::media::ui_icon_catalog::navigation::dropdown_chevron_down(),
             ),
-        ));
+            Some(12.0),
+            None,
+        )));
         let trigger_view = AnyView::new(TriggerFace {
             content: AnyView::new(Row::new(
                 VerticalAlignment::Center,
@@ -276,7 +277,10 @@ impl PrimitiveView for DatePickerBody {
             calendar_options,
         );
         let popover = Popover::new(AnyView::new(trigger_view), AnyView::new(calendar))
-            .width(CalendarView::width(picker.cell_size, &picker.options.calendar))
+            .width(CalendarView::width(
+                picker.cell_size,
+                &picker.options.calendar,
+            ))
             .surface(PopoverSurface::Content)
             .overflow(PopoverOverflow::Flip)
             .enabled(picker.options.presentation.is_enabled);
@@ -284,7 +288,11 @@ impl PrimitiveView for DatePickerBody {
         let _ = CalendarUnit::Day;
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(popover),
             )
             .frame_width(picker.options.presentation.width),

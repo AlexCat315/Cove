@@ -110,8 +110,7 @@ impl Vec3Constraints {
     /// with values it already holds.
     pub fn write(&self, current: Vec3, next: Vec3) -> Vec<(Vec3Axis, f32)> {
         const AXES: [Vec3Axis; 3] = [Vec3Axis::X, Vec3Axis::Y, Vec3Axis::Z];
-        AXES
-            .into_iter()
+        AXES.into_iter()
             .filter_map(|axis| {
                 let clamped = self.clamp(next.get(axis));
                 (current.get(axis) != clamped).then_some((axis, clamped))

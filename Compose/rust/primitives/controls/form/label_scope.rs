@@ -1,6 +1,6 @@
 //! Translation of Primitives/Controls/Form/LabelScope.swift.
-use cove_core::scene::{LayoutNode, Node};
 use crate::{AnyView, PrimitiveView, impl_primitive_view};
+use cove_core::scene::{LayoutNode, Node};
 
 pub const FORM_LABEL_SCOPE_KEY: &str = "CoveUI.form.label-scope";
 
@@ -12,7 +12,9 @@ pub struct FormLabelScope {
 
 impl FormLabelScope {
     pub fn new(content: impl crate::View + 'static) -> Self {
-        Self { content: AnyView::new(content) }
+        Self {
+            content: AnyView::new(content),
+        }
     }
     pub fn with_erased_content(content: AnyView) -> Self {
         Self { content }

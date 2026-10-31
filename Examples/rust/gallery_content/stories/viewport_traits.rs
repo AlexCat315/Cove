@@ -108,7 +108,11 @@ impl ViewportTraits {
         format!(
             "Text scale: {}%   ·   Keyboard: {}",
             self.text_scale_percent,
-            if self.keyboard_visible { "visible" } else { "hidden" }
+            if self.keyboard_visible {
+                "visible"
+            } else {
+                "hidden"
+            }
         )
     }
 }
@@ -150,16 +154,21 @@ impl View for ViewportTraitsStory {
                     10.0,
                     AnyView::new(TupleView::new(vec![
                         line(traits.viewport_line(), ViewportDebugName::SIZE),
-                        AnyView::new(Text::new(traits.width_class_line()).debug_name(
-                            ViewportDebugName::WIDTH_CLASS,
-                        )),
-                        AnyView::new(Text::new(traits.height_class_line()).debug_name(
-                            ViewportDebugName::HEIGHT_CLASS,
-                        )),
-                        AnyView::new(Text::new(traits.orientation_line()).debug_name(
-                            ViewportDebugName::ORIENTATION,
-                        )),
-                        AnyView::new(Text::new(traits.idiom_line()).debug_name(ViewportDebugName::IDIOM)),
+                        AnyView::new(
+                            Text::new(traits.width_class_line())
+                                .debug_name(ViewportDebugName::WIDTH_CLASS),
+                        ),
+                        AnyView::new(
+                            Text::new(traits.height_class_line())
+                                .debug_name(ViewportDebugName::HEIGHT_CLASS),
+                        ),
+                        AnyView::new(
+                            Text::new(traits.orientation_line())
+                                .debug_name(ViewportDebugName::ORIENTATION),
+                        ),
+                        AnyView::new(
+                            Text::new(traits.idiom_line()).debug_name(ViewportDebugName::IDIOM),
+                        ),
                         line(traits.safe_area_line(), ViewportDebugName::SAFE_AREA),
                         line(traits.text_scale_line(), ViewportDebugName::TEXT_SCALE),
                         line(THRESHOLD_CAPTION.to_string(), "viewport-thresholds"),
@@ -202,10 +211,22 @@ mod checks {
     #[test]
     fn size_classes_use_the_documented_thresholds() {
         // Compact < 600, Medium 600..999, Expanded >= 1000.
-        assert_eq!(ViewportTraits::new(&environment(599.0, 800.0)).width_class, "compact");
-        assert_eq!(ViewportTraits::new(&environment(600.0, 800.0)).width_class, "medium");
-        assert_eq!(ViewportTraits::new(&environment(999.0, 800.0)).width_class, "medium");
-        assert_eq!(ViewportTraits::new(&environment(1000.0, 800.0)).width_class, "expanded");
+        assert_eq!(
+            ViewportTraits::new(&environment(599.0, 800.0)).width_class,
+            "compact"
+        );
+        assert_eq!(
+            ViewportTraits::new(&environment(600.0, 800.0)).width_class,
+            "medium"
+        );
+        assert_eq!(
+            ViewportTraits::new(&environment(999.0, 800.0)).width_class,
+            "medium"
+        );
+        assert_eq!(
+            ViewportTraits::new(&environment(1000.0, 800.0)).width_class,
+            "expanded"
+        );
         assert_eq!(
             ViewportTraits::new(&environment(1200.0, 599.0)).height_class,
             "compact"
@@ -243,7 +264,10 @@ mod checks {
         assert_eq!(traits.orientation_line(), "Orientation: landscape");
         assert_eq!(traits.idiom_line(), "Idiom: desktop");
         assert_eq!(traits.safe_area_line(), "Safe area: 24 / 12 / 0 / 0");
-        assert_eq!(traits.text_scale_line(), "Text scale: 100%   ·   Keyboard: hidden");
+        assert_eq!(
+            traits.text_scale_line(),
+            "Text scale: 100%   ·   Keyboard: hidden"
+        );
     }
 
     #[test]
@@ -271,6 +295,9 @@ mod checks {
         assert_eq!(ViewportDebugName::SIZE, "viewport-size");
         assert_eq!(ViewportDebugName::WIDTH_CLASS, "viewport-width-class");
         assert_eq!(ViewportDebugName::TEXT_SCALE, "viewport-text-scale");
-        assert_eq!(THRESHOLD_CAPTION, "Compact < 600 · Medium 600–999 · Expanded ≥ 1000");
+        assert_eq!(
+            THRESHOLD_CAPTION,
+            "Compact < 600 · Medium 600–999 · Expanded ≥ 1000"
+        );
     }
 }

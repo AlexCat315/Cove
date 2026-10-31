@@ -1,6 +1,6 @@
 //! Translation of Theme/Styles/Buttons/ToggleButtonStyle.swift.
-use crate::theme::SemanticColorRef;
 use crate::AnyView;
+use crate::theme::SemanticColorRef;
 
 use super::builtin_button_chrome::{BuiltinButtonChrome, BuiltinButtonChromeKind};
 use super::button_style::{ButtonStyle, ButtonStyleConfiguration};
@@ -41,7 +41,10 @@ impl ButtonStyle for ToggleButtonStyle {
             SemanticColorRef::on_surface()
         };
         AnyView::new(BuiltinButtonChrome::new(
-            BuiltinButtonChromeKind::Toggle { min_width: self.min_width, height: self.height },
+            BuiltinButtonChromeKind::Toggle {
+                min_width: self.min_width,
+                height: self.height,
+            },
             &configuration,
             foreground,
         ))

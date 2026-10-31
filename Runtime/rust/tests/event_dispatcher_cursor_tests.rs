@@ -9,11 +9,11 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use cove_core::Rect;
 use cove_core::scene::{
     EventDispatcher, EventResult, FocusChain, InputHandlerRoute, InteractionRegistry, Node,
     NodeTree, PointerCapture,
 };
-use cove_core::Rect;
 use cove_platform::{InputEvent, MouseMotionEvent, SystemCursor, WindowId};
 
 struct TwoNode {
@@ -44,7 +44,12 @@ fn two_node_tree() -> TwoNode {
     dispatcher.cursor_sink = Some(Rc::new(move |cursor: SystemCursor| {
         sink.borrow_mut().push(cursor);
     }));
-    TwoNode { root, leaf, received, dispatcher }
+    TwoNode {
+        root,
+        leaf,
+        received,
+        dispatcher,
+    }
 }
 
 fn motion(x: f32, y: f32) -> InputEvent {
@@ -78,7 +83,10 @@ fn cursor_leave() {
     // Move outside leaf but still inside root.
     scene.dispatcher.dispatch(&motion(80.0, 80.0));
 
-    assert_eq!(*scene.received.borrow(), [SystemCursor::Pointer, SystemCursor::Arrow]);
+    assert_eq!(
+        *scene.received.borrow(),
+        [SystemCursor::Pointer, SystemCursor::Arrow]
+    );
 }
 
 #[test]
@@ -107,7 +115,11 @@ fn cursor_within_node() {
         &root,
         InputHandlerRoute::control(),
         Rc::new(move |event: &MouseMotionEvent, _| {
-            cursor_root.set_cursor(if event.x > 50.0 { Some(SystemCursor::Pointer) } else { None });
+            cursor_root.set_cursor(if event.x > 50.0 {
+                Some(SystemCursor::Pointer)
+            } else {
+                None
+            });
             EventResult::Ignored
         }),
     );

@@ -8,8 +8,6 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use cove_core::scene::{Align, EventResult, FlexDirection, Justify, LayoutNode, Node, Wrap};
-use cove_core::Binding;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::modifiers::style::AppearanceExt;
 use crate::primitives::controls::button::{Button, ButtonRole};
@@ -17,7 +15,9 @@ use crate::primitives::overlays::anchored::{
     AnchoredOverlayHost, PopoverOverflow, PopoverPlacement, PopoverSurface,
 };
 use crate::theme::styles::buttons::{ButtonStyle, ButtonStyleConfiguration, ButtonStyleViewExt};
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, View};
+use crate::{AnyView, BoxView, PrimitiveView, View, impl_primitive_view};
+use cove_core::Binding;
+use cove_core::scene::{Align, EventResult, FlexDirection, Justify, LayoutNode, Node, Wrap};
 
 /// How the popup sizes itself.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -43,7 +43,8 @@ pub struct Popover {
     pub placement: PopoverPlacement,
     pub surface: PopoverSurface,
     pub overflow: PopoverOverflow,
-    pub on_key: Option<Rc<dyn Fn(&cove_platform::KeyEvent, cove_core::scene::EventPhase) -> EventResult>>,
+    pub on_key:
+        Option<Rc<dyn Fn(&cove_platform::KeyEvent, cove_core::scene::EventPhase) -> EventResult>>,
     pub sizing: PopoverSizing,
     pub trigger_description: Option<PopoverTriggerDescription>,
     label: AnyView,
@@ -128,30 +129,36 @@ impl View for Popover {
                 is_enabled,
                 false,
                 self.is_presented.get() && is_enabled,
-                self.trigger_description.as_ref().and_then(|description| description.help.clone()),
+                self.trigger_description
+                    .as_ref()
+                    .and_then(|description| description.help.clone()),
             )
             .button_style(PopoverTriggerStyle),
         );
-        let overlay = AnyView::new(AnchoredOverlayHost::new(self.is_presented.get() && is_enabled, self.content.clone())
-            .width_opt(self.width)
-            .placement(self.placement)
-            .sizing_anchor(self.sizing == PopoverSizing::Anchor)
-            .surface(self.surface)
-            .overflow(self.overflow)
-            .on_dismiss({
-                let binding = self.is_presented.clone();
-                move || binding.set(false)
-            }));
-        AnyView::new(
-            BoxView::new(
-                FlexDirection::Column,
-                if self.sizing == PopoverSizing::Anchor { Align::Stretch } else { Align::FlexStart },
-                Justify::FlexStart,
-                Wrap::NoWrap,
-                0.0,
-                AnyView::new(crate::TupleView::new(vec![trigger, overlay])),
-            ),
-        )
+        let overlay = AnyView::new(
+            AnchoredOverlayHost::new(self.is_presented.get() && is_enabled, self.content.clone())
+                .width_opt(self.width)
+                .placement(self.placement)
+                .sizing_anchor(self.sizing == PopoverSizing::Anchor)
+                .surface(self.surface)
+                .overflow(self.overflow)
+                .on_dismiss({
+                    let binding = self.is_presented.clone();
+                    move || binding.set(false)
+                }),
+        );
+        AnyView::new(BoxView::new(
+            FlexDirection::Column,
+            if self.sizing == PopoverSizing::Anchor {
+                Align::Stretch
+            } else {
+                Align::FlexStart
+            },
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            0.0,
+            AnyView::new(crate::TupleView::new(vec![trigger, overlay])),
+        ))
     }
 }
 
@@ -180,8 +187,16 @@ impl PrimitiveView for PopoverTriggerLabel {
             .as_ref()
             .map(|description| description.label.clone())
             .unwrap_or_default();
-        let value = self.description.as_ref().map(|description| description.value.clone()).unwrap_or_default();
-        vec![AnyView::new(PopoverLabelSemantics { content: self.label.clone(), label, value })]
+        let value = self
+            .description
+            .as_ref()
+            .map(|description| description.value.clone())
+            .unwrap_or_default();
+        vec![AnyView::new(PopoverLabelSemantics {
+            content: self.label.clone(),
+            label,
+            value,
+        })]
     }
 }
 impl_primitive_view!(PopoverTriggerLabel);
@@ -229,14 +244,22 @@ impl ButtonStyle for PopoverTriggerStyle {
         // while a hugging trigger has no space to fill.
         AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(configuration.label.clone()),
             )
             .flex_with(1.0, 1.0, None)
             .frame_min_width(0.0)
             .corner_radius(theme.inputs.radius)
             .border_color(
-                if configuration.is_focused { theme.colors.focus_ring } else { cove_core::Color::CLEAR },
+                if configuration.is_focused {
+                    theme.colors.focus_ring
+                } else {
+                    cove_core::Color::CLEAR
+                },
                 if configuration.is_focused { 2.0 } else { 0.0 },
             ),
         )

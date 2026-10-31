@@ -46,7 +46,10 @@ impl AnyDividerStyle {
 }
 impl Clone for AnyDividerStyle {
     fn clone(&self) -> Self {
-        Self { make_body: self.make_body.clone(), style_id: self.style_id }
+        Self {
+            make_body: self.make_body.clone(),
+            style_id: self.style_id,
+        }
     }
 }
 impl PartialEq for AnyDividerStyle {

@@ -5,10 +5,6 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use cove_core::scene::{
-    AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, Justify, Node, NodeResource,
-    Wrap,
-};
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, PaddingExt};
 use crate::modifiers::style::SemanticStyleViewExt;
@@ -16,8 +12,12 @@ use crate::primitives::controls::button::{Button, ButtonIconSource, ButtonRole};
 use crate::primitives::layout::{ScrollAxis, ScrollView, ScrollbarGutter};
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
-use crate::theme::{theme_for_node, SemanticColorRef, SemanticFontRef};
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, TupleView, View};
+use crate::theme::{SemanticColorRef, SemanticFontRef, theme_for_node};
+use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_view};
+use cove_core::scene::{
+    AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, Justify, Node, NodeResource,
+    Wrap,
+};
 
 /// Copy confirmation hold, matching the Swift reset delay.
 const COPIED_HOLD_SECONDS: f64 = 1.6;
@@ -31,7 +31,11 @@ pub struct MarkdownCodeBlock {
 
 impl MarkdownCodeBlock {
     pub fn new(language: Option<String>, text: impl Into<String>) -> Self {
-        Self { language, text: text.into(), copied: cove_core::State::new(false) }
+        Self {
+            language,
+            text: text.into(),
+            copied: cove_core::State::new(false),
+        }
     }
 }
 
@@ -95,7 +99,11 @@ impl PrimitiveView for MarkdownCodeBlockBody {
 
         let header = AnyView::new(
             BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 8.0,
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                8.0,
                 AnyView::new(TupleView::new(vec![
                     AnyView::new(
                         Text::new(language_label.clone())
@@ -118,27 +126,33 @@ impl PrimitiveView for MarkdownCodeBlockBody {
                     }),
                 ])),
             )
-            .padding_insets(crate::modifiers::layout::EdgeInsets::new(4.0, 12.0, 4.0, 4.0)),
+            .padding_insets(crate::modifiers::layout::EdgeInsets::new(
+                4.0, 12.0, 4.0, 4.0,
+            )),
         );
 
         let scroll = ScrollView::new(
-                ScrollAxis::Horizontal,
-                AnyView::new(
-                    Text::new(self.text.clone())
-                        .semantic_font(SemanticFontRef::mono())
-                        .padding_edges(14.0, 12.0),
-                ),
-            )
-            .scrollbar_gutter(ScrollbarGutter::Overlay)
-            .accessibility_label(match self.language.clone() {
-                Some(language) => format!("{language} code"),
-                None => "Code".to_string(),
-            });
+            ScrollAxis::Horizontal,
+            AnyView::new(
+                Text::new(self.text.clone())
+                    .semantic_font(SemanticFontRef::mono())
+                    .padding_edges(14.0, 12.0),
+            ),
+        )
+        .scrollbar_gutter(ScrollbarGutter::Overlay)
+        .accessibility_label(match self.language.clone() {
+            Some(language) => format!("{language} code"),
+            None => "Code".to_string(),
+        });
         let code = AnyView::new(scroll);
 
         vec![AnyView::new(CodeBlockCard {
             content: AnyView::new(BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(TupleView::new(vec![
                     header,
                     AnyView::new(crate::primitives::text::Divider::new(
@@ -252,7 +266,11 @@ struct DelayedResetClock {
 impl DelayedResetClock {
     fn new(after: f64, on_reset: Rc<dyn Fn()>) -> Rc<Self> {
         let clock = Rc::new(Self {
-            after: if after.is_finite() { after.max(0.0) } else { COPIED_HOLD_SECONDS },
+            after: if after.is_finite() {
+                after.max(0.0)
+            } else {
+                COPIED_HOLD_SECONDS
+            },
             elapsed: Cell::new(0.0),
             on_reset,
             is_finished: Cell::new(false),
@@ -297,10 +315,11 @@ impl cove_core::scene::AnyAnimationController for DelayedResetClock {
 impl NodeResource for DelayedResetClock {
     fn mount(&self, _node: &Node) {
         *self.scheduler.borrow_mut() = Some(cove_core::scene::AnimatorScheduler::current());
-        let any: Rc<dyn cove_core::scene::AnyAnimationController> = match self.self_ref.borrow().upgrade() {
-            Some(clock) => clock,
-            None => Rc::new(FinishedClock),
-        };
+        let any: Rc<dyn cove_core::scene::AnyAnimationController> =
+            match self.self_ref.borrow().upgrade() {
+                Some(clock) => clock,
+                None => Rc::new(FinishedClock),
+            };
         if let Some(scheduler) = self.scheduler.borrow().as_ref() {
             scheduler.register(any);
         }

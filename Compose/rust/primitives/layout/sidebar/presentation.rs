@@ -1,11 +1,11 @@
 //! Translation of Primitives/Layout/Sidebar/Presentation.swift.
 //!
 //! Present the same destination nodes as a full sidebar or a narrow rail.
-use crate::modifiers::layout::FlexExt;
 use crate::modifiers::interaction::AccessibilityExt;
+use crate::modifiers::layout::FlexExt;
 use crate::primitives::controls::button::{Button, ButtonIconSource};
 use crate::theme::styles::buttons::{ButtonRole, ButtonStyleViewExt, GhostButtonStyle};
-use crate::{impl_primitive_view, AnyView, PrimitiveView, View, ViewExt};
+use crate::{AnyView, PrimitiveView, View, ViewExt, impl_primitive_view};
 
 /// Full sidebar or narrow rail presentation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -107,7 +107,11 @@ pub struct SidebarToggle {
 
 impl SidebarToggle {
     pub fn new(label: impl Into<String>, is_expanded: bool, action: impl Fn() + 'static) -> Self {
-        Self { label: label.into(), is_expanded, action: std::rc::Rc::new(action) }
+        Self {
+            label: label.into(),
+            is_expanded,
+            action: std::rc::Rc::new(action),
+        }
     }
 }
 
@@ -140,11 +144,11 @@ impl PrimitiveView for SidebarToggleBody {
     }
 
     fn update_node(&self, node: &cove_core::scene::Node) {
-        let mut semantics = node
-            .accessibility()
-            .unwrap_or_else(|| cove_core::scene::AccessibilitySemantics::new(
+        let mut semantics = node.accessibility().unwrap_or_else(|| {
+            cove_core::scene::AccessibilitySemantics::new(
                 cove_core::scene::AccessibilityRole::Button,
-            ));
+            )
+        });
         semantics.label = self.label.clone();
         semantics.state.is_expanded = Some(self.is_expanded);
         node.set_accessibility(Some(semantics));
@@ -181,7 +185,9 @@ impl PrimitiveView for SidebarToggleSized {
         let label = self.label.clone();
         let action = self.action.clone();
         let styled = Button::icon_with_options(
-            ButtonIconSource::resource(crate::primitives::media::ui_icon_catalog::layout::panel_left()),
+            ButtonIconSource::resource(
+                crate::primitives::media::ui_icon_catalog::layout::panel_left(),
+            ),
             Some(16.0),
             None,
             ButtonRole::Normal,
@@ -192,7 +198,9 @@ impl PrimitiveView for SidebarToggleSized {
             move || action(),
         )
         .button_style(GhostButtonStyle);
-        vec![AnyView::new(SidebarToggleFloor { content: AnyView::new(styled) })]
+        vec![AnyView::new(SidebarToggleFloor {
+            content: AnyView::new(styled),
+        })]
     }
 }
 crate::impl_primitive_view!(SidebarToggleSized);

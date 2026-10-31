@@ -7,12 +7,16 @@
 //! cannot borrow it.
 use crate::devtools::mirror::{FrameCapture, FrameTap, FrameTapSink, InputBridge, TimingPublisher};
 use crate::inspection::{Diagnostics, SceneInspector};
-use crate::server::config::{DevToolsConfig, DevToolsHostMirror, DevToolsHostObservation, DevToolsHostScene};
 use crate::server::DevServer;
 use crate::server::Outbound;
+use crate::server::config::{
+    DevToolsConfig, DevToolsHostMirror, DevToolsHostObservation, DevToolsHostScene,
+};
 use cove_core::scene::{InvalidationLog, NodeTree, PerformanceTimeline, RenderTree, StateRegistry};
 use cove_core::{DrawList, Rect};
-use cove_devtools_protocol::{Envelope, MirrorActivate, MirrorFrame, MirrorInput, MirrorStart, TimingFrame};
+use cove_devtools_protocol::{
+    Envelope, MirrorActivate, MirrorFrame, MirrorInput, MirrorStart, TimingFrame,
+};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -99,7 +103,10 @@ impl DevTools {
         self.install_observers();
     }
 
-    pub fn set_memory_snapshot(&self, provider: Option<Rc<dyn Fn() -> crate::inspection::DiagnosticMemorySnapshot>>) {
+    pub fn set_memory_snapshot(
+        &self,
+        provider: Option<Rc<dyn Fn() -> crate::inspection::DiagnosticMemorySnapshot>>,
+    ) {
         *self.diagnostics.memory.borrow_mut() = provider;
     }
 
@@ -114,9 +121,22 @@ impl DevTools {
 
     /// Capture a frame for the mirror viewport. No-op unless a client issued
     /// `mirror.start`.
-    pub fn mirror_capture(&mut self, draw_list: &DrawList, width_px: u32, height_px: u32, logical_width: f32, logical_height: f32) {
+    pub fn mirror_capture(
+        &mut self,
+        draw_list: &DrawList,
+        width_px: u32,
+        height_px: u32,
+        logical_width: f32,
+        logical_height: f32,
+    ) {
         if let Some(tap) = &mut self.frame_tap {
-            tap.capture(draw_list, width_px, height_px, logical_width, logical_height);
+            tap.capture(
+                draw_list,
+                width_px,
+                height_px,
+                logical_width,
+                logical_height,
+            );
         }
     }
 
@@ -144,9 +164,13 @@ impl DevTools {
         let reset_handle = scene.clone();
         self.server.host.scene = DevToolsHostScene {
             snapshot: Some(Rc::new(move || snapshot_handle.borrow().snapshot())),
-            select: Some(Rc::new(move |id: &str| select_handle.borrow().editor.select(Some(id)))),
+            select: Some(Rc::new(move |id: &str| {
+                select_handle.borrow().editor.select(Some(id))
+            })),
             clear_selection: Some(Rc::new(move || clear_handle.borrow().editor.select(None))),
-            inspect: Some(Rc::new(move |request: &Envelope| inspect_handle.borrow().editor.handle(request))),
+            inspect: Some(Rc::new(move |request: &Envelope| {
+                inspect_handle.borrow().editor.handle(request)
+            })),
             reset: Some(Rc::new(move || reset_handle.borrow().editor.reset())),
             diagnostics: None,
         };
@@ -198,7 +222,11 @@ impl DevTools {
                 }
             })),
             capture: Some(Rc::new(move |enabled: bool| {
-                capture_tree.borrow().timeline.borrow_mut().set_enabled(enabled);
+                capture_tree
+                    .borrow()
+                    .timeline
+                    .borrow_mut()
+                    .set_enabled(enabled);
             })),
             state: None,
         };
@@ -233,7 +261,9 @@ impl DevTools {
                 }
             })),
             input: Some(Rc::new(move |payload: &MirrorInput| {
-                let Some(event) = InputBridge::event(payload) else { return };
+                let Some(event) = InputBridge::event(payload) else {
+                    return;
+                };
                 if let Some(callback) = input_delivery.borrow().clone() {
                     callback(event);
                 }
@@ -246,15 +276,13 @@ impl DevTools {
     pub fn state_observation_provider(
         &self,
     ) -> Option<Rc<dyn Fn(&[String]) -> cove_devtools_protocol::StateObservation>> {
-        self.diagnostics
-            .state_observation_available()
-            .then(|| {
-                let tree = self.tree.clone();
-                Rc::new(move |ids: &[String]| {
-                    let diagnostics = Diagnostics::new(tree.clone(), None);
-                    diagnostics.state_observation(ids)
-                }) as Rc<dyn Fn(&[String]) -> cove_devtools_protocol::StateObservation>
-            })
+        self.diagnostics.state_observation_available().then(|| {
+            let tree = self.tree.clone();
+            Rc::new(move |ids: &[String]| {
+                let diagnostics = Diagnostics::new(tree.clone(), None);
+                diagnostics.state_observation(ids)
+            }) as Rc<dyn Fn(&[String]) -> cove_devtools_protocol::StateObservation>
+        })
     }
 
     pub fn start(&mut self) -> std::io::Result<()> {
@@ -308,7 +336,9 @@ impl DevTools {
         if self.server.host.window.resize.is_some() {
             capabilities.push("window".into());
         }
-        if self.server.host.checkpoint.capture.is_some() && self.server.host.checkpoint.restore.is_some() {
+        if self.server.host.checkpoint.capture.is_some()
+            && self.server.host.checkpoint.restore.is_some()
+        {
             capabilities.push("state".into());
         }
         let recording = &self.server.host.recording;
@@ -344,7 +374,10 @@ impl DevTools {
 
     /// Id of the most recently selected node, for hosts that draw an overlay.
     pub fn selected_node_id(&self) -> Option<String> {
-        self.scene.editor.selected_node().map(|node| node.id().0.to_string())
+        self.scene
+            .editor
+            .selected_node()
+            .map(|node| node.id().0.to_string())
     }
 
     /// Window-space frame for the selected node, if it still exists.
@@ -369,13 +402,15 @@ impl DevTools {
 
     fn wire_sinks(&mut self) {
         let outbound = self.outbound.clone();
-        self.frame_tap_sink.set_deliver(Some(Rc::new(move |frame: MirrorFrame| {
-            outbound.borrow_mut().push(Outbound::MirrorFrame(frame));
-        })));
+        self.frame_tap_sink
+            .set_deliver(Some(Rc::new(move |frame: MirrorFrame| {
+                outbound.borrow_mut().push(Outbound::MirrorFrame(frame));
+            })));
         let outbound = self.outbound.clone();
-        self.timing.set_deliver(Some(Rc::new(move |frame: TimingFrame| {
-            outbound.borrow_mut().push(Outbound::Timing(frame));
-        })));
+        self.timing
+            .set_deliver(Some(Rc::new(move |frame: TimingFrame| {
+                outbound.borrow_mut().push(Outbound::Timing(frame));
+            })));
     }
 
     fn unwire_sinks(&mut self) {
@@ -384,8 +419,12 @@ impl DevTools {
     }
 
     fn publish_discovery(&self) -> std::io::Result<()> {
-        let Some(launch) = &self.config.launch else { return Ok(()) };
-        let Some(port) = self.server.bound_port() else { return Ok(()) };
+        let Some(launch) = &self.config.launch else {
+            return Ok(());
+        };
+        let Some(port) = self.server.bound_port() else {
+            return Ok(());
+        };
         let descriptor = cove_devtools_protocol::DevToolsDiscovery {
             id: launch.id.clone(),
             pid: std::process::id(),
@@ -405,8 +444,12 @@ impl DevTools {
 
 /// Install the accessibility-action handler the mirror uses for
 /// `mirror.activate`.
-pub fn accessibility_actions(tree: Rc<RefCell<NodeTree>>) -> Rc<dyn Fn(&MirrorActivate) -> Option<String>> {
-    Rc::new(move |request: &MirrorActivate| crate::inspection::perform_accessibility_action(&tree, request))
+pub fn accessibility_actions(
+    tree: Rc<RefCell<NodeTree>>,
+) -> Rc<dyn Fn(&MirrorActivate) -> Option<String>> {
+    Rc::new(move |request: &MirrorActivate| {
+        crate::inspection::perform_accessibility_action(&tree, request)
+    })
 }
 
 /// Write a descriptor readable only by the owner, matching the Swift path's

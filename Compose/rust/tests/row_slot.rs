@@ -13,12 +13,10 @@
 mod support;
 
 use cove_composition::{AnyView, View};
-use cove_core::scene::{
-    AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap,
-};
+use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
+use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::overlays::menu::{Menu, MenuEntry, MenuItem};
-use cove_ui_compose::BoxView;
 
 use support::GlobalTestLock;
 
@@ -42,12 +40,9 @@ fn menu_rows_center_content_in_the_minimum_row_height() {
     GlobalTestLock::locked(|| {
         support::with_test_text_environment(|| {
             let graph = support::graph();
-            let menu = AnyView::new(Menu::new(vec![MenuEntry::Item(MenuItem::new(
-                1,
-                "Open",
-                || {},
-            ))])
-            .width(200.0));
+            let menu = AnyView::new(
+                Menu::new(vec![MenuEntry::Item(MenuItem::new(1, "Open", || {}))]).width(200.0),
+            );
             graph.install_view(menu, Default::default());
             settle(&graph);
 

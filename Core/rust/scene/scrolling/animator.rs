@@ -1,6 +1,8 @@
 //! Translation of CoveUIScene/Scrolling/ScrollAnimator.swift.
-use super::physics::{constrain, RubberBand, ScrollAxisMotion, ScrollPhysics, ScrollSpring, ScrollVelocityTracker};
-use crate::scene::{Animation, AnimationController, AnyAnimationController, AnimatorScheduler};
+use super::physics::{
+    RubberBand, ScrollAxisMotion, ScrollPhysics, ScrollSpring, ScrollVelocityTracker, constrain,
+};
+use crate::scene::{Animation, AnimationController, AnimatorScheduler, AnyAnimationController};
 use crate::{Point, Size};
 use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
@@ -35,7 +37,13 @@ pub struct ScrollAnimator {
     self_ref: RefCell<Weak<ScrollAnimator>>,
 }
 impl ScrollAnimator {
-    pub fn new(physics: ScrollPhysics, maximum_offset: Point, viewport_size: Size, initial_offset: Point, on_change: Option<Rc<dyn Fn(Point)>>) -> Rc<Self> {
+    pub fn new(
+        physics: ScrollPhysics,
+        maximum_offset: Point,
+        viewport_size: Size,
+        initial_offset: Point,
+        on_change: Option<Rc<dyn Fn(Point)>>,
+    ) -> Rc<Self> {
         let position = constrain(initial_offset, maximum_offset);
         let animator = Rc::new(Self {
             state: RefCell::new(State {
@@ -90,7 +98,10 @@ impl ScrollAnimator {
     /// Velocity of the current glide, in points per second.
     pub fn velocity(&self) -> Point {
         let state = self.state.borrow();
-        Point { x: state.x_motion.glide.unwrap_or(0.0), y: state.y_motion.glide.unwrap_or(0.0) }
+        Point {
+            x: state.x_motion.glide.unwrap_or(0.0),
+            y: state.y_motion.glide.unwrap_or(0.0),
+        }
     }
     /// `true` while the return spring owns the offset.
     pub fn is_settling(&self) -> bool {
@@ -169,7 +180,13 @@ impl ScrollAnimator {
             let mut state = self.state.borrow_mut();
             let maximum = state.maximum_offset;
             let offset = state.offset;
-            state.position = constrain(Point { x: offset.x + delta.x, y: offset.y + delta.y }, maximum);
+            state.position = constrain(
+                Point {
+                    x: offset.x + delta.x,
+                    y: offset.y + delta.y,
+                },
+                maximum,
+            );
             let position = state.position;
             drop(state);
             self.set_offset(position);
@@ -185,7 +202,13 @@ impl ScrollAnimator {
         self.stop_animation();
         let maximum = self.state.borrow().maximum_offset;
         let position = self.position();
-        let next = self.capped(Point { x: position.x + delta.x, y: position.y + delta.y }, maximum);
+        let next = self.capped(
+            Point {
+                x: position.x + delta.x,
+                y: position.y + delta.y,
+            },
+            maximum,
+        );
         {
             let mut state = self.state.borrow_mut();
             state.release_deadline = None;
@@ -203,7 +226,8 @@ impl ScrollAnimator {
             self.reset_tracking();
             self.begin_settling(launch);
         } else if self.physics.get().momentum.is_enabled {
-            self.state.borrow_mut().release_deadline = Some(time + self.physics.get().momentum.idle_window.max(0.0));
+            self.state.borrow_mut().release_deadline =
+                Some(time + self.physics.get().momentum.idle_window.max(0.0));
             self.start_driving_frames();
         }
         self.offset()
@@ -253,7 +277,10 @@ impl ScrollAnimator {
         }
         self.reset_tracking();
         let speed = thrown.x.hypot(thrown.y);
-        if !self.physics.get().momentum.is_enabled || self.is_overscrolled() || speed <= self.physics.get().momentum.minimum_velocity {
+        if !self.physics.get().momentum.is_enabled
+            || self.is_overscrolled()
+            || speed <= self.physics.get().momentum.minimum_velocity
+        {
             self.settle_now(thrown);
             return;
         }
@@ -300,8 +327,12 @@ impl ScrollAnimator {
             let maximum = state.maximum_offset;
             let viewport = state.viewport_size;
             let position = state.position;
-            let x = state.x_motion.advance(position.x, maximum.x, viewport.width, physics, step);
-            let y = state.y_motion.advance(position.y, maximum.y, viewport.height, physics, step);
+            let x = state
+                .x_motion
+                .advance(position.x, maximum.x, viewport.width, physics, step);
+            let y = state
+                .y_motion
+                .advance(position.y, maximum.y, viewport.height, physics, step);
             state.position = Point { x: x.0, y: y.0 };
             (x.1, y.1)
         };
@@ -312,7 +343,11 @@ impl ScrollAnimator {
     }
     /// Land immediately on the in-bounds position.
     pub fn finish_immediately(&self) {
-        if !(self.is_settling() || self.is_gliding() || self.is_overscrolled() || self.state.borrow().release_deadline.is_some()) {
+        if !(self.is_settling()
+            || self.is_gliding()
+            || self.is_overscrolled()
+            || self.state.borrow().release_deadline.is_some())
+        {
             return;
         }
         {
@@ -343,20 +378,30 @@ impl ScrollAnimator {
         }
         let from = self.position();
         let weak = self.self_ref.borrow().clone();
-        let controller = AnimationController::new(from, target, Animation::ease_in_out(duration), 0.0, move |point: Point| {
-            if let Some(animator) = weak.upgrade() {
-                animator.state.borrow_mut().position = point;
-                let visible = animator.visible_offset(point);
-                animator.set_offset(visible);
-            }
-        });
+        let controller = AnimationController::new(
+            from,
+            target,
+            Animation::ease_in_out(duration),
+            0.0,
+            move |point: Point| {
+                if let Some(animator) = weak.upgrade() {
+                    animator.state.borrow_mut().position = point;
+                    let visible = animator.visible_offset(point);
+                    animator.set_offset(visible);
+                }
+            },
+        );
         let weak = self.self_ref.borrow().clone();
         let weak_controller = Rc::downgrade(&controller);
         let on_finish: crate::scene::AnimationCallback = Rc::new(move || {
             if let Some(animator) = weak.upgrade() {
                 let is_current = {
                     let state = animator.state.borrow();
-                    state.target_animation.as_ref().is_some_and(|current| weak_controller.upgrade().is_some_and(|finished| Rc::ptr_eq(current, &finished)))
+                    state.target_animation.as_ref().is_some_and(|current| {
+                        weak_controller
+                            .upgrade()
+                            .is_some_and(|finished| Rc::ptr_eq(current, &finished))
+                    })
                 };
                 {
                     let mut state = animator.state.borrow_mut();
@@ -398,7 +443,10 @@ impl ScrollAnimator {
         state.tracker_y.window = physics.momentum.tracking_window;
         let x = state.tracker_x.velocity(Some(now), Some(stale_after));
         let y = state.tracker_y.velocity(Some(now), Some(stale_after));
-        Point { x: x.clamp(-ceiling, ceiling), y: y.clamp(-ceiling, ceiling) }
+        Point {
+            x: x.clamp(-ceiling, ceiling),
+            y: y.clamp(-ceiling, ceiling),
+        }
     }
 
     // MARK: - Private
@@ -431,14 +479,18 @@ impl ScrollAnimator {
     }
     fn start_driving_frames(&self) {
         self.state.borrow_mut().is_finished = false;
-        if let (Some(scheduler), Some(animator)) = (&self.scheduler, self.self_ref.borrow().upgrade()) {
+        if let (Some(scheduler), Some(animator)) =
+            (&self.scheduler, self.self_ref.borrow().upgrade())
+        {
             let erased: Rc<dyn AnyAnimationController> = animator;
             scheduler.register(erased);
         }
     }
     fn stop_driving_frames(&self) {
         self.state.borrow_mut().is_finished = true;
-        if let (Some(scheduler), Some(animator)) = (&self.scheduler, self.self_ref.borrow().upgrade()) {
+        if let (Some(scheduler), Some(animator)) =
+            (&self.scheduler, self.self_ref.borrow().upgrade())
+        {
             let erased: Rc<dyn AnyAnimationController> = animator;
             scheduler.unregister(&erased);
         }
@@ -477,8 +529,10 @@ impl ScrollAnimator {
         let target = constrain(position, maximum);
         {
             let mut state = self.state.borrow_mut();
-            state.x_motion.spring = (position.x < 0.0 || position.x > maximum.x).then_some(ScrollSpring::new(offset.x, velocity.x, target.x, settings));
-            state.y_motion.spring = (position.y < 0.0 || position.y > maximum.y).then_some(ScrollSpring::new(offset.y, velocity.y, target.y, settings));
+            state.x_motion.spring = (position.x < 0.0 || position.x > maximum.x)
+                .then_some(ScrollSpring::new(offset.x, velocity.x, target.x, settings));
+            state.y_motion.spring = (position.y < 0.0 || position.y > maximum.y)
+                .then_some(ScrollSpring::new(offset.y, velocity.y, target.y, settings));
         }
         if !physics.rubber_band.is_enabled {
             self.finish_immediately();
@@ -511,24 +565,52 @@ impl ScrollAnimator {
         let state = self.state.borrow();
         let physics = self.physics.get();
         Point {
-            x: axis_offset(raw.x, state.maximum_offset.x, state.viewport_size.width, physics),
-            y: axis_offset(raw.y, state.maximum_offset.y, state.viewport_size.height, physics),
+            x: axis_offset(
+                raw.x,
+                state.maximum_offset.x,
+                state.viewport_size.width,
+                physics,
+            ),
+            y: axis_offset(
+                raw.y,
+                state.maximum_offset.y,
+                state.viewport_size.height,
+                physics,
+            ),
         }
     }
     fn raw_position(&self, visible: Point) -> Point {
         let state = self.state.borrow();
         let physics = self.physics.get();
         Point {
-            x: axis_position(visible.x, state.maximum_offset.x, state.viewport_size.width, physics),
-            y: axis_position(visible.y, state.maximum_offset.y, state.viewport_size.height, physics),
+            x: axis_position(
+                visible.x,
+                state.maximum_offset.x,
+                state.viewport_size.width,
+                physics,
+            ),
+            y: axis_position(
+                visible.y,
+                state.maximum_offset.y,
+                state.viewport_size.height,
+                physics,
+            ),
         }
     }
     fn capped(&self, raw: Point, maximum: Point) -> Point {
         let physics = self.physics.get();
         let viewport = self.state.borrow().viewport_size;
         Point {
-            x: capped_axis(raw.x, maximum.x, physics.rubber_band.maximum_raw_overscroll * viewport.width),
-            y: capped_axis(raw.y, maximum.y, physics.rubber_band.maximum_raw_overscroll * viewport.height),
+            x: capped_axis(
+                raw.x,
+                maximum.x,
+                physics.rubber_band.maximum_raw_overscroll * viewport.width,
+            ),
+            y: capped_axis(
+                raw.y,
+                maximum.y,
+                physics.rubber_band.maximum_raw_overscroll * viewport.height,
+            ),
         }
     }
 }
@@ -591,7 +673,13 @@ impl AnyAnimationController for ScrollAnimator {
 
 /// Convenience: a default animator with no callbacks.
 pub fn default_animator() -> Rc<ScrollAnimator> {
-    ScrollAnimator::new(ScrollPhysics::DEFAULT, Point::default(), Size::default(), Point::default(), None)
+    ScrollAnimator::new(
+        ScrollPhysics::DEFAULT,
+        Point::default(),
+        Size::default(),
+        Point::default(),
+        None,
+    )
 }
 
 #[cfg(test)]
@@ -600,14 +688,38 @@ mod tests {
 
     #[test]
     fn direct_scrolling_clamps_to_the_range() {
-        let animator = ScrollAnimator::new(ScrollPhysics::DEFAULT, Point { x: 100.0, y: 100.0 }, Size { width: 50.0, height: 50.0 }, Point::default(), None);
-        assert_eq!(animator.scroll_directly(Point { x: 30.0, y: 40.0 }), Point { x: 30.0, y: 40.0 });
-        assert_eq!(animator.scroll_directly(Point { x: 500.0, y: 500.0 }), Point { x: 100.0, y: 100.0 });
+        let animator = ScrollAnimator::new(
+            ScrollPhysics::DEFAULT,
+            Point { x: 100.0, y: 100.0 },
+            Size {
+                width: 50.0,
+                height: 50.0,
+            },
+            Point::default(),
+            None,
+        );
+        assert_eq!(
+            animator.scroll_directly(Point { x: 30.0, y: 40.0 }),
+            Point { x: 30.0, y: 40.0 }
+        );
+        assert_eq!(
+            animator.scroll_directly(Point { x: 500.0, y: 500.0 }),
+            Point { x: 100.0, y: 100.0 }
+        );
     }
 
     #[test]
     fn adopting_an_offset_resets_motion() {
-        let animator = ScrollAnimator::new(ScrollPhysics::DEFAULT, Point { x: 100.0, y: 100.0 }, Size { width: 50.0, height: 50.0 }, Point::default(), None);
+        let animator = ScrollAnimator::new(
+            ScrollPhysics::DEFAULT,
+            Point { x: 100.0, y: 100.0 },
+            Size {
+                width: 50.0,
+                height: 50.0,
+            },
+            Point::default(),
+            None,
+        );
         animator.adopt(Point { x: 250.0, y: -50.0 });
         assert_eq!(animator.offset(), Point { x: 100.0, y: 0.0 });
         assert!(animator.is_finished());
@@ -615,14 +727,38 @@ mod tests {
 
     #[test]
     fn shrinking_range_pulls_the_offset_back() {
-        let animator = ScrollAnimator::new(ScrollPhysics::DEFAULT, Point { x: 100.0, y: 100.0 }, Size { width: 50.0, height: 50.0 }, Point { x: 90.0, y: 0.0 }, None);
-        animator.update(Point { x: 40.0, y: 100.0 }, Size { width: 50.0, height: 50.0 });
+        let animator = ScrollAnimator::new(
+            ScrollPhysics::DEFAULT,
+            Point { x: 100.0, y: 100.0 },
+            Size {
+                width: 50.0,
+                height: 50.0,
+            },
+            Point { x: 90.0, y: 0.0 },
+            None,
+        );
+        animator.update(
+            Point { x: 40.0, y: 100.0 },
+            Size {
+                width: 50.0,
+                height: 50.0,
+            },
+        );
         assert_eq!(animator.offset(), Point { x: 40.0, y: 0.0 });
     }
 
     #[test]
     fn overscroll_starts_the_return_spring() {
-        let animator = ScrollAnimator::new(ScrollPhysics::DEFAULT, Point { x: 100.0, y: 0.0 }, Size { width: 100.0, height: 100.0 }, Point::default(), None);
+        let animator = ScrollAnimator::new(
+            ScrollPhysics::DEFAULT,
+            Point { x: 100.0, y: 0.0 },
+            Size {
+                width: 100.0,
+                height: 100.0,
+            },
+            Point::default(),
+            None,
+        );
         animator.scroll_by(Point { x: 140.0, y: 0.0 });
         assert!(animator.is_overscrolled());
         assert!(animator.is_settling());

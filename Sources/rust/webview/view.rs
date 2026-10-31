@@ -1,6 +1,9 @@
 //! `WebView` as a composed view plus the node resource that owns its surface.
-use super::{resolve_geometry, WebViewGeometry, WebViewHandle, WebViewHost, WebViewRequest, WebViewState, WebViewSurface};
-use cove_composition::{impl_primitive_view, AnyView, PrimitiveView, View, ViewKind};
+use super::{
+    WebViewGeometry, WebViewHandle, WebViewHost, WebViewRequest, WebViewState, WebViewSurface,
+    resolve_geometry,
+};
+use cove_composition::{AnyView, PrimitiveView, View, ViewKind, impl_primitive_view};
 use cove_core::scene::{Align, FlexDirection, LayoutNode, Node, NodeResource};
 use std::any::Any;
 use std::cell::RefCell;
@@ -64,7 +67,9 @@ impl WebViewNodeResource {
             _ => false,
         };
         if !new_handle_matches {
-            if let (Some(current), Some(surface)) = (&current_handle, self.surface.borrow().as_ref()) {
+            if let (Some(current), Some(surface)) =
+                (&current_handle, self.surface.borrow().as_ref())
+            {
                 current.borrow_mut().detach(surface);
             }
             *self.handle.borrow_mut() = handle.clone();
@@ -72,7 +77,8 @@ impl WebViewNodeResource {
 
         *self.host.borrow_mut() = Some(host.clone());
         *self.request.borrow_mut() = Some(request.clone());
-        *self.on_state_change.borrow_mut() = on_state_change.map(|callback| Rc::from(callback) as Rc<dyn Fn(WebViewState)>);
+        *self.on_state_change.borrow_mut() =
+            on_state_change.map(|callback| Rc::from(callback) as Rc<dyn Fn(WebViewState)>);
 
         if host_changed {
             if let Some(surface) = self.surface.borrow_mut().take() {
@@ -100,7 +106,8 @@ impl WebViewNodeResource {
         if let Some(surface) = self.surface.borrow().as_ref() {
             return surface.clone();
         }
-        let created: Rc<RefCell<Box<dyn WebViewSurface>>> = Rc::new(RefCell::new(host.make_surface()));
+        let created: Rc<RefCell<Box<dyn WebViewSurface>>> =
+            Rc::new(RefCell::new(host.make_surface()));
         *self.surface.borrow_mut() = Some(created.clone());
         created
     }
@@ -158,7 +165,12 @@ pub struct WebView {
 
 impl WebView {
     pub fn new(request: WebViewRequest, host: Rc<dyn WebViewHost>) -> Self {
-        Self { request, host, handle: None, on_state_change: None }
+        Self {
+            request,
+            host,
+            handle: None,
+            on_state_change: None,
+        }
     }
     pub fn handle(mut self, handle: Rc<RefCell<WebViewHandle>>) -> Self {
         self.handle = Some(handle);
@@ -184,11 +196,18 @@ impl PrimitiveView for WebView {
     }
 
     fn update_node(&self, node: &Node) {
-        let Some(resource) = node.first_resource::<WebViewNodeResource>() else { return };
+        let Some(resource) = node.first_resource::<WebViewNodeResource>() else {
+            return;
+        };
         let callback = self.on_state_change.clone().map(|callback| {
             Box::new(move |state: WebViewState| callback(state)) as Box<dyn Fn(WebViewState)>
         });
-        resource.configure(self.host.clone(), self.request.clone(), self.handle.clone(), callback);
+        resource.configure(
+            self.host.clone(),
+            self.request.clone(),
+            self.handle.clone(),
+            callback,
+        );
 
         // Geometry must follow layout, and also follow every draw so a clip
         // change from an ancestor resize is picked up even when this node's own
@@ -203,7 +222,10 @@ impl PrimitiveView for WebView {
         let draw_node = node.downgrade();
         let draw_resource = resource.clone();
         node.update_draw(
-            WebViewDrawIdentity { request: self.request.clone(), host: Rc::as_ptr(&self.host).cast::<()>() as usize },
+            WebViewDrawIdentity {
+                request: self.request.clone(),
+                host: Rc::as_ptr(&self.host).cast::<()>() as usize,
+            },
             move |_list: &mut cove_core::DrawList, _offset: cove_core::Point| {
                 if let Some(node) = Node::upgrade(&draw_node) {
                     draw_resource.update_geometry(&node);

@@ -7,8 +7,8 @@
 use std::collections::BTreeSet;
 
 use cove_ui_compose::primitives::controls::fields::{
-    field_description, field_tooltip, has_preview, icon_for, picker_options, placeholder_kind,
-    AssetIconKind, AssetRef,
+    AssetIconKind, AssetRef, field_description, field_tooltip, has_preview, icon_for,
+    picker_options, placeholder_kind,
 };
 
 fn kinds(values: &[&str]) -> BTreeSet<String> {
@@ -18,8 +18,16 @@ fn kinds(values: &[&str]) -> BTreeSet<String> {
 #[test]
 fn known_kinds_map_to_their_icon() {
     assert_eq!(icon_for(Some("image")), AssetIconKind::Image);
-    assert_eq!(icon_for(Some("Texture")), AssetIconKind::Image, "matching is case-insensitive");
-    assert_eq!(icon_for(Some("Static Mesh")), AssetIconKind::Mesh, "substring match");
+    assert_eq!(
+        icon_for(Some("Texture")),
+        AssetIconKind::Image,
+        "matching is case-insensitive"
+    );
+    assert_eq!(
+        icon_for(Some("Static Mesh")),
+        AssetIconKind::Mesh,
+        "substring match"
+    );
     assert_eq!(icon_for(Some("shader")), AssetIconKind::Material);
     assert_eq!(icon_for(Some("music")), AssetIconKind::Audio);
     assert_eq!(icon_for(Some("mp4")), AssetIconKind::Video);
@@ -73,7 +81,11 @@ fn the_description_joins_kind_and_subtitle() {
     assert_eq!(field_description(Some(&with_both)), "image · Texture 2D");
 
     let kind_only = AssetRef::new("b", "B", "mesh");
-    assert_eq!(field_description(Some(&kind_only)), "mesh", "no dangling separator");
+    assert_eq!(
+        field_description(Some(&kind_only)),
+        "mesh",
+        "no dangling separator"
+    );
 
     assert_eq!(field_description(None), "");
 }
@@ -81,7 +93,11 @@ fn the_description_joins_kind_and_subtitle() {
 #[test]
 fn only_a_single_kind_slot_hints_its_kind() {
     assert_eq!(placeholder_kind(&kinds(&["image"])), Some("image"));
-    assert_eq!(placeholder_kind(&kinds(&["image", "mesh"])), None, "ambiguous slots stay generic");
+    assert_eq!(
+        placeholder_kind(&kinds(&["image", "mesh"])),
+        None,
+        "ambiguous slots stay generic"
+    );
     assert_eq!(placeholder_kind(&BTreeSet::new()), None);
 }
 

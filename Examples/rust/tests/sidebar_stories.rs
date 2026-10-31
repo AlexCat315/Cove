@@ -5,8 +5,8 @@
 
 use cove_examples::gallery_content::catalog::GalleryOptions;
 use cove_examples::gallery_content::stories::sidebar_stories::{
-    NestedSidebarExample, ResizableSidebarExample, DEFAULT_SIDEBAR_WIDTH, NESTED_DEFAULT_EXPANDED,
-    NESTED_DEFAULT_SELECTION,
+    DEFAULT_SIDEBAR_WIDTH, NESTED_DEFAULT_EXPANDED, NESTED_DEFAULT_SELECTION, NestedSidebarExample,
+    ResizableSidebarExample,
 };
 
 #[test]
@@ -72,8 +72,14 @@ fn selectable_ids_are_leaves_and_skip_disabled_items() {
     // Groups are expandable, not selectable; `nested-billing` is disabled.
     assert!(ids.contains(&"nested-welcome".to_owned()));
     assert!(ids.contains(&"nested-audit".to_owned()));
-    assert!(!ids.contains(&"nested-projects".to_owned()), "a group expands instead");
-    assert!(!ids.contains(&"nested-billing".to_owned()), "disabled items are not selectable");
+    assert!(
+        !ids.contains(&"nested-projects".to_owned()),
+        "a group expands instead"
+    );
+    assert!(
+        !ids.contains(&"nested-billing".to_owned()),
+        "disabled items are not selectable"
+    );
 }
 
 #[test]

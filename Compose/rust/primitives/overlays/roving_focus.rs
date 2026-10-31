@@ -5,12 +5,12 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
 use cove_core::scene::{
     EventPhase, EventResult, FocusChainHolder, InputHandlerRoute, InteractionRegistryHolder,
     LayoutNode, Node, NodeResource,
 };
 use cove_platform::KeyEvent;
-use crate::{impl_primitive_view, AnyView, PrimitiveView, View};
 
 const ROVING_ITEM: &str = "__roving.item";
 const ROVING_TAB_STOP: &str = "__roving.tabStop";
@@ -36,7 +36,12 @@ impl SelectionNavigation {
         }
     }
 
-    pub fn destination<Id: PartialEq + Clone>(self, items: &[Id], selection: Option<&Id>, wraps: bool) -> Option<Id> {
+    pub fn destination<Id: PartialEq + Clone>(
+        self,
+        items: &[Id],
+        selection: Option<&Id>,
+        wraps: bool,
+    ) -> Option<Id> {
         if items.is_empty() {
             return None;
         }
@@ -46,19 +51,23 @@ impl SelectionNavigation {
             Self::Last => items.last().cloned(),
             Self::Next => match index {
                 None => items.first().cloned(),
-                Some(index) => items.get(if wraps {
-                    (index + 1) % items.len()
-                } else {
-                    (index + 1).min(items.len() - 1)
-                }).cloned(),
+                Some(index) => items
+                    .get(if wraps {
+                        (index + 1) % items.len()
+                    } else {
+                        (index + 1).min(items.len() - 1)
+                    })
+                    .cloned(),
             },
             Self::Previous => match index {
                 None => items.last().cloned(),
-                Some(index) => items.get(if wraps {
-                    (index + items.len() - 1) % items.len()
-                } else {
-                    index.saturating_sub(1)
-                }).cloned(),
+                Some(index) => items
+                    .get(if wraps {
+                        (index + items.len() - 1) % items.len()
+                    } else {
+                        index.saturating_sub(1)
+                    })
+                    .cloned(),
             },
         }
     }
@@ -73,7 +82,10 @@ pub struct RovingFocusRequest {
 
 impl RovingFocusRequest {
     pub fn new() -> Self {
-        Self { target: None, visible: true }
+        Self {
+            target: None,
+            visible: true,
+        }
     }
 }
 
@@ -114,7 +126,10 @@ impl<Id: PartialEq + Clone + 'static> RovingFocusHost<Id> {
         self
     }
 
-    pub fn command(mut self, command: impl Fn(&KeyEvent) -> Option<SelectionNavigation> + 'static) -> Self {
+    pub fn command(
+        mut self,
+        command: impl Fn(&KeyEvent) -> Option<SelectionNavigation> + 'static,
+    ) -> Self {
         self.command = Rc::new(command);
         self
     }
@@ -164,7 +179,11 @@ impl<Id: PartialEq + Clone + 'static> PrimitiveView for RovingFocusHost<Id> {
             .unwrap_or_else(|| Rc::new(RefCell::new(RovingFocusRequest::new())));
         node.set_attachment(ROVING_FOCUS_REQUEST, request.clone());
 
-        let enabled_tokens: Vec<u64> = self.enabled_items.iter().map(|item| (self.identity)(item)).collect();
+        let enabled_tokens: Vec<u64> = self
+            .enabled_items
+            .iter()
+            .map(|item| (self.identity)(item))
+            .collect();
         {
             let mut state = request.borrow_mut();
             if let Some(target) = state.target
@@ -188,13 +207,19 @@ impl<Id: PartialEq + Clone + 'static> PrimitiveView for RovingFocusHost<Id> {
         let weak = node.downgrade();
         let resolve_identity = self.identity.clone();
         node.set_layout_did_update(Some(Rc::new(move |owner: &Node| {
-            let Some(owner_node) = Node::upgrade(&weak) else { return };
-            let Some(request) = owner_node.attachment::<Rc<RefCell<RovingFocusRequest>>>(ROVING_FOCUS_REQUEST) else {
+            let Some(owner_node) = Node::upgrade(&weak) else {
+                return;
+            };
+            let Some(request) =
+                owner_node.attachment::<Rc<RefCell<RovingFocusRequest>>>(ROVING_FOCUS_REQUEST)
+            else {
                 return;
             };
             let state = request.borrow().clone();
             let Some(target) = state.target else { return };
-            let Some(item) = locate(owner, target) else { return };
+            let Some(item) = locate(owner, target) else {
+                return;
+            };
             if !item.accepts_subtree_input() {
                 return;
             }
@@ -206,7 +231,9 @@ impl<Id: PartialEq + Clone + 'static> PrimitiveView for RovingFocusHost<Id> {
             let _ = &resolve_identity;
         }) as cove_core::scene::LayoutUpdateHook));
 
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         let key_request = request.clone();
         let key_selection = self.selection.clone();
         let key_enabled = self.enabled_items.clone();
@@ -215,60 +242,78 @@ impl<Id: PartialEq + Clone + 'static> PrimitiveView for RovingFocusHost<Id> {
         let key_command = self.command.clone();
         let key_wraps = self.wraps;
         let key_node = node.downgrade();
-        registry.set_key(node, InputHandlerRoute::control(), Rc::new(move |event: &KeyEvent, phase| {
-            if phase != EventPhase::Bubble {
-                return EventResult::Ignored;
-            }
-            let Some(command) = (key_command)(event) else { return EventResult::Ignored };
-            let Some(owner) = Node::upgrade(&key_node) else { return EventResult::Ignored };
-            let mut source = key_request.borrow().target;
-            if let Some(focused) = FocusChainHolder::current().and_then(|chain| chain.focused()) {
-                let mut candidate = Some(focused);
-                let mut focused_item = None;
-                while let Some(current) = candidate {
-                    if current == owner {
-                        break;
-                    }
-                    if let Some(id) = current.attachment::<u64>(ROVING_ITEM) {
-                        focused_item = Some(id);
-                        break;
-                    }
-                    candidate = current.parent();
-                }
-                // Text fields and other controls inside a panel keep their
-                // unhandled arrow keys; only group headers participate here.
-                let Some(focused_item) = focused_item else { return EventResult::Ignored };
-                let focused_in_enabled = key_enabled.iter().any(|item| (key_identity)(item) == focused_item);
-                if !focused_in_enabled {
+        registry.set_key(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event: &KeyEvent, phase| {
+                if phase != EventPhase::Bubble {
                     return EventResult::Ignored;
                 }
-                source = key_request.borrow().target.or(Some(focused_item));
-            }
-            let source_item = source.and_then(|token| {
-                key_enabled.iter().find(|item| (key_identity)(item) == token).cloned()
-            });
-            let Some(target) = command.destination(&key_enabled, source_item.as_ref(), key_wraps) else {
-                return EventResult::Ignored;
-            };
-            (key_on_select)(target.clone());
-            let target_token = (key_identity)(&target);
-            {
-                let mut state = key_request.borrow_mut();
-                state.target = Some(target_token);
-                state.visible = true;
-            }
-            update_tab_stops(&owner, Some(target_token));
-            let request = key_request.clone();
-            if let Some(item) = locate(&owner, target_token)
-                && item.accepts_subtree_input()
-                && let Some(chain) = FocusChainHolder::current()
-            {
-                chain.focus(Some(&item), true);
-                crate::primitives::layout::ScrollReveal::reveal(&item, false);
-                request.borrow_mut().target = None;
-            }
-            EventResult::Handled
-        }));
+                let Some(command) = (key_command)(event) else {
+                    return EventResult::Ignored;
+                };
+                let Some(owner) = Node::upgrade(&key_node) else {
+                    return EventResult::Ignored;
+                };
+                let mut source = key_request.borrow().target;
+                if let Some(focused) = FocusChainHolder::current().and_then(|chain| chain.focused())
+                {
+                    let mut candidate = Some(focused);
+                    let mut focused_item = None;
+                    while let Some(current) = candidate {
+                        if current == owner {
+                            break;
+                        }
+                        if let Some(id) = current.attachment::<u64>(ROVING_ITEM) {
+                            focused_item = Some(id);
+                            break;
+                        }
+                        candidate = current.parent();
+                    }
+                    // Text fields and other controls inside a panel keep their
+                    // unhandled arrow keys; only group headers participate here.
+                    let Some(focused_item) = focused_item else {
+                        return EventResult::Ignored;
+                    };
+                    let focused_in_enabled = key_enabled
+                        .iter()
+                        .any(|item| (key_identity)(item) == focused_item);
+                    if !focused_in_enabled {
+                        return EventResult::Ignored;
+                    }
+                    source = key_request.borrow().target.or(Some(focused_item));
+                }
+                let source_item = source.and_then(|token| {
+                    key_enabled
+                        .iter()
+                        .find(|item| (key_identity)(item) == token)
+                        .cloned()
+                });
+                let Some(target) =
+                    command.destination(&key_enabled, source_item.as_ref(), key_wraps)
+                else {
+                    return EventResult::Ignored;
+                };
+                (key_on_select)(target.clone());
+                let target_token = (key_identity)(&target);
+                {
+                    let mut state = key_request.borrow_mut();
+                    state.target = Some(target_token);
+                    state.visible = true;
+                }
+                update_tab_stops(&owner, Some(target_token));
+                let request = key_request.clone();
+                if let Some(item) = locate(&owner, target_token)
+                    && item.accepts_subtree_input()
+                    && let Some(chain) = FocusChainHolder::current()
+                {
+                    chain.focus(Some(&item), true);
+                    crate::primitives::layout::ScrollReveal::reveal(&item, false);
+                    request.borrow_mut().target = None;
+                }
+                EventResult::Handled
+            }),
+        );
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
@@ -286,7 +331,11 @@ pub struct RovingItem<Id: PartialEq + Clone + 'static> {
 
 impl<Id: PartialEq + Clone + 'static> RovingItem<Id> {
     pub fn new(id: Id, is_tab_stop: bool, identity: Rc<dyn Fn(&Id) -> u64>) -> Self {
-        Self { id, is_tab_stop, identity }
+        Self {
+            id,
+            is_tab_stop,
+            identity,
+        }
     }
 }
 
@@ -299,7 +348,8 @@ impl<Id: PartialEq + Clone + 'static> cove_composition::ViewModifier for RovingI
         // snapshot.
         let mut ancestor = node.parent();
         while let Some(parent) = ancestor {
-            if let Some(current) = parent.attachment::<Rc<dyn Fn() -> Option<u64>>>(ROVING_TAB_STOP) {
+            if let Some(current) = parent.attachment::<Rc<dyn Fn() -> Option<u64>>>(ROVING_TAB_STOP)
+            {
                 node.set_is_tab_stop(current() == Some(token));
                 return;
             }

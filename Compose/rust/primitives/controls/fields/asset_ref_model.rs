@@ -70,10 +70,21 @@ impl AssetIconKind {
     /// Order is the contract: the first group with any matching keyword wins, so
     /// `"image shader"` reads as an image because that group is earlier.
     const GROUPS: [(&'static [&'static str], AssetIconKind); 9] = [
-        (&["image", "texture", "sprite", "png", "jpg", "jpeg", "webp", "svg"], AssetIconKind::Image),
-        (&["mesh", "model", "gltf", "glb", "obj"], AssetIconKind::Mesh),
+        (
+            &[
+                "image", "texture", "sprite", "png", "jpg", "jpeg", "webp", "svg",
+            ],
+            AssetIconKind::Image,
+        ),
+        (
+            &["mesh", "model", "gltf", "glb", "obj"],
+            AssetIconKind::Mesh,
+        ),
         (&["material", "shader"], AssetIconKind::Material),
-        (&["audio", "sound", "music", "wav", "mp3"], AssetIconKind::Audio),
+        (
+            &["audio", "sound", "music", "wav", "mp3"],
+            AssetIconKind::Audio,
+        ),
         (&["video", "movie", "mp4"], AssetIconKind::Video),
         (&["scene", "prefab", "level"], AssetIconKind::Scene),
         (&["script", "code", "swift"], AssetIconKind::Script),
@@ -84,7 +95,9 @@ impl AssetIconKind {
 
 /// The icon category for an asset kind, or `File` when nothing matches.
 pub fn icon_for(kind: Option<&str>) -> AssetIconKind {
-    let Some(kind) = kind.map(str::to_lowercase) else { return AssetIconKind::File };
+    let Some(kind) = kind.map(str::to_lowercase) else {
+        return AssetIconKind::File;
+    };
     AssetIconKind::GROUPS
         .iter()
         .find(|(keywords, _)| keywords.iter().any(|keyword| kind.contains(keyword)))
@@ -108,7 +121,9 @@ pub fn picker_options<'a>(
 
 /// The description shown under the field: kind and subtitle joined by ` · `.
 pub fn field_description(reference: Option<&AssetRef>) -> String {
-    let Some(reference) = reference else { return String::new() };
+    let Some(reference) = reference else {
+        return String::new();
+    };
     [Some(reference.kind.as_str()), reference.subtitle.as_deref()]
         .into_iter()
         .flatten()

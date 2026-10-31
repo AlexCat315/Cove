@@ -28,7 +28,10 @@ fn variant(target: &str) -> Option<String> {
     } else if target.contains("windows") {
         Some(format!("windows-{arch}"))
     } else if target.contains("linux") {
-        Some(format!("linux-{}", if arch == "arm64" { "aarch64" } else { arch }))
+        Some(format!(
+            "linux-{}",
+            if arch == "arm64" { "aarch64" } else { arch }
+        ))
     } else {
         None
     }
@@ -50,7 +53,9 @@ fn zig_target(target: &str) -> Option<&'static str> {
 /// Builds the archive from the vendored Zig sources and returns its directory.
 fn build_from_source(root: &Path, target: &str) -> PathBuf {
     let zig_target = zig_target(target).unwrap_or_else(|| {
-        panic!("libghostty-vt has no Zig target for {target}; add a mapping in Terminal/rust/build.rs")
+        panic!(
+            "libghostty-vt has no Zig target for {target}; add a mapping in Terminal/rust/build.rs"
+        )
     });
     let source = root.join("third-party/ghostty");
     assert!(
@@ -71,7 +76,10 @@ fn build_from_source(root: &Path, target: &str) -> PathBuf {
     let status = build
         .status()
         .unwrap_or_else(|error| panic!("could not run zig to build libghostty-vt: {error}"));
-    assert!(status.success(), "zig build of libghostty-vt failed: {build:?}");
+    assert!(
+        status.success(),
+        "zig build of libghostty-vt failed: {build:?}"
+    );
     prefix.join("lib")
 }
 
@@ -104,12 +112,22 @@ fn main() {
 
     let artifact_root = env::var_os("COVE_GHOSTTY_ARTIFACT_ROOT")
         .map(PathBuf::from)
-        .map(|path| if path.is_absolute() { path } else { root.join(path) })
+        .map(|path| {
+            if path.is_absolute() {
+                path
+            } else {
+                root.join(path)
+            }
+        })
         .unwrap_or_else(|| root.join("vendor"));
     let bundle = env::var_os("COVE_GHOSTTY_VT_ROOT")
         .map(PathBuf::from)
         .unwrap_or_else(|| artifact_root.join("GhosttyVt.artifactbundle"));
-    let archive_name = if msvc { "ghostty-vt-static.lib" } else { "libghostty-vt.a" };
+    let archive_name = if msvc {
+        "ghostty-vt-static.lib"
+    } else {
+        "libghostty-vt.a"
+    };
 
     let (include, lib) = match variant(&target) {
         Some(variant) => {
@@ -117,10 +135,16 @@ fn main() {
             if variant_root.join("lib").join(archive_name).is_file() {
                 (variant_root.join("include"), variant_root.join("lib"))
             } else {
-                (root.join("third-party/ghostty/include"), build_from_source(&root, &target))
+                (
+                    root.join("third-party/ghostty/include"),
+                    build_from_source(&root, &target),
+                )
             }
         }
-        None => (root.join("third-party/ghostty/include"), build_from_source(&root, &target)),
+        None => (
+            root.join("third-party/ghostty/include"),
+            build_from_source(&root, &target),
+        ),
     };
 
     println!("cargo:include={}", include.display());

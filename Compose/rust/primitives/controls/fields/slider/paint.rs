@@ -47,7 +47,12 @@ pub fn ticks(
         }
         ticks.push(SliderTick {
             rect: if geometry.axis.is_horizontal() {
-                Rect::new(origin.x + tick - 0.5, track.y + track.height + 2.0, 1.0, 2.0)
+                Rect::new(
+                    origin.x + tick - 0.5,
+                    track.y + track.height + 2.0,
+                    1.0,
+                    2.0,
+                )
             } else {
                 Rect::new(track.x + track.width + 2.0, origin.y + tick - 0.5, 2.0, 1.0)
             },

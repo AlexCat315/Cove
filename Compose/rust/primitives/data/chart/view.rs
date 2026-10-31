@@ -16,8 +16,6 @@
 
 use std::rc::Rc;
 
-use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
-use cove_core::{Binding, State};
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::primitives::data::chart::{
     ChartCallout, ChartCalloutRow, ChartConfiguration, ChartContent, ChartGuides, ChartLegend,
@@ -25,6 +23,8 @@ use crate::primitives::data::chart::{
     ChartSlice, ChartStyle, ChartXDomain,
 };
 use crate::{AnyView, BoxView, TupleView, View};
+use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
+use cove_core::{Binding, State};
 
 /// Line, area, bar, scatter and pie/donut charts.
 pub struct Chart {
@@ -52,7 +52,11 @@ impl Chart {
     }
 
     /// Pie and donut slices.
-    pub fn pie(slices: Vec<ChartSlice>, style: ChartStyle, configuration: ChartConfiguration) -> Self {
+    pub fn pie(
+        slices: Vec<ChartSlice>,
+        style: ChartStyle,
+        configuration: ChartConfiguration,
+    ) -> Self {
         Self {
             content: ChartContent::Pie(slices),
             style,
@@ -108,7 +112,10 @@ impl Chart {
             ChartContent::Cartesian { series, .. } => series
                 .iter()
                 .filter(|series| !series.title.is_empty())
-                .map(|series| ChartLegendItem { title: series.title.clone(), color: series.color.clone() })
+                .map(|series| ChartLegendItem {
+                    title: series.title.clone(),
+                    color: series.color.clone(),
+                })
                 .collect(),
             ChartContent::Pie(slices) => slices
                 .iter()
@@ -184,14 +191,21 @@ impl Chart {
                 if rows.is_empty() {
                     return None;
                 }
-                Some(ChartCallout::new(point, self.category_label(point.index), rows))
+                Some(ChartCallout::new(
+                    point,
+                    self.category_label(point.index),
+                    rows,
+                ))
             }
             ChartContent::Pie(slices) => {
                 let slice = slices.get(point.index)?;
                 let total: f32 = slices.iter().map(|slice| slice.value.max(0.0)).sum();
                 let mut detail = format(slice.value);
                 if total > 0.0 {
-                    detail.push_str(&format!(" · {}%", (slice.value / total * 100.0).round() as i64));
+                    detail.push_str(&format!(
+                        " · {}%",
+                        (slice.value / total * 100.0).round() as i64
+                    ));
                 }
                 let title = if slice.title.is_empty() {
                     format!("Slice {}", point.index + 1)
@@ -275,7 +289,11 @@ impl Chart {
         };
         (
             self.configuration.label.clone(),
-            if parts.is_empty() { "No data".to_string() } else { parts.join("; ") },
+            if parts.is_empty() {
+                "No data".to_string()
+            } else {
+                parts.join("; ")
+            },
         )
     }
 }
@@ -283,7 +301,9 @@ impl Chart {
 impl View for Chart {
     fn body(&self) -> AnyView {
         let hidden = self.hidden();
-        let visible: Vec<bool> = (0..self.content.count()).map(|index| self.is_visible(index)).collect();
+        let visible: Vec<bool> = (0..self.content.count())
+            .map(|index| self.is_visible(index))
+            .collect();
 
         let requested = self
             .configuration
@@ -341,13 +361,18 @@ impl View for Chart {
             },
         };
 
-        let mut children = vec![AnyView::new(
-            AnyView::new(plot).flex_with(1.0, 1.0, Some(0.0)),
-        )];
+        let mut children = vec![AnyView::new(AnyView::new(plot).flex_with(
+            1.0,
+            1.0,
+            Some(0.0),
+        ))];
         if self.configuration.legend.placement.0 == ChartLegendPlacement::Bottom {
             children.push(AnyView::new(
-                AnyView::new(ChartLegend { items: self.legend_items(), hidden })
-                    .flex_with(0.0, 0.0, None),
+                AnyView::new(ChartLegend {
+                    items: self.legend_items(),
+                    hidden,
+                })
+                .flex_with(0.0, 0.0, None),
             ));
         }
 
@@ -429,7 +454,11 @@ impl ChartCalloutSource {
                         } else {
                             other.title.clone()
                         };
-                        Some(ChartCalloutRow { title: name, value: format(datum.y), color: Some(other.color.clone()) })
+                        Some(ChartCalloutRow {
+                            title: name,
+                            value: format(datum.y),
+                            color: Some(other.color.clone()),
+                        })
                     })
                     .collect();
                 if rows.is_empty() {
@@ -456,7 +485,10 @@ impl ChartCalloutSource {
                 let total: f32 = slices.iter().map(|slice| slice.value.max(0.0)).sum();
                 let mut detail = format(slice.value);
                 if total > 0.0 {
-                    detail.push_str(&format!(" · {}%", (slice.value / total * 100.0).round() as i64));
+                    detail.push_str(&format!(
+                        " · {}%",
+                        (slice.value / total * 100.0).round() as i64
+                    ));
                 }
                 let title = if slice.title.is_empty() {
                     format!("Slice {}", point.index + 1)

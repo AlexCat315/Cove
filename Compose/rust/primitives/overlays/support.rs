@@ -6,11 +6,11 @@
 //! that layer lands, so it is implemented here on top of the same
 //! `ViewModifier` routing the real modifiers use. Each one writes exactly the
 //! node/layout property its Swift counterpart writes.
-use cove_core::scene::{Direction, Edge, LayoutNode, Node, SurfaceShadow};
-use cove_core::Insets;
-use std::rc::Rc;
-use crate::theme::ThemeEnvironment;
 use crate::ViewModifier;
+use crate::theme::ThemeEnvironment;
+use cove_core::Insets;
+use cove_core::scene::{Direction, Edge, LayoutNode, Node, SurfaceShadow};
+use std::rc::Rc;
 
 /// Logical length accepted by `frame`: points or a fraction of the proposal.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -27,7 +27,12 @@ impl Dim {
     }
 }
 
-fn apply_dim_points(layout: &LayoutNode, dim: Option<Dim>, set_points: impl Fn(&LayoutNode, f32), set_percent: impl Fn(&LayoutNode, f32)) {
+fn apply_dim_points(
+    layout: &LayoutNode,
+    dim: Option<Dim>,
+    set_points: impl Fn(&LayoutNode, f32),
+    set_percent: impl Fn(&LayoutNode, f32),
+) {
     match dim {
         Some(Dim::Points(value)) => set_points(layout, value),
         Some(Dim::Percent(value)) => set_percent(layout, value),
@@ -37,13 +42,28 @@ fn apply_dim_points(layout: &LayoutNode, dim: Option<Dim>, set_points: impl Fn(&
 
 /// `EdgeInsets` in Swift; `cove_core::Insets` already has the same shape.
 pub fn insets_all(value: f32) -> Insets {
-    Insets { top: value, bottom: value, leading: value, trailing: value }
+    Insets {
+        top: value,
+        bottom: value,
+        leading: value,
+        trailing: value,
+    }
 }
 pub fn insets_horizontal(value: f32) -> Insets {
-    Insets { top: 0.0, bottom: 0.0, leading: value, trailing: value }
+    Insets {
+        top: 0.0,
+        bottom: 0.0,
+        leading: value,
+        trailing: value,
+    }
 }
 pub fn insets_vertical(value: f32) -> Insets {
-    Insets { top: value, bottom: value, leading: 0.0, trailing: 0.0 }
+    Insets {
+        top: value,
+        bottom: value,
+        leading: 0.0,
+        trailing: 0.0,
+    }
 }
 
 /// `.padding(EdgeInsets)`.
@@ -107,8 +127,18 @@ impl Frame {
 }
 impl ViewModifier for Frame {
     fn apply_layout(&self, layout: &LayoutNode) {
-        apply_dim_points(layout, self.width, |l, v| l.set_width(Some(v)), |l, v| l.set_width_percent(v));
-        apply_dim_points(layout, self.height, |l, v| l.set_height(Some(v)), |l, v| l.set_height_percent(v));
+        apply_dim_points(
+            layout,
+            self.width,
+            |l, v| l.set_width(Some(v)),
+            |l, v| l.set_width_percent(v),
+        );
+        apply_dim_points(
+            layout,
+            self.height,
+            |l, v| l.set_height(Some(v)),
+            |l, v| l.set_height_percent(v),
+        );
         if let Some(value) = self.min_width {
             layout.set_min_width(Some(value));
         }
@@ -133,7 +163,11 @@ pub struct Flex {
 }
 impl Flex {
     pub fn new(grow: f32, shrink: f32, basis: Option<f32>) -> Self {
-        Self { grow, shrink, basis }
+        Self {
+            grow,
+            shrink,
+            basis,
+        }
     }
 }
 impl ViewModifier for Flex {
@@ -205,7 +239,12 @@ pub struct ShadowStyle {
 }
 impl ViewModifier for ShadowStyle {
     fn apply_node(&self, node: &Node) {
-        node.set_shadow(SurfaceShadow { color: Some(self.color), offset_x: self.offset_x, offset_y: self.offset_y, blur: self.blur });
+        node.set_shadow(SurfaceShadow {
+            color: Some(self.color),
+            offset_x: self.offset_x,
+            offset_y: self.offset_y,
+            blur: self.blur,
+        });
     }
 }
 

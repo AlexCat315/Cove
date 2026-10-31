@@ -69,15 +69,33 @@ impl ObservableStateTracking {
         SCOPE_STACK.with(|stack| stack.borrow().last().cloned())
     }
     /// Run `body` inside a tracking scope, clearing the previous dependencies.
-    pub fn with_scope<R>(id: ReadScopeId, invalidate: Arc<dyn Fn() + Send + Sync>, invalidate_tracked: Option<Arc<dyn Fn(RecompositionReason) + Send + Sync>>, body: impl FnOnce() -> R) -> R {
-        let scope = Arc::new(ObservableStateScope { id, invalidate: invalidate.clone(), invalidate_tracked });
+    pub fn with_scope<R>(
+        id: ReadScopeId,
+        invalidate: Arc<dyn Fn() + Send + Sync>,
+        invalidate_tracked: Option<Arc<dyn Fn(RecompositionReason) + Send + Sync>>,
+        body: impl FnOnce() -> R,
+    ) -> R {
+        let scope = Arc::new(ObservableStateScope {
+            id,
+            invalidate: invalidate.clone(),
+            invalidate_tracked,
+        });
         SCOPE_STACK.with(|stack| stack.borrow_mut().push(scope.clone()));
         let tracked = scope.invalidate_tracked.clone();
         let read_scope = ReadScope::with_id(id, move |field: Option<&str>| match &tracked {
-            Some(tracked) => tracked(RecompositionReason::new("state").with_detail(field.unwrap_or_default())),
+            Some(tracked) => {
+                tracked(RecompositionReason::new("state").with_detail(field.unwrap_or_default()))
+            }
             None => invalidate(),
         });
-        struct Pop; impl Drop for Pop { fn drop(&mut self) { SCOPE_STACK.with(|stack| { stack.borrow_mut().pop(); }); } }
+        struct Pop;
+        impl Drop for Pop {
+            fn drop(&mut self) {
+                SCOPE_STACK.with(|stack| {
+                    stack.borrow_mut().pop();
+                });
+            }
+        }
         let _pop = Pop;
         with_read_scope(&read_scope, body)
     }
@@ -104,8 +122,18 @@ struct RegistrarInner {
 }
 impl RegistrarInner {
     fn remove_dependencies(&self, scope: ReadScopeId) {
-        let Some(keys) = self.keys_by_scope.lock().unwrap_or_else(|error| error.into_inner()).remove(&scope) else { return };
-        let mut observers = self.observers_by_key.lock().unwrap_or_else(|error| error.into_inner());
+        let Some(keys) = self
+            .keys_by_scope
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .remove(&scope)
+        else {
+            return;
+        };
+        let mut observers = self
+            .observers_by_key
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         for key in keys {
             if let Some(keyed) = observers.get_mut(&key) {
                 keyed.remove(&scope);
@@ -130,21 +158,46 @@ pub struct ObservableStateRegistrar {
 }
 impl ObservableStateRegistrar {
     pub fn new() -> Self {
-        Self { inner: Arc::new(RegistrarInner::default()), identity: crate::state_read_tracking::allocate_tracking_owner() }
+        Self {
+            inner: Arc::new(RegistrarInner::default()),
+            identity: crate::state_read_tracking::allocate_tracking_owner(),
+        }
     }
     pub fn access(&self, key: StateAccessKey) {
-        let Some(scope) = ObservableStateTracking::current() else { return };
+        let Some(scope) = ObservableStateTracking::current() else {
+            return;
+        };
         let inner: Weak<RegistrarInner> = Arc::downgrade(&self.inner);
-        crate::state_read_tracking::register_read_cleaner(self.identity, scope.id, move |scope_id| {
-            if let Some(inner) = inner.upgrade() {
-                inner.remove_dependencies(scope_id);
-            }
-        });
-        self.inner.observers_by_key.lock().unwrap_or_else(|error| error.into_inner()).entry(key.clone()).or_default().insert(
+        crate::state_read_tracking::register_read_cleaner(
+            self.identity,
             scope.id,
-            Observer { id: scope.id, invalidate: scope.invalidate.clone(), invalidate_tracked: scope.invalidate_tracked.clone() },
+            move |scope_id| {
+                if let Some(inner) = inner.upgrade() {
+                    inner.remove_dependencies(scope_id);
+                }
+            },
         );
-        self.inner.keys_by_scope.lock().unwrap_or_else(|error| error.into_inner()).entry(scope.id).or_default().insert(key);
+        self.inner
+            .observers_by_key
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .entry(key.clone())
+            .or_default()
+            .insert(
+                scope.id,
+                Observer {
+                    id: scope.id,
+                    invalidate: scope.invalidate.clone(),
+                    invalidate_tracked: scope.invalidate_tracked.clone(),
+                },
+            );
+        self.inner
+            .keys_by_scope
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .entry(scope.id)
+            .or_default()
+            .insert(key);
     }
     pub fn invalidate(&self, key: &StateAccessKey) {
         let observers: Vec<Observer> = self
@@ -164,14 +217,22 @@ impl ObservableStateRegistrar {
     }
     pub fn invalidate_all(&self) {
         let mut by_scope: BTreeMap<ReadScopeId, Observer> = BTreeMap::new();
-        for keyed in self.inner.observers_by_key.lock().unwrap_or_else(|error| error.into_inner()).values() {
+        for keyed in self
+            .inner
+            .observers_by_key
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .values()
+        {
             for observer in keyed.values() {
                 by_scope.insert(observer.id, observer.clone());
             }
         }
         for observer in by_scope.into_values() {
             match &observer.invalidate_tracked {
-                Some(tracked) => tracked(RecompositionReason::new("observable").with_detail("all fields")),
+                Some(tracked) => {
+                    tracked(RecompositionReason::new("observable").with_detail("all fields"))
+                }
                 None => (observer.invalidate)(),
             }
         }
@@ -191,9 +252,14 @@ mod tests {
         let registrar = ObservableStateRegistrar::new();
         let hits = Arc::new(AtomicU32::new(0));
         let counter = hits.clone();
-        ObservableStateTracking::with_scope(ReadScopeId(1), Arc::new(move || {
-            counter.fetch_add(1, Ordering::Relaxed);
-        }), None, || registrar.access(StateAccessKey::text("focus")));
+        ObservableStateTracking::with_scope(
+            ReadScopeId(1),
+            Arc::new(move || {
+                counter.fetch_add(1, Ordering::Relaxed);
+            }),
+            None,
+            || registrar.access(StateAccessKey::text("focus")),
+        );
         registrar.invalidate(&StateAccessKey::text("focus"));
         assert_eq!(hits.load(Ordering::Relaxed), 1);
         registrar.invalidate(&StateAccessKey::text("other"));

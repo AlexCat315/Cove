@@ -44,7 +44,10 @@ fn validates_before_executing_and_bounds_results() {
     // into `InvalidConfiguration`, so the violation text carries the path.
     match toolbox.execute("echo", &serde_json::json!({ "text": 12 })) {
         Err(AgentError::InvalidConfiguration(message)) => {
-            assert!(message.contains("text"), "violation should name the field: {message}");
+            assert!(
+                message.contains("text"),
+                "violation should name the field: {message}"
+            );
         }
         other => panic!("expected a schema violation, got {other:?}"),
     }
@@ -67,8 +70,12 @@ fn validates_before_executing_and_bounds_results() {
 #[test]
 fn model_receives_real_tool_results_and_explicit_skill_context() {
     let library = AgentSkillLibrary::new(vec![
-        AgentSkill::new("inspect", "Inspect app", "Read state before forming a diagnosis.")
-            .expect("skill"),
+        AgentSkill::new(
+            "inspect",
+            "Inspect app",
+            "Read state before forming a diagnosis.",
+        )
+        .expect("skill"),
     ])
     .expect("library");
     let saw_tool_names = std::rc::Rc::new(std::cell::Cell::new(false));
@@ -103,11 +110,19 @@ fn model_receives_real_tool_results_and_explicit_skill_context() {
         }),
     )
     .expect("session");
-    let run = session.run(vec![AgentMessage::user("Inspect")]).expect("run");
+    let run = session
+        .run(vec![AgentMessage::user("Inspect")])
+        .expect("run");
     assert_eq!(run.answer, "Verified");
     assert_eq!(run.tool_rounds, 1);
-    assert!(saw_tool_names.get(), "the model must see the registered tools");
-    assert!(saw_instructions.get(), "enabled skill instructions lead the messages");
+    assert!(
+        saw_tool_names.get(),
+        "the model must see the registered tools"
+    );
+    assert!(
+        saw_instructions.get(),
+        "enabled skill instructions lead the messages"
+    );
 }
 
 fn json_body(bytes: &[u8]) -> serde_json::Value {
@@ -166,7 +181,10 @@ fn tool_round_limit_is_enforced() {
         }),
     )
     .expect("session");
-    assert!(matches!(looping.run(Vec::new()), Err(AgentError::StepLimit)));
+    assert!(matches!(
+        looping.run(Vec::new()),
+        Err(AgentError::StepLimit)
+    ));
 }
 
 #[cfg(unix)]
@@ -175,12 +193,16 @@ fn skill_directory_rejects_escaping_symlinks() {
     use std::os::unix::fs::symlink;
 
     let root = std::env::temp_dir().join(format!("cove-agent-skills-{}", std::process::id()));
-    let outside = std::env::temp_dir().join(format!("cove-agent-skill-outside-{}", std::process::id()));
+    let outside =
+        std::env::temp_dir().join(format!("cove-agent-skill-outside-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
     let _ = std::fs::remove_file(&outside);
     std::fs::create_dir_all(root.join("inspect")).expect("skill dir");
-    std::fs::write(&outside, "---\nname: inspect\ndescription: Inspect\n---\nObserve first")
-        .expect("outside file");
+    std::fs::write(
+        &outside,
+        "---\nname: inspect\ndescription: Inspect\n---\nObserve first",
+    )
+    .expect("outside file");
     let link = root.join("inspect/SKILL.md");
     symlink(&outside, &link).expect("symlink");
 
@@ -192,7 +214,10 @@ fn skill_directory_rejects_escaping_symlinks() {
     std::fs::remove_file(&link).expect("unlink");
     std::fs::copy(&outside, &link).expect("copy");
     let library = AgentSkillLibrary::load(&root).expect("library loads");
-    assert_eq!(library.read("inspect").expect("skill").instructions, "Observe first");
+    assert_eq!(
+        library.read("inspect").expect("skill").instructions,
+        "Observe first"
+    );
 
     let _ = std::fs::remove_dir_all(&root);
     let _ = std::fs::remove_file(&outside);

@@ -6,7 +6,7 @@
 //! point, so the same sequence is exposed as [`main`] for the probe binary the
 //! Android build produces.
 
-use super::runner::{require, ProbeContext, ProbeFailure, ProbeReport, ProbeResult};
+use super::runner::{ProbeContext, ProbeFailure, ProbeReport, ProbeResult, require};
 use cove_graphics::rhi::{
     Device, DeviceConfig, GraphicsApi, NativeSurfaceKind, SurfaceDescriptor, TextureFormat,
 };
@@ -17,8 +17,11 @@ use std::sync::Arc;
 
 /// The Swift entry point's body, returning the process exit code.
 pub fn main(arguments: &[String]) -> i32 {
-    let _ =
-        LogSystem::bootstrap(Some("com.cove.android.probe"), LoggingConfiguration::default(), None);
+    let _ = LogSystem::bootstrap(
+        Some("com.cove.android.probe"),
+        LoggingConfiguration::default(),
+        None,
+    );
     println!("Cove Android native Rust probe");
     let code = match run(arguments) {
         Ok(code) => code,
@@ -26,9 +29,8 @@ pub fn main(arguments: &[String]) -> i32 {
             println!("FAIL initialization: {error}");
             let mut metadata = BTreeMap::new();
             metadata.insert("error".to_owned(), LogValue::String(error.0.clone()));
-            LogSystem::logger("com.cove.android.probe").log(
-                &LogEvent::new(Level::Error, "Initialization failed").with_metadata(metadata),
-            );
+            LogSystem::logger("com.cove.android.probe")
+                .log(&LogEvent::new(Level::Error, "Initialization failed").with_metadata(metadata));
             1
         }
     };
@@ -38,7 +40,9 @@ pub fn main(arguments: &[String]) -> i32 {
 
 fn run(arguments: &[String]) -> Result<i32, ProbeFailure> {
     let (Some(artifacts), Some(output)) = (arguments.get(1), arguments.get(2)) else {
-        return Err(ProbeFailure::new("usage: CoveAndroidProbe ARTIFACTS OUTPUT"));
+        return Err(ProbeFailure::new(
+            "usage: CoveAndroidProbe ARTIFACTS OUTPUT",
+        ));
     };
     let output = Path::new(output);
     std::fs::create_dir_all(output)
@@ -56,8 +60,11 @@ fn run(arguments: &[String]) -> Result<i32, ProbeFailure> {
     )?;
 
     let device = Arc::new(
-        Device::make(DeviceConfig { enable_validation: false, ..DeviceConfig::default() })
-            .map_err(|error| ProbeFailure::new(error.to_string()))?,
+        Device::make(DeviceConfig {
+            enable_validation: false,
+            ..DeviceConfig::default()
+        })
+        .map_err(|error| ProbeFailure::new(error.to_string()))?,
     );
     println!("GPU: {}", device.device_name());
     let context = ProbeContext {
@@ -80,7 +87,11 @@ fn run(arguments: &[String]) -> Result<i32, ProbeFailure> {
         match check(&context) {
             Ok(detail) => {
                 println!("PASS {name}: {detail}");
-                results.push(ProbeResult { name: name.to_owned(), passed: true, detail });
+                results.push(ProbeResult {
+                    name: name.to_owned(),
+                    passed: true,
+                    detail,
+                });
             }
             Err(error) => {
                 println!("FAIL {name}: {error}");
@@ -88,7 +99,11 @@ fn run(arguments: &[String]) -> Result<i32, ProbeFailure> {
                 metadata.insert("error".to_owned(), LogValue::String(error.0.clone()));
                 LogSystem::logger("com.cove.android.probe")
                     .log(&LogEvent::new(Level::Error, name).with_metadata(metadata));
-                results.push(ProbeResult { name: name.to_owned(), passed: false, detail: error.0 });
+                results.push(ProbeResult {
+                    name: name.to_owned(),
+                    passed: false,
+                    detail: error.0,
+                });
             }
         }
     }
@@ -102,5 +117,9 @@ fn run(arguments: &[String]) -> Result<i32, ProbeFailure> {
         serde_json::to_vec_pretty(&report).map_err(|error| ProbeFailure::new(error.to_string()))?;
     std::fs::write(context.output_directory().join("report.json"), encoded)
         .map_err(|error| ProbeFailure::new(error.to_string()))?;
-    Ok(if report.results.iter().any(|result| !result.passed) { 1 } else { 0 })
+    Ok(if report.results.iter().any(|result| !result.passed) {
+        1
+    } else {
+        0
+    })
 }

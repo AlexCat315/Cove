@@ -8,9 +8,9 @@ use std::collections::HashSet;
 
 use cove_examples::gallery_content::catalog::GalleryOptions;
 use cove_examples::gallery_content::stories::data_table_story::{
+    CATEGORIES, DataTableStory, ProjectNode, SortStats, TOTAL_COLUMNS, WarehouseRow,
     apply_quantity, compare_names, compare_quantities, group_thousands, validate_name,
-    validate_quantity, visible_tree_rows, DataTableStory, ProjectNode, SortStats, WarehouseRow,
-    CATEGORIES, TOTAL_COLUMNS,
+    validate_quantity, visible_tree_rows,
 };
 use cove_ui_compose::primitives::data::lists::table::ComparisonResult;
 
@@ -28,7 +28,11 @@ fn rows_are_generated_deterministically() {
     assert_eq!(WarehouseRow::generate(5), WarehouseRow::generate(5));
     assert_eq!(WarehouseRow::generate(1).category, "Material");
     assert_eq!(WarehouseRow::generate(2).category, "Mesh");
-    assert_eq!(WarehouseRow::generate(3).category, "Texture", "the rotation wraps");
+    assert_eq!(
+        WarehouseRow::generate(3).category,
+        "Texture",
+        "the rotation wraps"
+    );
 }
 
 #[test]
@@ -138,12 +142,19 @@ fn names_sort_ascending() {
 
 #[test]
 fn the_status_line_groups_digits_and_names_the_state() {
-    let stats = SortStats { completed_builds: 3, cache_hits: 7, is_pending: false };
+    let stats = SortStats {
+        completed_builds: 3,
+        cache_hits: 7,
+        is_pending: false,
+    };
     assert_eq!(
         stats.status_line(200_000, 2),
         "200,000 rows · 2 selected · Ready · 3 sort builds · 7 cache hits"
     );
-    let pending = SortStats { is_pending: true, ..SortStats::default() };
+    let pending = SortStats {
+        is_pending: true,
+        ..SortStats::default()
+    };
     assert!(pending.status_line(1_000, 0).contains("Sorting…"));
 }
 
@@ -168,18 +179,29 @@ fn the_sample_tree_opens_with_engine_expanded() {
 
 #[test]
 fn expanding_render_reveals_the_leaves_at_depth_two() {
-    let expanded: HashSet<String> =
-        ["engine".to_owned(), "render".to_owned()].into_iter().collect();
+    let expanded: HashSet<String> = ["engine".to_owned(), "render".to_owned()]
+        .into_iter()
+        .collect();
     let rows = visible_tree_rows(&expanded);
-    let metal = rows.iter().find(|(id, _)| id == "metal").expect("metal is visible");
-    assert_eq!(metal.1, 2, "leaves under a nested branch are two levels deep");
+    let metal = rows
+        .iter()
+        .find(|(id, _)| id == "metal")
+        .expect("metal is visible");
+    assert_eq!(
+        metal.1, 2,
+        "leaves under a nested branch are two levels deep"
+    );
 }
 
 #[test]
 fn a_collapsed_branch_hides_its_whole_subtree() {
     let rows = visible_tree_rows(&HashSet::new());
     let ids: Vec<&str> = rows.iter().map(|(id, _)| id.as_str()).collect();
-    assert_eq!(ids, vec!["engine", "editor", "readme"], "nothing is expanded");
+    assert_eq!(
+        ids,
+        vec!["engine", "editor", "readme"],
+        "nothing is expanded"
+    );
 }
 
 #[test]

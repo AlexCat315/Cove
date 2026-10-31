@@ -63,14 +63,18 @@ fn create_graphics_native(
     #[cfg(not(target_os = "windows"))]
     {
         let _ = (device, registries, descriptor);
-        Err(RhiError::unsupported_backend("DirectX 12 is only available on Windows"))
+        Err(RhiError::unsupported_backend(
+            "DirectX 12 is only available on Windows",
+        ))
     }
     #[cfg(target_os = "windows")]
     {
         let vertex = registries
             .shaders
             .get(&descriptor.vertex.id())
-            .ok_or_else(|| RhiError::invalid_argument("graphics pipeline: vertex shader not found"))?;
+            .ok_or_else(|| {
+                RhiError::invalid_argument("graphics pipeline: vertex shader not found")
+            })?;
         let fragment = match descriptor.fragment {
             Some(fragment) => Some(registries.shaders.get(&fragment.id()).ok_or_else(|| {
                 RhiError::invalid_argument("graphics pipeline: fragment shader not found")
@@ -100,10 +104,7 @@ fn create_graphics_native(
                     .map_err(|_| RhiError::invalid_argument("semantic name contains a NUL byte"))?;
                 semantic_names.push(name);
                 elements.push(sys::D3D12_INPUT_ELEMENT_DESC {
-                    SemanticName: semantic_names
-                        .last()
-                        .expect("just pushed")
-                        .as_ptr(),
+                    SemanticName: semantic_names.last().expect("just pushed").as_ptr(),
                     SemanticIndex: attribute.semantic.index,
                     Format: formats::dxgi_vertex_format(attribute.format),
                     InputSlot: attribute.buffer_index,
@@ -168,7 +169,8 @@ fn create_graphics_native(
         if let Some(state) = descriptor.depth_stencil {
             pipeline.DepthStencilState.DepthEnable = u32::from(descriptor.depth_format.is_some());
             pipeline.DepthStencilState.DepthWriteMask = u32::from(state.depth_write_enabled);
-            pipeline.DepthStencilState.DepthFunc = formats::comparison_function(state.depth_compare);
+            pipeline.DepthStencilState.DepthFunc =
+                formats::comparison_function(state.depth_compare);
         }
         pipeline.InputLayout = sys::D3D12_INPUT_LAYOUT_DESC {
             pInputElementDescs: elements.as_ptr(),
@@ -204,7 +206,9 @@ fn create_mesh_native(
     #[cfg(not(target_os = "windows"))]
     {
         let _ = (device, registries, descriptor);
-        Err(RhiError::unsupported_backend("DirectX 12 is only available on Windows"))
+        Err(RhiError::unsupported_backend(
+            "DirectX 12 is only available on Windows",
+        ))
     }
     #[cfg(target_os = "windows")]
     {
@@ -268,9 +272,8 @@ fn create_mesh_native(
             ..Default::default()
         };
         // A mesh pipeline has no vertex input layout.
-        pipeline.PrimitiveTopologyType = formats::primitive_topology_type(
-            crate::rhi::PrimitiveType::TriangleList,
-        );
+        pipeline.PrimitiveTopologyType =
+            formats::primitive_topology_type(crate::rhi::PrimitiveType::TriangleList);
         pipeline.IBStripCutValue = sys::D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED;
 
         let mut state: sys::ComPtr = core::ptr::null_mut();
@@ -300,7 +303,9 @@ fn create_compute_native(
     #[cfg(not(target_os = "windows"))]
     {
         let _ = (device, registries, descriptor);
-        Err(RhiError::unsupported_backend("DirectX 12 is only available on Windows"))
+        Err(RhiError::unsupported_backend(
+            "DirectX 12 is only available on Windows",
+        ))
     }
     #[cfg(target_os = "windows")]
     {
@@ -346,9 +351,8 @@ mod tests {
     fn pipeline_creation_reports_unsupported_off_windows() {
         #[cfg(not(target_os = "windows"))]
         {
-            let device = super::super::device::Dx12DeviceHandle::make(
-                crate::rhi::DeviceConfig::default(),
-            );
+            let device =
+                super::super::device::Dx12DeviceHandle::make(crate::rhi::DeviceConfig::default());
             assert!(device.is_err());
         }
     }

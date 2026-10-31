@@ -1,8 +1,8 @@
 //! Translation of Theme/Tokens/SemanticModifiers.swift.
-use cove_core::scene::Node;
-use crate::{AnyView, ModifiedContent, View, ViewExt, ViewModifier};
 use super::{SemanticColorRef, SemanticFontRef, ThemeMetric};
 use crate::theme::{Theme, ThemeReader};
+use crate::{AnyView, ModifiedContent, View, ViewExt, ViewModifier};
+use cove_core::scene::Node;
 
 /// Resolves a `SemanticColorRef` against the target node's active theme and
 /// writes the result into `node.background_color`.
@@ -52,7 +52,10 @@ pub struct SemanticBorderModifier {
 }
 impl SemanticBorderModifier {
     pub fn new(color: SemanticColorRef, width: f32) -> Self {
-        Self { color, width: width.max(0.0) }
+        Self {
+            color,
+            width: width.max(0.0),
+        }
     }
 }
 impl ViewModifier for SemanticBorderModifier {
@@ -86,7 +89,10 @@ impl SemanticFontModifier {
 impl ViewModifier for SemanticFontModifier {
     fn apply_node(&self, node: &Node) {
         let theme = crate::theme::theme_for_node(node);
-        let token = self.reference.resolve(&theme).resolving_family(theme.typography.family.as_deref());
+        let token = self
+            .reference
+            .resolve(&theme)
+            .resolving_family(theme.typography.family.as_deref());
         use crate::modifiers::style::{FONT, LETTER_SPACING, LINE_HEIGHT};
         let changed = node.attachment::<cove_core::Font>(FONT) != Some(token.font.clone())
             || node.attachment::<f32>(LINE_HEIGHT) != Some(token.line_height)

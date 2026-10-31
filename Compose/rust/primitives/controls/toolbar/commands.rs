@@ -5,16 +5,16 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::controls::button::{Button, ButtonRole};
+use crate::primitives::media::ui_icon_catalog;
+use crate::primitives::overlays::anchored::{PopoverOverflow, PopoverPlacement, PopoverSurface};
 use crate::primitives::overlays::menu::{Menu, MenuEntry};
 use crate::primitives::overlays::popover::Popover;
-use crate::primitives::overlays::anchored::{PopoverOverflow, PopoverPlacement, PopoverSurface};
-use crate::primitives::media::ui_icon_catalog;
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
+use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 
 use super::{ToolbarAxis, ToolbarItem, ToolbarItemPlacement, ToolbarOverflowLayout};
 
@@ -43,10 +43,14 @@ pub struct ToolbarCommands {
 impl ToolbarCommands {
     pub fn new(items: Vec<ToolbarItem>, is_enabled: bool, axis: ToolbarAxis) -> Self {
         assert!(
-            items.iter().enumerate().all(|(index, item)| items
+            items
                 .iter()
                 .enumerate()
-                .all(|(other, candidate)| other == index || candidate.command.id != item.command.id)),
+                .all(|(index, item)| items
+                    .iter()
+                    .enumerate()
+                    .all(|(other, candidate)| other == index
+                        || candidate.command.id != item.command.id)),
             "Toolbar command IDs must be unique"
         );
         Self {
@@ -117,9 +121,9 @@ impl ToolbarCommands {
                     move || action()
                 },
             );
-            return AnyView::new(
-                AnyView::new(button).with_modifier(ActionControlLabel { label: command.title.clone() }),
-            );
+            return AnyView::new(AnyView::new(button).with_modifier(ActionControlLabel {
+                label: command.title.clone(),
+            }));
         }
         if let Some(limit) = self.presentation.maximum_button_width {
             let button = Button::with_options(
@@ -138,13 +142,12 @@ impl ToolbarCommands {
                 command.is_selected,
                 Some(command.title.clone()),
             );
-            return AnyView::new(
-                {
-                    let labelled = AnyView::new(button)
-                        .with_modifier(ActionControlLabel { label: command.title.clone() });
-                    AnyView::new(labelled).frame(None, None, None, None, Some(limit), None)
-                },
-            );
+            return AnyView::new({
+                let labelled = AnyView::new(button).with_modifier(ActionControlLabel {
+                    label: command.title.clone(),
+                });
+                AnyView::new(labelled).frame(None, None, None, None, Some(limit), None)
+            });
         }
         let button = Button::with_options(
             AnyView::new(crate::primitives::text::Text::new(command.title.clone())),
@@ -158,7 +161,9 @@ impl ToolbarCommands {
             command.is_selected,
             Some(command.title.clone()),
         );
-        AnyView::new(AnyView::new(button).with_modifier(ActionControlLabel { label: command.title.clone() }))
+        AnyView::new(AnyView::new(button).with_modifier(ActionControlLabel {
+            label: command.title.clone(),
+        }))
     }
 }
 
@@ -169,11 +174,11 @@ struct ActionControlLabel {
 
 impl cove_composition::ViewModifier for ActionControlLabel {
     fn apply_node(&self, node: &Node) {
-        let mut semantics = node
-            .accessibility()
-            .unwrap_or_else(|| cove_core::scene::AccessibilitySemantics::new(
+        let mut semantics = node.accessibility().unwrap_or_else(|| {
+            cove_core::scene::AccessibilitySemantics::new(
                 cove_core::scene::AccessibilityRole::Button,
-            ));
+            )
+        });
         semantics.label = self.label.clone();
         node.set_accessibility(Some(semantics));
     }
@@ -220,11 +225,14 @@ impl PrimitiveView for ToolbarCommandsBody {
                 is_visible: visible,
                 is_overflow: false,
                 focus: self.overflow_focus.clone(),
-                content: AnyView::new(
-                    commands
-                        .command(item)
-                        .frame(None, None, Some(minimum), Some(minimum), None, None),
-                ),
+                content: AnyView::new(commands.command(item).frame(
+                    None,
+                    None,
+                    Some(minimum),
+                    Some(minimum),
+                    None,
+                    None,
+                )),
             }));
         }
 
@@ -316,7 +324,10 @@ impl PrimitiveView for ToolbarCommandsBody {
         layout.on_content_extent = content_extent;
         if commands.available_width.is_some() {
             // A fixed available width means the row hugs its measured content.
-            vec![AnyView::new(crate::LayoutContainer::<ToolbarOverflowLayout, AnyView>::with_erased_content(
+            vec![AnyView::new(crate::LayoutContainer::<
+                ToolbarOverflowLayout,
+                AnyView,
+            >::with_erased_content(
                 layout,
                 AnyView::new(TupleView::new(children)),
             ))]
@@ -382,7 +393,9 @@ impl PrimitiveView for ToolbarRetainedCommand {
             let focus = self.focus.clone();
             let is_visible = self.is_visible;
             node.set_layout_did_update(Some(Rc::new(move |owner: &Node| {
-                let Some(visible) = *focus.pending_visibility.borrow() else { return };
+                let Some(visible) = *focus.pending_visibility.borrow() else {
+                    return;
+                };
                 let mut pending = vec![owner.clone()];
                 let mut target = None;
                 while let Some(candidate) = pending.pop() {
@@ -464,12 +477,17 @@ impl PrimitiveView for OverflowButton {
             cove_core::Color::CLEAR
         }));
         node.set_corner_radius(theme.inputs.radius);
-        let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() else { return };
+        let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() else {
+            return;
+        };
         let on_hover = self.on_hover.clone();
-        registry.set_hover(node, Rc::new(move |phase| {
-            let hovered = phase == cove_core::scene::HoverPhase::Enter;
-            on_hover(hovered);
-        }));
+        registry.set_hover(
+            node,
+            Rc::new(move |phase| {
+                let hovered = phase == cove_core::scene::HoverPhase::Enter;
+                on_hover(hovered);
+            }),
+        );
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
@@ -480,7 +498,11 @@ impl PrimitiveView for OverflowButton {
         };
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Center, Justify::Center, Wrap::NoWrap, 0.0,
+                FlexDirection::Column,
+                Align::Center,
+                Justify::Center,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(crate::primitives::media::Icon::new(icon, 20.0)),
             )
             .frame_size(self.minimum_extent, self.minimum_extent),
@@ -512,7 +534,11 @@ impl PrimitiveView for ToolbarCommandProbe {
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         // A vertical bar measures height, so it must fill the cross axis.
         let content = if self.axis == ToolbarAxis::Vertical {
-            AnyView::new(self.content.clone().frame(None, None, None, Some(0.0), None, None))
+            AnyView::new(
+                self.content
+                    .clone()
+                    .frame(None, None, None, Some(0.0), None, None),
+            )
         } else {
             self.content.clone()
         };

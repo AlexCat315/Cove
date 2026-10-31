@@ -30,9 +30,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use cove_core::scene::{Node, NodeTree, Recomposer};
-use cove_core::{
-    remove_read_scope, with_read_scope, ReadScope, ReadScopeId, SnapshotValue, State,
-};
+use cove_core::{ReadScope, ReadScopeId, SnapshotValue, State, remove_read_scope, with_read_scope};
 
 /// Serializes tests that push and read the process-global read-scope stack.
 struct GlobalTestLock;
@@ -107,7 +105,9 @@ impl Harness {
         state.set_read_tracking_owner(self.scope.clone(), true);
         let owned = state.clone();
         let scope_id = self.scope_id;
-        self.unwire.borrow_mut().push(Box::new(move || owned.clear_read_tracking_owner(scope_id)));
+        self.unwire
+            .borrow_mut()
+            .push(Box::new(move || owned.clear_read_tracking_owner(scope_id)));
     }
 
     /// One initial body evaluation, matching `graph.install(root:)`.
@@ -120,8 +120,12 @@ impl Harness {
 
     /// Queues one body evaluation on the recomposer.
     fn evaluate(&self) {
-        let Some(body) = self.body.borrow().clone() else { return };
-        let Some(counter) = self.body_counter.borrow().clone() else { return };
+        let Some(body) = self.body.borrow().clone() else {
+            return;
+        };
+        let Some(counter) = self.body_counter.borrow().clone() else {
+            return;
+        };
         let scope = self.scope.clone();
         self.recomposer.invalidate(1, None, None, move || {
             with_read_scope(&scope, || {
@@ -178,7 +182,14 @@ struct Model {
 
 impl Model {
     fn new() -> Self {
-        Self { name: "a".into(), age: 0, details: Details { title: "a".into(), other: 0 } }
+        Self {
+            name: "a".into(),
+            age: 0,
+            details: Details {
+                title: "a".into(),
+                other: 0,
+            },
+        }
     }
 }
 
@@ -212,7 +223,10 @@ fn selective_and_conditional() {
         assert_eq!(count(&counter), 1);
 
         model.update(|state| state.age += 1);
-        assert!(!harness.has_pending(), "an unread field does not invalidate");
+        assert!(
+            !harness.has_pending(),
+            "an unread field does not invalidate"
+        );
 
         model.update(|state| state.name = "b".into());
         assert!(harness.has_pending(), "the read field invalidates");
@@ -220,7 +234,10 @@ fn selective_and_conditional() {
         assert_eq!(count(&counter), 2);
 
         model.update(|state| state.name = "b".into());
-        assert!(!harness.has_pending(), "an unchanged value does not invalidate");
+        assert!(
+            !harness.has_pending(),
+            "an unchanged value does not invalidate"
+        );
 
         use_name.set(false);
         harness.commit();
@@ -231,15 +248,25 @@ fn selective_and_conditional() {
         // `details.title`, because a nested member read has no field selector;
         // the port therefore tracks that field more coarsely, not less.
         model.update(|state| state.name = "c".into());
-        assert!(!harness.has_pending(), "the dropped `name` dependency stops invalidating");
+        assert!(
+            !harness.has_pending(),
+            "the dropped `name` dependency stops invalidating"
+        );
 
         model.update(|state| state.details.title = "b".into());
         harness.commit();
-        assert_eq!(count(&counter), 4, "the new `details` dependency invalidates");
+        assert_eq!(
+            count(&counter),
+            4,
+            "the new `details` dependency invalidates"
+        );
 
         harness.uninstall();
         model.update(|state| state.details.title = "c".into());
-        assert!(!harness.has_pending(), "an uninstalled scope records nothing");
+        assert!(
+            !harness.has_pending(),
+            "an uninstalled scope records nothing"
+        );
     });
 }
 
@@ -269,7 +296,9 @@ fn opaque_fallback() {
         let harness = Harness::new();
         let counter = counter();
         let shared = Arc::new(Mutex::new("a".to_string()));
-        let model = State::new(OpaqueField { text: shared.clone() });
+        let model = State::new(OpaqueField {
+            text: shared.clone(),
+        });
         harness.wire(&model);
 
         let body = {
@@ -285,9 +314,15 @@ fn opaque_fallback() {
         // would consider the value unchanged; the opaque read must not.
         *lock(&shared) = "b".into();
         let replacement = model.get();
-        assert!(replacement == model.get(), "the stale snapshot compares equal");
+        assert!(
+            replacement == model.get(),
+            "the stale snapshot compares equal"
+        );
         model.set(replacement);
-        assert!(harness.has_pending(), "an opaque read cannot hide a mutation");
+        assert!(
+            harness.has_pending(),
+            "an opaque read cannot hide a mutation"
+        );
         harness.commit();
         assert_eq!(count(&counter), 2);
     });
@@ -311,7 +346,10 @@ fn whole_value_reads_are_conservative() {
         assert_eq!(count(&counter), 1);
 
         model.update(|state| state.age += 1);
-        assert!(harness.has_pending(), "a whole-value read watches every field");
+        assert!(
+            harness.has_pending(),
+            "a whole-value read watches every field"
+        );
         harness.commit();
         assert_eq!(count(&counter), 2);
     });
@@ -358,7 +396,10 @@ fn subscript_element() {
         assert_eq!(count(&counter), 1);
 
         items.update(|values| values[1] = 99);
-        assert!(!harness.has_pending(), "an unread index does not invalidate");
+        assert!(
+            !harness.has_pending(),
+            "an unread index does not invalidate"
+        );
 
         items.update(|values| values[0] = 42);
         harness.commit();
@@ -366,7 +407,11 @@ fn subscript_element() {
 
         items.set(vec![9, 9, 9]);
         harness.commit();
-        assert_eq!(count(&counter), 3, "replacing the array invalidates the read index");
+        assert_eq!(
+            count(&counter),
+            3,
+            "replacing the array invalidates the read index"
+        );
     });
 }
 
@@ -382,8 +427,10 @@ fn subscript_dictionary() {
         let body = {
             let dict = dict.clone();
             Rc::new(move || {
-                let _ = dict
-                    .read_map_value("dict", "a".to_string(), |state: &HashMap<String, i32>| state);
+                let _ =
+                    dict.read_map_value("dict", "a".to_string(), |state: &HashMap<String, i32>| {
+                        state
+                    });
             })
         };
         harness.install(&counter, body);
@@ -402,7 +449,11 @@ fn subscript_dictionary() {
 
         dict.set(HashMap::from([("a".to_string(), 5), ("b".to_string(), 6)]));
         harness.commit();
-        assert_eq!(count(&counter), 3, "replacing the map invalidates the read key");
+        assert_eq!(
+            count(&counter),
+            3,
+            "replacing the map invalidates the read key"
+        );
     });
 }
 
@@ -427,12 +478,19 @@ fn subscript_custom() {
 
         grid.update(|cells| cells[1] = 99);
         harness.commit();
-        assert_eq!(count(&counter), 2, "whole-field granularity invalidates on any change");
+        assert_eq!(
+            count(&counter),
+            2,
+            "whole-field granularity invalidates on any change"
+        );
 
         grid.update(|cells| {
             let _ = cells.len();
         });
-        assert!(!harness.has_pending(), "an unchanged field does not re-invalidate");
+        assert!(
+            !harness.has_pending(),
+            "an unchanged field does not re-invalidate"
+        );
     });
 }
 
@@ -460,16 +518,27 @@ fn two_states_are_independent() {
 
         first.update(|items| items[1] = 99);
         second.update(|items| items[0] = 99);
-        assert!(!harness.has_pending(), "unread indices of either state do not invalidate");
+        assert!(
+            !harness.has_pending(),
+            "unread indices of either state do not invalidate"
+        );
         assert_eq!(count(&counter), 1);
 
         second.update(|items| items[1] = 42);
         harness.commit();
-        assert_eq!(count(&counter), 2, "the second state's read element invalidates");
+        assert_eq!(
+            count(&counter),
+            2,
+            "the second state's read element invalidates"
+        );
 
         first.update(|items| items[0] = 7);
         harness.commit();
-        assert_eq!(count(&counter), 3, "the first state's read element invalidates");
+        assert_eq!(
+            count(&counter),
+            3,
+            "the first state's read element invalidates"
+        );
     });
 }
 
@@ -505,15 +574,23 @@ fn deferred_layout_retains_owner() {
                 bump(&layout);
             });
         })));
-        let hook = node.layout_did_update().expect("the layout hook is installed");
+        let hook = node
+            .layout_did_update()
+            .expect("the layout hook is installed");
         hook(&node);
         assert_eq!(count(&layout_counter), 1);
 
         model.update(|state| state.age += 1);
-        assert!(!harness.has_pending(), "an unread field leaves the layout dependency intact");
+        assert!(
+            !harness.has_pending(),
+            "an unread field leaves the layout dependency intact"
+        );
 
         model.update(|state| state.name = "b".into());
-        assert!(harness.has_pending(), "the layout callback retained the state field");
+        assert!(
+            harness.has_pending(),
+            "the layout callback retained the state field"
+        );
         harness.commit();
         assert_eq!(count(&body_counter), 2);
     });
@@ -548,11 +625,17 @@ fn scope_stack_is_thread_local() {
 
         // `age` was only read off-scope, so writing it must not invalidate.
         model.update(|state| state.age += 1);
-        assert!(!harness.has_pending(), "a read on another thread records nothing here");
+        assert!(
+            !harness.has_pending(),
+            "a read on another thread records nothing here"
+        );
 
         // `name` was read on this thread, so it still invalidates.
         model.update(|state| state.name = "b".into());
-        assert!(harness.has_pending(), "the on-thread read still owns its dependency");
+        assert!(
+            harness.has_pending(),
+            "the on-thread read still owns its dependency"
+        );
     });
 }
 
@@ -573,15 +656,24 @@ fn uninstalled_scope_stops_tracking() {
         harness.install(&counter, body);
 
         model.update(|state| state.name = "b".into());
-        assert!(harness.has_pending(), "a wired, installed scope tracks its field");
+        assert!(
+            harness.has_pending(),
+            "a wired, installed scope tracks its field"
+        );
         harness.commit();
 
         harness.uninstall();
         model.update(|state| state.name = "c".into());
-        assert!(!harness.has_pending(), "an uninstalled scope records nothing");
+        assert!(
+            !harness.has_pending(),
+            "an uninstalled scope records nothing"
+        );
 
         let tree = RefCell::new(NodeTree::new());
         tree.borrow_mut().set_root(Some(Node::new()));
-        assert!(!tree.borrow().has_render_updates(), "the empty install leaves no render work");
+        assert!(
+            !tree.borrow().has_render_updates(),
+            "the empty install leaves no render work"
+        );
     });
 }

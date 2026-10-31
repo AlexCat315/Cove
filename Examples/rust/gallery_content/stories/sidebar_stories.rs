@@ -74,8 +74,8 @@ impl ResizableSidebarExample {
 
 impl cove_ui_compose::View for ResizableSidebarExample {
     fn body(&self) -> cove_ui_compose::AnyView {
-        use cove_ui_compose::modifiers::layout::LayoutFrameExt;
         use cove_ui_compose::ViewExt;
+        use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 
         let content = cove_ui_compose::primitives::text::Text::new(self.requested_width_label());
         let sidebar = cove_ui_compose::primitives::layout::sidebar::AdaptiveSidebar::new(
@@ -86,9 +86,7 @@ impl cove_ui_compose::View for ResizableSidebarExample {
         .content(content)
         .width(self.width.binding())
         .options(sidebar_options());
-        cove_ui_compose::AnyView::new(
-            cove_ui_compose::AnyView::new(sidebar).frame_height(220.0),
-        )
+        cove_ui_compose::AnyView::new(cove_ui_compose::AnyView::new(sidebar).frame_height(220.0))
     }
 
     fn tag(&self) -> &'static str {
@@ -150,7 +148,8 @@ impl NestedSidebarExample {
 
     /// Expands both authored groups.
     pub fn expand_groups(&self) {
-        self.expanded.set(vec!["nested-projects".to_owned(), "nested-team".to_owned()]);
+        self.expanded
+            .set(vec!["nested-projects".to_owned(), "nested-team".to_owned()]);
     }
 
     /// Collapses every group. The selection is deliberately preserved.
@@ -171,17 +170,31 @@ impl NestedSidebarExample {
     pub fn sections(&self) -> Vec<SidebarSection<String>> {
         let enabled = self.options.is_enabled;
         let audit = SidebarItem::new("nested-audit".to_owned(), "Audit log").context_menu(vec![
-            MenuEntry::Item(cove_ui_compose::primitives::overlays::menu::MenuItem::new(20, "Archive", || {})),
-            MenuEntry::Item(cove_ui_compose::primitives::overlays::menu::MenuItem::new(21, "Duplicate", || {})),
+            MenuEntry::Item(cove_ui_compose::primitives::overlays::menu::MenuItem::new(
+                20,
+                "Archive",
+                || {},
+            )),
+            MenuEntry::Item(cove_ui_compose::primitives::overlays::menu::MenuItem::new(
+                21,
+                "Duplicate",
+                || {},
+            )),
         ]);
-        let team = SidebarItem::new("nested-team".to_owned(), "Design team")
-            .children(vec![audit, SidebarItem::new("nested-billing".to_owned(), "Billing").enabled(false)]);
-        let projects = SidebarItem::new("nested-projects".to_owned(), "Project spaces")
-            .children(vec![SidebarItem::new("nested-welcome".to_owned(), "Getting started"), team]);
+        let team = SidebarItem::new("nested-team".to_owned(), "Design team").children(vec![
+            audit,
+            SidebarItem::new("nested-billing".to_owned(), "Billing").enabled(false),
+        ]);
+        let projects =
+            SidebarItem::new("nested-projects".to_owned(), "Project spaces").children(vec![
+                SidebarItem::new("nested-welcome".to_owned(), "Getting started"),
+                team,
+            ]);
         vec![SidebarSection::new(
             "nested-workspace",
             vec![
-                SidebarItem::new("nested-overview".to_owned(), "Workspace overview").enabled(enabled),
+                SidebarItem::new("nested-overview".to_owned(), "Workspace overview")
+                    .enabled(enabled),
                 projects,
             ],
         )]
@@ -210,8 +223,8 @@ impl NestedSidebarExample {
 
 impl cove_ui_compose::View for NestedSidebarExample {
     fn body(&self) -> cove_ui_compose::AnyView {
-        use cove_ui_compose::modifiers::layout::LayoutFrameExt;
         use cove_ui_compose::ViewExt;
+        use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 
         let selection = self.selection.get();
         let content = cove_ui_compose::primitives::text::Text::new(format!(
@@ -227,9 +240,7 @@ impl cove_ui_compose::View for NestedSidebarExample {
         .presentation(self.is_open.binding())
         .options(sidebar_options());
         let _ = selection;
-        cove_ui_compose::AnyView::new(
-            cove_ui_compose::AnyView::new(sidebar).frame_height(280.0),
-        )
+        cove_ui_compose::AnyView::new(cove_ui_compose::AnyView::new(sidebar).frame_height(280.0))
     }
 
     fn tag(&self) -> &'static str {

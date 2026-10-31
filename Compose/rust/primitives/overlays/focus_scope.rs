@@ -1,6 +1,6 @@
 //! A modal subtree that traps focus and optionally restores commands.
+use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
 use cove_core::scene::{FocusChain, FocusChainHolder, LayoutNode, ModalFocusResource, Node};
-use crate::{impl_primitive_view, AnyView, PrimitiveView, View};
 use std::rc::{Rc, Weak};
 
 pub struct FocusScope {
@@ -14,7 +14,10 @@ impl FocusScope {
     }
 
     pub fn with_restoring_commands(restores_commands: bool, content: impl View + 'static) -> Self {
-        Self { content: AnyView::new(content), restores_commands }
+        Self {
+            content: AnyView::new(content),
+            restores_commands,
+        }
     }
 }
 
@@ -27,7 +30,9 @@ impl PrimitiveView for FocusScope {
         node
     }
 
-    fn make_layout_node(&self) -> Option<LayoutNode> { None }
+    fn make_layout_node(&self) -> Option<LayoutNode> {
+        None
+    }
 
     fn update_node(&self, node: &Node) {
         let chain = FocusChainHolder::current();
@@ -37,11 +42,15 @@ impl PrimitiveView for FocusScope {
         let weak_chain: Option<Weak<FocusChain>> = chain.as_ref().map(Rc::downgrade);
         node.set_layout_did_update(weak_chain.map(|weak| {
             Rc::new(move |node: &Node| {
-                if let Some(chain) = weak.upgrade() { chain.settle_scope(node); }
+                if let Some(chain) = weak.upgrade() {
+                    chain.settle_scope(node);
+                }
             }) as cove_core::scene::LayoutUpdateHook
         }));
     }
 
-    fn children(&self, _node: &Node) -> Vec<AnyView> { vec![self.content.clone()] }
+    fn children(&self, _node: &Node) -> Vec<AnyView> {
+        vec![self.content.clone()]
+    }
 }
 impl_primitive_view!(FocusScope);

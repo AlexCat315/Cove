@@ -40,7 +40,13 @@ pub struct TerminalMouseEvent {
 
 impl TerminalMouseEvent {
     pub fn new(action: MouseAction, button: Option<MouseButton>, x: f32, y: f32) -> Self {
-        Self { action, button, x, y, modifiers: KeyModifiers::empty() }
+        Self {
+            action,
+            button,
+            x,
+            y,
+            modifiers: KeyModifiers::empty(),
+        }
     }
 
     fn ghostty_action(self) -> i32 {
@@ -90,9 +96,14 @@ impl MouseEncoder {
         unsafe {
             let mut encoder: GhosttyMouseEncoder = ptr::null_mut();
             let mut event: GhosttyMouseEvent = ptr::null_mut();
-            let encoder_ok = ffi::ghostty_mouse_encoder_new(ptr::null(), &mut encoder) == ffi::GHOSTTY_SUCCESS;
-            let event_ok = ffi::ghostty_mouse_event_new(ptr::null(), &mut event) == ffi::GHOSTTY_SUCCESS;
-            Self { encoder: if encoder_ok { encoder } else { ptr::null_mut() }, event: if event_ok { event } else { ptr::null_mut() } }
+            let encoder_ok =
+                ffi::ghostty_mouse_encoder_new(ptr::null(), &mut encoder) == ffi::GHOSTTY_SUCCESS;
+            let event_ok =
+                ffi::ghostty_mouse_event_new(ptr::null(), &mut event) == ffi::GHOSTTY_SUCCESS;
+            Self {
+                encoder: if encoder_ok { encoder } else { ptr::null_mut() },
+                event: if event_ok { event } else { ptr::null_mut() },
+            }
         }
     }
 
@@ -125,13 +136,19 @@ impl MouseEncoder {
 
             ffi::ghostty_mouse_event_set_action(self.event, mouse.ghostty_action());
             match mouse.button {
-                Some(button) => ffi::ghostty_mouse_event_set_button(self.event, TerminalMouseEvent::ghostty_button(button)),
+                Some(button) => ffi::ghostty_mouse_event_set_button(
+                    self.event,
+                    TerminalMouseEvent::ghostty_button(button),
+                ),
                 None => ffi::ghostty_mouse_event_clear_button(self.event),
             }
             ffi::ghostty_mouse_event_set_mods(self.event, mouse.ghostty_mods());
             ffi::ghostty_mouse_event_set_position(
                 self.event,
-                ffi::GhosttyMousePosition { x: mouse.x, y: mouse.y },
+                ffi::GhosttyMousePosition {
+                    x: mouse.x,
+                    y: mouse.y,
+                },
             );
 
             let mut buffer = vec![0u8; 64];
@@ -172,13 +189,18 @@ impl TerminalEngine {
         let mut tracking = false;
         // SAFETY: the terminal handle is live and `tracking` is a bool as documented.
         let result = unsafe {
-            ffi::ghostty_terminal_get(self.terminal, ffi::DATA_MOUSE_TRACKING, ptr::addr_of_mut!(tracking).cast())
+            ffi::ghostty_terminal_get(
+                self.terminal,
+                ffi::DATA_MOUSE_TRACKING,
+                ptr::addr_of_mut!(tracking).cast(),
+            )
         };
         result == ffi::GHOSTTY_SUCCESS && tracking
     }
 
     pub fn encode_mouse(&self, event: &TerminalMouseEvent) -> Vec<u8> {
         let (width, height) = self.cell_size();
-        self.mouse.encode(event, self.terminal, self.columns, self.rows, width, height)
+        self.mouse
+            .encode(event, self.terminal, self.columns, self.rows, width, height)
     }
 }

@@ -6,13 +6,13 @@
 
 use crate::cli::{AppPlatform, Arguments, Flag, OptionKey};
 use crate::project::{AppProject, ApplicationIdentity};
-use crate::support::{environment, Files, Shell, StdoutTarget, ToolError};
+use crate::support::{Files, Shell, StdoutTarget, ToolError, environment};
 use cove_devtools_protocol::{DevToolsDiscovery, DevToolsLaunch};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 /// A published development session, shared with `cove devtools`.
@@ -50,9 +50,7 @@ fn rewrite_port(endpoint: &str, port: i64) -> String {
         Some(index) => endpoint.split_at(index + 3),
         None => ("", endpoint),
     };
-    let authority_end = rest
-        .find(['/', '?', '#'])
-        .unwrap_or(rest.len());
+    let authority_end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
     let (authority, suffix) = rest.split_at(authority_end);
     let host = match authority.rfind(':') {
         Some(index) if !authority[index..].contains(']') => &authority[..index],
@@ -97,10 +95,7 @@ impl DevelopmentSession {
     }
 
     /// A session exists only for `--devtools` or `--profile` runs.
-    pub fn make(
-        project: AppProject,
-        arguments: &Arguments,
-    ) -> Result<Option<Self>, ToolError> {
+    pub fn make(project: AppProject, arguments: &Arguments) -> Result<Option<Self>, ToolError> {
         if !arguments.flags.contains(&Flag::Devtools)
             && arguments.configuration != crate::cli::BuildConfiguration::Profile
         {
@@ -237,9 +232,8 @@ mod cancellation {
     /// Upper bound on concurrent run loops in one CLI invocation.
     const SLOTS: usize = 8;
 
-    static FLAGS: [AtomicPtr<AtomicBool>; SLOTS] = [const {
-        AtomicPtr::new(std::ptr::null_mut())
-    }; SLOTS];
+    static FLAGS: [AtomicPtr<AtomicBool>; SLOTS] =
+        [const { AtomicPtr::new(std::ptr::null_mut()) }; SLOTS];
     static INSTALL: Once = Once::new();
 
     pub fn register(flag: Arc<AtomicBool>) {
@@ -303,7 +297,10 @@ pub fn process_is_alive(pid: i32) -> bool {
     #[cfg(unix)]
     {
         // SAFETY: `kill` with signal 0 only performs an existence check.
-        unsafe { libc::kill(pid, 0) == 0 || std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM) }
+        unsafe {
+            libc::kill(pid, 0) == 0
+                || std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM)
+        }
     }
     #[cfg(not(unix))]
     {
@@ -357,7 +354,11 @@ impl Inspector {
             )?;
         } else if cfg!(windows) {
             Shell::run(
-                &["rundll32.exe".into(), "url.dll,FileProtocolHandler".into(), url],
+                &[
+                    "rundll32.exe".into(),
+                    "url.dll,FileProtocolHandler".into(),
+                    url,
+                ],
                 None,
                 &environment(),
                 false,
@@ -379,7 +380,11 @@ impl Inspector {
 
     /// Runs one client action against the resolved live session, or opens the
     /// Inspector when the command has no action.
-    pub fn attach(arguments: &Arguments, project: &AppProject, root: &Path) -> Result<(), ToolError> {
+    pub fn attach(
+        arguments: &Arguments,
+        project: &AppProject,
+        root: &Path,
+    ) -> Result<(), ToolError> {
         let (session, file) = Self::live(arguments, project)?;
         let Some(client) = &arguments.client else {
             return Self::present(
@@ -559,10 +564,7 @@ impl DesktopRun {
         let deadline = Instant::now() + Duration::from_secs(20);
         let descriptor = PathBuf::from(&development.launch.descriptor_path);
         let mut runtime: Option<DevToolsDiscovery> = None;
-        while is_running(&mut child)
-            && Instant::now() < deadline
-            && !cancellation.is_cancelled()
-        {
+        while is_running(&mut child) && Instant::now() < deadline && !cancellation.is_cancelled() {
             if let Some(found) = read_discovery(&descriptor) {
                 runtime = Some(found);
                 break;
@@ -664,13 +666,14 @@ impl AndroidRun {
         let Some(development) = development else {
             return Ok(());
         };
-        let adb = toolchain.sdk.join("platform-tools/adb").display().to_string();
+        let adb = toolchain
+            .sdk
+            .join("platform-tools/adb")
+            .display()
+            .to_string();
         let command = vec![adb.clone(), "-s".into(), device.clone()];
         let cancellation = RunCancellation::new();
-        let descriptor = format!(
-            "files/devtools/{}.json",
-            development.launch.id
-        );
+        let descriptor = format!("files/devtools/{}.json", development.launch.id);
         let mut runtime: Option<DevToolsDiscovery> = None;
         let deadline = Instant::now() + Duration::from_secs(20);
         while Instant::now() < deadline && !cancellation.is_cancelled() {
@@ -713,11 +716,7 @@ impl AndroidRun {
             ));
         };
         let mut forward = command.clone();
-        forward.extend([
-            "forward".to_string(),
-            "tcp:0".into(),
-            format!("tcp:{port}"),
-        ]);
+        forward.extend(["forward".to_string(), "tcp:0".into(), format!("tcp:{port}")]);
         let forwarded = Shell::run(
             &forward,
             None,

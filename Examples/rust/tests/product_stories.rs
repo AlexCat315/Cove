@@ -6,9 +6,9 @@
 
 use cove_examples::gallery_content::catalog::GalleryOptions;
 use cove_examples::gallery_content::stories::product_stories::{
-    airport_label, is_valid_email, product_stories, search_airports, validate_email,
-    ComboboxStory, FormStory, NotificationStory, ProductStory, RadioStory, AIRPORTS,
-    DEFAULT_MODE, MAX_VISIBLE_TOASTS, OFFLINE_QUERY, RADIO_CHOICES,
+    AIRPORTS, ComboboxStory, DEFAULT_MODE, FormStory, MAX_VISIBLE_TOASTS, NotificationStory,
+    OFFLINE_QUERY, ProductStory, RADIO_CHOICES, RadioStory, airport_label, is_valid_email,
+    product_stories, search_airports, validate_email,
 };
 
 #[test]
@@ -88,7 +88,10 @@ fn a_whitespace_only_name_is_still_missing() {
     let story = FormStory::new(GalleryOptions::default());
     story.set_name("   ");
     story.set_email("ada@example.com");
-    assert!(!story.submit(), "a blank-looking name does not satisfy `required`");
+    assert!(
+        !story.submit(),
+        "a blank-looking name does not satisfy `required`"
+    );
 }
 
 #[test]
@@ -119,7 +122,11 @@ fn clearing_the_city_reads_as_none() {
 #[test]
 fn the_airport_directory_finds_matches_by_code_and_name() {
     assert_eq!(search_airports("PEK").unwrap().len(), 1);
-    assert_eq!(search_airports("pek").unwrap()[0].code, "PEK", "matching is case-insensitive");
+    assert_eq!(
+        search_airports("pek").unwrap()[0].code,
+        "PEK",
+        "matching is case-insensitive"
+    );
     let tokyo = search_airports("tokyo").unwrap();
     assert_eq!(tokyo.len(), 2, "Narita and Haneda");
     let london = search_airports("Heathrow").unwrap();

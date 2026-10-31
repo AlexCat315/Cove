@@ -174,13 +174,15 @@ pub fn results_presentation(
 ) -> ComboboxResultsPresentation {
     match phase {
         // The spinner only shows before there is anything to show.
-        ComboboxSearchPhase::Loading if match_count == 0 => {
-            ComboboxResultsPresentation::Searching
+        ComboboxSearchPhase::Loading if match_count == 0 => ComboboxResultsPresentation::Searching,
+        ComboboxSearchPhase::Failed(message) => {
+            ComboboxResultsPresentation::Failed(message.clone())
         }
-        ComboboxSearchPhase::Failed(message) => ComboboxResultsPresentation::Failed(message.clone()),
         ComboboxSearchPhase::TooShort(count) => ComboboxResultsPresentation::TooShort(*count),
         _ if match_count == 0 => ComboboxResultsPresentation::Empty(empty_text.to_owned()),
-        _ => ComboboxResultsPresentation::List { dimmed: phase.is_loading() },
+        _ => ComboboxResultsPresentation::List {
+            dimmed: phase.is_loading(),
+        },
     }
 }
 

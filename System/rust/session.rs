@@ -11,9 +11,9 @@ use super::platform::ProcessPlatform;
 use os_pipe::{PipeReader, PipeWriter};
 use std::io;
 use std::path::Path;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, Sender};
-use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 const READ_CHUNK: usize = 65_536;
@@ -100,7 +100,8 @@ impl Core {
                 }
             });
         if let Ok(handle) = handle {
-            self.state.install_timer(ProcessTimer::new(cancelled, handle));
+            self.state
+                .install_timer(ProcessTimer::new(cancelled, handle));
         }
     }
 }
@@ -142,9 +143,10 @@ impl ProcessSession {
             || path_contains_nul(&command.executable)
             || path_contains_nul(&command.directory)
             || command.arguments.iter().any(|value| value.contains('\0'))
-            || command.environment.iter().any(|(key, value)| {
-                key.contains('=') || key.contains('\0') || value.contains('\0')
-            })
+            || command
+                .environment
+                .iter()
+                .any(|(key, value)| key.contains('=') || key.contains('\0') || value.contains('\0'))
         {
             return Err(ProcessError::InvalidCommand.into());
         }

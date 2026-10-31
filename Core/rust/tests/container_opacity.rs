@@ -24,15 +24,26 @@ fn descendant_opacity() {
     root.set_opacity(0.5);
     let child = Node::new();
     child.set_frame(Rect::new(0.0, 0.0, 20.0, 20.0));
-    child.set_background_color(Some(Color { r: 1.0, g: 0.0, b: 0.0, a: 1.0 }));
+    child.set_background_color(Some(Color {
+        r: 1.0,
+        g: 0.0,
+        b: 0.0,
+        a: 1.0,
+    }));
     child.set_opacity(0.5);
     root.add_child(&child);
 
     let mut direct = DrawList::default();
     NodeRenderer.render(&root, &mut direct);
-    assert!(!direct.vertices().is_empty(), "the red child produced geometry");
     assert!(
-        direct.vertices().iter().all(|vertex| alpha(vertex) == QUARTER),
+        !direct.vertices().is_empty(),
+        "the red child produced geometry"
+    );
+    assert!(
+        direct
+            .vertices()
+            .iter()
+            .all(|vertex| alpha(vertex) == QUARTER),
         "nested 0.5 * 0.5 composes to a quarter alpha, saw {:?}",
         direct.vertices().iter().map(alpha).collect::<Vec<_>>()
     );
@@ -56,7 +67,10 @@ fn descendant_opacity() {
     let mut changed = DrawList::default();
     renderer.render(&render_tree, &mut changed);
     assert!(
-        changed.vertices().iter().all(|vertex| alpha(vertex) == HALF),
+        changed
+            .vertices()
+            .iter()
+            .all(|vertex| alpha(vertex) == HALF),
         "removing the ancestor's 0.5 raises descendants to a half alpha"
     );
 }

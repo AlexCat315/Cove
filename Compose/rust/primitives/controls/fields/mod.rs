@@ -37,16 +37,14 @@ pub use date_range_rules::{DateRangePreset, DateRangeRules};
 pub mod time_input_model;
 pub use time_input_model::{TimeInputHourCycle, TimeInputState, TimeSegment};
 pub mod vec3_field;
-pub use vec3_field::{Vec3Field, AXIS_BASIS, axis_tint};
+pub use vec3_field::{AXIS_BASIS, Vec3Field, axis_tint};
 pub mod vec3_model;
-pub use vec3_model::{
-    minimum_axis_width, shows_mixed, Vec3, Vec3Axis, Vec3Codec, Vec3Constraints,
-};
+pub use vec3_model::{Vec3, Vec3Axis, Vec3Codec, Vec3Constraints, minimum_axis_width, shows_mixed};
 pub mod json_field;
 pub use json_field::JsonField;
 pub mod json_field_model;
 pub use json_field_model::{
-    normalized_commit_text, pretty_printed, validate, JsonFieldLabels, JsonFieldValidation,
+    JsonFieldLabels, JsonFieldValidation, normalized_commit_text, pretty_printed, validate,
 };
 pub mod color_field;
 pub use color_field::ColorField;
@@ -56,13 +54,13 @@ pub mod combobox;
 pub use combobox::{Combobox, ComboboxPresentation, ComboboxSearch};
 pub mod combobox_model;
 pub use combobox_model::{
-    results_presentation, too_short_prompt, ComboboxResultsPresentation, ComboboxSearchPhase,
-    ComboboxSearchSession, DEFAULT_FAILURE_MESSAGE,
+    ComboboxResultsPresentation, ComboboxSearchPhase, ComboboxSearchSession,
+    DEFAULT_FAILURE_MESSAGE, results_presentation, too_short_prompt,
 };
 pub mod asset_ref_field;
 pub use asset_ref_field::{AssetRefField, icon_resource};
 pub mod asset_ref_model;
 pub use asset_ref_model::{
-    field_description, field_tooltip, has_preview, icon_for, picker_options, placeholder_kind,
-    AssetIconKind, AssetRef,
+    AssetIconKind, AssetRef, field_description, field_tooltip, has_preview, icon_for,
+    picker_options, placeholder_kind,
 };

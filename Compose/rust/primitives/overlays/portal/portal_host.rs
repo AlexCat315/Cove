@@ -14,18 +14,20 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use cove_composition::{impl_primitive_view, AnyView, LayoutDebugAttachmentKey, PrimitiveView, View, ViewExt};
 use crate::modifiers::layout::LayoutFrameExt;
 use crate::{ScrollAxis, ScrollView, ScrollbarGutter};
+use cove_composition::{
+    AnyView, LayoutDebugAttachmentKey, PrimitiveView, View, ViewExt, impl_primitive_view,
+};
 use cove_core::scene::{
     Align, Edge, FlexDirection, FocusChainHolder, InputHandlerRoute, InteractionRegistryHolder,
-    LayoutNode, Node, PointerCaptureHolder, PointerPhase, PositionType, WheelRoutingPriority,
-    WheelRoutingAttachmentKey,
+    LayoutNode, Node, PointerCaptureHolder, PointerPhase, PositionType, WheelRoutingAttachmentKey,
+    WheelRoutingPriority,
 };
 use cove_core::{Point, Rect, Size};
 
+use super::portal_placement::{PortalPlacement, portal_window_bounds};
 use super::portal_registry::{PortalEntry, PortalStore, PortalStoreEnvironment, PortalStoreHolder};
-use super::portal_placement::{portal_window_bounds, PortalPlacement};
 
 /// Node attachment carrying the store this host bound its observer to.
 const BOUND_STORE: &str = "CoveUICompose.portalHost.store";
@@ -46,7 +48,10 @@ pub struct PortalHost {
 
 impl PortalHost {
     pub fn new() -> Self {
-        Self { store: Rc::new(RefCell::new(None)), revision: Rc::new(Cell::new(0)) }
+        Self {
+            store: Rc::new(RefCell::new(None)),
+            revision: Rc::new(Cell::new(0)),
+        }
     }
 }
 
@@ -89,12 +94,18 @@ impl PrimitiveView for PortalHostPrimitive {
     fn make_node(&self) -> Node {
         let node = Node::new();
         node.set_is_hit_testable(false);
-        node.set_attachment(LayoutDebugAttachmentKey::LAYOUT_ROLE, "portal-host".to_owned());
+        node.set_attachment(
+            LayoutDebugAttachmentKey::LAYOUT_ROLE,
+            "portal-host".to_owned(),
+        );
         node
     }
 
     fn update_node(&self, node: &Node) {
-        node.set_attachment(LayoutDebugAttachmentKey::LAYOUT_ROLE, "portal-host".to_owned());
+        node.set_attachment(
+            LayoutDebugAttachmentKey::LAYOUT_ROLE,
+            "portal-host".to_owned(),
+        );
 
         // Resolve ownership exactly once, from a real window store. The shared
         // fallback is not ownership evidence, so waiting for a scoped store
@@ -116,7 +127,10 @@ impl PrimitiveView for PortalHostPrimitive {
                 InputHandlerRoute::overlay(),
                 Rc::new(move |event: &cove_platform::MouseButtonEvent, phase, _| {
                     if phase == PointerPhase::Down {
-                        store.dismiss_outside(Point { x: event.x, y: event.y });
+                        store.dismiss_outside(Point {
+                            x: event.x,
+                            y: event.y,
+                        });
                     }
                     cove_core::scene::EventResult::Ignored
                 }),
@@ -134,12 +148,11 @@ impl PrimitiveView for PortalHostPrimitive {
 
         // (Re)bind the observer only when the store identity changes.
         let bound: Option<Rc<PortalStore>> = node.attachment(BOUND_STORE);
-        let already_bound = bound.as_ref().is_some_and(|existing| Rc::ptr_eq(existing, &resolved));
+        let already_bound = bound
+            .as_ref()
+            .is_some_and(|existing| Rc::ptr_eq(existing, &resolved));
         if !already_bound {
-            if let (Some(store), Some(token)) = (
-                bound,
-                node.attachment::<u64>(OBSERVER_TOKEN),
-            ) {
+            if let (Some(store), Some(token)) = (bound, node.attachment::<u64>(OBSERVER_TOKEN)) {
                 store.remove_observer(token);
             }
             let revision = self.revision.clone();
@@ -164,8 +177,11 @@ impl PrimitiveView for PortalHostPrimitive {
             .into_iter()
             .map(|entry| {
                 AnyView::new(
-                    AnyView::new(PortalEntrySlot { store: store.clone(), entry: entry.clone() })
-                        .id(entry.id.clone()),
+                    AnyView::new(PortalEntrySlot {
+                        store: store.clone(),
+                        entry: entry.clone(),
+                    })
+                    .id(entry.id.clone()),
                 )
             })
             .collect()
@@ -199,10 +215,16 @@ impl PortalEntrySlot {
 impl PrimitiveView for PortalEntrySlot {
     fn make_node(&self) -> Node {
         let node = Node::new();
-        node.set_attachment(LayoutDebugAttachmentKey::LAYOUT_ROLE, "portal-entry".to_owned());
+        node.set_attachment(
+            LayoutDebugAttachmentKey::LAYOUT_ROLE,
+            "portal-entry".to_owned(),
+        );
         node.set_attachment(ENTRY_OWNER, self.entry.id.clone());
         node.set_attachment(LayoutDebugAttachmentKey::DEBUG_NAME, self.entry.id.clone());
-        node.set_attachment(WheelRoutingAttachmentKey::PRIORITY, WheelRoutingPriority::PreferHit);
+        node.set_attachment(
+            WheelRoutingAttachmentKey::PRIORITY,
+            WheelRoutingPriority::PreferHit,
+        );
         node
     }
 
@@ -228,7 +250,10 @@ impl PrimitiveView for PortalEntrySlot {
                 let window = portal_window_bounds(node);
                 let size: Size = {
                     let frame = node.frame();
-                    Size { width: frame.width, height: frame.height }
+                    Size {
+                        width: frame.width,
+                        height: frame.height,
+                    }
                 };
                 let position = match &entry.position_for_size {
                     Some(resolve) => resolve(size),
@@ -285,9 +310,14 @@ impl PrimitiveView for PortalEntrySlot {
         scroller.clips_only_overflow = true;
         // `LayoutFrameExt` exposes only the min-width shortcut, so the full
         // frame call carries the max bounds.
-        vec![AnyView::new(
-            AnyView::new(scroller).frame(None, None, Some(minimum), None, Some(maximum), Some(limit)),
-        )]
+        vec![AnyView::new(AnyView::new(scroller).frame(
+            None,
+            None,
+            Some(minimum),
+            None,
+            Some(maximum),
+            Some(limit),
+        ))]
     }
 }
 

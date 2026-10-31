@@ -9,9 +9,9 @@ use super::environment::LogLaunch;
 use super::handler::{LogEvent, UnifiedLogHandler};
 use super::observation::LogObservation;
 use super::record::{Level, LogQuery, LogRecord, LogSnapshot, LogValue};
-use super::runtime::{register_runtime, LogRuntime, LoggingStatus};
+use super::runtime::{LogRuntime, LoggingStatus, register_runtime};
 use std::collections::BTreeMap;
-use std::ffi::{c_char, CStr};
+use std::ffi::{CStr, c_char};
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -26,8 +26,8 @@ impl LogSystem {
         static RUNTIME: OnceLock<Arc<LogRuntime>> = OnceLock::new();
         RUNTIME
             .get_or_init(|| {
-                let run_id = std::env::var("COVE_LOG_RUN_ID")
-                    .unwrap_or_else(|_| unique_run_identifier());
+                let run_id =
+                    std::env::var("COVE_LOG_RUN_ID").unwrap_or_else(|_| unique_run_identifier());
                 let runtime = LogRuntime::new(run_id);
                 register_runtime(&runtime);
                 runtime
@@ -102,10 +102,7 @@ impl LogSystem {
         }
         #[cfg(target_os = "macos")]
         {
-            return home_directory()
-                .join("Library")
-                .join("Logs")
-                .join("Cove");
+            return home_directory().join("Library").join("Logs").join("Cove");
         }
         #[cfg(any(
             target_os = "ios",
@@ -177,8 +174,7 @@ unsafe extern "C" fn native_log(
     function: *const c_char,
     line: u32,
 ) {
-    let label =
-        unsafe { string_from_pointer(label) }.unwrap_or_else(|| "com.cove.native".into());
+    let label = unsafe { string_from_pointer(label) }.unwrap_or_else(|| "com.cove.native".into());
     let message = unsafe { string_from_pointer(message) }.unwrap_or_default();
     let mut metadata = BTreeMap::new();
     metadata.insert("origin".to_owned(), LogValue::from("native"));
@@ -203,7 +199,11 @@ unsafe fn string_from_pointer(pointer: *const c_char) -> Option<String> {
         return None;
     }
     // The native bridge guarantees NUL-terminated UTF-8 text.
-    Some(unsafe { CStr::from_ptr(pointer) }.to_string_lossy().into_owned())
+    Some(
+        unsafe { CStr::from_ptr(pointer) }
+            .to_string_lossy()
+            .into_owned(),
+    )
 }
 
 /// Console fallback used when no native handler is installed and by the
@@ -243,10 +243,7 @@ fn android_console_write(level: i32, message: &str) {
     let mut offset = 0;
     while offset < bytes.len() {
         let mut count = (bytes.len() - offset).min(3800);
-        while offset + count < bytes.len()
-            && count > 0
-            && bytes[offset + count] & 0xc0 == 0x80
-        {
+        while offset + count < bytes.len() && count > 0 && bytes[offset + count] & 0xc0 == 0x80 {
             count -= 1;
         }
         let chunk = &bytes[offset..offset + count];
@@ -273,14 +270,8 @@ unsafe extern "C" {
 mod native {
     use super::*;
 
-    type Handler = unsafe extern "C" fn(
-        i32,
-        *const c_char,
-        *const c_char,
-        *const c_char,
-        *const c_char,
-        u32,
-    );
+    type Handler =
+        unsafe extern "C" fn(i32, *const c_char, *const c_char, *const c_char, *const c_char, u32);
     type Flush = extern "C" fn();
 
     unsafe extern "C" {

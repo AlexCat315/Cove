@@ -7,8 +7,8 @@
 
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{Binding, State};
-use cove_ui_compose::primitives::controls::toggle::{Checkbox, CheckboxState, Toggle};
 use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::controls::toggle::{Checkbox, CheckboxState, Toggle};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::styles::buttons::button_style::{AnyButtonStyle, ButtonStyleViewExt};
 use cove_ui_compose::theme::styles::buttons::{
@@ -16,16 +16,21 @@ use cove_ui_compose::theme::styles::buttons::{
     ToggleButtonStyle,
 };
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
-use cove_ui_compose::{
-    AnyView, BoxView, DynamicField, LayoutDebugExt, TupleView, View,
-};
+use cove_ui_compose::{AnyView, BoxView, DynamicField, LayoutDebugExt, TupleView, View};
 
 use crate::gallery_content::catalog::GalleryOptions;
 use crate::gallery_content::stories::StorySection;
 
 /// The button variants the story shows, in declaration order.
-pub const BUTTON_VARIANTS: [&str; 7] =
-    ["Primary", "Secondary", "Danger", "Warning", "Success", "Info", "Ghost"];
+pub const BUTTON_VARIANTS: [&str; 7] = [
+    "Primary",
+    "Secondary",
+    "Danger",
+    "Warning",
+    "Success",
+    "Info",
+    "Ghost",
+];
 
 /// `ButtonStory`.
 pub struct ButtonStory {
@@ -53,7 +58,11 @@ impl ButtonStory {
 
     /// The toggle variant's label, which depends on selection.
     pub fn select_label(&self) -> &'static str {
-        if self.selected.get() { "Selected" } else { "Select me" }
+        if self.selected.get() {
+            "Selected"
+        } else {
+            "Select me"
+        }
     }
 }
 
@@ -206,10 +215,7 @@ fn variant_button(
         Button::title(label, move || clicks.update(|value| *value += 1)).enabled(enabled)
     };
     match style {
-        Some(style) => AnyView::new(
-            build(clicks.clone())
-                .button_style_any(style),
-        ),
+        Some(style) => AnyView::new(build(clicks.clone()).button_style_any(style)),
         None => match debug {
             Some(name) => AnyView::new(build(clicks.clone()).debug_name(name)),
             None => AnyView::new(build(clicks.clone())),
@@ -240,10 +246,7 @@ impl CheckboxStory {
 
     /// The mixed checkbox's label, which embeds the state description.
     pub fn mixed_label(&self) -> String {
-        format!(
-            "Partially selected collection: {:?}",
-            self.mixed.get()
-        )
+        format!("Partially selected collection: {:?}", self.mixed.get())
     }
 }
 
@@ -338,7 +341,11 @@ impl ToggleStory {
     pub fn values_line(&self) -> String {
         format!(
             "Notifications: {} · Usage analytics: {}",
-            if self.notifications.get() { "On" } else { "Off" },
+            if self.notifications.get() {
+                "On"
+            } else {
+                "Off"
+            },
             if self.telemetry.get() { "On" } else { "Off" }
         )
     }
@@ -422,7 +429,15 @@ mod checks {
     fn button_variants_match_the_swift_order() {
         assert_eq!(
             BUTTON_VARIANTS,
-            ["Primary", "Secondary", "Danger", "Warning", "Success", "Info", "Ghost"]
+            [
+                "Primary",
+                "Secondary",
+                "Danger",
+                "Warning",
+                "Success",
+                "Info",
+                "Ghost"
+            ]
         );
     }
 

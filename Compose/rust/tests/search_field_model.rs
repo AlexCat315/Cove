@@ -3,9 +3,7 @@
 //! Translation of the matching/highlight/key logic in
 //! `Primitives/Controls/Fields/SearchField.swift`.
 
-use cove_ui_compose::primitives::controls::fields::{
-    SearchAction, SearchFieldState, SearchKey,
-};
+use cove_ui_compose::primitives::controls::fields::{SearchAction, SearchFieldState, SearchKey};
 
 fn suggestions() -> Vec<String> {
     vec!["Frame rate".into(), "frame buffer".into(), "Memory".into()]
@@ -14,7 +12,11 @@ fn suggestions() -> Vec<String> {
 #[test]
 fn matching_is_case_insensitive_and_shows_everything_for_an_empty_query() {
     assert_eq!(SearchFieldState::matches("", &suggestions()).len(), 3);
-    assert_eq!(SearchFieldState::matches("   ", &suggestions()).len(), 3, "whitespace trims away");
+    assert_eq!(
+        SearchFieldState::matches("   ", &suggestions()).len(),
+        3,
+        "whitespace trims away"
+    );
     assert_eq!(
         SearchFieldState::matches("FRAME", &suggestions()),
         vec!["Frame rate".to_owned(), "frame buffer".to_owned()]

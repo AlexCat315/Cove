@@ -33,10 +33,20 @@ pub struct ResourceRef {
 }
 impl ResourceRef {
     pub const fn new(kind: ResourceKind, id: u32) -> Self {
-        Self { kind, id, subresource_base: 0, subresource_count: 1 }
+        Self {
+            kind,
+            id,
+            subresource_base: 0,
+            subresource_count: 1,
+        }
     }
     pub const fn with_subresources(kind: ResourceKind, id: u32, base: u16, count: u16) -> Self {
-        Self { kind, id, subresource_base: base, subresource_count: count }
+        Self {
+            kind,
+            id,
+            subresource_base: base,
+            subresource_count: count,
+        }
     }
     pub const fn buffer(id: u32) -> Self {
         Self::new(ResourceKind::Buffer, id)
@@ -67,14 +77,24 @@ pub struct Barrier {
 }
 impl Barrier {
     pub const fn new(resource: ResourceRef, before: ResourceState, after: ResourceState) -> Self {
-        Self { resource, before, after, cross_queue: false }
+        Self {
+            resource,
+            before,
+            after,
+            cross_queue: false,
+        }
     }
     pub const fn cross_queue(
         resource: ResourceRef,
         before: ResourceState,
         after: ResourceState,
     ) -> Self {
-        Self { resource, before, after, cross_queue: true }
+        Self {
+            resource,
+            before,
+            after,
+            cross_queue: true,
+        }
     }
 }
 
@@ -110,7 +130,10 @@ impl StateTracker {
     }
 
     pub fn current_state(&self, resource: ResourceRef) -> ResourceState {
-        self.current_states.get(&resource.tracker_key()).copied().unwrap_or_default()
+        self.current_states
+            .get(&resource.tracker_key())
+            .copied()
+            .unwrap_or_default()
     }
 
     pub fn remove_resource(&mut self, resource: ResourceRef) {
@@ -120,13 +143,18 @@ impl StateTracker {
     /// Records a required state. If it differs from the current state, a
     /// barrier is queued and the tracked state is advanced immediately. Returns
     /// the state prior to the transition so callers can capture it once.
-    pub fn require_state(&mut self, resource: ResourceRef, desired: ResourceState) -> ResourceState {
+    pub fn require_state(
+        &mut self,
+        resource: ResourceRef,
+        desired: ResourceState,
+    ) -> ResourceState {
         let key = resource.tracker_key();
         let current = self.current_states.get(&key).copied().unwrap_or_default();
         if current == desired {
             return current;
         }
-        self.pending_barriers.push(Barrier::new(resource, current, desired));
+        self.pending_barriers
+            .push(Barrier::new(resource, current, desired));
         self.current_states.insert(key, desired);
         current
     }
@@ -167,7 +195,10 @@ mod tests {
         let resource = ResourceRef::texture(1);
         tracker.require_state(resource, ResourceState::COPY_DESTINATION);
         tracker.require_state(resource, ResourceState::SHADER_RESOURCE);
-        assert_eq!(tracker.current_state(resource), ResourceState::SHADER_RESOURCE);
+        assert_eq!(
+            tracker.current_state(resource),
+            ResourceState::SHADER_RESOURCE
+        );
         let barriers = tracker.commit_barriers();
         assert_eq!(barriers.len(), 1);
         assert_eq!(barriers[0].before, ResourceState::EMPTY);

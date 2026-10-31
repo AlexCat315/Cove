@@ -23,7 +23,7 @@
 //! append as independent batch runs rather than coalescing across boundaries.
 use super::node_renderer::{emit_background, emit_border};
 use super::render_culling::RenderCulling;
-use super::rendering::{content_mask, paint_scaled, Painter};
+use super::rendering::{Painter, content_mask, paint_scaled};
 use super::{Affine2D, Node, RenderObject, RenderTree};
 use crate::{Clip, DrawList, LayeredShadow, Point, Rect, RoundedRect};
 
@@ -64,16 +64,27 @@ fn target_list(open: &mut [OpenNode]) -> &mut DrawList {
 
 impl LayerAwareNodeRenderer {
     pub fn new() -> Self {
-        Self { content_placements: Vec::new() }
+        Self {
+            content_placements: Vec::new(),
+        }
     }
 
     /// Execute the cached preorder plan. Exit records preserve painter, mask,
     /// overlay and opacity ordering without using the call stack.
     pub fn render(&mut self, tree: &RenderTree, frame: &mut DrawList) {
-        let Some(root_object) = tree.root() else { return };
-        let Some(root_node) = root_object.node() else { return };
+        let Some(root_object) = tree.root() else {
+            return;
+        };
+        let Some(root_node) = root_object.node() else {
+            return;
+        };
         let root_frame = root_node.frame();
-        frame.set_viewport_bounds(Some(Rect::new(root_frame.x, root_frame.y, root_frame.width, root_frame.height)));
+        frame.set_viewport_bounds(Some(Rect::new(
+            root_frame.x,
+            root_frame.y,
+            root_frame.width,
+            root_frame.height,
+        )));
         let plan = tree.paint_plan();
         // Keep the hot buffer locally owned, avoiding a field access for every
         // node. A reentrant render borrows its own independent buffer.
@@ -117,9 +128,17 @@ impl LayerAwareNodeRenderer {
                 continue;
             }
             let parent_index = plan.parents[index];
-            let placed = if parent_index >= 0 { placements[parent_index as usize] } else { Affine2D::IDENTITY };
-            let parent_clips = open.last().map_or_else(Vec::new, |record| record.child_clips.clone());
-            let allows_cache = open.last().is_none_or(|record| record.allows_container_cache);
+            let placed = if parent_index >= 0 {
+                placements[parent_index as usize]
+            } else {
+                Affine2D::IDENTITY
+            };
+            let parent_clips = open
+                .last()
+                .map_or_else(Vec::new, |record| record.child_clips.clone());
+            let allows_cache = open
+                .last()
+                .is_none_or(|record| record.allows_container_cache);
             let own = node.placement_step(Point::default()).followed(placed);
             let bounds = Rect::new(
                 own.e,
@@ -165,14 +184,25 @@ impl LayerAwareNodeRenderer {
                 let clip_unchanged = object.last_clip_stack() == parent_clips;
                 let reused = {
                     let destination = target_list(&mut open);
-                    reuse(&object, &node, destination, own, &parent_clips, placement_unchanged, clip_unchanged)
+                    reuse(
+                        &object,
+                        &node,
+                        destination,
+                        own,
+                        &parent_clips,
+                        placement_unchanged,
+                        clip_unchanged,
+                    )
                 };
                 if reused {
                     index = end;
                     continue;
                 }
                 let defer_container = !object.children().is_empty()
-                    && (!allows_cache || object.cache_invalid() || !placement_unchanged || !clip_unchanged);
+                    && (!allows_cache
+                        || object.cache_invalid()
+                        || !placement_unchanged
+                        || !clip_unchanged);
                 if !defer_container {
                     let mut list = DrawList::default();
                     {
@@ -190,7 +220,18 @@ impl LayerAwareNodeRenderer {
                     child_allows_cache = false;
                 }
             }
-            begin(&mut open, &object, &node, end, layer, caches, own, &parent_clips, child_allows_cache, inherited_clip_revision);
+            begin(
+                &mut open,
+                &object,
+                &node,
+                end,
+                layer,
+                caches,
+                own,
+                &parent_clips,
+                child_allows_cache,
+                inherited_clip_revision,
+            );
             index += 1;
         }
         if let Some(frame_record) = open.pop()
@@ -274,7 +315,16 @@ fn begin(
     if !frosted {
         emit_border(node, target_list(open), rect, radius, border_width);
     }
-    emit_background(node, target_list(open), x, y, width, height, radius, border_width);
+    emit_background(
+        node,
+        target_list(open),
+        x,
+        y,
+        width,
+        height,
+        radius,
+        border_width,
+    );
     if frosted {
         emit_border(node, target_list(open), rect, radius, border_width);
     }
@@ -297,7 +347,8 @@ fn finish(open: &mut Vec<OpenNode>) {
     let opacity = record.node.as_ref().map_or(1.0, Node::opacity);
     let subtree_opacity = record.node.as_ref().map_or(1.0, Node::subtree_opacity);
     let overlay: Option<Painter> = record.node.as_ref().and_then(Node::overlay_draw);
-    let (own, first_vertex, descendant_start) = (record.own, record.first_vertex, record.descendant_start);
+    let (own, first_vertex, descendant_start) =
+        (record.own, record.first_vertex, record.descendant_start);
     {
         let list = target_list(open);
         if mask.is_some() {
@@ -328,7 +379,11 @@ fn finish(open: &mut Vec<OpenNode>) {
         list.pop_clip(*clip);
     }
     object.set_cached_layer_uses_local_clips(list.clip_revision != record.inherited_clip_revision);
-    object.set_cached_paint_bounds(if object.children().is_empty() { RenderCulling::bounds(&list) } else { None });
+    object.set_cached_paint_bounds(if object.children().is_empty() {
+        RenderCulling::bounds(&list)
+    } else {
+        None
+    });
     object.set_cached_layer_list(Some(list.clone()));
     if let Some(bounds) = object.cached_paint_bounds() {
         let destination = target_list(open);
@@ -353,8 +408,12 @@ fn reuse(
     if object.cache_invalid() || !clip_unchanged {
         return false;
     }
-    let Some(cached) = object.cached_layer_list() else { return false };
-    if cached.pixel_scale != list.pixel_scale || cached.geometry_antialiasing != list.geometry_antialiasing {
+    let Some(cached) = object.cached_layer_list() else {
+        return false;
+    };
+    if cached.pixel_scale != list.pixel_scale
+        || cached.geometry_antialiasing != list.geometry_antialiasing
+    {
         return false;
     }
     if object.children().is_empty()
@@ -363,7 +422,12 @@ fn reuse(
         && own.a == old.a
         && own.shadow_scale == old.shadow_scale
     {
-        let moved = Rect::new(bounds.x + own.e - old.e, bounds.y + own.f - old.f, bounds.width, bounds.height);
+        let moved = Rect::new(
+            bounds.x + own.e - old.e,
+            bounds.y + own.f - old.f,
+            bounds.width,
+            bounds.height,
+        );
         if RenderCulling::is_outside(moved, list) {
             return true;
         }
@@ -391,14 +455,30 @@ fn reuse(
 /// of translating geometry that was cut for the old position. A leaf recorded
 /// entirely outside the mask kept its vertices but lost every triangle, so
 /// moving it into view would paint nothing.
-fn crosses_rounded_corner(bounds: Option<Rect>, old: Affine2D, new: Affine2D, clips: &[Clip]) -> bool {
-    let masks: Vec<RoundedRect> = clips.iter().filter_map(|clip| clip.mask).filter(|mask| mask.radius > 0.0).collect();
+fn crosses_rounded_corner(
+    bounds: Option<Rect>,
+    old: Affine2D,
+    new: Affine2D,
+    clips: &[Clip],
+) -> bool {
+    let masks: Vec<RoundedRect> = clips
+        .iter()
+        .filter_map(|clip| clip.mask)
+        .filter(|mask| mask.radius > 0.0)
+        .collect();
     if masks.is_empty() {
         return false;
     }
     let Some(bounds) = bounds else { return true };
-    let moved = Rect::new(bounds.x + new.e - old.e, bounds.y + new.f - old.f, bounds.width, bounds.height);
-    masks.iter().any(|mask| !mask.contains_bounds(bounds) || mask.touches_corner(moved))
+    let moved = Rect::new(
+        bounds.x + new.e - old.e,
+        bounds.y + new.f - old.f,
+        bounds.width,
+        bounds.height,
+    );
+    masks
+        .iter()
+        .any(|mask| !mask.contains_bounds(bounds) || mask.touches_corner(moved))
 }
 
 #[cfg(test)]

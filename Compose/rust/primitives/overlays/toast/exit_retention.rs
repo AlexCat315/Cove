@@ -32,10 +32,16 @@ impl ToastPresentation {
 
     /// Reconcile against the controller's active list. Existing cards keep their
     /// identity; a card that left the list stays for one exit animation.
-    pub fn update(&self, notifications: &[ToastNotification], limit: usize) -> Vec<ToastPresentationEntry> {
+    pub fn update(
+        &self,
+        notifications: &[ToastNotification],
+        limit: usize,
+    ) -> Vec<ToastPresentationEntry> {
         let mut entries = self.entries.borrow_mut();
-        let previous_ids: Vec<String> =
-            entries.iter().map(|entry| entry.notification.id.clone()).collect();
+        let previous_ids: Vec<String> = entries
+            .iter()
+            .map(|entry| entry.notification.id.clone())
+            .collect();
         for entry in entries.iter_mut() {
             if let Some(notification) = notifications
                 .iter()
@@ -43,7 +49,9 @@ impl ToastPresentation {
             {
                 entry.notification = notification.clone();
             }
-            let visible = notifications.iter().any(|candidate| candidate.id == entry.notification.id);
+            let visible = notifications
+                .iter()
+                .any(|candidate| candidate.id == entry.notification.id);
             if visible != entry.is_visible {
                 *self.revision.borrow_mut() += 1;
                 entry.revision = *self.revision.borrow();
@@ -76,9 +84,9 @@ impl ToastPresentation {
     /// Drop one exited card, but only for the revision that asked to leave.
     pub fn remove(&self, id: &str, revision: u64) {
         let mut entries = self.entries.borrow_mut();
-        let matches = entries
-            .iter()
-            .any(|entry| entry.notification.id == id && entry.revision == revision && !entry.is_visible);
+        let matches = entries.iter().any(|entry| {
+            entry.notification.id == id && entry.revision == revision && !entry.is_visible
+        });
         if !matches {
             return;
         }

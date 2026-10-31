@@ -8,7 +8,7 @@
 use std::rc::Rc;
 
 use cove_ui_compose::primitives::data::data_table::{
-    accepts_projection, DataTableRowMetrics, DataTableSortRequest,
+    DataTableRowMetrics, DataTableSortRequest, accepts_projection,
 };
 use cove_ui_compose::primitives::data::lists::table::{
     ComparisonResult, TableSort, TableSortDirection,
@@ -43,8 +43,16 @@ fn row_at_finds_the_containing_row_and_clamps() {
     let metrics = DataTableRowMetrics::variable(3, 20.0, index);
     assert_eq!(metrics.row_at(0.0), 0);
     assert_eq!(metrics.row_at(19.0), 0);
-    assert_eq!(metrics.row_at(25.0), 1, "offset 25 falls inside the 50pt row");
-    assert_eq!(metrics.row_at(500.0), 2, "past the end clamps to the last row");
+    assert_eq!(
+        metrics.row_at(25.0),
+        1,
+        "offset 25 falls inside the 50pt row"
+    );
+    assert_eq!(
+        metrics.row_at(500.0),
+        2,
+        "past the end clamps to the last row"
+    );
 }
 
 #[test]
@@ -76,7 +84,10 @@ fn a_descending_sort_keeps_ties_in_source_order() {
     let request = DataTableSortRequest {
         records: keys.to_vec(),
         ids: (0..keys.len()).collect(),
-        sort: TableSort { column_id: "k".into(), direction: TableSortDirection::Descending },
+        sort: TableSort {
+            column_id: "k".into(),
+            direction: TableSortDirection::Descending,
+        },
         // Convention: `Ascending` means "left sorts before right", so a
         // larger left is `Descending`.
         compare: Rc::new(|left: &i32, right: &i32| {
@@ -100,7 +111,10 @@ fn an_ascending_sort_orders_by_key() {
     let request = DataTableSortRequest {
         records: keys.to_vec(),
         ids: (0..keys.len()).collect(),
-        sort: TableSort { column_id: "k".into(), direction: TableSortDirection::Ascending },
+        sort: TableSort {
+            column_id: "k".into(),
+            direction: TableSortDirection::Ascending,
+        },
         // Convention: `Ascending` means "left sorts before right", so a
         // larger left is `Descending`.
         compare: Rc::new(|left: &i32, right: &i32| {
@@ -122,9 +136,24 @@ fn an_ascending_sort_orders_by_key() {
 
 #[test]
 fn a_stale_projection_is_rejected() {
-    let sort_a = TableSort { column_id: "a".into(), direction: TableSortDirection::Ascending };
-    let sort_b = TableSort { column_id: "b".into(), direction: TableSortDirection::Ascending };
-    assert!(accepts_projection(7, 7, &sort_a, &sort_a), "matching revision and sort");
-    assert!(!accepts_projection(6, 7, &sort_a, &sort_a), "older row revision");
-    assert!(!accepts_projection(7, 7, &sort_a, &sort_b), "superseded sort command");
+    let sort_a = TableSort {
+        column_id: "a".into(),
+        direction: TableSortDirection::Ascending,
+    };
+    let sort_b = TableSort {
+        column_id: "b".into(),
+        direction: TableSortDirection::Ascending,
+    };
+    assert!(
+        accepts_projection(7, 7, &sort_a, &sort_a),
+        "matching revision and sort"
+    );
+    assert!(
+        !accepts_projection(6, 7, &sort_a, &sort_a),
+        "older row revision"
+    );
+    assert!(
+        !accepts_projection(7, 7, &sort_a, &sort_b),
+        "superseded sort command"
+    );
 }

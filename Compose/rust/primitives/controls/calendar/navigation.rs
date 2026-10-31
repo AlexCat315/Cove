@@ -5,7 +5,9 @@
 use crate::foundation::{Calendar, CalendarUnit, Date};
 
 use super::super::date_values::DateAvailability;
-use super::period::{CalendarGranularity, CalendarPanel, has_available_day, interval_start, year_page};
+use super::period::{
+    CalendarGranularity, CalendarPanel, has_available_day, interval_start, year_page,
+};
 
 /// The cells one panel's keys move between: their extent, one step, how many sit
 /// in a row, and the page that PageUp/PageDown and Home/End use.
@@ -126,11 +128,8 @@ impl CalendarNavigation {
             Self::Step(count) => {
                 let mut candidate = date;
                 for _ in 0..3660 {
-                    let next = calendar.date_by_adding(
-                        cells.unit,
-                        count * cells.unit_count,
-                        candidate,
-                    )?;
+                    let next =
+                        calendar.date_by_adding(cells.unit, count * cells.unit_count, candidate)?;
                     candidate = next;
                     if cells.is_available(candidate, calendar, availability) {
                         return Some(cells.start(candidate, calendar));
@@ -154,8 +153,17 @@ impl CalendarNavigation {
                 let direction = if count > 0 { 1 } else { -1 };
                 // Try forward within the page, then the other way, so a page whose
                 // first cells are unavailable still lands somewhere.
-                scan(target, direction, start, end, cells, calendar, availability)
-                    .or_else(|| scan(target, -direction, start, end, cells, calendar, availability))
+                scan(target, direction, start, end, cells, calendar, availability).or_else(|| {
+                    scan(
+                        target,
+                        -direction,
+                        start,
+                        end,
+                        cells,
+                        calendar,
+                        availability,
+                    )
+                })
             }
         }
     }
@@ -183,11 +191,7 @@ fn scan(
         if cells.is_available(candidate, calendar, availability) {
             return Some(candidate);
         }
-        let next = calendar.date_by_adding(
-            cells.unit,
-            direction * cells.unit_count,
-            candidate,
-        )?;
+        let next = calendar.date_by_adding(cells.unit, direction * cells.unit_count, candidate)?;
         candidate = cells.start(next, calendar);
     }
     None

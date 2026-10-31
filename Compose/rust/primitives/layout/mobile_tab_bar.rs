@@ -5,33 +5,31 @@
 //! "more" menu.
 use std::rc::Rc;
 
-use cove_core::scene::{
-    AccessibilityRole, Align, FlexDirection, Justify, Wrap,
-};
-use cove_core::{Binding, State};
 use cove_composition::{AnyView, View};
+use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Wrap};
+use cove_core::{Binding, State};
 
+use crate::BoxView;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::Button;
 use crate::primitives::feedback::{Badge, BadgeVariant};
 use crate::primitives::layout::insets::{SafeArea, SafeAreaEdges};
+use crate::primitives::layout::overlay::OverlayViewExt;
 use crate::primitives::layout::tab_view::TabItem;
-use crate::primitives::media::ui_icon_catalog;
 use crate::primitives::media::Icon;
+use crate::primitives::media::ui_icon_catalog;
 use crate::primitives::overlays::anchored::PopoverPlacement;
 use crate::primitives::overlays::menu::{MenuEntry, MenuItem};
 use crate::primitives::overlays::popover::Popover;
-use crate::primitives::overlays::roving_focus::{roving_identity, RovingItem};
-use crate::primitives::layout::overlay::OverlayViewExt;
-use crate::{Row, TupleView};
+use crate::primitives::overlays::roving_focus::{RovingItem, roving_identity};
 use crate::theme::styles::buttons::{
-    button_style::{ButtonStyle, ButtonStyleConfiguration},
     ButtonStyleViewExt,
+    button_style::{ButtonStyle, ButtonStyleConfiguration},
 };
 use crate::theme::{SemanticColorRef, SemanticFontRef};
-use crate::BoxView;
+use crate::{Row, TupleView};
 
 const MAX_VISIBLE: usize = 4;
 
@@ -43,12 +41,12 @@ pub struct MobileTabBar<Id: std::hash::Hash + Eq + Clone + PartialEq + 'static> 
 }
 
 impl<Id: std::hash::Hash + Eq + Clone + PartialEq + 'static> MobileTabBar<Id> {
-    pub fn new(
-        tabs: Vec<TabItem<Id>>,
-        selection: Binding<Id>,
-        is_enabled: bool,
-    ) -> Self {
-        Self { tabs, selection, is_enabled }
+    pub fn new(tabs: Vec<TabItem<Id>>, selection: Binding<Id>, is_enabled: bool) -> Self {
+        Self {
+            tabs,
+            selection,
+            is_enabled,
+        }
     }
 
     fn visible_tabs(&self) -> Vec<TabItem<Id>> {
@@ -56,10 +54,7 @@ impl<Id: std::hash::Hash + Eq + Clone + PartialEq + 'static> MobileTabBar<Id> {
             return self.tabs.clone();
         }
         let mut result: Vec<TabItem<Id>> = self.tabs.iter().take(MAX_VISIBLE).cloned().collect();
-        if let Some(selected) = self
-            .tabs
-            .iter()
-            .find(|tab| tab.id == self.selection.get())
+        if let Some(selected) = self.tabs.iter().find(|tab| tab.id == self.selection.get())
             && !result.iter().any(|tab| tab.id == selected.id)
         {
             if let Some(slot) = result.get_mut(MAX_VISIBLE - 1) {
@@ -90,11 +85,7 @@ impl<Id: std::hash::Hash + Eq + Clone + PartialEq + Send + Sync + 'static> View
 
         let mut row_items: Vec<AnyView> = Vec::new();
         for tab in &visible {
-            row_items.push(tab_item(
-                tab.clone(),
-                selection.clone(),
-                is_enabled,
-            ));
+            row_items.push(tab_item(tab.clone(), selection.clone(), is_enabled));
         }
         if !hidden.is_empty() {
             row_items.push(more_item(
@@ -105,8 +96,12 @@ impl<Id: std::hash::Hash + Eq + Clone + PartialEq + Send + Sync + 'static> View
             ));
         }
 
-        let row = Row::new(crate::VerticalAlignment::Center, 0.0, AnyView::new(TupleView::new(row_items)))
-            .padding_edges(4.0, 6.0);
+        let row = Row::new(
+            crate::VerticalAlignment::Center,
+            0.0,
+            AnyView::new(TupleView::new(row_items)),
+        )
+        .padding_edges(4.0, 6.0);
         let safe = SafeArea::new(
             SafeAreaEdges(SafeAreaEdges::HORIZONTAL.0 | SafeAreaEdges::BOTTOM.0),
             row,
@@ -188,7 +183,11 @@ fn tab_item<Id: std::hash::Hash + Eq + Clone + PartialEq + Send + Sync + 'static
 
     AnyView::new(crate::ModifiedContent::new(
         AnyView::new(button),
-        RovingItem::new(tab.id.clone(), is_selected, Rc::new(|id| roving_identity(id))),
+        RovingItem::new(
+            tab.id.clone(),
+            is_selected,
+            Rc::new(|id| roving_identity(id)),
+        ),
     ))
 }
 
@@ -221,7 +220,10 @@ fn more_item<Id: std::hash::Hash + Eq + Clone + PartialEq + Send + Sync + 'stati
         Wrap::NoWrap,
         4.0,
         AnyView::new(TupleView::new(vec![
-            AnyView::new(Icon::new(ui_icon_catalog::action::more_horizontal(), 24.0).accessibility_hidden(true)),
+            AnyView::new(
+                Icon::new(ui_icon_catalog::action::more_horizontal(), 24.0)
+                    .accessibility_hidden(true),
+            ),
             AnyView::new(
                 crate::primitives::text::Text::new("More")
                     .truncated()
@@ -277,14 +279,7 @@ impl ButtonStyle for MobileTabStyle {
             configuration.label,
         )
         .padding_edges(4.0, 6.0)
-        .frame(
-            None,
-            None,
-            None,
-            Some(52.0),
-            None,
-            None,
-        )
+        .frame(None, None, None, Some(52.0), None, None)
         .flex_with(1.0, 1.0, None)
         .semantic_foreground(ink)
         .corner_radius(12.0)
@@ -296,9 +291,7 @@ impl ButtonStyle for MobileTabStyle {
             AnyView::new(body)
         };
         let body = if is_focused {
-            AnyView::new(
-                body.border_color(theme.colors.focus_ring, 2.0),
-            )
+            AnyView::new(body.border_color(theme.colors.focus_ring, 2.0))
         } else {
             body
         };

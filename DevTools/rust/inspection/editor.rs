@@ -98,19 +98,24 @@ impl SceneEditor {
             index.clear();
             let mut stack = vec![root.clone()];
             while let Some(node) = stack.pop() {
-                let reference = Rc::new(RefCell::new(NodeRef { node: Some(node.clone()) }));
+                let reference = Rc::new(RefCell::new(NodeRef {
+                    node: Some(node.clone()),
+                }));
                 index.insert(node.id().0.to_string(), reference.clone());
                 index.insert(SceneInspector::identifier(&node), reference);
                 stack.extend(node.children());
             }
-            self.indexed_version.set(Some(root.subtree_structure_version()));
+            self.indexed_version
+                .set(Some(root.subtree_structure_version()));
             *self.indexed_root.borrow_mut() = Some(root);
         }
         self.node_index
             .borrow()
             .get(id)
             .and_then(|reference| reference.borrow().node.clone())
-            .filter(|node| node.parent().is_some() || self.tree.borrow().root().as_ref() == Some(node))
+            .filter(|node| {
+                node.parent().is_some() || self.tree.borrow().root().as_ref() == Some(node)
+            })
     }
 
     pub fn select(&self, id: Option<&str>) {
@@ -135,8 +140,16 @@ impl SceneEditor {
     pub fn state(&self) -> InspectionState {
         self.prune();
         InspectionState {
-            selected_id: self.selected.borrow().as_ref().map(|node| node.id().0.to_string()),
-            hovered_id: self.hovered.borrow().as_ref().map(|node| node.id().0.to_string()),
+            selected_id: self
+                .selected
+                .borrow()
+                .as_ref()
+                .map(|node| node.id().0.to_string()),
+            hovered_id: self
+                .hovered
+                .borrow()
+                .as_ref()
+                .map(|node| node.id().0.to_string()),
             picking: self.picking.get(),
             can_undo: !self.undo.borrow().is_empty(),
             can_redo: !self.redo.borrow().is_empty(),
@@ -163,10 +176,20 @@ impl SceneEditor {
                 .collect();
             self.apply(live);
         }
-        if self.selected.borrow().as_ref().is_some_and(|node| self.find(&node.id().0.to_string()).is_none()) {
+        if self
+            .selected
+            .borrow()
+            .as_ref()
+            .is_some_and(|node| self.find(&node.id().0.to_string()).is_none())
+        {
             *self.selected.borrow_mut() = None;
         }
-        if self.hovered.borrow().as_ref().is_some_and(|node| self.find(&node.id().0.to_string()).is_none()) {
+        if self
+            .hovered
+            .borrow()
+            .as_ref()
+            .is_some_and(|node| self.find(&node.id().0.to_string()).is_none())
+        {
             *self.hovered.borrow_mut() = None;
         }
     }
@@ -216,9 +239,10 @@ impl SceneEditor {
             }
             node.mark_render_dirty(InvalidationSource::style_set("debugStyle"));
             if style.is_some() {
-                self.override_nodes
-                    .borrow_mut()
-                    .insert(id.clone(), Rc::new(RefCell::new(NodeRef { node: Some(node) })));
+                self.override_nodes.borrow_mut().insert(
+                    id.clone(),
+                    Rc::new(RefCell::new(NodeRef { node: Some(node) })),
+                );
             } else {
                 self.override_nodes.borrow_mut().remove(&id);
             }
@@ -262,7 +286,11 @@ impl SceneEditor {
                         y: payload.get("y")?.as_f64()? as f32,
                     })
                 }) else {
-                    return error(request, "bad_request", "Expected finite window coordinates x/y");
+                    return error(
+                        request,
+                        "bad_request",
+                        "Expected finite window coordinates x/y",
+                    );
                 };
                 let node = self.pick(point);
                 if request.r#type == "inspect.hover" {
@@ -281,7 +309,11 @@ impl SceneEditor {
                     return error(request, "bad_request", "Expected node id");
                 };
                 let Some(node) = self.find(id) else {
-                    return error(request, "stale_node", "Selected node is no longer in the scene");
+                    return error(
+                        request,
+                        "stale_node",
+                        "Selected node is no longer in the scene",
+                    );
                 };
                 let node_id = node.id().0.to_string();
                 let mut next = self.overrides.borrow().clone();
@@ -292,9 +324,15 @@ impl SceneEditor {
                         .and_then(|payload| payload.get("properties"))
                         .and_then(|value| value.as_object())
                     else {
-                        return error(request, "bad_request", "Expected node id and supported properties");
+                        return error(
+                            request,
+                            "bad_request",
+                            "Expected node id and supported properties",
+                        );
                     };
-                    if properties.get("padding").is_some_and(|value| value.is_object())
+                    if properties
+                        .get("padding")
+                        .is_some_and(|value| value.is_object())
                         && node.layout_node().is_none()
                     {
                         return error(
@@ -312,10 +350,20 @@ impl SceneEditor {
                         match key.as_str() {
                             "padding" => {
                                 style.padding = value.as_object().map(|edges| LayoutInsets {
-                                    top: edges.get("top").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
-                                    right: edges.get("right").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
-                                    bottom: edges.get("bottom").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
-                                    left: edges.get("left").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
+                                    top: edges.get("top").and_then(|v| v.as_f64()).unwrap_or(0.0)
+                                        as f32,
+                                    right: edges
+                                        .get("right")
+                                        .and_then(|v| v.as_f64())
+                                        .unwrap_or(0.0)
+                                        as f32,
+                                    bottom: edges
+                                        .get("bottom")
+                                        .and_then(|v| v.as_f64())
+                                        .unwrap_or(0.0)
+                                        as f32,
+                                    left: edges.get("left").and_then(|v| v.as_f64()).unwrap_or(0.0)
+                                        as f32,
                                 });
                             }
                             "backgroundColor" => {
@@ -334,7 +382,11 @@ impl SceneEditor {
                     }
                 }
                 if next.len() > MAX_OVERRIDE_NODES {
-                    return error(request, "limit", "At most 256 nodes may have temporary styles");
+                    return error(
+                        request,
+                        "limit",
+                        "At most 256 nodes may have temporary styles",
+                    );
                 }
                 self.commit(next);
             }
@@ -371,11 +423,9 @@ impl SceneEditor {
         let state = self.state();
         // The response echoes the request type with `.ok`, carrying the new
         // inspection state so a client never has to poll.
-        let mut response = request.ok().unwrap_or_else(|| Envelope::new(
-            format!("{}.ok", request.r#type),
-            request.id,
-            None,
-        ));
+        let mut response = request
+            .ok()
+            .unwrap_or_else(|| Envelope::new(format!("{}.ok", request.r#type), request.id, None));
         response.payload = serde_json::to_value(state).ok();
         response
     }
@@ -392,7 +442,9 @@ impl SceneEditor {
             if !node.is_layout_visible()
                 || node.opacity() <= 0.0
                 || node.subtree_opacity() <= 0.0
-                || node.layout_node().is_some_and(|layout| layout.display() == Display::None)
+                || node
+                    .layout_node()
+                    .is_some_and(|layout| layout.display() == Display::None)
             {
                 return None;
             }
@@ -402,7 +454,8 @@ impl SceneEditor {
                 return None;
             }
             // Reverse paint order: greater z first, then later siblings first.
-            let mut children: Vec<(usize, Node)> = node.children().into_iter().enumerate().collect();
+            let mut children: Vec<(usize, Node)> =
+                node.children().into_iter().enumerate().collect();
             children.sort_by(|(left_index, left), (right_index, right)| {
                 right
                     .z_index()
@@ -415,7 +468,8 @@ impl SceneEditor {
                     return Some(hit);
                 }
             }
-            (inside && (node.layout_node().is_some() || node.background_color().is_some())).then(|| node.clone())
+            (inside && (node.layout_node().is_some() || node.background_color().is_some()))
+                .then(|| node.clone())
         }
         visit(&root, point)
     }
@@ -439,14 +493,20 @@ impl SceneEditor {
         }
         match event {
             InputEvent::MouseMotion(motion) => {
-                *self.hovered.borrow_mut() = self.pick(Point { x: motion.x, y: motion.y });
+                *self.hovered.borrow_mut() = self.pick(Point {
+                    x: motion.x,
+                    y: motion.y,
+                });
                 self.notify();
                 true
             }
             InputEvent::MouseButtonDown(button) => {
                 self.swallowed_buttons.borrow_mut().push(button.button);
                 if button.button == cove_platform::MouseButton::Left {
-                    *self.selected.borrow_mut() = self.pick(Point { x: button.x, y: button.y });
+                    *self.selected.borrow_mut() = self.pick(Point {
+                        x: button.x,
+                        y: button.y,
+                    });
                     self.picking.set(false);
                     *self.hovered.borrow_mut() = None;
                     self.notify();
@@ -470,7 +530,11 @@ impl SceneEditor {
     /// Draw the hover/selection outline plus padding tint, clipped by ancestors.
     pub fn draw_overlay(&self, list: &mut DrawList) {
         self.prune();
-        let node = self.hovered.borrow().clone().or_else(|| self.selected.borrow().clone());
+        let node = self
+            .hovered
+            .borrow()
+            .clone()
+            .or_else(|| self.selected.borrow().clone());
         let Some(node) = node else { return };
         let frame = node.absolute_frame();
         if frame.width <= 0.0 || frame.height <= 0.0 {
@@ -488,18 +552,30 @@ impl SceneEditor {
             list.push_clip_rect(*clip);
         }
         let hovered = self.hovered.borrow().is_some();
-        if hovered
-            && let Some(padding) = node.layout_node().map(|layout| layout.resolved_padding())
+        if hovered && let Some(padding) = node.layout_node().map(|layout| layout.resolved_padding())
         {
             let tint = Color::from_rgba8(100, 210, 130, 75);
             let _ = list.add_rect(Rect::new(frame.x, frame.y, frame.width, padding.top), tint);
             let _ = list.add_rect(
-                Rect::new(frame.x, frame.y + (frame.height - padding.bottom).max(0.0), frame.width, padding.bottom),
+                Rect::new(
+                    frame.x,
+                    frame.y + (frame.height - padding.bottom).max(0.0),
+                    frame.width,
+                    padding.bottom,
+                ),
                 tint,
             );
-            let _ = list.add_rect(Rect::new(frame.x, frame.y, padding.left, frame.height), tint);
             let _ = list.add_rect(
-                Rect::new(frame.x + (frame.width - padding.right).max(0.0), frame.y, padding.right, frame.height),
+                Rect::new(frame.x, frame.y, padding.left, frame.height),
+                tint,
+            );
+            let _ = list.add_rect(
+                Rect::new(
+                    frame.x + (frame.width - padding.right).max(0.0),
+                    frame.y,
+                    padding.right,
+                    frame.height,
+                ),
                 tint,
             );
         }
@@ -508,14 +584,30 @@ impl SceneEditor {
         } else {
             Color::from_rgba8(80, 160, 255, 255)
         };
-        let _ = list.add_rect(Rect::new(frame.x, frame.y, frame.width, 2.0_f32.min(frame.height)), color);
         let _ = list.add_rect(
-            Rect::new(frame.x, frame.y + (frame.height - 2.0).max(0.0), frame.width, 2.0_f32.min(frame.height)),
+            Rect::new(frame.x, frame.y, frame.width, 2.0_f32.min(frame.height)),
             color,
         );
-        let _ = list.add_rect(Rect::new(frame.x, frame.y, 2.0_f32.min(frame.width), frame.height), color);
         let _ = list.add_rect(
-            Rect::new(frame.x + (frame.width - 2.0).max(0.0), frame.y, 2.0_f32.min(frame.width), frame.height),
+            Rect::new(
+                frame.x,
+                frame.y + (frame.height - 2.0).max(0.0),
+                frame.width,
+                2.0_f32.min(frame.height),
+            ),
+            color,
+        );
+        let _ = list.add_rect(
+            Rect::new(frame.x, frame.y, 2.0_f32.min(frame.width), frame.height),
+            color,
+        );
+        let _ = list.add_rect(
+            Rect::new(
+                frame.x + (frame.width - 2.0).max(0.0),
+                frame.y,
+                2.0_f32.min(frame.width),
+                frame.height,
+            ),
             color,
         );
         for _ in &clips {
@@ -540,7 +632,11 @@ impl SceneEditor {
     pub fn color(hex: &str) -> Option<Color> {
         let digits = hex.strip_prefix('#')?;
         let value = u32::from_str_radix(digits, 16).ok()?;
-        let rgba = if digits.len() == 6 { (value << 8) | 255 } else { value };
+        let rgba = if digits.len() == 6 {
+            (value << 8) | 255
+        } else {
+            value
+        };
         Some(Color::from_rgba8(
             ((rgba >> 24) & 255) as u8,
             ((rgba >> 16) & 255) as u8,

@@ -143,39 +143,24 @@ impl BuildConfiguration {
             _ => None,
         }
     }
-
-    /// SwiftPM configuration name.
-    pub fn swift_configuration(self) -> &'static str {
-        if self == Self::Debug { "debug" } else { "release" }
-    }
-
-    /// Extra compiler flags carried by the profile configuration.
-    pub fn swift_flags(self) -> Vec<String> {
-        if self == Self::Profile {
-            vec!["-Xswiftc".into(), "-DCOVE_PROFILE".into()]
-        } else {
-            Vec::new()
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Operation {
     AndroidExport,
-    SelfUpdate,
     InstallCli,
     PackageCli,
     PackageNative,
     PackageBuild,
-    Setup,
-    SdkInstall,
-    SdkUse,
-    SdkList,
     Create,
     Build,
     Run,
     Clean,
     Test,
+    Fmt,
+    Clippy,
+    Check,
+    Migration,
     Task,
     Doctor,
     Devices,
@@ -219,10 +204,11 @@ pub enum OptionKey {
     Sdk,
     Target,
     Architecture,
+    Package,
 }
 
 impl OptionKey {
-    pub const ALL: [Self; 32] = [
+    pub const ALL: [Self; 33] = [
         Self::HostPackage,
         Self::ProjectAssets,
         Self::BinDirectory,
@@ -255,6 +241,7 @@ impl OptionKey {
         Self::Sdk,
         Self::Target,
         Self::Architecture,
+        Self::Package,
     ];
 
     pub fn raw_value(self) -> &'static str {
@@ -291,6 +278,7 @@ impl OptionKey {
             Self::Sdk => "sdk",
             Self::Target => "target",
             Self::Architecture => "arch",
+            Self::Package => "package",
         }
     }
 
@@ -309,6 +297,12 @@ pub enum Flag {
     SkipBuild,
     BuildOnly,
     BuildTests,
+    Fix,
+    AllTargets,
+    Locked,
+    Offline,
+    Json,
+    RequireComplete,
 }
 
 impl Flag {
@@ -320,6 +314,12 @@ impl Flag {
             Self::SkipBuild => "skip-build",
             Self::BuildOnly => "build-only",
             Self::BuildTests => "build-tests",
+            Self::Fix => "fix",
+            Self::AllTargets => "all-targets",
+            Self::Locked => "locked",
+            Self::Offline => "offline",
+            Self::Json => "json",
+            Self::RequireComplete => "require-complete",
         }
     }
 
@@ -331,9 +331,25 @@ impl Flag {
             Self::SkipBuild,
             Self::BuildOnly,
             Self::BuildTests,
+            Self::Fix,
+            Self::AllTargets,
+            Self::Locked,
+            Self::Offline,
+            Self::Json,
+            Self::RequireComplete,
         ]
         .into_iter()
         .find(|candidate| candidate.raw_value() == value)
+    }
+
+    /// The Cargo flag this passes through, when it has one.
+    pub fn cargo_argument(self) -> Option<&'static str> {
+        match self {
+            Self::AllTargets => Some("--all-targets"),
+            Self::Locked => Some("--locked"),
+            Self::Offline => Some("--offline"),
+            _ => None,
+        }
     }
 }
 
@@ -415,8 +431,8 @@ impl DevToolsClient {
             }
             "capture" => build("capture-ui", arguments.to_vec()),
             "resize" => {
-                let counted = arguments.len() == 2
-                    || (arguments.len() == 4 && arguments[2] == "--capture");
+                let counted =
+                    arguments.len() == 2 || (arguments.len() == 4 && arguments[2] == "--capture");
                 let sized = arguments.iter().take(2).all(|value| {
                     value
                         .parse::<f64>()
@@ -477,12 +493,6 @@ impl Arguments {
             .ok_or_else(|| ToolError::invalid("Supply a command; use cove --help"))?;
         let mut task_name = None;
         let operation = match verb.as_str() {
-            "self" => {
-                if tokens.pop_front().as_deref() != Some("update") {
-                    return Err(ToolError::invalid("Use cove self update [VERSION]"));
-                }
-                Operation::SelfUpdate
-            }
             "create" => {
                 if tokens.pop_front().as_deref() != Some("app") {
                     return Err(ToolError::invalid("Use cove create app <directory>"));
@@ -493,6 +503,13 @@ impl Arguments {
             "run" => Operation::Run,
             "clean" => Operation::Clean,
             "test" => Operation::Test,
+            "fmt" => Operation::Fmt,
+            "clippy" => Operation::Clippy,
+            "check" => Operation::Check,
+            "migration" => match tokens.pop_front().as_deref() {
+                Some("status") => Operation::Migration,
+                _ => return Err(ToolError::invalid("Use cove migration status [--json]")),
+            },
             "task" => {
                 if let Some(first) = tokens.front() {
                     if !first.starts_with("--") {
@@ -502,13 +519,6 @@ impl Arguments {
                 Operation::Task
             }
             "doctor" => Operation::Doctor,
-            "setup" => Operation::Setup,
-            "sdk" => match tokens.pop_front().as_deref() {
-                Some("install") => Operation::SdkInstall,
-                Some("use") => Operation::SdkUse,
-                Some("list") => Operation::SdkList,
-                _ => return Err(ToolError::invalid("Use cove sdk install/use/list")),
-            },
             "devices" => Operation::Devices,
             "showcase" => Operation::Showcase,
             "devtools" => Operation::Devtools,
@@ -538,7 +548,16 @@ impl Arguments {
         let mut client: Option<DevToolsClient> = None;
 
         while let Some(token) = tokens.pop_front() {
-            if token == "--" && (operation == Operation::Run || operation == Operation::Task) {
+            if token == "--"
+                && matches!(
+                    operation,
+                    Operation::Run
+                        | Operation::Task
+                        | Operation::Fmt
+                        | Operation::Clippy
+                        | Operation::Check
+                )
+            {
                 application_arguments = tokens.iter().cloned().collect();
                 break;
             } else if operation == Operation::Devtools {
@@ -577,9 +596,10 @@ impl Arguments {
             }
             if let Some(stripped) = token.strip_prefix("--") {
                 if let Some(key) = OptionKey::parse(stripped) {
-                    let value = tokens.front().cloned().filter(|value| {
-                        !value.is_empty() && !value.starts_with("--")
-                    });
+                    let value = tokens
+                        .front()
+                        .cloned()
+                        .filter(|value| !value.is_empty() && !value.starts_with("--"));
                     if !allowed_options(operation).contains(&key)
                         || values.contains_key(&key)
                         || value.is_none()
@@ -599,21 +619,11 @@ impl Arguments {
             }
         }
 
-        if [
-            Operation::Create,
-            Operation::SdkInstall,
-            Operation::SdkUse,
-            Operation::InstallCli,
-        ]
-        .contains(&operation)
-            && subject.is_none()
-        {
+        if [Operation::Create, Operation::InstallCli].contains(&operation) && subject.is_none() {
             return Err(ToolError::invalid("Supply a project directory"));
         }
         if [
             Operation::Doctor,
-            Operation::Setup,
-            Operation::SdkList,
             Operation::Devices,
             Operation::AndroidCompile,
         ]
@@ -624,8 +634,13 @@ impl Arguments {
                 "This command does not take a project directory",
             ));
         }
-        if [Operation::Create, Operation::Clean, Operation::Test, Operation::Task]
-            .contains(&operation)
+        if [
+            Operation::Create,
+            Operation::Clean,
+            Operation::Test,
+            Operation::Task,
+        ]
+        .contains(&operation)
             && platform.is_some()
         {
             return Err(ToolError::invalid(format!(
@@ -666,8 +681,9 @@ impl Arguments {
             }
         });
 
-        if [Operation::Setup, Operation::PackageNative].contains(&operation)
-            && (values.contains_key(&OptionKey::Sdk) || values.contains_key(&OptionKey::Architecture))
+        if [Operation::PackageNative].contains(&operation)
+            && (values.contains_key(&OptionKey::Sdk)
+                || values.contains_key(&OptionKey::Architecture))
         {
             let sdk = values.get(&OptionKey::Sdk);
             let architecture = values.get(&OptionKey::Architecture);
@@ -684,7 +700,9 @@ impl Arguments {
                 && valid_architecture
                 && !forbidden_pair)
             {
-                return Err(ToolError::invalid("Select a valid iOS SDK and architecture"));
+                return Err(ToolError::invalid(
+                    "Select a valid iOS SDK and architecture",
+                ));
             }
         }
         if [
@@ -696,7 +714,9 @@ impl Arguments {
         .contains(&operation)
             && selected_platform != AppPlatform::Android
         {
-            return Err(ToolError::invalid("This operation currently requires --android"));
+            return Err(ToolError::invalid(
+                "This operation currently requires --android",
+            ));
         }
         let android_only = [
             OptionKey::AndroidSdk,
@@ -708,9 +728,7 @@ impl Arguments {
             OptionKey::Component,
         ];
         if selected_platform != AppPlatform::Android
-            && android_only
-                .iter()
-                .any(|key| values.contains_key(key))
+            && android_only.iter().any(|key| values.contains_key(key))
         {
             return Err(ToolError::invalid("Android options require --android"));
         }
@@ -743,12 +761,8 @@ impl Arguments {
             return Err(ToolError::invalid("--no-open requires --devtools"));
         }
         if !application_arguments.is_empty()
-            && [
-                AppPlatform::Android,
-                AppPlatform::Ios,
-                AppPlatform::Web,
-            ]
-            .contains(&selected_platform)
+            && [AppPlatform::Android, AppPlatform::Ios, AppPlatform::Web]
+                .contains(&selected_platform)
         {
             return Err(ToolError::invalid(
                 "Application arguments after -- are supported for desktop runs",
@@ -821,11 +835,28 @@ pub fn standardized(value: impl AsRef<Path>) -> PathBuf {
 
 fn allowed_flags(operation: Operation) -> BTreeSet<Flag> {
     match operation {
-        Operation::Run => [Flag::Devtools, Flag::NoOpen].into_iter().collect(),
-        Operation::Devtools => [Flag::NoOpen].into_iter().collect(),
-        Operation::Test => [Flag::NoParallel, Flag::SkipBuild, Flag::BuildOnly]
+        Operation::Run => [Flag::Devtools, Flag::NoOpen, Flag::Locked, Flag::Offline]
             .into_iter()
             .collect(),
+        Operation::Devtools => [Flag::NoOpen].into_iter().collect(),
+        Operation::Build => [Flag::Locked, Flag::Offline].into_iter().collect(),
+        Operation::Test => [
+            Flag::NoParallel,
+            Flag::SkipBuild,
+            Flag::BuildOnly,
+            Flag::Locked,
+            Flag::Offline,
+        ]
+        .into_iter()
+        .collect(),
+        Operation::Fmt => [Flag::Fix, Flag::Locked].into_iter().collect(),
+        Operation::Clippy => [Flag::AllTargets, Flag::Locked, Flag::Offline, Flag::Fix]
+            .into_iter()
+            .collect(),
+        Operation::Check => [Flag::AllTargets, Flag::Locked, Flag::Offline]
+            .into_iter()
+            .collect(),
+        Operation::Migration => [Flag::Json, Flag::RequireComplete].into_iter().collect(),
         Operation::PackageBuild => [Flag::BuildTests].into_iter().collect(),
         _ => BTreeSet::new(),
     }
@@ -864,21 +895,28 @@ fn allowed_options(operation: Operation) -> BTreeSet<OptionKey> {
             OptionKey::Device,
             OptionKey::Simulator,
             OptionKey::Team,
+            OptionKey::Package,
         ]),
         Operation::Run => with_android(&[
             OptionKey::Output,
             OptionKey::Device,
             OptionKey::Simulator,
             OptionKey::Team,
+            OptionKey::Package,
         ]),
+        Operation::Fmt | Operation::Clippy | Operation::Check => {
+            union(&[OptionKey::Package, OptionKey::Target])
+        }
+        Operation::Migration => union(&[]),
         Operation::Test => union(&[
             OptionKey::Filter,
             OptionKey::ScratchPath,
             OptionKey::TestingLibrary,
             OptionKey::Timeout,
             OptionKey::EventOutput,
+            OptionKey::Package,
         ]),
-        Operation::Clean | Operation::SdkInstall | Operation::SelfUpdate => BTreeSet::new(),
+        Operation::Clean => BTreeSet::new(),
         Operation::InstallCli => [OptionKey::BinDirectory].into_iter().collect(),
         Operation::PackageCli => union(&[OptionKey::Output]),
         Operation::PackageNative => union(&[
@@ -896,20 +934,11 @@ fn allowed_options(operation: Operation) -> BTreeSet<OptionKey> {
             OptionKey::ScratchPath,
             OptionKey::ResultFile,
         ]),
-        Operation::SdkUse | Operation::SdkList => BTreeSet::new(),
-        Operation::Setup => union(&[
-            OptionKey::AndroidSdk,
-            OptionKey::Ndk,
-            OptionKey::Sdk,
-            OptionKey::Architecture,
-        ]),
         Operation::Doctor => union(&[OptionKey::AndroidSdk, OptionKey::Ndk]),
         Operation::Devices => [OptionKey::AndroidSdk].into_iter().collect(),
-        Operation::Showcase => with_android(&[
-            OptionKey::Output,
-            OptionKey::Component,
-            OptionKey::Device,
-        ]),
+        Operation::Showcase => {
+            with_android(&[OptionKey::Output, OptionKey::Component, OptionKey::Device])
+        }
         Operation::Devtools => union(&[OptionKey::Session]),
         Operation::AndroidPrepare => union(&[OptionKey::Ndk]),
         Operation::AndroidExport => with_android(&[
@@ -939,7 +968,7 @@ impl Diagnostics {
     pub fn doctor(arguments: &Arguments, root: &Path) -> Result<(), ToolError> {
         crate::toolchains::ToolchainSetup::report(arguments, root)?;
         println!(
-            "Toolchain checks passed. cove setup prepares shared native archives; cove build validates application linking."
+            "Toolchain checks passed. cove build drives Cargo; platform packaging validates application linking."
         );
         Ok(())
     }
@@ -948,7 +977,13 @@ impl Diagnostics {
         if arguments.platform == AppPlatform::Ios {
             arguments.platform.require_available()?;
             crate::support::Shell::run(
-                &["xcrun".into(), "simctl".into(), "list".into(), "devices".into(), "available".into()],
+                &[
+                    "xcrun".into(),
+                    "simctl".into(),
+                    "list".into(),
+                    "devices".into(),
+                    "available".into(),
+                ],
                 None,
                 &crate::support::environment(),
                 false,

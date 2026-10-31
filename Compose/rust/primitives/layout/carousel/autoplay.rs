@@ -7,11 +7,11 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
+use cove_composition::{AnyView, PrimitiveView, View};
 use cove_core::scene::{
-    AnyAnimationController, AnimatorScheduler, FocusChainHolder, InvalidationSource, LayoutNode,
+    AnimatorScheduler, AnyAnimationController, FocusChainHolder, InvalidationSource, LayoutNode,
     Node, NodeResource,
 };
-use cove_composition::{AnyView, PrimitiveView, View};
 
 use crate::impl_primitive_view;
 
@@ -258,8 +258,12 @@ impl AnyAnimationController for CarouselClock {
         if self.is_finished.get() {
             return;
         }
-        let Some(node) = self.node.borrow().clone() else { return };
-        let Some(session) = self.session.borrow().clone() else { return };
+        let Some(node) = self.node.borrow().clone() else {
+            return;
+        };
+        let Some(session) = self.session.borrow().clone() else {
+            return;
+        };
         session.observe((self.page.borrow())());
         if session.is_hovered.get() || Self::contains_focus(&node) {
             return;
@@ -295,7 +299,9 @@ pub struct ReducedMotionReader {
 
 impl ReducedMotionReader {
     pub fn new(content: impl Fn(bool) -> AnyView + 'static) -> Self {
-        Self { content: Rc::new(content) }
+        Self {
+            content: Rc::new(content),
+        }
     }
 }
 

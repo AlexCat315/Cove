@@ -22,9 +22,9 @@ pub type NIODevToolsTransport = StdDevToolsTransport;
 
 use crate::server::config::hello_envelope;
 use cove_devtools_protocol::{
-    decode_payload, state as decode_state_map, Envelope, InputRecording, MirrorFrame, MirrorStopped, Session,
-    StateDifference, StateObservation, StateWatch, Subscription, TimelineSnapshot, TimingFrame, TreeSnapshot,
-    WindowResize,
+    Envelope, InputRecording, MirrorFrame, MirrorStopped, Session, StateDifference,
+    StateObservation, StateWatch, Subscription, TimelineSnapshot, TimingFrame, TreeSnapshot,
+    WindowResize, decode_payload, state as decode_state_map,
 };
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -100,7 +100,12 @@ impl DevServer {
             config,
             transport,
             host: DevToolsHost::default(),
-            advertised_capabilities: vec!["tree".into(), "select".into(), "log".into(), "timing".into()],
+            advertised_capabilities: vec![
+                "tree".into(),
+                "select".into(),
+                "log".into(),
+                "timing".into(),
+            ],
             clients: BTreeMap::new(),
             recording_owner: None,
             selection_owner: None,
@@ -133,9 +138,13 @@ impl DevServer {
         let capabilities = self.advertised_capabilities.clone();
         let config = self.config.clone();
         let sender_handle = sender;
-        self.transport.start(&self.config.host, self.config.port, Arc::new(move |event| {
-            let _ = sender_handle.send(event);
-        }))?;
+        self.transport.start(
+            &self.config.host,
+            self.config.port,
+            Arc::new(move |event| {
+                let _ = sender_handle.send(event);
+            }),
+        )?;
         let _ = (capabilities, config);
         self.started = true;
         Ok(())
@@ -250,7 +259,11 @@ impl DevServer {
         };
         // Validation runs against the client's own session before any handler
         // can mutate shared state.
-        if let Some(error) = self.clients.get(&key).and_then(|client| client.session.validate(&envelope)) {
+        if let Some(error) = self
+            .clients
+            .get(&key)
+            .and_then(|client| client.session.validate(&envelope))
+        {
             self.send(error, connection);
             return;
         }
@@ -259,35 +272,53 @@ impl DevServer {
             return;
         }
         match envelope.r#type.as_str() {
-            "diagnostics.tools" | "diagnostics.call" => self.dispatch_diagnostics(envelope, connection),
-            "state.list" | "state.subscribe" | "state.unsubscribe" | "timeline.subscribe"
+            "diagnostics.tools" | "diagnostics.call" => {
+                self.dispatch_diagnostics(envelope, connection)
+            }
+            "state.list"
+            | "state.subscribe"
+            | "state.unsubscribe"
+            | "timeline.subscribe"
             | "timeline.unsubscribe" => self.dispatch_observation(envelope, connection, key),
             "mirror.start" | "mirror.stop" | "mirror.input" | "mirror.activate" => {
                 self.dispatch_mirror(envelope, connection, key)
             }
             "window.resize" => self.dispatch_window(envelope, connection),
-            "state.checkpoint" | "state.restore" | "state.diff" => self.dispatch_checkpoint(envelope, connection),
+            "state.checkpoint" | "state.restore" | "state.diff" => {
+                self.dispatch_checkpoint(envelope, connection)
+            }
             "input.record.start" | "input.record.stop" | "input.replay" => {
                 self.dispatch_recording(envelope, connection, key)
             }
-            "hello.ack" | "tree.subscribe" | "tree.unsubscribe" | "select.node" | "select.clear" | "bye"
-            | "log.subscribe" | "log.unsubscribe" | "timing.subscribe" | "timing.unsubscribe" => {
-                self.dispatch_scene(envelope, connection, key)
-            }
-            other => self.send_error(connection, &envelope, "not_implemented", &format!("unknown message type: {other}")),
+            "hello.ack" | "tree.subscribe" | "tree.unsubscribe" | "select.node"
+            | "select.clear" | "bye" | "log.subscribe" | "log.unsubscribe" | "timing.subscribe"
+            | "timing.unsubscribe" => self.dispatch_scene(envelope, connection, key),
+            other => self.send_error(
+                connection,
+                &envelope,
+                "not_implemented",
+                &format!("unknown message type: {other}"),
+            ),
         }
     }
 
     // MARK: - Scene
 
-    fn dispatch_scene(&mut self, envelope: Envelope, connection: &Arc<dyn DevToolsConnection>, key: usize) {
+    fn dispatch_scene(
+        &mut self,
+        envelope: Envelope,
+        connection: &Arc<dyn DevToolsConnection>,
+        key: usize,
+    ) {
         match envelope.r#type.as_str() {
             "hello.ack" => {}
             "tree.subscribe" => {
                 self.set_subscription(Subscription::Tree, true, key);
                 if let Some(snapshot) = &self.host.scene.snapshot {
                     let snapshot = snapshot();
-                    let mut response = envelope.ok().unwrap_or_else(|| Envelope::new("tree.snapshot", envelope.id, None));
+                    let mut response = envelope
+                        .ok()
+                        .unwrap_or_else(|| Envelope::new("tree.snapshot", envelope.id, None));
                     response.r#type = "tree.snapshot".into();
                     response.payload = serde_json::to_value(&snapshot).ok();
                     self.send(response, connection);
@@ -299,7 +330,12 @@ impl DevServer {
             }
             "select.node" => {
                 if self.inspection_owner.is_some_and(|owner| owner != key) {
-                    self.send_error(connection, &envelope, "busy", "Another inspector owns the scene editor");
+                    self.send_error(
+                        connection,
+                        &envelope,
+                        "busy",
+                        "Another inspector owns the scene editor",
+                    );
                     return;
                 }
                 let node_id = envelope
@@ -316,7 +352,12 @@ impl DevServer {
                         }
                         self.send_ok(connection, &envelope);
                     }
-                    None => self.send_error(connection, &envelope, "bad_request", "select.node requires payload.id"),
+                    None => self.send_error(
+                        connection,
+                        &envelope,
+                        "bad_request",
+                        "select.node requires payload.id",
+                    ),
                 }
             }
             "select.clear" => {
@@ -330,14 +371,17 @@ impl DevServer {
             }
             "bye" => connection.close(),
             "log.subscribe" => {
-                let query = decode_payload::<cove_logging::LogQuery>(&envelope.payload).unwrap_or_default();
+                let query =
+                    decode_payload::<cove_logging::LogQuery>(&envelope.payload).unwrap_or_default();
                 let snapshot = DevToolsLogFeed::snapshot(&query);
                 let last = snapshot.records.last().map(|record| record.sequence);
                 if let Some(client) = self.clients.get_mut(&key) {
                     client.session.log_query = query.clone();
                     client.session.log_sequence = last.or(query.after_sequence).unwrap_or(0);
                 }
-                let mut response = envelope.ok().unwrap_or_else(|| Envelope::new("log.snapshot", envelope.id, None));
+                let mut response = envelope
+                    .ok()
+                    .unwrap_or_else(|| Envelope::new("log.snapshot", envelope.id, None));
                 response.r#type = "log.snapshot".into();
                 response.payload = serde_json::to_value(&snapshot).ok();
                 self.send(response, connection);
@@ -358,18 +402,37 @@ impl DevServer {
         }
     }
 
-    fn dispatch_diagnostics(&mut self, envelope: Envelope, connection: &Arc<dyn DevToolsConnection>) {
+    fn dispatch_diagnostics(
+        &mut self,
+        envelope: Envelope,
+        connection: &Arc<dyn DevToolsConnection>,
+    ) {
         let Some(diagnostics) = &self.host.scene.diagnostics else {
-            self.send_error(connection, &envelope, "unsupported", "Host has no diagnostic query adapter");
+            self.send_error(
+                connection,
+                &envelope,
+                "unsupported",
+                "Host has no diagnostic query adapter",
+            );
             return;
         };
         let response = diagnostics(&envelope);
         self.send(response, connection);
     }
 
-    fn dispatch_inspect(&mut self, envelope: Envelope, connection: &Arc<dyn DevToolsConnection>, key: usize) {
+    fn dispatch_inspect(
+        &mut self,
+        envelope: Envelope,
+        connection: &Arc<dyn DevToolsConnection>,
+        key: usize,
+    ) {
         if self.host.scene.inspect.is_none() {
-            self.send_error(connection, &envelope, "unsupported", "Host has no scene editor");
+            self.send_error(
+                connection,
+                &envelope,
+                "unsupported",
+                "Host has no scene editor",
+            );
             return;
         }
         if self.inspection_owner.is_some_and(|owner| owner != key) {
@@ -404,15 +467,27 @@ impl DevServer {
 
     // MARK: - Observation
 
-    fn dispatch_observation(&mut self, envelope: Envelope, connection: &Arc<dyn DevToolsConnection>, key: usize) {
+    fn dispatch_observation(
+        &mut self,
+        envelope: Envelope,
+        connection: &Arc<dyn DevToolsConnection>,
+        key: usize,
+    ) {
         match envelope.r#type.as_str() {
             "state.list" | "state.subscribe" => {
                 let Some(state) = self.host.observation.state.clone() else {
-                    self.send_error(connection, &envelope, "unsupported", "Host has no state registry");
+                    self.send_error(
+                        connection,
+                        &envelope,
+                        "unsupported",
+                        "Host has no state registry",
+                    );
                     return;
                 };
                 let ids = if envelope.r#type == "state.subscribe" {
-                    decode_payload::<StateWatch>(&envelope.payload).map(|watch| watch.ids).unwrap_or_default()
+                    decode_payload::<StateWatch>(&envelope.payload)
+                        .map(|watch| watch.ids)
+                        .unwrap_or_default()
                 } else {
                     Vec::new()
                 };
@@ -423,7 +498,9 @@ impl DevServer {
                     self.set_subscription(Subscription::State, true, key);
                 }
                 let observation = state(&ids);
-                let mut response = envelope.ok().unwrap_or_else(|| Envelope::new(format!("{}.ok", envelope.r#type), envelope.id, None));
+                let mut response = envelope.ok().unwrap_or_else(|| {
+                    Envelope::new(format!("{}.ok", envelope.r#type), envelope.id, None)
+                });
                 response.payload = serde_json::to_value(&observation).ok();
                 self.send(response, connection);
             }
@@ -436,7 +513,12 @@ impl DevServer {
             }
             "timeline.subscribe" => {
                 if self.host.observation.timeline.is_none() {
-                    self.send_error(connection, &envelope, "unsupported", "Host has no timeline recorder");
+                    self.send_error(
+                        connection,
+                        &envelope,
+                        "unsupported",
+                        "Host has no timeline recorder",
+                    );
                     return;
                 }
                 if let Some(client) = self.clients.get_mut(&key) {
@@ -464,14 +546,30 @@ impl DevServer {
         }
     }
 
-    fn send_timeline(&mut self, snapshot: &TimelineSnapshot, connection: &Arc<dyn DevToolsConnection>, id: Option<i64>) {
+    fn send_timeline(
+        &mut self,
+        snapshot: &TimelineSnapshot,
+        connection: &Arc<dyn DevToolsConnection>,
+        id: Option<i64>,
+    ) {
         let key = Arc::as_ptr(connection) as *const () as usize;
-        let Some(client) = self.clients.get_mut(&key) else { return };
-        if !client.session.subscriptions.contains(&Subscription::Timeline) {
+        let Some(client) = self.clients.get_mut(&key) else {
+            return;
+        };
+        if !client
+            .session
+            .subscriptions
+            .contains(&Subscription::Timeline)
+        {
             return;
         }
         let cursor = client.session.timeline_sequence;
-        let events: Vec<_> = snapshot.events.iter().filter(|event| event.sequence > cursor).cloned().collect();
+        let events: Vec<_> = snapshot
+            .events
+            .iter()
+            .filter(|event| event.sequence > cursor)
+            .cloned()
+            .collect();
         if let Some(last) = events.last() {
             client.session.timeline_sequence = last.sequence;
         }
@@ -479,7 +577,10 @@ impl DevServer {
         if id.is_none() && events.is_empty() {
             return;
         }
-        let payload = TimelineSnapshot { events, dropped: snapshot.dropped };
+        let payload = TimelineSnapshot {
+            events,
+            dropped: snapshot.dropped,
+        };
         let mut envelope = Envelope::new("timeline.events", id, serde_json::to_value(payload).ok());
         envelope.r#type = "timeline.events".into();
         self.send(envelope, connection);
@@ -487,19 +588,33 @@ impl DevServer {
 
     // MARK: - Mirror
 
-    fn dispatch_mirror(&mut self, envelope: Envelope, connection: &Arc<dyn DevToolsConnection>, key: usize) {
+    fn dispatch_mirror(
+        &mut self,
+        envelope: Envelope,
+        connection: &Arc<dyn DevToolsConnection>,
+        key: usize,
+    ) {
         match envelope.r#type.as_str() {
             "mirror.start" => {
                 let payload = if envelope.payload.is_some() {
                     match decode_payload::<cove_devtools_protocol::MirrorStart>(&envelope.payload) {
                         Some(payload) => payload,
                         None => {
-                            self.send_error(connection, &envelope, "bad_request", "mirror.start payload is malformed");
+                            self.send_error(
+                                connection,
+                                &envelope,
+                                "bad_request",
+                                "mirror.start payload is malformed",
+                            );
                             return;
                         }
                     }
                 } else {
-                    cove_devtools_protocol::MirrorStart { fps: None, quality: None, scale: None }
+                    cove_devtools_protocol::MirrorStart {
+                        fps: None,
+                        quality: None,
+                        scale: None,
+                    }
                 };
                 self.set_subscription(Subscription::Mirror, true, key);
                 if let Some(start) = &self.host.mirror.start {
@@ -532,7 +647,12 @@ impl DevServer {
                         }
                         self.send_ok(connection, &envelope);
                     }
-                    None => self.send_error(connection, &envelope, "bad_request", "mirror.input requires payload"),
+                    None => self.send_error(
+                        connection,
+                        &envelope,
+                        "bad_request",
+                        "mirror.input requires payload",
+                    ),
                 }
             }
             "mirror.activate" => {
@@ -545,8 +665,15 @@ impl DevServer {
                     );
                     return;
                 }
-                let Some(request) = decode_payload::<cove_devtools_protocol::MirrorActivate>(&envelope.payload) else {
-                    self.send_error(connection, &envelope, "bad_request", "mirror.activate requires payload.node_id");
+                let Some(request) =
+                    decode_payload::<cove_devtools_protocol::MirrorActivate>(&envelope.payload)
+                else {
+                    self.send_error(
+                        connection,
+                        &envelope,
+                        "bad_request",
+                        "mirror.activate requires payload.node_id",
+                    );
                     return;
                 };
                 let failure = self
@@ -568,7 +695,9 @@ impl DevServer {
     // MARK: - Window / checkpoint / recording
 
     fn dispatch_window(&mut self, envelope: Envelope, connection: &Arc<dyn DevToolsConnection>) {
-        let Some(request) = decode_payload::<WindowResize>(&envelope.payload).filter(WindowResize::is_valid) else {
+        let Some(request) =
+            decode_payload::<WindowResize>(&envelope.payload).filter(WindowResize::is_valid)
+        else {
             self.send_error(
                 connection,
                 &envelope,
@@ -590,7 +719,11 @@ impl DevServer {
         }
     }
 
-    fn dispatch_checkpoint(&mut self, envelope: Envelope, connection: &Arc<dyn DevToolsConnection>) {
+    fn dispatch_checkpoint(
+        &mut self,
+        envelope: Envelope,
+        connection: &Arc<dyn DevToolsConnection>,
+    ) {
         match envelope.r#type.as_str() {
             "state.checkpoint" => {
                 let snapshot = self
@@ -600,7 +733,9 @@ impl DevServer {
                     .as_ref()
                     .map(|capture| capture())
                     .unwrap_or_default();
-                let mut response = envelope.ok().unwrap_or_else(|| Envelope::new("state.checkpoint.ok", envelope.id, None));
+                let mut response = envelope
+                    .ok()
+                    .unwrap_or_else(|| Envelope::new("state.checkpoint.ok", envelope.id, None));
                 response.payload = serde_json::to_value(&snapshot).ok();
                 self.send(response, connection);
             }
@@ -616,8 +751,18 @@ impl DevServer {
                 };
                 match &self.host.checkpoint.restore {
                     Some(restore) if restore(&snapshot) => self.send_ok(connection, &envelope),
-                    Some(_) => self.send_error(connection, &envelope, "bad_request", "Host rejected checkpoint state"),
-                    None => self.send_error(connection, &envelope, "unsupported", "Host has no checkpoint restore provider"),
+                    Some(_) => self.send_error(
+                        connection,
+                        &envelope,
+                        "bad_request",
+                        "Host rejected checkpoint state",
+                    ),
+                    None => self.send_error(
+                        connection,
+                        &envelope,
+                        "unsupported",
+                        "Host has no checkpoint restore provider",
+                    ),
                 }
             }
             "state.diff" => {
@@ -638,7 +783,9 @@ impl DevServer {
                     .map(|capture| capture())
                     .unwrap_or_default();
                 let diff = StateDifference::new(&before, &after);
-                let mut response = envelope.ok().unwrap_or_else(|| Envelope::new("state.diff.ok", envelope.id, None));
+                let mut response = envelope
+                    .ok()
+                    .unwrap_or_else(|| Envelope::new("state.diff.ok", envelope.id, None));
                 response.payload = serde_json::to_value(&diff).ok();
                 self.send(response, connection);
             }
@@ -646,11 +793,21 @@ impl DevServer {
         }
     }
 
-    fn dispatch_recording(&mut self, envelope: Envelope, connection: &Arc<dyn DevToolsConnection>, key: usize) {
+    fn dispatch_recording(
+        &mut self,
+        envelope: Envelope,
+        connection: &Arc<dyn DevToolsConnection>,
+        key: usize,
+    ) {
         match envelope.r#type.as_str() {
             "input.record.start" => {
                 if self.recording_owner.is_some() || self.host.recording.start.is_none() {
-                    self.send_error(connection, &envelope, "invalid_state", "Recording unavailable or already active");
+                    self.send_error(
+                        connection,
+                        &envelope,
+                        "invalid_state",
+                        "Recording unavailable or already active",
+                    );
                     return;
                 }
                 self.recording_owner = Some(key);
@@ -664,18 +821,30 @@ impl DevServer {
                     self.send_ok(connection, &envelope);
                 } else {
                     self.recording_owner = None;
-                    self.send_error(connection, &envelope, "invalid_state", "Host could not start recording");
+                    self.send_error(
+                        connection,
+                        &envelope,
+                        "invalid_state",
+                        "Host could not start recording",
+                    );
                 }
             }
             "input.record.stop" => {
                 if self.recording_owner != Some(key) {
-                    self.send_error(connection, &envelope, "invalid_state", "This connection does not own a recording");
+                    self.send_error(
+                        connection,
+                        &envelope,
+                        "invalid_state",
+                        "This connection does not own a recording",
+                    );
                     return;
                 }
                 self.recording_owner = None;
                 match self.host.recording.stop.as_ref().and_then(|stop| stop()) {
                     Some(recording) => {
-                        let mut response = envelope.ok().unwrap_or_else(|| Envelope::new("input.record.stop.ok", envelope.id, None));
+                        let mut response = envelope.ok().unwrap_or_else(|| {
+                            Envelope::new("input.record.stop.ok", envelope.id, None)
+                        });
                         response.payload = serde_json::to_value(&recording).ok();
                         self.send(response, connection);
                     }
@@ -684,11 +853,21 @@ impl DevServer {
             }
             "input.replay" => {
                 if self.recording_owner.is_some() || self.host.recording.replay.is_none() {
-                    self.send_error(connection, &envelope, "invalid_state", "Stop recording before replaying");
+                    self.send_error(
+                        connection,
+                        &envelope,
+                        "invalid_state",
+                        "Stop recording before replaying",
+                    );
                     return;
                 }
                 let Some(recording) = decode_payload::<InputRecording>(&envelope.payload) else {
-                    self.send_error(connection, &envelope, "bad_request", "input.replay requires a recording payload");
+                    self.send_error(
+                        connection,
+                        &envelope,
+                        "bad_request",
+                        "input.replay requires a recording payload",
+                    );
                     return;
                 };
                 let accepted = self
@@ -700,7 +879,12 @@ impl DevServer {
                 if accepted {
                     self.send_ok(connection, &envelope);
                 } else {
-                    self.send_error(connection, &envelope, "bad_request", "Host rejected recording state");
+                    self.send_error(
+                        connection,
+                        &envelope,
+                        "bad_request",
+                        "Host rejected recording state",
+                    );
                 }
             }
             _ => {}
@@ -717,7 +901,9 @@ impl DevServer {
         if self.tree_broadcast_pending {
             return;
         }
-        let Some(snapshot) = self.host.scene.snapshot.clone() else { return };
+        let Some(snapshot) = self.host.scene.snapshot.clone() else {
+            return;
+        };
         let snapshot = snapshot();
         self.tree_broadcast_pending = true;
         self.broadcast_tree(&snapshot, "tree.delta", None);
@@ -754,7 +940,9 @@ impl DevServer {
             let mut loss = dropped;
             let mut entries = Vec::new();
             {
-                let Some(client) = self.clients.get_mut(&key) else { continue };
+                let Some(client) = self.clients.get_mut(&key) else {
+                    continue;
+                };
                 for record in &records {
                     if record.sequence > client.session.log_sequence
                         && client.session.log_query.matches(record)
@@ -771,15 +959,22 @@ impl DevServer {
                 client.log_sequence = client.session.log_sequence;
             }
             let (connection, gap, sequence) = {
-                let Some(client) = self.clients.get(&key) else { continue };
-                (client.connection.clone(), client.session.log_dropped, client.log_sequence)
+                let Some(client) = self.clients.get(&key) else {
+                    continue;
+                };
+                (
+                    client.connection.clone(),
+                    client.session.log_dropped,
+                    client.log_sequence,
+                )
             };
             for record in entries {
                 let envelope = Envelope::new("log.entry", None, serde_json::to_value(&record).ok());
                 self.send(envelope, &connection);
             }
             if gap > 0 && connection.is_writable() {
-                let envelope = Envelope::new("log.gap", None, Some(serde_json::json!({ "dropped": gap })));
+                let envelope =
+                    Envelope::new("log.gap", None, Some(serde_json::json!({ "dropped": gap })));
                 self.send(envelope, &connection);
                 if let Some(client) = self.clients.get_mut(&key) {
                     client.session.log_dropped = 0;
@@ -795,7 +990,11 @@ impl DevServer {
     }
 
     fn latest_log_sequence(&self) -> u64 {
-        self.clients.values().map(|client| client.log_sequence).max().unwrap_or(0)
+        self.clients
+            .values()
+            .map(|client| client.log_sequence)
+            .max()
+            .unwrap_or(0)
     }
 
     pub fn broadcast_timing(&mut self, frame: TimingFrame) {
@@ -816,7 +1015,9 @@ impl DevServer {
             .map(|(key, client)| (*key, client.session.watched_state_ids.clone()))
             .collect();
         for (key, ids) in watchers {
-            let Some(state) = self.host.observation.state.clone() else { continue };
+            let Some(state) = self.host.observation.state.clone() else {
+                continue;
+            };
             let observation = state(&ids);
             let should_send = self.clients.get(&key).is_some_and(|client| {
                 client.session.subscriptions.contains(&Subscription::State)
@@ -827,25 +1028,43 @@ impl DevServer {
                 continue;
             }
             let connection = {
-                let Some(client) = self.clients.get_mut(&key) else { continue };
+                let Some(client) = self.clients.get_mut(&key) else {
+                    continue;
+                };
                 client.last_state = Some(observation.clone());
                 client.connection.clone()
             };
-            let envelope = Envelope::new("state.observation", None, serde_json::to_value(&observation).ok());
+            let envelope = Envelope::new(
+                "state.observation",
+                None,
+                serde_json::to_value(&observation).ok(),
+            );
             self.send(envelope, &connection);
         }
         let cursor = self
             .clients
             .values()
-            .filter(|client| client.session.subscriptions.contains(&Subscription::Timeline))
+            .filter(|client| {
+                client
+                    .session
+                    .subscriptions
+                    .contains(&Subscription::Timeline)
+            })
             .map(|client| client.session.timeline_sequence)
             .min();
-        let (Some(cursor), Some(timeline)) = (cursor, &self.host.observation.timeline) else { return };
+        let (Some(cursor), Some(timeline)) = (cursor, &self.host.observation.timeline) else {
+            return;
+        };
         let snapshot = timeline(cursor);
         let connections: Vec<Arc<dyn DevToolsConnection>> = self
             .clients
             .values()
-            .filter(|client| client.session.subscriptions.contains(&Subscription::Timeline))
+            .filter(|client| {
+                client
+                    .session
+                    .subscriptions
+                    .contains(&Subscription::Timeline)
+            })
             .map(|client| client.connection.clone())
             .collect();
         for connection in connections {
@@ -865,7 +1084,10 @@ impl DevServer {
         let envelope = Envelope::new(
             "mirror.stopped",
             None,
-            serde_json::to_value(MirrorStopped { reason: reason.into() }).ok(),
+            serde_json::to_value(MirrorStopped {
+                reason: reason.into(),
+            })
+            .ok(),
         );
         self.send_to_subscribers(&envelope, Subscription::Mirror);
     }
@@ -886,7 +1108,13 @@ impl DevServer {
         }
     }
 
-    fn send_error(&mut self, connection: &Arc<dyn DevToolsConnection>, request: &Envelope, code: &str, message: &str) {
+    fn send_error(
+        &mut self,
+        connection: &Arc<dyn DevToolsConnection>,
+        request: &Envelope,
+        code: &str,
+        message: &str,
+    ) {
         let mut envelope = request.error(code, message);
         envelope.payload = Some(serde_json::json!({ "code": code, "message": message }));
         self.send(envelope, connection);
@@ -923,9 +1151,18 @@ impl DevServer {
     }
 
     fn remove_client(&mut self, key: usize) {
-        let Some(removed) = self.clients.remove(&key) else { return };
-        let was_mirroring = removed.session.subscriptions.contains(&Subscription::Mirror);
-        if removed.session.subscriptions.contains(&Subscription::Timeline) {
+        let Some(removed) = self.clients.remove(&key) else {
+            return;
+        };
+        let was_mirroring = removed
+            .session
+            .subscriptions
+            .contains(&Subscription::Mirror);
+        if removed
+            .session
+            .subscriptions
+            .contains(&Subscription::Timeline)
+        {
             self.sync_timeline_capture();
         }
         if self.inspection_owner == Some(key) {
@@ -966,6 +1203,8 @@ impl DevServer {
 }
 
 fn log_debug(message: &str) {
-    cove_logging::LogSystem::logger("com.cove.devtools")
-        .log(&cove_logging::LogEvent::new(cove_logging::Level::Debug, message));
+    cove_logging::LogSystem::logger("com.cove.devtools").log(&cove_logging::LogEvent::new(
+        cove_logging::Level::Debug,
+        message,
+    ));
 }

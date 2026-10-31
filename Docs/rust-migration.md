@@ -16,15 +16,15 @@
 
 按最新要求：**实施过程中不运行测试，全部文件转换结束后再统一验证。** 本次盘点没有运行 `cargo test`、跨平台验收或 GUI 冒烟测试；仅为修复工作区可编译性做了局部 `cargo check`，不构成验收结论。
 
-## 总量（2026-10-30 盘点）
+## 总量（2026-10-31 刷新）
 
 | 范围 | 文件数 | 已写入 | 进行中 | 未开始 |
 | --- | ---: | ---: | ---: | ---: |
 | 生产源码 | 984 | 983 | 0 | 1 |
-| 测试源码 | 424 | 98 | 0 | 326 |
+| 测试源码 | 424 | 118 | 0 | 306 |
 | SwiftPM 清单 | 25 | 25（Cargo 清单） | 0 | 0 |
 | CLI 项目模板 | 5 | 5 | 0 | 0 |
-| 合计 | 1,438 | 1,111 | 0 | 327 |
+| 合计 | 1,438 | 1,131 | 0 | 307 |
 
 生产源码、清单与模板的迁移已收口。唯一未开始的生产文件是
 `Tools/Support/Sources/ToolSupport/NSNumber+Boolean.swift`——Objective-C 的 `NSNumber`
@@ -115,7 +115,23 @@ Swift 原实现重写，并复用已有的“数据/几何一半”模块，没�
 ### 状态口径不变
 
 `written_unverified` 仍**不代表通过验收**：本轮未做逐文件行为对照，仅以
-`cargo check --workspace` 为编译门禁。测试迁移仍在进行（见上表 326 个测试文件）。
+`cargo check --workspace` 为编译门禁。测试迁移仍在进行（见上表 306 个测试文件）。
+
+### 测试迁移进展（2026-10-31）
+
+本批新写 5 个集成测试并在 `Compose/Cargo.toml` 注册 `[[test]]`，全部经
+`cargo check -p cove-ui-compose --tests` 验证 0 error：
+
+| Swift 测试 | Rust 目标 | 覆盖行为 |
+| --- | --- | --- |
+| `SelectEnumerationTests` | `select_enumeration` | 枚举按序成选项、调用方标签、占位符与宽度 |
+| `OffscreenReuseTests` | `offscreen_reuse` | 离屏快照几何复用、状态变更重建、trim 后保持 |
+| `ScratchGeometryTests` | `scratch_geometry` | 原 Swift 仅打印无断言，落为可清除 Combobox 的冒烟测试 |
+| `RecompositionPaintTests` | `recomposition_paint` | draw identity 不变不重绘、值变更才重绘 |
+| `ChromeComponentTests` | `chrome_component` | Link 语义、StatusBar 单/双槽高度（含分隔线 +1） |
+
+清单重新生成时，另把 15 个早已落盘但旧 JSON 未标记的 `[[test]]` 目标正确置为
+`written_unverified`；这些目标文件均真实存在，非空测试。
 
 ## 逐模块进度（生产源码）
 

@@ -6,8 +6,8 @@
 //! null object: inspection overlays and input interception are absent, while
 //! memory counters remain available to the native host.
 
-use cove_core::scene::NodeTree;
 use cove_core::DrawList;
+use cove_core::scene::NodeTree;
 use cove_platform::InputEvent;
 use std::cell::RefCell;
 use std::collections::BTreeMap;

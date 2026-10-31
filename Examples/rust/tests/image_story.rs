@@ -6,8 +6,8 @@
 
 use cove_examples::gallery_content::catalog::GalleryOptions;
 use cove_examples::gallery_content::stories::image_story::{
-    surface_caption, surface_detail, surface_for, ImageSourceKind, ImageStory, ImageSurface,
-    MISSING_PATH, STACKING_BREAKPOINT,
+    ImageSourceKind, ImageStory, ImageSurface, MISSING_PATH, STACKING_BREAKPOINT, surface_caption,
+    surface_detail, surface_for,
 };
 use cove_ui_compose::primitives::media::{AsyncImagePhase, ImageContentMode};
 
@@ -25,7 +25,10 @@ fn the_story_starts_with_the_bundled_source() {
 #[test]
 fn each_source_resolves_to_its_own_url() {
     let story = story();
-    assert_eq!(story.resolved_url().as_deref(), Some("gallery-landscape.svg"));
+    assert_eq!(
+        story.resolved_url().as_deref(),
+        Some("gallery-landscape.svg")
+    );
 
     story.set_source(ImageSourceKind::Missing);
     assert_eq!(story.resolved_url().as_deref(), Some(MISSING_PATH));
@@ -78,7 +81,10 @@ fn every_non_empty_source_can_retry() {
 
 #[test]
 fn an_unknown_source_id_falls_back_to_bundled() {
-    assert_eq!(ImageSourceKind::from_id("nonsense"), ImageSourceKind::Bundled);
+    assert_eq!(
+        ImageSourceKind::from_id("nonsense"),
+        ImageSourceKind::Bundled
+    );
     assert_eq!(ImageSourceKind::from_id("empty"), ImageSourceKind::Empty);
 }
 
@@ -122,7 +128,11 @@ fn the_story_offers_three_content_modes() {
     let story = story();
     assert_eq!(
         story.content_modes(),
-        [ImageContentMode::Fit, ImageContentMode::Fill, ImageContentMode::Stretch]
+        [
+            ImageContentMode::Fit,
+            ImageContentMode::Fill,
+            ImageContentMode::Stretch
+        ]
     );
 }
 

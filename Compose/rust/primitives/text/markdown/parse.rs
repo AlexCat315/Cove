@@ -142,7 +142,10 @@ impl InlineState {
             Tag::Image { dest_url, .. } => {
                 // Images render as their alternative text, linked to the source.
                 self.flush();
-                self.stack.push((self.traits.union(RichTextTraits::ITALIC), Some(dest_url.to_string())));
+                self.stack.push((
+                    self.traits.union(RichTextTraits::ITALIC),
+                    Some(dest_url.to_string()),
+                ));
             }
             _ => {}
         }
@@ -150,7 +153,9 @@ impl InlineState {
 
     fn end(&mut self, tag: TagEnd) {
         match tag {
-            TagEnd::Emphasis | TagEnd::Strong | TagEnd::Strikethrough | TagEnd::Image => self.close(),
+            TagEnd::Emphasis | TagEnd::Strong | TagEnd::Strikethrough | TagEnd::Image => {
+                self.close()
+            }
             TagEnd::Link => self.close(),
             _ => {}
         }
@@ -191,7 +196,11 @@ impl InlineState {
             return;
         }
         let text = std::mem::take(&mut self.literal);
-        self.runs.push(RichTextRun { text, traits: self.traits, link: self.link.clone() });
+        self.runs.push(RichTextRun {
+            text,
+            traits: self.traits,
+            link: self.link.clone(),
+        });
     }
 
     fn finish(mut self) -> Vec<RichTextRun> {
@@ -233,7 +242,10 @@ fn convert<'a>(events: impl Iterator<Item = Event<'a>>) -> Vec<MarkdownBlock> {
             Event::Start(tag) => match tag {
                 Tag::Paragraph => inline = InlineState::default(),
                 Tag::Heading { level, .. } => {
-                    stack.push(Frame::Heading { level: heading_level(level), inline: InlineState::default() });
+                    stack.push(Frame::Heading {
+                        level: heading_level(level),
+                        inline: InlineState::default(),
+                    });
                 }
                 Tag::BlockQuote(_) => stack.push(Frame::Quote(Vec::new())),
                 Tag::List(start) => stack.push(Frame::List(ListFrame {
@@ -247,7 +259,10 @@ fn convert<'a>(events: impl Iterator<Item = Event<'a>>) -> Vec<MarkdownBlock> {
                         _ => None,
                     };
                     let _ = is_checked;
-                    stack.push(Frame::Item(ListItemFrame { is_checked: None, blocks: Vec::new() }));
+                    stack.push(Frame::Item(ListItemFrame {
+                        is_checked: None,
+                        blocks: Vec::new(),
+                    }));
                 }
                 Tag::Table(alignments) => stack.push(Frame::Table(TableFrame {
                     alignments: alignments
@@ -304,7 +319,11 @@ fn convert<'a>(events: impl Iterator<Item = Event<'a>>) -> Vec<MarkdownBlock> {
                 TagEnd::Heading(_) => {
                     if let Some(Frame::Heading { level, inline }) = stack.pop() {
                         let runs = inline.finish();
-                        emit(&mut stack, &mut blocks, MarkdownBlock::Heading { level, runs });
+                        emit(
+                            &mut stack,
+                            &mut blocks,
+                            MarkdownBlock::Heading { level, runs },
+                        );
                     }
                 }
                 TagEnd::BlockQuote(_) => {
@@ -328,7 +347,10 @@ fn convert<'a>(events: impl Iterator<Item = Event<'a>>) -> Vec<MarkdownBlock> {
                         emit(
                             &mut stack,
                             &mut blocks,
-                            MarkdownBlock::List(MarkdownList { start: list.start, items: list.items }),
+                            MarkdownBlock::List(MarkdownList {
+                                start: list.start,
+                                items: list.items,
+                            }),
                         );
                     }
                 }
@@ -369,7 +391,11 @@ fn convert<'a>(events: impl Iterator<Item = Event<'a>>) -> Vec<MarkdownBlock> {
                 TagEnd::CodeBlock => {
                     if let Some((language, text)) = code.take() {
                         let text = text.strip_suffix('\n').map(str::to_string).unwrap_or(text);
-                        emit(&mut stack, &mut blocks, MarkdownBlock::Code { language, text });
+                        emit(
+                            &mut stack,
+                            &mut blocks,
+                            MarkdownBlock::Code { language, text },
+                        );
                     }
                 }
                 _ => {}
@@ -407,7 +433,10 @@ fn convert<'a>(events: impl Iterator<Item = Event<'a>>) -> Vec<MarkdownBlock> {
                     emit(
                         &mut stack,
                         &mut blocks,
-                        MarkdownBlock::Code { language: Some("html".to_string()), text: trimmed.to_string() },
+                        MarkdownBlock::Code {
+                            language: Some("html".to_string()),
+                            text: trimmed.to_string(),
+                        },
                     );
                 }
             }

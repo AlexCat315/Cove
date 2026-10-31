@@ -5,13 +5,13 @@
 //! container.
 use std::rc::Rc;
 
+use crate::LayoutContainer;
+use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
+use crate::primitives::text::Text;
+use crate::theme::{SemanticColorRef, SemanticFontRef, theme_for_node};
+use crate::{AnyView, Layout, LayoutSubview, ProposedViewSize, View};
 use cove_core::scene::{InvalidationSource, Node};
 use cove_core::{Point, Rect, Size, TextAlignment};
-use crate::LayoutContainer;
-use crate::primitives::text::Text;
-use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
-use crate::theme::{theme_for_node, SemanticColorRef, SemanticFontRef};
-use crate::{AnyView, Layout, LayoutSubview, ProposedViewSize, View};
 
 use super::document::{MarkdownAlignment, MarkdownTable};
 
@@ -57,7 +57,11 @@ impl MarkdownTableLayout {
         let widths: Vec<f32> = (0..self.columns)
             .map(|column| {
                 let natural = (0..self.rows)
-                    .map(|row| cell(row, column).size_that_fits(ProposedViewSize::UNSPECIFIED).width)
+                    .map(|row| {
+                        cell(row, column)
+                            .size_that_fits(ProposedViewSize::UNSPECIFIED)
+                            .width
+                    })
                     .fold(0.0_f32, f32::max);
                 MAXIMUM_COLUMN.min(MINIMUM_COLUMN.max(natural.ceil()))
             })
@@ -84,7 +88,12 @@ impl Layout for MarkdownTableLayout {
         self.geometry(subviews).size()
     }
 
-    fn place_subviews(&self, bounds: Rect, _proposal: ProposedViewSize, subviews: &[LayoutSubview]) {
+    fn place_subviews(
+        &self,
+        bounds: Rect,
+        _proposal: ProposedViewSize,
+        subviews: &[LayoutSubview],
+    ) {
         let geometry = self.geometry(subviews);
         if geometry.widths.is_empty() {
             return;
@@ -103,7 +112,11 @@ impl Layout for MarkdownTableLayout {
             let mut x = bounds.x;
             for column in 0..self.columns {
                 // The leading/trailing columns follow the reading direction.
-                let index = if rtl { self.columns - 1 - column } else { column };
+                let index = if rtl {
+                    self.columns - 1 - column
+                } else {
+                    column
+                };
                 subviews[1 + row * self.columns + index].place(
                     Point::new(x, y),
                     ProposedViewSize::new(
@@ -137,7 +150,10 @@ pub struct MarkdownTableView {
 
 impl MarkdownTableView {
     pub fn new(table: MarkdownTable) -> Self {
-        Self { table, on_open_link: None }
+        Self {
+            table,
+            on_open_link: None,
+        }
     }
 
     pub fn on_open_link(mut self, handler: impl Fn(&str) + 'static) -> Self {
@@ -146,7 +162,13 @@ impl MarkdownTableView {
     }
 
     fn cell_alignment(&self, column: usize) -> TextAlignment {
-        match self.table.alignments.get(column).copied().unwrap_or(MarkdownAlignment::Leading) {
+        match self
+            .table
+            .alignments
+            .get(column)
+            .copied()
+            .unwrap_or(MarkdownAlignment::Leading)
+        {
             MarkdownAlignment::Leading => TextAlignment::Leading,
             MarkdownAlignment::Center => TextAlignment::Center,
             MarkdownAlignment::Trailing => TextAlignment::Trailing,
@@ -202,10 +224,12 @@ impl View for MarkdownTableView {
             crate::primitives::layout::ScrollView::new(
                 crate::primitives::layout::ScrollAxis::Horizontal,
                 AnyView::new(TableCard {
-                    content: AnyView::new(LayoutContainer::<MarkdownTableLayout, AnyView>::with_erased_content(
-                        layout,
-                        AnyView::new(crate::TupleView::new(cell_views)),
-                    )),
+                    content: AnyView::new(
+                        LayoutContainer::<MarkdownTableLayout, AnyView>::with_erased_content(
+                            layout,
+                            AnyView::new(crate::TupleView::new(cell_views)),
+                        ),
+                    ),
                 }),
             )
             .accessibility_label("Table"),

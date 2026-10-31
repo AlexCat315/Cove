@@ -6,7 +6,7 @@
 
 use cove_examples::gallery_content::catalog::GalleryOptions;
 use cove_examples::gallery_content::stories::command_story::{
-    commands, CommandStory, RECENT_LIMIT,
+    CommandStory, RECENT_LIMIT, commands,
 };
 
 fn story() -> CommandStory {
@@ -33,8 +33,11 @@ fn the_catalogue_lists_eight_commands_across_four_groups() {
 #[test]
 fn only_deploy_is_disabled() {
     let items = commands();
-    let disabled: Vec<&str> =
-        items.iter().filter(|item| !item.is_enabled).map(|item| item.id.as_str()).collect();
+    let disabled: Vec<&str> = items
+        .iter()
+        .filter(|item| !item.is_enabled)
+        .map(|item| item.id.as_str())
+        .collect();
     assert_eq!(disabled, vec!["Deploy to Device"]);
 }
 
@@ -68,7 +71,11 @@ fn an_enabled_command_runs_and_is_recorded() {
 fn a_disabled_command_never_runs() {
     let story = story();
     assert!(!story.run("Deploy to Device"));
-    assert_eq!(story.last_run(), "none", "a disabled command is skipped, not run");
+    assert_eq!(
+        story.last_run(),
+        "none",
+        "a disabled command is skipped, not run"
+    );
     assert!(story.recent().is_empty());
 }
 
@@ -80,7 +87,11 @@ fn recents_are_most_recent_first_and_capped() {
     story.run("Rename Symbol");
     assert_eq!(
         story.recent(),
-        vec!["Rename Symbol".to_owned(), "Go to File".to_owned(), "Run Build".to_owned()]
+        vec![
+            "Rename Symbol".to_owned(),
+            "Go to File".to_owned(),
+            "Run Build".to_owned()
+        ]
     );
     // A fourth run pushes the oldest out.
     story.run("Toggle Theme");
@@ -112,7 +123,12 @@ fn a_query_suppresses_the_recent_section() {
     let story = story();
     story.run("Run Build");
     // With a query the results are ranked, never prefixed with Recent.
-    assert!(!story.entries("build").iter().any(|entry| entry.id() == "header:Recent"));
+    assert!(
+        !story
+            .entries("build")
+            .iter()
+            .any(|entry| entry.id() == "header:Recent")
+    );
 }
 
 #[test]
@@ -120,8 +136,14 @@ fn arrow_navigation_wraps() {
     let story = story();
     let matches = story.ranked("go").len();
     assert!(matches >= 2);
-    assert_eq!(story.next_highlight(matches, Some(matches - 1), 1, true), Some(0));
-    assert_eq!(story.next_highlight(matches, Some(0), -1, true), Some(matches - 1));
+    assert_eq!(
+        story.next_highlight(matches, Some(matches - 1), 1, true),
+        Some(0)
+    );
+    assert_eq!(
+        story.next_highlight(matches, Some(0), -1, true),
+        Some(matches - 1)
+    );
 }
 
 #[test]

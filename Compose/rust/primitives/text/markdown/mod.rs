@@ -11,6 +11,6 @@ pub use document::{
     MarkdownAlignment, MarkdownBlock, MarkdownList, MarkdownListItem, MarkdownTable,
 };
 pub use list_block::MarkdownListView;
-pub use markdown_view::{markdown_block, MarkdownBlocks, MarkdownView};
+pub use markdown_view::{MarkdownBlocks, MarkdownView, markdown_block};
 pub use parse::{blocks, runs};
 pub use table_block::{MarkdownTableLayout, MarkdownTableView};

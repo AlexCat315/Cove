@@ -19,7 +19,11 @@ pub struct AgentSkill {
 }
 
 impl AgentSkill {
-    pub fn new(name: impl Into<String>, description: impl Into<String>, instructions: impl Into<String>) -> Result<Self, AgentError> {
+    pub fn new(
+        name: impl Into<String>,
+        description: impl Into<String>,
+        instructions: impl Into<String>,
+    ) -> Result<Self, AgentError> {
         let skill = Self {
             name: name.into(),
             description: description.into(),
@@ -63,7 +67,8 @@ pub struct AgentSkillLibrary {
 impl AgentSkillLibrary {
     pub fn new(skills: Vec<AgentSkill>) -> Result<Self, AgentError> {
         let mut names = std::collections::BTreeSet::new();
-        if skills.len() > MAX_SKILLS || !skills.iter().all(|skill| names.insert(skill.name.clone())) {
+        if skills.len() > MAX_SKILLS || !skills.iter().all(|skill| names.insert(skill.name.clone()))
+        {
             return Err(AgentError::InvalidConfiguration(
                 "Skills must have unique names; at most 64 are supported.".into(),
             ));
@@ -84,8 +89,15 @@ impl AgentSkillLibrary {
     }
 
     pub fn instructions(&self, names: &[String]) -> Result<String, AgentError> {
-        if names.iter().collect::<std::collections::BTreeSet<_>>().len() != names.len() {
-            return Err(AgentError::InvalidConfiguration("Duplicate enabled skill.".into()));
+        if names
+            .iter()
+            .collect::<std::collections::BTreeSet<_>>()
+            .len()
+            != names.len()
+        {
+            return Err(AgentError::InvalidConfiguration(
+                "Duplicate enabled skill.".into(),
+            ));
         }
         names
             .iter()
@@ -110,7 +122,9 @@ impl AgentSkillLibrary {
             if name.to_string_lossy().starts_with('.') {
                 continue;
             }
-            let Ok(metadata) = entry.metadata() else { continue };
+            let Ok(metadata) = entry.metadata() else {
+                continue;
+            };
             if !metadata.is_dir() {
                 continue;
             }
@@ -131,7 +145,9 @@ impl AgentSkillLibrary {
                 continue;
             }
             if skills.len() >= MAX_SKILLS {
-                return Err(AgentError::InvalidConfiguration("Skill library exceeds 64 entries.".into()));
+                return Err(AgentError::InvalidConfiguration(
+                    "Skill library exceeds 64 entries.".into(),
+                ));
             }
             if !file.starts_with(&root) || file == root {
                 return Err(AgentError::InvalidConfiguration(
@@ -152,9 +168,8 @@ impl AgentSkillLibrary {
 }
 
 fn canonical(path: &Path) -> Result<std::path::PathBuf, AgentError> {
-    std::fs::canonicalize(path).map_err(|_| AgentError::InvalidConfiguration(
-        "Skill directory is not readable.".into(),
-    ))
+    std::fs::canonicalize(path)
+        .map_err(|_| AgentError::InvalidConfiguration("Skill directory is not readable.".into()))
 }
 
 fn parse_skill(text: &str) -> Result<AgentSkill, AgentError> {
@@ -218,7 +233,10 @@ mod tests {
 
     #[test]
     fn frontmatter_is_scalar_only() {
-        let skill = parse_skill("---\nname: ui-diagnostics\ndescription: \"Investigate UI\"\n---\nDo the thing.\n").unwrap();
+        let skill = parse_skill(
+            "---\nname: ui-diagnostics\ndescription: \"Investigate UI\"\n---\nDo the thing.\n",
+        )
+        .unwrap();
         assert_eq!(skill.name, "ui-diagnostics");
         assert_eq!(skill.description, "Investigate UI");
         assert_eq!(skill.instructions, "Do the thing.");

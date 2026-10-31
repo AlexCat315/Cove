@@ -30,8 +30,17 @@ pub struct PerformanceTimeline {
 impl PerformanceTimeline {
     pub const DEFAULT_CAPACITY: usize = 2048;
     pub fn new(capacity: usize) -> Self {
-        Self { enabled: false, externally_enabled: false, active_recordings: 0, buffer: Vec::new(), next_index: 0,
-            dropped: 0, sequence: 0, origin: Instant::now(), capacity: capacity.clamp(1, 8192) }
+        Self {
+            enabled: false,
+            externally_enabled: false,
+            active_recordings: 0,
+            buffer: Vec::new(),
+            next_index: 0,
+            dropped: 0,
+            sequence: 0,
+            origin: Instant::now(),
+            capacity: capacity.clamp(1, 8192),
+        }
     }
     pub fn enabled(&self) -> bool {
         self.enabled
@@ -73,11 +82,17 @@ impl PerformanceTimeline {
         if self.next_index == 0 {
             return self.buffer.clone();
         }
-        self.buffer[self.next_index..].iter().chain(self.buffer[..self.next_index].iter()).cloned().collect()
+        self.buffer[self.next_index..]
+            .iter()
+            .chain(self.buffer[..self.next_index].iter())
+            .cloned()
+            .collect()
     }
     /// Read only the tail after a connection cursor, without copying old spans.
     pub fn events_after(&self, sequence: u64) -> Vec<TimelineEvent> {
-        let Some(last) = self.buffer.last() else { return Vec::new() };
+        let Some(last) = self.buffer.last() else {
+            return Vec::new();
+        };
         let latest = if self.buffer.len() == self.capacity {
             self.buffer[(self.next_index + self.buffer.len() - 1) % self.buffer.len()].sequence
         } else {
@@ -92,19 +107,34 @@ impl PerformanceTimeline {
         } else {
             self.buffer.len() - count
         };
-        (0..count).map(|offset| self.buffer[(first + offset) % self.buffer.len()].clone()).collect()
+        (0..count)
+            .map(|offset| self.buffer[(first + offset) % self.buffer.len()].clone())
+            .collect()
     }
     pub fn begin(&self) -> Option<f64> {
         self.enabled.then(|| self.milliseconds())
     }
-    pub fn end(&mut self, start: Option<f64>, phase: impl Into<String>, name: impl Into<String>, scope_id: Option<String>, reasons: &[RecompositionReason]) {
-        let (true, Some(start)) = (self.enabled, start) else { return };
+    pub fn end(
+        &mut self,
+        start: Option<f64>,
+        phase: impl Into<String>,
+        name: impl Into<String>,
+        scope_id: Option<String>,
+        reasons: &[RecompositionReason],
+    ) {
+        let (true, Some(start)) = (self.enabled, start) else {
+            return;
+        };
         self.sequence = self.sequence.wrapping_add(1);
         let name = name.into();
         let event = TimelineEvent {
             sequence: self.sequence,
             phase: phase.into(),
-            name: if name.chars().count() > 160 { name.chars().take(160).collect() } else { name },
+            name: if name.chars().count() > 160 {
+                name.chars().take(160).collect()
+            } else {
+                name
+            },
             scope_id,
             start_ms: start,
             duration_ms: (self.milliseconds() - start).max(0.0),

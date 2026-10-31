@@ -8,17 +8,15 @@
 use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
 
+use crate::impl_primitive_view;
 use crate::modifiers::layout::LayoutFrameExt;
+use crate::primitives::overlays::portal::{PortalPlacementMode, PortalResource, PortalStoreHolder};
+use cove_composition::{AnyView, PrimitiveView, View};
 use cove_core::scene::{
     Align, AnimatorScheduler, EventResult, FocusChainHolder, HoverPhase, InputHandlerRoute,
     InteractionRegistryHolder, LayoutNode, Node, NodeResource, PointerPhase,
 };
 use cove_core::{Point, Rect, Size};
-use cove_composition::{AnyView, PrimitiveView, View};
-use crate::primitives::overlays::portal::{
-    PortalPlacementMode, PortalResource, PortalStoreHolder,
-};
-use crate::impl_primitive_view;
 
 /// How long the pointer must rest before a tip appears.
 pub const DEFAULT_DELAY: f64 = 0.6;
@@ -54,9 +52,21 @@ impl Default for TooltipOptions {
 
 impl TooltipOptions {
     pub fn validate(&mut self) {
-        self.delay = if self.delay.is_finite() { self.delay.max(0.0) } else { DEFAULT_DELAY };
-        self.max_width = if self.max_width.is_finite() { self.max_width.max(80.0) } else { 320.0 };
-        self.gap = if self.gap.is_finite() { self.gap.max(0.0) } else { 6.0 };
+        self.delay = if self.delay.is_finite() {
+            self.delay.max(0.0)
+        } else {
+            DEFAULT_DELAY
+        };
+        self.max_width = if self.max_width.is_finite() {
+            self.max_width.max(80.0)
+        } else {
+            320.0
+        };
+        self.gap = if self.gap.is_finite() {
+            self.gap.max(0.0)
+        } else {
+            6.0
+        };
     }
 
     pub fn validated(mut self) -> Self {
@@ -100,7 +110,10 @@ thread_local! {
 
 impl TooltipArbitration {
     pub fn new() -> Rc<Self> {
-        Rc::new(Self { last_shown: Cell::new(f64::NEG_INFINITY), ..Default::default() })
+        Rc::new(Self {
+            last_shown: Cell::new(f64::NEG_INFINITY),
+            ..Default::default()
+        })
     }
 
     /// The active window's rules; `None` until a window registers one.
@@ -119,7 +132,10 @@ impl TooltipArbitration {
     pub fn register(&self, session: &Rc<TooltipSession>) {
         self.prune();
         let mut sessions = self.sessions.borrow_mut();
-        if !sessions.iter().any(|entry| entry.ptr_eq(&Rc::downgrade(session))) {
+        if !sessions
+            .iter()
+            .any(|entry| entry.ptr_eq(&Rc::downgrade(session)))
+        {
             sessions.push(Rc::downgrade(session));
         }
     }
@@ -145,11 +161,15 @@ impl TooltipArbitration {
     /// so this one must stay quiet: over nested targets the inner wins.
     pub fn has_inner_active(&self, session: &TooltipSession) -> bool {
         self.prune();
-        let Some(node) = session.anchor_node() else { return false };
+        let Some(node) = session.anchor_node() else {
+            return false;
+        };
         self.live_sessions().iter().any(|other| {
             !std::ptr::eq(other.as_ref(), session)
                 && other.is_active()
-                && other.anchor_node().is_some_and(|other_node| is_descendant(&other_node, &node))
+                && other
+                    .anchor_node()
+                    .is_some_and(|other_node| is_descendant(&other_node, &node))
         })
     }
 
@@ -183,7 +203,9 @@ impl TooltipArbitration {
     }
 
     fn prune(&self) {
-        self.sessions.borrow_mut().retain(|entry| entry.strong_count() > 0);
+        self.sessions
+            .borrow_mut()
+            .retain(|entry| entry.strong_count() > 0);
     }
 
     fn live_sessions(&self) -> Vec<Rc<TooltipSession>> {
@@ -291,7 +313,10 @@ impl TooltipSession {
     }
 
     fn arbitration(&self) -> Option<Rc<TooltipArbitration>> {
-        self.owner.borrow().clone().or_else(TooltipArbitration::current)
+        self.owner
+            .borrow()
+            .clone()
+            .or_else(TooltipArbitration::current)
     }
 
     pub fn anchor_node(&self) -> Option<Node> {
@@ -356,7 +381,10 @@ impl TooltipSession {
             return;
         }
         // Over elements inside one another only the inner tip shows.
-        if self.arbitration().is_some_and(|arbitration| arbitration.has_inner_active(self)) {
+        if self
+            .arbitration()
+            .is_some_and(|arbitration| arbitration.has_inner_active(self))
+        {
             self.hide();
             return;
         }
@@ -376,12 +404,16 @@ impl TooltipSession {
         // run along a toolbar does not wait again. Keyboard focus does *not* skip
         // it: focus lands on a trigger the instant a menu closes, and a chip
         // covering the bar the person just used reads as an accident.
-        let warm = self.arbitration().is_some_and(|arbitration| arbitration.is_warm());
+        let warm = self
+            .arbitration()
+            .is_some_and(|arbitration| arbitration.is_warm());
         if options.delay == 0.0 || warm || self.elapsed.get() >= options.delay {
             self.show();
         } else {
             self.is_finished.set(false);
-            AnimatorScheduler::current().register(Rc::new(ClockRef { session: self.me_weak() }));
+            AnimatorScheduler::current().register(Rc::new(ClockRef {
+                session: self.me_weak(),
+            }));
         }
     }
 
@@ -422,15 +454,21 @@ impl TooltipSession {
     }
 
     fn show(&self) {
-        let Some(node) = self.node.borrow().clone() else { return };
+        let Some(node) = self.node.borrow().clone() else {
+            return;
+        };
         if !node.accepts_subtree_input() {
             return;
         }
-        let Some(content) = self.content.borrow().clone() else { return };
+        let Some(content) = self.content.borrow().clone() else {
+            return;
+        };
         if !(self.can_show.borrow())() {
             return;
         }
-        let Some(arbitration) = self.arbitration() else { return };
+        let Some(arbitration) = self.arbitration() else {
+            return;
+        };
         if arbitration.has_inner_active(self) {
             return;
         }
@@ -443,7 +481,14 @@ impl TooltipSession {
         let window = window_bounds(&node);
         let options = self.options.borrow().clone();
         let sized_content = AnyView::new(ContentBox {
-            content: AnyView::new(content.frame(None, None, None, None, Some(options.max_width), None)),
+            content: AnyView::new(content.frame(
+                None,
+                None,
+                None,
+                None,
+                Some(options.max_width),
+                None,
+            )),
         });
         let position_for_size =
             Rc::new(move |size: Size| Self::resting_spot(size, anchor, gap, window));
@@ -490,7 +535,9 @@ impl TooltipSession {
     }
 
     pub fn update_position(&self) {
-        let Some(node) = self.node.borrow().clone() else { return };
+        let Some(node) = self.node.borrow().clone() else {
+            return;
+        };
         if !node.accepts_subtree_input() {
             self.dismiss();
             return;
@@ -525,9 +572,7 @@ impl TooltipSession {
         }
         // A target the tip was covering (a nested one that just closed) may now
         // own the screen without the pointer moving onto it again.
-        if was_presented
-            && let Some(arbitration) = self.arbitration()
-        {
+        if was_presented && let Some(arbitration) = self.arbitration() {
             arbitration.reconsider(self);
         }
     }
@@ -584,7 +629,9 @@ struct ClockRef {
 
 impl cove_core::scene::AnyAnimationController for ClockRef {
     fn is_finished(&self) -> bool {
-        self.session.upgrade().is_none_or(|session| session.is_finished())
+        self.session
+            .upgrade()
+            .is_none_or(|session| session.is_finished())
     }
 
     fn tick(&self, delta_time: f64) {
@@ -627,7 +674,9 @@ pub struct TooltipArbitrationAmbient {
 
 impl TooltipArbitrationAmbient {
     pub fn new() -> Self {
-        Self { arbitration: TooltipArbitration::new() }
+        Self {
+            arbitration: TooltipArbitration::new(),
+        }
     }
 
     pub fn with(arbitration: Rc<TooltipArbitration>) -> Self {
@@ -726,7 +775,10 @@ impl View for Tooltip {
         let focused = focus.as_ref().and_then(|chain| chain.focused());
         let focus_visible = focus.as_ref().is_some_and(|chain| chain.is_focus_visible());
         AnyView::new(TooltipHost {
-            target: self.target.clone().unwrap_or_else(|| AnyView::new(crate::EmptyView)),
+            target: self
+                .target
+                .clone()
+                .unwrap_or_else(|| AnyView::new(crate::EmptyView)),
             content: self.content.clone(),
             options: self.options.clone(),
             focused,
@@ -791,17 +843,21 @@ const COORDINATE_AVAILABLE: &str = "CoveUI.tooltip.coordinate.available";
 
 impl CoordinateTooltipHost {
     fn present(&self, node: &Node) {
-        let Some(resource) = node.first_resource::<PortalResource>() else { return };
+        let Some(resource) = node.first_resource::<PortalResource>() else {
+            return;
+        };
         if !node.accepts_subtree_input() || !self.is_presented || !self.options.is_enabled {
             resource.unmount(node);
             return;
         }
         let anchor = self.anchor.rect();
         let options = self.options.clone();
-        let content = AnyView::new(ContentBox { content: AnyView::new(SizeLimited {
-            content: self.content.clone(),
-            max_width: options.max_width,
-        }) });
+        let content = AnyView::new(ContentBox {
+            content: AnyView::new(SizeLimited {
+                content: self.content.clone(),
+                max_width: options.max_width,
+            }),
+        });
         resource.present(
             Some(PortalStoreHolder::current()),
             Point::new(anchor.x, anchor.y + anchor.height + options.gap),
@@ -834,7 +890,11 @@ impl PrimitiveView for TooltipHost {
         let node = Node::new();
         node.set_is_hit_testable(true);
         node.add_resource(PortalResource::new());
-        node.set_attachment(PORTAL_ATTACHMENT, node.first_resource::<PortalResource>().expect("portal resource"));
+        node.set_attachment(
+            PORTAL_ATTACHMENT,
+            node.first_resource::<PortalResource>()
+                .expect("portal resource"),
+        );
         node.set_attachment("tooltip.host", true);
         node
     }
@@ -852,8 +912,7 @@ impl PrimitiveView for TooltipHost {
             session
         });
         let in_subtree = self.focused.as_ref().is_some_and(|focused| {
-            FocusChainHolder::current()
-                .is_some_and(|chain| chain.contains(focused, node))
+            FocusChainHolder::current().is_some_and(|chain| chain.contains(focused, node))
         });
         let truncated = self.shows_truncated_text.clone();
         session.configure(
@@ -868,12 +927,17 @@ impl PrimitiveView for TooltipHost {
         if let Some(registry) = InteractionRegistryHolder::current() {
             let hover_session = Rc::downgrade(&session);
             let hover_owner = node.downgrade();
-            registry.set_hover(node, Rc::new(move |phase: HoverPhase| {
-                let Some(session) = hover_session.upgrade() else { return };
-                let allowed = Node::upgrade(&hover_owner)
-                    .is_some_and(|owner| supports_control_hover(&owner));
-                session.set_hovered(phase == HoverPhase::Enter && allowed);
-            }));
+            registry.set_hover(
+                node,
+                Rc::new(move |phase: HoverPhase| {
+                    let Some(session) = hover_session.upgrade() else {
+                        return;
+                    };
+                    let allowed = Node::upgrade(&hover_owner)
+                        .is_some_and(|owner| supports_control_hover(&owner));
+                    session.set_hovered(phase == HoverPhase::Enter && allowed);
+                }),
+            );
             let pointer_session = Rc::downgrade(&session);
             registry.set_pointer(
                 node,
@@ -888,16 +952,20 @@ impl PrimitiveView for TooltipHost {
                 }),
             );
             let key_session = Rc::downgrade(&session);
-            registry.set_key(node, InputHandlerRoute::control(), Rc::new(move |event, _| {
-                if event.scancode != crate::Scancode::ESCAPE {
-                    return EventResult::Ignored;
-                }
-                key_session
-                    .upgrade()
-                    .is_some_and(|session| session.dismiss())
-                    .then_some(EventResult::Handled)
-                    .unwrap_or(EventResult::Ignored)
-            }));
+            registry.set_key(
+                node,
+                InputHandlerRoute::control(),
+                Rc::new(move |event, _| {
+                    if event.scancode != crate::Scancode::ESCAPE {
+                        return EventResult::Ignored;
+                    }
+                    key_session
+                        .upgrade()
+                        .is_some_and(|session| session.dismiss())
+                        .then_some(EventResult::Handled)
+                        .unwrap_or(EventResult::Ignored)
+                }),
+            );
         }
         let layout_session = Rc::downgrade(&session);
         node.set_layout_did_update(Some(Rc::new(move |_node: &Node| {

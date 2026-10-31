@@ -159,8 +159,12 @@ mod tests {
     use super::*;
     #[test]
     fn nearest_explicit_direction_wins() {
-        assert!(resolves_right_to_left([Direction::Inherit, Direction::Rtl, Direction::Ltr].into_iter()));
-        assert!(!resolves_right_to_left([Direction::Inherit, Direction::Inherit].into_iter()));
+        assert!(resolves_right_to_left(
+            [Direction::Inherit, Direction::Rtl, Direction::Ltr].into_iter()
+        ));
+        assert!(!resolves_right_to_left(
+            [Direction::Inherit, Direction::Inherit].into_iter()
+        ));
     }
     #[test]
     fn axis_helpers() {

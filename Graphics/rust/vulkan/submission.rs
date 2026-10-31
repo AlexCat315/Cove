@@ -9,11 +9,11 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use crate::rhi::{
-    BarrierCommand, ColorLoadAction, Completion, ComputeCommand, ComputePassRecord,
-    CopyCommand, CopyPassRecord, CpuProfilePhase, DepthLoadAction, GpuTimestampMarker,
-    GpuTimestampProfile, PlannedCommand, PlannedSubmit, RenderCommand, RenderPassRecord,
-    RenderTextureInfo, RhiError, RhiResult, SubmissionCpuProfile, Texture, TextureFormat,
-    TextureSubresource, TextureUploadRegion, UploadLocation, UploadRingChunk, rhi_byte_range,
+    BarrierCommand, ColorLoadAction, Completion, ComputeCommand, ComputePassRecord, CopyCommand,
+    CopyPassRecord, CpuProfilePhase, DepthLoadAction, GpuTimestampMarker, GpuTimestampProfile,
+    PlannedCommand, PlannedSubmit, RenderCommand, RenderPassRecord, RenderTextureInfo, RhiError,
+    RhiResult, SubmissionCpuProfile, Texture, TextureFormat, TextureSubresource,
+    TextureUploadRegion, UploadLocation, UploadRingChunk, rhi_byte_range,
     rhi_color_texture_copy_extent, rhi_count, rhi_render_pass_signature, rhi_require,
     rhi_texture_subresource_extent, rhi_texture_upload_bytes,
 };
@@ -21,9 +21,9 @@ use crate::rhi::{
 use super::acceleration;
 use super::formats;
 use super::memory::{VulkanMemoryAllocation, VulkanMemoryAllocator};
-use super::rendering::{AttachmentShape, clear_value};
 use super::registries::{VulkanRegistries, VulkanTextureRecord};
 use super::rendering::RenderPassObjects;
+use super::rendering::{AttachmentShape, clear_value};
 use super::resources::{create_buffer, lock};
 use super::setup::VulkanContext;
 use super::sys;
@@ -44,7 +44,11 @@ pub struct CommandPool {
 
 impl CommandPool {
     pub fn new(handle: sys::VkCommandPool) -> Self {
-        Self { handle, buffers: Vec::new(), used: 0 }
+        Self {
+            handle,
+            buffers: Vec::new(),
+            used: 0,
+        }
     }
 
     pub fn rewind(&mut self) {
@@ -129,7 +133,9 @@ impl UploadRingChunk for VulkanUploadChunk {
     unsafe fn cpu_pointer(&self) -> *mut u8 {
         // SAFETY: a host-visible block exposes a mapping valid for the chunk's
         // lifetime, and the allocator validated this suballocation's range.
-        self.allocation.cpu_pointer(0).unwrap_or(core::ptr::null_mut())
+        self.allocation
+            .cpu_pointer(0)
+            .unwrap_or(core::ptr::null_mut())
     }
 }
 
@@ -144,7 +150,9 @@ impl VulkanFrameUploader {
     pub fn new(
         factory: impl FnMut(usize) -> RhiResult<VulkanUploadChunk> + Send + 'static,
     ) -> Self {
-        Self { allocator: crate::rhi::ChunkUploadAllocator::new(4 * 1024 * 1024, factory) }
+        Self {
+            allocator: crate::rhi::ChunkUploadAllocator::new(4 * 1024 * 1024, factory),
+        }
     }
 }
 
@@ -155,7 +163,10 @@ impl crate::rhi::FrameUploader for VulkanFrameUploader {
 
     fn write(&mut self, bytes: &[u8], alignment: usize) -> RhiResult<UploadLocation> {
         let allocation = self.allocator.write(bytes, alignment)?;
-        Ok(UploadLocation::new(allocation.chunk().buffer_handle, allocation.offset()))
+        Ok(UploadLocation::new(
+            allocation.chunk().buffer_handle,
+            allocation.offset(),
+        ))
     }
 }
 
@@ -218,7 +229,8 @@ pub fn state_access(state: crate::rhi::ResourceState) -> u32 {
         flags |= sys::VK_ACCESS_SHADER_READ_BIT | sys::VK_ACCESS_SHADER_WRITE_BIT;
     }
     if state.contains(ResourceState::RENDER_TARGET) {
-        flags |= sys::VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | sys::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        flags |=
+            sys::VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | sys::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     }
     if state.contains(ResourceState::DEPTH_WRITE) {
         flags |= sys::VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
@@ -405,9 +417,14 @@ pub unsafe fn encode_barriers(
             _ => {
                 let buffer = {
                     let registries = lock(registries);
-                    registries.buffers.get(&barrier.resource.id).map(|record| (record.buffer, record.size))
+                    registries
+                        .buffers
+                        .get(&barrier.resource.id)
+                        .map(|record| (record.buffer, record.size))
                 };
-                let Some((native, size)) = buffer else { continue };
+                let Some((native, size)) = buffer else {
+                    continue;
+                };
                 let memory = sys::VkBufferMemoryBarrier {
                     sType: sys::VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
                     pNext: core::ptr::null(),
@@ -417,7 +434,8 @@ pub unsafe fn encode_barriers(
                     } else {
                         state_access(barrier.source_state)
                     },
-                    dstAccessMask: if barrier.sync_action == crate::rhi::BarrierSyncAction::Release {
+                    dstAccessMask: if barrier.sync_action == crate::rhi::BarrierSyncAction::Release
+                    {
                         0
                     } else {
                         state_access(barrier.destination_state)
@@ -466,7 +484,12 @@ impl<'a> Encoder<'a> {
         registries: &'a Arc<Mutex<VulkanRegistries>>,
         cmd: sys::VkCommandBuffer,
     ) -> Self {
-        Self { context, registries, cmd, timing: None }
+        Self {
+            context,
+            registries,
+            cmd,
+            timing: None,
+        }
     }
 
     /// Encodes every command, returning the timestamp recording the caller must
@@ -485,7 +508,11 @@ impl<'a> Encoder<'a> {
             if let Some(timing) = &self.timing {
                 // SAFETY: `cmd` is recording.
                 unsafe {
-                    self.write_timestamp(timing, sys::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, (index * 2) as u32)
+                    self.write_timestamp(
+                        timing,
+                        sys::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                        (index * 2) as u32,
+                    )
                 };
             }
             // SAFETY: the caller opened `cmd` for recording.
@@ -493,7 +520,11 @@ impl<'a> Encoder<'a> {
             if let Some(timing) = &self.timing {
                 // SAFETY: `cmd` is still recording.
                 unsafe {
-                    self.write_timestamp(timing, sys::VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, (index * 2 + 1) as u32)
+                    self.write_timestamp(
+                        timing,
+                        sys::VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                        (index * 2 + 1) as u32,
+                    )
                 };
             }
         }
@@ -553,9 +584,10 @@ impl<'a> Encoder<'a> {
             };
             let (view, format) = {
                 let registries = lock(self.registries);
-                let texture = registries.textures.get(&target.texture.id()).ok_or_else(|| {
-                    RhiError::invalid_argument("unknown color target")
-                })?;
+                let texture = registries
+                    .textures
+                    .get(&target.texture.id())
+                    .ok_or_else(|| RhiError::invalid_argument("unknown color target"))?;
                 (registries.attachment_view(texture), texture.format)
             };
             let shape = AttachmentShape {
@@ -583,9 +615,10 @@ impl<'a> Encoder<'a> {
                 };
                 let resolve_view = {
                     let registries = lock(self.registries);
-                    let texture = registries.textures.get(&resolve.id()).ok_or_else(|| {
-                        RhiError::invalid_argument("unknown resolve target")
-                    })?;
+                    let texture = registries
+                        .textures
+                        .get(&resolve.id())
+                        .ok_or_else(|| RhiError::invalid_argument("unknown resolve target"))?;
                     registries.attachment_view(texture)
                 };
                 let resolve_shape = AttachmentShape {
@@ -617,9 +650,10 @@ impl<'a> Encoder<'a> {
             };
             let (view, format) = {
                 let registries = lock(self.registries);
-                let texture = registries.textures.get(&target.texture.id()).ok_or_else(|| {
-                    RhiError::invalid_argument("invalid depth target")
-                })?;
+                let texture = registries
+                    .textures
+                    .get(&target.texture.id())
+                    .ok_or_else(|| RhiError::invalid_argument("invalid depth target"))?;
                 rhi_require(texture.format.is_depth(), "invalid depth target")?;
                 (registries.attachment_view(texture), texture.format)
             };
@@ -647,7 +681,10 @@ impl<'a> Encoder<'a> {
                 self.cmd,
                 pass,
                 framebuffer,
-                sys::VkRect2D { offset: sys::VkOffset2D { x: 0, y: 0 }, extent },
+                sys::VkRect2D {
+                    offset: sys::VkOffset2D { x: 0, y: 0 },
+                    extent,
+                },
                 &clears,
             )
         };
@@ -662,7 +699,10 @@ impl<'a> Encoder<'a> {
             minDepth: 0.0,
             maxDepth: 1.0,
         };
-        let mut scissor = sys::VkRect2D { offset: sys::VkOffset2D { x: 0, y: 0 }, extent };
+        let mut scissor = sys::VkRect2D {
+            offset: sys::VkOffset2D { x: 0, y: 0 },
+            extent,
+        };
         // SAFETY: `cmd` is recording inside the pass.
         unsafe {
             (self.context.draw.cmd_set_viewport)(self.cmd, 0, 1, &viewport);
@@ -678,10 +718,10 @@ impl<'a> Encoder<'a> {
                     RenderCommand::SetMeshPipeline(handle) => {
                         let (pipeline, id) = {
                             let registries = lock(self.registries);
-                            let pipeline = registries
-                                .mesh_pipelines
-                                .get(&handle.id())
-                                .ok_or_else(|| RhiError::invalid_argument("unknown mesh pipeline"))?;
+                            let pipeline =
+                                registries.mesh_pipelines.get(&handle.id()).ok_or_else(|| {
+                                    RhiError::invalid_argument("unknown mesh pipeline")
+                                })?;
                             (pipeline.pipeline, pipeline.descriptor.layout.id())
                         };
                         layout_id = Some(id);
@@ -700,7 +740,11 @@ impl<'a> Encoder<'a> {
                             mesh_bound && self.context.advanced.draw_mesh_tasks.is_some(),
                             "mesh dispatch requires mesh pipeline",
                         )?;
-                        let dispatch = self.context.advanced.draw_mesh_tasks.expect("checked above");
+                        let dispatch = self
+                            .context
+                            .advanced
+                            .draw_mesh_tasks
+                            .expect("checked above");
                         // SAFETY: `cmd` is recording inside the pass.
                         unsafe {
                             dispatch(
@@ -714,12 +758,10 @@ impl<'a> Encoder<'a> {
                     RenderCommand::SetPipeline(handle) => {
                         let (pipeline, id, raster) = {
                             let registries = lock(self.registries);
-                            let pipeline = registries
-                                .graphics_pipelines
-                                .get(&handle.id())
-                                .ok_or_else(|| {
-                                    RhiError::invalid_argument("unknown graphics pipeline")
-                                })?;
+                            let pipeline =
+                                registries.graphics_pipelines.get(&handle.id()).ok_or_else(
+                                    || RhiError::invalid_argument("unknown graphics pipeline"),
+                                )?;
                             (
                                 pipeline.pipeline,
                                 pipeline.descriptor.layout.id(),
@@ -738,7 +780,11 @@ impl<'a> Encoder<'a> {
                             )
                         };
                     }
-                    RenderCommand::SetBindingSet { slot, set, dynamic_offsets } => {
+                    RenderCommand::SetBindingSet {
+                        slot,
+                        set,
+                        dynamic_offsets,
+                    } => {
                         // SAFETY: forwarded from the enclosing contract.
                         unsafe {
                             self.bind_set(
@@ -754,7 +800,11 @@ impl<'a> Encoder<'a> {
                         // SAFETY: forwarded from the enclosing contract.
                         unsafe { self.push_constants(layout_id, *stage, *slot, data)? };
                     }
-                    RenderCommand::SetVertexBuffer { slot, buffer, offset } => {
+                    RenderCommand::SetVertexBuffer {
+                        slot,
+                        buffer,
+                        offset,
+                    } => {
                         let native = {
                             let registries = lock(self.registries);
                             let record = registries.buffers.get(&buffer.id()).ok_or_else(|| {
@@ -776,7 +826,11 @@ impl<'a> Encoder<'a> {
                             )
                         };
                     }
-                    RenderCommand::SetIndexBuffer { buffer, offset, index_type } => {
+                    RenderCommand::SetIndexBuffer {
+                        buffer,
+                        offset,
+                        index_type,
+                    } => {
                         let native = {
                             let registries = lock(self.registries);
                             let record = registries.buffers.get(&buffer.id()).ok_or_else(|| {
@@ -806,13 +860,14 @@ impl<'a> Encoder<'a> {
                             maxDepth: value.max_depth as f32,
                         };
                         // SAFETY: `cmd` is recording inside the pass.
-                        unsafe {
-                            (self.context.draw.cmd_set_viewport)(self.cmd, 0, 1, &viewport)
-                        };
+                        unsafe { (self.context.draw.cmd_set_viewport)(self.cmd, 0, 1, &viewport) };
                     }
                     RenderCommand::SetScissor(value) => {
                         scissor = sys::VkRect2D {
-                            offset: sys::VkOffset2D { x: value.x as i32, y: value.y as i32 },
+                            offset: sys::VkOffset2D {
+                                x: value.x as i32,
+                                y: value.y as i32,
+                            },
                             extent: sys::VkExtent2D {
                                 width: rhi_count(value.width)?,
                                 height: rhi_count(value.height)?,
@@ -859,7 +914,11 @@ impl<'a> Encoder<'a> {
                             )
                         };
                     }
-                    RenderCommand::DrawIndirect { buffer, offset, draw_count } => {
+                    RenderCommand::DrawIndirect {
+                        buffer,
+                        offset,
+                        draw_count,
+                    } => {
                         let native = {
                             let registries = lock(self.registries);
                             let record = registries.buffers.get(&buffer.id()).ok_or_else(|| {
@@ -904,14 +963,15 @@ impl<'a> Encoder<'a> {
         for command in &record.body {
             match command {
                 ComputeCommand::SetPipeline(handle) => {
-                    let (pipeline, id) = {
-                        let registries = lock(self.registries);
-                        let pipeline = registries
-                            .compute_pipelines
-                            .get(&handle.id())
-                            .ok_or_else(|| RhiError::invalid_argument("unknown compute pipeline"))?;
-                        (pipeline.pipeline, pipeline.descriptor.layout.id())
-                    };
+                    let (pipeline, id) =
+                        {
+                            let registries = lock(self.registries);
+                            let pipeline =
+                                registries.compute_pipelines.get(&handle.id()).ok_or_else(
+                                    || RhiError::invalid_argument("unknown compute pipeline"),
+                                )?;
+                            (pipeline.pipeline, pipeline.descriptor.layout.id())
+                        };
                     layout_id = Some(id);
                     // SAFETY: the caller guarantees `cmd` is recording.
                     unsafe {
@@ -922,7 +982,11 @@ impl<'a> Encoder<'a> {
                         )
                     };
                 }
-                ComputeCommand::SetBindingSet { slot, set, dynamic_offsets } => {
+                ComputeCommand::SetBindingSet {
+                    slot,
+                    set,
+                    dynamic_offsets,
+                } => {
                     // SAFETY: forwarded from this function's contract.
                     unsafe {
                         self.bind_set(
@@ -938,7 +1002,11 @@ impl<'a> Encoder<'a> {
                     // SAFETY: forwarded from this function's contract.
                     unsafe { self.push_constants(layout_id, *stage, *slot, data)? };
                 }
-                ComputeCommand::Dispatch { groups_x, groups_y, groups_z } => {
+                ComputeCommand::Dispatch {
+                    groups_x,
+                    groups_y,
+                    groups_z,
+                } => {
                     rhi_require(
                         layout_id.is_some() && *groups_x > 0 && *groups_y > 0 && *groups_z > 0,
                         "dispatch requires a pipeline and positive groups",
@@ -1008,7 +1076,12 @@ impl<'a> Encoder<'a> {
     unsafe fn encode_copy_pass(&mut self, record: &CopyPassRecord) -> RhiResult<()> {
         for command in &record.body {
             match command {
-                CopyCommand::CopyTexture { src, dst, width, height } => {
+                CopyCommand::CopyTexture {
+                    src,
+                    dst,
+                    width,
+                    height,
+                } => {
                     let (src_image, dst_image, src_format, dst_format, src_size, dst_size) = {
                         let registries = lock(self.registries);
                         let source = registries.textures.get(&src.id()).ok_or_else(|| {
@@ -1092,16 +1165,29 @@ impl<'a> Encoder<'a> {
                         )
                     };
                 }
-                CopyCommand::CopyBuffer { src, src_offset, dst, dst_offset, size } => {
+                CopyCommand::CopyBuffer {
+                    src,
+                    src_offset,
+                    dst,
+                    dst_offset,
+                    size,
+                } => {
                     let (src_buffer, dst_buffer, src_size, dst_size) = {
                         let registries = lock(self.registries);
-                        let source = registries.buffers.get(&src.id()).ok_or_else(|| {
-                            RhiError::invalid_argument("unknown copy buffer")
-                        })?;
-                        let destination = registries.buffers.get(&dst.id()).ok_or_else(|| {
-                            RhiError::invalid_argument("unknown copy buffer")
-                        })?;
-                        (source.buffer, destination.buffer, source.size, destination.size)
+                        let source = registries
+                            .buffers
+                            .get(&src.id())
+                            .ok_or_else(|| RhiError::invalid_argument("unknown copy buffer"))?;
+                        let destination = registries
+                            .buffers
+                            .get(&dst.id())
+                            .ok_or_else(|| RhiError::invalid_argument("unknown copy buffer"))?;
+                        (
+                            source.buffer,
+                            destination.buffer,
+                            source.size,
+                            destination.size,
+                        )
                     };
                     rhi_byte_range(*src_offset, *size, src_size)?;
                     rhi_byte_range(*dst_offset, *size, dst_size)?;
@@ -1113,11 +1199,7 @@ impl<'a> Encoder<'a> {
                     // SAFETY: both ranges were validated inside their buffers.
                     unsafe {
                         (self.context.draw.cmd_copy_buffer)(
-                            self.cmd,
-                            src_buffer,
-                            dst_buffer,
-                            1,
-                            &region,
+                            self.cmd, src_buffer, dst_buffer, 1, &region,
                         )
                     };
                 }
@@ -1412,7 +1494,10 @@ impl<'a> Encoder<'a> {
                         !matches!(target.load_action, DepthLoadAction::Load),
                         "transient depth attachments cannot load prior contents",
                     )?;
-                    rhi_require(!target.store, "transient depth attachments cannot preserve contents")?;
+                    rhi_require(
+                        !target.store,
+                        "transient depth attachments cannot preserve contents",
+                    )?;
                 }
             }
         }
@@ -1495,7 +1580,9 @@ impl<'a> Encoder<'a> {
                 query_count as u32,
             )
         };
-        profile.note(format!("recording {query_count} queries over {marker_count} passes"));
+        profile.note(format!(
+            "recording {query_count} queries over {marker_count} passes"
+        ));
         Some(TimestampRecording {
             pool,
             query_count: query_count as u32,
@@ -1585,7 +1672,8 @@ impl TimestampRecording {
             )
         };
         if status != sys::VK_SUCCESS {
-            self.profile.note(format!("vkGetQueryPoolResults returned {status}"));
+            self.profile
+                .note(format!("vkGetQueryPoolResults returned {status}"));
             return;
         }
         let mut usable = 0;
@@ -1601,9 +1689,13 @@ impl TimestampRecording {
                 continue;
             }
             let index = query / 2;
-            let label =
-                self.labels.get(index).cloned().unwrap_or_else(|| format!("pass#{index}"));
-            self.profile.append(GpuTimestampMarker::new(label, elapsed as u64));
+            let label = self
+                .labels
+                .get(index)
+                .cloned()
+                .unwrap_or_else(|| format!("pass#{index}"));
+            self.profile
+                .append(GpuTimestampMarker::new(label, elapsed as u64));
             usable += 1;
         }
         self.profile.note(if usable == 0 {
@@ -1663,7 +1755,8 @@ impl FenceWaiter {
             (self.sync.wait_for_fences)(self.device, 1, fences.as_mut_ptr(), sys::VK_TRUE, u64::MAX)
         };
         if result != sys::VK_SUCCESS {
-            self.status.record(format!("vkWaitForFences failed: {result}"));
+            self.status
+                .record(format!("vkWaitForFences failed: {result}"));
         }
         // SAFETY: the fence signalled (or the wait failed and the driver still owns
         // it), and nothing else references it.
@@ -1731,7 +1824,8 @@ impl Submitter<'_> {
         // SAFETY: `cmd` was just allocated from this slot's pool and is not
         // recording.
         rhi_require(
-            unsafe { (self.context.draw.begin_command_buffer)(cmd, &begin_info) } == sys::VK_SUCCESS,
+            unsafe { (self.context.draw.begin_command_buffer)(cmd, &begin_info) }
+                == sys::VK_SUCCESS,
             "vkBeginCommandBuffer failed",
         )?;
 
@@ -1761,9 +1855,7 @@ impl Submitter<'_> {
         let signals: Vec<TimelineEntry> = submit
             .signal_semaphores
             .iter()
-            .map(|semaphore| {
-                self.semaphore(semaphore.id, semaphore.value)
-            })
+            .map(|semaphore| self.semaphore(semaphore.id, semaphore.value))
             .collect::<RhiResult<Vec<_>>>()?;
 
         let mut fence: sys::VkFence = sys::VK_NULL_HANDLE;
@@ -1797,8 +1889,12 @@ impl Submitter<'_> {
         }
         if status != sys::VK_SUCCESS {
             // SAFETY: the submit failed, so the fence is unreferenced.
-            unsafe { (self.context.sync.destroy_fence)(self.context.device, fence, core::ptr::null()) };
-            return Err(RhiError::submit_failed(format!("vkQueueSubmit failed: {status}")));
+            unsafe {
+                (self.context.sync.destroy_fence)(self.context.device, fence, core::ptr::null())
+            };
+            return Err(RhiError::submit_failed(format!(
+                "vkQueueSubmit failed: {status}"
+            )));
         }
         let _ = pool_handle;
 
@@ -1842,7 +1938,10 @@ impl Submitter<'_> {
                 &mut handle,
             )
         };
-        rhi_require(status == sys::VK_SUCCESS && handle != sys::VK_NULL_HANDLE, "vkCreateCommandPool failed")?;
+        rhi_require(
+            status == sys::VK_SUCCESS && handle != sys::VK_NULL_HANDLE,
+            "vkCreateCommandPool failed",
+        )?;
         frame.command_pools.insert(family, CommandPool::new(handle));
         Ok(handle)
     }
@@ -1850,7 +1949,10 @@ impl Submitter<'_> {
     /// Resolves (creating on first use) the native semaphore for a timeline ID.
     fn semaphore(&mut self, id: u32, value: u64) -> RhiResult<TimelineEntry> {
         if let Some(existing) = self.timeline_semaphores.get(&id) {
-            return Ok(TimelineEntry { semaphore: *existing, value });
+            return Ok(TimelineEntry {
+                semaphore: *existing,
+                value,
+            });
         }
         let type_info = sys::VkSemaphoreTypeCreateInfo {
             sType: sys::VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
@@ -1892,7 +1994,8 @@ impl Submitter<'_> {
     ) -> sys::VkResult {
         let wait_values: Vec<u64> = waits.iter().map(|entry| entry.value).collect();
         let signal_values: Vec<u64> = signals.iter().map(|entry| entry.value).collect();
-        let wait_handles: Vec<sys::VkSemaphore> = waits.iter().map(|entry| entry.semaphore).collect();
+        let wait_handles: Vec<sys::VkSemaphore> =
+            waits.iter().map(|entry| entry.semaphore).collect();
         let signal_handles: Vec<sys::VkSemaphore> =
             signals.iter().map(|entry| entry.semaphore).collect();
         let stages = vec![sys::VK_PIPELINE_STAGE_ALL_COMMANDS_BIT; waits.len()];
@@ -2061,7 +2164,10 @@ fn make_staging_buffer(
     };
     let _ = &mut create_info;
     let handle = crate::rhi::Buffer::new(lock(registries).next_internal_id());
-    let mut allocator = context.staging_allocator.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let mut allocator = context
+        .staging_allocator
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     create_buffer(
         context,
         registries,
@@ -2077,7 +2183,11 @@ fn make_staging_buffer(
             .ok_or_else(|| RhiError::OutOfMemory)?;
         (record.buffer, record.allocation)
     };
-    Ok(StagingBuffer { buffer: native, allocation, pointer: allocation.cpu_pointer(0) })
+    Ok(StagingBuffer {
+        buffer: native,
+        allocation,
+        pointer: allocation.cpu_pointer(0),
+    })
 }
 
 fn destroy_staging_buffer(
@@ -2087,7 +2197,10 @@ fn destroy_staging_buffer(
 ) {
     // SAFETY: the caller waited for the copy that used this buffer.
     unsafe { (context.core.destroy_buffer)(context.device, staging.buffer, core::ptr::null()) };
-    let mut allocator = context.staging_allocator.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let mut allocator = context
+        .staging_allocator
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     allocator.free(staging.allocation);
 }
 
@@ -2099,11 +2212,17 @@ pub fn one_shot(
     context: &VulkanContext,
     body: impl FnOnce(sys::VkCommandBuffer) -> RhiResult<()>,
 ) -> RhiResult<()> {
-    let mut scratch = context.scratch.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let mut scratch = context
+        .scratch
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let pool = scratch.command_pool(context)?;
     // SAFETY: the pool belongs to this device and no recorded work references it.
     let reset = unsafe { (context.draw.reset_command_pool)(context.device, pool, 0) };
-    rhi_require(reset == sys::VK_SUCCESS, "immediate command pool reset failed")?;
+    rhi_require(
+        reset == sys::VK_SUCCESS,
+        "immediate command pool reset failed",
+    )?;
 
     let allocate_info = sys::VkCommandBufferAllocateInfo {
         sType: sys::VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -2116,11 +2235,7 @@ pub fn one_shot(
     // SAFETY: the pool is live and the out-parameter is a live local.
     rhi_require(
         unsafe {
-            (context.resources.allocate_command_buffers)(
-                context.device,
-                &allocate_info,
-                &mut cmd,
-            )
+            (context.resources.allocate_command_buffers)(context.device, &allocate_info, &mut cmd)
         } == sys::VK_SUCCESS
             && !cmd.is_null(),
         "vkAllocateCommandBuffers failed",
@@ -2157,21 +2272,30 @@ pub fn one_shot(
         pSignalSemaphores: core::ptr::null(),
     };
     // SAFETY: `cmd` is ended and `info` outlives the call.
-    let status = unsafe {
-        (context.sync.queue_submit)(context.queues.graphics.handle, 1, &info, fence)
-    };
-    rhi_require(status == sys::VK_SUCCESS, "Vulkan immediate transfer submit failed")?;
+    let status =
+        unsafe { (context.sync.queue_submit)(context.queues.graphics.handle, 1, &info, fence) };
+    rhi_require(
+        status == sys::VK_SUCCESS,
+        "Vulkan immediate transfer submit failed",
+    )?;
     let mut fences = [fence];
     // SAFETY: the fence belongs to this submission; wait indefinitely.
     rhi_require(
         unsafe {
-            (context.sync.wait_for_fences)(context.device, 1, fences.as_mut_ptr(), sys::VK_TRUE, u64::MAX)
+            (context.sync.wait_for_fences)(
+                context.device,
+                1,
+                fences.as_mut_ptr(),
+                sys::VK_TRUE,
+                u64::MAX,
+            )
         } == sys::VK_SUCCESS,
         "immediate fence wait failed",
     )?;
     // SAFETY: the fence signalled.
     rhi_require(
-        unsafe { (context.sync.reset_fences)(context.device, 1, fences.as_mut_ptr()) } == sys::VK_SUCCESS,
+        unsafe { (context.sync.reset_fences)(context.device, 1, fences.as_mut_ptr()) }
+            == sys::VK_SUCCESS,
         "immediate fence reset failed",
     )
 }
@@ -2184,7 +2308,10 @@ pub struct ScratchResources {
 
 impl ScratchResources {
     pub fn new() -> Self {
-        Self { command_pool: None, fence: None }
+        Self {
+            command_pool: None,
+            fence: None,
+        }
     }
 
     pub fn command_pool(&mut self, context: &VulkanContext) -> RhiResult<sys::VkCommandPool> {
@@ -2257,7 +2384,10 @@ fn format_aspect(format: TextureFormat) -> u32 {
 }
 
 fn is_transient(registries: &VulkanRegistries, texture: Texture) -> bool {
-    registries.textures.get(&texture.id()).is_some_and(|record| record.transient_attachment)
+    registries
+        .textures
+        .get(&texture.id())
+        .is_some_and(|record| record.transient_attachment)
 }
 
 fn describe_texture(record: &VulkanTextureRecord) -> RhiResult<RenderTextureInfo<u32>> {
@@ -2289,17 +2419,26 @@ mod tests {
             state_layout(ResourceState::DEPTH_WRITE),
             sys::VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
         );
-        assert_eq!(state_layout(ResourceState::COPY_SOURCE), sys::VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+        assert_eq!(
+            state_layout(ResourceState::COPY_SOURCE),
+            sys::VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+        );
         assert_eq!(
             state_layout(ResourceState::COPY_DESTINATION),
             sys::VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
         );
-        assert_eq!(state_layout(ResourceState::PRESENT), sys::VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+        assert_eq!(
+            state_layout(ResourceState::PRESENT),
+            sys::VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+        );
         assert_eq!(
             state_layout(ResourceState::SHADER_RESOURCE),
             sys::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
         );
-        assert_eq!(state_layout(ResourceState::UNORDERED_ACCESS), sys::VK_IMAGE_LAYOUT_GENERAL);
+        assert_eq!(
+            state_layout(ResourceState::UNORDERED_ACCESS),
+            sys::VK_IMAGE_LAYOUT_GENERAL
+        );
         // Both copy directions together need GENERAL, since one layout must serve.
         assert_eq!(
             state_layout(ResourceState::COPY_SOURCE | ResourceState::COPY_DESTINATION),
@@ -2316,7 +2455,10 @@ mod tests {
         let target = state_access(ResourceState::RENDER_TARGET);
         assert_ne!(target & sys::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 0);
         let acceleration = state_access(ResourceState::ACCELERATION_STRUCTURE_WRITE);
-        assert_ne!(acceleration & sys::VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR, 0);
+        assert_ne!(
+            acceleration & sys::VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
+            0
+        );
     }
 
     #[test]
@@ -2334,9 +2476,7 @@ mod tests {
 
     #[test]
     fn labels_name_passes_by_kind_and_ordinal() {
-        use crate::rhi::{
-            PlannedCommand, RenderPassDescriptor, RenderPassRecord,
-        };
+        use crate::rhi::{PlannedCommand, RenderPassDescriptor, RenderPassRecord};
         let commands = vec![
             PlannedCommand::RenderPass(RenderPassRecord {
                 descriptor: RenderPassDescriptor::new(Vec::new()).with_label("scene"),
@@ -2345,7 +2485,10 @@ mod tests {
             PlannedCommand::ComputePass(crate::rhi::ComputePassRecord { body: Vec::new() }),
             PlannedCommand::ComputePass(crate::rhi::ComputePassRecord { body: Vec::new() }),
         ];
-        assert_eq!(encode_labels(&commands), vec!["scene", "computePass#0", "computePass#1"]);
+        assert_eq!(
+            encode_labels(&commands),
+            vec!["scene", "computePass#0", "computePass#1"]
+        );
     }
 
     #[test]

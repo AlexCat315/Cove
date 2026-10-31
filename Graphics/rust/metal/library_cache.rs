@@ -30,22 +30,36 @@ pub struct MetalLibraryCache {
 }
 impl MetalLibraryCache {
     pub fn new(device: &Retained<ProtocolObject<dyn MTLDevice>>) -> Self {
-        Self { device: device.clone(), libraries: Mutex::new(Libraries::default()) }
+        Self {
+            device: device.clone(),
+            libraries: Mutex::new(Libraries::default()),
+        }
     }
 
     /// Returns the compiled/loaded library for a shader module descriptor,
     /// compiling MSL source only on first sight of that source.
-    pub fn library(&self, descriptor: &ShaderModuleDescriptor) -> RhiResult<Retained<ProtocolObject<dyn MTLLibrary>>> {
-        let mut libraries = self.libraries.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    pub fn library(
+        &self,
+        descriptor: &ShaderModuleDescriptor,
+    ) -> RhiResult<Retained<ProtocolObject<dyn MTLLibrary>>> {
+        let mut libraries = self
+            .libraries
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         match descriptor.format {
             ShaderFormat::MslSource => {
                 if let Some(cached) = libraries.source.get(&descriptor.code) {
                     return Ok(cached.clone());
                 }
                 let source = String::from_utf8_lossy(&descriptor.code);
-                match self.device.newLibraryWithSource_options_error(&NSString::from_str(&source), None) {
+                match self
+                    .device
+                    .newLibraryWithSource_options_error(&NSString::from_str(&source), None)
+                {
                     Ok(library) => {
-                        libraries.source.insert(descriptor.code.clone(), library.clone());
+                        libraries
+                            .source
+                            .insert(descriptor.code.clone(), library.clone());
                         Ok(library)
                     }
                     Err(error) => Err(RhiError::invalid_argument(format!(
@@ -63,7 +77,9 @@ impl MetalLibraryCache {
                 let data = DispatchData::from_bytes(&descriptor.code);
                 match self.device.newLibraryWithData_error(&data) {
                     Ok(library) => {
-                        libraries.metallib.insert(descriptor.code.clone(), library.clone());
+                        libraries
+                            .metallib
+                            .insert(descriptor.code.clone(), library.clone());
                         Ok(library)
                     }
                     Err(error) => Err(RhiError::invalid_argument(format!(

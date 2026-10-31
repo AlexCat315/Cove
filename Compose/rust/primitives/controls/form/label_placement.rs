@@ -11,7 +11,13 @@ pub enum FieldLabelPlacement {
 }
 
 impl FieldLabelPlacement {
-    pub fn is_leading(self, width: f32, label_width: f32, min_value_width: f32, spacing: f32) -> bool {
+    pub fn is_leading(
+        self,
+        width: f32,
+        label_width: f32,
+        min_value_width: f32,
+        spacing: f32,
+    ) -> bool {
         match self {
             Self::Adaptive => width >= label_width + spacing + min_value_width,
             Self::Leading => true,

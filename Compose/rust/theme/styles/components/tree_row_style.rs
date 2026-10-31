@@ -116,8 +116,15 @@ pub trait TreeRowStyleViewExt: View + Sized + 'static {
     fn tree_row_style<S: TreeRowStyle + 'static>(self, style: S) -> ModifiedContent {
         self.tree_row_style_scoped(style, TreeRowStyleScope::Content)
     }
-    fn tree_row_style_scoped<S: TreeRowStyle + 'static>(self, style: S, scope: TreeRowStyleScope) -> ModifiedContent {
-        self.composition_local(TreeRowStyleEnvironment::key(), AnyTreeRowStyle::new(style, scope))
+    fn tree_row_style_scoped<S: TreeRowStyle + 'static>(
+        self,
+        style: S,
+        scope: TreeRowStyleScope,
+    ) -> ModifiedContent {
+        self.composition_local(
+            TreeRowStyleEnvironment::key(),
+            AnyTreeRowStyle::new(style, scope),
+        )
     }
 }
 impl<T: View + Sized + 'static> TreeRowStyleViewExt for T {}

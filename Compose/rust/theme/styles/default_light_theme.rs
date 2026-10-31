@@ -1,6 +1,6 @@
 //! Translation of Theme/Styles/DefaultLightTheme.swift.
-use cove_core::{Color, LayeredShadow, SurfaceShadow};
 use crate::theme::{ColorScheme, ElevationScale, Theme};
+use cove_core::{Color, LayeredShadow, SurfaceShadow};
 
 fn color(r: u8, g: u8, b: u8) -> Color {
     Color::from_rgba8(r, g, b, 255)
@@ -51,12 +51,37 @@ pub fn value() -> Theme {
         dark.radius,
         ElevationScale::new(
             SurfaceShadow::NONE,
-            SurfaceShadow { color: Some(alpha(0, 0, 0, 0x1F)), offset_x: 0.0, offset_y: 1.0, blur: 2.0 },
-            SurfaceShadow { color: Some(alpha(0, 0, 0, 0x0F)), offset_x: 0.0, offset_y: 1.0, blur: 3.0 },
-            SurfaceShadow { color: Some(alpha(0, 0, 0, 0x2E)), offset_x: 0.0, offset_y: 6.0, blur: 20.0 },
+            SurfaceShadow {
+                color: Some(alpha(0, 0, 0, 0x1F)),
+                offset_x: 0.0,
+                offset_y: 1.0,
+                blur: 2.0,
+            },
+            SurfaceShadow {
+                color: Some(alpha(0, 0, 0, 0x0F)),
+                offset_x: 0.0,
+                offset_y: 1.0,
+                blur: 3.0,
+            },
+            SurfaceShadow {
+                color: Some(alpha(0, 0, 0, 0x2E)),
+                offset_x: 0.0,
+                offset_y: 6.0,
+                blur: 20.0,
+            },
             LayeredShadow {
-                ambient: SurfaceShadow { color: Some(alpha(0, 0, 0, 0x1A)), offset_x: 0.0, offset_y: 0.0, blur: 40.0 },
-                key: SurfaceShadow { color: Some(alpha(0, 0, 0, 0x4D)), offset_x: 0.0, offset_y: 10.0, blur: 16.0 },
+                ambient: SurfaceShadow {
+                    color: Some(alpha(0, 0, 0, 0x1A)),
+                    offset_x: 0.0,
+                    offset_y: 0.0,
+                    blur: 40.0,
+                },
+                key: SurfaceShadow {
+                    color: Some(alpha(0, 0, 0, 0x4D)),
+                    offset_x: 0.0,
+                    offset_y: 10.0,
+                    blur: 16.0,
+                },
             },
         ),
         dark.motion,

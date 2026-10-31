@@ -82,9 +82,8 @@ fn is_executable(path: &Path) -> bool {
 
 /// Resolves an executable or reports the same actionable error as Swift.
 pub fn require(name: &str, environment: &BTreeMap<String, String>) -> Result<PathBuf, ToolError> {
-    executable(name, environment).ok_or_else(|| {
-        ToolError::message(format!("Required tool not found on PATH: {name}"))
-    })
+    executable(name, environment)
+        .ok_or_else(|| ToolError::message(format!("Required tool not found on PATH: {name}")))
 }
 
 /// Runs to completion and returns trimmed standard output.

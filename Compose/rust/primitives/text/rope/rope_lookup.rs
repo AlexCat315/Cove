@@ -12,9 +12,9 @@ impl RopeNode {
                     branch.left.utf8_offset_for_character_index(index)
                 } else {
                     branch.left.metrics.utf8_length
-                        + branch
-                            .right
-                            .utf8_offset_for_character_index(index - branch.left.metrics.character_count)
+                        + branch.right.utf8_offset_for_character_index(
+                            index - branch.left.metrics.character_count,
+                        )
                 }
             }
         }
@@ -28,9 +28,9 @@ impl RopeNode {
                     branch.left.character_index_for_utf8_offset(offset)
                 } else {
                     branch.left.metrics.character_count
-                        + branch
-                            .right
-                            .character_index_for_utf8_offset(offset - branch.left.metrics.utf8_length)
+                        + branch.right.character_index_for_utf8_offset(
+                            offset - branch.left.metrics.utf8_length,
+                        )
                 }
             }
         }
@@ -40,8 +40,7 @@ impl RopeNode {
         match &self.storage {
             RopeStorage::Leaf(leaf) => {
                 let boundary = leaf.character_boundaries[index];
-                let prefix =
-                    std::str::from_utf8(&leaf.bytes[..boundary]).unwrap_or_default();
+                let prefix = std::str::from_utf8(&leaf.bytes[..boundary]).unwrap_or_default();
                 prefix.encode_utf16().count()
             }
             RopeStorage::Branch(branch) => {
@@ -49,9 +48,9 @@ impl RopeNode {
                     branch.left.utf16_offset_for_character_index(index)
                 } else {
                     branch.left.metrics.utf16_length
-                        + branch
-                            .right
-                            .utf16_offset_for_character_index(index - branch.left.metrics.character_count)
+                        + branch.right.utf16_offset_for_character_index(
+                            index - branch.left.metrics.character_count,
+                        )
                 }
             }
         }
@@ -185,11 +184,7 @@ impl RopeNode {
                 let split = branch.left.metrics.utf8_length;
                 let mut result: Vec<Arc<RopeLeaf>> = Vec::new();
                 if range.start < split {
-                    result.extend(
-                        branch
-                            .left
-                            .leaves_in(range.start..split.min(range.end)),
-                    );
+                    result.extend(branch.left.leaves_in(range.start..split.min(range.end)));
                 }
                 if range.end > split {
                     result.extend(

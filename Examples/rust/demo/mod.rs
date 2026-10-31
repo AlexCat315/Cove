@@ -77,7 +77,13 @@ impl ShowcaseLaunch {
             // `min(2, max(1, value))`, with a non-finite value falling back to 1.
             text_scale: Self::argument("--text-scale", arguments)
                 .and_then(|value| value.parse::<f64>().ok())
-                .map(|value| if value.is_finite() { value.clamp(1.0, 2.0) } else { 1.0 })
+                .map(|value| {
+                    if value.is_finite() {
+                        value.clamp(1.0, 2.0)
+                    } else {
+                        1.0
+                    }
+                })
                 .unwrap_or(1.0),
         }
     }
@@ -220,10 +226,22 @@ mod checks {
 
     #[test]
     fn text_scale_is_clamped_to_one_through_two() {
-        assert_eq!(ShowcaseLaunch::new(&args(&["--text-scale", "1.5"])).text_scale, 1.5);
-        assert_eq!(ShowcaseLaunch::new(&args(&["--text-scale", "0.5"])).text_scale, 1.0);
-        assert_eq!(ShowcaseLaunch::new(&args(&["--text-scale", "9"])).text_scale, 2.0);
-        assert_eq!(ShowcaseLaunch::new(&args(&["--text-scale", "nope"])).text_scale, 1.0);
+        assert_eq!(
+            ShowcaseLaunch::new(&args(&["--text-scale", "1.5"])).text_scale,
+            1.5
+        );
+        assert_eq!(
+            ShowcaseLaunch::new(&args(&["--text-scale", "0.5"])).text_scale,
+            1.0
+        );
+        assert_eq!(
+            ShowcaseLaunch::new(&args(&["--text-scale", "9"])).text_scale,
+            2.0
+        );
+        assert_eq!(
+            ShowcaseLaunch::new(&args(&["--text-scale", "nope"])).text_scale,
+            1.0
+        );
     }
 
     #[test]

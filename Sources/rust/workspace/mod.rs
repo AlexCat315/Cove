@@ -6,8 +6,8 @@
 //! one place. The view layer reads only the document and the controller.
 mod controller;
 mod drag;
-pub mod ids;
 mod icons;
+pub mod ids;
 mod model;
 mod sizing;
 mod tab_style;
@@ -19,26 +19,30 @@ pub use controller::{
     SubscriptionToken, WorkspaceCommand, WorkspaceController, WorkspaceHitTarget, WorkspaceTarget,
     WorkspaceTransactionResult,
 };
-pub use tab_style::WorkspaceTabStyle;
 pub use drag::{
-    drag_overlay, first_node, resolve_drag, set_drag_overlay, tab_band, tab_frames, workspace_root,
-    WorkspaceDragResolution, WorkspaceDropPreview, WorkspaceReorderPreview, WorkspaceTabDragOverlayState,
+    WorkspaceDragResolution, WorkspaceDropPreview, WorkspaceReorderPreview,
+    WorkspaceTabDragOverlayState, drag_overlay, first_node, resolve_drag, set_drag_overlay,
+    tab_band, tab_frames, workspace_root,
 };
-pub use icons::{WorkspacePanelIconCatalog, WORKSPACE_RESOURCE_BUNDLE_NAME};
+pub use icons::{WORKSPACE_RESOURCE_BUNDLE_NAME, WorkspacePanelIconCatalog};
 pub use model::{
-    WorkspaceClosedPanel, WorkspaceCollapsedItem, WorkspaceDocument, WorkspaceFloatingWindow, WorkspaceLayoutNode,
-    WorkspaceLayoutSplit, WorkspacePanel, WorkspacePanelDescriptor, WorkspacePanelRegistry, WorkspaceSlot,
-    WorkspaceSlotKind, WorkspaceSlotSize, WorkspaceTabGroup,
+    WorkspaceClosedPanel, WorkspaceCollapsedItem, WorkspaceDocument, WorkspaceFloatingWindow,
+    WorkspaceLayoutNode, WorkspaceLayoutSplit, WorkspacePanel, WorkspacePanelDescriptor,
+    WorkspacePanelRegistry, WorkspaceSlot, WorkspaceSlotKind, WorkspaceSlotSize, WorkspaceTabGroup,
 };
 pub use sizing::{
-    SplitConstraints, WorkspaceAxisSizing, WorkspaceLayoutMetrics, WorkspacePanelSizing, WorkspaceRect,
-    WorkspaceResolvedSplit, WorkspaceSizingResolver, WorkspaceSplitFractions,
+    SplitConstraints, WorkspaceAxisSizing, WorkspaceLayoutMetrics, WorkspacePanelSizing,
+    WorkspaceRect, WorkspaceResolvedSplit, WorkspaceSizingResolver, WorkspaceSplitFractions,
 };
-pub use theme::{resolve_workspace_theme, WorkspaceRegionSizing, WorkspaceTheme, WorkspaceThemeEnvironment};
+pub use tab_style::WorkspaceTabStyle;
+pub use theme::{
+    WorkspaceRegionSizing, WorkspaceTheme, WorkspaceThemeEnvironment, resolve_workspace_theme,
+};
 pub use view::{
-    chrome_rail_slots, chrome_thickness, collapsed_groups_on, compact_layout, rail_edge, rail_groups, rail_plan,
-    renderable_layout, visible_chrome_rail_slots, visible_groups, WorkspaceBox, WorkspaceLabel, WorkspacePane,
-    WorkspaceRegionTransition, WorkspaceResizeGeometry, WorkspaceVerticalTitle,
+    WorkspaceBox, WorkspaceLabel, WorkspacePane, WorkspaceRegionTransition,
+    WorkspaceResizeGeometry, WorkspaceVerticalTitle, chrome_rail_slots, chrome_thickness,
+    collapsed_groups_on, compact_layout, rail_edge, rail_groups, rail_plan, renderable_layout,
+    visible_chrome_rail_slots, visible_groups,
 };
 pub use workspace_view::{
     WorkspaceContent, WorkspaceLayoutNodeView, WorkspaceRailReserve, WorkspaceSplitDivider,
@@ -46,6 +50,6 @@ pub use workspace_view::{
 };
 
 pub use ids::{
-    WorkspaceEdge, WorkspaceFloatingWindowID, WorkspacePanelID, WorkspacePlacementKind, WorkspaceSlotID,
-    WorkspaceSplitAxis, WorkspaceSplitID, WorkspaceTabGroupID,
+    WorkspaceEdge, WorkspaceFloatingWindowID, WorkspacePanelID, WorkspacePlacementKind,
+    WorkspaceSlotID, WorkspaceSplitAxis, WorkspaceSplitID, WorkspaceTabGroupID,
 };

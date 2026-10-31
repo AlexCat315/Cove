@@ -15,12 +15,12 @@ use cove_graphics::{
     AccelerationStructure, AdapterCapabilities, BindingLayout, BindingLayoutDescriptor,
     BindingLayoutEntry, BindingSet, BindingSetEntry, Buffer, BufferDescriptor, Capabilities,
     Completion, ComputePipeline, ComputePipelineDescriptor, Device, DeviceConfig, FrameUploader,
-    GraphicsApi, GraphicsPipeline, GraphicsPipelineDescriptor, GraphicsPipelineKey,
-    MeshPipeline, MeshPipelineDescriptor, MeshPipelineKey, PipelineLayout, PipelineLayoutDescriptor,
-    PlannedSubmit, PresentationMode, RhiBackend, RhiError, RhiResult, Sampler, SamplerDescriptor,
-    ShaderModule, ShaderModuleDescriptor, ShaderModuleKey, SubmissionCpuProfile, SurfaceDescriptor,
-    Swapchain, SwapchainImage, Texture, TextureDescriptor, TextureSubresource, TextureUploadRegion,
-    UploadLocation,
+    GraphicsApi, GraphicsPipeline, GraphicsPipelineDescriptor, GraphicsPipelineKey, MeshPipeline,
+    MeshPipelineDescriptor, MeshPipelineKey, PipelineLayout, PipelineLayoutDescriptor,
+    PlannedSubmit, PresentationMode, QueueLimits, RhiBackend, RhiError, RhiResult, Sampler,
+    SamplerDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderModuleKey, SubmissionCpuProfile,
+    SurfaceDescriptor, Swapchain, SwapchainImage, Texture, TextureDescriptor, TextureSubresource,
+    TextureUploadRegion, UploadLocation,
 };
 
 /// Everything a test can assert on after driving the frontend device.
@@ -86,6 +86,11 @@ impl RecordingBackend {
         Self::new(Capabilities::configure(|capabilities| {
             capabilities.graphics = true;
             capabilities.compute = true;
+            capabilities.max_queues = QueueLimits {
+                graphics: 1,
+                compute: 1,
+                transfer: 1,
+            };
         }))
     }
 
@@ -95,6 +100,11 @@ impl RecordingBackend {
             capabilities.graphics = true;
             capabilities.compute = true;
             capabilities.mesh_shading.mesh = true;
+            capabilities.max_queues = QueueLimits {
+                graphics: 1,
+                compute: 1,
+                transfer: 1,
+            };
         }))
     }
 
@@ -103,14 +113,18 @@ impl RecordingBackend {
     }
 
     pub fn lock(&self) -> MutexGuard<'_, RecordingState> {
-        self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+        self.state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 }
 
 /// Releases every held presentation completion, as GPU retirement would.
 pub fn complete_presentations(state: &Arc<Mutex<RecordingState>>) {
     let bodies: Vec<Completion> = {
-        let mut guard = state.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut guard = state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         std::mem::take(&mut guard.pending_presentations)
     };
     for body in bodies {
@@ -119,11 +133,17 @@ pub fn complete_presentations(state: &Arc<Mutex<RecordingState>>) {
 }
 
 pub fn reject_next_idle(state: &Arc<Mutex<RecordingState>>) {
-    state.lock().unwrap_or_else(std::sync::PoisonError::into_inner).reject_next_idle = true;
+    state
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .reject_next_idle = true;
 }
 
 pub fn reject_next_present(state: &Arc<Mutex<RecordingState>>) {
-    state.lock().unwrap_or_else(std::sync::PoisonError::into_inner).reject_next_present = true;
+    state
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .reject_next_present = true;
 }
 
 /// Builds a device over a recording backend.
@@ -134,7 +154,10 @@ pub fn make_device(backend: &RecordingBackend, frames_in_flight: usize) -> Devic
             capabilities: backend.capabilities,
             next_texture: Mutex::new(0x8000_0000),
         }),
-        DeviceConfig { frames_in_flight, ..Default::default() },
+        DeviceConfig {
+            frames_in_flight,
+            ..Default::default()
+        },
     )
     .expect("device")
 }
@@ -173,7 +196,11 @@ impl RhiBackend for RecordingBackend {
         descriptor: SurfaceDescriptor,
     ) -> RhiResult<()> {
         let mut state = self.lock();
-        match state.windows.iter_mut().find(|(window, _)| *window == handle) {
+        match state
+            .windows
+            .iter_mut()
+            .find(|(window, _)| *window == handle)
+        {
             Some(entry) => entry.1 = descriptor,
             None => state.windows.push((handle, descriptor)),
         }
@@ -185,7 +212,11 @@ impl RhiBackend for RecordingBackend {
         let descriptor = state
             .descriptor_for(handle)
             .ok_or_else(|| RhiError::invalid_argument("unknown swapchain"))?;
-        Ok(if descriptor.vsync_enabled { PresentationMode::Fifo } else { PresentationMode::Immediate })
+        Ok(if descriptor.vsync_enabled {
+            PresentationMode::Fifo
+        } else {
+            PresentationMode::Immediate
+        })
     }
 
     fn destroy_swapchain(&mut self, handle: Swapchain) {
@@ -197,12 +228,17 @@ impl RhiBackend for RecordingBackend {
         let mut state = self.lock();
         if state.reject_next_acquire {
             state.reject_next_acquire = false;
-            return Err(RhiError::SwapchainAcquireFailed("acquire rejected by the test".into()));
+            return Err(RhiError::SwapchainAcquireFailed(
+                "acquire rejected by the test".into(),
+            ));
         }
         let descriptor = state
             .descriptor_for(handle)
             .ok_or_else(|| RhiError::invalid_argument("unknown swapchain"))?;
-        let mut next = self.next_texture.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut next = self
+            .next_texture
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let texture = Texture::new(*next);
         *next += 1;
         Ok(SwapchainImage::new(
@@ -228,11 +264,19 @@ impl RhiBackend for RecordingBackend {
         Ok(())
     }
 
-    fn create_texture(&mut self, _handle: Texture, _descriptor: TextureDescriptor) -> RhiResult<()> {
+    fn create_texture(
+        &mut self,
+        _handle: Texture,
+        _descriptor: TextureDescriptor,
+    ) -> RhiResult<()> {
         Ok(())
     }
 
-    fn create_sampler(&mut self, _handle: Sampler, _descriptor: SamplerDescriptor) -> RhiResult<()> {
+    fn create_sampler(
+        &mut self,
+        _handle: Sampler,
+        _descriptor: SamplerDescriptor,
+    ) -> RhiResult<()> {
         Ok(())
     }
 
@@ -357,7 +401,9 @@ impl RhiBackend for RecordingBackend {
         let mut state = self.lock();
         if state.reject_next_idle {
             state.reject_next_idle = false;
-            return Err(RhiError::submit_failed("completed GPU work reported an error"));
+            return Err(RhiError::submit_failed(
+                "completed GPU work reported an error",
+            ));
         }
         Ok(())
     }

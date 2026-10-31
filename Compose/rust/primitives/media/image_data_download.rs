@@ -71,7 +71,11 @@ impl ImageLoadingPolicy {
     }
 
     pub fn validate(&mut self) {
-        self.timeout = if self.timeout.is_finite() { self.timeout.max(0.1) } else { 15.0 };
+        self.timeout = if self.timeout.is_finite() {
+            self.timeout.max(0.1)
+        } else {
+            15.0
+        };
         self.maximum_download_bytes = self.maximum_download_bytes.max(1);
         self.maximum_source_pixels = self.maximum_source_pixels.max(1);
     }
@@ -150,15 +154,17 @@ impl ImageDataDownload {
         let mut policy = policy.clone();
         policy.validate();
         if url.starts_with("file:") {
-            let path = url.trim_start_matches("file://").trim_start_matches("file:");
+            let path = url
+                .trim_start_matches("file://")
+                .trim_start_matches("file:");
             return Self::load_file(path, &policy);
         }
         let scheme = url.split(':').next().unwrap_or("").to_ascii_lowercase();
         if scheme != "http" && scheme != "https" {
             return Err(AsyncImageError::UnsupportedUrl);
         }
-        let transport = ImageDownloadTransportHolder::current()
-            .ok_or(AsyncImageError::HostUnavailable)?;
+        let transport =
+            ImageDownloadTransportHolder::current().ok_or(AsyncImageError::HostUnavailable)?;
         let (data, mime) = transport.fetch(url, policy.maximum_download_bytes)?;
         if data.len() > policy.maximum_download_bytes {
             return Err(AsyncImageError::DownloadTooLarge);
@@ -171,7 +177,10 @@ impl ImageDataDownload {
         Ok(DownloadedImage::new(data, url, mime.as_deref()))
     }
 
-    fn load_file(path: &str, policy: &ImageLoadingPolicy) -> Result<DownloadedImage, AsyncImageError> {
+    fn load_file(
+        path: &str,
+        policy: &ImageLoadingPolicy,
+    ) -> Result<DownloadedImage, AsyncImageError> {
         let metadata = std::fs::metadata(path).map_err(|error| match error.kind() {
             std::io::ErrorKind::NotFound => AsyncImageError::FileNotFound,
             _ => AsyncImageError::FileReadFailed,
@@ -186,11 +195,18 @@ impl ImageDataDownload {
         if data.len() > policy.maximum_download_bytes {
             return Err(AsyncImageError::DownloadTooLarge);
         }
-        Ok(DownloadedImage { data, format_hint: path_extension(path) })
+        Ok(DownloadedImage {
+            data,
+            format_hint: path_extension(path),
+        })
     }
 
     /// HTTP response metadata checks performed before a body is accepted.
-    pub fn accepts_response(status: u16, expected_content_length: Option<u64>, limit: usize) -> Result<(), AsyncImageError> {
+    pub fn accepts_response(
+        status: u16,
+        expected_content_length: Option<u64>,
+        limit: usize,
+    ) -> Result<(), AsyncImageError> {
         if !(200..300).contains(&status) {
             return Err(AsyncImageError::HttpStatus(status));
         }
@@ -211,7 +227,12 @@ pub struct DownloadProgressReporter {
 
 impl DownloadProgressReporter {
     pub fn new(limit: usize, progress: Option<DownloadProgress>) -> Arc<Self> {
-        Arc::new(Self { data: RefCell::new(Vec::new()), reported: RefCell::new(0), limit, progress })
+        Arc::new(Self {
+            data: RefCell::new(Vec::new()),
+            reported: RefCell::new(0),
+            limit,
+            progress,
+        })
     }
 
     /// Appends `chunk`; returns the received-so-far snapshot when the 64 KiB

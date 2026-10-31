@@ -32,11 +32,23 @@ mod tests {
     #[test]
     fn clip_and_viewport_both_cull() {
         let mut list = DrawList::default();
-        assert!(!RenderCulling::is_outside(Rect::new(0.0, 0.0, 10.0, 10.0), &list));
+        assert!(!RenderCulling::is_outside(
+            Rect::new(0.0, 0.0, 10.0, 10.0),
+            &list
+        ));
         list.push_clip_rect(Rect::new(0.0, 0.0, 100.0, 100.0));
-        assert!(RenderCulling::is_outside(Rect::new(200.0, 0.0, 10.0, 10.0), &list));
-        assert!(!RenderCulling::is_outside(Rect::new(10.0, 10.0, 10.0, 10.0), &list));
+        assert!(RenderCulling::is_outside(
+            Rect::new(200.0, 0.0, 10.0, 10.0),
+            &list
+        ));
+        assert!(!RenderCulling::is_outside(
+            Rect::new(10.0, 10.0, 10.0, 10.0),
+            &list
+        ));
         list.viewport_bounds = Some(Rect::new(0.0, 0.0, 50.0, 50.0));
-        assert!(RenderCulling::is_outside(Rect::new(60.0, 60.0, 10.0, 10.0), &list));
+        assert!(RenderCulling::is_outside(
+            Rect::new(60.0, 60.0, 10.0, 10.0),
+            &list
+        ));
     }
 }

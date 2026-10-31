@@ -4,12 +4,7 @@ use cove_core::{Bitmap, Size, image_lod};
 
 #[test]
 fn odd_dimensions_include_the_last_pixel() {
-    let image = Bitmap::new(
-        3,
-        1,
-        vec![255, 0, 0, 255, 255, 0, 0, 255, 0, 0, 255, 255],
-    )
-    .unwrap();
+    let image = Bitmap::new(3, 1, vec![255, 0, 0, 255, 255, 0, 0, 255, 0, 0, 255, 255]).unwrap();
     assert_eq!(image.reduced_mip().unwrap().pixels(), [170, 0, 85, 255]);
 }
 

@@ -6,10 +6,10 @@
 use std::collections::HashMap;
 
 use super::{
-    BindingLayoutDescriptor, BindingLayoutEntry, BindingType, BufferBindingLayout, PushConstantRange,
-    ReflectedShaderConstant, RhiError, RhiResult, ShaderConstantType, ShaderConstantValue,
-    ShaderFormat, ShaderModuleDescriptor, ShaderSpecializationConstant, ShaderStage,
-    ShaderVisibility, ThreadgroupSize, ThreadgroupSpecialization, rhi_require,
+    BindingLayoutDescriptor, BindingLayoutEntry, BindingType, BufferBindingLayout,
+    PushConstantRange, ReflectedShaderConstant, RhiError, RhiResult, ShaderConstantType,
+    ShaderConstantValue, ShaderFormat, ShaderModuleDescriptor, ShaderSpecializationConstant,
+    ShaderStage, ShaderVisibility, ThreadgroupSize, ThreadgroupSpecialization, rhi_require,
 };
 use serde::{Deserialize, Serialize};
 
@@ -24,7 +24,13 @@ pub struct ReflectedShaderBinding {
 }
 impl ReflectedShaderBinding {
     pub fn new(name: impl Into<String>, slot: u32, binding_type: BindingType) -> Self {
-        Self { buffer: BufferBindingLayout::DEFAULT, name: name.into(), slot, space: 0, binding_type }
+        Self {
+            buffer: BufferBindingLayout::DEFAULT,
+            name: name.into(),
+            slot,
+            space: 0,
+            binding_type,
+        }
     }
 }
 
@@ -98,10 +104,13 @@ impl ShaderArtifact {
 
         for constant in specialization {
             rhi_require(
-                self.interface.specialization_constants.iter().any(|reflected| {
-                    reflected.id == constant.id
-                        && reflected.constant_type == constant.value.constant_type()
-                }),
+                self.interface
+                    .specialization_constants
+                    .iter()
+                    .any(|reflected| {
+                        reflected.id == constant.id
+                            && reflected.constant_type == constant.value.constant_type()
+                    }),
                 "unknown shader specialization ID or incompatible type",
             )?;
         }
@@ -110,9 +119,18 @@ impl ShaderArtifact {
         // Materialize artifact defaults on every target so physical dispatch
         // dimensions also agree when the offline default was customized.
         let defaults = [
-            (self.interface.threadgroup_specialization.x, self.interface.threadgroup_size.x),
-            (self.interface.threadgroup_specialization.y, self.interface.threadgroup_size.y),
-            (self.interface.threadgroup_specialization.z, self.interface.threadgroup_size.z),
+            (
+                self.interface.threadgroup_specialization.x,
+                self.interface.threadgroup_size.x,
+            ),
+            (
+                self.interface.threadgroup_specialization.y,
+                self.interface.threadgroup_size.y,
+            ),
+            (
+                self.interface.threadgroup_specialization.z,
+                self.interface.threadgroup_size.z,
+            ),
         ];
         for (id, size) in defaults {
             let Some(id) = id else { continue };
@@ -122,12 +140,16 @@ impl ShaderArtifact {
                 .iter()
                 .find(|constant| constant.id == id)
             else {
-                return Err(RhiError::layout_mismatch("workgroup constant needs a reflected integer ID"));
+                return Err(RhiError::layout_mismatch(
+                    "workgroup constant needs a reflected integer ID",
+                ));
             };
             if reflected.constant_type != ShaderConstantType::Uint32
                 && reflected.constant_type != ShaderConstantType::Int32
             {
-                return Err(RhiError::layout_mismatch("workgroup constant needs a reflected integer ID"));
+                return Err(RhiError::layout_mismatch(
+                    "workgroup constant needs a reflected integer ID",
+                ));
             }
             if values.iter().any(|constant| constant.id == id) {
                 continue;
@@ -165,13 +187,20 @@ impl ShaderArtifact {
     /// Target-specific reflected slots. Cross-target logical bindings must be
     /// lowered by the toolchain; the backend never guesses register remappings.
     pub fn binding_layout_descriptor(&self, space: u32) -> RhiResult<BindingLayoutDescriptor> {
-        let bindings: Vec<&ReflectedShaderBinding> =
-            self.interface.bindings.iter().filter(|binding| binding.space == space).collect();
+        let bindings: Vec<&ReflectedShaderBinding> = self
+            .interface
+            .bindings
+            .iter()
+            .filter(|binding| binding.space == space)
+            .collect();
         let mut slots: Vec<u32> = bindings.iter().map(|binding| binding.slot).collect();
         let count = slots.len();
         slots.sort_unstable();
         slots.dedup();
-        rhi_require(count == slots.len(), "reflected resources need distinct RHI binding slots")?;
+        rhi_require(
+            count == slots.len(),
+            "reflected resources need distinct RHI binding slots",
+        )?;
         let entries = bindings
             .into_iter()
             .map(|binding| {
@@ -188,15 +217,24 @@ impl ShaderArtifact {
 }
 
 /// Merge stage visibility while preserving the reflected resource ABI.
-pub fn reflected_binding_layout(artifacts: &[ShaderArtifact]) -> RhiResult<BindingLayoutDescriptor> {
+pub fn reflected_binding_layout(
+    artifacts: &[ShaderArtifact],
+) -> RhiResult<BindingLayoutDescriptor> {
     let mut entries: HashMap<u32, BindingLayoutEntry> = HashMap::new();
     for artifact in artifacts {
-        let mut slots: Vec<u32> = artifact.interface.bindings.iter().map(|binding| binding.slot).collect();
+        let mut slots: Vec<u32> = artifact
+            .interface
+            .bindings
+            .iter()
+            .map(|binding| binding.slot)
+            .collect();
         let count = slots.len();
         slots.sort_unstable();
         slots.dedup();
         if slots.len() != count {
-            return Err(RhiError::layout_mismatch("duplicate reflected resource slot in one shader"));
+            return Err(RhiError::layout_mismatch(
+                "duplicate reflected resource slot in one shader",
+            ));
         }
         for binding in &artifact.interface.bindings {
             if binding.space != 0 {
@@ -205,7 +243,9 @@ pub fn reflected_binding_layout(artifacts: &[ShaderArtifact]) -> RhiResult<Bindi
             let visibility = ShaderVisibility::from_stage(artifact.stage);
             match entries.get_mut(&binding.slot) {
                 Some(existing) => {
-                    if existing.binding_type != binding.binding_type || existing.buffer != binding.buffer {
+                    if existing.binding_type != binding.binding_type
+                        || existing.buffer != binding.buffer
+                    {
                         return Err(RhiError::layout_mismatch(format!(
                             "inconsistent reflected resource at {}",
                             binding.slot
@@ -214,8 +254,9 @@ pub fn reflected_binding_layout(artifacts: &[ShaderArtifact]) -> RhiResult<Bindi
                     existing.visibility.insert(visibility);
                 }
                 None => {
-                    let entry = BindingLayoutEntry::new(binding.slot, binding.binding_type, visibility)
-                        .with_buffer_layout(binding.buffer);
+                    let entry =
+                        BindingLayoutEntry::new(binding.slot, binding.binding_type, visibility)
+                            .with_buffer_layout(binding.buffer);
                     entries.insert(binding.slot, entry);
                 }
             }
@@ -238,21 +279,22 @@ mod tests {
             vec![0x03, 0x02, 0x23, 0x07],
             "slang",
         );
-        artifact.interface.bindings.push(ReflectedShaderBinding::new(
-            "ui",
-            0,
-            BindingType::Texture,
-        ));
-        artifact.interface.push_constants.push(PushConstantRange::new(
-            ShaderStage::Fragment,
-            0,
-            16,
-        ));
-        artifact.interface.specialization_constants.push(ReflectedShaderConstant::new(
-            3,
-            "workgroupX",
-            ShaderConstantType::Uint32,
-        ));
+        artifact
+            .interface
+            .bindings
+            .push(ReflectedShaderBinding::new("ui", 0, BindingType::Texture));
+        artifact
+            .interface
+            .push_constants
+            .push(PushConstantRange::new(ShaderStage::Fragment, 0, 16));
+        artifact
+            .interface
+            .specialization_constants
+            .push(ReflectedShaderConstant::new(
+                3,
+                "workgroupX",
+                ShaderConstantType::Uint32,
+            ));
         artifact.interface.threadgroup_specialization.x = Some(3);
         artifact.interface.threadgroup_size = ThreadgroupSize::new(8, 4, 1);
         artifact
@@ -333,6 +375,13 @@ mod tests {
         let layout = artifact.binding_layout_descriptor(0).expect("layout");
         assert_eq!(layout.entries.len(), 1);
         assert_eq!(layout.entries[0].binding_type, BindingType::Texture);
-        assert_eq!(artifact.binding_layout_descriptor(1).expect("layout").entries.len(), 0);
+        assert_eq!(
+            artifact
+                .binding_layout_descriptor(1)
+                .expect("layout")
+                .entries
+                .len(),
+            0
+        );
     }
 }

@@ -5,15 +5,15 @@
 use std::rc::Rc;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::Binding;
+use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 
 use crate::modifiers::layout::LayoutFrameExt;
 use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::controls::date_values::TimeOfDay;
+use crate::primitives::text::Text;
 use crate::primitives::text::text_buffer::TextBuffer;
 use crate::primitives::text::text_field::{TextField, TextFieldEvents};
-use crate::primitives::text::Text;
 use crate::theme::SemanticFontRef;
 use crate::{AnyView, BoxView, TupleView, View};
 
@@ -58,7 +58,11 @@ impl TimeFieldOptions {
 
     /// The placeholder text for the authored precision.
     pub fn placeholder(&self) -> &'static str {
-        if self.show_seconds { "HH:MM:SS" } else { "HH:MM" }
+        if self.show_seconds {
+            "HH:MM:SS"
+        } else {
+            "HH:MM"
+        }
     }
 }
 
@@ -80,7 +84,11 @@ pub struct TimeField {
 
 impl TimeField {
     pub fn new(value: Binding<Option<TimeOfDay>>, options: TimeFieldOptions) -> Self {
-        Self { value, options: options.validated(), session: Arc::new(Mutex::new(TimeFieldSession::default())) }
+        Self {
+            value,
+            options: options.validated(),
+            session: Arc::new(Mutex::new(TimeFieldSession::default())),
+        }
     }
 
     fn snapshot(&self) -> TimeField {
@@ -104,7 +112,10 @@ impl TimeField {
     /// Commits the draft. Empty text clears the value; text outside the
     /// authored range or unparseable stays in the field with an error.
     fn commit(&self) {
-        let mut session = self.session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut session = self
+            .session
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         if !session.changed {
             return;
         }
@@ -115,9 +126,8 @@ impl TimeField {
             session.changed = false;
             return;
         }
-        let parsed = TimeOfDay::parse(&text, self.options.show_seconds).filter(|time| {
-            *time >= self.options.minimum && *time <= self.options.maximum
-        });
+        let parsed = TimeOfDay::parse(&text, self.options.show_seconds)
+            .filter(|time| *time >= self.options.minimum && *time <= self.options.maximum);
         match parsed {
             Some(time) => {
                 self.value.set(Some(time));
@@ -212,15 +222,30 @@ impl View for TimeField {
                             return false;
                         }
                         // Shift steps an hour; the plain key steps a minute.
-                        let step = if event.modifiers.has_shift() { 3600 } else { field.options.minute_step * 60 };
-                        let delta = if event.scancode == crate::Scancode::ARROW_UP { step } else { -step };
+                        let step = if event.modifiers.has_shift() {
+                            3600
+                        } else {
+                            field.options.minute_step * 60
+                        };
+                        let delta = if event.scancode == crate::Scancode::ARROW_UP {
+                            step
+                        } else {
+                            -step
+                        };
                         let current = field.value.get().unwrap_or(field.options.minimum);
-                        let seconds = (current.seconds() + delta)
-                            .clamp(field.options.minimum.seconds(), field.options.maximum.seconds());
-                        let next = TimeOfDay::new(seconds / 3600, (seconds / 60) % 60, seconds % 60);
+                        let seconds = (current.seconds() + delta).clamp(
+                            field.options.minimum.seconds(),
+                            field.options.maximum.seconds(),
+                        );
+                        let next =
+                            TimeOfDay::new(seconds / 3600, (seconds / 60) % 60, seconds % 60);
                         field.value.set(Some(next));
-                        let mut session = field.session.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-                        session.draft = TextBuffer::new(&next.formatted(field.options.show_seconds));
+                        let mut session = field
+                            .session
+                            .lock()
+                            .unwrap_or_else(|poisoned| poisoned.into_inner());
+                        session.draft =
+                            TextBuffer::new(&next.formatted(field.options.show_seconds));
                         session.changed = false;
                         session.error.clear();
                         true
@@ -229,14 +254,25 @@ impl View for TimeField {
                 ..Default::default()
             });
 
-        let error = self.session.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).error.clone();
-        let label = AnyView::new(TimeFieldLabel { input: AnyView::new(input) });
+        let error = self
+            .session
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .error
+            .clone();
+        let label = AnyView::new(TimeFieldLabel {
+            input: AnyView::new(input),
+        });
         if error.is_empty() {
             return label;
         }
         AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 4.0,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                4.0,
                 AnyView::new(TupleView::new(vec![
                     label,
                     AnyView::new(
@@ -284,7 +320,11 @@ crate::impl_primitive_view!(TimeFieldLabel);
 impl TimeField {
     /// The error text currently shown under the field.
     pub fn error(&self) -> String {
-        self.session.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).error.clone()
+        self.session
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .error
+            .clone()
     }
 }
 
@@ -294,7 +334,8 @@ impl Clone for TimeField {
     }
 }
 
-
 fn lock(session: &Arc<Mutex<TimeFieldSession>>) -> MutexGuard<'_, TimeFieldSession> {
-    session.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    session
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }

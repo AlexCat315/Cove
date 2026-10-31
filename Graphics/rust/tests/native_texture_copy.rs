@@ -6,10 +6,14 @@
 //! The `copy` helper is device-only (it chains two blits and compares pixels),
 //! so only the validation half is ported here.
 
-use cove_graphics::{rhi_color_texture_copy_extent, TextureCopyExtent, TextureFormat};
+use cove_graphics::{TextureCopyExtent, TextureFormat, rhi_color_texture_copy_extent};
 
 fn extent(width: usize, height: usize, format: TextureFormat) -> TextureCopyExtent {
-    TextureCopyExtent { width, height, format }
+    TextureCopyExtent {
+        width,
+        height,
+        format,
+    }
 }
 
 #[test]
@@ -30,7 +34,8 @@ fn color_copy_rejects_out_of_range_and_mismatched_formats() {
     // A negative extent cannot reach this API: the parameters are `usize`, so a
     // negative Swift literal is rejected by the type system instead.
     assert!(
-        rhi_color_texture_copy_extent(1, 1, source, extent(6, 6, TextureFormat::Rgba8Unorm)).is_err(),
+        rhi_color_texture_copy_extent(1, 1, source, extent(6, 6, TextureFormat::Rgba8Unorm))
+            .is_err(),
         "mismatched formats are rejected"
     );
     assert!(
@@ -50,7 +55,10 @@ fn color_copy_rejects_out_of_range_and_mismatched_formats() {
 fn copy_is_bounded_by_the_destination() {
     let source = extent(8, 8, TextureFormat::Rgba8Unorm);
     let destination = extent(2, 2, TextureFormat::Rgba8Unorm);
-    assert_eq!(rhi_color_texture_copy_extent(2, 2, source, destination), Ok(()));
+    assert_eq!(
+        rhi_color_texture_copy_extent(2, 2, source, destination),
+        Ok(())
+    );
     assert!(rhi_color_texture_copy_extent(3, 2, source, destination).is_err());
     assert!(rhi_color_texture_copy_extent(2, 3, source, destination).is_err());
 }

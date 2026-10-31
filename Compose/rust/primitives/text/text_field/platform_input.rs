@@ -7,8 +7,8 @@
 //! replacing text.
 use std::rc::Rc;
 
-use cove_core::scene::TextInputClient;
 use crate::primitives::text::text_buffer::TextBuffer;
+use cove_core::scene::TextInputClient;
 
 use super::text_field::FieldState;
 use super::text_field_options::{TextFieldAxis, TextFieldBehavior};
@@ -28,7 +28,11 @@ pub fn character_index(buffer: &TextBuffer, offset: i32, round_up: bool) -> usiz
     for (index, character) in buffer.string_value().chars().enumerate() {
         let next = units + character.len_utf16();
         if target < next {
-            return if round_up && target > units { index + 1 } else { index };
+            return if round_up && target > units {
+                index + 1
+            } else {
+                index
+            };
         }
         units = next;
     }

@@ -7,7 +7,10 @@
 use crate::desktop::application::composition::{
     AppDisplayHandleHolder, AssetDropRegistry, AssetDropRegistryHolder,
 };
-use cove_core::scene::{ClipboardHolder, FocusChain, FocusChainHolder, InteractionRegistry, InteractionRegistryHolder, PointerCapture, PointerCaptureHolder, UIWorkSchedulerHolder};
+use cove_core::scene::{
+    ClipboardHolder, FocusChain, FocusChainHolder, InteractionRegistry, InteractionRegistryHolder,
+    PointerCapture, PointerCaptureHolder, UIWorkSchedulerHolder,
+};
 use cove_imaging::{ImageAssetRegistry, ImageAssetRegistryHolder};
 use cove_text::{TextEnvironment, TextEnvironmentHolder};
 use std::rc::Rc;
@@ -76,10 +79,7 @@ pub mod clipboard_handlers {
         )> = const { RefCell::new((None, None)) };
     }
 
-    pub fn remember(
-        read: Option<Rc<dyn Fn() -> Option<String>>>,
-        write: Option<Rc<dyn Fn(&str)>>,
-    ) {
+    pub fn remember(read: Option<Rc<dyn Fn() -> Option<String>>>, write: Option<Rc<dyn Fn(&str)>>) {
         SLOT.with(|slot| *slot.borrow_mut() = (read, write));
     }
 

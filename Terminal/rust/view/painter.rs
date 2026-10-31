@@ -5,8 +5,8 @@
 //! layout cache is keyed by grapheme, not by ever-changing program output.
 
 use crate::engine::{
-    CellWidth, CursorShape, TerminalCell, TerminalCellAttributes, TerminalFrame, TerminalImagePlacement,
-    TerminalRGB, PLACEHOLDER_CODEPOINT,
+    CellWidth, CursorShape, PLACEHOLDER_CODEPOINT, TerminalCell, TerminalCellAttributes,
+    TerminalFrame, TerminalImagePlacement, TerminalRGB,
 };
 use crate::view::{box_drawing, cell_metrics::CellMetrics, url_detector::UrlMatch};
 use cove_core::{Color, DrawList, Font, Point, Rect, TextureId};
@@ -38,11 +38,21 @@ impl<'a> TerminalPainter<'a> {
     pub fn paint(&self, list: &mut DrawList, bounds: Rect) {
         let _ = list.add_rect(bounds, self.color(self.frame.background));
         for row in 0..self.frame.rows {
-            self.paint_backgrounds(list, row, bounds.y + row as f32 * self.metrics.height, bounds.x);
+            self.paint_backgrounds(
+                list,
+                row,
+                bounds.y + row as f32 * self.metrics.height,
+                bounds.x,
+            );
         }
         self.paint_images(list, true, bounds);
         for row in 0..self.frame.rows {
-            self.paint_glyphs(list, row, bounds.y + row as f32 * self.metrics.height, bounds.x);
+            self.paint_glyphs(
+                list,
+                row,
+                bounds.y + row as f32 * self.metrics.height,
+                bounds.x,
+            );
         }
         self.paint_images(list, false, bounds);
         self.paint_cursor(list, bounds);
@@ -54,7 +64,11 @@ impl<'a> TerminalPainter<'a> {
         for column in 0..self.frame.columns {
             let cell = self.frame.cell(row, column);
             let fill = self.colors(cell).1;
-            let next = if fill == self.frame.background { None } else { Some(fill) };
+            let next = if fill == self.frame.background {
+                None
+            } else {
+                Some(fill)
+            };
             if next != run_color {
                 if let Some(color) = run_color
                     && column > run_start
@@ -93,7 +107,8 @@ impl<'a> TerminalPainter<'a> {
             let cell = self.frame.cell(row, column);
             if cell.width == CellWidth::Spacer
                 || cell.attributes.contains(TerminalCellAttributes::INVISIBLE)
-                || (!self.is_blinking_text_shown && cell.attributes.contains(TerminalCellAttributes::BLINK))
+                || (!self.is_blinking_text_shown
+                    && cell.attributes.contains(TerminalCellAttributes::BLINK))
             {
                 continue;
             }
@@ -103,7 +118,11 @@ impl<'a> TerminalPainter<'a> {
                 continue;
             }
             let left = origin_x + column as f32 * self.metrics.width;
-            let span = if cell.width == CellWidth::Wide { 2.0 } else { 1.0 } * self.metrics.width;
+            let span = if cell.width == CellWidth::Wide {
+                2.0
+            } else {
+                1.0
+            } * self.metrics.width;
             let mut foreground = self.color(self.colors(cell).0);
             if cell.attributes.contains(TerminalCellAttributes::FAINT) {
                 foreground = foreground.multiplied_alpha(0.6);
@@ -133,17 +152,22 @@ impl<'a> TerminalPainter<'a> {
                     None,
                 );
             }
-            let is_hovered_link = self
-                .hovered_link
-                .as_ref()
-                .is_some_and(|link| link.row == row && (link.columns.0..=link.columns.1).contains(&column));
-            if cell.attributes.contains(TerminalCellAttributes::UNDERLINE) || cell.is_hyperlink || is_hovered_link {
+            let is_hovered_link = self.hovered_link.as_ref().is_some_and(|link| {
+                link.row == row && (link.columns.0..=link.columns.1).contains(&column)
+            });
+            if cell.attributes.contains(TerminalCellAttributes::UNDERLINE)
+                || cell.is_hyperlink
+                || is_hovered_link
+            {
                 let _ = list.add_rect(
                     Rect::new(left, top + self.metrics.height - 2.0, span, 1.0),
                     foreground,
                 );
             }
-            if cell.attributes.contains(TerminalCellAttributes::STRIKETHROUGH) {
+            if cell
+                .attributes
+                .contains(TerminalCellAttributes::STRIKETHROUGH)
+            {
                 let _ = list.add_rect(
                     Rect::new(left, top + (self.metrics.height / 2.0).round(), span, 1.0),
                     foreground,
@@ -165,31 +189,50 @@ impl<'a> TerminalPainter<'a> {
                 continue;
             }
             let rect = Rect::new(
-                bounds.x + placement.column as f32 * self.metrics.width + placement.offset.0 as f32 * scale_x,
-                bounds.y + placement.row as f32 * self.metrics.height + placement.offset.1 as f32 * scale_y,
+                bounds.x
+                    + placement.column as f32 * self.metrics.width
+                    + placement.offset.0 as f32 * scale_x,
+                bounds.y
+                    + placement.row as f32 * self.metrics.height
+                    + placement.offset.1 as f32 * scale_y,
                 placement.width as f32 * scale_x,
                 placement.height as f32 * scale_y,
             );
             let source = placement.source;
-            let min = Point::new(source.0 as f32 / size.0 as f32, source.1 as f32 / size.1 as f32);
+            let min = Point::new(
+                source.0 as f32 / size.0 as f32,
+                source.1 as f32 / size.1 as f32,
+            );
             let max = Point::new(
                 (source.0 + source.2) as f32 / size.0 as f32,
                 (source.1 + source.3) as f32 / size.1 as f32,
             );
-            let tint = Color { r: 1.0, g: 1.0, b: 1.0, a: self.opacity };
+            let tint = Color {
+                r: 1.0,
+                g: 1.0,
+                b: 1.0,
+                a: self.opacity,
+            };
             let _ = list.add_image_quad(rect, *texture, tint, min, max);
         }
     }
 
     fn paint_cursor(&self, list: &mut DrawList, bounds: Rect) {
         let cursor = &self.frame.cursor;
-        if !cursor.is_visible || cursor.row >= self.frame.rows || cursor.column >= self.frame.columns {
+        if !cursor.is_visible
+            || cursor.row >= self.frame.rows
+            || cursor.column >= self.frame.columns
+        {
             return;
         }
         let cell = self.frame.cell(cursor.row, cursor.column);
         let left = bounds.x + cursor.column as f32 * self.metrics.width;
         let top = bounds.y + cursor.row as f32 * self.metrics.height;
-        let width = if cell.width == CellWidth::Wide { 2.0 } else { 1.0 } * self.metrics.width;
+        let width = if cell.width == CellWidth::Wide {
+            2.0
+        } else {
+            1.0
+        } * self.metrics.width;
         let ink = self.color(self.colors(cell).0);
 
         if !self.preedit.is_empty() {
@@ -202,7 +245,12 @@ impl<'a> TerminalPainter<'a> {
                 0.0,
             );
             let _ = list.add_rect(
-                Rect::new(left, top, width.max(layout.total_width), self.metrics.height),
+                Rect::new(
+                    left,
+                    top,
+                    width.max(layout.total_width),
+                    self.metrics.height,
+                ),
                 self.color(self.frame.background),
             );
             let _ = list.add_text(
@@ -214,13 +262,23 @@ impl<'a> TerminalPainter<'a> {
                 None,
             );
             let _ = list.add_rect(
-                Rect::new(left, top + self.metrics.height - 2.0, layout.total_width, 1.0),
+                Rect::new(
+                    left,
+                    top + self.metrics.height - 2.0,
+                    layout.total_width,
+                    1.0,
+                ),
                 ink,
             );
             return;
         }
         if !self.is_focused {
-            let _ = list.add_rounded_rect_stroke(Rect::new(left, top, width, self.metrics.height), 0.0, 1.0, ink);
+            let _ = list.add_rounded_rect_stroke(
+                Rect::new(left, top, width, self.metrics.height),
+                0.0,
+                1.0,
+                ink,
+            );
             return;
         }
         if !self.is_cursor_shown {
@@ -250,13 +308,21 @@ impl<'a> TerminalPainter<'a> {
                 }
             }
             CursorShape::HollowBlock => {
-                let _ = list.add_rounded_rect_stroke(Rect::new(left, top, width, self.metrics.height), 0.0, 1.0, ink);
+                let _ = list.add_rounded_rect_stroke(
+                    Rect::new(left, top, width, self.metrics.height),
+                    0.0,
+                    1.0,
+                    ink,
+                );
             }
             CursorShape::Bar => {
                 let _ = list.add_rect(Rect::new(left, top, 2.0, self.metrics.height), ink);
             }
             CursorShape::Underline => {
-                let _ = list.add_rect(Rect::new(left, top + self.metrics.height - 2.0, width, 2.0), ink);
+                let _ = list.add_rect(
+                    Rect::new(left, top + self.metrics.height - 2.0, width, 2.0),
+                    ink,
+                );
             }
         }
     }

@@ -1,12 +1,12 @@
 //! Translation of Android/Integration/Diagnostics.swift.
 
 use crate::desktop::diagnostics::integration::{
-    take_factory, DevToolsConfiguration, DiagnosticMemorySnapshot, DiagnosticsCallbacks,
-    DiagnosticsSession, NullDiagnosticsSession,
+    DevToolsConfiguration, DiagnosticMemorySnapshot, DiagnosticsCallbacks, DiagnosticsSession,
+    NullDiagnosticsSession, take_factory,
 };
 use cove_composition::ViewGraph;
-use cove_core::scene::NodeTree;
 use cove_core::DrawList;
+use cove_core::scene::NodeTree;
 use cove_platform::InputEvent;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -23,7 +23,10 @@ pub struct DiagnosticsInbox {
 
 impl DiagnosticsInbox {
     pub fn new(schedule: Rc<dyn Fn()>) -> Self {
-        Self { work: RefCell::new(Vec::new()), schedule: Some(schedule) }
+        Self {
+            work: RefCell::new(Vec::new()),
+            schedule: Some(schedule),
+        }
     }
 
     pub fn enqueue(&self, operation: Box<dyn FnOnce()>) {
@@ -75,7 +78,13 @@ impl AndroidDiagnostics {
             let _ = (config, tree, graph, invalidate, memory);
             Box::new(NullDiagnosticsSession) as Box<dyn DiagnosticsSession>
         };
-        Ok(Self { inbox, session, frame_start: Instant::now(), layout_ms: 0.0, draw_ms: 0.0 })
+        Ok(Self {
+            inbox,
+            session,
+            frame_start: Instant::now(),
+            layout_ms: 0.0,
+            draw_ms: 0.0,
+        })
     }
 
     pub fn drain(&mut self) {
@@ -114,5 +123,3 @@ impl AndroidDiagnostics {
         self.session.stop();
     }
 }
-
-

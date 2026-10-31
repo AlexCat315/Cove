@@ -5,13 +5,6 @@
 //! exit transition runs, so the panel animates out instead of vanishing.
 use std::rc::Rc;
 
-use cove_core::scene::{
-    AccessibilityRole, Align, EventResult, FlexDirection, InputHandlerRole, InputHandlerRoute,
-    InputRoutingPriority, InteractionRegistryHolder, Justify, LayoutNode, Node, PointerPhase,
-    PositionType,
-};
-use cove_core::{Binding, Color, Edge, Point, Rect, Size};
-use cove_platform::MouseButton;
 use crate::animation::content::AnimatedVisibility;
 use crate::animation::transition::Transition;
 use crate::modifiers::interaction::AccessibilityExt;
@@ -20,10 +13,17 @@ use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::overlays::focus_scope::FocusScope;
 use crate::primitives::overlays::portal::portal_registry::PortalResource;
 use crate::primitives::overlays::portal::{
-    portal_window_bounds, PortalStoreEnvironment, PortalStoreHolder,
+    PortalStoreEnvironment, PortalStoreHolder, portal_window_bounds,
 };
 use crate::theme::theme_for_node;
-use crate::{impl_primitive_view, AnyView, PrimitiveView, View, ViewExt};
+use crate::{AnyView, PrimitiveView, View, ViewExt, impl_primitive_view};
+use cove_core::scene::{
+    AccessibilityRole, Align, EventResult, FlexDirection, InputHandlerRole, InputHandlerRoute,
+    InputRoutingPriority, InteractionRegistryHolder, Justify, LayoutNode, Node, PointerPhase,
+    PositionType,
+};
+use cove_core::{Binding, Color, Edge, Point, Rect, Size};
+use cove_platform::MouseButton;
 
 use super::modal_options::{ModalBackdrop, ModalGeometry, ModalOptions, ModalPlacement};
 
@@ -54,10 +54,7 @@ impl Modal {
         self
     }
 
-    pub fn fitting_geometry(
-        mut self,
-        fit: impl Fn(&mut ModalGeometry, Size) + 'static,
-    ) -> Self {
+    pub fn fitting_geometry(mut self, fit: impl Fn(&mut ModalGeometry, Size) + 'static) -> Self {
         self.fitting_geometry = Some(Rc::new(fit));
         self
     }
@@ -113,9 +110,19 @@ impl PrimitiveView for ModalPresenter {
         let content = self.content.clone();
         let weak = node.downgrade();
         node.set_layout_did_update(Some(Rc::new(move |owner: &Node| {
-            let Some(node) = Node::upgrade(&weak) else { return };
+            let Some(node) = Node::upgrade(&weak) else {
+                return;
+            };
             if node.attachment::<Rect>(WINDOW_BOUNDS) != Some(portal_window_bounds(&node)) {
-                present(&node, presented.get(), &retained, &options, &fitting, &content, &presented);
+                present(
+                    &node,
+                    presented.get(),
+                    &retained,
+                    &options,
+                    &fitting,
+                    &content,
+                    &presented,
+                );
             }
             let _ = owner;
         }) as cove_core::scene::LayoutUpdateHook));
@@ -154,9 +161,18 @@ fn present(
     );
     let mut fitted = options.clone();
     if let Some(fit) = fitting.as_ref() {
-        fit(&mut fitted.geometry, Size { width: bounds.width, height: bounds.height });
+        fit(
+            &mut fitted.geometry,
+            Size {
+                width: bounds.width,
+                height: bounds.height,
+            },
+        );
     }
-    fitted.geometry.fit_compact_window(Size { width: bounds.width, height: bounds.height });
+    fitted.geometry.fit_compact_window(Size {
+        width: bounds.width,
+        height: bounds.height,
+    });
     let retained_state = retained.clone();
     let panel = AnyView::new(AnimatedVisibility::new(
         is_presented,
@@ -222,41 +238,57 @@ impl PrimitiveView for ModalBackdropView {
             ModalBackdrop::Dimmed => Color::BLACK.multiplied_alpha(0.2),
         };
         node.set_background_color(Some(fill));
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         let closes_on_backdrop = self.options.dismissal.closes_on_backdrop;
         let closes_on_escape = self.options.dismissal.closes_on_escape;
         let dismiss = self.dismiss.clone();
-        registry.set_pointer(node, InputHandlerRoute::new(
-            InputHandlerRole::Control, InputRoutingPriority::MODAL, "modal.backdrop",
-        ), Rc::new(move |event, phase, event_phase| {
-            if event_phase != cove_core::scene::EventPhase::Target {
-                return EventResult::Ignored;
-            }
-            if event.button != MouseButton::Left {
-                return EventResult::Handled;
-            }
-            if closes_on_backdrop && phase == PointerPhase::Down {
-                dismiss();
-            }
-            EventResult::Handled
-        }));
-        let dismiss = self.dismiss.clone();
-        registry.set_key(node, InputHandlerRoute::overlay(), Rc::new(move |event, _phase| {
-            if event.scancode == crate::Scancode::ESCAPE {
-                if closes_on_escape {
+        registry.set_pointer(
+            node,
+            InputHandlerRoute::new(
+                InputHandlerRole::Control,
+                InputRoutingPriority::MODAL,
+                "modal.backdrop",
+            ),
+            Rc::new(move |event, phase, event_phase| {
+                if event_phase != cove_core::scene::EventPhase::Target {
+                    return EventResult::Ignored;
+                }
+                if event.button != MouseButton::Left {
+                    return EventResult::Handled;
+                }
+                if closes_on_backdrop && phase == PointerPhase::Down {
                     dismiss();
                 }
-                return EventResult::Handled;
-            }
-            EventResult::Ignored
-        }));
-        registry.set_wheel(node, InputHandlerRoute::overlay(), Rc::new(move |_event, phase| {
-            if phase == cove_core::scene::EventPhase::Capture {
-                EventResult::Ignored
-            } else {
                 EventResult::Handled
-            }
-        }));
+            }),
+        );
+        let dismiss = self.dismiss.clone();
+        registry.set_key(
+            node,
+            InputHandlerRoute::overlay(),
+            Rc::new(move |event, _phase| {
+                if event.scancode == crate::Scancode::ESCAPE {
+                    if closes_on_escape {
+                        dismiss();
+                    }
+                    return EventResult::Handled;
+                }
+                EventResult::Ignored
+            }),
+        );
+        registry.set_wheel(
+            node,
+            InputHandlerRoute::overlay(),
+            Rc::new(move |_event, phase| {
+                if phase == cove_core::scene::EventPhase::Capture {
+                    EventResult::Ignored
+                } else {
+                    EventResult::Handled
+                }
+            }),
+        );
         let _ = self.is_visible;
     }
 
@@ -291,8 +323,16 @@ impl PrimitiveView for ModalBackdropView {
         let bounds = portal_window_bounds(node);
         let inset = self.options.geometry.inset;
         let size = Size {
-            width: self.options.geometry.width.min((bounds.width - inset * 2.0).max(0.0)),
-            height: self.options.geometry.height.min((bounds.height - inset * 2.0).max(0.0)),
+            width: self
+                .options
+                .geometry
+                .width
+                .min((bounds.width - inset * 2.0).max(0.0)),
+            height: self
+                .options
+                .geometry
+                .height
+                .min((bounds.height - inset * 2.0).max(0.0)),
         };
         let panel = AnyView::new(AnimatedVisibility::new(
             self.is_visible,
@@ -329,14 +369,18 @@ impl PrimitiveView for ModalBackdropView {
             if self.options.fits_content_height {
                 None
             } else {
-                Some(crate::modifiers::layout::FrameDimension::Points(size.height))
+                Some(crate::modifiers::layout::FrameDimension::Points(
+                    size.height,
+                ))
             },
             None,
             None,
             None,
             Some(size.height),
         ));
-        vec![AnyView::new(sized.modifier(TranslationY { value: self.options.translation_y }))]
+        vec![AnyView::new(sized.modifier(TranslationY {
+            value: self.options.translation_y,
+        }))]
     }
 }
 impl_primitive_view!(ModalBackdropView);
@@ -350,11 +394,16 @@ impl cove_composition::ViewModifier for TranslationY {
     fn apply_node(&self, node: &Node) {
         let value = self.value;
         let weak = node.downgrade();
-        node.animatable_set_with("modal.translationY", node.content_offset().y, value, move |offset| {
-            if let Some(owner) = Node::upgrade(&weak) {
-                let current = owner.content_offset();
-                owner.set_content_offset(Point::new(current.x, offset));
-            }
-        });
+        node.animatable_set_with(
+            "modal.translationY",
+            node.content_offset().y,
+            value,
+            move |offset| {
+                if let Some(owner) = Node::upgrade(&weak) {
+                    let current = owner.content_offset();
+                    owner.set_content_offset(Point::new(current.x, offset));
+                }
+            },
+        );
     }
 }

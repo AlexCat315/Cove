@@ -18,7 +18,10 @@ impl SurfaceState {
         surface.viewport.width = 0.0;
         surface.viewport.height = 0.0;
         surface.viewport.scale = Self::valid_scale(scale);
-        Self { value: State::new(surface), system_bar_icon_style: -1 }
+        Self {
+            value: State::new(surface),
+            system_bar_icon_style: -1,
+        }
     }
 
     pub fn value(&self) -> State<Environment> {
@@ -71,8 +74,7 @@ impl SurfaceState {
         let Some(background) = theme.map(|theme| theme.colors.background) else {
             return;
         };
-        let luminance =
-            0.2126 * background.r + 0.7152 * background.g + 0.0722 * background.b;
+        let luminance = 0.2126 * background.r + 0.7152 * background.g + 0.0722 * background.b;
         self.system_bar_icon_style = if luminance > 0.5 { 1 } else { 0 };
     }
 
@@ -85,6 +87,10 @@ impl SurfaceState {
     }
 
     fn valid_scale(value: f32) -> f32 {
-        if value.is_finite() && value > 0.0 { value } else { 1.0 }
+        if value.is_finite() && value > 0.0 {
+            value
+        } else {
+            1.0
+        }
     }
 }

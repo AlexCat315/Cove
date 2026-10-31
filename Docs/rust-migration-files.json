@@ -6600,8 +6600,10 @@
       "source": "DevTools/Inspection/Tests/CoveUIAgentCoreTests/AgentTests.swift",
       "source_sha256": "2d342d2b1387682a4d82ea667d034771c5dda62759c80755093fad45769957b4",
       "source_lines": 93,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "agent_tests"
+      ],
       "module": "DevTools",
       "kind": "test",
       "planned": false
@@ -7026,8 +7028,10 @@
       "source": "DevTools/Tests/CoveUIAgentTransportTests/TransportTests.swift",
       "source_sha256": "5db5e4ed25909f25ab77b7819cec2f008516769990e7e81f07b873ca7253aa9d",
       "source_lines": 26,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "transport_tests"
+      ],
       "module": "DevTools",
       "kind": "test",
       "planned": false
@@ -7036,8 +7040,10 @@
       "source": "DevTools/Tests/CoveUIDevToolsServerTests/DevServerTests.swift",
       "source_sha256": "b25fbab45be734b6e473ff27970b034130e28f153c0b8dca76f2405ca5c160e2",
       "source_lines": 553,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "dev_server_tests"
+      ],
       "module": "DevTools",
       "kind": "test",
       "planned": false
@@ -9561,8 +9567,10 @@
       "source": "Graphics/Tests/NativeRHITests/NativeRecordedTextureUploadTests.swift",
       "source_sha256": "a385397c38bd3d881515947f156a592a5e9b616ccf1e5a47d2cc6d2e2ef04ebd",
       "source_lines": 83,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "native_recorded_texture_upload"
+      ],
       "module": "Graphics",
       "kind": "test",
       "planned": false
@@ -9581,8 +9589,10 @@
       "source": "Graphics/Tests/NativeRHITests/NativeTextureCopyTests.swift",
       "source_sha256": "78ec6d347a0cedcee0bd3f36c37f9120ebf0b2dc2487d32b915ed2f92dd7d8e6",
       "source_lines": 46,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "native_texture_copy"
+      ],
       "module": "Graphics",
       "kind": "test",
       "planned": false
@@ -9591,8 +9601,10 @@
       "source": "Graphics/Tests/NativeRHITests/NativeTextureRegionTests.swift",
       "source_sha256": "dbd8032aee4d5dfe00a85072ea3535ce80d0ca63217adcaca0bdebc885874468",
       "source_lines": 82,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "native_texture_region"
+      ],
       "module": "Graphics",
       "kind": "test",
       "planned": false
@@ -9601,8 +9613,10 @@
       "source": "Graphics/Tests/NativeRHITests/PipelineCacheTests.swift",
       "source_sha256": "0c49b95e065f6bac7fc44d2073b200d7a8318a5405eb9b3be9bff0dea9b106ad",
       "source_lines": 264,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "pipeline_cache"
+      ],
       "module": "Graphics",
       "kind": "test",
       "planned": false
@@ -12797,8 +12811,10 @@
       "source": "Tests/CoveUIComposeTests/ChartAxisTests.swift",
       "source_sha256": "4c46cd1431ff91eeea7aa2b8f9434e850fab200e6b8eaaf51b135c5dd528c124",
       "source_lines": 242,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "chart_axis"
+      ],
       "module": "Tests",
       "kind": "test",
       "planned": false
@@ -12857,8 +12873,10 @@
       "source": "Tests/CoveUIComposeTests/ChromeComponentTests.swift",
       "source_sha256": "e4ae5735496febf152640e8c72278cbf378561882e2485a48b5b051e71d6b214",
       "source_lines": 58,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "chrome_component"
+      ],
       "module": "Tests",
       "kind": "test",
       "planned": false
@@ -13241,8 +13259,10 @@
       "source": "Tests/CoveUIComposeTests/JsonFieldTests.swift",
       "source_sha256": "203c69a43da746c8d6566db5924181dfb6579c6ad367c32acbed1665b5f4d887",
       "source_lines": 141,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "json_field"
+      ],
       "module": "Tests",
       "kind": "test",
       "planned": false
@@ -13465,8 +13485,10 @@
       "source": "Tests/CoveUIComposeTests/OffscreenReuseTests.swift",
       "source_sha256": "499cbfa709e789c590297c9c687ce7e5bae9777e2f13735455db5765b09fad7f",
       "source_lines": 30,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "offscreen_reuse"
+      ],
       "module": "Tests",
       "kind": "test",
       "planned": false
@@ -13623,8 +13645,10 @@
       "source": "Tests/CoveUIComposeTests/RecompositionPaintTests.swift",
       "source_sha256": "dde14ea8b948a7a7370bb105358fbcb70836e99f5504ffab43b67598ccf7ac65",
       "source_lines": 49,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "recomposition_paint"
+      ],
       "module": "Tests",
       "kind": "test",
       "planned": false
@@ -13715,8 +13739,10 @@
       "source": "Tests/CoveUIComposeTests/ScratchGeometryTests.swift",
       "source_sha256": "7f261a3329f9f12260514dd1eda30d4e0f98593664c3b9c3507dd7ba331f3114",
       "source_lines": 48,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "scratch_geometry"
+      ],
       "module": "Tests",
       "kind": "test",
       "planned": false
@@ -13805,8 +13831,10 @@
       "source": "Tests/CoveUIComposeTests/SearchFieldTests.swift",
       "source_sha256": "baba53121e34be095e4743b1a5f85d4664fe2bc53f9c7daa363dea01be3a91ea",
       "source_lines": 95,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "search_field"
+      ],
       "module": "Tests",
       "kind": "test",
       "planned": false
@@ -13825,8 +13853,10 @@
       "source": "Tests/CoveUIComposeTests/SelectEnumerationTests.swift",
       "source_sha256": "164c9da51e72236e74b797b2e6371542f6bff4501d97fcdbcc18c3bdfea8f733",
       "source_lines": 18,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "select_enumeration"
+      ],
       "module": "Tests",
       "kind": "test",
       "planned": false
@@ -14255,8 +14285,10 @@
       "source": "Tests/CoveUIComposeTests/TimeInputTests.swift",
       "source_sha256": "3535123be0f64fea90752a9e72ec8e3a5c1390a2d14c11301890fabf232b0c95",
       "source_lines": 125,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "time_input"
+      ],
       "module": "Tests",
       "kind": "test",
       "planned": false
@@ -14387,8 +14419,10 @@
       "source": "Tests/CoveUIComposeTests/Vec3FieldTests.swift",
       "source_sha256": "1531cb6fc8a802cf4021e7e68478204662935fc61ae474d25ac4cced00311702",
       "source_lines": 129,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "vec3_field"
+      ],
       "module": "Tests",
       "kind": "test",
       "planned": false
@@ -14577,8 +14611,10 @@
       "source": "Tests/CoveUIRuntimeTests/AnimationControllerTests.swift",
       "source_sha256": "f8376d199e290ec59fe488a5fe1c2406234fac35ba2cd837946635f2e4134038",
       "source_lines": 220,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "animation_controller_tests"
+      ],
       "module": "Tests",
       "kind": "test",
       "planned": false
@@ -15319,8 +15355,10 @@
       "source": "Tests/CoveUIWorkspaceTests/PanelRegistryTests.swift",
       "source_sha256": "00e5f324dbb9f952cb79b090df5512c5f4109af619855583ed50cc15f89a1c66",
       "source_lines": 69,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "panel_registry"
+      ],
       "module": "Tests",
       "kind": "test",
       "planned": false
@@ -15329,8 +15367,10 @@
       "source": "Tests/CoveUIWorkspaceTests/PanelSizingTests.swift",
       "source_sha256": "f89799a813cc071e0f6b2abcd5471426d55765f66cce0815aa809b61471a04d5",
       "source_lines": 85,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "panel_sizing"
+      ],
       "module": "Tests",
       "kind": "test",
       "planned": false

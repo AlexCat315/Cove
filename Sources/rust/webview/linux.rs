@@ -12,10 +12,12 @@
 //! work.
 #![cfg(target_os = "linux")]
 
-use super::{WebViewCommand, WebViewGeometry, WebViewHost, WebViewRequest, WebViewState, WebViewSurface};
+use super::{
+    WebViewCommand, WebViewGeometry, WebViewHost, WebViewRequest, WebViewState, WebViewSurface,
+};
 use crate::webview::WebViewPhase;
 use std::cell::RefCell;
-use std::ffi::{c_char, c_int, c_void, CStr, CString};
+use std::ffi::{CStr, CString, c_char, c_int, c_void};
 use std::rc::Rc;
 
 /// GTK widget/container handle (`GtkWidget *`).
@@ -47,7 +49,8 @@ struct GtkApi {
 struct WebKitApi {
     webkit_web_view_new: Option<unsafe extern "C" fn() -> WebKitWebView>,
     webkit_web_view_load_uri: Option<unsafe extern "C" fn(WebKitWebView, *const c_char)>,
-    webkit_web_view_load_html: Option<unsafe extern "C" fn(WebKitWebView, *const c_char, *const c_char)>,
+    webkit_web_view_load_html:
+        Option<unsafe extern "C" fn(WebKitWebView, *const c_char, *const c_char)>,
     webkit_web_view_reload: Option<unsafe extern "C" fn(WebKitWebView)>,
     webkit_web_view_stop_loading: Option<unsafe extern "C" fn(WebKitWebView)>,
     webkit_web_view_go_back: Option<unsafe extern "C" fn(WebKitWebView)>,
@@ -56,7 +59,16 @@ struct WebKitApi {
     webkit_web_view_can_go_forward: Option<unsafe extern "C" fn(WebKitWebView) -> c_int>,
     webkit_web_view_get_uri: Option<unsafe extern "C" fn(WebKitWebView) -> *const c_char>,
     webkit_web_view_get_title: Option<unsafe extern "C" fn(WebKitWebView) -> *const c_char>,
-    g_signal_connect_data: Option<unsafe extern "C" fn(*mut c_void, *const c_char, GCallback, *mut c_void, *mut c_void, c_int) -> u64>,
+    g_signal_connect_data: Option<
+        unsafe extern "C" fn(
+            *mut c_void,
+            *const c_char,
+            GCallback,
+            *mut c_void,
+            *mut c_void,
+            c_int,
+        ) -> u64,
+    >,
 }
 
 #[derive(Default)]
@@ -80,7 +92,9 @@ const RTLD_NOW: c_int = 2;
 
 fn open(names: &[&str]) -> Option<*mut c_void> {
     for name in names {
-        let Ok(c_name) = CString::new(*name) else { continue };
+        let Ok(c_name) = CString::new(*name) else {
+            continue;
+        };
         let handle = unsafe { dlopen(c_name.as_ptr(), RTLD_NOW) };
         if !handle.is_null() {
             return Some(handle);
@@ -90,7 +104,9 @@ fn open(names: &[&str]) -> Option<*mut c_void> {
 }
 
 unsafe fn resolve<T>(handle: *mut c_void, name: &str, target: &mut Option<T>) {
-    let Ok(c_name) = CString::new(name) else { return };
+    let Ok(c_name) = CString::new(name) else {
+        return;
+    };
     let symbol = unsafe { dlsym(handle, c_name.as_ptr()) };
     if !symbol.is_null() {
         *target = Some(unsafe { std::mem::transmute_copy::<*mut c_void, T>(&symbol) });
@@ -106,13 +122,22 @@ fn libraries() -> Rc<Libraries> {
             return libraries.clone();
         }
         let mut libraries = Libraries::default();
-        let Some(gtk_handle) = open(&["libgtk-4.so.1", "libgtk-4.so", "libgtk-3.so.0", "libgtk-3.so"]) else {
+        let Some(gtk_handle) = open(&[
+            "libgtk-4.so.1",
+            "libgtk-4.so",
+            "libgtk-3.so.0",
+            "libgtk-3.so",
+        ]) else {
             libraries.error = Some("GTK is not installed (libgtk-4 or libgtk-3)".into());
             let libraries = Rc::new(libraries);
             *slot.borrow_mut() = Some(libraries.clone());
             return libraries;
         };
-        let Some(webkit_handle) = open(&["libwebkit2gtk-4.1.so.0", "libwebkit2gtk-4.0.so.37", "libwebkit2gtk-4.0.so"]) else {
+        let Some(webkit_handle) = open(&[
+            "libwebkit2gtk-4.1.so.0",
+            "libwebkit2gtk-4.0.so.37",
+            "libwebkit2gtk-4.0.so",
+        ]) else {
             libraries.error = Some("WebKitGTK is not installed (libwebkit2gtk-4.1 or 4.0)".into());
             let libraries = Rc::new(libraries);
             *slot.borrow_mut() = Some(libraries.clone());
@@ -122,35 +147,115 @@ fn libraries() -> Rc<Libraries> {
             let gtk = &mut libraries.gtk;
             resolve(gtk_handle, "gtk_init_check", &mut gtk.gtk_init_check);
             resolve(gtk_handle, "gtk_window_new", &mut gtk.gtk_window_new);
-            resolve(gtk_handle, "gtk_window_set_child", &mut gtk.gtk_window_set_child);
+            resolve(
+                gtk_handle,
+                "gtk_window_set_child",
+                &mut gtk.gtk_window_set_child,
+            );
             resolve(gtk_handle, "gtk_container_add", &mut gtk.gtk_container_add);
-            resolve(gtk_handle, "gtk_widget_add_css_class", &mut gtk.gtk_widget_add_css_class);
+            resolve(
+                gtk_handle,
+                "gtk_widget_add_css_class",
+                &mut gtk.gtk_widget_add_css_class,
+            );
             resolve(gtk_handle, "gtk_fixed_new", &mut gtk.gtk_fixed_new);
             resolve(gtk_handle, "gtk_fixed_put", &mut gtk.gtk_fixed_put);
             resolve(gtk_handle, "gtk_fixed_move", &mut gtk.gtk_fixed_move);
-            resolve(gtk_handle, "gtk_widget_set_size_request", &mut gtk.gtk_widget_set_size_request);
-            resolve(gtk_handle, "gtk_widget_set_visible", &mut gtk.gtk_widget_set_visible);
-            resolve(gtk_handle, "gtk_widget_get_width", &mut gtk.gtk_widget_get_width);
-            resolve(gtk_handle, "gtk_widget_destroy", &mut gtk.gtk_widget_destroy);
-            resolve(gtk_handle, "gtk_widget_unparent", &mut gtk.gtk_widget_unparent);
+            resolve(
+                gtk_handle,
+                "gtk_widget_set_size_request",
+                &mut gtk.gtk_widget_set_size_request,
+            );
+            resolve(
+                gtk_handle,
+                "gtk_widget_set_visible",
+                &mut gtk.gtk_widget_set_visible,
+            );
+            resolve(
+                gtk_handle,
+                "gtk_widget_get_width",
+                &mut gtk.gtk_widget_get_width,
+            );
+            resolve(
+                gtk_handle,
+                "gtk_widget_destroy",
+                &mut gtk.gtk_widget_destroy,
+            );
+            resolve(
+                gtk_handle,
+                "gtk_widget_unparent",
+                &mut gtk.gtk_widget_unparent,
+            );
 
             let webkit = &mut libraries.webkit;
-            resolve(webkit_handle, "webkit_web_view_new", &mut webkit.webkit_web_view_new);
-            resolve(webkit_handle, "webkit_web_view_load_uri", &mut webkit.webkit_web_view_load_uri);
-            resolve(webkit_handle, "webkit_web_view_load_html", &mut webkit.webkit_web_view_load_html);
-            resolve(webkit_handle, "webkit_web_view_reload", &mut webkit.webkit_web_view_reload);
-            resolve(webkit_handle, "webkit_web_view_stop_loading", &mut webkit.webkit_web_view_stop_loading);
-            resolve(webkit_handle, "webkit_web_view_go_back", &mut webkit.webkit_web_view_go_back);
-            resolve(webkit_handle, "webkit_web_view_go_forward", &mut webkit.webkit_web_view_go_forward);
-            resolve(webkit_handle, "webkit_web_view_can_go_back", &mut webkit.webkit_web_view_can_go_back);
-            resolve(webkit_handle, "webkit_web_view_can_go_forward", &mut webkit.webkit_web_view_can_go_forward);
-            resolve(webkit_handle, "webkit_web_view_get_uri", &mut webkit.webkit_web_view_get_uri);
-            resolve(webkit_handle, "webkit_web_view_get_title", &mut webkit.webkit_web_view_get_title);
+            resolve(
+                webkit_handle,
+                "webkit_web_view_new",
+                &mut webkit.webkit_web_view_new,
+            );
+            resolve(
+                webkit_handle,
+                "webkit_web_view_load_uri",
+                &mut webkit.webkit_web_view_load_uri,
+            );
+            resolve(
+                webkit_handle,
+                "webkit_web_view_load_html",
+                &mut webkit.webkit_web_view_load_html,
+            );
+            resolve(
+                webkit_handle,
+                "webkit_web_view_reload",
+                &mut webkit.webkit_web_view_reload,
+            );
+            resolve(
+                webkit_handle,
+                "webkit_web_view_stop_loading",
+                &mut webkit.webkit_web_view_stop_loading,
+            );
+            resolve(
+                webkit_handle,
+                "webkit_web_view_go_back",
+                &mut webkit.webkit_web_view_go_back,
+            );
+            resolve(
+                webkit_handle,
+                "webkit_web_view_go_forward",
+                &mut webkit.webkit_web_view_go_forward,
+            );
+            resolve(
+                webkit_handle,
+                "webkit_web_view_can_go_back",
+                &mut webkit.webkit_web_view_can_go_back,
+            );
+            resolve(
+                webkit_handle,
+                "webkit_web_view_can_go_forward",
+                &mut webkit.webkit_web_view_can_go_forward,
+            );
+            resolve(
+                webkit_handle,
+                "webkit_web_view_get_uri",
+                &mut webkit.webkit_web_view_get_uri,
+            );
+            resolve(
+                webkit_handle,
+                "webkit_web_view_get_title",
+                &mut webkit.webkit_web_view_get_title,
+            );
             // `g_signal_connect_data` lives in GObject, which GTK depends on.
             let gobject_handle = open(&["libgobject-2.0.so.0"]).unwrap_or(gtk_handle);
-            resolve(gobject_handle, "g_signal_connect_data", &mut webkit.g_signal_connect_data);
+            resolve(
+                gobject_handle,
+                "g_signal_connect_data",
+                &mut webkit.g_signal_connect_data,
+            );
         }
-        libraries.gtk_major = if libraries.gtk.gtk_window_set_child.is_some() { 4 } else { 3 };
+        libraries.gtk_major = if libraries.gtk.gtk_window_set_child.is_some() {
+            4
+        } else {
+            3
+        };
         if libraries.gtk.gtk_init_check.is_some() {
             // GTK parses argv; this surface passes none and tolerates a failure
             // because a display may legitimately be absent in a headless test.
@@ -173,7 +278,9 @@ pub struct LinuxWebKitHost {
 impl LinuxWebKitHost {
     /// `window_provider` returns the `GtkWindow*` the web view should follow.
     pub fn new(window_provider: impl Fn() -> Option<GtkWindow> + 'static) -> Self {
-        Self { window_provider: Rc::new(window_provider) }
+        Self {
+            window_provider: Rc::new(window_provider),
+        }
     }
 }
 
@@ -234,12 +341,18 @@ impl WebViewSurface for LinuxWebKitSurface {
             state.publish();
             return;
         }
-        state.state = WebViewState { phase: WebViewPhase::Loading, ..WebViewState::default() };
+        state.state = WebViewState {
+            phase: WebViewPhase::Loading,
+            ..WebViewState::default()
+        };
         match request {
             WebViewRequest::Url(url) => {
                 state.loads_html = false;
                 state.state.url = Some(url.clone());
-                if let (Some(load), Ok(c_url)) = (libraries.webkit.webkit_web_view_load_uri, CString::new(url.as_str())) {
+                if let (Some(load), Ok(c_url)) = (
+                    libraries.webkit.webkit_web_view_load_uri,
+                    CString::new(url.as_str()),
+                ) {
                     unsafe { load(state.web_view, c_url.as_ptr()) };
                 }
             }
@@ -255,7 +368,8 @@ impl WebViewSurface for LinuxWebKitSurface {
                         load(
                             state.web_view,
                             body.as_ptr(),
-                            base.as_ref().map_or(std::ptr::null(), |value| value.as_ptr()),
+                            base.as_ref()
+                                .map_or(std::ptr::null(), |value| value.as_ptr()),
                         )
                     };
                 }
@@ -383,8 +497,12 @@ fn ensure_views(state: &mut LinuxWebKitState, libraries: &Libraries) {
     if state.web_view != std::ptr::null_mut() {
         return;
     }
-    let Some(fixed_new) = libraries.gtk.gtk_fixed_new else { return };
-    let Some(web_view_new) = libraries.webkit.webkit_web_view_new else { return };
+    let Some(fixed_new) = libraries.gtk.gtk_fixed_new else {
+        return;
+    };
+    let Some(web_view_new) = libraries.webkit.webkit_web_view_new else {
+        return;
+    };
     let container = unsafe { fixed_new() };
     let web_view = unsafe { web_view_new() };
     if container.is_null() || web_view.is_null() {
@@ -443,7 +561,9 @@ impl LinuxWebKitState {
         if let Some(get_title) = webkit.webkit_web_view_get_title {
             let title = unsafe { get_title(self.web_view) };
             if !title.is_null() {
-                let value = unsafe { CStr::from_ptr(title) }.to_string_lossy().to_string();
+                let value = unsafe { CStr::from_ptr(title) }
+                    .to_string_lossy()
+                    .to_string();
                 if !value.is_empty() {
                     self.state.title = Some(value);
                 }

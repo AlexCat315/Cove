@@ -5,8 +5,8 @@
 //! recorded. Reported once a second so steady state produces one line per
 //! second instead of one line per frame.
 
-use cove_graphics::rhi::GpuTimestampProfile;
 use cove_graphics::rhi::Device;
+use cove_graphics::rhi::GpuTimestampProfile;
 use cove_logging::{Level, LogEvent, LogSystem};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -44,7 +44,12 @@ impl GpuTimingReporter {
         // not to truncate a session before its summary lines are read.
         let created = Arc::new(GpuTimestampProfile::new(1 << 16));
         device.set_gpu_timestamp_profile(Some(created.clone()));
-        Self { profile: Some(created), reported: 0, window: BTreeMap::new(), window_start: 0 }
+        Self {
+            profile: Some(created),
+            reported: 0,
+            window: BTreeMap::new(),
+            window_start: 0,
+        }
     }
 
     pub fn is_recording(&self) -> bool {
@@ -52,7 +57,9 @@ impl GpuTimingReporter {
     }
 
     pub fn tick(&mut self, timestamp: u64) {
-        let Some(profile) = self.profile.clone() else { return };
+        let Some(profile) = self.profile.clone() else {
+            return;
+        };
         if self.window_start == 0 {
             self.window_start = timestamp;
         }
@@ -119,7 +126,11 @@ fn parseable(label: &str) -> String {
     label
         .chars()
         .map(|character| {
-            if character.is_alphanumeric() || character == '_' { character } else { '_' }
+            if character.is_alphanumeric() || character == '_' {
+                character
+            } else {
+                '_'
+            }
         })
         .collect()
 }

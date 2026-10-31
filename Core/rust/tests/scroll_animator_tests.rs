@@ -22,7 +22,9 @@ struct ManualClock {
 
 impl ManualClock {
     fn new() -> Self {
-        Self { now: Rc::new(Cell::new(0.0)) }
+        Self {
+            now: Rc::new(Cell::new(0.0)),
+        }
     }
     fn run(&self, frames: usize, interval: f64) {
         for _ in 0..frames {
@@ -32,15 +34,14 @@ impl ManualClock {
     }
 }
 
-fn make_animator(
-    physics: ScrollPhysics,
-    maximum: f32,
-    viewport_height: f32,
-) -> Rc<ScrollAnimator> {
+fn make_animator(physics: ScrollPhysics, maximum: f32, viewport_height: f32) -> Rc<ScrollAnimator> {
     ScrollAnimator::new(
         physics,
         Point::new(0.0, maximum),
-        Size { width: 200.0, height: viewport_height },
+        Size {
+            width: 200.0,
+            height: viewport_height,
+        },
         Point::default(),
         None,
     )
@@ -119,7 +120,13 @@ fn a_range_that_shrinks_snaps_in_place_instead_of_animating() {
     with_isolated_scheduler(|| {
         let animator = make_animator(ScrollPhysics::DEFAULT, 100.0, 100.0);
         animator.scroll_by(Point::new(0.0, 140.0));
-        animator.update(Point::new(0.0, 20.0), Size { width: 200.0, height: 100.0 });
+        animator.update(
+            Point::new(0.0, 20.0),
+            Size {
+                width: 200.0,
+                height: 100.0,
+            },
+        );
         assert_eq!(animator.offset().y, 20.0);
         assert!(!animator.is_settling());
     });
@@ -131,7 +138,13 @@ fn growth_does_not_interrupt_an_in_flight_stretch() {
         let animator = make_animator(ScrollPhysics::DEFAULT, 100.0, 100.0);
         animator.scroll_by(Point::new(0.0, 140.0));
         let stretched = animator.offset().y;
-        animator.update(Point::new(0.0, 160.0), Size { width: 200.0, height: 100.0 });
+        animator.update(
+            Point::new(0.0, 160.0),
+            Size {
+                width: 200.0,
+                height: 100.0,
+            },
+        );
         assert_eq!(animator.offset().y, stretched);
         assert!(animator.is_settling());
     });
@@ -170,7 +183,10 @@ fn each_axis_is_independent() {
         let animator = ScrollAnimator::new(
             ScrollPhysics::DEFAULT,
             Point::new(50.0, 50.0),
-            Size { width: 60.0, height: 60.0 },
+            Size {
+                width: 60.0,
+                height: 60.0,
+            },
             Point::default(),
             None,
         );
@@ -505,7 +521,10 @@ fn one_edge_rebounds_while_the_other_axis_continues_gliding() {
         let animator = ScrollAnimator::new(
             ScrollPhysics::DEFAULT,
             Point::new(75.0, 2_000.0),
-            Size { width: 100.0, height: 100.0 },
+            Size {
+                width: 100.0,
+                height: 100.0,
+            },
             Point::default(),
             None,
         );

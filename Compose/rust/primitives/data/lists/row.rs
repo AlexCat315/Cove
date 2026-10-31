@@ -2,9 +2,6 @@
 //!
 //! Title and fixed slots. Touch rows stay within their proposal; desktop rows
 //! retain horizontal overflow for dense, independently authored accessory slots.
-use cove_core::scene::{
-    Align, FlexDirection, Justify, LayoutNode, Node, Wrap,
-};
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
@@ -12,8 +9,9 @@ use crate::primitives::controls::button::{ButtonIcon, ButtonIconSource};
 use crate::primitives::layout::{ScrollAxis, ScrollView};
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::ButtonRole;
-use crate::theme::{theme_for_node, SemanticFontRef, ThemeReader};
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, TupleView, View, ViewExt};
+use crate::theme::{SemanticFontRef, ThemeReader, theme_for_node};
+use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, ViewExt, impl_primitive_view};
+use cove_core::scene::{Align, FlexDirection, Justify, LayoutNode, Node, Wrap};
 
 /// Authored options for one list row.
 #[derive(Clone, Debug, PartialEq)]
@@ -25,7 +23,11 @@ pub struct ListRowOptions {
 
 impl Default for ListRowOptions {
     fn default() -> Self {
-        Self { subtitle: None, role: ButtonRole::Normal, shows_disclosure: false }
+        Self {
+            subtitle: None,
+            role: ButtonRole::Normal,
+            shows_disclosure: false,
+        }
     }
 }
 
@@ -98,57 +100,88 @@ impl View for ListRow {
                 theme.colors.on_surface
             };
             let title_content = match options.subtitle.clone() {
-                Some(subtitle) => AnyView::new(
-                    BoxView::new(
-                        FlexDirection::Column, Align::FlexStart, Justify::FlexStart, Wrap::NoWrap, 4.0,
-                        AnyView::new(TupleView::new(vec![
-                            AnyView::new(Text::new(title.clone()).truncated().foreground_color(title_color)),
-                            AnyView::new(
-                                Text::new(subtitle)
-                                    .truncated()
-                                    .semantic_font(SemanticFontRef::caption())
-                                    .semantic_foreground(crate::theme::SemanticColorRef::on_surface_muted()),
-                            ),
-                        ])),
-                    ),
+                Some(subtitle) => AnyView::new(BoxView::new(
+                    FlexDirection::Column,
+                    Align::FlexStart,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    4.0,
+                    AnyView::new(TupleView::new(vec![
+                        AnyView::new(
+                            Text::new(title.clone())
+                                .truncated()
+                                .foreground_color(title_color),
+                        ),
+                        AnyView::new(
+                            Text::new(subtitle)
+                                .truncated()
+                                .semantic_font(SemanticFontRef::caption())
+                                .semantic_foreground(
+                                    crate::theme::SemanticColorRef::on_surface_muted(),
+                                ),
+                        ),
+                    ])),
+                )),
+                None => AnyView::new(
+                    Text::new(title.clone())
+                        .truncated()
+                        .foreground_color(title_color),
                 ),
-                None => AnyView::new(Text::new(title.clone()).truncated().foreground_color(title_color)),
             };
             let trailing_content = if options.shows_disclosure {
-                AnyView::new(
-                    BoxView::new(
-                        FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 8.0,
-                        AnyView::new(TupleView::new(vec![
-                            AnyView::new(trailing.clone().flex(0.0).shrink(0.0)),
-                            AnyView::new(
-                                AnyView::new(ListDisclosure).modifier(
-                                    crate::modifiers::interaction::AccessibilityModifier::new(
-                                        |semantics| semantics.is_hidden = true,
-                                    ),
-                                ),
+                AnyView::new(BoxView::new(
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    8.0,
+                    AnyView::new(TupleView::new(vec![
+                        AnyView::new(trailing.clone().flex(0.0).shrink(0.0)),
+                        AnyView::new(AnyView::new(ListDisclosure).modifier(
+                            crate::modifiers::interaction::AccessibilityModifier::new(
+                                |semantics| semantics.is_hidden = true,
                             ),
-                        ])),
-                    ),
-                )
+                        )),
+                    ])),
+                ))
             } else {
                 AnyView::new(BoxView::new(
-                    FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    0.0,
                     trailing.clone(),
                 ))
             };
             let contents = AnyView::new(
                 BoxView::new(
-                    FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    0.0,
                     AnyView::new(TupleView::new(vec![
                         AnyView::new(BoxView::new(
-                            FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                            FlexDirection::Row,
+                            Align::Center,
+                            Justify::FlexStart,
+                            Wrap::NoWrap,
+                            0.0,
                             leading.clone(),
                         )),
                         title_content,
                         trailing_content,
                     ])),
                 )
-                .frame(None, None, None, if touch { Some(44.0) } else { None }, None, None)
+                .frame(
+                    None,
+                    None,
+                    None,
+                    if touch { Some(44.0) } else { None },
+                    None,
+                    None,
+                )
                 .accessibility(|semantics| semantics.combines_children = true),
             );
             let scroll = ScrollView::new(ScrollAxis::Horizontal, contents)
@@ -194,7 +227,9 @@ impl PrimitiveView for ListDisclosure {
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         vec![AnyView::new(ButtonIcon::new(
-            ButtonIconSource::resource(crate::primitives::media::ui_icon_catalog::navigation::chevron_right()),
+            ButtonIconSource::resource(
+                crate::primitives::media::ui_icon_catalog::navigation::chevron_right(),
+            ),
             Some(12.0),
             None,
         ))]

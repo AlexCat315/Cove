@@ -38,7 +38,10 @@ fn main() {
         // Report one variable the parent injected. An absent value prints
         // nothing, so the test fails loudly rather than comparing empty strings.
         "environment" => {
-            print!("{}", std::env::var("COVE_FIXTURE_VALUE").unwrap_or_default());
+            print!(
+                "{}",
+                std::env::var("COVE_FIXTURE_VALUE").unwrap_or_default()
+            );
             std::io::stdout().flush().ok();
         }
         // Stay alive until cancelled.

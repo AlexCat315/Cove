@@ -6,11 +6,11 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
 use cove_core::scene::{
-    AccessibilityRole, AccessibilitySemantics, Align, Display, FlexDirection,
-    FocusChainHolder, LayoutNode, Node, PointerCaptureHolder,
+    AccessibilityRole, AccessibilitySemantics, Align, Display, FlexDirection, FocusChainHolder,
+    LayoutNode, Node, PointerCaptureHolder,
 };
-use crate::{impl_primitive_view, AnyView, PrimitiveView, View};
 
 use super::super::split_compact::SplitPane;
 
@@ -46,7 +46,13 @@ impl SplitRetainedRegion {
         direction: FlexDirection,
         content: impl View + 'static,
     ) -> Self {
-        Self { is_visible, focus, pane, direction, content: AnyView::new(content) }
+        Self {
+            is_visible,
+            focus,
+            pane,
+            direction,
+            content: AnyView::new(content),
+        }
     }
 }
 
@@ -75,7 +81,11 @@ impl PrimitiveView for SplitRetainedRegion {
     fn update_layout(&self, layout: &LayoutNode) {
         layout.set_align_items(Align::Stretch);
         layout.set_flex_direction(self.direction);
-        layout.set_display(if self.is_visible { Display::Flex } else { Display::None });
+        layout.set_display(if self.is_visible {
+            Display::Flex
+        } else {
+            Display::None
+        });
     }
 
     fn update_node(&self, node: &Node) {
@@ -88,7 +98,11 @@ impl PrimitiveView for SplitRetainedRegion {
             ..Default::default()
         }));
         if let Some(layout) = node.layout_node() {
-            layout.set_display(if self.is_visible { Display::Flex } else { Display::None });
+            layout.set_display(if self.is_visible {
+                Display::Flex
+            } else {
+                Display::None
+            });
         }
         if self.is_visible {
             return;
@@ -103,7 +117,9 @@ impl PrimitiveView for SplitRetainedRegion {
             }
         }
         if let Some(capture) = PointerCaptureHolder::current()
-            && capture.target().is_some_and(|target| contains(&target, node))
+            && capture
+                .target()
+                .is_some_and(|target| contains(&target, node))
         {
             capture.release();
         }
@@ -124,7 +140,11 @@ pub struct SplitFocusHandoff {
 
 impl SplitFocusHandoff {
     pub fn new(focus: Rc<SplitFocusTransfer>, is_compact: bool, selection: SplitPane) -> Self {
-        Self { focus, is_compact, selection }
+        Self {
+            focus,
+            is_compact,
+            selection,
+        }
     }
 
     /// The preferred Tab stop inside `root` for the pane about to be shown.
@@ -146,7 +166,10 @@ impl SplitFocusHandoff {
         }
         if preferred
             && !self.is_compact
-            && candidate.attachment::<Option<SplitPane>>(PANE_MARKER).flatten() == Some(self.selection)
+            && candidate
+                .attachment::<Option<SplitPane>>(PANE_MARKER)
+                .flatten()
+                == Some(self.selection)
         {
             if let Some(found) = self.locate(candidate, false) {
                 return Some(found);

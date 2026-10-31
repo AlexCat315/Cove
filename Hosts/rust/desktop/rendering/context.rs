@@ -1,6 +1,6 @@
 //! Translation of Desktop/Sources/CoveUI/Rendering/Context.swift.
 
-use crate::desktop::application::configuration::{ApplicationConfiguration, AppWindowRendering};
+use crate::desktop::application::configuration::{AppWindowRendering, ApplicationConfiguration};
 use crate::desktop::window::native_renderer::{
     AppWindowRenderSettings, AppWindowRenderer, NativeAppWindowRenderer,
 };
@@ -14,10 +14,7 @@ impl AppWindowRenderSettings {
     /// Resolves this window's settings against the application defaults. Analytic
     /// geometry antialiasing is single-sample by definition, so it wins over an
     /// authored `sampleCount`.
-    pub fn resolve(
-        config: &ApplicationConfiguration,
-        window: AppWindowRendering,
-    ) -> Self {
+    pub fn resolve(config: &ApplicationConfiguration, window: AppWindowRendering) -> Self {
         let analytic = window
             .geometry_antialiasing
             .unwrap_or(config.rendering.geometry_antialiasing)
@@ -25,7 +22,10 @@ impl AppWindowRenderSettings {
         let samples = if analytic {
             1
         } else {
-            window.sample_count.unwrap_or(config.rendering.sample_count).max(1)
+            window
+                .sample_count
+                .unwrap_or(config.rendering.sample_count)
+                .max(1)
         };
         Self {
             samples,
@@ -65,10 +65,16 @@ impl AppRenderingContext {
     ) -> RhiResult<Box<dyn AppWindowRenderer>> {
         let device = self.device.clone();
         let presentation = device.with_frame_session(|| {
-            self.renderer
-                .make_presentation_renderer(TextureFormat::Bgra8UnormSrgb, settings.samples as usize)
+            self.renderer.make_presentation_renderer(
+                TextureFormat::Bgra8UnormSrgb,
+                settings.samples as usize,
+            )
         })?;
-        Ok(Box::new(NativeAppWindowRenderer::new(device, presentation, settings)))
+        Ok(Box::new(NativeAppWindowRenderer::new(
+            device,
+            presentation,
+            settings,
+        )))
     }
 
     pub fn upload_font_atlas(&self, atlas: &FontAtlas, texture_id: TextureId) -> RhiResult<()> {

@@ -1,6 +1,6 @@
 //! Translation of CoveUIComposeCore/Layout/LayoutValue.swift.
-use cove_core::scene::LayoutNode;
 use crate::{ModifiedContent, View, ViewExt, ViewModifier};
+use cove_core::scene::LayoutNode;
 
 /// A per-child value a custom `Layout` reads from its subviews, such as a grid
 /// cell's span. Values live with the child's layout node, so children declare

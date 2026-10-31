@@ -33,21 +33,23 @@ impl Theme {
         motion: MotionScale,
         inputs: Option<InputAppearance>,
     ) -> Self {
-        let inputs = inputs.unwrap_or_else(|| InputAppearance::new(
-            colors.surface,
-            colors.surface_variant,
-            colors.border,
-            colors.border_strong,
-            colors.accent,
-            colors.error,
-            colors.border,
-            1.0,
-            1.0,
-            colors.surface_variant,
-            colors.on_surface_muted,
-            colors.border,
-            radius.md,
-        ));
+        let inputs = inputs.unwrap_or_else(|| {
+            InputAppearance::new(
+                colors.surface,
+                colors.surface_variant,
+                colors.border,
+                colors.border_strong,
+                colors.accent,
+                colors.error,
+                colors.border,
+                1.0,
+                1.0,
+                colors.surface_variant,
+                colors.on_surface_muted,
+                colors.border,
+                radius.md,
+            )
+        });
         Self {
             colors,
             typography,

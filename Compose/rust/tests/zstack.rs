@@ -13,17 +13,13 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use cove_composition::layout::LayoutDirectionExt;
-use cove_composition::{
-    Alignment, AnyView, LayoutDebugExt, TupleView, View, ViewExt, ViewGraph,
-};
-use cove_core::scene::{
-    Align, Direction, EventDispatcher, FlexDirection, Justify, Node, Wrap,
-};
+use cove_composition::{Alignment, AnyView, LayoutDebugExt, TupleView, View, ViewExt, ViewGraph};
+use cove_core::scene::{Align, Direction, EventDispatcher, FlexDirection, Justify, Node, Wrap};
 use cove_platform::{InputEvent, MouseButton, MouseButtonEvent, PointerKind, WindowId};
+use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::controls::button::Button;
 use cove_ui_compose::primitives::layout::zstack::ZStack;
-use cove_ui_compose::BoxView;
 
 use support::GlobalTestLock;
 
@@ -83,7 +79,10 @@ fn measures_and_aligns() {
         assert_eq!(named(&graph, "large").frame().x, 0.0);
         assert_eq!(named(&graph, "large").frame().y, 0.0);
         assert_eq!(
-            (named(&graph, "small").frame().x, named(&graph, "small").frame().y),
+            (
+                named(&graph, "small").frame().x,
+                named(&graph, "small").frame().y
+            ),
             (0.0, 0.0),
             "TopLeading places the small child at the origin"
         );
@@ -102,7 +101,10 @@ fn measures_and_aligns() {
         graph.install_view(stack, Default::default());
         graph.compute_layout(300.0, 200.0);
         assert_eq!(
-            (named(&graph, "small").frame().x, named(&graph, "small").frame().y),
+            (
+                named(&graph, "small").frame().x,
+                named(&graph, "small").frame().y
+            ),
             (40.0, 10.0),
             "a centered child sits at the midpoint of the remaining space"
         );
@@ -132,7 +134,10 @@ fn rtl_alignment() {
         graph.install_view(stack, Default::default());
         graph.compute_layout(300.0, 200.0);
         assert_eq!(
-            (named(&graph, "small").frame().x, named(&graph, "small").frame().y),
+            (
+                named(&graph, "small").frame().x,
+                named(&graph, "small").frame().y
+            ),
             (80.0, 0.0),
             "RTL flips semantic leading to the right edge"
         );
@@ -146,12 +151,8 @@ fn topmost_child_wins_hit_testing() {
         let hits: Rc<RefCell<Vec<&'static str>>> = Rc::new(RefCell::new(Vec::new()));
         let front_hits = hits.clone();
         let back_hits = hits.clone();
-        let front = Button::new(unsized_box(), move || {
-            front_hits.borrow_mut().push("front")
-        });
-        let back = Button::new(unsized_box(), move || {
-            back_hits.borrow_mut().push("back")
-        });
+        let front = Button::new(unsized_box(), move || front_hits.borrow_mut().push("front"));
+        let back = Button::new(unsized_box(), move || back_hits.borrow_mut().push("back"));
         let stack = AnyView::new(
             AnyView::new(ZStack::new(
                 Alignment::Center,
@@ -198,8 +199,10 @@ fn card_content_stays_inside_its_box() {
         support::with_test_text_environment(|| {
             let mut scene = support::TestScene::new();
             let label = AnyView::new(
-                AnyView::new(cove_ui_compose::primitives::text::Text::new("Top-left layer"))
-                    .debug_name("label"),
+                AnyView::new(cove_ui_compose::primitives::text::Text::new(
+                    "Top-left layer",
+                ))
+                .debug_name("label"),
             );
             let accent = AnyView::new(
                 AnyView::new(

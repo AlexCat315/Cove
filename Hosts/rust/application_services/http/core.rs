@@ -22,7 +22,9 @@ impl Url {
     /// Parses an `http`/`https` URL. Rejects anything else, a missing host, and
     /// non-numeric or out-of-range ports.
     pub fn parse(url: &str) -> Result<Self, AsyncImageError> {
-        let (scheme, rest) = url.split_once("://").ok_or(AsyncImageError::UnsupportedUrl)?;
+        let (scheme, rest) = url
+            .split_once("://")
+            .ok_or(AsyncImageError::UnsupportedUrl)?;
         let secure = match scheme.to_ascii_lowercase().as_str() {
             "https" => true,
             "http" => false,
@@ -41,7 +43,9 @@ impl Url {
         }
         let (host, port) = match authority.rfind(':') {
             // A bare IPv6 literal has multiple colons and no port.
-            Some(index) if !authority[index..].contains(']') && authority.matches(':').count() == 1 => {
+            Some(index)
+                if !authority[index..].contains(']') && authority.matches(':').count() == 1 =>
+            {
                 let port = authority[index + 1..]
                     .parse::<u16>()
                     .map_err(|_| AsyncImageError::UnsupportedUrl)?;
@@ -114,7 +118,9 @@ pub fn parse_head(head: &[u8]) -> Result<ResponseHead, AsyncImageError> {
     let mut content_type = None;
     let mut location = None;
     for line in lines {
-        let Some((name, value)) = line.split_once(':') else { continue };
+        let Some((name, value)) = line.split_once(':') else {
+            continue;
+        };
         let value = value.trim();
         match name.trim().to_ascii_lowercase().as_str() {
             "content-length" => content_length = value.parse::<usize>().ok(),
@@ -126,7 +132,13 @@ pub fn parse_head(head: &[u8]) -> Result<ResponseHead, AsyncImageError> {
             _ => {}
         }
     }
-    Ok(ResponseHead { status, content_length, chunked, content_type, location })
+    Ok(ResponseHead {
+        status,
+        content_length,
+        chunked,
+        content_type,
+        location,
+    })
 }
 
 /// Decodes a chunked body, returning the bytes decoded so far and whether the
@@ -135,7 +147,10 @@ pub fn decode_chunked(body: &[u8]) -> (Vec<u8>, bool) {
     let mut result = Vec::new();
     let mut cursor = 0;
     loop {
-        let Some(relative) = body[cursor..].windows(2).position(|window| window == b"\r\n") else {
+        let Some(relative) = body[cursor..]
+            .windows(2)
+            .position(|window| window == b"\r\n")
+        else {
             return (result, false);
         };
         let size_line = &body[cursor..cursor + relative];
@@ -233,7 +248,10 @@ mod tests {
 
     #[test]
     fn rejects_unknown_scheme() {
-        assert_eq!(Url::parse("ftp://example.com"), Err(AsyncImageError::UnsupportedUrl));
+        assert_eq!(
+            Url::parse("ftp://example.com"),
+            Err(AsyncImageError::UnsupportedUrl)
+        );
     }
 
     #[test]

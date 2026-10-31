@@ -2,10 +2,10 @@
 //!
 //! Line commands follow the displayed row. Without a shaping environment, the
 //! rope still provides a deterministic logical-line boundary.
-use cove_core::scene::Point;
-use cove_text::TextEnvironment;
 use crate::primitives::text::text_buffer::TextBuffer;
 use crate::primitives::text::text_document_layout::TextDocumentLayout;
+use cove_core::scene::Point;
+use cove_text::TextEnvironment;
 
 /// A caret move caused by a line, page or document command.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -30,9 +30,7 @@ pub fn line_boundary(
     if !is_vertical {
         return if ending { buffer.character_count() } else { 0 };
     }
-    if wraps_lines
-        && let Some(document) = document
-    {
+    if wraps_lines && let Some(document) = document {
         let (_, row) = document.caret(caret, line_end_affinity, env);
         let rows = document.index().row_count();
         return document.character(
@@ -56,13 +54,17 @@ pub fn move_cursor_vertically(
     env: Option<&TextEnvironment>,
 ) -> CaretMove {
     if line_delta == 0 {
-        return CaretMove { target: caret, ..Default::default() };
+        return CaretMove {
+            target: caret,
+            ..Default::default()
+        };
     }
     match (document, env) {
         (Some(document), Some(env)) => {
             let (x, row) = document.caret(caret, line_end_affinity, env);
             let rows = document.index().row_count();
-            let target_row = (row as isize + line_delta).clamp(0, rows.saturating_sub(1) as isize) as usize;
+            let target_row =
+                (row as isize + line_delta).clamp(0, rows.saturating_sub(1) as isize) as usize;
             let desired_x = preferred_caret_x.unwrap_or(x);
             let target = document.character(target_row, desired_x, env);
             let (_, landed_row) = document.caret(target, true, env);
@@ -75,7 +77,9 @@ pub fn move_cursor_vertically(
         }
         _ => {
             let (line, column) = buffer.line_and_column(caret);
-            let row = (line as isize + line_delta).clamp(0, buffer.line_count().saturating_sub(1) as isize) as usize;
+            let row = (line as isize + line_delta)
+                .clamp(0, buffer.line_count().saturating_sub(1) as isize)
+                as usize;
             CaretMove {
                 target: buffer.character_index_for_line(row, column),
                 extend_selection: false,

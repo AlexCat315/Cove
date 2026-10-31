@@ -30,14 +30,21 @@ fn register_and_resolve() {
     assert_eq!(registry.count(), 2);
     assert_eq!(
         registry.ids(),
-        [WorkspacePanelID::new("hierarchy"), WorkspacePanelID::new("inspector")]
+        [
+            WorkspacePanelID::new("hierarchy"),
+            WorkspacePanelID::new("inspector")
+        ]
     );
     assert_eq!(
-        registry.descriptor(&WorkspacePanelID::new("hierarchy")).map(|d| d.panel.title.as_str()),
+        registry
+            .descriptor(&WorkspacePanelID::new("hierarchy"))
+            .map(|d| d.panel.title.as_str()),
         Some("Scene")
     );
     assert_eq!(
-        registry.descriptor(&WorkspacePanelID::new("missing")).map(|d| d.panel.title.as_str()),
+        registry
+            .descriptor(&WorkspacePanelID::new("missing"))
+            .map(|d| d.panel.title.as_str()),
         None
     );
 }
@@ -62,7 +69,9 @@ fn register_overwrite_keeps_order() {
         "replacing a descriptor must not move it"
     );
     assert_eq!(
-        registry.descriptor(&WorkspacePanelID::new("b")).map(|d| d.panel.title.as_str()),
+        registry
+            .descriptor(&WorkspacePanelID::new("b"))
+            .map(|d| d.panel.title.as_str()),
         Some("B'")
     );
 }
@@ -87,7 +96,9 @@ fn update_descriptor_keeps_factory_and_order() {
         [WorkspacePanelID::new("a"), WorkspacePanelID::new("b")]
     );
     assert_eq!(
-        registry.descriptor(&WorkspacePanelID::new("b")).map(|d| d.panel.title.as_str()),
+        registry
+            .descriptor(&WorkspacePanelID::new("b"))
+            .map(|d| d.panel.title.as_str()),
         Some("Localized B")
     );
     // The factory still produces a view after the metadata update.
@@ -123,7 +134,9 @@ fn a_descriptor_update_cannot_change_panel_identity() {
     // The identity is the map key, so a mismatching descriptor replaces nothing.
     assert_eq!(registry.ids(), [WorkspacePanelID::new("a")]);
     assert_eq!(
-        registry.descriptor(&WorkspacePanelID::new("a")).map(|d| d.panel.id.clone()),
+        registry
+            .descriptor(&WorkspacePanelID::new("a"))
+            .map(|d| d.panel.id.clone()),
         Some(WorkspacePanelID::new("a"))
     );
 }

@@ -37,7 +37,10 @@ pub struct NullBackend {
 
 impl NullBackend {
     pub fn new() -> Self {
-        Self { counters: BackendCounters::default(), next_texture: AtomicUsize::new(1) }
+        Self {
+            counters: BackendCounters::default(),
+            next_texture: AtomicUsize::new(1),
+        }
     }
 }
 
@@ -93,7 +96,9 @@ impl RhiBackend for NullBackend {
         _handle: Swapchain,
         _descriptor: SurfaceDescriptor,
     ) -> RhiResult<()> {
-        self.counters.configured_swapchains.fetch_add(1, Ordering::SeqCst);
+        self.counters
+            .configured_swapchains
+            .fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
 
@@ -102,7 +107,9 @@ impl RhiBackend for NullBackend {
     }
 
     fn destroy_swapchain(&mut self, _handle: Swapchain) {
-        self.counters.destroyed_swapchains.fetch_add(1, Ordering::SeqCst);
+        self.counters
+            .destroyed_swapchains
+            .fetch_add(1, Ordering::SeqCst);
     }
 
     fn acquire_swapchain_image(&mut self, handle: Swapchain) -> RhiResult<SwapchainImage> {
@@ -120,11 +127,19 @@ impl RhiBackend for NullBackend {
         Ok(())
     }
 
-    fn create_texture(&mut self, _handle: Texture, _descriptor: TextureDescriptor) -> RhiResult<()> {
+    fn create_texture(
+        &mut self,
+        _handle: Texture,
+        _descriptor: TextureDescriptor,
+    ) -> RhiResult<()> {
         Ok(())
     }
 
-    fn create_sampler(&mut self, _handle: Sampler, _descriptor: SamplerDescriptor) -> RhiResult<()> {
+    fn create_sampler(
+        &mut self,
+        _handle: Sampler,
+        _descriptor: SamplerDescriptor,
+    ) -> RhiResult<()> {
         Ok(())
     }
 
@@ -222,7 +237,10 @@ impl RhiBackend for NullBackend {
 
     fn make_frame_uploader(&mut self, _slot: usize) -> RhiResult<Box<dyn FrameUploader>> {
         self.counters.uploaders.fetch_add(1, Ordering::SeqCst);
-        Ok(Box::new(NullUploader { storage: vec![0; 64 * 1024], cursor: 0 }))
+        Ok(Box::new(NullUploader {
+            storage: vec![0; 64 * 1024],
+            cursor: 0,
+        }))
     }
 
     fn submit(
@@ -237,7 +255,9 @@ impl RhiBackend for NullBackend {
     }
 
     fn destroy_buffer(&mut self, _handle: Buffer) {
-        self.counters.destroyed_buffers.fetch_add(1, Ordering::SeqCst);
+        self.counters
+            .destroyed_buffers
+            .fetch_add(1, Ordering::SeqCst);
     }
 
     fn destroy_texture(&mut self, _handle: Texture) {}
@@ -259,10 +279,12 @@ mod tests {
 
     #[test]
     fn the_null_backend_supports_a_full_frame() {
-        let device = Device::new(Box::new(NullBackend::new()), DeviceConfig::default())
-            .expect("device");
+        let device =
+            Device::new(Box::new(NullBackend::new()), DeviceConfig::default()).expect("device");
         assert_eq!(device.device_name(), "null adapter");
-        let buffer = device.make_buffer(BufferDescriptor::new(64, super::super::BufferUsage::VERTEX)).expect("buffer");
+        let buffer = device
+            .make_buffer(BufferDescriptor::new(64, super::super::BufferUsage::VERTEX))
+            .expect("buffer");
         device.begin_frame().expect("begin");
         let location = device.upload_transient(&[1, 2, 3, 4], 4).expect("upload");
         assert_eq!(location.offset, 0);

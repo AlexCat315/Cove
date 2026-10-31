@@ -24,7 +24,10 @@ fn loopback_binding_supports_ephemeral_ports_and_restart() {
     let server = AgentLocalServer::new(0, echo_handler());
     server.start().expect("start");
     let port = server.bound_port().expect("bound port");
-    assert_ne!(port, 0, "binding port 0 must publish the kernel-assigned port");
+    assert_ne!(
+        port, 0,
+        "binding port 0 must publish the kernel-assigned port"
+    );
 
     server.stop();
     assert_eq!(server.bound_port(), None, "stopping releases the port");

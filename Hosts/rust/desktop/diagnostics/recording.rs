@@ -47,15 +47,15 @@ impl InputRecorder {
 
     /// Begins a recording unless one is already running, matching the Swift
     /// `start` guard that returned `false`.
-    pub fn start(
-        &mut self,
-        state: BTreeMap<String, String>,
-        focus_target: Option<String>,
-    ) -> bool {
+    pub fn start(&mut self, state: BTreeMap<String, String>, focus_target: Option<String>) -> bool {
         if self.recording.is_some() {
             return false;
         }
-        self.recording = Some(InputRecording { initial_state: state, focus_target, events: Vec::new() });
+        self.recording = Some(InputRecording {
+            initial_state: state,
+            focus_target,
+            events: Vec::new(),
+        });
         self.started_at = Some(std::time::Instant::now());
         true
     }
@@ -66,7 +66,10 @@ impl InputRecorder {
             .map(|start| start.elapsed().as_secs_f64())
             .unwrap_or(0.0);
         if let Some(recording) = &mut self.recording {
-            recording.events.push(RecordedInput { event: event.clone(), timestamp });
+            recording.events.push(RecordedInput {
+                event: event.clone(),
+                timestamp,
+            });
         }
     }
 
@@ -99,7 +102,9 @@ impl RecordingControl {
         checkpoint: Option<&ApplicationCheckpoint>,
         recorder: Rc<std::cell::RefCell<InputRecorder>>,
     ) {
-        let Some(checkpoint) = checkpoint.cloned() else { return };
+        let Some(checkpoint) = checkpoint.cloned() else {
+            return;
+        };
         let capture_checkpoint = checkpoint.clone();
         self.capture = Some(Rc::new(move || capture_checkpoint.capture()));
         let restore_checkpoint = checkpoint.clone();

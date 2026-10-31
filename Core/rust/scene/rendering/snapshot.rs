@@ -54,8 +54,20 @@ pub struct DrawListSnapshot {
     pub resources: DrawListResources,
 }
 impl DrawListSnapshot {
-    pub fn new(vertices: Vec<Vertex>, indices: Vec<u32>, batches: Vec<DrawBatch>, logical_size: [f32; 2]) -> Self {
-        Self { vertices, indices, batches, logical_size, atlas_updates: Vec::new(), resources: DrawListResources::default() }
+    pub fn new(
+        vertices: Vec<Vertex>,
+        indices: Vec<u32>,
+        batches: Vec<DrawBatch>,
+        logical_size: [f32; 2],
+    ) -> Self {
+        Self {
+            vertices,
+            indices,
+            batches,
+            logical_size,
+            atlas_updates: Vec::new(),
+            resources: DrawListResources::default(),
+        }
     }
     pub fn is_empty(&self) -> bool {
         self.batches.is_empty()

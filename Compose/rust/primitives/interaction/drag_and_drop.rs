@@ -8,19 +8,19 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
+use crate::AnyView;
+use crate::modifiers::interaction::HitTestingExt;
+use crate::primitives::overlays::portal::PortalPlacementMode;
+use crate::primitives::overlays::portal::portal_registry::{
+    PortalResource, PortalStoreEnvironment, PortalStoreHolder,
+};
+use crate::{PrimitiveView, View, ViewExt, impl_primitive_view};
+use cove_core::Point;
 use cove_core::scene::{
     CompositionLocal, EventResult, InputHandlerRoute, InteractionRegistryHolder, LayoutNode, Node,
     PointerCaptureHolder, PointerPhase,
 };
-use cove_core::Point;
-use crate::AnyView;
 use cove_platform::MouseButton;
-use crate::primitives::overlays::portal::portal_registry::{
-    PortalResource, PortalStoreEnvironment, PortalStoreHolder,
-};
-use crate::primitives::overlays::portal::PortalPlacementMode;
-use crate::modifiers::interaction::HitTestingExt;
-use crate::{impl_primitive_view, PrimitiveView, View, ViewExt};
 
 /// Movement before which the pointer still reads as a tap.
 const DRAG_THRESHOLD: f32 = 6.0;
@@ -88,7 +88,15 @@ impl DragSession {
         let key = node.id().0;
         let mut targets = self.targets.borrow_mut();
         targets.retain(|(existing, _)| *existing != key);
-        targets.push((key, DragTarget { node: Some(node.clone()), accepts, drop, on_targeted }));
+        targets.push((
+            key,
+            DragTarget {
+                node: Some(node.clone()),
+                accepts,
+                drop,
+                on_targeted,
+            },
+        ));
     }
 
     pub fn begin(&self, payload: u64, preview: AnyView, pointer: Point) {
@@ -106,7 +114,9 @@ impl DragSession {
     }
 
     pub fn end(&self) {
-        let Some(payload) = self.payload.get() else { return };
+        let Some(payload) = self.payload.get() else {
+            return;
+        };
         self.refresh_target();
         if let Some(active) = self.active.get()
             && let Some(target) = self.targets.borrow().iter().find(|(key, _)| *key == active)
@@ -139,7 +149,12 @@ impl DragSession {
     fn refresh_target(&self) {
         {
             let mut targets = self.targets.borrow_mut();
-            targets.retain(|(_, target)| target.node.as_ref().is_some_and(|node| node.parent().is_some()));
+            targets.retain(|(_, target)| {
+                target
+                    .node
+                    .as_ref()
+                    .is_some_and(|node| node.parent().is_some())
+            });
         }
         let next = self.target_at(self.pointer.get());
         let next_key = next.map(|node| node.id().0);
@@ -154,7 +169,11 @@ impl DragSession {
         }
         self.active.set(next_key);
         if let Some(key) = next_key
-            && let Some(target) = self.targets.borrow().iter().find(|(existing, _)| *existing == key)
+            && let Some(target) = self
+                .targets
+                .borrow()
+                .iter()
+                .find(|(existing, _)| *existing == key)
             && let Some(on_targeted) = target.1.on_targeted.as_ref()
         {
             on_targeted(true);
@@ -166,7 +185,9 @@ impl DragSession {
         let mut best: Option<(Node, usize)> = None;
         let targets = self.targets.borrow();
         for (_, target) in targets.iter() {
-            let Some(node) = target.node.as_ref() else { continue };
+            let Some(node) = target.node.as_ref() else {
+                continue;
+            };
             if !(target.accepts)(&payload) {
                 continue;
             }
@@ -177,7 +198,10 @@ impl DragSession {
                 continue;
             }
             let depth = depth_of(node);
-            if best.as_ref().is_none_or(|(_, best_depth)| depth > *best_depth) {
+            if best
+                .as_ref()
+                .is_none_or(|(_, best_depth)| depth > *best_depth)
+            {
                 best = Some((node.clone(), depth));
             }
         }
@@ -186,7 +210,10 @@ impl DragSession {
 }
 
 fn contains(rect: cove_core::Rect, point: Point) -> bool {
-    point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height
+    point.x >= rect.x
+        && point.x <= rect.x + rect.width
+        && point.y >= rect.y
+        && point.y <= rect.y + rect.height
 }
 
 fn depth_of(node: &Node) -> usize {
@@ -228,7 +255,11 @@ impl DragScope {
             let _ = &session_for_change;
             revision_for_change.set(revision_for_change.get().wrapping_add(1));
         }));
-        Self { session, revision, content: AnyView::new(content) }
+        Self {
+            session,
+            revision,
+            content: AnyView::new(content),
+        }
     }
 }
 
@@ -250,10 +281,7 @@ impl View for DragScope {
                     }),
                 ])),
             )
-            .composition_local(
-                DragScopeEnvironment::key(),
-                Some(self.session.clone()),
-            ),
+            .composition_local(DragScopeEnvironment::key(), Some(self.session.clone())),
         )
     }
 }
@@ -267,7 +295,11 @@ pub struct Draggable {
 
 impl Draggable {
     pub fn new(payload: u64, preview: impl View + 'static, content: impl View + 'static) -> Self {
-        Self { payload, preview: AnyView::new(preview), content: AnyView::new(content) }
+        Self {
+            payload,
+            preview: AnyView::new(preview),
+            content: AnyView::new(content),
+        }
     }
 }
 
@@ -304,65 +336,81 @@ impl PrimitiveView for DragSourceHost {
     }
 
     fn update_node(&self, node: &Node) {
-        let Some(session) = node.composition_value(&DragScopeEnvironment::key()) else { return };
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(session) = node.composition_value(&DragScopeEnvironment::key()) else {
+            return;
+        };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         let payload = self.payload;
         let preview = self.preview.clone();
         let pointer_session = session.clone();
         let pointer_node = node.downgrade();
-        registry.set_pointer(node, InputHandlerRoute::control(), Rc::new(move |event, phase, _event_phase| {
-            if event.button != MouseButton::Left {
-                return EventResult::Ignored;
-            }
-            let Some(owner) = Node::upgrade(&pointer_node) else { return EventResult::Ignored };
-            match phase {
-                PointerPhase::Down => {
-                    owner.set_attachment(DRAG_START, Point::new(event.x, event.y));
-                    owner.set_attachment(DRAG_ACTIVE, false);
-                    EventResult::Ignored
-                }
-                PointerPhase::Up => {
-                    let active = owner.attachment::<bool>(DRAG_ACTIVE) == Some(true);
-                    owner.remove_attachment(DRAG_START);
-                    owner.set_attachment(DRAG_ACTIVE, false);
-                    if !active {
-                        return EventResult::Ignored;
-                    }
-                    if PointerCaptureHolder::current()
-                        .and_then(|capture| capture.target())
-                        .is_some_and(|target| target == owner)
-                        && let Some(capture) = PointerCaptureHolder::current()
-                    {
-                        capture.release();
-                    }
-                    pointer_session.end();
-                    EventResult::Handled
-                }
-            }
-        }));
-        let motion_session = session.clone();
-        let motion_node = node.downgrade();
-        registry.set_motion(node, InputHandlerRoute::control(), Rc::new(move |event, _phase| {
-            let Some(owner) = Node::upgrade(&motion_node) else { return EventResult::Ignored };
-            let Some(start) = owner.attachment::<Point>(DRAG_START) else {
-                return EventResult::Ignored;
-            };
-            let point = Point::new(event.x, event.y);
-            if owner.attachment::<bool>(DRAG_ACTIVE) != Some(true) {
-                let dx = point.x - start.x;
-                let dy = point.y - start.y;
-                if (dx * dx + dy * dy).sqrt() < DRAG_THRESHOLD {
+        registry.set_pointer(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, phase, _event_phase| {
+                if event.button != MouseButton::Left {
                     return EventResult::Ignored;
                 }
-                owner.set_attachment(DRAG_ACTIVE, true);
-                if let Some(capture) = PointerCaptureHolder::current() {
-                    capture.acquire(&owner, true);
+                let Some(owner) = Node::upgrade(&pointer_node) else {
+                    return EventResult::Ignored;
+                };
+                match phase {
+                    PointerPhase::Down => {
+                        owner.set_attachment(DRAG_START, Point::new(event.x, event.y));
+                        owner.set_attachment(DRAG_ACTIVE, false);
+                        EventResult::Ignored
+                    }
+                    PointerPhase::Up => {
+                        let active = owner.attachment::<bool>(DRAG_ACTIVE) == Some(true);
+                        owner.remove_attachment(DRAG_START);
+                        owner.set_attachment(DRAG_ACTIVE, false);
+                        if !active {
+                            return EventResult::Ignored;
+                        }
+                        if PointerCaptureHolder::current()
+                            .and_then(|capture| capture.target())
+                            .is_some_and(|target| target == owner)
+                            && let Some(capture) = PointerCaptureHolder::current()
+                        {
+                            capture.release();
+                        }
+                        pointer_session.end();
+                        EventResult::Handled
+                    }
                 }
-                motion_session.begin(payload, preview.clone(), point);
-            }
-            motion_session.move_to(point);
-            EventResult::Handled
-        }));
+            }),
+        );
+        let motion_session = session.clone();
+        let motion_node = node.downgrade();
+        registry.set_motion(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, _phase| {
+                let Some(owner) = Node::upgrade(&motion_node) else {
+                    return EventResult::Ignored;
+                };
+                let Some(start) = owner.attachment::<Point>(DRAG_START) else {
+                    return EventResult::Ignored;
+                };
+                let point = Point::new(event.x, event.y);
+                if owner.attachment::<bool>(DRAG_ACTIVE) != Some(true) {
+                    let dx = point.x - start.x;
+                    let dy = point.y - start.y;
+                    if (dx * dx + dy * dy).sqrt() < DRAG_THRESHOLD {
+                        return EventResult::Ignored;
+                    }
+                    owner.set_attachment(DRAG_ACTIVE, true);
+                    if let Some(capture) = PointerCaptureHolder::current() {
+                        capture.acquire(&owner, true);
+                    }
+                    motion_session.begin(payload, preview.clone(), point);
+                }
+                motion_session.move_to(point);
+                EventResult::Handled
+            }),
+        );
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
@@ -431,8 +479,15 @@ impl PrimitiveView for DropTargetHost {
     }
 
     fn update_node(&self, node: &Node) {
-        let Some(session) = node.composition_value(&DragScopeEnvironment::key()) else { return };
-        session.register(node, self.accepts.clone(), self.on_drop.clone(), self.on_targeted.clone());
+        let Some(session) = node.composition_value(&DragScopeEnvironment::key()) else {
+            return;
+        };
+        session.register(
+            node,
+            self.accepts.clone(),
+            self.on_drop.clone(),
+            self.on_targeted.clone(),
+        );
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
@@ -460,7 +515,9 @@ impl PrimitiveView for DragPreviewPortal {
     }
 
     fn update_node(&self, node: &Node) {
-        let Some(resource) = node.first_resource::<PortalResource>() else { return };
+        let Some(resource) = node.first_resource::<PortalResource>() else {
+            return;
+        };
         if !self.session.is_dragging() {
             cove_core::scene::NodeResource::unmount(&*resource, node);
             return;

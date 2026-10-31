@@ -3,13 +3,11 @@
 //! Surface container with a labelled header bar. Visual chrome is delegated to
 //! the active `PanelStyle`; call sites only supply title, optional accessory and
 //! content.
-use cove_core::scene::{Align, FlexDirection, LayoutNode, Node};
 use crate::modifiers::layout::FlexExt;
-use crate::theme::styles::components::{
-    PanelStyleConfiguration, PanelStyleEnvironment,
-};
+use crate::theme::styles::components::{PanelStyleConfiguration, PanelStyleEnvironment};
 use crate::theme::theme_for_node;
-use crate::{impl_primitive_view, AnyView, PrimitiveView, View};
+use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
+use cove_core::scene::{Align, FlexDirection, LayoutNode, Node};
 
 /// Surface container with a labelled header bar.
 pub struct Panel {

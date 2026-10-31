@@ -23,17 +23,23 @@ impl Default for WorkspaceAxisSizing {
 
 impl WorkspaceAxisSizing {
     pub fn new(minimum: f32, preferred: Option<f32>, maximum: Option<f32>) -> Self {
-        let minimum = if minimum.is_finite() { minimum.max(0.0) } else { 0.0 };
+        let minimum = if minimum.is_finite() {
+            minimum.max(0.0)
+        } else {
+            0.0
+        };
         let maximum = maximum.and_then(|value| value.is_finite().then(|| value.max(minimum)));
         let preferred = preferred.and_then(|value| {
-            value.is_finite().then(|| {
-                match maximum {
-                    Some(ceiling) => value.max(minimum).min(ceiling),
-                    None => value.max(minimum),
-                }
+            value.is_finite().then(|| match maximum {
+                Some(ceiling) => value.max(minimum).min(ceiling),
+                None => value.max(minimum),
             })
         });
-        Self { minimum, preferred, maximum }
+        Self {
+            minimum,
+            preferred,
+            maximum,
+        }
     }
 
     fn combine_stacked(first: Self, second: Self, gap: f32) -> Self {
@@ -47,8 +53,14 @@ impl WorkspaceAxisSizing {
     fn combine_sibling(first: Self, second: Self) -> Self {
         Self::new(
             first.minimum.max(second.minimum),
-            [first.preferred, second.preferred].into_iter().flatten().reduce(f32::max),
-            [first.maximum, second.maximum].into_iter().flatten().reduce(f32::min),
+            [first.preferred, second.preferred]
+                .into_iter()
+                .flatten()
+                .reduce(f32::max),
+            [first.maximum, second.maximum]
+                .into_iter()
+                .flatten()
+                .reduce(f32::min),
         )
     }
 }
@@ -82,7 +94,11 @@ pub struct WorkspaceLayoutMetrics {
 
 impl Default for WorkspaceLayoutMetrics {
     fn default() -> Self {
-        Self { tab_height: 34.0, divider: 1.0, shows_collapsed_rails: true }
+        Self {
+            tab_height: 34.0,
+            divider: 1.0,
+            shows_collapsed_rails: true,
+        }
     }
 }
 
@@ -106,14 +122,21 @@ pub struct WorkspaceSizingResolver<'a> {
 
 impl<'a> WorkspaceSizingResolver<'a> {
     pub fn new(document: &'a WorkspaceDocument) -> Self {
-        Self { document, metrics: WorkspaceLayoutMetrics::default() }
+        Self {
+            document,
+            metrics: WorkspaceLayoutMetrics::default(),
+        }
     }
 
     pub fn with_metrics(document: &'a WorkspaceDocument, metrics: WorkspaceLayoutMetrics) -> Self {
         Self { document, metrics }
     }
 
-    pub fn group(&self, group_id: &WorkspaceTabGroupID, axis: WorkspaceSplitAxis) -> WorkspaceAxisSizing {
+    pub fn group(
+        &self,
+        group_id: &WorkspaceTabGroupID,
+        axis: WorkspaceSplitAxis,
+    ) -> WorkspaceAxisSizing {
         let Some(group) = self.document.groups.get(group_id) else {
             return WorkspaceAxisSizing::default();
         };
@@ -126,10 +149,26 @@ impl<'a> WorkspaceSizingResolver<'a> {
                 WorkspaceSplitAxis::Vertical => &panel.sizing.height,
             })
             .collect();
-        let chrome = if axis == WorkspaceSplitAxis::Vertical { self.metrics.tab_height } else { 0.0 };
-        let minimum = sizes.iter().map(|size| size.minimum).fold(0.0_f32, f32::max) + chrome;
-        let preferred = sizes.iter().filter_map(|size| size.preferred).reduce(f32::max).map(|value| value + chrome);
-        let maximum = sizes.iter().filter_map(|size| size.maximum).reduce(f32::min).map(|value| value + chrome);
+        let chrome = if axis == WorkspaceSplitAxis::Vertical {
+            self.metrics.tab_height
+        } else {
+            0.0
+        };
+        let minimum = sizes
+            .iter()
+            .map(|size| size.minimum)
+            .fold(0.0_f32, f32::max)
+            + chrome;
+        let preferred = sizes
+            .iter()
+            .filter_map(|size| size.preferred)
+            .reduce(f32::max)
+            .map(|value| value + chrome);
+        let maximum = sizes
+            .iter()
+            .filter_map(|size| size.maximum)
+            .reduce(f32::min)
+            .map(|value| value + chrome);
         WorkspaceAxisSizing::new(minimum, preferred, maximum)
     }
 
@@ -142,15 +181,29 @@ impl<'a> WorkspaceSizingResolver<'a> {
             .unwrap_or_default()
     }
 
-    fn visible_layout(&self, node: &WorkspaceLayoutNode, axis: WorkspaceSplitAxis) -> Option<WorkspaceAxisSizing> {
+    fn visible_layout(
+        &self,
+        node: &WorkspaceLayoutNode,
+        axis: WorkspaceSplitAxis,
+    ) -> Option<WorkspaceAxisSizing> {
         match node {
             WorkspaceLayoutNode::Group(id) => {
                 let group = self.document.groups.get(id)?;
                 (!group.is_collapsed && !group.panels.is_empty()).then(|| self.group(id, axis))
             }
-            WorkspaceLayoutNode::Split { axis: split_axis, first, second, .. } => {
-                match (self.visible_layout(first, axis), self.visible_layout(second, axis)) {
-                    (Some(first), Some(second)) => Some(self.combine(first, second, *split_axis == axis, self.metrics.divider)),
+            WorkspaceLayoutNode::Split {
+                axis: split_axis,
+                first,
+                second,
+                ..
+            } => {
+                match (
+                    self.visible_layout(first, axis),
+                    self.visible_layout(second, axis),
+                ) {
+                    (Some(first), Some(second)) => {
+                        Some(self.combine(first, second, *split_axis == axis, self.metrics.divider))
+                    }
                     (Some(value), None) | (None, Some(value)) => Some(value),
                     (None, None) => None,
                 }
@@ -158,16 +211,34 @@ impl<'a> WorkspaceSizingResolver<'a> {
         }
     }
 
-    pub fn layout(&self, node: &WorkspaceLayoutNode, axis: WorkspaceSplitAxis) -> WorkspaceAxisSizing {
+    pub fn layout(
+        &self,
+        node: &WorkspaceLayoutNode,
+        axis: WorkspaceSplitAxis,
+    ) -> WorkspaceAxisSizing {
         match node {
             WorkspaceLayoutNode::Group(id) => self.group(id, axis),
-            WorkspaceLayoutNode::Split { axis: split_axis, first, second, .. } => {
-                self.combine(self.layout(first, axis), self.layout(second, axis), *split_axis == axis, self.metrics.divider)
-            }
+            WorkspaceLayoutNode::Split {
+                axis: split_axis,
+                first,
+                second,
+                ..
+            } => self.combine(
+                self.layout(first, axis),
+                self.layout(second, axis),
+                *split_axis == axis,
+                self.metrics.divider,
+            ),
         }
     }
 
-    pub fn combine(&self, first: WorkspaceAxisSizing, second: WorkspaceAxisSizing, stacked: bool, gap: f32) -> WorkspaceAxisSizing {
+    pub fn combine(
+        &self,
+        first: WorkspaceAxisSizing,
+        second: WorkspaceAxisSizing,
+        stacked: bool,
+        gap: f32,
+    ) -> WorkspaceAxisSizing {
         if stacked {
             WorkspaceAxisSizing::combine_stacked(first, second, gap)
         } else {
@@ -176,24 +247,35 @@ impl<'a> WorkspaceSizingResolver<'a> {
     }
 
     /// Clamp a proposed floating frame to the group's own size contract.
-    pub fn floating_frame(&self, proposed: WorkspaceRect, group_id: &WorkspaceTabGroupID, title_height: f32) -> WorkspaceRect {
+    pub fn floating_frame(
+        &self,
+        proposed: WorkspaceRect,
+        group_id: &WorkspaceTabGroupID,
+        title_height: f32,
+    ) -> WorkspaceRect {
         let width = self.group(group_id, WorkspaceSplitAxis::Horizontal);
         let height = self.group(group_id, WorkspaceSplitAxis::Vertical);
         let mut result = proposed;
-        result.width = width.minimum.max(
-            width.maximum.unwrap_or(f32::INFINITY).min(if proposed.width.is_finite() {
-                proposed.width
-            } else {
-                width.preferred.unwrap_or(520.0)
-            }),
-        );
+        result.width = width
+            .minimum
+            .max(
+                width
+                    .maximum
+                    .unwrap_or(f32::INFINITY)
+                    .min(if proposed.width.is_finite() {
+                        proposed.width
+                    } else {
+                        width.preferred.unwrap_or(520.0)
+                    }),
+            );
         let height_proposal = if proposed.height.is_finite() {
             proposed.height
         } else {
             height.preferred.unwrap_or(390.0) + title_height
         };
         result.height = (height.minimum + title_height).max(
-            (height.maximum.unwrap_or(f32::INFINITY - title_height) + title_height).min(height_proposal),
+            (height.maximum.unwrap_or(f32::INFINITY - title_height) + title_height)
+                .min(height_proposal),
         );
         result
     }
@@ -211,7 +293,13 @@ pub struct SplitConstraints {
 
 impl Default for SplitConstraints {
     fn default() -> Self {
-        Self { fraction: (0.0, 1.0), minimum_first: 0.0, minimum_second: 0.0, maximum_first: None, maximum_second: None }
+        Self {
+            fraction: (0.0, 1.0),
+            minimum_first: 0.0,
+            minimum_second: 0.0,
+            maximum_first: None,
+            maximum_second: None,
+        }
     }
 }
 
@@ -272,11 +360,19 @@ impl WorkspaceResolvedSplit {
         let range = constraints.range(available);
         let initial = match fraction {
             Some(value) => value,
-            None if available > 0.0 && first.preferred.is_some() => first.preferred.unwrap_or(0.0) / available,
-            None if available > 0.0 && second.preferred.is_some() => 1.0 - second.preferred.unwrap_or(0.0) / available,
+            None if available > 0.0 && first.preferred.is_some() => {
+                first.preferred.unwrap_or(0.0) / available
+            }
+            None if available > 0.0 && second.preferred.is_some() => {
+                1.0 - second.preferred.unwrap_or(0.0) / available
+            }
             None => fallback,
         };
-        let initial = if initial.is_finite() { initial } else { fallback };
+        let initial = if initial.is_finite() {
+            initial
+        } else {
+            fallback
+        };
         Self {
             fraction: range.0.max(range.1.min(initial)),
             range,
@@ -302,7 +398,12 @@ impl Default for WorkspaceRect {
 
 impl WorkspaceRect {
     pub fn new(x: f32, y: f32, width: f32, height: f32) -> Self {
-        Self { x, y, width: width.max(160.0), height: height.max(120.0) }
+        Self {
+            x,
+            y,
+            width: width.max(160.0),
+            height: height.max(120.0),
+        }
     }
 }
 
@@ -318,7 +419,12 @@ pub struct WorkspaceSplitFractions {
 }
 
 impl WorkspaceSplitFractions {
-    pub fn new(leading: Option<f32>, center_trailing: Option<f32>, top_bottom: Option<f32>, top: Option<f32>) -> Self {
+    pub fn new(
+        leading: Option<f32>,
+        center_trailing: Option<f32>,
+        top_bottom: Option<f32>,
+        top: Option<f32>,
+    ) -> Self {
         Self {
             leading: leading.map(Self::clamp),
             center_trailing: center_trailing.map(Self::clamp),
@@ -327,7 +433,11 @@ impl WorkspaceSplitFractions {
         }
     }
     pub fn clamp(value: f32) -> f32 {
-        if value.is_finite() { value.clamp(0.0, 1.0) } else { 0.5 }
+        if value.is_finite() {
+            value.clamp(0.0, 1.0)
+        } else {
+            0.5
+        }
     }
 }
 
@@ -346,5 +456,9 @@ pub(crate) fn deserialize_axis_sizing<'de, D: Deserializer<'de>>(
         maximum: Option<f32>,
     }
     let raw = Raw::deserialize(deserializer)?;
-    Ok(WorkspaceAxisSizing::new(raw.minimum, raw.preferred, raw.maximum))
+    Ok(WorkspaceAxisSizing::new(
+        raw.minimum,
+        raw.preferred,
+        raw.maximum,
+    ))
 }

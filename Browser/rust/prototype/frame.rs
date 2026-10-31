@@ -61,7 +61,14 @@ pub struct Frame {
 /// Clamps the requested viewport exactly like the Swift renderer.
 pub fn viewport_size(raw_width: f32, raw_height: f32) -> (f32, f32) {
     let clamp = |value: f32, minimum: f32, fallback: f32| {
-        if value.is_finite() { value.max(minimum).min(4096.0) } else { fallback }
+        if value.is_finite() {
+            value.max(minimum).min(4096.0)
+        } else {
+            fallback
+        }
     };
-    (clamp(raw_width, 280.0, 640.0), clamp(raw_height, 360.0, 460.0))
+    (
+        clamp(raw_width, 280.0, 640.0),
+        clamp(raw_height, 360.0, 460.0),
+    )
 }

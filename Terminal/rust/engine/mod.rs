@@ -14,7 +14,6 @@ use std::{cell::Cell, ptr, rc::Rc};
 
 pub mod ffi;
 pub mod frame;
-mod sized;
 mod frame_reader;
 mod hyperlink;
 mod images;
@@ -23,13 +22,17 @@ mod mouse;
 mod placeholder_diacritics;
 mod placeholders;
 mod selection;
+mod sized;
 
-pub use frame::{CellWidth, CursorShape, TerminalCell, TerminalCellAttributes, TerminalCursor, TerminalFrame, TerminalRGB};
 pub use frame::TerminalScrollPosition;
+pub use frame::{
+    CellWidth, CursorShape, TerminalCell, TerminalCellAttributes, TerminalCursor, TerminalFrame,
+    TerminalRGB,
+};
 pub use images::TerminalImagePlacement;
 pub use key_encoder::{KeyModifiers, TerminalKey};
 pub use mouse::{MouseAction, MouseButton, TerminalMouseEvent};
-pub use placeholders::{PlaceholderCell, PlaceholderRun, PLACEHOLDER_CODEPOINT};
+pub use placeholders::{PLACEHOLDER_CODEPOINT, PlaceholderCell, PlaceholderRun};
 pub use selection::{SelectionPhase, TerminalPointer};
 
 thread_local! {
@@ -94,7 +97,8 @@ impl TerminalEngine {
         // engine through the userdata pointer stored here.
         unsafe {
             let mut terminal: GhosttyTerminal = ptr::null_mut();
-            if ffi::ghostty_terminal_new(ptr::null(), &mut terminal, columns as u16, rows as u16) != ffi::GHOSTTY_SUCCESS
+            if ffi::ghostty_terminal_new(ptr::null(), &mut terminal, columns as u16, rows as u16)
+                != ffi::GHOSTTY_SUCCESS
             {
                 panic!("libghostty-vt: terminal allocation failed");
             }
@@ -183,7 +187,14 @@ impl TerminalEngine {
         // place; the output buffer is sized from the reported requirement.
         unsafe {
             let mut needed = 0usize;
-            ffi::ghostty_paste_encode(data.as_mut_ptr(), data.len(), bracketed, ptr::null_mut(), 0, &mut needed);
+            ffi::ghostty_paste_encode(
+                data.as_mut_ptr(),
+                data.len(),
+                bracketed,
+                ptr::null_mut(),
+                0,
+                &mut needed,
+            );
             if needed == 0 {
                 return Vec::new();
             }
@@ -210,7 +221,10 @@ impl TerminalEngine {
     pub fn scroll(&mut self, rows: i32) {
         let mut behavior = ffi::GhosttyTerminalScrollViewport {
             tag: ffi::GHOSTTY_SCROLL_VIEWPORT_DELTA,
-            value: ffi::GhosttyTerminalScrollViewportValue { delta: rows as i64, _padding: 0 },
+            value: ffi::GhosttyTerminalScrollViewportValue {
+                delta: rows as i64,
+                _padding: 0,
+            },
         };
         // SAFETY: the terminal is live and `behavior` is the documented struct.
         unsafe { ffi::ghostty_terminal_scroll_viewport(self.terminal, behavior) };
@@ -220,7 +234,10 @@ impl TerminalEngine {
     pub fn scroll_to_bottom(&mut self) {
         let behavior = ffi::GhosttyTerminalScrollViewport {
             tag: ffi::GHOSTTY_SCROLL_VIEWPORT_BOTTOM,
-            value: ffi::GhosttyTerminalScrollViewportValue { delta: 0, _padding: 0 },
+            value: ffi::GhosttyTerminalScrollViewportValue {
+                delta: 0,
+                _padding: 0,
+            },
         };
         // SAFETY: as above.
         unsafe { ffi::ghostty_terminal_scroll_viewport(self.terminal, behavior) };
@@ -229,7 +246,9 @@ impl TerminalEngine {
     /// Full-screen programs (vim, less, htop) run on the alternate screen, which
     /// has no scrollback; wheel input then belongs to the program.
     pub fn is_alternate_screen(&self) -> bool {
-        self.is_mode_set(1049, false) || self.is_mode_set(1047, false) || self.is_mode_set(47, false)
+        self.is_mode_set(1049, false)
+            || self.is_mode_set(1047, false)
+            || self.is_mode_set(47, false)
     }
 
     pub fn title(&self) -> String {
@@ -237,22 +256,44 @@ impl TerminalEngine {
         // SAFETY: the terminal is live and `value` is the documented type; the
         // borrowed bytes are copied before the next mutating call.
         unsafe {
-            if ffi::ghostty_terminal_get(self.terminal, ffi::DATA_TITLE, ptr::addr_of_mut!(value).cast())
-                != ffi::GHOSTTY_SUCCESS
+            if ffi::ghostty_terminal_get(
+                self.terminal,
+                ffi::DATA_TITLE,
+                ptr::addr_of_mut!(value).cast(),
+            ) != ffi::GHOSTTY_SUCCESS
             {
                 return String::new();
             }
-            value.to_utf8().map(|bytes| String::from_utf8_lossy(&bytes).into_owned()).unwrap_or_default()
+            value
+                .to_utf8()
+                .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
+                .unwrap_or_default()
         }
     }
 
     pub fn set_default_colors(&mut self, foreground: TerminalRGB, background: TerminalRGB) {
-        let fg = ffi::GhosttyColorRgb { r: foreground.r, g: foreground.g, b: foreground.b };
-        let bg = ffi::GhosttyColorRgb { r: background.r, g: background.g, b: background.b };
+        let fg = ffi::GhosttyColorRgb {
+            r: foreground.r,
+            g: foreground.g,
+            b: foreground.b,
+        };
+        let bg = ffi::GhosttyColorRgb {
+            r: background.r,
+            g: background.g,
+            b: background.b,
+        };
         // SAFETY: the terminal is live and both values are the documented type.
         unsafe {
-            ffi::ghostty_terminal_set(self.terminal, ffi::OPT_COLOR_FOREGROUND, ptr::addr_of!(fg).cast());
-            ffi::ghostty_terminal_set(self.terminal, ffi::OPT_COLOR_BACKGROUND, ptr::addr_of!(bg).cast());
+            ffi::ghostty_terminal_set(
+                self.terminal,
+                ffi::OPT_COLOR_FOREGROUND,
+                ptr::addr_of!(fg).cast(),
+            );
+            ffi::ghostty_terminal_set(
+                self.terminal,
+                ffi::OPT_COLOR_BACKGROUND,
+                ptr::addr_of!(bg).cast(),
+            );
         }
     }
 
@@ -297,13 +338,25 @@ impl TerminalEngine {
     }
 
     fn scroll_position(&self) -> TerminalScrollPosition {
-        let mut bar = ffi::GhosttyTerminalScrollbar { total: 0, offset: 0, len: 0 };
+        let mut bar = ffi::GhosttyTerminalScrollbar {
+            total: 0,
+            offset: 0,
+            len: 0,
+        };
         // SAFETY: the terminal is live and `bar` is the documented type.
         let result = unsafe {
-            ffi::ghostty_terminal_get(self.terminal, ffi::DATA_SCROLLBAR, ptr::addr_of_mut!(bar).cast())
+            ffi::ghostty_terminal_get(
+                self.terminal,
+                ffi::DATA_SCROLLBAR,
+                ptr::addr_of_mut!(bar).cast(),
+            )
         };
         if result != ffi::GHOSTTY_SUCCESS {
-            return TerminalScrollPosition { total: self.rows, offset: 0, visible: self.rows };
+            return TerminalScrollPosition {
+                total: self.rows,
+                offset: 0,
+                visible: self.rows,
+            };
         }
         TerminalScrollPosition {
             total: bar.total as usize,
@@ -315,10 +368,17 @@ impl TerminalEngine {
     // MARK: Private
 
     pub(crate) fn is_mode_set(&self, number: u16, ansi: bool) -> bool {
-        let mut config = ffi::GhosttyTerminalModeConfig { mode: ffi::ghostty_mode_new(number, ansi), value: false };
+        let mut config = ffi::GhosttyTerminalModeConfig {
+            mode: ffi::ghostty_mode_new(number, ansi),
+            value: false,
+        };
         // SAFETY: the terminal is live and `config` is the documented type.
         let result = unsafe {
-            ffi::ghostty_terminal_get(self.terminal, ffi::DATA_MODE, ptr::addr_of_mut!(config).cast())
+            ffi::ghostty_terminal_get(
+                self.terminal,
+                ffi::DATA_MODE,
+                ptr::addr_of_mut!(config).cast(),
+            )
         };
         result == ffi::GHOSTTY_SUCCESS && config.value
     }
@@ -342,7 +402,11 @@ impl TerminalEngine {
         let mut lines = lines;
         // SAFETY: the terminal is live and `lines` is a `size_t` as documented.
         unsafe {
-            ffi::ghostty_terminal_set(self.terminal, ffi::OPT_SCROLLBACK_MAX_LINES, ptr::addr_of!(lines).cast());
+            ffi::ghostty_terminal_set(
+                self.terminal,
+                ffi::OPT_SCROLLBACK_MAX_LINES,
+                ptr::addr_of!(lines).cast(),
+            );
         }
         let _ = &mut lines;
     }
@@ -351,7 +415,11 @@ impl TerminalEngine {
         let mut blink = blink;
         // SAFETY: the terminal is live and `blink` is a `bool` as documented.
         unsafe {
-            ffi::ghostty_terminal_set(self.terminal, ffi::OPT_DEFAULT_CURSOR_BLINK, ptr::addr_of!(blink).cast());
+            ffi::ghostty_terminal_set(
+                self.terminal,
+                ffi::OPT_DEFAULT_CURSOR_BLINK,
+                ptr::addr_of!(blink).cast(),
+            );
         }
         let _ = &mut blink;
     }
@@ -369,7 +437,11 @@ impl TerminalEngine {
                 ffi::OPT_WRITE_PTY,
                 reply as *const std::ffi::c_void,
             );
-            ffi::ghostty_terminal_set(self.terminal, ffi::OPT_BELL, bell as *const std::ffi::c_void);
+            ffi::ghostty_terminal_set(
+                self.terminal,
+                ffi::OPT_BELL,
+                bell as *const std::ffi::c_void,
+            );
             ffi::ghostty_terminal_set(
                 self.terminal,
                 ffi::OPT_TITLE_CHANGED,

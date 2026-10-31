@@ -5,21 +5,24 @@
 use std::collections::BTreeSet;
 use std::rc::Rc;
 
-use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
-use cove_core::{Binding, Color};
-use cove_platform::KeyEvent;
 use crate::animation::content::AnimatedVisibility;
 use crate::animation::transition::Transition;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{Button, ButtonIcon, ButtonIconSource, ButtonRole};
 use crate::primitives::overlays::roving_focus::{
-    roving_identity, RovingFocusHost, RovingItem, SelectionNavigation,
+    RovingFocusHost, RovingItem, SelectionNavigation, roving_identity,
 };
 use crate::primitives::text::Text;
-use crate::theme::styles::buttons::{ButtonStyle, ButtonStyleConfiguration, ButtonStyleViewExt};
 use crate::theme::SemanticFontRef;
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View, ViewExt};
+use crate::theme::styles::buttons::{ButtonStyle, ButtonStyleConfiguration, ButtonStyleViewExt};
+use crate::{
+    AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View, ViewExt,
+    impl_primitive_view,
+};
+use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
+use cove_core::{Binding, Color};
+use cove_platform::KeyEvent;
 
 /// One collapsible section.
 #[derive(Clone)]
@@ -32,7 +35,12 @@ pub struct AccordionItem<Id: PartialEq + Clone> {
 
 impl<Id: PartialEq + Clone> AccordionItem<Id> {
     pub fn new(id: Id, title: impl Into<String>, content: impl View + 'static) -> Self {
-        Self { id, title: title.into(), is_enabled: true, content: AnyView::new(content) }
+        Self {
+            id,
+            title: title.into(),
+            is_enabled: true,
+            content: AnyView::new(content),
+        }
     }
 
     pub fn enabled(mut self, is_enabled: bool) -> Self {
@@ -59,7 +67,13 @@ impl<Id: PartialEq + Clone + Ord + std::hash::Hash + Send + Sync + 'static> Acco
                 .all(|(other, candidate)| other == index || candidate.id != item.id)),
             "Accordion IDs must be unique"
         );
-        Self { items, expanded, allows_multiple: false, is_enabled: true, focused: cove_core::State::new(None) }
+        Self {
+            items,
+            expanded,
+            allows_multiple: false,
+            is_enabled: true,
+            focused: cove_core::State::new(None),
+        }
     }
 
     pub fn allows_multiple(mut self, allows_multiple: bool) -> Self {
@@ -75,7 +89,10 @@ impl<Id: PartialEq + Clone + Ord + std::hash::Hash + Send + Sync + 'static> Acco
     /// Toggle one section, respecting single-expansion mode.
     pub fn toggle(&self, id: &Id) {
         if !self.is_enabled
-            || !self.items.iter().any(|item| &item.id == id && item.is_enabled)
+            || !self
+                .items
+                .iter()
+                .any(|item| &item.id == id && item.is_enabled)
         {
             return;
         }
@@ -153,7 +170,10 @@ impl<Id: PartialEq + Clone + Ord + std::hash::Hash + Send + Sync + 'static> View
             let button = Button::with_options(
                 header,
                 move || {
-                    if !items_for_toggle.iter().any(|item| item.id == toggle_id && item.is_enabled) {
+                    if !items_for_toggle
+                        .iter()
+                        .any(|item| item.id == toggle_id && item.is_enabled)
+                    {
                         return;
                     }
                     let mut next = expanded_for_button.get();
@@ -182,16 +202,14 @@ impl<Id: PartialEq + Clone + Ord + std::hash::Hash + Send + Sync + 'static> View
                     .modifier(RovingItem::new(item_id_for_row, is_tab_stop, identity))
                     .modifier(ExpandedState { is_expanded }),
             )];
-            column.push(AnyView::new(
-                AnimatedVisibility::new(
-                    is_expanded,
-                    Transition::collapse(),
-                    None,
-                    false,
-                    None,
-                    AnyView::new(item.content.clone().padding(12.0)),
-                ),
-            ));
+            column.push(AnyView::new(AnimatedVisibility::new(
+                is_expanded,
+                Transition::collapse(),
+                None,
+                false,
+                None,
+                AnyView::new(item.content.clone().padding(12.0)),
+            )));
             if index + 1 < item_count {
                 column.push(AnyView::new(crate::primitives::text::Divider::new(
                     None,
@@ -199,29 +217,32 @@ impl<Id: PartialEq + Clone + Ord + std::hash::Hash + Send + Sync + 'static> View
                     crate::primitives::text::DividerAxis::Horizontal,
                 )));
             }
-            sections.push(AnyView::new(
-                BoxView::new(
-                    FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 0.0,
-                    AnyView::new(TupleView::new(column)),
-                ),
-            ));
+            sections.push(AnyView::new(BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
+                AnyView::new(TupleView::new(column)),
+            )));
         }
         let selection = self.focused.clone();
         let selection_for_host = selection.clone();
         let enabled_for_host = enabled.clone();
         let identity: Rc<dyn Fn(&Id) -> u64> = Rc::new(|id: &Id| roving_identity(id));
-        let command: Rc<dyn Fn(&KeyEvent) -> Option<SelectionNavigation>> = Rc::new(|event: &KeyEvent| {
-            if !event.modifiers.is_empty() {
-                return None;
-            }
-            match event.scancode {
-                crate::Scancode::ARROW_UP => Some(SelectionNavigation::Previous),
-                crate::Scancode::ARROW_DOWN => Some(SelectionNavigation::Next),
-                crate::Scancode::HOME => Some(SelectionNavigation::First),
-                crate::Scancode::END => Some(SelectionNavigation::Last),
-                _ => None,
-            }
-        });
+        let command: Rc<dyn Fn(&KeyEvent) -> Option<SelectionNavigation>> =
+            Rc::new(|event: &KeyEvent| {
+                if !event.modifiers.is_empty() {
+                    return None;
+                }
+                match event.scancode {
+                    crate::Scancode::ARROW_UP => Some(SelectionNavigation::Previous),
+                    crate::Scancode::ARROW_DOWN => Some(SelectionNavigation::Next),
+                    crate::Scancode::HOME => Some(SelectionNavigation::First),
+                    crate::Scancode::END => Some(SelectionNavigation::Last),
+                    _ => None,
+                }
+            });
         let host = RovingFocusHost::new(
             enabled,
             move || selection_for_host.get(),
@@ -231,12 +252,14 @@ impl<Id: PartialEq + Clone + Ord + std::hash::Hash + Send + Sync + 'static> View
                 }
             },
             move |id: &Id| identity(id),
-            AnyView::new(
-                BoxView::new(
-                    FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 0.0,
-                    AnyView::new(TupleView::new(sections)),
-                ),
-            ),
+            AnyView::new(BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
+                AnyView::new(TupleView::new(sections)),
+            )),
         )
         .command(move |event: &KeyEvent| command(event));
         AnyView::new(
@@ -262,7 +285,11 @@ impl ButtonStyle for AccordionHeaderStyle {
             Color::CLEAR
         };
         let row = BoxView::new(
-            FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 0.0,
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            0.0,
             AnyView::new(AnyView::new(configuration.label.clone()).flex_with(1.0, 1.0, None)),
         )
         .flex_with(1.0, 1.0, None)
@@ -273,7 +300,11 @@ impl ButtonStyle for AccordionHeaderStyle {
         })
         .background_color(fill)
         .border_color(
-            if configuration.is_focused { theme.colors.focus_ring } else { Color::CLEAR },
+            if configuration.is_focused {
+                theme.colors.focus_ring
+            } else {
+                Color::CLEAR
+            },
             2.0,
         )
         .opacity(if configuration.is_enabled { 1.0 } else { 0.55 });
@@ -288,9 +319,9 @@ struct ExpandedState {
 
 impl cove_composition::ViewModifier for ExpandedState {
     fn apply_node(&self, node: &Node) {
-        let mut semantics = node
-            .accessibility()
-            .unwrap_or_else(|| cove_core::scene::AccessibilitySemantics::new(AccessibilityRole::Button));
+        let mut semantics = node.accessibility().unwrap_or_else(|| {
+            cove_core::scene::AccessibilitySemantics::new(AccessibilityRole::Button)
+        });
         semantics.state.is_expanded = Some(self.is_expanded);
         node.set_accessibility(Some(semantics));
     }

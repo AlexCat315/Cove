@@ -11,12 +11,7 @@ use cove_text::{FontAtlas, FreeTypeColorGlyphFace};
 #[test]
 fn resample_averages_coverage_and_weights_color_by_alpha() {
     // 2x2: opaque red, transparent black, opaque red, transparent black -> 1x1.
-    let pixels: [u8; 16] = [
-        255, 0, 0, 255,
-        0, 0, 0, 0,
-        255, 0, 0, 255,
-        0, 0, 0, 0,
-    ];
+    let pixels: [u8; 16] = [255, 0, 0, 255, 0, 0, 0, 0, 255, 0, 0, 255, 0, 0, 0, 0];
     let result =
         FreeTypeColorGlyphFace::resample(&pixels, 2, 2, 1, 1).expect("a 2x2 RGBA source is valid");
     assert_eq!(
@@ -35,7 +30,9 @@ fn monochrome_face_has_no_color_source() {
         return;
     };
     atlas.load_font_path(std::path::Path::new(path), 16.0, 1.0);
-    let Some(face) = atlas.font_face() else { return };
+    let Some(face) = atlas.font_face() else {
+        return;
+    };
     assert!(
         !face.has_color_source(),
         "the host test font is monochrome, so it exposes no colour source"

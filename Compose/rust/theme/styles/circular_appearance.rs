@@ -44,7 +44,12 @@ pub struct CircularThemeHost<Value: Clone + PartialEq + 'static> {
 }
 impl<Value: Clone + PartialEq + 'static> CircularThemeHost<Value> {
     pub fn new(theme: Theme, value: Value, transition: ThemeTransition, content: AnyView) -> Self {
-        Self { theme, value, transition, content }
+        Self {
+            theme,
+            value,
+            transition,
+            content,
+        }
     }
 }
 
@@ -170,8 +175,12 @@ fn apply_progress(node: &Node, origin: Point, sequence: u64, progress: f32) {
         return;
     }
     let bounds = WindowRevealContext::bounds(node);
-    let dx = (origin.x - bounds.x).abs().max((origin.x - bounds.max_x()).abs());
-    let dy = (origin.y - bounds.y).abs().max((origin.y - bounds.max_y()).abs());
+    let dx = (origin.x - bounds.x)
+        .abs()
+        .max((origin.x - bounds.max_x()).abs());
+    let dy = (origin.y - bounds.y)
+        .abs()
+        .max((origin.y - bounds.max_y()).abs());
     let radius = (dx * dx + dy * dy).sqrt() * progress;
     node.request_reveal(Some(Reveal::new(sequence, origin.x, origin.y, radius, 1.0)));
 }

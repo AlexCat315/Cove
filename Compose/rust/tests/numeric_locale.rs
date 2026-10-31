@@ -64,16 +64,32 @@ fn values_that_round_to_zero_lose_their_sign() {
 #[test]
 fn non_finite_drafts_are_rejected() {
     let format = separated('.');
-    assert_eq!(format.parse("NaN"), None, "NaN is not a number the field accepts");
+    assert_eq!(
+        format.parse("NaN"),
+        None,
+        "NaN is not a number the field accepts"
+    );
     assert_eq!(format.parse("infinity"), None, "infinity is not accepted");
-    assert_eq!(format.parse("inf"), None, "the short infinity spelling is rejected");
-    assert_eq!(format.parse("1e999"), None, "overflowing exponents are rejected");
+    assert_eq!(
+        format.parse("inf"),
+        None,
+        "the short infinity spelling is rejected"
+    );
+    assert_eq!(
+        format.parse("1e999"),
+        None,
+        "overflowing exponents are rejected"
+    );
 }
 
 #[test]
 fn a_comma_locale_formats_and_parses_locally() {
     let comma = separated(',');
-    assert_eq!(comma.format(1234.5), "1234,5", "the decimal separator is a comma");
+    assert_eq!(
+        comma.format(1234.5),
+        "1234,5",
+        "the decimal separator is a comma"
+    );
     assert_eq!(
         comma.parse("12,5e2"),
         Some(1250.0),
@@ -107,14 +123,22 @@ fn grouping_separator_is_rejected_when_configured() {
         None,
         "a dot is grouping here, so it must not parse as a decimal"
     );
-    assert_eq!(format.parse("1234,5"), Some(1234.5), "plain decimals still parse");
+    assert_eq!(
+        format.parse("1234,5"),
+        Some(1234.5),
+        "plain decimals still parse"
+    );
 }
 
 #[test]
 fn rounding_is_half_even_at_the_requested_precision() {
     // 0.125 at 2 decimals: half-even rounds to 0.12 (the even neighbour).
     let format = separated('.');
-    assert_eq!(format.format(0.125), "0.12", "half-even rounds to the even digit");
+    assert_eq!(
+        format.format(0.125),
+        "0.12",
+        "half-even rounds to the even digit"
+    );
     assert_eq!(format.format(0.135), "0.14", "the other half rounds up");
     // Trailing fraction zeros are trimmed, matching minimumFractionDigits = 0.
     assert_eq!(format.format(2.5), "2.5", "trailing zeros are dropped");

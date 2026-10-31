@@ -71,9 +71,13 @@ impl DataTableColumnOrder {
 
     /// The presented column whose span contains the dragged column's centre.
     pub fn target(source: usize, offset: f32, geometry: &DataTableColumnGeometry) -> usize {
-        let Some(&width) = geometry.widths.get(source) else { return source };
+        let Some(&width) = geometry.widths.get(source) else {
+            return source;
+        };
         let starts = geometry.starts();
-        let Some(&start) = starts.get(source) else { return source };
+        let Some(&start) = starts.get(source) else {
+            return source;
+        };
         let centre = start + width / 2.0 + offset;
         starts
             .iter()

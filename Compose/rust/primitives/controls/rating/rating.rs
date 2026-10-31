@@ -6,17 +6,17 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::primitives::media::ui_icon_catalog;
+use crate::primitives::media::vector_image_raster::VectorImageRaster;
+use crate::theme::{ControlSize, ControlSizeEnvironment, SemanticColorRef, theme_for_node};
+use crate::{AnyView, PrimitiveView, View};
 use cove_core::scene::{
-    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, EventResult,
-    FocusChainHolder, InputHandlerRoute, InteractionRegistryHolder, LayoutNode, Node, NodeResource,
-    PointerCapture, PointerCaptureHolder, PointerPhase,
+    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, EventResult, FocusChainHolder,
+    InputHandlerRoute, InteractionRegistryHolder, LayoutNode, Node, NodeResource, PointerCapture,
+    PointerCaptureHolder, PointerPhase,
 };
 use cove_core::{Color, Point, Rect};
 use cove_platform::{MouseButton, SystemCursor};
-use crate::primitives::media::ui_icon_catalog;
-use crate::primitives::media::vector_image_raster::VectorImageRaster;
-use crate::theme::{theme_for_node, ControlSize, ControlSizeEnvironment, SemanticColorRef};
-use crate::{AnyView, PrimitiveView, View};
 
 use super::rating_geometry::RatingGeometry;
 
@@ -40,7 +40,9 @@ impl RatingPrecision {
     pub const TENTH: Self = Self { divisions: 10 };
 
     pub fn divisions(count: usize) -> Self {
-        Self { divisions: count.clamp(1, 20) }
+        Self {
+            divisions: count.clamp(1, 20),
+        }
     }
 
     pub fn increment(&self) -> f64 {
@@ -71,11 +73,17 @@ pub struct RatingSymbol {
 
 impl RatingSymbol {
     pub fn star() -> Self {
-        Self { filled: "star-fill", empty: "star" }
+        Self {
+            filled: "star-fill",
+            empty: "star",
+        }
     }
 
     pub fn heart() -> Self {
-        Self { filled: "heart-fill", empty: "heart" }
+        Self {
+            filled: "heart-fill",
+            empty: "heart",
+        }
     }
 }
 
@@ -117,12 +125,21 @@ impl RatingSelection {
     }
 
     pub fn clamped(&self, value: f64) -> f64 {
-        if value.is_finite() { value.clamp(0.0, self.maximum as f64) } else { 0.0 }
+        if value.is_finite() {
+            value.clamp(0.0, self.maximum as f64)
+        } else {
+            0.0
+        }
     }
 
     pub fn snapped(&self, value: f64) -> f64 {
-        let floor = if self.allows_clear { 0.0 } else { self.precision.increment() };
-        self.clamped(self.precision.snapped(self.clamped(value))).max(floor)
+        let floor = if self.allows_clear {
+            0.0
+        } else {
+            self.precision.increment()
+        };
+        self.clamped(self.precision.snapped(self.clamped(value)))
+            .max(floor)
     }
 }
 
@@ -159,7 +176,11 @@ impl RatingAppearance {
                 None
             };
         }
-        self.spacing = if self.spacing.is_finite() { self.spacing.clamp(0.0, 24.0) } else { 4.0 };
+        self.spacing = if self.spacing.is_finite() {
+            self.spacing.clamp(0.0, 24.0)
+        } else {
+            4.0
+        };
     }
 }
 
@@ -172,7 +193,11 @@ pub struct RatingPalette {
 }
 
 impl RatingPalette {
-    pub fn resolve(node: &Node, appearance: &RatingAppearance, selection: &RatingSelection) -> Self {
+    pub fn resolve(
+        node: &Node,
+        appearance: &RatingAppearance,
+        selection: &RatingSelection,
+    ) -> Self {
         let theme = theme_for_node(node);
         let alpha = if selection.is_enabled { 1.0 } else { 0.4 };
         Self {
@@ -219,7 +244,9 @@ impl RatingSession {
             return;
         }
         *self.preview.borrow_mut() = candidate;
-        node.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("ratingInteraction"));
+        node.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+            "ratingInteraction",
+        ));
     }
 
     pub fn begin(&self, candidate: f64, node: &Node) {
@@ -229,7 +256,9 @@ impl RatingSession {
         if let Some(capture) = self.capture.borrow().as_ref() {
             capture.acquire(node, true);
         }
-        node.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("ratingInteraction"));
+        node.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+            "ratingInteraction",
+        ));
     }
 
     pub fn cancel(&self, node: &Node) {
@@ -241,7 +270,9 @@ impl RatingSession {
         {
             capture.release();
         }
-        node.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("ratingInteraction"));
+        node.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+            "ratingInteraction",
+        ));
     }
 }
 
@@ -276,11 +307,7 @@ pub struct Rating {
 }
 
 impl Rating {
-    pub fn new(
-        label: impl Into<String>,
-        value: f64,
-        on_change: impl Fn(f64) + 'static,
-    ) -> Self {
+    pub fn new(label: impl Into<String>, value: f64, on_change: impl Fn(f64) + 'static) -> Self {
         let mut selection = RatingSelection::default();
         selection.validate();
         let mut appearance = RatingAppearance::default();
@@ -312,7 +339,9 @@ impl Rating {
 
 impl View for Rating {
     fn body(&self) -> AnyView {
-        AnyView::new(RatingBody { rating: self.snapshot() })
+        AnyView::new(RatingBody {
+            rating: self.snapshot(),
+        })
     }
 }
 
@@ -357,13 +386,8 @@ impl PrimitiveView for RatingBody {
     fn update_node(&self, node: &Node) {
         let rating = &self.rating;
         let density = node.composition_value(&ControlSizeEnvironment::key());
-        let geometry = RatingGeometry::new(
-            &rating.appearance,
-            &rating.selection,
-            density,
-            false,
-            0.0,
-        );
+        let geometry =
+            RatingGeometry::new(&rating.appearance, &rating.selection, density, false, 0.0);
         let session = rating.session.clone();
         *session.value.borrow_mut() = rating.selection.clamped(rating.value);
         *session.on_change.borrow_mut() = Some(rating.on_change.clone());
@@ -429,8 +453,12 @@ impl PrimitiveView for RatingBody {
                 }
             }));
             let current = configuration.value;
-            actions.increment = Some(Rc::new(move || increment(current + selection.precision.increment())));
-            actions.decrement = Some(Rc::new(move || decrement(current - selection.precision.increment())));
+            actions.increment = Some(Rc::new(move || {
+                increment(current + selection.precision.increment())
+            }));
+            actions.decrement = Some(Rc::new(move || {
+                decrement(current - selection.precision.increment())
+            }));
         }
         node.set_accessibility_actions(actions);
 
@@ -442,7 +470,9 @@ impl PrimitiveView for RatingBody {
         node.update_draw(
             (configuration, palette, appearance.symbol.clone()),
             move |list, origin| {
-                let Some(owner) = Node::upgrade(&weak) else { return };
+                let Some(owner) = Node::upgrade(&weak) else {
+                    return;
+                };
                 let value = session_for_draw
                     .preview
                     .borrow()
@@ -459,7 +489,9 @@ impl PrimitiveView for RatingBody {
             },
         );
 
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         if !rating.selection.is_interactive() {
             registry.remove(node);
             return;
@@ -488,13 +520,17 @@ fn make_writer(rating: &Rating, node: &Node) -> Rc<dyn Fn(f64)> {
     let session = rating.session.clone();
     let weak = node.downgrade();
     Rc::new(move |raw: f64| {
-        let Some(owner) = Node::upgrade(&weak) else { return };
+        let Some(owner) = Node::upgrade(&weak) else {
+            return;
+        };
         session.cancel(&owner);
         let next = selection.snapped(raw);
         if next != *session.value.borrow() {
             on_change(next);
         }
-        owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("ratingValue"));
+        owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+            "ratingValue",
+        ));
     })
 }
 
@@ -525,7 +561,10 @@ fn paint(
     let bounds = Rect::new(origin.x, origin.y, frame.width, frame.height);
     for index in 0..geometry.maximum {
         let rect = geometry.star_rect(index, origin, frame.height, right_to_left);
-        if let Some(asset) = outline.as_ref().map(|raster| raster.resolve(geometry.star_size, geometry.star_size)) {
+        if let Some(asset) = outline
+            .as_ref()
+            .map(|raster| raster.resolve(geometry.star_size, geometry.star_size))
+        {
             let _ = list.add_image_mask_quad(
                 rect,
                 asset.texture_id(),
@@ -589,112 +628,175 @@ fn install_input(
     // Hover previews the value the click would commit.
     let hover_session = session.clone();
     let hover_node = node.downgrade();
-    registry.set_hover(node, Rc::new(move |phase| {
-        let Some(owner) = Node::upgrade(&hover_node) else { return };
-        if phase == cove_core::scene::HoverPhase::Leave {
-            hover_session.hover(None, &owner);
-        }
-    }));
+    registry.set_hover(
+        node,
+        Rc::new(move |phase| {
+            let Some(owner) = Node::upgrade(&hover_node) else {
+                return;
+            };
+            if phase == cove_core::scene::HoverPhase::Leave {
+                hover_session.hover(None, &owner);
+            }
+        }),
+    );
 
     let motion_session = session.clone();
     let motion_node = node.downgrade();
     let motion_geometry = geometry;
     let motion_write = write.clone();
-    registry.set_motion(node, InputHandlerRoute::control(), Rc::new(move |event, phase| {
-        if phase != cove_core::scene::EventPhase::Target {
-            return EventResult::Ignored;
-        }
-        let Some(owner) = Node::upgrade(&motion_node) else { return EventResult::Ignored };
-        let pressed = motion_session.pressed_candidate.borrow().is_some();
-        let origin = owner.absolute_frame();
-        let inside = motion_geometry.contains(event.x, event.y, Point::new(origin.x, origin.y), owner.frame().size());
-        motion_session.hover(
-            inside.then(|| {
-                motion_geometry.candidate(
-                    event.x,
-                    origin.x,
-                    owner.resolves_right_to_left(),
-                    selection.precision,
-                )
-            }),
-            &owner,
-        );
-        let _ = &motion_write;
-        if pressed { EventResult::Handled } else { EventResult::Ignored }
-    }));
+    registry.set_motion(
+        node,
+        InputHandlerRoute::control(),
+        Rc::new(move |event, phase| {
+            if phase != cove_core::scene::EventPhase::Target {
+                return EventResult::Ignored;
+            }
+            let Some(owner) = Node::upgrade(&motion_node) else {
+                return EventResult::Ignored;
+            };
+            let pressed = motion_session.pressed_candidate.borrow().is_some();
+            let origin = owner.absolute_frame();
+            let inside = motion_geometry.contains(
+                event.x,
+                event.y,
+                Point::new(origin.x, origin.y),
+                owner.frame().size(),
+            );
+            motion_session.hover(
+                inside.then(|| {
+                    motion_geometry.candidate(
+                        event.x,
+                        origin.x,
+                        owner.resolves_right_to_left(),
+                        selection.precision,
+                    )
+                }),
+                &owner,
+            );
+            let _ = &motion_write;
+            if pressed {
+                EventResult::Handled
+            } else {
+                EventResult::Ignored
+            }
+        }),
+    );
 
     let pointer_session = session.clone();
     let pointer_node = node.downgrade();
     let pointer_geometry = geometry;
     let pointer_write = write.clone();
-    registry.set_pointer(node, InputHandlerRoute::control(), Rc::new(move |event, phase, event_phase| {
-        if event.button != MouseButton::Left || event_phase != cove_core::scene::EventPhase::Target {
-            return EventResult::Ignored;
-        }
-        let Some(owner) = Node::upgrade(&pointer_node) else { return EventResult::Ignored };
-        let origin = owner.absolute_frame();
-        let right_to_left = owner.resolves_right_to_left();
-        match phase {
-            PointerPhase::Down => {
-                if !pointer_geometry.contains(event.x, event.y, Point::new(origin.x, origin.y), owner.frame().size()) {
-                    return EventResult::Ignored;
-                }
-                pointer_session.begin(
-                    pointer_geometry.candidate(event.x, origin.x, right_to_left, selection.precision),
-                    &owner,
-                );
+    registry.set_pointer(
+        node,
+        InputHandlerRoute::control(),
+        Rc::new(move |event, phase, event_phase| {
+            if event.button != MouseButton::Left
+                || event_phase != cove_core::scene::EventPhase::Target
+            {
+                return EventResult::Ignored;
             }
-            PointerPhase::Up => {
-                if pointer_session.pressed_candidate.borrow().is_none() {
-                    return EventResult::Ignored;
+            let Some(owner) = Node::upgrade(&pointer_node) else {
+                return EventResult::Ignored;
+            };
+            let origin = owner.absolute_frame();
+            let right_to_left = owner.resolves_right_to_left();
+            match phase {
+                PointerPhase::Down => {
+                    if !pointer_geometry.contains(
+                        event.x,
+                        event.y,
+                        Point::new(origin.x, origin.y),
+                        owner.frame().size(),
+                    ) {
+                        return EventResult::Ignored;
+                    }
+                    pointer_session.begin(
+                        pointer_geometry.candidate(
+                            event.x,
+                            origin.x,
+                            right_to_left,
+                            selection.precision,
+                        ),
+                        &owner,
+                    );
                 }
-                let inside = pointer_geometry.contains(event.x, event.y, Point::new(origin.x, origin.y), owner.frame().size());
-                let candidate = pointer_geometry.candidate(event.x, origin.x, right_to_left, selection.precision);
-                // Clicking the current value clears, but only when the pointer
-                // never moved: a drag always commits.
-                let clears = selection.allows_clear
-                    && !*pointer_session.has_moved.borrow()
-                    && candidate == selection.clamped(*pointer_session.value.borrow());
-                pointer_session.cancel(&owner);
-                if inside {
-                    pointer_write(if clears { 0.0 } else { candidate });
+                PointerPhase::Up => {
+                    if pointer_session.pressed_candidate.borrow().is_none() {
+                        return EventResult::Ignored;
+                    }
+                    let inside = pointer_geometry.contains(
+                        event.x,
+                        event.y,
+                        Point::new(origin.x, origin.y),
+                        owner.frame().size(),
+                    );
+                    let candidate = pointer_geometry.candidate(
+                        event.x,
+                        origin.x,
+                        right_to_left,
+                        selection.precision,
+                    );
+                    // Clicking the current value clears, but only when the pointer
+                    // never moved: a drag always commits.
+                    let clears = selection.allows_clear
+                        && !*pointer_session.has_moved.borrow()
+                        && candidate == selection.clamped(*pointer_session.value.borrow());
+                    pointer_session.cancel(&owner);
+                    if inside {
+                        pointer_write(if clears { 0.0 } else { candidate });
+                    }
                 }
             }
-        }
-        EventResult::Handled
-    }));
+            EventResult::Handled
+        }),
+    );
 
     let key_session = session.clone();
     let key_node = node.downgrade();
     let key_write = write;
-    registry.set_key(node, InputHandlerRoute::control(), Rc::new(move |event, phase| {
-        if phase != cove_core::scene::EventPhase::Target {
-            return EventResult::Ignored;
-        }
-        if event.modifiers.has_ctrl() || event.modifiers.has_gui() || event.modifiers.has_alt() {
-            return EventResult::Ignored;
-        }
-        let Some(owner) = Node::upgrade(&key_node) else { return EventResult::Ignored };
-        let current = selection.clamped(*key_session.value.borrow());
-        let right_to_left = owner.resolves_right_to_left();
-        // Shift moves a whole symbol, so fine precision stays quick to traverse.
-        let step = if event.modifiers.has_shift() { 1.0 } else { selection.precision.increment() };
-        match event.scancode {
-            crate::Scancode::ARROW_LEFT => key_write(current + if right_to_left { step } else { -step }),
-            crate::Scancode::ARROW_RIGHT => key_write(current + if right_to_left { -step } else { step }),
-            crate::Scancode::ARROW_DOWN => key_write(current - step),
-            crate::Scancode::ARROW_UP => key_write(current + step),
-            crate::Scancode::HOME => key_write(0.0),
-            crate::Scancode::END => key_write(selection.maximum as f64),
-            crate::Scancode::BACKSPACE | crate::Scancode::DELETE => {
-                if !selection.allows_clear {
-                    return EventResult::Ignored;
-                }
-                key_write(0.0)
+    registry.set_key(
+        node,
+        InputHandlerRoute::control(),
+        Rc::new(move |event, phase| {
+            if phase != cove_core::scene::EventPhase::Target {
+                return EventResult::Ignored;
             }
-            crate::Scancode::ESCAPE => key_session.cancel(&owner),
-            _ => return EventResult::Ignored,
-        }
-        EventResult::Handled
-    }));
+            if event.modifiers.has_ctrl() || event.modifiers.has_gui() || event.modifiers.has_alt()
+            {
+                return EventResult::Ignored;
+            }
+            let Some(owner) = Node::upgrade(&key_node) else {
+                return EventResult::Ignored;
+            };
+            let current = selection.clamped(*key_session.value.borrow());
+            let right_to_left = owner.resolves_right_to_left();
+            // Shift moves a whole symbol, so fine precision stays quick to traverse.
+            let step = if event.modifiers.has_shift() {
+                1.0
+            } else {
+                selection.precision.increment()
+            };
+            match event.scancode {
+                crate::Scancode::ARROW_LEFT => {
+                    key_write(current + if right_to_left { step } else { -step })
+                }
+                crate::Scancode::ARROW_RIGHT => {
+                    key_write(current + if right_to_left { -step } else { step })
+                }
+                crate::Scancode::ARROW_DOWN => key_write(current - step),
+                crate::Scancode::ARROW_UP => key_write(current + step),
+                crate::Scancode::HOME => key_write(0.0),
+                crate::Scancode::END => key_write(selection.maximum as f64),
+                crate::Scancode::BACKSPACE | crate::Scancode::DELETE => {
+                    if !selection.allows_clear {
+                        return EventResult::Ignored;
+                    }
+                    key_write(0.0)
+                }
+                crate::Scancode::ESCAPE => key_session.cancel(&owner),
+                _ => return EventResult::Ignored,
+            }
+            EventResult::Handled
+        }),
+    );
 }

@@ -1,5 +1,5 @@
 //! Translation of CoveUIScene/Input/HitTester.swift.
-use crate::scene::{placement_step, Node};
+use crate::scene::{Node, placement_step};
 use crate::{Point, Rect};
 
 /// Result of a hit test — the deepest hit-testable node containing the point,
@@ -46,14 +46,22 @@ fn walk(node: &Node, point_in_parent: Point, path: &mut Vec<Node>) -> Option<Hit
     path.push(node.clone());
     let content = placement_step(frame, node.transform(), node.content_offset());
     let child_point = content.source(point_in_parent);
-    let children = if node.children_may_need_z_sort() { node.render_ordered_children() } else { node.children() };
+    let children = if node.children_may_need_z_sort() {
+        node.render_ordered_children()
+    } else {
+        node.children()
+    };
     for child in children.iter().rev() {
         if let Some(hit) = walk(child, child_point, path) {
             return Some(hit);
         }
     }
     if node.is_hit_testable() && local_bounds.contains(local) {
-        return Some(HitResult { node: node.clone(), path: path.clone(), local_point: local });
+        return Some(HitResult {
+            node: node.clone(),
+            path: path.clone(),
+            local_point: local,
+        });
     }
     path.pop();
     None
@@ -95,9 +103,19 @@ mod tests {
         child.set_frame(Rect::new(-50.0, 0.0, 200.0, 40.0));
         left.add_child(&child);
         // Outside the clipping parent: the whole subtree is rejected.
-        assert!(HitTester::hit_test(&root, Point { x: 150.0, y: 10.0 }).unwrap().node != child);
+        assert!(
+            HitTester::hit_test(&root, Point { x: 150.0, y: 10.0 })
+                .unwrap()
+                .node
+                != child
+        );
         // Inside: the overflowing child still answers inside the clip.
-        assert_eq!(HitTester::hit_test(&root, Point { x: 50.0, y: 10.0 }).unwrap().node, child);
+        assert_eq!(
+            HitTester::hit_test(&root, Point { x: 50.0, y: 10.0 })
+                .unwrap()
+                .node,
+            child
+        );
 
         left.set_transform(crate::scene::NodeTransform::anchored(2.0, 0.0, 0.0));
         let hit = HitTester::hit_test(&root, Point { x: 50.0, y: 10.0 }).unwrap();

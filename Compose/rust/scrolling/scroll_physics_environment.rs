@@ -1,7 +1,7 @@
 //! CompositionLocal carrying the overscroll physics policy.
-use std::rc::Rc;
-use cove_core::scene::{CompositionLocal, Node, ScrollPhysics};
 use crate::{ModifiedContent, ProvideCompositionLocalModifier, View, ViewExt};
+use cove_core::scene::{CompositionLocal, Node, ScrollPhysics};
+use std::rc::Rc;
 
 pub struct ScrollPhysicsEnvironment;
 impl ScrollPhysicsEnvironment {
@@ -15,7 +15,10 @@ impl ScrollPhysicsEnvironment {
 
 pub trait ScrollPhysicsExt: View + Sized + 'static {
     fn scroll_physics(self, physics: ScrollPhysics) -> ModifiedContent {
-        self.modifier(ProvideCompositionLocalModifier::new(ScrollPhysicsEnvironment::key(), physics))
+        self.modifier(ProvideCompositionLocalModifier::new(
+            ScrollPhysicsEnvironment::key(),
+            physics,
+        ))
     }
 }
 impl<T: View + Sized + 'static> ScrollPhysicsExt for T {}

@@ -2,8 +2,8 @@
 
 use super::scene::AndroidContentSession;
 use cove_composition::LayoutDebugAttachmentKey;
-use cove_core::scene::AccessibilityTree;
 use cove_core::Rect;
+use cove_core::scene::AccessibilityTree;
 use std::collections::HashMap;
 
 #[derive(Clone, Default)]
@@ -20,8 +20,7 @@ impl AndroidContentSession {
         if let Some(root) = tree.root() {
             let mut stack = vec![root];
             while let Some(node) = stack.pop() {
-                if let Some(name) =
-                    node.attachment::<String>(LayoutDebugAttachmentKey::DEBUG_NAME)
+                if let Some(name) = node.attachment::<String>(LayoutDebugAttachmentKey::DEBUG_NAME)
                 {
                     controls.insert(name, node.absolute_frame());
                 }
@@ -32,6 +31,9 @@ impl AndroidContentSession {
             .root()
             .map(|root| AccessibilityTree::snapshot(&root))
             .unwrap_or_default();
-        Inspection { controls, semantics }
+        Inspection {
+            controls,
+            semantics,
+        }
     }
 }

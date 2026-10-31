@@ -36,15 +36,21 @@ fn runtime(configure: impl FnOnce(&mut LoggingConfiguration)) -> Arc<LogRuntime>
 }
 
 fn messages(snapshot: &LogSnapshot) -> Vec<&str> {
-    snapshot.records.iter().map(|record| record.message.as_str()).collect()
+    snapshot
+        .records
+        .iter()
+        .map(|record| record.message.as_str())
+        .collect()
 }
 
 #[test]
 fn standard_logger_preserves_value_semantics_and_dynamic_module_filters() {
     let runtime = runtime(|configuration| {
         configuration.filtering.minimum = Level::Warning;
-        configuration.filtering.modules =
-            BTreeMap::from([("com.test".into(), Level::Debug), ("com.test.noisy".into(), Level::Error)]);
+        configuration.filtering.modules = BTreeMap::from([
+            ("com.test".into(), Level::Debug),
+            ("com.test.noisy".into(), Level::Error),
+        ]);
     });
 
     let mut first = runtime.logger("com.test.application");
@@ -71,7 +77,10 @@ fn standard_logger_preserves_value_semantics_and_dynamic_module_filters() {
         minimum: Level::Trace,
         ..LogQuery::default()
     });
-    assert_eq!(messages(&snapshot), vec!["local override", "module default"]);
+    assert_eq!(
+        messages(&snapshot),
+        vec!["local override", "module default"]
+    );
     assert_eq!(
         snapshot.records[0].metadata.get("owner"),
         Some(&LogValue::from("second"))
@@ -99,32 +108,45 @@ fn context_metadata_and_recursive_redaction_preserve_structure() {
         ("trace_id".into(), LogValue::from("trace-1")),
         ("precedence".into(), LogValue::from("context")),
     ]);
-    LogContext::with_values(context, || logger.log(
-        &LogEvent::new(Level::Info, "message").with_metadata(BTreeMap::from([
-            ("precedence".into(), LogValue::from("event")),
-            (
-                "nested".into(),
-                LogValue::Object(BTreeMap::from([
-                    ("TOKEN".into(), LogValue::from("sensitive")),
-                    (
-                        "safe".into(),
-                        LogValue::Array(vec![LogValue::from("a"), LogValue::from("b")]),
-                    ),
-                ])),
-            ),
-        ])),
-    ));
+    LogContext::with_values(context, || {
+        logger.log(
+            &LogEvent::new(Level::Info, "message").with_metadata(BTreeMap::from([
+                ("precedence".into(), LogValue::from("event")),
+                (
+                    "nested".into(),
+                    LogValue::Object(BTreeMap::from([
+                        ("TOKEN".into(), LogValue::from("sensitive")),
+                        (
+                            "safe".into(),
+                            LogValue::Array(vec![LogValue::from("a"), LogValue::from("b")]),
+                        ),
+                    ])),
+                ),
+            ])),
+        )
+    });
 
     runtime.flush();
     let snapshot = runtime.snapshot(&LogQuery::default());
     let record = snapshot.records.first().expect("one record");
     // The provider supplies the trace id and wins over the ambient context.
-    assert_eq!(record.metadata.get("trace_id"), Some(&LogValue::from("provider-trace")));
-    assert_eq!(record.metadata.get("provided"), Some(&LogValue::from("dynamic")));
+    assert_eq!(
+        record.metadata.get("trace_id"),
+        Some(&LogValue::from("provider-trace"))
+    );
+    assert_eq!(
+        record.metadata.get("provided"),
+        Some(&LogValue::from("dynamic"))
+    );
     // Event metadata has the highest precedence.
-    assert_eq!(record.metadata.get("precedence"), Some(&LogValue::from("event")));
+    assert_eq!(
+        record.metadata.get("precedence"),
+        Some(&LogValue::from("event"))
+    );
     let nested = record.metadata.get("nested").expect("nested metadata");
-    let LogValue::Object(nested) = nested else { panic!("nested stays an object") };
+    let LogValue::Object(nested) = nested else {
+        panic!("nested stays an object")
+    };
     assert_eq!(nested.get("TOKEN"), Some(&LogValue::from("[redacted]")));
     assert!(matches!(nested.get("safe"), Some(LogValue::Array(items)) if items.len() == 2));
 
@@ -147,7 +169,9 @@ fn concurrent_writers_have_ordered_sequences_and_observer_can_log_again() {
             let runtime = runtime.clone();
             move |record: &cove_logging::LogRecord| {
                 if record.message == "nested" {
-                    runtime.logger("observer").log(&LogEvent::new(Level::Info, "reentrant"));
+                    runtime
+                        .logger("observer")
+                        .log(&LogEvent::new(Level::Info, "reentrant"));
                 }
             }
         }),
@@ -166,18 +190,30 @@ fn concurrent_writers_have_ordered_sequences_and_observer_can_log_again() {
     for handle in handles {
         handle.join().expect("worker thread");
     }
-    runtime.logger("test").log(&LogEvent::new(Level::Info, "nested"));
+    runtime
+        .logger("test")
+        .log(&LogEvent::new(Level::Info, "nested"));
     runtime.flush();
     observation.cancel();
     runtime.flush();
 
     let snapshot = runtime.snapshot(&LogQuery::default());
     assert_eq!(snapshot.records.len(), 802);
-    let sequences: Vec<u64> = snapshot.records.iter().map(|record| record.sequence).collect();
+    let sequences: Vec<u64> = snapshot
+        .records
+        .iter()
+        .map(|record| record.sequence)
+        .collect();
     let mut sorted = sequences.clone();
     sorted.sort_unstable();
     assert_eq!(sequences, sorted, "sequences are ordered");
-    assert_eq!(snapshot.records.last().map(|record| record.message.as_str()), Some("reentrant"));
+    assert_eq!(
+        snapshot
+            .records
+            .last()
+            .map(|record| record.message.as_str()),
+        Some("reentrant")
+    );
     assert_eq!(runtime.status().dropped, 0);
 }
 
@@ -228,8 +264,10 @@ fn record_bounds_and_history_queries_are_explicit() {
     logger.log(&LogEvent::new(Level::Info, "old"));
     logger.log(&LogEvent::new(Level::Warning, "match"));
     logger.log(
-        &LogEvent::new(Level::Error, "你好".repeat(1000))
-            .with_metadata(BTreeMap::from([("long".into(), LogValue::from("x".repeat(1000)))])),
+        &LogEvent::new(Level::Error, "你好".repeat(1000)).with_metadata(BTreeMap::from([(
+            "long".into(),
+            LogValue::from("x".repeat(1000)),
+        )])),
     );
     runtime.flush();
 
@@ -249,10 +287,18 @@ fn record_bounds_and_history_queries_are_explicit() {
 #[test]
 fn process_installation_is_idempotent_and_native_records_join_the_pipeline() {
     let configuration = LoggingConfiguration {
-        storage: cove_logging::Storage { enabled: false, ..Default::default() },
-        console: cove_logging::Console { enabled: false, ..Default::default() },
+        storage: cove_logging::Storage {
+            enabled: false,
+            ..Default::default()
+        },
+        console: cove_logging::Console {
+            enabled: false,
+            ..Default::default()
+        },
         ..Default::default()
     };
-    assert!(LogSystem::bootstrap(Some("test"), configuration.clone(), None).expect("first bootstrap"));
+    assert!(
+        LogSystem::bootstrap(Some("test"), configuration.clone(), None).expect("first bootstrap")
+    );
     assert!(!LogSystem::bootstrap(Some("test"), configuration, None).expect("second bootstrap"));
 }

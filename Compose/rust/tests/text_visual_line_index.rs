@@ -37,7 +37,11 @@ fn wrapping_and_splicing_preserve_positions_and_snapshots() {
             expected[line] = count;
         }
 
-        assert_eq!(old.row_count(), old_total, "a snapshot keeps its own row total");
+        assert_eq!(
+            old.row_count(),
+            old_total,
+            "a snapshot keeps its own row total"
+        );
         assert_eq!(index.line_count(), expected.len());
         assert_eq!(index.row_count(), expected.iter().sum::<usize>());
         assert!(index.height() < 32, "the run tree stays balanced");

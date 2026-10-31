@@ -5,8 +5,8 @@
 //! overwrite results for a later query.
 
 use cove_ui_compose::primitives::controls::fields::{
-    results_presentation, too_short_prompt, ComboboxResultsPresentation, ComboboxSearchPhase,
-    ComboboxSearchSession,
+    ComboboxResultsPresentation, ComboboxSearchPhase, ComboboxSearchSession, results_presentation,
+    too_short_prompt,
 };
 
 fn options(values: &[&str]) -> Vec<String> {
@@ -16,7 +16,11 @@ fn options(values: &[&str]) -> Vec<String> {
 #[test]
 fn a_query_shorter_than_the_minimum_publishes_too_short_without_requesting() {
     let mut session = ComboboxSearchSession::new();
-    assert_eq!(session.begin("ab", 3, false), None, "no request id is issued");
+    assert_eq!(
+        session.begin("ab", 3, false),
+        None,
+        "no request id is issued"
+    );
     assert_eq!(session.phase(), &ComboboxSearchPhase::TooShort(3));
     assert!(session.results().is_empty());
 }
@@ -53,7 +57,10 @@ fn a_failed_query_may_be_retried_without_forcing() {
     let generation = session.begin("frame", 0, false).unwrap();
     session.fail(generation, "offline");
     assert!(session.phase().is_failure());
-    assert!(session.begin("frame", 0, false).is_some(), "a failure may retry");
+    assert!(
+        session.begin("frame", 0, false).is_some(),
+        "a failure may retry"
+    );
 }
 
 #[test]
@@ -61,7 +68,10 @@ fn forcing_always_reissues_the_request() {
     let mut session = ComboboxSearchSession::new();
     let generation = session.begin("frame", 0, false).unwrap();
     session.deliver(generation, options(&["a"]));
-    assert!(session.begin("frame", 0, true).is_some(), "force bypasses the repeat guard");
+    assert!(
+        session.begin("frame", 0, true).is_some(),
+        "force bypasses the repeat guard"
+    );
 }
 
 #[test]
@@ -119,7 +129,10 @@ fn cancelling_invalidates_an_in_flight_response() {
     let mut session = ComboboxSearchSession::new();
     let generation = session.begin("frame", 0, false).unwrap();
     session.cancel();
-    assert!(!session.deliver(generation, options(&["late"])), "cancelled delivery is rejected");
+    assert!(
+        !session.deliver(generation, options(&["late"])),
+        "cancelled delivery is rejected"
+    );
     assert!(session.results().is_empty());
 }
 

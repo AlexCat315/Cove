@@ -1,11 +1,11 @@
 //! Triggered and repeating keyframe tracks translated from Animation/Keyframes/Track.swift.
+use crate::{AnyView, DynamicField, PrimitiveView, View, ViewKind};
+use cove_core::State;
 use cove_core::scene::{
     ActiveAnimationContext, Align, Animation, AnimationController, AnimationCurve,
     AnimatorScheduler, AnyAnimationController, FlexDirection, Interpolatable, KeyframeTimeline,
     LayoutNode, Node, NodeResource,
 };
-use cove_core::State;
-use crate::{AnyView, DynamicField, PrimitiveView, View, ViewKind};
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
@@ -91,7 +91,9 @@ where
         node
     }
 
-    fn make_layout_node(&self) -> Option<LayoutNode> { Some(LayoutNode::new()) }
+    fn make_layout_node(&self) -> Option<LayoutNode> {
+        Some(LayoutNode::new())
+    }
 
     fn update_layout(&self, layout: &LayoutNode) {
         layout.set_flex_direction(FlexDirection::Column);
@@ -99,7 +101,9 @@ where
     }
 
     fn update_node(&self, node: &Node) {
-        let Some(session) = node.first_resource::<TrackSession<Trigger>>() else { return };
+        let Some(session) = node.first_resource::<TrackSession<Trigger>>() else {
+            return;
+        };
         let timeline = self.timeline.clone();
         let publish = self.publish.clone();
         session.update(
@@ -111,7 +115,9 @@ where
         );
     }
 
-    fn children(&self, _node: &Node) -> Vec<AnyView> { vec![self.content.clone()] }
+    fn children(&self, _node: &Node) -> Vec<AnyView> {
+        vec![self.content.clone()]
+    }
 }
 
 impl<Value, Trigger> View for TrackHost<Value, Trigger>
@@ -119,7 +125,9 @@ where
     Value: Interpolatable + Send,
     Trigger: Clone + Eq + 'static,
 {
-    fn kind(&self) -> ViewKind<'_> { ViewKind::Primitive(self) }
+    fn kind(&self) -> ViewKind<'_> {
+        ViewKind::Primitive(self)
+    }
 }
 
 struct TrackSession<Trigger> {
@@ -170,7 +178,11 @@ impl<Trigger: Clone + Eq + 'static> TrackSession<Trigger> {
         *self.publish.borrow_mut() = publish;
         let mounted = self.trigger.borrow().is_some();
         let triggered = mounted && self.trigger.borrow().as_ref() != Some(&trigger);
-        let was_playing = self.controller.borrow().as_ref().is_some_and(|controller| !controller.is_finished());
+        let was_playing = self
+            .controller
+            .borrow()
+            .as_ref()
+            .is_some_and(|controller| !controller.is_finished());
         let was_repeating = *self.repeating.borrow();
         let duration_changed = *self.duration.borrow() != duration;
         let changed = triggered
@@ -178,7 +190,9 @@ impl<Trigger: Clone + Eq + 'static> TrackSession<Trigger> {
             || was_repeating != repeating
             || *self.reduced_motion.borrow() != reduced_motion
             || duration_changed;
-        if !changed { return; }
+        if !changed {
+            return;
+        }
 
         *self.trigger.borrow_mut() = Some(trigger);
         *self.repeating.borrow_mut() = repeating;
@@ -192,22 +206,33 @@ impl<Trigger: Clone + Eq + 'static> TrackSession<Trigger> {
         self.stop();
 
         if reduced_motion {
-            if repeating { self.publish_time(0.0); }
-            else if triggered || was_playing { self.publish_time(duration); }
+            if repeating {
+                self.publish_time(0.0);
+            } else if triggered || was_playing {
+                self.publish_time(duration);
+            }
             return;
         }
 
         if !triggered && !repeating && !(duration_changed && was_playing) {
-            if was_repeating { self.publish_time(duration); }
+            if was_repeating {
+                self.publish_time(duration);
+            }
             return;
         }
 
         self.publish_time(0.0);
         let animation = Animation::new(duration, AnimationCurve::Linear);
-        let animation = if repeating { animation.repeat_forever(false) } else { animation };
+        let animation = if repeating {
+            animation.repeat_forever(false)
+        } else {
+            animation
+        };
         let weak: Weak<Self> = Rc::downgrade(self);
         let controller = AnimationController::new(0.0, duration, animation, 0.0, move |time| {
-            if let Some(session) = weak.upgrade() { session.publish_time(time); }
+            if let Some(session) = weak.upgrade() {
+                session.publish_time(time);
+            }
         });
         let context = ActiveAnimationContext::current();
         if let Some(completion) = context.completion {
@@ -232,5 +257,7 @@ impl<Trigger: Clone + Eq + 'static> NodeResource for TrackSession<Trigger> {
         self.scheduler.borrow_mut().take();
     }
 
-    fn as_any_rc(self: Rc<Self>) -> Rc<dyn std::any::Any> { self }
+    fn as_any_rc(self: Rc<Self>) -> Rc<dyn std::any::Any> {
+        self
+    }
 }

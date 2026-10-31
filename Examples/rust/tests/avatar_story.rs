@@ -29,8 +29,14 @@ fn changing_the_source_swaps_the_url() {
 
 #[test]
 fn an_unknown_source_id_falls_back_to_bundled() {
-    assert_eq!(AvatarImageSource::from_id("nonsense"), AvatarImageSource::Bundled);
-    assert_eq!(AvatarImageSource::from_id("missing"), AvatarImageSource::Missing);
+    assert_eq!(
+        AvatarImageSource::from_id("nonsense"),
+        AvatarImageSource::Bundled
+    );
+    assert_eq!(
+        AvatarImageSource::from_id("missing"),
+        AvatarImageSource::Missing
+    );
 }
 
 #[test]
@@ -39,7 +45,11 @@ fn the_group_starts_at_three_of_six() {
     let geometry = story.group_geometry(32.0);
     assert_eq!(geometry.visible_count, 3);
     assert!(geometry.has_overflow, "the remaining three need a marker");
-    assert_eq!(geometry.item_count(), 4, "three members plus the overflow marker");
+    assert_eq!(
+        geometry.item_count(),
+        4,
+        "three members plus the overflow marker"
+    );
 }
 
 #[test]
@@ -75,7 +85,11 @@ fn overlap_reduces_the_step_between_members() {
     let story = AvatarStory::new(GalleryOptions::default());
     // 0.3 overlap at a 32pt diameter means each member advances 22.4pt.
     let geometry = story.group_geometry(32.0);
-    assert!((geometry.step - 22.4).abs() < 0.001, "step was {}", geometry.step);
+    assert!(
+        (geometry.step - 22.4).abs() < 0.001,
+        "step was {}",
+        geometry.step
+    );
 }
 
 #[test]
@@ -90,7 +104,10 @@ fn every_status_is_rendered_in_declared_order() {
 fn the_initial_cases_include_unicode_and_an_empty_name() {
     assert!(INITIAL_CASES.contains(&"李 小龙"));
     assert!(INITIAL_CASES.contains(&"Émile Zola"));
-    assert!(INITIAL_CASES.contains(&""), "the empty name exercises the Anonymous fallback");
+    assert!(
+        INITIAL_CASES.contains(&""),
+        "the empty name exercises the Anonymous fallback"
+    );
 }
 
 #[test]

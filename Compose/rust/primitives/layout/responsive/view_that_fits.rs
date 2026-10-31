@@ -12,8 +12,8 @@
 //!   that fits; measurement uses an unspecified proposal so a parent width
 //!   cannot make a wrapping wide branch look like it fits.
 
-use cove_composition::{impl_primitive_view, AnyView, PrimitiveView, View, ViewExt};
 use cove_composition::adaptive::ContainerSizeReader;
+use cove_composition::{AnyView, PrimitiveView, View, ViewExt, impl_primitive_view};
 // Layout vocabulary is re-exported at the Compose crate root.
 use crate::{Layout, LayoutContainer, LayoutSubview, ProposedViewSize};
 use cove_core::scene::{Align, Display, FlexDirection, LayoutNode, Node, Wrap};
@@ -34,7 +34,11 @@ impl ViewThatFitsMode {
     /// Non-finite and negative thresholds collapse to zero, so a threshold mode
     /// always selects wide rather than misbehaving.
     pub fn threshold(value: f32) -> Self {
-        Self::Threshold(if value.is_finite() { value.max(0.0) } else { 0.0 })
+        Self::Threshold(if value.is_finite() {
+            value.max(0.0)
+        } else {
+            0.0
+        })
     }
 }
 
@@ -64,7 +68,11 @@ impl ViewThatFits {
         wide: impl View + 'static,
         compact: impl View + 'static,
     ) -> Self {
-        Self { mode, wide: AnyView::new(wide), compact: AnyView::new(compact) }
+        Self {
+            mode,
+            wide: AnyView::new(wide),
+            compact: AnyView::new(compact),
+        }
     }
 }
 
@@ -115,17 +123,28 @@ struct IntrinsicFittingLayout;
 impl IntrinsicFittingLayout {
     /// The chosen index and the size to report.
     fn selection(&self, proposal: ProposedViewSize, subviews: &[LayoutSubview]) -> (usize, Size) {
-        let Some(wide) = subviews.first() else { return (0, Size::default()) };
+        let Some(wide) = subviews.first() else {
+            return (0, Size::default());
+        };
         // An unspecified proposal measures the natural size; a parent width must
         // not make a wrapping wide branch look like it fits.
         let natural = wide.size_that_fits(ProposedViewSize::UNSPECIFIED);
-        let fits_width = proposal.width.is_none_or(|width| natural.width <= width + 0.5);
-        let fits_height = proposal.height.is_none_or(|height| natural.height <= height + 0.5);
+        let fits_width = proposal
+            .width
+            .is_none_or(|width| natural.width <= width + 0.5);
+        let fits_height = proposal
+            .height
+            .is_none_or(|height| natural.height <= height + 0.5);
         if fits_width && fits_height {
             (0, wide.size_that_fits(proposal))
         } else {
             let index = 1.min(subviews.len().saturating_sub(1));
-            (index, subviews.get(index).map_or(Size::default(), |sub| sub.size_that_fits(proposal)))
+            (
+                index,
+                subviews
+                    .get(index)
+                    .map_or(Size::default(), |sub| sub.size_that_fits(proposal)),
+            )
         }
     }
 }
@@ -135,15 +154,27 @@ impl Layout for IntrinsicFittingLayout {
         self.selection(proposal, subviews).1
     }
 
-    fn place_subviews(&self, bounds: Rect, _proposal: ProposedViewSize, subviews: &[LayoutSubview]) {
+    fn place_subviews(
+        &self,
+        bounds: Rect,
+        _proposal: ProposedViewSize,
+        subviews: &[LayoutSubview],
+    ) {
         let Some(wide) = subviews.first() else { return };
         let natural = wide.size_that_fits(ProposedViewSize::UNSPECIFIED);
         let fits = natural.width <= bounds.width + 0.5 && natural.height <= bounds.height + 0.5;
-        let chosen = if fits { 0 } else { 1.min(subviews.len().saturating_sub(1)) };
+        let chosen = if fits {
+            0
+        } else {
+            1.min(subviews.len().saturating_sub(1))
+        };
         let proposal = ProposedViewSize::new(Some(bounds.width), Some(bounds.height));
         for (index, subview) in subviews.iter().enumerate() {
             subview.place(
-                Point { x: bounds.x, y: bounds.y },
+                Point {
+                    x: bounds.x,
+                    y: bounds.y,
+                },
                 proposal,
                 index == chosen,
             );
@@ -196,7 +227,11 @@ impl PrimitiveView for RetainedBranch {
     fn update_layout(&self, layout: &LayoutNode) {
         layout.set_align_items(Align::Stretch);
         layout.set_flex_direction(FlexDirection::Column);
-        layout.set_display(if self.is_active { Display::Flex } else { Display::None });
+        layout.set_display(if self.is_active {
+            Display::Flex
+        } else {
+            Display::None
+        });
     }
 
     fn update_node(&self, node: &Node) {
@@ -209,12 +244,16 @@ impl PrimitiveView for RetainedBranch {
             // A hidden branch must not keep focus or pointer capture, or it
             // would swallow input while invisible.
             if let Some(chain) = cove_core::scene::FocusChainHolder::current()
-                && chain.focused().is_some_and(|focused| is_within(&focused, node))
+                && chain
+                    .focused()
+                    .is_some_and(|focused| is_within(&focused, node))
             {
                 chain.clear();
             }
             if let Some(capture) = cove_core::scene::PointerCaptureHolder::current()
-                && capture.target().is_some_and(|target| is_within(&target, node))
+                && capture
+                    .target()
+                    .is_some_and(|target| is_within(&target, node))
             {
                 capture.release();
             }

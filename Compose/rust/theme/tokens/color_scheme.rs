@@ -83,7 +83,8 @@ impl ColorScheme {
             background,
             surface,
             surface_variant,
-            surface_pressed: surface_pressed.unwrap_or_else(|| mix(surface_variant, on_surface, 0.12)),
+            surface_pressed: surface_pressed
+                .unwrap_or_else(|| mix(surface_variant, on_surface, 0.12)),
             surface_sunken,
             surface_raised,
             surface_floating,
@@ -117,7 +118,11 @@ impl ColorScheme {
 
 /// Straight-alpha linear interpolation, matching `Color.mixed(with:amount:)`.
 pub fn mix(from: Color, to: Color, amount: f32) -> Color {
-    let t = if amount.is_finite() { amount.clamp(0.0, 1.0) } else { 0.0 };
+    let t = if amount.is_finite() {
+        amount.clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
     Color {
         r: from.r + (to.r - from.r) * t,
         g: from.g + (to.g - from.g) * t,

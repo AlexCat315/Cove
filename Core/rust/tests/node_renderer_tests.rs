@@ -41,7 +41,11 @@ fn background_fills_emit_quads() {
 
     assert_eq!(list.vertices().len(), 8, "two filled quads");
     assert_eq!(list.indices().len(), 12);
-    assert_eq!(list.batches().len(), 1, "a shared texture id merges the draws");
+    assert_eq!(
+        list.batches().len(),
+        1,
+        "a shared texture id merges the draws"
+    );
     assert_eq!(list.batches()[0].texture_id, 0);
 }
 
@@ -52,7 +56,12 @@ fn backdrop_rides_on_the_fill() {
     let panel = framed(20.0, 20.0, 80.0, 40.0);
     panel.set_corner_radius(6.0);
     panel.set_backdrop_blur(12.0);
-    panel.set_background_color(Some(Color { r: 1.0, g: 1.0, b: 1.0, a: 0.84 }));
+    panel.set_background_color(Some(Color {
+        r: 1.0,
+        g: 1.0,
+        b: 1.0,
+        a: 0.84,
+    }));
     root.add_child(&panel);
 
     let mut list = DrawList::default();
@@ -61,7 +70,10 @@ fn backdrop_rides_on_the_fill() {
     // The panel cannot merge into the container behind it: the blur has to land
     // between the two, which only a batch boundary can express.
     assert_eq!(list.batches().len(), 2);
-    assert!(list.batches()[0].backdrop.is_none(), "the container keeps a plain batch");
+    assert!(
+        list.batches()[0].backdrop.is_none(),
+        "the container keeps a plain batch"
+    );
     // The backdrop covers the whole node, not just the fill, so the border ring
     // drawn over it stays crisp.
     assert_eq!(
@@ -79,12 +91,27 @@ fn backdrop_rides_on_the_fill() {
 fn frosted_border_stays_on_top() {
     for layered in [false, true] {
         let root = framed(0.0, 0.0, 120.0, 80.0);
-        root.set_background_color(Some(Color { r: 0.2, g: 0.2, b: 0.2, a: 1.0 }));
+        root.set_background_color(Some(Color {
+            r: 0.2,
+            g: 0.2,
+            b: 0.2,
+            a: 1.0,
+        }));
         let panel = framed(20.0, 20.0, 80.0, 40.0);
         panel.set_corner_radius(6.0);
         panel.set_backdrop_blur(12.0);
-        panel.set_background_color(Some(Color { r: 1.0, g: 1.0, b: 1.0, a: 0.5 }));
-        panel.set_border_color(Some(Color { r: 0.0, g: 0.0, b: 0.0, a: 0.1 }));
+        panel.set_background_color(Some(Color {
+            r: 1.0,
+            g: 1.0,
+            b: 1.0,
+            a: 0.5,
+        }));
+        panel.set_border_color(Some(Color {
+            r: 0.0,
+            g: 0.0,
+            b: 0.0,
+            a: 0.1,
+        }));
         panel.set_border_width(1.0);
         root.add_child(&panel);
 
@@ -104,7 +131,13 @@ fn frosted_border_stays_on_top() {
             .expect("a backdrop batch exists");
         // The ring's translucent black lands in the composited batch, so it is
         // painted over the frost rather than under it.
-        let ring_color = Color { r: 0.0, g: 0.0, b: 0.0, a: 0.1 }.rgba8();
+        let ring_color = Color {
+            r: 0.0,
+            g: 0.0,
+            b: 0.0,
+            a: 0.1,
+        }
+        .rgba8();
         let ring_vertices: Vec<usize> = list
             .vertices()
             .iter()
@@ -131,7 +164,10 @@ fn backdrop_without_fill_is_dropped() {
 
     let mut list = DrawList::default();
     NodeRenderer.render(&root, &mut list);
-    assert!(list.batches().is_empty(), "a backdrop with nothing to composite emits nothing");
+    assert!(
+        list.batches().is_empty(),
+        "a backdrop with nothing to composite emits nothing"
+    );
 }
 
 #[test]
@@ -144,7 +180,11 @@ fn child_frames_accumulate_origin() {
     let mut list = DrawList::default();
     NodeRenderer.render(&root, &mut list);
 
-    assert_eq!(list.vertices()[0].x, 15.0, "the child origin accumulates onto the parent's");
+    assert_eq!(
+        list.vertices()[0].x,
+        15.0,
+        "the child origin accumulates onto the parent's"
+    );
     assert_eq!(list.vertices()[0].y, 17.0);
 }
 
@@ -179,14 +219,23 @@ fn draw_callback_fires() {
     let mut list = DrawList::default();
     NodeRenderer.render(&root, &mut list);
 
-    assert_eq!(*observed.borrow(), Some(Point { x: 0.0, y: 0.0 }), "the callback sees the node origin");
+    assert_eq!(
+        *observed.borrow(),
+        Some(Point { x: 0.0, y: 0.0 }),
+        "the callback sees the node origin"
+    );
     assert_eq!(list.vertices().len(), 4, "the background still emits");
 }
 
 #[test]
 fn opacity_multiplies_alpha() {
     let root = framed(0.0, 0.0, 10.0, 10.0);
-    root.set_background_color(Some(Color { r: 1.0, g: 0.0, b: 0.0, a: 1.0 }));
+    root.set_background_color(Some(Color {
+        r: 1.0,
+        g: 0.0,
+        b: 0.0,
+        a: 1.0,
+    }));
     root.set_opacity(0.5);
 
     let mut list = DrawList::default();
@@ -216,7 +265,11 @@ fn content_offset_translates_children() {
         Some(Rect::new(0.0, 0.0, 100.0, 100.0)),
         "the clip stays at the root frame",
     );
-    assert_eq!(list.vertices()[0].y, -30.0, "the child is translated by the content offset");
+    assert_eq!(
+        list.vertices()[0].y,
+        -30.0,
+        "the child is translated by the content offset"
+    );
 }
 
 #[test]
@@ -230,7 +283,10 @@ fn corner_radius_emits_rounded_rect() {
 
     // A plain rect emits 4 vertices; a rounded rect decomposes into many more
     // (centre quad + edges + per-corner triangle fans).
-    assert!(list.vertices().len() > 4, "the rounded path emits extra geometry");
+    assert!(
+        list.vertices().len() > 4,
+        "the rounded path emits extra geometry"
+    );
     assert_eq!(list.batches().len(), 1);
     assert_eq!(list.batches()[0].texture_id, 0);
 }
@@ -243,5 +299,9 @@ fn corner_radius_zero_is_plain() {
 
     let mut list = DrawList::default();
     NodeRenderer.render(&root, &mut list);
-    assert_eq!(list.vertices().len(), 4, "a zero radius keeps the plain quad");
+    assert_eq!(
+        list.vertices().len(),
+        4,
+        "a zero radius keeps the plain quad"
+    );
 }

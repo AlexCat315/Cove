@@ -156,24 +156,13 @@ pub struct CommandListVtbl {
     pub GetDevice: usize,
     pub GetType: usize,
     pub Close: unsafe extern "system" fn(sys::ComPtr) -> sys::HRESULT,
-    pub Reset: unsafe extern "system" fn(
-        sys::ComPtr,
-        sys::ComPtr,
-        sys::ComPtr,
-    ) -> sys::HRESULT,
+    pub Reset: unsafe extern "system" fn(sys::ComPtr, sys::ComPtr, sys::ComPtr) -> sys::HRESULT,
     pub ClearState: usize,
     pub DrawInstanced: unsafe extern "system" fn(sys::ComPtr, u32, u32, u32, u32),
-    pub DrawIndexedInstanced:
-        unsafe extern "system" fn(sys::ComPtr, u32, u32, u32, i32, u32),
+    pub DrawIndexedInstanced: unsafe extern "system" fn(sys::ComPtr, u32, u32, u32, i32, u32),
     pub Dispatch: unsafe extern "system" fn(sys::ComPtr, u32, u32, u32),
-    pub CopyBufferRegion: unsafe extern "system" fn(
-        sys::ComPtr,
-        sys::ComPtr,
-        u64,
-        sys::ComPtr,
-        u64,
-        u64,
-    ),
+    pub CopyBufferRegion:
+        unsafe extern "system" fn(sys::ComPtr, sys::ComPtr, u64, sys::ComPtr, u64, u64),
     pub CopyTextureRegion: unsafe extern "system" fn(
         sys::ComPtr,
         *const sys::D3D12_TEXTURE_COPY_LOCATION,

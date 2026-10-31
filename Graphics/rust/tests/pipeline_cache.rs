@@ -17,10 +17,16 @@ use support::{RecordingBackend, make_device};
 fn graphics_descriptor(device: &Device) -> GraphicsPipelineDescriptor {
     let layout = support::empty_layout(device);
     let vertex = device
-        .make_shader_module(support::shader_descriptor(ShaderStage::Vertex, &[1, 2, 3, 4]))
+        .make_shader_module(support::shader_descriptor(
+            ShaderStage::Vertex,
+            &[1, 2, 3, 4],
+        ))
         .expect("vertex shader");
     let fragment = device
-        .make_shader_module(support::shader_descriptor(ShaderStage::Fragment, &[1, 2, 3, 4]))
+        .make_shader_module(support::shader_descriptor(
+            ShaderStage::Fragment,
+            &[1, 2, 3, 4],
+        ))
         .expect("fragment shader");
     let mut descriptor = GraphicsPipelineDescriptor::new(layout, vertex);
     descriptor.fragment = Some(fragment);
@@ -36,14 +42,22 @@ fn graphics_pipelines_intern_and_ref_count() {
     let device = make_device(&backend, 2);
     let descriptor = graphics_descriptor(&device);
 
-    let first = device.make_graphics_pipeline(descriptor.clone()).expect("first pipeline");
+    let first = device
+        .make_graphics_pipeline(descriptor.clone())
+        .expect("first pipeline");
     // The label is not part of the pipeline key.
     let mut relabeled = descriptor.clone();
     relabeled.label = Some("label does not affect state");
-    let second = device.make_graphics_pipeline(relabeled).expect("second pipeline");
+    let second = device
+        .make_graphics_pipeline(relabeled)
+        .expect("second pipeline");
 
     assert_eq!(first, second, "identical state interns to one handle");
-    assert_eq!(backend.lock().created_graphics, vec![first], "one backend compile");
+    assert_eq!(
+        backend.lock().created_graphics,
+        vec![first],
+        "one backend compile"
+    );
 
     let statistics = device.pipeline_statistics();
     assert_eq!(statistics.graphics.cold.count, 1);
@@ -52,14 +66,23 @@ fn graphics_pipelines_intern_and_ref_count() {
     assert_eq!(statistics.graphics.live, 1);
 
     device.destroy_graphics_pipeline(first);
-    assert!(backend.lock().destroyed_graphics.is_empty(), "the second lease keeps it alive");
+    assert!(
+        backend.lock().destroyed_graphics.is_empty(),
+        "the second lease keeps it alive"
+    );
     assert_eq!(device.pipeline_statistics().graphics.live, 1);
 
     device.destroy_graphics_pipeline(second);
-    assert_eq!(backend.lock().destroyed_graphics, vec![first], "the last release retires it");
+    assert_eq!(
+        backend.lock().destroyed_graphics,
+        vec![first],
+        "the last release retires it"
+    );
     assert_eq!(device.pipeline_statistics().graphics.live, 0);
 
-    let recreated = device.make_graphics_pipeline(descriptor).expect("recreated pipeline");
+    let recreated = device
+        .make_graphics_pipeline(descriptor)
+        .expect("recreated pipeline");
     assert_ne!(recreated, first, "a retired pipeline is not resurrected");
     assert_eq!(backend.lock().created_graphics.len(), 2);
     assert_eq!(device.pipeline_statistics().graphics.cold.count, 2);
@@ -72,12 +95,19 @@ fn different_graphics_state_gets_its_own_pipeline() {
     let device = make_device(&backend, 2);
     let descriptor = graphics_descriptor(&device);
 
-    let single_sample = device.make_graphics_pipeline(descriptor.clone()).expect("single sample");
+    let single_sample = device
+        .make_graphics_pipeline(descriptor.clone())
+        .expect("single sample");
     let mut multisampled = descriptor;
     multisampled.sample_count = 2;
-    let two_samples = device.make_graphics_pipeline(multisampled).expect("two samples");
+    let two_samples = device
+        .make_graphics_pipeline(multisampled)
+        .expect("two samples");
 
-    assert_ne!(single_sample, two_samples, "sample count changes the native pipeline");
+    assert_ne!(
+        single_sample, two_samples,
+        "sample count changes the native pipeline"
+    );
     assert_eq!(backend.lock().created_graphics.len(), 2);
     assert_eq!(device.pipeline_statistics().graphics.live, 2);
     device.destroy_graphics_pipeline(single_sample);
@@ -90,17 +120,27 @@ fn compute_pipelines_intern_and_ref_count() {
     let device = make_device(&backend, 2);
     let layout = support::empty_layout(&device);
     let shader = device
-        .make_shader_module(support::shader_descriptor(ShaderStage::Compute, &[1, 2, 3, 4]))
+        .make_shader_module(support::shader_descriptor(
+            ShaderStage::Compute,
+            &[1, 2, 3, 4],
+        ))
         .expect("compute shader");
     let descriptor = ComputePipelineDescriptor::new(layout, shader);
 
-    let first = device.make_compute_pipeline(descriptor.clone()).expect("first compute");
-    let second = device.make_compute_pipeline(descriptor).expect("second compute");
+    let first = device
+        .make_compute_pipeline(descriptor.clone())
+        .expect("first compute");
+    let second = device
+        .make_compute_pipeline(descriptor)
+        .expect("second compute");
     assert_eq!(first, second);
     assert_eq!(backend.lock().created_compute, vec![first]);
 
     device.destroy_compute_pipeline(first);
-    assert!(backend.lock().destroyed_compute.is_empty(), "still leased once");
+    assert!(
+        backend.lock().destroyed_compute.is_empty(),
+        "still leased once"
+    );
     device.destroy_compute_pipeline(second);
     assert_eq!(backend.lock().destroyed_compute, vec![first]);
     assert_eq!(device.pipeline_statistics().compute.live, 0);
@@ -115,19 +155,27 @@ fn mesh_pipelines_intern_and_ref_count() {
         .make_shader_module(support::shader_descriptor(ShaderStage::Mesh, &[1, 2, 3, 4]))
         .expect("mesh shader");
     let fragment = device
-        .make_shader_module(support::shader_descriptor(ShaderStage::Fragment, &[1, 2, 3, 4]))
+        .make_shader_module(support::shader_descriptor(
+            ShaderStage::Fragment,
+            &[1, 2, 3, 4],
+        ))
         .expect("fragment shader");
     let mut descriptor = MeshPipelineDescriptor::new(layout, mesh);
     descriptor.fragment = Some(fragment);
 
-    let first = device.make_mesh_pipeline(descriptor.clone()).expect("first mesh");
+    let first = device
+        .make_mesh_pipeline(descriptor.clone())
+        .expect("first mesh");
     let second = device.make_mesh_pipeline(descriptor).expect("second mesh");
     assert_eq!(first, second);
     assert_eq!(backend.lock().created_mesh, vec![first]);
     assert_eq!(device.pipeline_statistics().mesh.live, 1);
 
     device.destroy_mesh_pipeline(first);
-    assert!(backend.lock().destroyed_mesh.is_empty(), "still leased once");
+    assert!(
+        backend.lock().destroyed_mesh.is_empty(),
+        "still leased once"
+    );
     device.destroy_mesh_pipeline(second);
     assert_eq!(backend.lock().destroyed_mesh, vec![first]);
     assert_eq!(device.pipeline_statistics().mesh.live, 0);
@@ -138,13 +186,22 @@ fn shader_module_creations_are_measured() {
     let backend = RecordingBackend::standard();
     let device = make_device(&backend, 2);
     let vertex = device
-        .make_shader_module(support::shader_descriptor(ShaderStage::Vertex, &[1, 2, 3, 4]))
+        .make_shader_module(support::shader_descriptor(
+            ShaderStage::Vertex,
+            &[1, 2, 3, 4],
+        ))
         .expect("vertex shader");
     let fragment = device
-        .make_shader_module(support::shader_descriptor(ShaderStage::Fragment, &[1, 2, 3, 4]))
+        .make_shader_module(support::shader_descriptor(
+            ShaderStage::Fragment,
+            &[1, 2, 3, 4],
+        ))
         .expect("fragment shader");
 
-    assert_eq!(backend.lock().created_shader_modules, vec![vertex, fragment]);
+    assert_eq!(
+        backend.lock().created_shader_modules,
+        vec![vertex, fragment]
+    );
     assert_eq!(device.pipeline_statistics().shader_modules.count, 2);
     device.reset_pipeline_statistics();
     assert_eq!(device.pipeline_statistics().shader_modules.count, 0);
@@ -178,22 +235,36 @@ fn shader_modules_share_content_and_release_their_own_leases() {
     let backend = RecordingBackend::standard();
     let device = make_device(&backend, 2);
     let descriptor = support::shader_descriptor(ShaderStage::Vertex, &[1, 2, 3, 4]);
-    let first = device.make_shader_module(descriptor.clone()).expect("first shader");
-    let second = device.make_shader_module(descriptor).expect("second shader");
+    let first = device
+        .make_shader_module(descriptor.clone())
+        .expect("first shader");
+    let second = device
+        .make_shader_module(descriptor)
+        .expect("second shader");
 
     assert_eq!(first, second, "identical source intern to one module");
     assert_eq!(backend.lock().created_shader_modules.len(), 1);
     assert_eq!(device.pipeline_statistics().shader_module_cache_hits, 1);
 
     device.destroy_shader_module(first);
-    assert_eq!(device.pipeline_statistics().live_shader_modules, 1, "one lease remains");
+    assert_eq!(
+        device.pipeline_statistics().live_shader_modules,
+        1,
+        "one lease remains"
+    );
     device.destroy_shader_module(second);
     assert_eq!(device.pipeline_statistics().live_shader_modules, 0);
 
     let recreated = device
-        .make_shader_module(support::shader_descriptor(ShaderStage::Vertex, &[1, 2, 3, 4]))
+        .make_shader_module(support::shader_descriptor(
+            ShaderStage::Vertex,
+            &[1, 2, 3, 4],
+        ))
         .expect("recreated shader");
-    assert_ne!(first, recreated, "production allocates a fresh handle after retirement");
+    assert_ne!(
+        first, recreated,
+        "production allocates a fresh handle after retirement"
+    );
     device.destroy_shader_module(recreated);
 }
 
@@ -202,16 +273,27 @@ fn reset_clears_counters_but_keeps_interned_pipelines() {
     let backend = RecordingBackend::standard();
     let device = make_device(&backend, 2);
     let descriptor = graphics_descriptor(&device);
-    let pipeline = device.make_graphics_pipeline(descriptor.clone()).expect("pipeline");
+    let pipeline = device
+        .make_graphics_pipeline(descriptor.clone())
+        .expect("pipeline");
 
     device.reset_pipeline_statistics();
     let statistics = device.pipeline_statistics();
     assert_eq!(statistics.graphics.cold.count, 0);
     assert_eq!(statistics.graphics.warm_count, 0);
-    assert_eq!(statistics.graphics.live, 1, "interning outlives the counters");
+    assert_eq!(
+        statistics.graphics.live, 1,
+        "interning outlives the counters"
+    );
 
-    let reused = device.make_graphics_pipeline(descriptor).expect("reused pipeline");
-    assert_eq!(backend.lock().created_graphics.len(), 1, "still one backend compile");
+    let reused = device
+        .make_graphics_pipeline(descriptor)
+        .expect("reused pipeline");
+    assert_eq!(
+        backend.lock().created_graphics.len(),
+        1,
+        "still one backend compile"
+    );
     assert_eq!(device.pipeline_statistics().graphics.warm_count, 1);
     device.destroy_graphics_pipeline(pipeline);
     device.destroy_graphics_pipeline(reused);
@@ -226,7 +308,10 @@ fn pipeline_key_excludes_the_label() {
     first.label = Some("first");
     let mut second = first.clone();
     second.label = Some("second");
-    assert_eq!(support::graphics_key(&first), support::graphics_key(&second));
+    assert_eq!(
+        support::graphics_key(&first),
+        support::graphics_key(&second)
+    );
 }
 
 /// A backend without mesh shading reports the feature as unavailable rather than

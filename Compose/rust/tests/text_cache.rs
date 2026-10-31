@@ -18,12 +18,12 @@ use support::GlobalTestLock;
 
 #[test]
 fn evicts_least_recently_read_entry() {
-    let cache: TextCache<String, i32> =
-        TextCache::new(TextCacheLimits { maximum_entries: 2, maximum_bytes: 10 });
+    let cache: TextCache<String, i32> = TextCache::new(TextCacheLimits {
+        maximum_entries: 2,
+        maximum_bytes: 10,
+    });
 
-    let read = |key: &str, value: i32| -> i32 {
-        cache.value(key.to_string(), |_| 4, || value)
-    };
+    let read = |key: &str, value: i32| -> i32 { cache.value(key.to_string(), |_| 4, || value) };
 
     assert_eq!(read("a", 1), 1, "the first read builds and stores");
     assert_eq!(read("b", 2), 2, "the second read fills the entry bound");
@@ -55,8 +55,10 @@ fn evicts_least_recently_read_entry() {
 #[test]
 fn oversized_results_and_disabled_caches_are_not_retained() {
     // A zero entry bound disables retention entirely.
-    let disabled =
-        TextCache::<i32, i32>::new(TextCacheLimits { maximum_entries: 0, maximum_bytes: 8 * 1024 * 1024 });
+    let disabled = TextCache::<i32, i32>::new(TextCacheLimits {
+        maximum_entries: 0,
+        maximum_bytes: 8 * 1024 * 1024,
+    });
     assert_eq!(
         disabled.value(1, |_| 4, || 42),
         42,
@@ -69,8 +71,15 @@ fn oversized_results_and_disabled_caches_are_not_retained() {
     );
 
     // A result costing more than the byte bound is returned but not stored.
-    let tiny = TextCache::<i32, i32>::new(TextCacheLimits { maximum_entries: 512, maximum_bytes: 3 });
-    assert_eq!(tiny.value(1, |_| 4, || 42), 42, "the value is still returned");
+    let tiny = TextCache::<i32, i32>::new(TextCacheLimits {
+        maximum_entries: 512,
+        maximum_bytes: 3,
+    });
+    assert_eq!(
+        tiny.value(1, |_| 4, || 42),
+        42,
+        "the value is still returned"
+    );
     assert_eq!(
         tiny.snapshot().entries,
         0,

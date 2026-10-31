@@ -1,6 +1,6 @@
 //! Select the first measured child layout that fits the proposed size.
-use cove_core::Size;
 use crate::{Layout, LayoutSubview, ProposedViewSize};
+use cove_core::Size;
 use std::rc::Rc;
 
 pub struct LayoutThatFits {
@@ -9,7 +9,10 @@ pub struct LayoutThatFits {
 
 impl LayoutThatFits {
     pub fn new(candidates: Vec<Rc<dyn Layout>>) -> Self {
-        assert!(!candidates.is_empty(), "LayoutThatFits requires at least one candidate");
+        assert!(
+            !candidates.is_empty(),
+            "LayoutThatFits requires at least one candidate"
+        );
         Self { candidates }
     }
 
@@ -31,7 +34,12 @@ impl Layout for LayoutThatFits {
         self.selection(proposal, subviews).1
     }
 
-    fn place_subviews(&self, bounds: cove_core::Rect, _proposal: ProposedViewSize, subviews: &[LayoutSubview]) {
+    fn place_subviews(
+        &self,
+        bounds: cove_core::Rect,
+        _proposal: ProposedViewSize,
+        subviews: &[LayoutSubview],
+    ) {
         let actual = ProposedViewSize::new(Some(bounds.width), Some(bounds.height));
         let (index, _) = self.selection(actual, subviews);
         self.candidates[index].place_subviews(bounds, actual, subviews);

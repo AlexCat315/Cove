@@ -26,7 +26,10 @@ use super::acceleration::MetalAccelerationStructure;
 /// encoder never re-resolves a handle while binding.
 #[derive(Clone)]
 pub enum MetalBoundValue {
-    Buffer { buffer: Retained<ProtocolObject<dyn MTLBuffer>>, offset: usize },
+    Buffer {
+        buffer: Retained<ProtocolObject<dyn MTLBuffer>>,
+        offset: usize,
+    },
     Texture(Retained<ProtocolObject<dyn MTLTexture>>),
     Sampler(Retained<ProtocolObject<dyn MTLSamplerState>>),
     AccelerationStructure(std::sync::Arc<MetalAccelerationStructure>),
@@ -96,11 +99,21 @@ impl MetalBindingSet {
     pub fn new(entries: Vec<MetalBoundEntry>, dynamic_slots: &HashMap<u32, usize>) -> Self {
         let mut dynamic_offset_index = HashMap::new();
         for entry in &entries {
-            let Some(offset_index) = dynamic_slots.get(&entry.slot) else { continue };
+            let Some(offset_index) = dynamic_slots.get(&entry.slot) else {
+                continue;
+            };
             for stage in DYNAMIC_STAGES {
-                if entry.visibility.contains(ShaderVisibility::from_stage(stage)) {
-                    dynamic_offset_index
-                        .insert(MetalDynamicKey { stage, index: entry.slot as usize }, *offset_index);
+                if entry
+                    .visibility
+                    .contains(ShaderVisibility::from_stage(stage))
+                {
+                    dynamic_offset_index.insert(
+                        MetalDynamicKey {
+                            stage,
+                            index: entry.slot as usize,
+                        },
+                        *offset_index,
+                    );
                 }
             }
         }
@@ -117,7 +130,10 @@ impl MetalBindingSet {
         let mut result = Vec::new();
         for entry in entries {
             for stage in stages {
-                if entry.visibility.contains(ShaderVisibility::from_stage(*stage)) {
+                if entry
+                    .visibility
+                    .contains(ShaderVisibility::from_stage(*stage))
+                {
                     result.push(MetalBindingApply {
                         stage: *stage,
                         index: entry.slot as usize,
@@ -181,7 +197,9 @@ impl MetalBindingRegistry {
     }
 
     pub fn remove(&mut self, id: u32) {
-        let Some(old) = self.sets.remove(&id) else { return };
+        let Some(old) = self.sets.remove(&id) else {
+            return;
+        };
         for entry in &old.entries {
             let resource = entry.resource.id;
             if let Some(users) = self.users.get_mut(&resource) {
@@ -195,7 +213,9 @@ impl MetalBindingRegistry {
 
     /// Retirement has already waited for every frame that could use these sets.
     pub fn remove_all_referencing(&mut self, resource: u32) {
-        let Some(dependents) = self.users.get(&resource).cloned() else { return };
+        let Some(dependents) = self.users.get(&resource).cloned() else {
+            return;
+        };
         for id in dependents {
             self.remove(id);
         }
@@ -297,8 +317,14 @@ mod tests {
 
     #[test]
     fn apply_tables_project_the_swift_stage_groups() {
-        assert_eq!(GRAPHICS_STAGES, [ShaderStage::Vertex, ShaderStage::Fragment]);
-        assert_eq!(MESH_STAGES, [ShaderStage::Task, ShaderStage::Mesh, ShaderStage::Fragment]);
+        assert_eq!(
+            GRAPHICS_STAGES,
+            [ShaderStage::Vertex, ShaderStage::Fragment]
+        );
+        assert_eq!(
+            MESH_STAGES,
+            [ShaderStage::Task, ShaderStage::Mesh, ShaderStage::Fragment]
+        );
         assert_eq!(COMPUTE_STAGES, [ShaderStage::Compute]);
         assert_eq!(DYNAMIC_STAGES.len(), 5);
     }

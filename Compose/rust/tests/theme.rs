@@ -10,8 +10,8 @@
 
 mod support;
 
-use cove_core::scene::{CompositionLocal, Node};
 use cove_core::Color;
+use cove_core::scene::{CompositionLocal, Node};
 use cove_ui_compose::theme::Theme;
 
 use support::GlobalTestLock;
@@ -74,7 +74,14 @@ fn spacing_and_radius_scales_are_monotonic() {
 fn spacing_scale_matches_the_authored_steps() {
     let spacing = Theme::default_dark().spacing;
     assert_eq!(
-        [spacing.xs, spacing.sm, spacing.md, spacing.lg, spacing.xl, spacing.xxl],
+        [
+            spacing.xs,
+            spacing.sm,
+            spacing.md,
+            spacing.lg,
+            spacing.xl,
+            spacing.xxl
+        ],
         [4.0, 6.0, 8.0, 12.0, 16.0, 24.0],
         "the authored 4/6/8/12/16/24 ramp"
     );
@@ -114,7 +121,12 @@ fn theme_is_a_value_type() {
     let original_accent = Theme::default_dark().colors.accent;
 
     let mut copy = Theme::default_dark();
-    copy.colors.accent = Color { r: 1.0, g: 0.0, b: 0.0, a: 1.0 };
+    copy.colors.accent = Color {
+        r: 1.0,
+        g: 0.0,
+        b: 0.0,
+        a: 1.0,
+    };
 
     assert_eq!(
         Theme::default_dark().colors.accent,
@@ -134,12 +146,22 @@ fn theme_flows_through_a_composition_local() {
         let node = Node::new();
 
         let mut custom = Theme::default_dark();
-        custom.colors.accent = Color { r: 0.9, g: 0.2, b: 0.4, a: 1.0 };
+        custom.colors.accent = Color {
+            r: 0.9,
+            g: 0.2,
+            b: 0.4,
+            a: 1.0,
+        };
         node.set_composition_value(&theme_key, custom);
 
         assert_eq!(
             node.composition_value(&theme_key).colors.accent,
-            Color { r: 0.9, g: 0.2, b: 0.4, a: 1.0 },
+            Color {
+                r: 0.9,
+                g: 0.2,
+                b: 0.4,
+                a: 1.0
+            },
             "the provided theme is what consumers read back"
         );
     });

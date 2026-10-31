@@ -10,7 +10,9 @@ pub struct LayoutTree {
 }
 impl LayoutTree {
     pub fn new() -> Self {
-        Self { root: LayoutNode::new() }
+        Self {
+            root: LayoutNode::new(),
+        }
     }
     pub fn reset_caches(&self) {
         clear_text_measure_cache(&self.root);

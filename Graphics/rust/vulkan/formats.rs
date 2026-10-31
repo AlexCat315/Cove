@@ -4,7 +4,7 @@
 //!
 //! Pure free functions, so every mapping is testable without a driver.
 use crate::rhi::{
-    BlendFactor, BlendOperation, BindingType, CompareOp, CullMode, FrontWinding, IndexType,
+    BindingType, BlendFactor, BlendOperation, CompareOp, CullMode, FrontWinding, IndexType,
     PrimitiveType, RhiResult, SamplerAddressMode, SamplerFilter, SamplerMipFilter, ShaderStage,
     ShaderVisibility, TextureFormat, VertexFormat, rhi_validate_sample_count,
 };
@@ -203,7 +203,10 @@ pub fn vk_stage_flags(stage: ShaderStage) -> u32 {
 
 /// The native shader stage bits for a visibility set, in declaration order.
 pub fn vk_visibility_flags(visibility: ShaderVisibility) -> u32 {
-    visibility.stages().into_iter().fold(0, |bits, stage| bits | vk_stage_flags(stage))
+    visibility
+        .stages()
+        .into_iter()
+        .fold(0, |bits, stage| bits | vk_stage_flags(stage))
 }
 
 /// The native descriptor type for a binding declaration.
@@ -317,15 +320,27 @@ mod tests {
             assert_ne!(vk_format(format), sys::VK_FORMAT_UNDEFINED, "{format:?}");
         }
         // The presentable formats are the ones the reverse map knows.
-        assert_eq!(texture_format(sys::VK_FORMAT_B8G8R8A8_SRGB), TextureFormat::Bgra8UnormSrgb);
-        assert_eq!(texture_format(sys::VK_FORMAT_R32_SFLOAT), TextureFormat::Invalid);
+        assert_eq!(
+            texture_format(sys::VK_FORMAT_B8G8R8A8_SRGB),
+            TextureFormat::Bgra8UnormSrgb
+        );
+        assert_eq!(
+            texture_format(sys::VK_FORMAT_R32_SFLOAT),
+            TextureFormat::Invalid
+        );
         assert_eq!(vk_format(TextureFormat::Invalid), sys::VK_FORMAT_UNDEFINED);
     }
 
     #[test]
     fn depth_and_stencil_aspects_match_the_formats() {
-        assert_eq!(aspect_flags(TextureFormat::Rgba8Unorm), sys::VK_IMAGE_ASPECT_COLOR_BIT);
-        assert_eq!(aspect_flags(TextureFormat::Depth32Float), sys::VK_IMAGE_ASPECT_DEPTH_BIT);
+        assert_eq!(
+            aspect_flags(TextureFormat::Rgba8Unorm),
+            sys::VK_IMAGE_ASPECT_COLOR_BIT
+        );
+        assert_eq!(
+            aspect_flags(TextureFormat::Depth32Float),
+            sys::VK_IMAGE_ASPECT_DEPTH_BIT
+        );
         assert_eq!(
             aspect_flags(TextureFormat::Depth24UnormStencil8),
             sys::VK_IMAGE_ASPECT_DEPTH_BIT | sys::VK_IMAGE_ASPECT_STENCIL_BIT
@@ -361,7 +376,10 @@ mod tests {
             vk_visibility_flags(ShaderVisibility::GRAPHICS),
             sys::VK_SHADER_STAGE_VERTEX_BIT | sys::VK_SHADER_STAGE_FRAGMENT_BIT
         );
-        assert_eq!(vk_visibility_flags(ShaderVisibility::COMPUTE), sys::VK_SHADER_STAGE_COMPUTE_BIT);
+        assert_eq!(
+            vk_visibility_flags(ShaderVisibility::COMPUTE),
+            sys::VK_SHADER_STAGE_COMPUTE_BIT
+        );
         let all = vk_visibility_flags(ShaderVisibility::ALL);
         for bit in [
             sys::VK_SHADER_STAGE_VERTEX_BIT,
@@ -396,9 +414,15 @@ mod tests {
 
     #[test]
     fn dimension_maps_choose_the_matching_native_types() {
-        assert_eq!(vk_image_type(TextureDimension::Texture3D), sys::VK_IMAGE_TYPE_3D);
+        assert_eq!(
+            vk_image_type(TextureDimension::Texture3D),
+            sys::VK_IMAGE_TYPE_3D
+        );
         assert_eq!(vk_image_type(TextureDimension::Cube), sys::VK_IMAGE_TYPE_2D);
-        assert_eq!(vk_image_view_type(TextureDimension::Cube), sys::VK_IMAGE_VIEW_TYPE_CUBE);
+        assert_eq!(
+            vk_image_view_type(TextureDimension::Cube),
+            sys::VK_IMAGE_VIEW_TYPE_CUBE
+        );
         assert_eq!(
             vk_image_view_type(TextureDimension::Texture2DArray),
             sys::VK_IMAGE_VIEW_TYPE_2D_ARRAY
@@ -407,9 +431,18 @@ mod tests {
 
     #[test]
     fn vertex_formats_are_float_widths() {
-        assert_eq!(vk_vertex_format(VertexFormat::Float), sys::VK_FORMAT_R32_SFLOAT);
-        assert_eq!(vk_vertex_format(VertexFormat::Float4), sys::VK_FORMAT_R32G32B32A32_SFLOAT);
-        assert_eq!(vk_vertex_format(VertexFormat::Unorm8x4), sys::VK_FORMAT_R8G8B8A8_UNORM);
+        assert_eq!(
+            vk_vertex_format(VertexFormat::Float),
+            sys::VK_FORMAT_R32_SFLOAT
+        );
+        assert_eq!(
+            vk_vertex_format(VertexFormat::Float4),
+            sys::VK_FORMAT_R32G32B32A32_SFLOAT
+        );
+        assert_eq!(
+            vk_vertex_format(VertexFormat::Unorm8x4),
+            sys::VK_FORMAT_R8G8B8A8_UNORM
+        );
         assert_eq!(vk_index_type(IndexType::Uint16), sys::VK_INDEX_TYPE_UINT16);
     }
 }

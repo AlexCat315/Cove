@@ -28,7 +28,8 @@ impl AnimationCurve {
             return time;
         }
         let period: f32 = 0.4;
-        1.0 + 2f32.powf(-10.0 * time) * ((time - period / 4.0) * (2.0 * std::f32::consts::PI) / period).sin()
+        1.0 + 2f32.powf(-10.0 * time)
+            * ((time - period / 4.0) * (2.0 * std::f32::consts::PI) / period).sin()
     }
 }
 

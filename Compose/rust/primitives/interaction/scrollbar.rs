@@ -6,6 +6,7 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
+use crate::{PrimitiveView, View, impl_primitive_view};
 use cove_core::scene::{
     AccessibilityActions, AccessibilityRole, AccessibilitySemantics, EventPhase, EventResult,
     FocusChainHolder, HoverPhase, InputHandlerRoute, InteractionRegistryHolder, LayoutNode, Node,
@@ -13,7 +14,6 @@ use cove_core::scene::{
 };
 use cove_core::{Binding, Color, Point, Rect};
 use cove_platform::MouseButton;
-use crate::{impl_primitive_view, PrimitiveView, View};
 
 const CHROME_OPACITY: &str = "__scrollbar_chrome_opacity";
 const IS_HOVERED: &str = "__scrollbar_is_hovered";
@@ -58,7 +58,12 @@ pub struct Scrollbar {
 }
 
 impl Scrollbar {
-    pub fn new(axis: ScrollbarAxis, offset: Binding<f32>, content_extent: f32, viewport_extent: f32) -> Self {
+    pub fn new(
+        axis: ScrollbarAxis,
+        offset: Binding<f32>,
+        content_extent: f32,
+        viewport_extent: f32,
+    ) -> Self {
         Self {
             axis,
             offset,
@@ -71,12 +76,20 @@ impl Scrollbar {
     }
 
     pub fn thickness(mut self, thickness: f32) -> Self {
-        self.thickness = if thickness.is_finite() { thickness.max(8.0) } else { 12.0 };
+        self.thickness = if thickness.is_finite() {
+            thickness.max(8.0)
+        } else {
+            12.0
+        };
         self
     }
 
     pub fn minimum_thumb_extent(mut self, extent: f32) -> Self {
-        self.minimum_thumb_extent = if extent.is_finite() { extent.max(16.0) } else { 32.0 };
+        self.minimum_thumb_extent = if extent.is_finite() {
+            extent.max(16.0)
+        } else {
+            32.0
+        };
         self
     }
 
@@ -123,12 +136,19 @@ fn apply_desired_visibility(node: &Node) {
 fn set_chrome_visible(node: &Node, visible: bool) {
     let current = node.attachment::<f32>(CHROME_OPACITY).unwrap_or(0.0);
     let weak = node.downgrade();
-    node.animatable_set_with(CHROME_OPACITY, current, if visible { 1.0 } else { 0.0 }, move |opacity| {
-        if let Some(owner) = Node::upgrade(&weak) {
-            owner.set_attachment(CHROME_OPACITY, opacity);
-            owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("scrollbarChromeOpacity"));
-        }
-    });
+    node.animatable_set_with(
+        CHROME_OPACITY,
+        current,
+        if visible { 1.0 } else { 0.0 },
+        move |opacity| {
+            if let Some(owner) = Node::upgrade(&weak) {
+                owner.set_attachment(CHROME_OPACITY, opacity);
+                owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                    "scrollbarChromeOpacity",
+                ));
+            }
+        },
+    );
 }
 
 /// Scrolling reveals the bar even when nothing holds it: it appears at once and
@@ -145,7 +165,9 @@ fn flash_if_unheld(node: &Node) {
     let apply = move |opacity: f32| {
         if let Some(owner) = Node::upgrade(&weak) {
             owner.set_attachment(CHROME_OPACITY, opacity);
-            owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("scrollbarChromeOpacity"));
+            owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                "scrollbarChromeOpacity",
+            ));
         }
     };
     let current = node.attachment::<f32>(CHROME_OPACITY).unwrap_or(0.0);
@@ -157,7 +179,9 @@ fn flash_if_unheld(node: &Node) {
     node.animatable_set_with("__scrollbar.fade", 1.0_f32, 0.0_f32, move |opacity| {
         if let Some(owner) = Node::upgrade(&weak) {
             owner.set_attachment(CHROME_OPACITY, opacity);
-            owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("scrollbarChromeOpacity"));
+            owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                "scrollbarChromeOpacity",
+            ));
         }
     });
 }
@@ -210,7 +234,10 @@ impl PrimitiveView for Scrollbar {
         // to reveal chrome, so the bar stays visible there.
         let supports_hover = crate::primitives::controls::adaptive::supports_control_hover(node);
         if node.attachment::<f32>(CHROME_OPACITY).is_none() {
-            node.set_attachment(CHROME_OPACITY, if supports_hover { 0.0_f32 } else { 1.0_f32 });
+            node.set_attachment(
+                CHROME_OPACITY,
+                if supports_hover { 0.0_f32 } else { 1.0_f32 },
+            );
             node.set_attachment(IS_HOVERED, false);
             node.set_attachment(IS_DRAGGING, false);
             node.set_attachment(DESIRED_VISIBLE, false);
@@ -219,7 +246,11 @@ impl PrimitiveView for Scrollbar {
 
         let value = self.value();
         let max_offset = self.max_offset();
-        let percent = if max_offset > 0.0 { ((value / max_offset) * 100.0).round() as i64 } else { 0 };
+        let percent = if max_offset > 0.0 {
+            ((value / max_offset) * 100.0).round() as i64
+        } else {
+            0
+        };
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Slider,
             label: self.label.clone(),
@@ -232,22 +263,33 @@ impl PrimitiveView for Scrollbar {
         let decrement_view = self.snapshot();
         let set_value_view = self.snapshot();
         node.set_accessibility_actions(AccessibilityActions {
-            increment: Some(Rc::new(move || scroll_by(&increment_view, increment_view.viewport_extent * 0.9))),
-            decrement: Some(Rc::new(move || scroll_by(&decrement_view, -decrement_view.viewport_extent * 0.9))),
+            increment: Some(Rc::new(move || {
+                scroll_by(&increment_view, increment_view.viewport_extent * 0.9)
+            })),
+            decrement: Some(Rc::new(move || {
+                scroll_by(&decrement_view, -decrement_view.viewport_extent * 0.9)
+            })),
             set_value: Some(Rc::new(move |text: &str| {
                 if set_value_view.max_offset() <= 0.0 {
                     return;
                 }
-                let digits: String = text.chars().filter(|character| character.is_ascii_digit()).collect();
-                let Ok(percent) = digits.parse::<i64>() else { return };
-                set_value_view.offset.set(
-                    set_value_view.max_offset() * percent.clamp(0, 100) as f32 / 100.0,
-                );
+                let digits: String = text
+                    .chars()
+                    .filter(|character| character.is_ascii_digit())
+                    .collect();
+                let Ok(percent) = digits.parse::<i64>() else {
+                    return;
+                };
+                set_value_view
+                    .offset
+                    .set(set_value_view.max_offset() * percent.clamp(0, 100) as f32 / 100.0);
             })),
             ..Default::default()
         });
 
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         let focus_node = node.downgrade();
         node.set_attachment(
             cove_core::scene::TextInputAttachmentKey::FOCUS_CHANGE_HANDLER,
@@ -259,86 +301,111 @@ impl PrimitiveView for Scrollbar {
         );
 
         let hover_node = node.downgrade();
-        registry.set_hover(node, Rc::new(move |phase| {
-            let Some(owner) = Node::upgrade(&hover_node) else { return };
-            match phase {
-                HoverPhase::Enter => owner.set_attachment(IS_HOVERED, true),
-                HoverPhase::Leave => owner.set_attachment(IS_HOVERED, false),
-            }
-            apply_desired_visibility(&owner);
-        }));
+        registry.set_hover(
+            node,
+            Rc::new(move |phase| {
+                let Some(owner) = Node::upgrade(&hover_node) else {
+                    return;
+                };
+                match phase {
+                    HoverPhase::Enter => owner.set_attachment(IS_HOVERED, true),
+                    HoverPhase::Leave => owner.set_attachment(IS_HOVERED, false),
+                }
+                apply_desired_visibility(&owner);
+            }),
+        );
 
         let pointer_node = node.downgrade();
         let pointer_view = self.snapshot();
-        registry.set_pointer(node, InputHandlerRoute::control(), Rc::new(move |event, phase, _event_phase| {
-            if event.button != MouseButton::Left {
-                return EventResult::Ignored;
-            }
-            let Some(owner) = Node::upgrade(&pointer_node) else { return EventResult::Ignored };
-            match phase {
-                PointerPhase::Down => {
-                    if let Some(chain) = FocusChainHolder::current() {
-                        chain.focus(Some(&owner), false);
-                    }
-                    if let Some(capture) = PointerCaptureHolder::current() {
-                        capture.acquire(&owner, true);
-                    }
-                    owner.set_attachment(IS_DRAGGING, true);
-                    apply_desired_visibility(&owner);
-                    update_from_point(&pointer_view, &owner, Point::new(event.x, event.y));
-                    EventResult::Handled
+        registry.set_pointer(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, phase, _event_phase| {
+                if event.button != MouseButton::Left {
+                    return EventResult::Ignored;
                 }
-                PointerPhase::Up => {
-                    if PointerCaptureHolder::current()
-                        .and_then(|capture| capture.target())
-                        .is_some_and(|target| target == owner)
-                        && let Some(capture) = PointerCaptureHolder::current()
-                    {
-                        capture.release();
+                let Some(owner) = Node::upgrade(&pointer_node) else {
+                    return EventResult::Ignored;
+                };
+                match phase {
+                    PointerPhase::Down => {
+                        if let Some(chain) = FocusChainHolder::current() {
+                            chain.focus(Some(&owner), false);
+                        }
+                        if let Some(capture) = PointerCaptureHolder::current() {
+                            capture.acquire(&owner, true);
+                        }
+                        owner.set_attachment(IS_DRAGGING, true);
+                        apply_desired_visibility(&owner);
+                        update_from_point(&pointer_view, &owner, Point::new(event.x, event.y));
+                        EventResult::Handled
                     }
-                    owner.set_attachment(IS_DRAGGING, false);
-                    apply_desired_visibility(&owner);
-                    EventResult::Handled
+                    PointerPhase::Up => {
+                        if PointerCaptureHolder::current()
+                            .and_then(|capture| capture.target())
+                            .is_some_and(|target| target == owner)
+                            && let Some(capture) = PointerCaptureHolder::current()
+                        {
+                            capture.release();
+                        }
+                        owner.set_attachment(IS_DRAGGING, false);
+                        apply_desired_visibility(&owner);
+                        EventResult::Handled
+                    }
                 }
-            }
-        }));
+            }),
+        );
 
         let motion_node = node.downgrade();
         let motion_view = self.snapshot();
-        registry.set_motion(node, InputHandlerRoute::control(), Rc::new(move |event, _phase| {
-            // Scrub only while dragging; plain hover motion over the bar must
-            // not move the thumb.
-            let Some(owner) = Node::upgrade(&motion_node) else { return EventResult::Ignored };
-            if !PointerCaptureHolder::current()
-                .and_then(|capture| capture.target())
-                .is_some_and(|target| target == owner)
-            {
-                return EventResult::Ignored;
-            }
-            update_from_point(&motion_view, &owner, Point::new(event.x, event.y));
-            EventResult::Handled
-        }));
+        registry.set_motion(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, _phase| {
+                // Scrub only while dragging; plain hover motion over the bar must
+                // not move the thumb.
+                let Some(owner) = Node::upgrade(&motion_node) else {
+                    return EventResult::Ignored;
+                };
+                if !PointerCaptureHolder::current()
+                    .and_then(|capture| capture.target())
+                    .is_some_and(|target| target == owner)
+                {
+                    return EventResult::Ignored;
+                }
+                update_from_point(&motion_view, &owner, Point::new(event.x, event.y));
+                EventResult::Handled
+            }),
+        );
 
         let key_view = self.snapshot();
-        registry.set_key(node, InputHandlerRoute::control(), Rc::new(move |event, phase| {
-            if phase == EventPhase::Capture {
-                return EventResult::Ignored;
-            }
-            match event.scancode {
-                crate::Scancode::ARROW_UP | crate::Scancode::ARROW_LEFT => {
-                    scroll_by(&key_view, -(20.0_f32).max(key_view.viewport_extent * 0.1));
+        registry.set_key(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, phase| {
+                if phase == EventPhase::Capture {
+                    return EventResult::Ignored;
                 }
-                crate::Scancode::ARROW_DOWN | crate::Scancode::ARROW_RIGHT => {
-                    scroll_by(&key_view, (20.0_f32).max(key_view.viewport_extent * 0.1));
+                match event.scancode {
+                    crate::Scancode::ARROW_UP | crate::Scancode::ARROW_LEFT => {
+                        scroll_by(&key_view, -(20.0_f32).max(key_view.viewport_extent * 0.1));
+                    }
+                    crate::Scancode::ARROW_DOWN | crate::Scancode::ARROW_RIGHT => {
+                        scroll_by(&key_view, (20.0_f32).max(key_view.viewport_extent * 0.1));
+                    }
+                    crate::Scancode::PAGE_UP => {
+                        scroll_by(&key_view, -key_view.viewport_extent * 0.9)
+                    }
+                    crate::Scancode::PAGE_DOWN => {
+                        scroll_by(&key_view, key_view.viewport_extent * 0.9)
+                    }
+                    crate::Scancode::HOME => key_view.offset.set(0.0),
+                    crate::Scancode::END => key_view.offset.set(key_view.max_offset()),
+                    _ => return EventResult::Ignored,
                 }
-                crate::Scancode::PAGE_UP => scroll_by(&key_view, -key_view.viewport_extent * 0.9),
-                crate::Scancode::PAGE_DOWN => scroll_by(&key_view, key_view.viewport_extent * 0.9),
-                crate::Scancode::HOME => key_view.offset.set(0.0),
-                crate::Scancode::END => key_view.offset.set(key_view.max_offset()),
-                _ => return EventResult::Ignored,
-            }
-            EventResult::Handled
-        }));
+                EventResult::Handled
+            }),
+        );
 
         let chain = FocusChainHolder::current();
         let focused = chain
@@ -346,7 +413,14 @@ impl PrimitiveView for Scrollbar {
             .and_then(|chain| chain.focused())
             .is_some_and(|focused| focused == *node);
         let visible_focus = focused && chain.as_ref().is_some_and(|chain| chain.is_focus_visible());
-        node.set_attachment(AXIS, if self.axis == ScrollbarAxis::Vertical { 0_u8 } else { 1_u8 });
+        node.set_attachment(
+            AXIS,
+            if self.axis == ScrollbarAxis::Vertical {
+                0_u8
+            } else {
+                1_u8
+            },
+        );
         node.set_attachment(THICKNESS, self.thickness);
         node.set_attachment(CONTENT, self.content_extent);
         node.set_attachment(VIEWPORT, self.viewport_extent);
@@ -365,7 +439,9 @@ impl PrimitiveView for Scrollbar {
         };
         let weak_node = node.downgrade();
         node.update_draw(paint, move |list, origin| {
-            let Some(owner) = Node::upgrade(&weak_node) else { return };
+            let Some(owner) = Node::upgrade(&weak_node) else {
+                return;
+            };
             let theme = crate::theme::theme_for_node(&owner);
             draw_scrollbar(list, origin, &owner, &theme);
         });
@@ -417,10 +493,17 @@ fn draw_scrollbar(
     let travel = (track - thumb).max(0.0);
     let max_offset = node.attachment::<f32>(MAX_OFFSET).unwrap_or(0.0);
     let value = node.attachment::<f32>(VALUE).unwrap_or(0.0);
-    let fraction = if max_offset > 0.0 { value / max_offset } else { 0.0 };
+    let fraction = if max_offset > 0.0 {
+        value / max_offset
+    } else {
+        0.0
+    };
     let position = fraction * travel;
     let track_color = theme.colors.surface_variant.multiplied_alpha(0.7 * opacity);
-    let thumb_color = theme.colors.on_surface_muted.multiplied_alpha(0.85 * opacity);
+    let thumb_color = theme
+        .colors
+        .on_surface_muted
+        .multiplied_alpha(0.85 * opacity);
     let chain = FocusChainHolder::current();
     let focused = chain
         .as_ref()
@@ -473,7 +556,13 @@ fn draw_scrollbar(
 
 fn axis_of(node: &Node) -> ScrollbarAxis {
     node.attachment::<u8>(AXIS)
-        .map(|value| if value == 0 { ScrollbarAxis::Vertical } else { ScrollbarAxis::Horizontal })
+        .map(|value| {
+            if value == 0 {
+                ScrollbarAxis::Vertical
+            } else {
+                ScrollbarAxis::Horizontal
+            }
+        })
         .unwrap_or(ScrollbarAxis::Vertical)
 }
 

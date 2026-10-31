@@ -7,25 +7,27 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cove_core::scene::{
-    AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap,
-};
-use cove_core::{Binding, Color, Point, Rect, Size};
-use cove_imaging::BundleImageResource;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{EdgeInsets, FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
-use crate::primitives::controls::button::{ActionControlAccessibility, Button, ButtonIconSource, ButtonRole};
+use crate::primitives::controls::button::{
+    ActionControlAccessibility, Button, ButtonIconSource, ButtonRole,
+};
 use crate::primitives::feedback::{Badge, StatusTone};
-use crate::{Layout, LayoutContainer, LayoutSubview, ProposedViewSize};
-use crate::primitives::media::{ui_icon_catalog, Icon};
+use crate::primitives::media::{Icon, ui_icon_catalog};
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
 use crate::theme::{
-    node_text_scaler, theme_for_node, IconMetrics, SemanticColorRef, SemanticFontRef,
-    SemanticIconSize, Theme,
+    IconMetrics, SemanticColorRef, SemanticFontRef, SemanticIconSize, Theme, node_text_scaler,
+    theme_for_node,
 };
-use crate::{AnyView, BoxView, PrimitiveView, Row, Spacer, TupleView, VerticalAlignment, View, ViewExt};
+use crate::{
+    AnyView, BoxView, PrimitiveView, Row, Spacer, TupleView, VerticalAlignment, View, ViewExt,
+};
+use crate::{Layout, LayoutContainer, LayoutSubview, ProposedViewSize};
+use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
+use cove_core::{Binding, Color, Point, Rect, Size};
+use cove_imaging::BundleImageResource;
 
 pub mod heading_layout;
 
@@ -122,7 +124,12 @@ pub struct TimelineGroup {
 impl TimelineGroup {
     pub fn new(title: impl Into<String>, events: Vec<TimelineEvent>) -> Self {
         let title = title.into();
-        Self { id: title.clone(), title, events, is_collapsible: true }
+        Self {
+            id: title.clone(),
+            title,
+            events,
+            is_collapsible: true,
+        }
     }
 
     pub fn id(mut self, id: impl Into<String>) -> Self {
@@ -143,17 +150,34 @@ pub enum TimelineSpacing {
     Uniform,
     /// Extra gap proportional to the time between dated events, clamped to
     /// `minimum..maximum` points, then multiplied by the zoom factor.
-    Proportional { points_per_hour: f32, minimum: f32, maximum: f32 },
+    Proportional {
+        points_per_hour: f32,
+        minimum: f32,
+        maximum: f32,
+    },
 }
 
 impl TimelineSpacing {
     pub fn proportional(points_per_hour: f32) -> Self {
-        Self::Proportional { points_per_hour, minimum: 0.0, maximum: 240.0 }
+        Self::Proportional {
+            points_per_hour,
+            minimum: 0.0,
+            maximum: 240.0,
+        }
     }
 
     fn gap(self, earlier: Option<f64>, later: Option<f64>, zoom: f32) -> f32 {
-        let Self::Proportional { points_per_hour, minimum, maximum } = self else { return 0.0 };
-        let (Some(earlier), Some(later)) = (earlier, later) else { return 0.0 };
+        let Self::Proportional {
+            points_per_hour,
+            minimum,
+            maximum,
+        } = self
+        else {
+            return 0.0;
+        };
+        let (Some(earlier), Some(later)) = (earlier, later) else {
+            return 0.0;
+        };
         let hours = ((later - earlier).abs() / 3600.0) as f32;
         (hours * points_per_hour).clamp(minimum, maximum) * zoom
     }
@@ -175,7 +199,10 @@ pub struct TimelineZoom {
 
 impl TimelineZoom {
     pub fn new(factor: Binding<f32>) -> Self {
-        Self { factor, range: (0.25, 8.0) }
+        Self {
+            factor,
+            range: (0.25, 8.0),
+        }
     }
 
     pub fn range(mut self, lower: f32, upper: f32) -> Self {
@@ -226,13 +253,20 @@ impl Timeline {
 
     /// Every event in display order, across groups.
     pub fn events(&self) -> Vec<&TimelineEvent> {
-        self.groups.iter().flat_map(|group| group.events.iter()).collect()
+        self.groups
+            .iter()
+            .flat_map(|group| group.events.iter())
+            .collect()
     }
 
     fn is_collapsed(&self, id: &str) -> bool {
         match &self.collapsed_groups {
             Some(binding) => binding.get().iter().any(|value| value == id),
-            None => self.local_collapsed.borrow().iter().any(|value| value == id),
+            None => self
+                .local_collapsed
+                .borrow()
+                .iter()
+                .any(|value| value == id),
         }
     }
 
@@ -286,7 +320,10 @@ impl View for Timeline {
                 && group.is_collapsible
                 && match &collapsed_binding {
                     Some(binding) => binding.get().iter().any(|value| value == &group.id),
-                    None => local_collapsed.borrow().iter().any(|value| value == &group.id),
+                    None => local_collapsed
+                        .borrow()
+                        .iter()
+                        .any(|value| value == &group.id),
                 };
             let factor = zoom
                 .as_ref()
@@ -317,7 +354,12 @@ impl View for Timeline {
                         }
                     }
                 });
-                group_column.push(AnyView::new(group_header(group, is_collapsed, toggle, is_last_group)));
+                group_column.push(AnyView::new(group_header(
+                    group,
+                    is_collapsed,
+                    toggle,
+                    is_last_group,
+                )));
             }
             if !is_collapsed {
                 let event_count = group.events.len();
@@ -335,8 +377,7 @@ impl View for Timeline {
                         shows_trailing_connector,
                     };
                     group_column.push(AnyView::new(
-                        AnyView::new(row)
-                            .padding_insets(EdgeInsets::new(0.0, 0.0, gap, 0.0)),
+                        AnyView::new(row).padding_insets(EdgeInsets::new(0.0, 0.0, gap, 0.0)),
                     ));
                 }
             }
@@ -454,7 +495,9 @@ fn group_header(
             .frame_min_width(0.0),
     ));
     row.push(AnyView::new(
-        Badge::new(count.clone()).tone(StatusTone::Neutral).accessibility_hidden(true),
+        Badge::new(count.clone())
+            .tone(StatusTone::Neutral)
+            .accessibility_hidden(true),
     ));
     let label = AnyView::new(
         AnyView::new(Row::new(
@@ -626,11 +669,14 @@ impl TimelineRow {
                 .accessibility_hidden(true),
             );
         }
-        let resource = self.event.icon.clone().unwrap_or_else(|| self.event.tone.icon());
+        let resource = self
+            .event
+            .icon
+            .clone()
+            .unwrap_or_else(|| self.event.tone.icon());
         let size = metrics.size(theme.icons.medium);
         AnyView::new(
-            Icon::with_semantic(resource, size, self.event.tone.color())
-                .accessibility_hidden(true),
+            Icon::with_semantic(resource, size, self.event.tone.color()).accessibility_hidden(true),
         )
     }
 }

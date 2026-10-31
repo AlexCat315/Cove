@@ -48,9 +48,11 @@ mod unix {
 
     #[test]
     fn stdout_and_stderr_drain_through_exit() {
-        let session =
-            ProcessSession::spawn(&command("printf stdout; printf stderr >&2; exit 7"), ProcessLimits::default())
-                .expect("spawn");
+        let session = ProcessSession::spawn(
+            &command("printf stdout; printf stderr >&2; exit 7"),
+            ProcessLimits::default(),
+        )
+        .expect("spawn");
         let output = session.collect().expect("collect");
         assert_eq!(String::from_utf8_lossy(&output.stdout), "stdout");
         assert_eq!(String::from_utf8_lossy(&output.stderr), "stderr");
@@ -60,8 +62,7 @@ mod unix {
 
     #[test]
     fn stdin_is_delivered_before_eof_without_inheriting_environment() {
-        let mut request =
-            command("cat; printf '%s' \"${COVE_PROCESS_SECRET-unset}\"");
+        let mut request = command("cat; printf '%s' \"${COVE_PROCESS_SECRET-unset}\"");
         // Only the explicitly provided environment reaches the child.
         request.environment = BTreeMap::new();
         let mut session = ProcessSession::spawn(&request, ProcessLimits::default()).expect("spawn");
@@ -102,12 +103,13 @@ mod unix {
 
     #[test]
     fn output_is_bounded_even_when_the_child_never_exits() {
-        let limits = ProcessLimits { output_bytes: 100, ..Default::default() };
-        let session = ProcessSession::spawn(
-            &command("while :; do printf 1234567890; done"),
-            limits,
-        )
-        .expect("spawn");
+        let limits = ProcessLimits {
+            output_bytes: 100,
+            ..Default::default()
+        };
+        let session =
+            ProcessSession::spawn(&command("while :; do printf 1234567890; done"), limits)
+                .expect("spawn");
         let output = session.collect().expect("collection stops at the limit");
         assert!(
             output.stdout.len() <= 100,
@@ -119,10 +121,12 @@ mod unix {
 
     #[test]
     fn a_process_ignoring_term_is_killed_after_its_deadline() {
-        let limits = ProcessLimits { timeout: Duration::from_millis(100), ..Default::default() };
-        let session =
-            ProcessSession::spawn(&command("trap '' TERM; while :; do :; done"), limits)
-                .expect("spawn");
+        let limits = ProcessLimits {
+            timeout: Duration::from_millis(100),
+            ..Default::default()
+        };
+        let session = ProcessSession::spawn(&command("trap '' TERM; while :; do :; done"), limits)
+            .expect("spawn");
         let started = std::time::Instant::now();
         let output = session.collect().expect("collect");
         assert_eq!(output.reason, Termination::TimedOut);
@@ -135,15 +139,19 @@ mod unix {
 
     #[test]
     fn cancellation_terminates_a_long_running_command() {
-        let session = ProcessSession::spawn(&command("while :; do :; done"), ProcessLimits::default())
-            .expect("spawn");
+        let session =
+            ProcessSession::spawn(&command("while :; do :; done"), ProcessLimits::default())
+                .expect("spawn");
         session.cancel();
         while session.next_event().is_some() {}
     }
 
     #[test]
     fn pending_stdin_has_a_separate_budget() {
-        let limits = ProcessLimits { input_bytes: 8, ..Default::default() };
+        let limits = ProcessLimits {
+            input_bytes: 8,
+            ..Default::default()
+        };
         let mut session =
             ProcessSession::spawn(&command("while :; do :; done"), limits).expect("spawn");
         assert!(

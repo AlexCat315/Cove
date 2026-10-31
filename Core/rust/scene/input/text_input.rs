@@ -1,6 +1,6 @@
 //! Translation of CoveUIScene/TextInputAttachment.swift and TextInputClient.swift.
-use crate::scene::Node;
 use crate::Point;
+use crate::scene::Node;
 use cove_platform::TextInputArea;
 use serde::{Deserialize, Serialize};
 use std::rc::Rc;
@@ -23,8 +23,14 @@ pub struct TextEditActions {
     pub perform: Rc<dyn Fn(TextEditCommand)>,
 }
 impl TextEditActions {
-    pub fn new(can_perform: impl Fn(TextEditCommand) -> bool + 'static, perform: impl Fn(TextEditCommand) + 'static) -> Self {
-        Self { can_perform: Rc::new(can_perform), perform: Rc::new(perform) }
+    pub fn new(
+        can_perform: impl Fn(TextEditCommand) -> bool + 'static,
+        perform: impl Fn(TextEditCommand) + 'static,
+    ) -> Self {
+        Self {
+            can_perform: Rc::new(can_perform),
+            perform: Rc::new(perform),
+        }
     }
 }
 
@@ -57,7 +63,14 @@ pub struct TextInputSnapshot {
 }
 impl TextInputSnapshot {
     pub fn new(text: impl Into<String>, selection_start: i32, selection_end: i32) -> Self {
-        Self { text: text.into(), selection_start, selection_end, composition_start: -1, composition_end: -1, ..Self::default() }
+        Self {
+            text: text.into(),
+            selection_start,
+            selection_end,
+            composition_start: -1,
+            composition_end: -1,
+            ..Self::default()
+        }
     }
 }
 
@@ -69,8 +82,16 @@ pub struct TextInputClient {
     pub delete_surrounding: Rc<dyn Fn(i32, i32)>,
 }
 impl TextInputClient {
-    pub fn new(snapshot: impl Fn() -> TextInputSnapshot + 'static, select: impl Fn(i32, i32) + 'static, delete_surrounding: impl Fn(i32, i32) + 'static) -> Self {
-        Self { snapshot: Rc::new(snapshot), select: Rc::new(select), delete_surrounding: Rc::new(delete_surrounding) }
+    pub fn new(
+        snapshot: impl Fn() -> TextInputSnapshot + 'static,
+        select: impl Fn(i32, i32) + 'static,
+        delete_surrounding: impl Fn(i32, i32) + 'static,
+    ) -> Self {
+        Self {
+            snapshot: Rc::new(snapshot),
+            select: Rc::new(select),
+            delete_surrounding: Rc::new(delete_surrounding),
+        }
     }
 }
 

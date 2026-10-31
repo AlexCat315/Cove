@@ -16,8 +16,10 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use cove_platform::{NativeMenuIcon, NativeMenuItem, NativeMenuKind, NativeMenuSnapshot, NativeShortcut};
 use crate::primitives::overlays::menu::{MenuEntry, MenuItemRole};
+use cove_platform::{
+    NativeMenuIcon, NativeMenuItem, NativeMenuKind, NativeMenuSnapshot, NativeShortcut,
+};
 
 /// A menu snapshot plus the actions of its items.
 #[derive(Clone, Default)]
@@ -27,10 +29,7 @@ pub struct NativeMenuBuild {
 }
 
 impl NativeMenuBuild {
-    pub fn new(
-        snapshot: NativeMenuSnapshot,
-        actions: BTreeMap<i64, Rc<dyn Fn()>>,
-    ) -> Self {
+    pub fn new(snapshot: NativeMenuSnapshot, actions: BTreeMap<i64, Rc<dyn Fn()>>) -> Self {
         Self { snapshot, actions }
     }
 
@@ -88,7 +87,11 @@ impl NativeMenuBuilder {
                 },
                 MenuEntry::Submenu(branch) => NativeMenuItem {
                     id,
-                    kind: NativeMenuKind::Submenu(Self::snapshot(&branch.entries, next_id, actions)),
+                    kind: NativeMenuKind::Submenu(Self::snapshot(
+                        &branch.entries,
+                        next_id,
+                        actions,
+                    )),
                     title: branch.title.clone(),
                     enabled: branch.is_enabled,
                     checked: false,
@@ -148,15 +151,18 @@ impl NativeMenuBuilder {
             }
         }
 
-        let key: String = rest
-            .chars()
-            .filter(|character| *character != '+')
-            .collect();
+        let key: String = rest.chars().filter(|character| *character != '+').collect();
         let key = key.trim().to_string();
         if key.is_empty() {
             return None;
         }
-        Some(NativeShortcut { key, ctrl, alt, shift, meta })
+        Some(NativeShortcut {
+            key,
+            ctrl,
+            alt,
+            shift,
+            meta,
+        })
     }
 
     /// The template glyph for an item.

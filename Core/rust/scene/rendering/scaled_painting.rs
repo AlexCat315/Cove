@@ -34,7 +34,11 @@ pub fn paint_scaled(painter: &Painter, list: &mut DrawList, origin: Point, scale
     let vertices: Vec<Vertex> = local
         .vertices()
         .iter()
-        .map(|vertex| Vertex { x: x + (vertex.x - x) * scale, y: y + (vertex.y - y) * scale, ..*vertex })
+        .map(|vertex| Vertex {
+            x: x + (vertex.x - x) * scale,
+            y: y + (vertex.y - y) * scale,
+            ..*vertex
+        })
         .collect();
     let batches = local
         .batches()
@@ -78,7 +82,10 @@ mod tests {
     fn scale_maps_geometry_about_the_origin() {
         let mut list = DrawList::default();
         let painter: Painter = Rc::new(|list, origin| {
-            let _ = list.add_rect(Rect::new(origin.x + 10.0, origin.y, 10.0, 10.0), Color::BLACK);
+            let _ = list.add_rect(
+                Rect::new(origin.x + 10.0, origin.y, 10.0, 10.0),
+                Color::BLACK,
+            );
         });
         paint_scaled(&painter, &mut list, Point::new(0.0, 0.0), 2.0);
         let bounds = list.paint_bounds().unwrap();

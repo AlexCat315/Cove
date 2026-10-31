@@ -6,7 +6,9 @@
 //! host behaviour: launch-mode selection, rendering mode, per-frame typography
 //! metrics, checkpoint state and page reporting.
 
-use super::inspection::{semantic_nodes, InputSnapshot, SemanticNode, Snapshot, TypographyStatistics};
+use super::inspection::{
+    InputSnapshot, SemanticNode, Snapshot, TypographyStatistics, semantic_nodes,
+};
 use crate::android::contract::launch::{SceneLaunch, SceneLaunchMode};
 use crate::android::integration::scene::{AndroidContentSession, Rendering};
 use cove_composition::AnyView;
@@ -30,7 +32,12 @@ pub struct Bounds {
 
 impl Bounds {
     pub fn new(rect: Rect) -> Self {
-        Self { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+        Self {
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
+        }
     }
 }
 
@@ -193,8 +200,9 @@ impl HostedScene {
             typography.begin_frame();
         }
         drop(source);
-        self.drawing =
-            self.content.prepare((pixels.0 as i32, pixels.1 as i32), scale, delta_time);
+        self.drawing = self
+            .content
+            .prepare((pixels.0 as i32, pixels.1 as i32), scale, delta_time);
         let mut source = self.content_source.borrow_mut();
         if let Some(typography) = source.typography_mut() {
             if typography.atlas_is_full() {
@@ -202,8 +210,9 @@ impl HostedScene {
                     atlas.reset();
                 }
                 typography.begin_frame();
-                self.drawing =
-                    self.content.prepare((pixels.0 as i32, pixels.1 as i32), scale, 0.0);
+                self.drawing = self
+                    .content
+                    .prepare((pixels.0 as i32, pixels.1 as i32), scale, 0.0);
             }
             typography.finish_frame();
         }
@@ -315,7 +324,10 @@ impl HostedScene {
     /// The IME and touch routing need only the focused editor, not a traversal
     /// and serialization of every semantic node and diagnostic control bound.
     pub fn input_snapshot(&self) -> String {
-        let value = InputSnapshot { focused: self.focused_id(), editor: self.editor_snapshot() };
+        let value = InputSnapshot {
+            focused: self.focused_id(),
+            editor: self.editor_snapshot(),
+        };
         serde_json::to_string(&value).unwrap_or_else(|_| "{}".to_owned())
     }
 }

@@ -8,11 +8,11 @@
 //! interactive chrome is inset. `SafeArea` consumes the insets this root
 //! publishes, so screens that own a status bar, navigation bar or keyboard get
 //! the correct avoidance without a letterboxed surface.
-use crate::modifiers::layout::{EdgeInsets, FlexExt, LayoutFrameExt};
 use crate::adaptive::SurfaceEnvironment;
-use crate::theme::{node_text_scaler, TextScaler, TextScalerEnvironment};
+use crate::modifiers::layout::{EdgeInsets, FlexExt, LayoutFrameExt};
+use crate::theme::{TextScaler, TextScalerEnvironment, node_text_scaler};
+use crate::{AnyView, BoxView, PrimitiveView, View, ViewExt, impl_primitive_view};
 use cove_core::scene::ReducedMotionEnvironment;
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, View, ViewExt};
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 
 use super::safe_area::safe_area_insets;
@@ -25,7 +25,10 @@ pub struct SurfaceRoot {
 
 impl SurfaceRoot {
     pub fn new(environment: cove_core::Environment, content: impl View + 'static) -> Self {
-        Self { environment, content: AnyView::new(content) }
+        Self {
+            environment,
+            content: AnyView::new(content),
+        }
     }
 
     /// The safe area is persistent chrome; the keyboard overlays it while it is
@@ -37,7 +40,12 @@ impl SurfaceRoot {
         } else {
             0.0
         };
-        EdgeInsets::new(safe.top, safe.leading, safe.bottom.max(keyboard), safe.trailing)
+        EdgeInsets::new(
+            safe.top,
+            safe.leading,
+            safe.bottom.max(keyboard),
+            safe.trailing,
+        )
     }
 }
 
@@ -46,7 +54,11 @@ impl View for SurfaceRoot {
         let environment = self.environment.clone();
         let content = AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(self.content.clone().flex_with(1.0, 1.0, Some(0.0))),
             )
             .flex_with(1.0, 1.0, Some(0.0))

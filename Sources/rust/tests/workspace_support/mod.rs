@@ -76,7 +76,10 @@ pub fn group_node(id: &str) -> WorkspaceLayoutNode {
 /// authored split fractions.
 pub fn make_document() -> WorkspaceDocument {
     let panels = BTreeMap::from([
-        (WorkspacePanelID::new("hierarchy"), panel("hierarchy", "Hierarchy")),
+        (
+            WorkspacePanelID::new("hierarchy"),
+            panel("hierarchy", "Hierarchy"),
+        ),
         (
             WorkspacePanelID::new("viewport"),
             WorkspacePanel {
@@ -85,14 +88,32 @@ pub fn make_document() -> WorkspaceDocument {
                 ..panel("viewport", "Viewport")
             },
         ),
-        (WorkspacePanelID::new("inspector"), panel("inspector", "Inspector")),
-        (WorkspacePanelID::new("console"), panel("console", "Console")),
+        (
+            WorkspacePanelID::new("inspector"),
+            panel("inspector", "Inspector"),
+        ),
+        (
+            WorkspacePanelID::new("console"),
+            panel("console", "Console"),
+        ),
     ]);
     let groups = BTreeMap::from([
-        (WorkspaceTabGroupID::new("leading"), group("leading", &["hierarchy"])),
-        (WorkspaceTabGroupID::new("center"), group("center", &["viewport"])),
-        (WorkspaceTabGroupID::new("trailing"), group("trailing", &["inspector"])),
-        (WorkspaceTabGroupID::new("bottom"), group("bottom", &["console"])),
+        (
+            WorkspaceTabGroupID::new("leading"),
+            group("leading", &["hierarchy"]),
+        ),
+        (
+            WorkspaceTabGroupID::new("center"),
+            group("center", &["viewport"]),
+        ),
+        (
+            WorkspaceTabGroupID::new("trailing"),
+            group("trailing", &["inspector"]),
+        ),
+        (
+            WorkspaceTabGroupID::new("bottom"),
+            group("bottom", &["console"]),
+        ),
     ]);
     let mut slots = WorkspaceSlot::standard_editor_slots();
     for (slot_id, group_id) in [
@@ -103,7 +124,11 @@ pub fn make_document() -> WorkspaceDocument {
     ] {
         slots.insert(
             slot_id.clone(),
-            WorkspaceSlot::new(slot_id, WorkspaceSlotKind::Content, Some(group_node(group_id))),
+            WorkspaceSlot::new(
+                slot_id,
+                WorkspaceSlotKind::Content,
+                Some(group_node(group_id)),
+            ),
         );
     }
     WorkspaceDocument {
@@ -117,7 +142,10 @@ pub fn make_document() -> WorkspaceDocument {
 
 /// A document with no region chrome at all, so a slot render can be observed
 /// without neighbouring rails affecting the frame.
-pub fn make_bare_document(group_ids: &[(&str, &[&str])], slot_id: WorkspaceSlotID) -> WorkspaceDocument {
+pub fn make_bare_document(
+    group_ids: &[(&str, &[&str])],
+    slot_id: WorkspaceSlotID,
+) -> WorkspaceDocument {
     let mut panels = BTreeMap::new();
     let mut groups = BTreeMap::new();
     for (id, panel_ids) in group_ids {
@@ -138,7 +166,10 @@ pub fn make_bare_document(group_ids: &[(&str, &[&str])], slot_id: WorkspaceSlotI
         WorkspaceSplitAxis::Horizontal,
         0.5,
     );
-    slots.insert(slot_id.clone(), WorkspaceSlot::new(slot_id, WorkspaceSlotKind::Content, layout));
+    slots.insert(
+        slot_id.clone(),
+        WorkspaceSlot::new(slot_id, WorkspaceSlotKind::Content, layout),
+    );
     WorkspaceDocument::new(panels, groups, slots)
 }
 
@@ -156,7 +187,12 @@ pub struct WorkspaceRig {
 
 impl WorkspaceRig {
     /// `WorkspaceViewRig(controller:width:height:root:)`.
-    pub fn new(controller: Rc<RefCell<WorkspaceController>>, width: f32, height: f32, root: impl View + 'static) -> Self {
+    pub fn new(
+        controller: Rc<RefCell<WorkspaceController>>,
+        width: f32,
+        height: f32,
+        root: impl View + 'static,
+    ) -> Self {
         let interactions = Rc::new(InteractionRegistry::new());
         let focus = Rc::new(FocusChain::new());
         let capture = Rc::new(PointerCapture::new());
@@ -175,7 +211,16 @@ impl WorkspaceRig {
         );
         graph.install(root, Default::default());
         graph.compute_layout(width, height);
-        Self { controller, graph, interactions, focus, capture, dispatcher, width, height }
+        Self {
+            controller,
+            graph,
+            interactions,
+            focus,
+            capture,
+            dispatcher,
+            width,
+            height,
+        }
     }
 
     /// The default workspace root: `WorkspaceView` over a debug-named content
@@ -207,7 +252,9 @@ impl WorkspaceRig {
     }
 
     pub fn optional_named(&self, name: &str) -> Option<Node> {
-        self.nodes().into_iter().find(|node| debug_name(node).as_deref() == Some(name))
+        self.nodes()
+            .into_iter()
+            .find(|node| debug_name(node).as_deref() == Some(name))
     }
 
     pub fn frame(&self, name: &str) -> Rect {
@@ -244,13 +291,14 @@ impl WorkspaceRig {
     }
 
     pub fn move_drag(&self, to: Point) {
-        self.dispatcher.dispatch(&InputEvent::MouseMotion(MouseMotionEvent {
-            x: to.x,
-            y: to.y,
-            delta_x: 0.0,
-            delta_y: 0.0,
-            kind: Default::default(),
-        }));
+        self.dispatcher
+            .dispatch(&InputEvent::MouseMotion(MouseMotionEvent {
+                x: to.x,
+                y: to.y,
+                delta_x: 0.0,
+                delta_y: 0.0,
+                kind: Default::default(),
+            }));
         self.pump();
     }
 
@@ -262,18 +310,21 @@ impl WorkspaceRig {
     /// `drag(from:to:)`: press, two motion samples, release.
     pub fn drag(&self, from: Point, to: Point) {
         self.begin_drag(from);
-        let mid = Point { x: (from.x + to.x) * 0.5, y: (from.y + to.y) * 0.5 };
+        let mid = Point {
+            x: (from.x + to.x) * 0.5,
+            y: (from.y + to.y) * 0.5,
+        };
         self.move_drag(mid);
         self.move_drag(to);
         self.end_drag(to);
     }
 
     pub fn collapse(&self, group_id: &str) {
-        self.controller
-            .borrow_mut()
-            .dispatch(cove_ui_addons::workspace::WorkspaceCommand::Collapse(
-                WorkspaceTabGroupID::new(group_id),
-            ));
+        self.controller.borrow_mut().dispatch(
+            cove_ui_addons::workspace::WorkspaceCommand::Collapse(WorkspaceTabGroupID::new(
+                group_id,
+            )),
+        );
         self.pump();
     }
 
@@ -293,13 +344,17 @@ impl WorkspaceRig {
 
 impl Drop for WorkspaceRig {
     fn drop(&mut self) {
-        if InteractionRegistryHolder::current().is_some_and(|current| Rc::ptr_eq(&current, &self.interactions)) {
+        if InteractionRegistryHolder::current()
+            .is_some_and(|current| Rc::ptr_eq(&current, &self.interactions))
+        {
             InteractionRegistryHolder::set_current(None);
         }
         if FocusChainHolder::current().is_some_and(|current| Rc::ptr_eq(&current, &self.focus)) {
             FocusChainHolder::set_current(None);
         }
-        if PointerCaptureHolder::current().is_some_and(|current| Rc::ptr_eq(&current, &self.capture)) {
+        if PointerCaptureHolder::current()
+            .is_some_and(|current| Rc::ptr_eq(&current, &self.capture))
+        {
             PointerCaptureHolder::set_current(None);
         }
     }
@@ -308,8 +363,8 @@ impl Drop for WorkspaceRig {
 /// `makeWorkspaceRoot(controller:)`: the workspace over debug-named content.
 pub fn workspace_root(controller: Rc<RefCell<WorkspaceController>>) -> AnyView {
     use cove_composition::{EmptyView, LayoutDebugExt};
-    use cove_ui_compose::BoxView;
     use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
+    use cove_ui_compose::BoxView;
 
     AnyView::new(WorkspaceView::new(
         controller,

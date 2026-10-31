@@ -7,8 +7,8 @@
 //! `WorkspaceLayoutSplit` address and the `WorkspaceLayoutNode::resizing` walk
 //! live in this module.
 use super::ids::{
-    WorkspaceEdge, WorkspaceFloatingWindowID, WorkspacePanelID, WorkspaceSlotID, WorkspaceSplitAxis,
-    WorkspaceTabGroupID,
+    WorkspaceEdge, WorkspaceFloatingWindowID, WorkspacePanelID, WorkspaceSlotID,
+    WorkspaceSplitAxis, WorkspaceTabGroupID,
 };
 use super::sizing::{WorkspacePanelSizing, WorkspaceRect};
 use cove_composition::{AnyView, EmptyView};
@@ -35,7 +35,12 @@ impl WorkspaceLayoutNode {
     }
 
     pub fn split(axis: WorkspaceSplitAxis, fraction: f32, first: Self, second: Self) -> Self {
-        Self::Split { axis, fraction, first: Box::new(first), second: Box::new(second) }
+        Self::Split {
+            axis,
+            fraction,
+            first: Box::new(first),
+            second: Box::new(second),
+        }
     }
 
     pub fn leaf_group_ids(&self) -> Vec<WorkspaceTabGroupID> {
@@ -54,7 +59,11 @@ impl WorkspaceLayoutNode {
     }
 
     /// Stack the provided groups vertically, left-heavy tree like Swift.
-    pub fn stacked(group_ids: &[WorkspaceTabGroupID], axis: WorkspaceSplitAxis, fraction: f32) -> Option<Self> {
+    pub fn stacked(
+        group_ids: &[WorkspaceTabGroupID],
+        axis: WorkspaceSplitAxis,
+        fraction: f32,
+    ) -> Option<Self> {
         let mut iterator = group_ids.iter();
         let mut root = Self::Group(iterator.next()?.clone());
         for next in iterator {
@@ -63,34 +72,51 @@ impl WorkspaceLayoutNode {
         Some(root)
     }
 
-    pub fn appending(&self, group_id: WorkspaceTabGroupID, axis: WorkspaceSplitAxis, fraction: f32) -> Self {
+    pub fn appending(
+        &self,
+        group_id: WorkspaceTabGroupID,
+        axis: WorkspaceSplitAxis,
+        fraction: f32,
+    ) -> Self {
         Self::split(axis, fraction, self.clone(), Self::Group(group_id))
     }
 
     pub fn removing(&self, group_id: &WorkspaceTabGroupID) -> Option<Self> {
         match self {
             Self::Group(current) => (current != group_id).then(|| self.clone()),
-            Self::Split { axis, fraction, first, second } => {
-                match (first.removing(group_id), second.removing(group_id)) {
-                    (None, None) => None,
-                    (Some(remaining), None) | (None, Some(remaining)) => Some(remaining),
-                    (Some(next_first), Some(next_second)) => {
-                        Some(Self::split(*axis, *fraction, next_first, next_second))
-                    }
+            Self::Split {
+                axis,
+                fraction,
+                first,
+                second,
+            } => match (first.removing(group_id), second.removing(group_id)) {
+                (None, None) => None,
+                (Some(remaining), None) | (None, Some(remaining)) => Some(remaining),
+                (Some(next_first), Some(next_second)) => {
+                    Some(Self::split(*axis, *fraction, next_first, next_second))
                 }
-            }
+            },
         }
     }
 
     /// Re-target a split identified by the groups on each side. Addresses
     /// survive subtree compaction because they name content, not paths.
     pub fn resizing(&self, address: &WorkspaceLayoutSplit, fraction: f32) -> Option<Self> {
-        let Self::Split { axis, fraction: current, first, second } = self else {
+        let Self::Split {
+            axis,
+            fraction: current,
+            first,
+            second,
+        } = self
+        else {
             return None;
         };
-        if first.contains_group(&address.first_group) && second.contains_group(&address.second_group) {
+        if first.contains_group(&address.first_group)
+            && second.contains_group(&address.second_group)
+        {
             let next = super::sizing::WorkspaceSplitFractions::clamp(fraction);
-            return (next != *current).then(|| Self::split(*axis, next, (**first).clone(), (**second).clone()));
+            return (next != *current)
+                .then(|| Self::split(*axis, next, (**first).clone(), (**second).clone()));
         }
         if let Some(next) = first.resizing(address, fraction) {
             return Some(Self::split(*axis, *current, next, (**second).clone()));
@@ -111,8 +137,16 @@ pub struct WorkspaceLayoutSplit {
 }
 
 impl WorkspaceLayoutSplit {
-    pub fn new(slot: WorkspaceSlotID, first_group: WorkspaceTabGroupID, second_group: WorkspaceTabGroupID) -> Self {
-        Self { slot, first_group, second_group }
+    pub fn new(
+        slot: WorkspaceSlotID,
+        first_group: WorkspaceTabGroupID,
+        second_group: WorkspaceTabGroupID,
+    ) -> Self {
+        Self {
+            slot,
+            first_group,
+            second_group,
+        }
     }
 }
 
@@ -159,7 +193,13 @@ pub struct WorkspaceTabGroup {
 impl WorkspaceTabGroup {
     pub fn new(id: WorkspaceTabGroupID, panels: Vec<WorkspacePanelID>) -> Self {
         let active = panels.first().cloned();
-        Self { id, panels, active_panel_id: active, is_collapsed: false, pinned_panel_ids: Vec::new() }
+        Self {
+            id,
+            panels,
+            active_panel_id: active,
+            is_collapsed: false,
+            pinned_panel_ids: Vec::new(),
+        }
     }
 
     pub fn is_pinned(&self, panel_id: &WorkspacePanelID) -> bool {
@@ -187,7 +227,10 @@ impl WorkspaceSlotSize {
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum WorkspaceSlotKind {
     Content,
-    Chrome { edge: WorkspaceEdge, size: WorkspaceSlotSize },
+    Chrome {
+        edge: WorkspaceEdge,
+        size: WorkspaceSlotSize,
+    },
     Overlay,
     Floating,
 }
@@ -200,7 +243,11 @@ pub struct WorkspaceSlot {
 }
 
 impl WorkspaceSlot {
-    pub fn new(id: WorkspaceSlotID, kind: WorkspaceSlotKind, layout: Option<WorkspaceLayoutNode>) -> Self {
+    pub fn new(
+        id: WorkspaceSlotID,
+        kind: WorkspaceSlotKind,
+        layout: Option<WorkspaceLayoutNode>,
+    ) -> Self {
         Self { id, kind, layout }
     }
 
@@ -209,7 +256,9 @@ impl WorkspaceSlot {
     }
 
     pub fn contains_group(&self, group_id: &WorkspaceTabGroupID) -> bool {
-        self.layout.as_ref().is_some_and(|layout| layout.contains_group(group_id))
+        self.layout
+            .as_ref()
+            .is_some_and(|layout| layout.contains_group(group_id))
     }
 
     pub fn append_group(&mut self, group_id: WorkspaceTabGroupID) {
@@ -223,7 +272,10 @@ impl WorkspaceSlot {
     }
 
     pub fn remove_group(&mut self, group_id: &WorkspaceTabGroupID) {
-        self.layout = self.layout.as_ref().and_then(|layout| layout.removing(group_id));
+        self.layout = self
+            .layout
+            .as_ref()
+            .and_then(|layout| layout.removing(group_id));
     }
 
     pub fn standard_editor_slots() -> BTreeMap<WorkspaceSlotID, WorkspaceSlot> {
@@ -236,8 +288,18 @@ impl WorkspaceSlot {
         ] {
             slots.insert(id.clone(), Self::content(id));
         }
-        slots.insert(WorkspaceSlotID::overlay(), Self::new(WorkspaceSlotID::overlay(), WorkspaceSlotKind::Overlay, None));
-        slots.insert(WorkspaceSlotID::floating(), Self::new(WorkspaceSlotID::floating(), WorkspaceSlotKind::Floating, None));
+        slots.insert(
+            WorkspaceSlotID::overlay(),
+            Self::new(WorkspaceSlotID::overlay(), WorkspaceSlotKind::Overlay, None),
+        );
+        slots.insert(
+            WorkspaceSlotID::floating(),
+            Self::new(
+                WorkspaceSlotID::floating(),
+                WorkspaceSlotKind::Floating,
+                None,
+            ),
+        );
         slots.extend(Self::standard_editor_chrome_rail_slots());
         slots
     }
@@ -245,13 +307,26 @@ impl WorkspaceSlot {
     pub fn standard_editor_chrome_rail_slots() -> BTreeMap<WorkspaceSlotID, WorkspaceSlot> {
         let mut slots = BTreeMap::new();
         for (id, edge) in [
-            (WorkspaceSlotID::chrome_leading_rail(), WorkspaceEdge::Leading),
-            (WorkspaceSlotID::chrome_trailing_rail(), WorkspaceEdge::Trailing),
+            (
+                WorkspaceSlotID::chrome_leading_rail(),
+                WorkspaceEdge::Leading,
+            ),
+            (
+                WorkspaceSlotID::chrome_trailing_rail(),
+                WorkspaceEdge::Trailing,
+            ),
             (WorkspaceSlotID::chrome_bottom_rail(), WorkspaceEdge::Bottom),
         ] {
             slots.insert(
                 id.clone(),
-                Self::new(id, WorkspaceSlotKind::Chrome { edge, size: WorkspaceSlotSize::Fixed(40.0) }, None),
+                Self::new(
+                    id,
+                    WorkspaceSlotKind::Chrome {
+                        edge,
+                        size: WorkspaceSlotSize::Fixed(40.0),
+                    },
+                    None,
+                ),
             );
         }
         slots
@@ -268,8 +343,20 @@ pub struct WorkspaceFloatingWindow {
 }
 
 impl WorkspaceFloatingWindow {
-    pub fn new(id: WorkspaceFloatingWindowID, group_id: WorkspaceTabGroupID, title: String, frame: WorkspaceRect, z_index: i32) -> Self {
-        Self { id, group_id, title, frame, z_index }
+    pub fn new(
+        id: WorkspaceFloatingWindowID,
+        group_id: WorkspaceTabGroupID,
+        title: String,
+        frame: WorkspaceRect,
+        z_index: i32,
+    ) -> Self {
+        Self {
+            id,
+            group_id,
+            title,
+            frame,
+            z_index,
+        }
     }
 }
 
@@ -290,7 +377,13 @@ impl WorkspaceClosedPanel {
         floating_window_id: Option<WorkspaceFloatingWindowID>,
         index: usize,
     ) -> Self {
-        Self { panel_id, group_id, slot_id, floating_window_id, index }
+        Self {
+            panel_id,
+            group_id,
+            slot_id,
+            floating_window_id,
+            index,
+        }
     }
 }
 
@@ -334,7 +427,10 @@ impl WorkspaceDocument {
     }
 
     pub fn slot(&self, id: &WorkspaceSlotID) -> WorkspaceSlot {
-        self.slots.get(id).cloned().unwrap_or_else(|| WorkspaceSlot::content(id.clone()))
+        self.slots
+            .get(id)
+            .cloned()
+            .unwrap_or_else(|| WorkspaceSlot::content(id.clone()))
     }
 
     pub fn set_slot(&mut self, slot: WorkspaceSlot) {
@@ -359,7 +455,11 @@ impl WorkspaceDocument {
     pub fn group_containing(&self, panel_id: &WorkspacePanelID) -> Option<&WorkspaceTabGroup> {
         self.slots
             .values()
-            .flat_map(|slot| slot.layout.iter().flat_map(|layout| layout.leaf_group_ids()))
+            .flat_map(|slot| {
+                slot.layout
+                    .iter()
+                    .flat_map(|layout| layout.leaf_group_ids())
+            })
             .filter_map(|id| self.groups.get(&id))
             .find(|group| group.panels.contains(panel_id))
             .or_else(|| {
@@ -368,7 +468,11 @@ impl WorkspaceDocument {
                     .filter_map(|window| self.groups.get(&window.group_id))
                     .find(|group| group.panels.contains(panel_id))
             })
-            .or_else(|| self.groups.values().find(|group| group.panels.contains(panel_id)))
+            .or_else(|| {
+                self.groups
+                    .values()
+                    .find(|group| group.panels.contains(panel_id))
+            })
     }
 
     pub fn slot_containing(&self, group_id: &WorkspaceTabGroupID) -> Option<WorkspaceSlotID> {
@@ -378,19 +482,32 @@ impl WorkspaceDocument {
             .map(|slot| slot.id.clone())
     }
 
-    pub fn floating_window_containing(&self, group_id: &WorkspaceTabGroupID) -> Option<&WorkspaceFloatingWindow> {
-        self.floating_windows.iter().find(|window| &window.group_id == group_id)
+    pub fn floating_window_containing(
+        &self,
+        group_id: &WorkspaceTabGroupID,
+    ) -> Option<&WorkspaceFloatingWindow> {
+        self.floating_windows
+            .iter()
+            .find(|window| &window.group_id == group_id)
     }
 
     pub fn referenced_layout_group_ids(&self) -> std::collections::BTreeSet<WorkspaceTabGroupID> {
         self.slots
             .values()
-            .flat_map(|slot| slot.layout.as_ref().map(|layout| layout.leaf_group_ids()).unwrap_or_default())
+            .flat_map(|slot| {
+                slot.layout
+                    .as_ref()
+                    .map(|layout| layout.leaf_group_ids())
+                    .unwrap_or_default()
+            })
             .collect()
     }
 
     pub fn referenced_floating_group_ids(&self) -> std::collections::BTreeSet<WorkspaceTabGroupID> {
-        self.floating_windows.iter().map(|window| window.group_id.clone()).collect()
+        self.floating_windows
+            .iter()
+            .map(|window| window.group_id.clone())
+            .collect()
     }
 
     pub fn has_valid_layout_references(&self) -> bool {
@@ -401,7 +518,8 @@ impl WorkspaceDocument {
         {
             return false;
         }
-        let attached: std::collections::BTreeSet<_> = layout_ids.union(&floating_ids).cloned().collect();
+        let attached: std::collections::BTreeSet<_> =
+            layout_ids.union(&floating_ids).cloned().collect();
         self.groups
             .iter()
             .filter(|(_, group)| !group.panels.is_empty())
@@ -426,7 +544,11 @@ impl WorkspacePanelDescriptor {
     }
 
     pub fn with(panel: WorkspacePanel) -> Self {
-        Self { panel, default_slot: WorkspaceSlotID::center(), factory: Rc::new(|| AnyView::new(EmptyView)) }
+        Self {
+            panel,
+            default_slot: WorkspaceSlotID::center(),
+            factory: Rc::new(|| AnyView::new(EmptyView)),
+        }
     }
 
     pub fn default_slot(mut self, slot: WorkspaceSlotID) -> Self {
@@ -453,7 +575,11 @@ impl WorkspacePanelDescriptor {
 
 impl Clone for WorkspacePanelDescriptor {
     fn clone(&self) -> Self {
-        Self { panel: self.panel.clone(), default_slot: self.default_slot.clone(), factory: self.factory.clone() }
+        Self {
+            panel: self.panel.clone(),
+            default_slot: self.default_slot.clone(),
+            factory: self.factory.clone(),
+        }
     }
 }
 
@@ -486,7 +612,11 @@ impl WorkspacePanelRegistry {
 
     /// Re-author a registered descriptor. An update that would change the
     /// panel identity is rejected, matching the Swift precondition.
-    pub fn update_descriptor(&mut self, id: &WorkspacePanelID, update: impl FnOnce(&mut WorkspacePanelDescriptor)) {
+    pub fn update_descriptor(
+        &mut self,
+        id: &WorkspacePanelID,
+        update: impl FnOnce(&mut WorkspacePanelDescriptor),
+    ) {
         let Some(mut descriptor) = self.by_id.get(id).cloned() else {
             return;
         };
@@ -502,15 +632,25 @@ impl WorkspacePanelRegistry {
     }
 
     pub fn make(&self, id: &WorkspacePanelID) -> AnyView {
-        self.by_id.get(id).map_or_else(|| AnyView::new(EmptyView), WorkspacePanelDescriptor::make)
+        self.by_id
+            .get(id)
+            .map_or_else(|| AnyView::new(EmptyView), WorkspacePanelDescriptor::make)
     }
 
     /// A content closure for [`WorkspaceView`], so the registry can be handed to
     /// a view without the caller rebuilding the indirection.
     pub fn content(&self) -> Rc<dyn Fn(WorkspacePanelID) -> AnyView> {
-        let snapshot: BTreeMap<WorkspacePanelID, AnyView> =
-            self.order.iter().filter_map(|id| self.by_id.get(id).map(|d| (id.clone(), d.make()))).collect();
-        Rc::new(move |id| snapshot.get(&id).cloned().unwrap_or_else(|| AnyView::new(EmptyView)))
+        let snapshot: BTreeMap<WorkspacePanelID, AnyView> = self
+            .order
+            .iter()
+            .filter_map(|id| self.by_id.get(id).map(|d| (id.clone(), d.make())))
+            .collect();
+        Rc::new(move |id| {
+            snapshot
+                .get(&id)
+                .cloned()
+                .unwrap_or_else(|| AnyView::new(EmptyView))
+        })
     }
 
     pub fn unregister(&mut self, id: &WorkspacePanelID) {
@@ -531,12 +671,18 @@ impl WorkspacePanelRegistry {
     }
 
     pub fn descriptors(&self) -> Vec<WorkspacePanelDescriptor> {
-        self.order.iter().filter_map(|id| self.by_id.get(id).cloned()).collect()
+        self.order
+            .iter()
+            .filter_map(|id| self.by_id.get(id).cloned())
+            .collect()
     }
 
     /// The panels of every registered descriptor, in registration order.
     pub fn panels(&self) -> Vec<WorkspacePanel> {
-        self.descriptors().into_iter().map(|descriptor| descriptor.panel).collect()
+        self.descriptors()
+            .into_iter()
+            .map(|descriptor| descriptor.panel)
+            .collect()
     }
 }
 

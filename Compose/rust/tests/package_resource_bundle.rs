@@ -22,11 +22,15 @@ fn built_in_icon_resolves() {
     // Dropdown triggers draw the wider arrow rather than the navigation
     // chevron, so both variants must ship.
     assert!(
-        ui_icon_catalog::navigation::dropdown_chevron_down().path().is_some(),
+        ui_icon_catalog::navigation::dropdown_chevron_down()
+            .path()
+            .is_some(),
         "Navigation.dropdownChevronDown resolves to a bundled file"
     );
     assert!(
-        ui_icon_catalog::navigation::dropdown_chevron_up().path().is_some(),
+        ui_icon_catalog::navigation::dropdown_chevron_up()
+            .path()
+            .is_some(),
         "Navigation.dropdownChevronUp resolves to a bundled file"
     );
 }

@@ -13,20 +13,19 @@ use crate::rhi::{
     AccelerationStructure, AccelerationStructureDescriptor, AdapterCapabilities, BindingLayout,
     BindingLayoutDescriptor, BindingLayoutEntry, BindingSet, BindingSetEntry, Buffer,
     BufferDescriptor, Capabilities, Completion, ComputePipeline, ComputePipelineDescriptor,
-    CpuProfilePhase, DeviceConfig, FrameUploader, GraphicsApi, GraphicsPipeline,
-    GraphicsPipelineDescriptor, GpuTimestampProfile, MeshPipeline, MeshPipelineDescriptor,
+    CpuProfilePhase, DeviceConfig, FrameUploader, GpuTimestampProfile, GraphicsApi,
+    GraphicsPipeline, GraphicsPipelineDescriptor, MeshPipeline, MeshPipelineDescriptor,
     PipelineLayout, PipelineLayoutDescriptor, PlannedSubmit, PresentationMode, QueueClass,
-    RhiBackend, RhiError, RhiResult, Sampler, SamplerDescriptor, ShaderModule,
-    RhiCompilationWork, RhiCompiledObject, ShaderModuleDescriptor, SubmissionCpuProfile,
-    SurfaceDescriptor, Swapchain, SwapchainImage,
-    Texture, TextureAllocation, TextureDescriptor, TextureSubresource, TextureUploadRegion,
-    rhi_require, rhi_validate_texture_samples,
+    RhiBackend, RhiCompilationWork, RhiCompiledObject, RhiError, RhiResult, Sampler,
+    SamplerDescriptor, ShaderModule, ShaderModuleDescriptor, SubmissionCpuProfile,
+    SurfaceDescriptor, Swapchain, SwapchainImage, Texture, TextureAllocation, TextureDescriptor,
+    TextureSubresource, TextureUploadRegion, rhi_require, rhi_validate_texture_samples,
 };
 
 use super::device::{Dx12DeviceHandle, execute_and_signal};
 use super::resources::Dx12Registries;
-use crate::rhi::UploadRingChunk;
 use super::sys;
+use crate::rhi::UploadRingChunk;
 
 // SAFETY: every field is a COM pointer or an `Arc<Mutex<_>>`. Direct3D 12 objects
 // are documented as usable from multiple threads, and the backend is handed to the
@@ -56,7 +55,9 @@ impl Dx12Backend {
     }
 
     fn lock(&self) -> std::sync::MutexGuard<'_, Dx12Registries> {
-        self.registries.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+        self.registries
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     /// Waits for the graphics queue to finish, which is the documented idle path.
@@ -100,7 +101,9 @@ pub struct Dx12FrameUploader {
 
 impl Dx12FrameUploader {
     pub fn new(factory: impl FnMut(usize) -> RhiResult<Dx12UploadChunk> + Send + 'static) -> Self {
-        Self { allocator: crate::rhi::ChunkUploadAllocator::new(4 * 1024 * 1024, factory) }
+        Self {
+            allocator: crate::rhi::ChunkUploadAllocator::new(4 * 1024 * 1024, factory),
+        }
     }
 }
 
@@ -155,7 +158,13 @@ impl RhiBackend for Dx12Backend {
             .get(&handle.id())
             .map_or(1, |chain| chain.generation + 1);
         self.destroy_swapchain(handle);
-        super::swapchain::create(&mut self.device, &self.registries, handle, &descriptor, generation)
+        super::swapchain::create(
+            &mut self.device,
+            &self.registries,
+            handle,
+            &descriptor,
+            generation,
+        )
     }
 
     fn presentation_mode(&self, handle: Swapchain) -> RhiResult<PresentationMode> {
@@ -328,12 +337,7 @@ impl RhiBackend for Dx12Backend {
 
     // MARK: Immediate data transfer
 
-    fn upload_buffer_data(
-        &mut self,
-        buffer: Buffer,
-        offset: usize,
-        data: &[u8],
-    ) -> RhiResult<()> {
+    fn upload_buffer_data(&mut self, buffer: Buffer, offset: usize, data: &[u8]) -> RhiResult<()> {
         let registries = self.lock();
         super::buffer::upload(&registries, &self.device, buffer, offset, data)
     }
@@ -363,15 +367,18 @@ impl RhiBackend for Dx12Backend {
         // reads its immutable metadata.
         let record = {
             let registries = self.lock();
-            registries.textures.get(&texture.id()).map(|record| TextureSnapshot {
-                resource: record.resource,
-                format: record.format,
-                width: record.width,
-                height: record.height,
-                mip_levels: record.mip_levels,
-                layers: record.layers,
-                sample_count: record.sample_count,
-            })
+            registries
+                .textures
+                .get(&texture.id())
+                .map(|record| TextureSnapshot {
+                    resource: record.resource,
+                    format: record.format,
+                    width: record.width,
+                    height: record.height,
+                    mip_levels: record.mip_levels,
+                    layers: record.layers,
+                    sample_count: record.sample_count,
+                })
         };
         let record = record.ok_or_else(|| RhiError::invalid_argument("unknown texture"))?;
         super::texture::upload_snapshot(
@@ -396,15 +403,18 @@ impl RhiBackend for Dx12Backend {
         self.wait_until_idle()?;
         let record = {
             let registries = self.lock();
-            registries.textures.get(&texture.id()).map(|record| TextureSnapshot {
-                resource: record.resource,
-                format: record.format,
-                width: record.width,
-                height: record.height,
-                mip_levels: record.mip_levels,
-                layers: record.layers,
-                sample_count: record.sample_count,
-            })
+            registries
+                .textures
+                .get(&texture.id())
+                .map(|record| TextureSnapshot {
+                    resource: record.resource,
+                    format: record.format,
+                    width: record.width,
+                    height: record.height,
+                    mip_levels: record.mip_levels,
+                    layers: record.layers,
+                    sample_count: record.sample_count,
+                })
         };
         let record = record.ok_or_else(|| RhiError::invalid_argument("unknown texture"))?;
         super::texture::read_snapshot(
@@ -422,7 +432,9 @@ impl RhiBackend for Dx12Backend {
 
     fn make_frame_uploader(&mut self, slot: usize) -> RhiResult<Box<dyn FrameUploader>> {
         let uploader = if let Some(existing) = self.uploaders.get(&slot) {
-            let mut guard = existing.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            let mut guard = existing
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             crate::rhi::FrameUploader::reset(&mut *guard);
             Arc::clone(existing)
         } else {
@@ -604,18 +616,34 @@ impl Dx12Backend {
             }
             RhiCompilationRequest::Graphics(handle, descriptor) => {
                 let mut registries = self.lock();
-                super::pipeline::create_graphics(&self.device, &mut registries, handle, &descriptor)?;
-                Ok(RhiCompilationWork::new(|| Ok(RhiCompiledObject::new(|| {}, || {}))))
+                super::pipeline::create_graphics(
+                    &self.device,
+                    &mut registries,
+                    handle,
+                    &descriptor,
+                )?;
+                Ok(RhiCompilationWork::new(|| {
+                    Ok(RhiCompiledObject::new(|| {}, || {}))
+                }))
             }
             RhiCompilationRequest::Compute(handle, descriptor) => {
                 let mut registries = self.lock();
-                super::pipeline::create_compute(&self.device, &mut registries, handle, &descriptor)?;
-                Ok(RhiCompilationWork::new(|| Ok(RhiCompiledObject::new(|| {}, || {}))))
+                super::pipeline::create_compute(
+                    &self.device,
+                    &mut registries,
+                    handle,
+                    &descriptor,
+                )?;
+                Ok(RhiCompilationWork::new(|| {
+                    Ok(RhiCompiledObject::new(|| {}, || {}))
+                }))
             }
             RhiCompilationRequest::Mesh(handle, descriptor) => {
                 let mut registries = self.lock();
                 super::pipeline::create_mesh(&self.device, &mut registries, handle, &descriptor)?;
-                Ok(RhiCompilationWork::new(|| Ok(RhiCompiledObject::new(|| {}, || {}))))
+                Ok(RhiCompilationWork::new(|| {
+                    Ok(RhiCompiledObject::new(|| {}, || {}))
+                }))
             }
         }
     }
@@ -650,7 +678,14 @@ unsafe impl Sync for UploadFactory {}
 
 impl UploadFactory {
     fn make_chunk(&self, capacity: usize) -> RhiResult<Dx12UploadChunk> {
-        let handle = Buffer::new(self.next_id + self.registries.lock().map(|guard| guard.buffers.len() as u32).unwrap_or(0));
+        let handle = Buffer::new(
+            self.next_id
+                + self
+                    .registries
+                    .lock()
+                    .map(|guard| guard.buffers.len() as u32)
+                    .unwrap_or(0),
+        );
         let record = super::buffer::create_upload_heap(self.device, capacity.max(1))?;
         let pointer = record.mapped;
         self.registries
@@ -658,7 +693,11 @@ impl UploadFactory {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .buffers
             .insert(handle.id(), record);
-        Ok(Dx12UploadChunk { handle, capacity, pointer })
+        Ok(Dx12UploadChunk {
+            handle,
+            capacity,
+            pointer,
+        })
     }
 }
 
@@ -670,13 +709,19 @@ struct SharedUploader {
 impl FrameUploader for SharedUploader {
     fn reset(&mut self) {
         FrameUploader::reset(
-            &mut *self.uploader.lock().unwrap_or_else(std::sync::PoisonError::into_inner),
+            &mut *self
+                .uploader
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
         );
     }
 
     fn write(&mut self, bytes: &[u8], alignment: usize) -> RhiResult<crate::rhi::UploadLocation> {
         FrameUploader::write(
-            &mut *self.uploader.lock().unwrap_or_else(std::sync::PoisonError::into_inner),
+            &mut *self
+                .uploader
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
             bytes,
             alignment,
         )

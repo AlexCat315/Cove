@@ -5,7 +5,7 @@
 //! formatting is stable regardless of the input's key order.
 
 use cove_ui_compose::primitives::controls::fields::{
-    normalized_commit_text, pretty_printed, validate, JsonFieldLabels, JsonFieldValidation,
+    JsonFieldLabels, JsonFieldValidation, normalized_commit_text, pretty_printed, validate,
 };
 
 #[test]
@@ -40,7 +40,11 @@ fn any_valid_document_validates() {
         "null",
         r#"{"nested": {"deep": [1, {"x": null}]}}"#,
     ] {
-        assert_eq!(validate(text), JsonFieldValidation::Valid, "{text} should be valid");
+        assert_eq!(
+            validate(text),
+            JsonFieldValidation::Valid,
+            "{text} should be valid"
+        );
     }
 }
 
@@ -68,7 +72,10 @@ fn pretty_printing_sorts_keys() {
 fn pretty_printing_is_stable_across_key_order() {
     let one = pretty_printed(r#"{"b": 1, "a": 2}"#).unwrap();
     let other = pretty_printed(r#"{"a": 2, "b": 1}"#).unwrap();
-    assert_eq!(one, other, "semantically equal documents format identically");
+    assert_eq!(
+        one, other,
+        "semantically equal documents format identically"
+    );
 }
 
 #[test]
@@ -78,14 +85,24 @@ fn pretty_printing_an_empty_field_formats_the_empty_object() {
 
 #[test]
 fn pretty_printing_invalid_input_returns_nothing() {
-    assert_eq!(pretty_printed("{"), None, "no partial result for invalid input");
+    assert_eq!(
+        pretty_printed("{"),
+        None,
+        "no partial result for invalid input"
+    );
 }
 
 #[test]
 fn pretty_output_indents_nested_structures() {
     let pretty = pretty_printed(r#"{"a":{"b":1}}"#).unwrap();
-    assert!(pretty.contains('\n'), "pretty output is multi-line:\n{pretty}");
-    assert!(pretty.contains("  "), "pretty output is indented:\n{pretty}");
+    assert!(
+        pretty.contains('\n'),
+        "pretty output is multi-line:\n{pretty}"
+    );
+    assert!(
+        pretty.contains("  "),
+        "pretty output is indented:\n{pretty}"
+    );
 }
 
 #[test]

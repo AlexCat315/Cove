@@ -68,18 +68,65 @@ impl Token {
 /// order, so the list is re-sorted here and the membership test stays a binary
 /// search.
 pub const KEYWORDS: [&str; 59] = [
-    "Self", "actor", "any", "as", "async",
-    "await", "break", "case", "catch", "class",
-    "continue", "default", "defer", "deinit", "do",
-    "else", "enum", "extension", "fallthrough", "false",
-    "fileprivate", "final", "for", "func", "guard",
-    "if", "import", "in", "init", "inout",
-    "internal", "is", "lazy", "let", "nil",
-    "open", "operator", "override", "private", "protocol",
-    "public", "repeat", "required", "return", "self",
-    "some", "static", "struct", "switch", "throw",
-    "throws", "true", "try", "typealias", "unowned",
-    "var", "weak", "where", "while",
+    "Self",
+    "actor",
+    "any",
+    "as",
+    "async",
+    "await",
+    "break",
+    "case",
+    "catch",
+    "class",
+    "continue",
+    "default",
+    "defer",
+    "deinit",
+    "do",
+    "else",
+    "enum",
+    "extension",
+    "fallthrough",
+    "false",
+    "fileprivate",
+    "final",
+    "for",
+    "func",
+    "guard",
+    "if",
+    "import",
+    "in",
+    "init",
+    "inout",
+    "internal",
+    "is",
+    "lazy",
+    "let",
+    "nil",
+    "open",
+    "operator",
+    "override",
+    "private",
+    "protocol",
+    "public",
+    "repeat",
+    "required",
+    "return",
+    "self",
+    "some",
+    "static",
+    "struct",
+    "switch",
+    "throw",
+    "throws",
+    "true",
+    "try",
+    "typealias",
+    "unowned",
+    "var",
+    "weak",
+    "where",
+    "while",
 ];
 
 /// Whether `word` is a highlighted keyword.
@@ -121,7 +168,11 @@ pub fn tokens(source: &str) -> Vec<Token> {
             while index < bytes.len() && bytes[index] != b'\n' {
                 index += 1;
             }
-            result.push(Token { start, end: index, kind: TokenKind::Comment });
+            result.push(Token {
+                start,
+                end: index,
+                kind: TokenKind::Comment,
+            });
             continue;
         }
         if byte == b'"' {
@@ -139,7 +190,11 @@ pub fn tokens(source: &str) -> Vec<Token> {
                     index += 1;
                 }
             }
-            result.push(Token { start, end: index, kind: TokenKind::String });
+            result.push(Token {
+                start,
+                end: index,
+                kind: TokenKind::String,
+            });
             continue;
         }
         if is_digit(byte) {
@@ -147,7 +202,11 @@ pub fn tokens(source: &str) -> Vec<Token> {
             while index < bytes.len() && is_digit(bytes[index]) {
                 index += 1;
             }
-            result.push(Token { start, end: index, kind: TokenKind::Number });
+            result.push(Token {
+                start,
+                end: index,
+                kind: TokenKind::Number,
+            });
             continue;
         }
         if is_word_start(byte) {
@@ -158,9 +217,17 @@ pub fn tokens(source: &str) -> Vec<Token> {
             // Every byte in the range is ASCII, so this slice is a valid `str`.
             let word = &source[start..index];
             if is_keyword(word) {
-                result.push(Token { start, end: index, kind: TokenKind::Keyword });
+                result.push(Token {
+                    start,
+                    end: index,
+                    kind: TokenKind::Keyword,
+                });
             } else if bytes[start].is_ascii_uppercase() {
-                result.push(Token { start, end: index, kind: TokenKind::Type });
+                result.push(Token {
+                    start,
+                    end: index,
+                    kind: TokenKind::Type,
+                });
             }
             continue;
         }
@@ -206,7 +273,10 @@ pub fn folds(source: &str, tokens: &[Token]) -> Vec<FoldRegion> {
         }
         if token_index < tokens.len()
             && tokens[token_index].contains(offset)
-            && matches!(tokens[token_index].kind, TokenKind::String | TokenKind::Comment)
+            && matches!(
+                tokens[token_index].kind,
+                TokenKind::String | TokenKind::Comment
+            )
         {
             continue;
         }
@@ -217,7 +287,10 @@ pub fn folds(source: &str, tokens: &[Token]) -> Vec<FoldRegion> {
                 let first = line_of_byte[start];
                 let last = line_of_byte[offset];
                 if first < last {
-                    regions.push(FoldRegion { first_line: first, last_line: last });
+                    regions.push(FoldRegion {
+                        first_line: first,
+                        last_line: last,
+                    });
                 }
             }
         }
@@ -288,8 +361,14 @@ impl TextEditorStory {
             is_bookmarked: State::new(true),
             breakpoints: State::new(vec![3]),
             fold_regions: State::new(vec![
-                FoldRegion { first_line: 0, last_line: 6 },
-                FoldRegion { first_line: 3, last_line: 5 },
+                FoldRegion {
+                    first_line: 0,
+                    last_line: 6,
+                },
+                FoldRegion {
+                    first_line: 3,
+                    last_line: 5,
+                },
             ]),
             tokens: State::new(tokens(SAMPLE_SOURCE)),
         }

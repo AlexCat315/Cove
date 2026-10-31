@@ -39,7 +39,11 @@ impl ChartScale {
             style.min_value,
             style.max_value,
             tick_count,
-            if stack.is_percent { ChartScaleKind::Linear } else { kind },
+            if stack.is_percent {
+                ChartScaleKind::Linear
+            } else {
+                kind
+            },
         )
     }
 
@@ -57,12 +61,23 @@ impl ChartScale {
         }
     }
 
-    fn fit_linear(extent: &[f32], explicit_min: Option<f32>, explicit_max: Option<f32>, tick_count: i32) -> Self {
+    fn fit_linear(
+        extent: &[f32],
+        explicit_min: Option<f32>,
+        explicit_max: Option<f32>,
+        tick_count: i32,
+    ) -> Self {
         let explicit_min = explicit_min.filter(|value| value.is_finite());
         let explicit_max = explicit_max.filter(|value| value.is_finite());
-        let values: Vec<f32> = extent.iter().copied().filter(|value| value.is_finite()).collect();
-        let mut lower = explicit_min.unwrap_or_else(|| values.iter().copied().reduce(f32::min).unwrap_or(0.0));
-        let mut upper = explicit_max.unwrap_or_else(|| values.iter().copied().reduce(f32::max).unwrap_or(1.0));
+        let values: Vec<f32> = extent
+            .iter()
+            .copied()
+            .filter(|value| value.is_finite())
+            .collect();
+        let mut lower =
+            explicit_min.unwrap_or_else(|| values.iter().copied().reduce(f32::min).unwrap_or(0.0));
+        let mut upper =
+            explicit_max.unwrap_or_else(|| values.iter().copied().reduce(f32::max).unwrap_or(1.0));
         if lower > upper {
             std::mem::swap(&mut lower, &mut upper);
         }
@@ -78,7 +93,11 @@ impl ChartScale {
         if explicit_max.is_none() {
             upper = (upper / step).ceil() * step;
         }
-        let ticks = if tick_count > 0 { Self::ticks(lower, upper, step) } else { Vec::new() };
+        let ticks = if tick_count > 0 {
+            Self::ticks(lower, upper, step)
+        } else {
+            Vec::new()
+        };
         Self {
             domain: ChartRange::new(lower, upper),
             ticks,
@@ -89,7 +108,12 @@ impl ChartScale {
 
     /// Fits in log space and snaps to whole decades. Non-positive values and
     /// bounds have no place on the axis and are ignored.
-    fn fit_log(extent: &[f32], explicit_min: Option<f32>, explicit_max: Option<f32>, tick_count: i32) -> Self {
+    fn fit_log(
+        extent: &[f32],
+        explicit_min: Option<f32>,
+        explicit_max: Option<f32>,
+        tick_count: i32,
+    ) -> Self {
         let explicit_min = explicit_min.filter(|value| value.is_finite() && *value > 0.0);
         let explicit_max = explicit_max.filter(|value| value.is_finite() && *value > 0.0);
         let values: Vec<f32> = extent
@@ -97,8 +121,10 @@ impl ChartScale {
             .copied()
             .filter(|value| value.is_finite() && *value > 0.0)
             .collect();
-        let mut lower = explicit_min.unwrap_or_else(|| values.iter().copied().reduce(f32::min).unwrap_or(1.0));
-        let mut upper = explicit_max.unwrap_or_else(|| values.iter().copied().reduce(f32::max).unwrap_or(10.0));
+        let mut lower =
+            explicit_min.unwrap_or_else(|| values.iter().copied().reduce(f32::min).unwrap_or(1.0));
+        let mut upper =
+            explicit_max.unwrap_or_else(|| values.iter().copied().reduce(f32::max).unwrap_or(10.0));
         if lower > upper {
             std::mem::swap(&mut lower, &mut upper);
         }
@@ -112,9 +138,18 @@ impl ChartScale {
             lower /= 10.0;
             upper *= 10.0;
         }
-        let ticks = if tick_count > 0 { Self::log_ticks(lower, upper) } else { Vec::new() };
+        let ticks = if tick_count > 0 {
+            Self::log_ticks(lower, upper)
+        } else {
+            Vec::new()
+        };
         let decimals = Self::decimals_for_log(&ticks);
-        Self { domain: ChartRange::new(lower, upper), ticks, decimals, kind: ChartScaleKind::Log }
+        Self {
+            domain: ChartRange::new(lower, upper),
+            ticks,
+            decimals,
+            kind: ChartScaleKind::Log,
+        }
     }
 
     /// The y for a value, clamped to the plot.
@@ -203,7 +238,9 @@ impl ChartScale {
         if !(0..=64).contains(&count) {
             return vec![lower, upper];
         }
-        (0..=count).map(|index| first + index as f32 * step).collect()
+        (0..=count)
+            .map(|index| first + index as f32 * step)
+            .collect()
     }
 
     /// Ticks at 1, 2 and 5 x 10^n, thinned to a countable set.
@@ -225,11 +262,19 @@ impl ChartScale {
         let mut chosen = if ticks.len() <= 9 {
             ticks
         } else {
-            ticks.into_iter().filter(|value| Self::is_decade(*value)).collect()
+            ticks
+                .into_iter()
+                .filter(|value| Self::is_decade(*value))
+                .collect()
         };
         if chosen.len() > 9 {
             let stride = (chosen.len() as f32 / 9.0).ceil() as usize;
-            chosen = chosen.into_iter().enumerate().filter(|(index, _)| index % stride == 0).map(|(_, value)| value).collect();
+            chosen = chosen
+                .into_iter()
+                .enumerate()
+                .filter(|(index, _)| index % stride == 0)
+                .map(|(_, value)| value)
+                .collect();
         }
         chosen
     }
@@ -260,7 +305,11 @@ impl ChartScale {
     /// Log ticks span decades, so the smallest tick sets precision.
     fn decimals_for_log(ticks: &[f32]) -> i32 {
         let mut places = 0;
-        for tick in ticks.iter().copied().filter(|tick| *tick > 0.0 && *tick < 1.0) {
+        for tick in ticks
+            .iter()
+            .copied()
+            .filter(|tick| *tick > 0.0 && *tick < 1.0)
+        {
             places = places.max((-tick.log10()).ceil() as i32);
         }
         places.min(4)

@@ -15,7 +15,10 @@ pub struct PointerCapture {
 }
 impl PointerCapture {
     pub fn new() -> Self {
-        Self { target: RefCell::new(None), allows_gesture_transfer: Cell::new(false) }
+        Self {
+            target: RefCell::new(None),
+            allows_gesture_transfer: Cell::new(false),
+        }
     }
     pub fn target(&self) -> Option<Node> {
         self.target.borrow().clone()
@@ -34,14 +37,18 @@ impl PointerCapture {
         let previous = self.target.borrow_mut().replace(node.clone());
         self.allows_gesture_transfer.set(allows_gesture_transfer);
         if let Some(previous) = previous {
-            previous.attachment::<Rc<dyn Fn()>>(PointerCaptureAttachmentKey::DID_LOSE_CAPTURE).map(|callback| callback());
+            previous
+                .attachment::<Rc<dyn Fn()>>(PointerCaptureAttachmentKey::DID_LOSE_CAPTURE)
+                .map(|callback| callback());
         }
     }
     pub fn release(&self) {
         let previous = self.target.borrow_mut().take();
         self.allows_gesture_transfer.set(false);
         if let Some(previous) = previous {
-            previous.attachment::<Rc<dyn Fn()>>(PointerCaptureAttachmentKey::DID_LOSE_CAPTURE).map(|callback| callback());
+            previous
+                .attachment::<Rc<dyn Fn()>>(PointerCaptureAttachmentKey::DID_LOSE_CAPTURE)
+                .map(|callback| callback());
         }
     }
 }
@@ -90,7 +97,10 @@ mod tests {
         let second = Node::new();
         let lost = Rc::new(Cell::new(0));
         let counter = lost.clone();
-        first.set_attachment(PointerCaptureAttachmentKey::DID_LOSE_CAPTURE, Rc::new(move || counter.set(counter.get() + 1)) as Rc<dyn Fn()>);
+        first.set_attachment(
+            PointerCaptureAttachmentKey::DID_LOSE_CAPTURE,
+            Rc::new(move || counter.set(counter.get() + 1)) as Rc<dyn Fn()>,
+        );
         capture.acquire(&first, false);
         assert!(capture.is_active());
         capture.acquire(&second, true);

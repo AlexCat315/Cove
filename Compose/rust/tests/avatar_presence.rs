@@ -17,11 +17,10 @@ mod support;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cove_composition::{AnyView, View};
-use cove_core::scene::{
-    AccessibilityRole, Align, Direction, FlexDirection, Justify, Node, Wrap,
-};
 use cove_composition::layout::LayoutDirectionExt;
+use cove_composition::{AnyView, View};
+use cove_core::scene::{AccessibilityRole, Align, Direction, FlexDirection, Justify, Node, Wrap};
+use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::data::avatar::avatar::{Avatar, AvatarShape};
 use cove_ui_compose::primitives::data::avatar::group::{AvatarGroup, AvatarGroupOptions};
@@ -31,7 +30,6 @@ use cove_ui_compose::primitives::data::avatar::member_list::{
 use cove_ui_compose::primitives::data::avatar::status::{
     AvatarStatus, AvatarStatusGeometry, AvatarStatusIndicator,
 };
-use cove_ui_compose::BoxView;
 
 use support::GlobalTestLock;
 
@@ -55,12 +53,10 @@ fn status_sits_on_the_outline_at_the_logical_bottom_trailing_corner() {
     GlobalTestLock::locked(|| {
         for rtl in [false, true] {
             let graph = support::graph();
-            let avatar = AnyView::new(
-                Avatar::new("Jason Lee").configure(|appearance| {
-                    appearance.diameter = Some(48.0);
-                    appearance.status = Some(AvatarStatus::Busy);
-                }),
-            );
+            let avatar = AnyView::new(Avatar::new("Jason Lee").configure(|appearance| {
+                appearance.diameter = Some(48.0);
+                appearance.status = Some(AvatarStatus::Busy);
+            }));
             let container = AnyView::new(
                 AnyView::new(BoxView::new(
                     FlexDirection::Row,
@@ -70,7 +66,11 @@ fn status_sits_on_the_outline_at_the_logical_bottom_trailing_corner() {
                     0.0,
                     AnyView::new(avatar),
                 ))
-                .layout_direction(if rtl { Direction::Rtl } else { Direction::Ltr }),
+                .layout_direction(if rtl {
+                    Direction::Rtl
+                } else {
+                    Direction::Ltr
+                }),
             );
             graph.install_view(container, Default::default());
             graph.compute_layout(200.0, 200.0);
@@ -103,7 +103,8 @@ fn status_sits_on_the_outline_at_the_logical_bottom_trailing_corner() {
 
             let geometry = AvatarStatusGeometry::new(48.0, AvatarShape::Circle);
             assert_eq!(
-                status.frame().width, geometry.size,
+                status.frame().width,
+                geometry.size,
                 "the indicator is the resolved geometry size"
             );
 
@@ -158,8 +159,10 @@ fn status_labels_can_be_overridden_and_every_status_has_a_distinct_shape() {
         "an avatar without a status announces nothing"
     );
 
-    let labels: std::collections::HashSet<&str> =
-        AvatarStatus::ALL.iter().map(|status| status.label()).collect();
+    let labels: std::collections::HashSet<&str> = AvatarStatus::ALL
+        .iter()
+        .map(|status| status.label())
+        .collect();
     assert_eq!(labels.len(), 4, "every status has its own label");
 
     let square = AvatarStatusGeometry::new(48.0, AvatarShape::Square);
@@ -174,7 +177,10 @@ fn status_labels_can_be_overridden_and_every_status_has_a_distinct_shape() {
 fn status_geometry_scales_with_the_diameter() {
     let small = AvatarStatusGeometry::new(24.0, AvatarShape::Circle);
     let large = AvatarStatusGeometry::new(96.0, AvatarShape::Circle);
-    assert!(small.size < large.size, "larger avatars get larger indicators");
+    assert!(
+        small.size < large.size,
+        "larger avatars get larger indicators"
+    );
     assert!(
         small.size >= 6.0 && large.size <= 24.0,
         "the indicator size stays within its clamp"
@@ -208,15 +214,16 @@ fn the_overflow_marker_opens_the_member_list_which_reports_selection() {
             })
             .collect();
 
-        let group = AvatarGroup::new(members.clone()).configure(|options: &mut AvatarGroupOptions| {
-            options.limit = 2;
-            options.diameter = Some(32.0);
-            options.member_list = Some(AvatarMemberList {
-                title: "Members".to_string(),
-                scope: AvatarMemberListScope::Remaining,
-                on_select: None,
+        let group =
+            AvatarGroup::new(members.clone()).configure(|options: &mut AvatarGroupOptions| {
+                options.limit = 2;
+                options.diameter = Some(32.0);
+                options.member_list = Some(AvatarMemberList {
+                    title: "Members".to_string(),
+                    scope: AvatarMemberListScope::Remaining,
+                    on_select: None,
+                });
             });
-        });
 
         // The remaining scope is what the roster shows after a 2-of-5 limit.
         let remaining: Vec<Avatar> = members[group.options.limit..].to_vec();
@@ -281,7 +288,10 @@ fn the_overflow_marker_opens_the_member_list_which_reports_selection() {
             Some("p3"),
             "selection reports the member's identity"
         );
-        assert!(trigger.is_presented() == false, "selection leaves the roster dismissed");
+        assert!(
+            trigger.is_presented() == false,
+            "selection leaves the roster dismissed"
+        );
 
         trigger.dismiss();
         assert!(!trigger.is_presented(), "dismiss is idempotent");
@@ -291,7 +301,9 @@ fn the_overflow_marker_opens_the_member_list_which_reports_selection() {
 #[test]
 fn a_group_without_a_member_list_keeps_a_static_marker() {
     GlobalTestLock::locked(|| {
-        let members: Vec<Avatar> = (0..4).map(|index| Avatar::new(format!("P{index}"))).collect();
+        let members: Vec<Avatar> = (0..4)
+            .map(|index| Avatar::new(format!("P{index}")))
+            .collect();
         let graph = support::graph();
         graph.install_view(
             AnyView::new(AvatarGroup::new(members).configure(|options| {
@@ -349,7 +361,9 @@ fn status_indicator_is_decorative_and_not_focusable() {
 #[test]
 fn group_marks_the_overflow_slot_as_a_button_only_with_a_roster() {
     GlobalTestLock::locked(|| {
-        let members: Vec<Avatar> = (0..4).map(|index| Avatar::new(format!("P{index}"))).collect();
+        let members: Vec<Avatar> = (0..4)
+            .map(|index| Avatar::new(format!("P{index}")))
+            .collect();
         let graph = support::graph();
         graph.install_view(
             AnyView::new(AvatarGroup::new(members).configure(|options| {

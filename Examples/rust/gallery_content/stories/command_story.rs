@@ -7,12 +7,12 @@
 //! recent-command ordering the prose promises.
 
 use cove_core::State;
-use cove_ui_compose::modifiers::layout::FlexExt;
 use cove_ui_compose::LayoutDebugExt;
+use cove_ui_compose::modifiers::layout::FlexExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::button::Button;
 use cove_ui_compose::primitives::overlays::{
-    destination, display_entries, ranked, record_recent, CommandEntry, CommandItem,
+    CommandEntry, CommandItem, destination, display_entries, ranked, record_recent,
 };
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
@@ -29,8 +29,11 @@ pub const RECENT_LIMIT: usize = 3;
 /// `Deploy to Device` is disabled so the arrow-key skip is observable.
 pub fn commands() -> Vec<CommandItem> {
     vec![
-        CommandItem::new("Toggle Theme", "Toggle Theme", "View")
-            .with_keywords(["dark", "light", "appearance"]),
+        CommandItem::new("Toggle Theme", "Toggle Theme", "View").with_keywords([
+            "dark",
+            "light",
+            "appearance",
+        ]),
         CommandItem::new("Go to File", "Go to File", "Navigate").with_keywords(["jump", "search"]),
         CommandItem::new("Go to Line", "Go to Line", "Navigate").with_keywords(["jump"]),
         CommandItem::new("Format Document", "Format Document", "Edit")
@@ -125,7 +128,13 @@ impl CommandStory {
     }
 
     /// The next highlight for an arrow press.
-    pub fn next_highlight(&self, count: usize, current: Option<usize>, delta: i64, wraps: bool) -> Option<usize> {
+    pub fn next_highlight(
+        &self,
+        count: usize,
+        current: Option<usize>,
+        delta: i64,
+        wraps: bool,
+    ) -> Option<usize> {
         destination(count, current, delta, wraps)
     }
 }

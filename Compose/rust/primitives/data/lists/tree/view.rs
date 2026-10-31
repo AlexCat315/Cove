@@ -24,29 +24,27 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-use cove_composition::Scancode;
-use cove_core::scene::{
-    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, Align, DrawHook, EventPhase,
-    EventResult, FlexDirection, HoverPhase, InputHandlerRoute, InteractionRegistryHolder,
-    Justify, LayoutNode, Node, PointerPhase, Wrap,
-};
-use cove_core::{Binding, Color, Rect, State};
-use cove_platform::{KeyEvent, KeyModifiers, MouseButton, SystemCursor};
+use super::options::{TreeOptions, TreeSelection};
+use super::{TreeDropPosition, TreeNodeKey, TreeSearchFilterPolicy};
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::AppearanceExt;
 use crate::primitives::controls::Button;
 use crate::primitives::layout::virtualization::FixedVirtualStack;
-use crate::primitives::media::{ui_icon_catalog, Icon};
+use crate::primitives::media::{Icon, ui_icon_catalog};
 use crate::primitives::overlays::selection_key_host::SelectionKeyHost;
 use crate::theme::styles::buttons::ButtonStyleViewExt;
-use crate::theme::styles::components::{
-    TreeRowStyleConfiguration, TreeRowStyleEnvironment,
-};
-use crate::theme::{theme_for_node, SemanticColorRef};
+use crate::theme::styles::components::{TreeRowStyleConfiguration, TreeRowStyleEnvironment};
+use crate::theme::{SemanticColorRef, theme_for_node};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
-use super::options::{TreeOptions, TreeSelection};
-use super::{TreeDropPosition, TreeSearchFilterPolicy, TreeNodeKey};
+use cove_composition::Scancode;
+use cove_core::scene::{
+    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, Align, DrawHook, EventPhase,
+    EventResult, FlexDirection, HoverPhase, InputHandlerRoute, InteractionRegistryHolder, Justify,
+    LayoutNode, Node, PointerPhase, Wrap,
+};
+use cove_core::{Binding, Color, Rect, State};
+use cove_platform::{KeyEvent, KeyModifiers, MouseButton, SystemCursor};
 
 const PRESSED: &str = "__tree_row_pressed";
 const HOVERED: &str = "__tree_row_hovered";
@@ -126,7 +124,9 @@ where
     Element: Clone,
     Id: std::hash::Hash + Eq + Clone,
 {
-    let query = search.map(|(_, query)| query.trim().to_lowercase()).unwrap_or_default();
+    let query = search
+        .map(|(_, query)| query.trim().to_lowercase())
+        .unwrap_or_default();
     let filter_active = filters && !query.is_empty() && search.is_some();
 
     // A blank query matches nothing to mark, and walking it would resolve lazy
@@ -148,9 +148,21 @@ where
             let own = text(node).to_lowercase().contains(query);
             self_matches.insert(id.clone(), own);
             let mut any = own;
-            if has_children.map(|predicate| predicate(node)).unwrap_or(true) {
+            if has_children
+                .map(|predicate| predicate(node))
+                .unwrap_or(true)
+            {
                 for child in children(node) {
-                    if walk(&child, id_of, children, has_children, text, query, self_matches, subtree_matches) {
+                    if walk(
+                        &child,
+                        id_of,
+                        children,
+                        has_children,
+                        text,
+                        query,
+                        self_matches,
+                        subtree_matches,
+                    ) {
                         any = true;
                     }
                 }
@@ -170,7 +182,10 @@ where
                 &mut subtree_matches,
             );
         }
-        TreeSearchMetadata { self_matches, subtree_matches }
+        TreeSearchMetadata {
+            self_matches,
+            subtree_matches,
+        }
     });
 
     fn append<Element, Id>(
@@ -511,25 +526,35 @@ where
     Element: Clone,
     Id: std::hash::Hash + Eq + Clone,
 {
-    let Some(ia) = entries.iter().position(|entry| &entry.key == a) else { return HashSet::new() };
-    let Some(ib) = entries.iter().position(|entry| &entry.key == b) else { return HashSet::new() };
+    let Some(ia) = entries.iter().position(|entry| &entry.key == a) else {
+        return HashSet::new();
+    };
+    let Some(ib) = entries.iter().position(|entry| &entry.key == b) else {
+        return HashSet::new();
+    };
     let (lower, upper) = if ia <= ib { (ia, ib) } else { (ib, ia) };
-    entries[lower..=upper].iter().map(|entry| entry.key.clone()).collect()
+    entries[lower..=upper]
+        .iter()
+        .map(|entry| entry.key.clone())
+        .collect()
 }
 
-fn ids_between<Element, Id>(
-    a: &Id,
-    b: &Id,
-    entries: &[TreeEntry<Element, Id>],
-) -> HashSet<Id>
+fn ids_between<Element, Id>(a: &Id, b: &Id, entries: &[TreeEntry<Element, Id>]) -> HashSet<Id>
 where
     Element: Clone,
     Id: std::hash::Hash + Eq + Clone,
 {
-    let Some(ia) = entries.iter().position(|entry| &entry.id == a) else { return HashSet::new() };
-    let Some(ib) = entries.iter().position(|entry| &entry.id == b) else { return HashSet::new() };
+    let Some(ia) = entries.iter().position(|entry| &entry.id == a) else {
+        return HashSet::new();
+    };
+    let Some(ib) = entries.iter().position(|entry| &entry.id == b) else {
+        return HashSet::new();
+    };
     let (lower, upper) = if ia <= ib { (ia, ib) } else { (ib, ia) };
-    entries[lower..=upper].iter().map(|entry| entry.id.clone()).collect()
+    entries[lower..=upper]
+        .iter()
+        .map(|entry| entry.id.clone())
+        .collect()
 }
 
 impl<Element, Id, RowContent> View for Tree<Element, Id, RowContent>
@@ -561,12 +586,8 @@ where
                 let id = entry.id.clone();
                 let has_next_sibling = entry.has_next_sibling;
                 let ancestor = entry.ancestor_has_next_siblings.clone();
-                let content = (self.row_content)(
-                    &entry.element,
-                    is_selected,
-                    entry.is_expanded,
-                    entry.depth,
-                );
+                let content =
+                    (self.row_content)(&entry.element, is_selected, entry.is_expanded, entry.depth);
 
                 let drop_position = drag_target
                     .as_ref()
@@ -610,23 +631,21 @@ where
                     })
                 };
                 let trailing: Option<AnyView> = self.options.slots.trailing.as_ref().map(|slot| {
-                    AnyView::new(
+                    AnyView::new(AnyView::new(
                         AnyView::new(
-                            AnyView::new(
-                                AnyView::new(slot(
-                                    entry.element.clone(),
-                                    is_selected,
-                                    entry.is_expanded,
-                                    entry.is_search_hit,
-                                    hovered.get().as_ref() == Some(&entry.key),
-                                    entry.depth,
-                                ))
-                                .padding_edges(4.0, 0.0)
-                                .frame_width(trailing_width),
-                            )
-                            .clipped(),
-                        ),
-                    )
+                            AnyView::new(slot(
+                                entry.element.clone(),
+                                is_selected,
+                                entry.is_expanded,
+                                entry.is_search_hit,
+                                hovered.get().as_ref() == Some(&entry.key),
+                                entry.depth,
+                            ))
+                            .padding_edges(4.0, 0.0)
+                            .frame_width(trailing_width),
+                        )
+                        .clipped(),
+                    ))
                 });
                 let _ = id;
 
@@ -659,15 +678,13 @@ where
             .collect();
 
         let ids: Vec<TreeNodeKey<Id>> = entries.iter().map(|entry| entry.key.clone()).collect();
-        let scroll_to = entries
-            .iter()
-            .position(|entry| {
-                if uses_key_selection {
-                    selected_keys.contains(&entry.key)
-                } else {
-                    selected_ids.contains(&entry.id)
-                }
-            });
+        let scroll_to = entries.iter().position(|entry| {
+            if uses_key_selection {
+                selected_keys.contains(&entry.key)
+            } else {
+                selected_ids.contains(&entry.id)
+            }
+        });
 
         let mut stack = FixedVirtualStack::new(ids, layout.row_height, {
             let rows = rows.clone();
@@ -692,23 +709,24 @@ where
                 .flex_with(1.0, 1.0, Some(0.0)),
         );
 
-        let host = SelectionKeyHost::new(
-            tree,
-            is_enabled,
-            {
-                let actions = self.session_actions();
-                move |event: &KeyEvent| actions.handle_key(event)
-            },
-        );
+        let host = SelectionKeyHost::new(tree, is_enabled, {
+            let actions = self.session_actions();
+            move |event: &KeyEvent| actions.handle_key(event)
+        });
 
-        AnyView::new(AnyView::new(host).accessibility(move |semantics: &mut AccessibilitySemantics| {
-            semantics.role = AccessibilityRole::Tree;
-            semantics.state.is_enabled = is_enabled;
-        }))
+        AnyView::new(AnyView::new(host).accessibility(
+            move |semantics: &mut AccessibilitySemantics| {
+                semantics.role = AccessibilityRole::Tree;
+                semantics.state.is_enabled = is_enabled;
+            },
+        ))
     }
 
     fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
-        vec![crate::DynamicField::state("expansion", &self.local_expanded)]
+        vec![crate::DynamicField::state(
+            "expansion",
+            &self.local_expanded,
+        )]
     }
 }
 
@@ -869,9 +887,17 @@ where
         if let Some(binding) = &self.selection.multiple_keys {
             let mut next = binding.get();
             if extending {
-                let anchor = self.selection.primary_key.get().unwrap_or_else(|| entry.key.clone());
+                let anchor = self
+                    .selection
+                    .primary_key
+                    .get()
+                    .unwrap_or_else(|| entry.key.clone());
                 let keys = keys_between(&anchor, &entry.key, &entries);
-                next = if keys.is_empty() { HashSet::from([entry.key.clone()]) } else { keys };
+                next = if keys.is_empty() {
+                    HashSet::from([entry.key.clone()])
+                } else {
+                    keys
+                };
             } else if toggling {
                 if !next.remove(&entry.key) {
                     next.insert(entry.key.clone());
@@ -884,9 +910,17 @@ where
         if let Some(binding) = &self.selection.multiple {
             let mut next = binding.get();
             if extending {
-                let anchor = self.selection.primary.get().unwrap_or_else(|| entry.id.clone());
+                let anchor = self
+                    .selection
+                    .primary
+                    .get()
+                    .unwrap_or_else(|| entry.id.clone());
                 let ids = ids_between(&anchor, &entry.id, &entries);
-                next = if ids.is_empty() { HashSet::from([entry.id.clone()]) } else { ids };
+                next = if ids.is_empty() {
+                    HashSet::from([entry.id.clone()])
+                } else {
+                    ids
+                };
             } else if toggling {
                 if !next.remove(&entry.id) {
                     next.insert(entry.id.clone());
@@ -905,7 +939,9 @@ where
 
     fn step(&self, entry: &TreeEntry<Element, Id>, delta: i64) {
         let entries = self.entries.borrow();
-        let Some(index) = entries.iter().position(|other| other.key == entry.key) else { return };
+        let Some(index) = entries.iter().position(|other| other.key == entry.key) else {
+            return;
+        };
         let target = (index as i64 + delta).clamp(0, entries.len() as i64 - 1) as usize;
         if target != index {
             let target = entries[target].clone();
@@ -990,14 +1026,20 @@ where
 
         match event.scancode {
             Scancode::ARROW_DOWN => {
-                let index = entries.iter().position(|entry| entry.key == current.key).unwrap_or(0);
+                let index = entries
+                    .iter()
+                    .position(|entry| entry.key == current.key)
+                    .unwrap_or(0);
                 if let Some(next) = entries.get(index + 1).cloned() {
                     self.select(&next, event.modifiers);
                 }
                 true
             }
             Scancode::ARROW_UP => {
-                let index = entries.iter().position(|entry| entry.key == current.key).unwrap_or(0);
+                let index = entries
+                    .iter()
+                    .position(|entry| entry.key == current.key)
+                    .unwrap_or(0);
                 if index > 0
                     && let Some(previous) = entries.get(index - 1).cloned()
                 {
@@ -1088,7 +1130,9 @@ impl PrimitiveView for TreeRow {
             let gutter = self.depth as f32 * self.indentation + self.disclosure_width;
             let weak = node.downgrade();
             let overlay: DrawHook = Rc::new(move |list, origin| {
-                let Some(node) = Node::upgrade(&weak) else { return };
+                let Some(node) = Node::upgrade(&weak) else {
+                    return;
+                };
                 let frame = node.frame();
                 draw_drop_indicator(
                     position,
@@ -1140,54 +1184,71 @@ impl PrimitiveView for TreeRow {
         node.set_attachment(HOVERED, self.is_hovered);
         paint();
 
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
 
         let hover_paint = paint.clone();
         let hover_action = self.on_hover.clone();
         let hover_enabled = self.is_enabled;
-        registry.set_hover(node, Rc::new(move |phase: HoverPhase| {
-            if !hover_enabled {
-                return;
-            }
-            hover_action(phase == HoverPhase::Enter);
-            hover_paint();
-        }));
+        registry.set_hover(
+            node,
+            Rc::new(move |phase: HoverPhase| {
+                if !hover_enabled {
+                    return;
+                }
+                hover_action(phase == HoverPhase::Enter);
+                hover_paint();
+            }),
+        );
 
         let pointer_select = self.on_select.clone();
         let pointer_node = node.clone();
         registry.set_pointer(
             node,
             InputHandlerRoute::control(),
-            Rc::new(move |event: &cove_platform::MouseButtonEvent, phase: PointerPhase, delivery: EventPhase| {
-                if delivery == EventPhase::Capture || event.button != MouseButton::Left {
-                    return EventResult::Ignored;
-                }
-                match phase {
-                    PointerPhase::Down => {
-                        pointer_node.set_attachment(PRESSED, true);
-                        EventResult::Handled
+            Rc::new(
+                move |event: &cove_platform::MouseButtonEvent,
+                      phase: PointerPhase,
+                      delivery: EventPhase| {
+                    if delivery == EventPhase::Capture || event.button != MouseButton::Left {
+                        return EventResult::Ignored;
                     }
-                    PointerPhase::Up => {
-                        let was = pointer_node.attachment::<bool>(PRESSED) == Some(true);
-                        pointer_node.set_attachment(PRESSED, false);
-                        if was {
-                            pointer_select(event.modifiers);
-                            return EventResult::Handled;
+                    match phase {
+                        PointerPhase::Down => {
+                            pointer_node.set_attachment(PRESSED, true);
+                            EventResult::Handled
                         }
-                        EventResult::Ignored
+                        PointerPhase::Up => {
+                            let was = pointer_node.attachment::<bool>(PRESSED) == Some(true);
+                            pointer_node.set_attachment(PRESSED, false);
+                            if was {
+                                pointer_select(event.modifiers);
+                                return EventResult::Handled;
+                            }
+                            EventResult::Ignored
+                        }
                     }
-                }
-            }),
+                },
+            ),
         );
 
         let key_node = node.clone();
         let on_key = self.on_key_command();
-        registry.set_key(node, InputHandlerRoute::control(), Rc::new(move |event: &KeyEvent, phase: EventPhase| {
-            if phase == EventPhase::Capture || event.is_repeat {
-                return EventResult::Ignored;
-            }
-            if on_key(event) { EventResult::Handled } else { EventResult::Ignored }
-        }));
+        registry.set_key(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event: &KeyEvent, phase: EventPhase| {
+                if phase == EventPhase::Capture || event.is_repeat {
+                    return EventResult::Ignored;
+                }
+                if on_key(event) {
+                    EventResult::Handled
+                } else {
+                    EventResult::Ignored
+                }
+            }),
+        );
         let _ = key_node;
 
         let clear_node = node.downgrade();
@@ -1226,7 +1287,11 @@ impl PrimitiveView for TreeRow {
             } else {
                 ui_icon_catalog::navigation::chevron_right()
             };
-            let label = if self.is_expanded { "Collapse" } else { "Expand" };
+            let label = if self.is_expanded {
+                "Collapse"
+            } else {
+                "Expand"
+            };
             let toggle = self.on_toggle.clone();
             let enabled = self.is_enabled;
             AnyView::new(
@@ -1250,9 +1315,7 @@ impl PrimitiveView for TreeRow {
         };
 
         let mut row = vec![
-            AnyView::new(
-                AnyView::new(crate::EmptyView).frame_size(indent.max(0.0), row_height),
-            ),
+            AnyView::new(AnyView::new(crate::EmptyView).frame_size(indent.max(0.0), row_height)),
             disclosure,
             AnyView::new(
                 AnyView::new(BoxView::new(
@@ -1383,9 +1446,14 @@ impl PrimitiveView for TreeGuideOverlay {
         let has_next_sibling = self.has_next_sibling;
         let weak = node.downgrade();
         let draw: DrawHook = Rc::new(move |list, origin| {
-            let Some(node) = Node::upgrade(&weak) else { return };
+            let Some(node) = Node::upgrade(&weak) else {
+                return;
+            };
             let theme = theme_for_node(&node);
-            let ink = theme.colors.on_surface_muted.multiplied_alpha(0.24 * node.opacity());
+            let ink = theme
+                .colors
+                .on_surface_muted
+                .multiplied_alpha(0.24 * node.opacity());
             let base_x = origin.x;
             let base_y = origin.y;
             let center_lead = (((indentation.max(2.0).floor() - 1.0) * 0.5).floor()).max(0.0);
@@ -1396,7 +1464,11 @@ impl PrimitiveView for TreeGuideOverlay {
             for level in 0..depth {
                 let stroke_x = (base_x + level as f32 * indentation + center_lead).floor();
                 if level == depth - 1 {
-                    let vertical_bottom = if has_next_sibling { bottom } else { base_y + center_y + 1.0 };
+                    let vertical_bottom = if has_next_sibling {
+                        bottom
+                    } else {
+                        base_y + center_y + 1.0
+                    };
                     let _ = list.add_rect(
                         Rect::new(stroke_x, top, 1.0, (vertical_bottom - top).max(1.0)),
                         ink,
@@ -1404,7 +1476,8 @@ impl PrimitiveView for TreeGuideOverlay {
                     continue;
                 }
                 if ancestor.get(level).copied().unwrap_or(false) {
-                    let _ = list.add_rect(Rect::new(stroke_x, top, 1.0, (bottom - top).max(1.0)), ink);
+                    let _ =
+                        list.add_rect(Rect::new(stroke_x, top, 1.0, (bottom - top).max(1.0)), ink);
                 }
             }
         });
@@ -1443,24 +1516,40 @@ fn draw_drop_indicator(
     match position {
         TreeDropPosition::Inside => {
             let _ = list.add_rounded_rect(
-                Rect::new(frame.x + 1.0, frame.y + 1.0, (frame.width - 2.0).max(2.0), (frame.height - 2.0).max(2.0)),
+                Rect::new(
+                    frame.x + 1.0,
+                    frame.y + 1.0,
+                    (frame.width - 2.0).max(2.0),
+                    (frame.height - 2.0).max(2.0),
+                ),
                 4.0,
                 accent.multiplied_alpha(0.12),
             );
             let _ = list.add_rounded_rect_stroke(
-                Rect::new(frame.x + 1.0, frame.y + 1.0, (frame.width - 2.0).max(2.0), (frame.height - 2.0).max(2.0)),
+                Rect::new(
+                    frame.x + 1.0,
+                    frame.y + 1.0,
+                    (frame.width - 2.0).max(2.0),
+                    (frame.height - 2.0).max(2.0),
+                ),
                 4.0,
                 1.0,
                 accent.multiplied_alpha(0.9),
             );
         }
         TreeDropPosition::Before => {
-            let _ = list.add_rect(Rect::new(frame.x, frame.y + 1.0, frame.width, 2.0), accent.multiplied_alpha(0.95));
+            let _ = list.add_rect(
+                Rect::new(frame.x, frame.y + 1.0, frame.width, 2.0),
+                accent.multiplied_alpha(0.95),
+            );
             let _ = list.add_rect(Rect::new(frame.x, frame.y, 6.0, 4.0), accent);
         }
         TreeDropPosition::After => {
             let y = frame.y + frame.height - 3.0;
-            let _ = list.add_rect(Rect::new(frame.x, y, frame.width, 2.0), accent.multiplied_alpha(0.95));
+            let _ = list.add_rect(
+                Rect::new(frame.x, y, frame.width, 2.0),
+                accent.multiplied_alpha(0.95),
+            );
             let _ = list.add_rect(Rect::new(frame.x, y - 1.0, 6.0, 4.0), accent);
         }
     }

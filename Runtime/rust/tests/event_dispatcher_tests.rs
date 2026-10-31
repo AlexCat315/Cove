@@ -18,12 +18,12 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use cove_core::Rect;
 use cove_core::scene::{
     EventDispatcher, EventPhase, EventResult, FocusChain, HoverPhase, InputDispatchTrace,
     InputHandlerRole, InputHandlerRoute, InteractionRegistry, Node, NodeTree, PointerCapture,
     PointerPhase,
 };
-use cove_core::Rect;
 use cove_platform::{
     InputEvent, KeyEvent, MouseButton, MouseButtonEvent, MouseMotionEvent, MouseWheelEvent,
     PointerKind, ScrollInput, WindowId,
@@ -77,10 +77,12 @@ fn register(
     interactions.set_pointer(
         node,
         InputHandlerRoute::control(),
-        Rc::new(move |_: &MouseButtonEvent, _: PointerPhase, phase: EventPhase| {
-            record(&pointer, &pointer_label, phase);
-            result(handle)
-        }),
+        Rc::new(
+            move |_: &MouseButtonEvent, _: PointerPhase, phase: EventPhase| {
+                record(&pointer, &pointer_label, phase);
+                result(handle)
+            },
+        ),
     );
     let hover = recorder.clone();
     let hover_label = label.clone();
@@ -134,7 +136,11 @@ fn record(recorder: &Rc<RefCell<Recorder>>, label: &str, phase: EventPhase) {
 }
 
 fn result(handle: bool) -> EventResult {
-    if handle { EventResult::Handled } else { EventResult::Ignored }
+    if handle {
+        EventResult::Handled
+    } else {
+        EventResult::Ignored
+    }
 }
 
 impl Scene {
@@ -161,7 +167,11 @@ impl Scene {
             focus.clone(),
             WindowId::MAIN,
         );
-        Self { recorder, leaf, dispatcher }
+        Self {
+            recorder,
+            leaf,
+            dispatcher,
+        }
     }
 
     fn recorder(&self) -> std::cell::Ref<'_, Recorder> {
@@ -212,7 +222,12 @@ fn wheel(x: f32, y: f32, mouse_x: Option<f32>, mouse_y: Option<f32>) -> InputEve
 }
 
 fn key(scancode: u32) -> KeyEvent {
-    KeyEvent { scancode, keycode: 0, modifiers: Default::default(), is_repeat: false }
+    KeyEvent {
+        scancode,
+        keycode: 0,
+        modifiers: Default::default(),
+        is_repeat: false,
+    }
 }
 
 fn assert_matches(actual: &[String], expected: &[String], message: &str) {
@@ -228,9 +243,17 @@ fn capture_target_bubble() {
     scene.dispatcher.dispatch(&left_down(20.0, 20.0));
 
     let recorder = scene.recorder();
-    assert_matches(&recorder.capture, &["root:capture".into(), "mid:capture".into()], "capture root→mid");
+    assert_matches(
+        &recorder.capture,
+        &["root:capture".into(), "mid:capture".into()],
+        "capture root→mid",
+    );
     assert_matches(&recorder.target, &["leaf:target".into()], "target leaf");
-    assert_matches(&recorder.bubble, &["mid:bubble".into(), "root:bubble".into()], "bubble mid→root");
+    assert_matches(
+        &recorder.bubble,
+        &["mid:bubble".into(), "root:bubble".into()],
+        "bubble mid→root",
+    );
 }
 
 #[test]
@@ -256,9 +279,19 @@ fn capture_handled() {
     dispatcher.dispatch(&left_down(20.0, 20.0));
 
     let recorder = recorder.borrow();
-    assert_matches(&recorder.capture, &["root:capture".into()], "only the handled capture ran");
-    assert!(recorder.target.is_empty(), "capture handling stops the target phase");
-    assert!(recorder.bubble.is_empty(), "capture handling stops the bubble phase");
+    assert_matches(
+        &recorder.capture,
+        &["root:capture".into()],
+        "only the handled capture ran",
+    );
+    assert!(
+        recorder.target.is_empty(),
+        "capture handling stops the target phase"
+    );
+    assert!(
+        recorder.bubble.is_empty(),
+        "capture handling stops the bubble phase"
+    );
 }
 
 #[test]
@@ -269,7 +302,11 @@ fn pointer_capture_motion() {
     // Point far outside leaf — would normally miss or land elsewhere.
     scene.dispatcher.dispatch(&motion(500.0, 500.0, 1.0, 1.0));
 
-    assert_matches(&scene.recorder().target, &["leaf:target".into()], "capture target receives motion");
+    assert_matches(
+        &scene.recorder().target,
+        &["leaf:target".into()],
+        "capture target receives motion",
+    );
 }
 
 #[test]
@@ -303,16 +340,18 @@ fn pointer_up_after_capture_release_refreshes_hover() {
     interactions.set_pointer(
         &left,
         InputHandlerRoute::control(),
-        Rc::new(move |_: &MouseButtonEvent, phase: PointerPhase, _: EventPhase| match phase {
-            PointerPhase::Down => {
-                down_capture.acquire(&down_node, false);
-                EventResult::Handled
-            }
-            PointerPhase::Up => {
-                up_capture.release();
-                EventResult::Handled
-            }
-        }),
+        Rc::new(
+            move |_: &MouseButtonEvent, phase: PointerPhase, _: EventPhase| match phase {
+                PointerPhase::Down => {
+                    down_capture.acquire(&down_node, false);
+                    EventResult::Handled
+                }
+                PointerPhase::Up => {
+                    up_capture.release();
+                    EventResult::Handled
+                }
+            },
+        ),
     );
 
     let dispatcher = EventDispatcher::new(
@@ -343,8 +382,16 @@ fn auto_focus() {
 
     scene.dispatcher.dispatch(&left_down(20.0, 20.0));
 
-    let focused = scene.dispatcher.focus_chain.focused().expect("a focused node");
-    assert_eq!(focused.id(), scene.leaf.id(), "the clicked leaf takes focus");
+    let focused = scene
+        .dispatcher
+        .focus_chain
+        .focused()
+        .expect("a focused node");
+    assert_eq!(
+        focused.id(),
+        scene.leaf.id(),
+        "the clicked leaf takes focus"
+    );
 }
 
 #[test]
@@ -360,7 +407,11 @@ fn hover_path_diff() {
 
     scene.recorder.borrow_mut().hover.clear();
     scene.dispatcher.dispatch(&motion(90.0, 90.0, 1.0, 1.0));
-    assert_matches(&scene.recorder().hover, &["leaf:leave".into()], "only the leaf leaves");
+    assert_matches(
+        &scene.recorder().hover,
+        &["leaf:leave".into()],
+        "only the leaf leaves",
+    );
 
     scene.recorder.borrow_mut().hover.clear();
     scene.dispatcher.dispatch(&motion(240.0, 240.0, 1.0, 1.0));
@@ -400,9 +451,19 @@ fn wheel_prefers_deepest_target() {
     dispatcher.dispatch(&wheel(0.0, -1.0, None, None));
 
     let recorder = recorder.borrow();
-    assert!(recorder.capture.is_empty(), "the wheel takes no capture pass");
-    assert_matches(&recorder.target, &["leaf:target".into()], "the deepest target consumes the wheel");
-    assert!(recorder.bubble.is_empty(), "a handled wheel target stops the bubble");
+    assert!(
+        recorder.capture.is_empty(),
+        "the wheel takes no capture pass"
+    );
+    assert_matches(
+        &recorder.target,
+        &["leaf:target".into()],
+        "the deepest target consumes the wheel",
+    );
+    assert!(
+        recorder.bubble.is_empty(),
+        "a handled wheel target stops the bubble"
+    );
 }
 
 #[test]
@@ -427,7 +488,11 @@ fn wheel_uses_event_cursor_coordinates() {
     dispatcher.dispatch(&wheel(0.0, -1.0, Some(60.0), Some(60.0)));
 
     let recorder = recorder.borrow();
-    assert_matches(&recorder.target, &["leaf:target".into()], "the wheel hit-tests its own cursor");
+    assert_matches(
+        &recorder.target,
+        &["leaf:target".into()],
+        "the wheel hit-tests its own cursor",
+    );
     assert!(recorder.bubble.is_empty());
 }
 
@@ -446,19 +511,27 @@ fn chrome_route_preempts_target_control() {
     interactions.set_pointer(
         &root,
         InputHandlerRoute::scroll_chrome(),
-        Rc::new(move |_: &MouseButtonEvent, _: PointerPhase, phase: EventPhase| {
-            chrome.borrow_mut().push(format!("chrome:{}", phase_name(phase)));
-            EventResult::Handled
-        }),
+        Rc::new(
+            move |_: &MouseButtonEvent, _: PointerPhase, phase: EventPhase| {
+                chrome
+                    .borrow_mut()
+                    .push(format!("chrome:{}", phase_name(phase)));
+                EventResult::Handled
+            },
+        ),
     );
     let control = recorder.clone();
     interactions.set_pointer(
         &leaf,
         InputHandlerRoute::control(),
-        Rc::new(move |_: &MouseButtonEvent, _: PointerPhase, phase: EventPhase| {
-            control.borrow_mut().push(format!("leaf:{}", phase_name(phase)));
-            EventResult::Handled
-        }),
+        Rc::new(
+            move |_: &MouseButtonEvent, _: PointerPhase, phase: EventPhase| {
+                control
+                    .borrow_mut()
+                    .push(format!("leaf:{}", phase_name(phase)));
+                EventResult::Handled
+            },
+        ),
     );
 
     let mut dispatcher = EventDispatcher::new(
@@ -476,7 +549,11 @@ fn chrome_route_preempts_target_control() {
 
     dispatcher.dispatch(&left_down(40.0, 40.0));
 
-    assert_matches(recorder.borrow().as_slice(), &["chrome:capture".into()], "chrome preempts the control");
+    assert_matches(
+        recorder.borrow().as_slice(),
+        &["chrome:capture".into()],
+        "chrome preempts the control",
+    );
     let traces = traces.borrow();
     let first = traces.first().expect("a dispatch trace was emitted");
     assert_eq!(
@@ -569,7 +646,9 @@ fn global_shortcut_fallback_receives_key() {
         &global,
         InputHandlerRoute::shortcut(),
         Rc::new(move |_: &KeyEvent, phase: EventPhase| {
-            shortcut_calls.borrow_mut().push(format!("shortcut:{}", phase_name(phase)));
+            shortcut_calls
+                .borrow_mut()
+                .push(format!("shortcut:{}", phase_name(phase)));
             EventResult::Handled
         }),
     );
@@ -634,7 +713,11 @@ fn focused_key_handler_wins_before_global_shortcut() {
     );
     dispatcher.dispatch(&InputEvent::KeyDown(key(42)));
 
-    assert_matches(calls.borrow().as_slice(), &["focused".into()], "the focused handler wins alone");
+    assert_matches(
+        calls.borrow().as_slice(),
+        &["focused".into()],
+        "the focused handler wins alone",
+    );
 }
 
 #[test]
@@ -680,7 +763,9 @@ fn overlay_key_route_has_first_refusal() {
         &overlay,
         InputHandlerRoute::overlay(),
         Rc::new(move |_: &KeyEvent, phase: EventPhase| {
-            overlay_calls.borrow_mut().push(format!("overlay:{}", phase_name(phase)));
+            overlay_calls
+                .borrow_mut()
+                .push(format!("overlay:{}", phase_name(phase)));
             EventResult::Handled
         }),
     );

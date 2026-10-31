@@ -4,18 +4,18 @@
 
 use std::rc::Rc;
 
-use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::State;
+use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use cove_ui_compose::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
-use cove_ui_compose::primitives::controls::button::Button;
 use cove_ui_compose::primitives::controls::ButtonRole;
+use cove_ui_compose::primitives::controls::button::Button;
 use cove_ui_compose::primitives::data::avatar::Avatar;
-use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use cove_ui_compose::primitives::media::Icon;
+use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
+use cove_ui_compose::primitives::overlays::PopoverPlacement;
 use cove_ui_compose::primitives::overlays::hover_card::HoverCard;
 use cove_ui_compose::primitives::overlays::popconfirm::Popconfirm;
-use cove_ui_compose::primitives::overlays::PopoverPlacement;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
 use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView, View, ViewExt};
@@ -32,7 +32,9 @@ fn caption(text: impl Into<String>) -> AnyView {
 }
 
 fn body_strong(text: impl Into<String>) -> AnyView {
-    AnyView::new(Text::new(text).semantic_font(cove_ui_compose::theme::SemanticFontRef::body_strong()))
+    AnyView::new(
+        Text::new(text).semantic_font(cove_ui_compose::theme::SemanticFontRef::body_strong()),
+    )
 }
 
 /// A labelled row: leading icon, title + detail, trailing control.
@@ -192,7 +194,10 @@ pub struct HoverCardStory {
 
 impl HoverCardStory {
     pub fn new(options: GalleryOptions) -> Self {
-        Self { options, following: State::new(false) }
+        Self {
+            options,
+            following: State::new(false),
+        }
     }
 
     pub fn is_following(&self) -> bool {
@@ -239,7 +244,9 @@ impl View for HoverCardStory {
                         )),
                     ])),
                 )),
-                caption("Contributor since 1843. Open the profile with a click or keyboard for the same actions."),
+                caption(
+                    "Contributor since 1843. Open the profile with a click or keyboard for the same actions.",
+                ),
                 AnyView::new(
                     Button::title(if following { "Unfollow" } else { "Follow" }, move || {
                         toggle.update(|value| *value = !*value)
@@ -270,7 +277,11 @@ impl View for HoverCardStory {
             12.0,
             AnyView::new(TupleView::new(vec![
                 AnyView::new(card),
-                caption(if following { "Following Ada" } else { "Not following Ada" }),
+                caption(if following {
+                    "Following Ada"
+                } else {
+                    "Not following Ada"
+                }),
             ])),
         ));
 

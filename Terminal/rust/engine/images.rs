@@ -3,7 +3,9 @@
 //! Pixel values use the cell size last reported to the engine.
 
 use crate::engine::TerminalEngine;
-use crate::engine::ffi::{self, GhosttyKittyGraphics, GhosttyKittyGraphicsImage, GhosttyKittyGraphicsPlacementIterator};
+use crate::engine::ffi::{
+    self, GhosttyKittyGraphics, GhosttyKittyGraphicsImage, GhosttyKittyGraphicsPlacementIterator,
+};
 use std::ptr;
 
 /// Where a Kitty graphics placement sits in the viewport.
@@ -43,28 +45,50 @@ impl KittyImage {
             if image.is_null() {
                 return None;
             }
-            Some(Self { width: Self::width(image), height: Self::height(image), generation: Self::generation(image) })
+            Some(Self {
+                width: Self::width(image),
+                height: Self::height(image),
+                generation: Self::generation(image),
+            })
         }
     }
 
     unsafe fn width(image: GhosttyKittyGraphicsImage) -> u32 {
         let mut value: u32 = 0;
         // SAFETY: caller guarantees a live image handle.
-        unsafe { ffi::ghostty_kitty_graphics_image_get(image, ffi::KITTY_IMAGE_DATA_WIDTH, ptr::addr_of_mut!(value).cast()) };
+        unsafe {
+            ffi::ghostty_kitty_graphics_image_get(
+                image,
+                ffi::KITTY_IMAGE_DATA_WIDTH,
+                ptr::addr_of_mut!(value).cast(),
+            )
+        };
         value
     }
 
     unsafe fn height(image: GhosttyKittyGraphicsImage) -> u32 {
         let mut value: u32 = 0;
         // SAFETY: caller guarantees a live image handle.
-        unsafe { ffi::ghostty_kitty_graphics_image_get(image, ffi::KITTY_IMAGE_DATA_HEIGHT, ptr::addr_of_mut!(value).cast()) };
+        unsafe {
+            ffi::ghostty_kitty_graphics_image_get(
+                image,
+                ffi::KITTY_IMAGE_DATA_HEIGHT,
+                ptr::addr_of_mut!(value).cast(),
+            )
+        };
         value
     }
 
     unsafe fn generation(image: GhosttyKittyGraphicsImage) -> u64 {
         let mut value: u64 = 0;
         // SAFETY: caller guarantees a live image handle.
-        unsafe { ffi::ghostty_kitty_graphics_image_get(image, ffi::KITTY_IMAGE_DATA_GENERATION, ptr::addr_of_mut!(value).cast()) };
+        unsafe {
+            ffi::ghostty_kitty_graphics_image_get(
+                image,
+                ffi::KITTY_IMAGE_DATA_GENERATION,
+                ptr::addr_of_mut!(value).cast(),
+            )
+        };
         value
     }
 }
@@ -76,7 +100,11 @@ impl TerminalEngine {
         // SAFETY: the terminal handle is live and `graphics` points at a slot of
         // the documented type.
         let result = unsafe {
-            ffi::ghostty_terminal_get(self.terminal, ffi::DATA_KITTY_GRAPHICS, ptr::addr_of_mut!(graphics).cast())
+            ffi::ghostty_terminal_get(
+                self.terminal,
+                ffi::DATA_KITTY_GRAPHICS,
+                ptr::addr_of_mut!(graphics).cast(),
+            )
         };
         (result == ffi::GHOSTTY_SUCCESS && !graphics.is_null()).then_some(graphics)
     }
@@ -91,14 +119,18 @@ impl TerminalEngine {
         // terminal stay live for every call in between.
         unsafe {
             let mut iterator: GhosttyKittyGraphicsPlacementIterator = ptr::null_mut();
-            if ffi::ghostty_kitty_graphics_placement_iterator_new(ptr::null(), &mut iterator) != ffi::GHOSTTY_SUCCESS
+            if ffi::ghostty_kitty_graphics_placement_iterator_new(ptr::null(), &mut iterator)
+                != ffi::GHOSTTY_SUCCESS
                 || iterator.is_null()
             {
                 return Vec::new();
             }
             let mut handle = iterator;
-            if ffi::ghostty_kitty_graphics_get(graphics, ffi::KITTY_GRAPHICS_DATA_PLACEMENT_ITERATOR, ptr::addr_of_mut!(handle).cast())
-                != ffi::GHOSTTY_SUCCESS
+            if ffi::ghostty_kitty_graphics_get(
+                graphics,
+                ffi::KITTY_GRAPHICS_DATA_PLACEMENT_ITERATOR,
+                ptr::addr_of_mut!(handle).cast(),
+            ) != ffi::GHOSTTY_SUCCESS
             {
                 ffi::ghostty_kitty_graphics_placement_iterator_free(iterator);
                 return Vec::new();
@@ -109,13 +141,27 @@ impl TerminalEngine {
                 order += 1;
                 let mut image_id: u32 = 0;
                 let mut z: i32 = 0;
-                ffi::ghostty_kitty_graphics_placement_get(iterator, ffi::PLACEMENT_DATA_IMAGE_ID, ptr::addr_of_mut!(image_id).cast());
-                ffi::ghostty_kitty_graphics_placement_get(iterator, ffi::PLACEMENT_DATA_Z, ptr::addr_of_mut!(z).cast());
-                let Some(image) = ffi::ghostty_kitty_graphics_image(graphics, image_id).as_ref() else {
+                ffi::ghostty_kitty_graphics_placement_get(
+                    iterator,
+                    ffi::PLACEMENT_DATA_IMAGE_ID,
+                    ptr::addr_of_mut!(image_id).cast(),
+                );
+                ffi::ghostty_kitty_graphics_placement_get(
+                    iterator,
+                    ffi::PLACEMENT_DATA_Z,
+                    ptr::addr_of_mut!(z).cast(),
+                );
+                let Some(image) = ffi::ghostty_kitty_graphics_image(graphics, image_id).as_ref()
+                else {
                     continue;
                 };
                 let mut info = ffi::sized_placement_render_info();
-                if ffi::ghostty_kitty_graphics_placement_render_info(iterator, image, self.terminal, &mut info) != ffi::GHOSTTY_SUCCESS
+                if ffi::ghostty_kitty_graphics_placement_render_info(
+                    iterator,
+                    image,
+                    self.terminal,
+                    &mut info,
+                ) != ffi::GHOSTTY_SUCCESS
                     || !info.viewport_visible
                     || info.pixel_width == 0
                     || info.pixel_height == 0
@@ -125,9 +171,21 @@ impl TerminalEngine {
                 let mut generation: u64 = 0;
                 let mut width: u32 = 0;
                 let mut height: u32 = 0;
-                ffi::ghostty_kitty_graphics_image_get(image, ffi::KITTY_IMAGE_DATA_GENERATION, ptr::addr_of_mut!(generation).cast());
-                ffi::ghostty_kitty_graphics_image_get(image, ffi::KITTY_IMAGE_DATA_WIDTH, ptr::addr_of_mut!(width).cast());
-                ffi::ghostty_kitty_graphics_image_get(image, ffi::KITTY_IMAGE_DATA_HEIGHT, ptr::addr_of_mut!(height).cast());
+                ffi::ghostty_kitty_graphics_image_get(
+                    image,
+                    ffi::KITTY_IMAGE_DATA_GENERATION,
+                    ptr::addr_of_mut!(generation).cast(),
+                );
+                ffi::ghostty_kitty_graphics_image_get(
+                    image,
+                    ffi::KITTY_IMAGE_DATA_WIDTH,
+                    ptr::addr_of_mut!(width).cast(),
+                );
+                ffi::ghostty_kitty_graphics_image_get(
+                    image,
+                    ffi::KITTY_IMAGE_DATA_HEIGHT,
+                    ptr::addr_of_mut!(height).cast(),
+                );
                 placements.push((
                     z,
                     offset,
@@ -154,7 +212,10 @@ impl TerminalEngine {
         }
         // Stable within a z layer: equal z keeps protocol order.
         placements.sort_by_key(|(z, order, _)| (*z, *order));
-        placements.into_iter().map(|(_, _, placement)| placement).collect()
+        placements
+            .into_iter()
+            .map(|(_, _, placement)| placement)
+            .collect()
     }
 
     /// The image's current pixels as straight-alpha RGBA8.
@@ -171,12 +232,31 @@ impl TerminalEngine {
             let mut length: usize = 0;
             let mut format: i32 = ffi::KITTY_IMAGE_FORMAT_RGBA;
             let mut data: *const u8 = ptr::null();
-            ffi::ghostty_kitty_graphics_image_get(image, ffi::KITTY_IMAGE_DATA_WIDTH, ptr::addr_of_mut!(width).cast());
-            ffi::ghostty_kitty_graphics_image_get(image, ffi::KITTY_IMAGE_DATA_HEIGHT, ptr::addr_of_mut!(height).cast());
-            ffi::ghostty_kitty_graphics_image_get(image, ffi::KITTY_IMAGE_DATA_FORMAT, ptr::addr_of_mut!(format).cast());
-            ffi::ghostty_kitty_graphics_image_get(image, ffi::KITTY_IMAGE_DATA_DATA_LEN, ptr::addr_of_mut!(length).cast());
-            if ffi::ghostty_kitty_graphics_image_get(image, ffi::KITTY_IMAGE_DATA_DATA_PTR, ptr::addr_of_mut!(data).cast())
-                != ffi::GHOSTTY_SUCCESS
+            ffi::ghostty_kitty_graphics_image_get(
+                image,
+                ffi::KITTY_IMAGE_DATA_WIDTH,
+                ptr::addr_of_mut!(width).cast(),
+            );
+            ffi::ghostty_kitty_graphics_image_get(
+                image,
+                ffi::KITTY_IMAGE_DATA_HEIGHT,
+                ptr::addr_of_mut!(height).cast(),
+            );
+            ffi::ghostty_kitty_graphics_image_get(
+                image,
+                ffi::KITTY_IMAGE_DATA_FORMAT,
+                ptr::addr_of_mut!(format).cast(),
+            );
+            ffi::ghostty_kitty_graphics_image_get(
+                image,
+                ffi::KITTY_IMAGE_DATA_DATA_LEN,
+                ptr::addr_of_mut!(length).cast(),
+            );
+            if ffi::ghostty_kitty_graphics_image_get(
+                image,
+                ffi::KITTY_IMAGE_DATA_DATA_PTR,
+                ptr::addr_of_mut!(data).cast(),
+            ) != ffi::GHOSTTY_SUCCESS
                 || data.is_null()
                 || width == 0
                 || height == 0

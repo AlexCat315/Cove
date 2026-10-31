@@ -47,13 +47,12 @@ impl ResourceBundle {
             roots.push(path.into());
         }
         roots.push(parent.to_owned());
-        if parent.file_name().is_some_and(|n| n == "MacOS") {
-            if let Some(contents) = parent
+        if parent.file_name().is_some_and(|n| n == "MacOS")
+            && let Some(contents) = parent
                 .parent()
                 .filter(|p| p.file_name().is_some_and(|n| n == "Contents"))
-            {
-                roots.push(contents.join("Resources"));
-            }
+        {
+            roots.push(contents.join("Resources"));
         }
         Ok(Self::locate(names, &roots))
     }

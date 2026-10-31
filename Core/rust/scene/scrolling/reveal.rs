@@ -1,6 +1,6 @@
 //! Translation of CoveUIScene/Scrolling/Reveal.swift.
-use crate::scene::Node;
 use crate::Rect;
+use crate::scene::Node;
 use std::rc::Rc;
 
 impl Node {
@@ -46,9 +46,13 @@ mod tests {
         inner.add_child(&target);
         let calls = Rc::new(RefCell::new(Vec::new()));
         let outer_calls = calls.clone();
-        outer.set_scroll_reveal(Some(Rc::new(move |frame| outer_calls.borrow_mut().push(("outer", frame)))));
+        outer.set_scroll_reveal(Some(Rc::new(move |frame| {
+            outer_calls.borrow_mut().push(("outer", frame))
+        })));
         let inner_calls = calls.clone();
-        inner.set_scroll_reveal(Some(Rc::new(move |frame| inner_calls.borrow_mut().push(("inner", frame)))));
+        inner.set_scroll_reveal(Some(Rc::new(move |frame| {
+            inner_calls.borrow_mut().push(("inner", frame))
+        })));
         target.reveal_in_scroll_ancestors(false);
         let order: Vec<&str> = calls.borrow().iter().map(|(name, _)| *name).collect();
         assert_eq!(order, vec!["inner", "outer"]);

@@ -50,7 +50,8 @@ impl McpServer {
         };
         let raw_id = request.get("id").cloned().unwrap_or(Value::Null);
         // JSON-RPC ids are strings or numbers; anything else is rejected.
-        let valid_id = raw_id.is_null() || raw_id.is_string()
+        let valid_id = raw_id.is_null()
+            || raw_id.is_string()
             || raw_id.as_i64().is_some()
             || raw_id.as_u64().is_some()
             || raw_id.as_f64().is_some();
@@ -85,30 +86,54 @@ impl McpServer {
     fn dispatch(&self, method: &str, params: &Value, id: &Value) -> Vec<u8> {
         match method {
             "initialize" => {
-                let requested = params.get("protocolVersion").and_then(Value::as_str).unwrap_or_default();
-                let version = if PROTOCOL_VERSIONS.contains(&requested) { requested } else { PROTOCOL_VERSIONS[0] };
-                response(id, json!({
-                    "protocolVersion": version,
-                    "serverInfo": { "name": self.name, "version": self.version },
-                    "capabilities": {
-                        "tools": { "listChanged": self.tools_may_change },
-                        "prompts": {}
-                    }
-                }))
+                let requested = params
+                    .get("protocolVersion")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+                let version = if PROTOCOL_VERSIONS.contains(&requested) {
+                    requested
+                } else {
+                    PROTOCOL_VERSIONS[0]
+                };
+                response(
+                    id,
+                    json!({
+                        "protocolVersion": version,
+                        "serverInfo": { "name": self.name, "version": self.version },
+                        "capabilities": {
+                            "tools": { "listChanged": self.tools_may_change },
+                            "prompts": {}
+                        }
+                    }),
+                )
             }
             "ping" => response(id, json!({})),
             "tools/list" => {
-                let tools: Vec<Value> = self.toolbox.tools.iter().map(|tool| tool.mcp_definition()).collect();
+                let tools: Vec<Value> = self
+                    .toolbox
+                    .tools
+                    .iter()
+                    .map(|tool| tool.mcp_definition())
+                    .collect();
                 response(id, json!({ "tools": tools }))
             }
             "tools/call" => {
                 let (Some(name), true) = (
                     params.get("name").and_then(Value::as_str),
-                    params.get("arguments").is_none_or(|value| value.is_object()),
+                    params
+                        .get("arguments")
+                        .is_none_or(|value| value.is_object()),
                 ) else {
-                    return error(id, -32602, "tools/call requires a name and object arguments.");
+                    return error(
+                        id,
+                        -32602,
+                        "tools/call requires a name and object arguments.",
+                    );
                 };
-                let arguments = params.get("arguments").cloned().unwrap_or_else(|| json!({}));
+                let arguments = params
+                    .get("arguments")
+                    .cloned()
+                    .unwrap_or_else(|| json!({}));
                 match self.toolbox.execute(name, &arguments) {
                     Ok(result) => {
                         let text = String::from_utf8_lossy(&result.json).to_string();
@@ -125,10 +150,13 @@ impl McpServer {
                     }
                     Err(error) => {
                         let message = error.to_string();
-                        response(id, json!({
-                            "content": [{ "type": "text", "text": truncate(&message) }],
-                            "isError": true
-                        }))
+                        response(
+                            id,
+                            json!({
+                                "content": [{ "type": "text", "text": truncate(&message) }],
+                                "isError": true
+                            }),
+                        )
                     }
                 }
             }
@@ -142,15 +170,21 @@ impl McpServer {
                 response(id, json!({ "prompts": prompts }))
             }
             "prompts/get" => {
-                let name = params.get("name").and_then(Value::as_str).unwrap_or_default();
+                let name = params
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
                 match self.skills.read(name) {
-                    Ok(skill) => response(id, json!({
-                        "description": skill.description,
-                        "messages": [{
-                            "role": "user",
-                            "content": { "type": "text", "text": skill.instructions }
-                        }]
-                    })),
+                    Ok(skill) => response(
+                        id,
+                        json!({
+                            "description": skill.description,
+                            "messages": [{
+                                "role": "user",
+                                "content": { "type": "text", "text": skill.instructions }
+                            }]
+                        }),
+                    ),
                     Err(failure) => error(id, -32602, &failure.to_string()),
                 }
             }
@@ -206,7 +240,11 @@ mod tests {
 
     #[test]
     fn notifications_get_no_response() {
-        assert!(server().respond(br#"{"jsonrpc":"2.0","method":"ping"}"#).is_none());
+        assert!(
+            server()
+                .respond(br#"{"jsonrpc":"2.0","method":"ping"}"#)
+                .is_none()
+        );
     }
 
     #[test]
@@ -225,21 +263,35 @@ mod tests {
 
     #[test]
     fn malformed_and_unknown_requests_are_errors() {
-        assert_eq!(parse(&server().respond(b"not json").unwrap())["error"]["code"], -32700);
         assert_eq!(
-            parse(&server().respond(br#"{"jsonrpc":"2.0","id":1,"method":"nope"}"#).unwrap())["error"]["code"],
+            parse(&server().respond(b"not json").unwrap())["error"]["code"],
+            -32700
+        );
+        assert_eq!(
+            parse(
+                &server()
+                    .respond(br#"{"jsonrpc":"2.0","id":1,"method":"nope"}"#)
+                    .unwrap()
+            )["error"]["code"],
             -32601
         );
         assert_eq!(
-            parse(&server().respond(br#"{"jsonrpc":"2.0","id":1,"method":"ping","params":[]}"#).unwrap())
-                ["error"]["code"],
+            parse(
+                &server()
+                    .respond(br#"{"jsonrpc":"2.0","id":1,"method":"ping","params":[]}"#)
+                    .unwrap()
+            )["error"]["code"],
             -32602
         );
     }
 
     #[test]
     fn tools_list_and_call_round_trip() {
-        let listed = parse(&server().respond(br#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#).unwrap());
+        let listed = parse(
+            &server()
+                .respond(br#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#)
+                .unwrap(),
+        );
         assert_eq!(listed["result"]["tools"][0]["name"], "echo");
         let called = parse(
             &server()

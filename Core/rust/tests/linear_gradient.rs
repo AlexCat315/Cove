@@ -11,11 +11,21 @@
 use cove_core::{Color, DrawList, LinearGradient, Point, Rect};
 
 fn red() -> Color {
-    Color { r: 1.0, g: 0.0, b: 0.0, a: 1.0 }
+    Color {
+        r: 1.0,
+        g: 0.0,
+        b: 0.0,
+        a: 1.0,
+    }
 }
 
 fn blue() -> Color {
-    Color { r: 0.0, g: 0.0, b: 1.0, a: 1.0 }
+    Color {
+        r: 0.0,
+        g: 0.0,
+        b: 1.0,
+        a: 1.0,
+    }
 }
 
 fn rect() -> Rect {
@@ -32,31 +42,77 @@ fn same(a: Color, b: Color) -> bool {
 #[test]
 fn angles() {
     // 90° ramps left to right.
-    let across = LinearGradient { start: red(), end: blue(), angle: 90.0 };
-    assert!(same(across.color_at(Point { x: 10.0, y: 40.0 }, rect()), red()));
-    assert!(same(across.color_at(Point { x: 110.0, y: 40.0 }, rect()), blue()));
+    let across = LinearGradient {
+        start: red(),
+        end: blue(),
+        angle: 90.0,
+    };
+    assert!(same(
+        across.color_at(Point { x: 10.0, y: 40.0 }, rect()),
+        red()
+    ));
+    assert!(same(
+        across.color_at(Point { x: 110.0, y: 40.0 }, rect()),
+        blue()
+    ));
 
     // 180° ramps top to bottom.
-    let down = LinearGradient { start: red(), end: blue(), angle: 180.0 };
-    assert!(same(down.color_at(Point { x: 60.0, y: 20.0 }, rect()), red()));
-    assert!(same(down.color_at(Point { x: 60.0, y: 60.0 }, rect()), blue()));
+    let down = LinearGradient {
+        start: red(),
+        end: blue(),
+        angle: 180.0,
+    };
+    assert!(same(
+        down.color_at(Point { x: 60.0, y: 20.0 }, rect()),
+        red()
+    ));
+    assert!(same(
+        down.color_at(Point { x: 60.0, y: 60.0 }, rect()),
+        blue()
+    ));
 
     // 135° ramps from the top-left corner to the bottom-right.
-    let diagonal = LinearGradient { start: red(), end: blue(), angle: 135.0 };
-    assert!(same(diagonal.color_at(Point { x: 10.0, y: 20.0 }, rect()), red()));
-    assert!(same(diagonal.color_at(Point { x: 110.0, y: 60.0 }, rect()), blue()));
+    let diagonal = LinearGradient {
+        start: red(),
+        end: blue(),
+        angle: 135.0,
+    };
+    assert!(same(
+        diagonal.color_at(Point { x: 10.0, y: 20.0 }, rect()),
+        red()
+    ));
+    assert!(same(
+        diagonal.color_at(Point { x: 110.0, y: 60.0 }, rect()),
+        blue()
+    ));
 
     let middle = diagonal.color_at(Point { x: 60.0, y: 40.0 }, rect());
-    assert!((middle.r - 0.5).abs() < 0.001, "midpoint red is half, got {}", middle.r);
-    assert!((middle.b - 0.5).abs() < 0.001, "midpoint blue is half, got {}", middle.b);
+    assert!(
+        (middle.r - 0.5).abs() < 0.001,
+        "midpoint red is half, got {}",
+        middle.r
+    );
+    assert!(
+        (middle.b - 0.5).abs() < 0.001,
+        "midpoint blue is half, got {}",
+        middle.b
+    );
 }
 
 #[test]
 fn drawing() {
     let mut list = DrawList::default();
-    let gradient = LinearGradient { start: red(), end: blue(), angle: 90.0 };
-    list.add_linear_gradient(rect(), 8.0, gradient).expect("rounded gradient fill");
-    assert!(!list.vertices().is_empty(), "the gradient produced geometry");
+    let gradient = LinearGradient {
+        start: red(),
+        end: blue(),
+        angle: 90.0,
+    };
+    list.add_linear_gradient(rect(), 8.0, gradient)
+        .expect("rounded gradient fill");
+    assert!(
+        !list.vertices().is_empty(),
+        "the gradient produced geometry"
+    );
 
     let mut saw_transparent_fringe = false;
     for vertex in list.vertices() {
@@ -68,7 +124,13 @@ fn drawing() {
             continue;
         }
         let expected = gradient
-            .color_at(Point { x: vertex.x, y: vertex.y }, rect())
+            .color_at(
+                Point {
+                    x: vertex.x,
+                    y: vertex.y,
+                },
+                rect(),
+            )
             .multiplied_alpha(coverage);
         assert_eq!(
             vertex.color,

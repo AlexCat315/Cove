@@ -6,8 +6,9 @@
 
 use cove_examples::gallery_content::catalog::GalleryOptions;
 use cove_examples::gallery_content::stories::overlay_stories_file::{
-    leaf_count, many_entries, menu_depth, tab_after_close, workspace_entries, DisclosureStory,
-    MenuStory, ModalStory, PopoverStory, TabsStory, GROUP_STRIDE, INITIAL_DOCUMENTS, MANY_COMMANDS,
+    DisclosureStory, GROUP_STRIDE, INITIAL_DOCUMENTS, MANY_COMMANDS, MenuStory, ModalStory,
+    PopoverStory, TabsStory, leaf_count, many_entries, menu_depth, tab_after_close,
+    workspace_entries,
 };
 use cove_ui_compose::primitives::overlays::menu::MenuEntry;
 
@@ -28,7 +29,10 @@ fn labels_and_separators_are_not_commands() {
     // submenu, Unavailable and Delete. The submenu contributes most of the nine
     // leaves while counting as one row, so the row count is the smaller number.
     assert_eq!(entries.len(), 7);
-    assert!(entries.len() < leaves, "a submenu holds several leaves but is one row");
+    assert!(
+        entries.len() < leaves,
+        "a submenu holds several leaves but is one row"
+    );
     assert!(matches!(entries[0], MenuEntry::Label { .. }));
     assert!(matches!(entries[3], MenuEntry::Separator { .. }));
 }
@@ -42,7 +46,9 @@ fn disabling_the_story_disables_the_interactive_commands_only() {
         fn walk(entries: &[MenuEntry]) -> Option<bool> {
             for entry in entries {
                 match entry {
-                    MenuEntry::Item(item) if item.title == "Restricted" => return Some(item.is_enabled),
+                    MenuEntry::Item(item) if item.title == "Restricted" => {
+                        return Some(item.is_enabled);
+                    }
                     MenuEntry::Submenu(submenu) => {
                         if let Some(found) = walk(&submenu.entries) {
                             return Some(found);
@@ -55,9 +61,15 @@ fn disabling_the_story_disables_the_interactive_commands_only() {
         }
         walk(entries).unwrap_or(true)
     };
-    assert!(!find_restricted(&enabled), "Restricted is disabled even when the story is on");
+    assert!(
+        !find_restricted(&enabled),
+        "Restricted is disabled even when the story is on"
+    );
     assert!(!find_restricted(&disabled));
-    assert!(leaf_count(&enabled) == leaf_count(&disabled), "the shape is unchanged");
+    assert!(
+        leaf_count(&enabled) == leaf_count(&disabled),
+        "the shape is unchanged"
+    );
 }
 
 #[test]
@@ -112,7 +124,11 @@ fn menu_ids_are_unique() {
     let mut ids = Vec::new();
     collect(&story.many(), &mut ids);
     let unique: std::collections::HashSet<u64> = ids.iter().copied().collect();
-    assert_eq!(unique.len(), ids.len(), "the 100-row menu has no colliding ids");
+    assert_eq!(
+        unique.len(),
+        ids.len(),
+        "the 100-row menu has no colliding ids"
+    );
 }
 
 #[test]
@@ -154,7 +170,11 @@ fn collapsing_a_disclosure_keeps_the_draft() {
     story.set_draft("edited");
     story.toggle();
     assert!(!story.is_expanded());
-    assert_eq!(story.draft(), "edited", "caller-owned expansion preserves the draft");
+    assert_eq!(
+        story.draft(),
+        "edited",
+        "caller-owned expansion preserves the draft"
+    );
 }
 
 #[test]
@@ -186,9 +206,17 @@ fn closing_the_last_document_falls_back_to_the_previous_tab() {
     let story = TabsStory::new(GalleryOptions::default());
     // Select the last document, then close it.
     story.close_document(1); // removes Material.cove; selection was Scene.cove
-    assert_eq!(story.document_selection(), "Scene.cove", "an unselected close keeps the selection");
+    assert_eq!(
+        story.document_selection(),
+        "Scene.cove",
+        "an unselected close keeps the selection"
+    );
     let fallback = story.close_document(1); // removes Notes.md
-    assert_eq!(fallback.as_deref(), Some("Scene.cove"), "the nearest remaining tab");
+    assert_eq!(
+        fallback.as_deref(),
+        Some("Scene.cove"),
+        "the nearest remaining tab"
+    );
 }
 
 #[test]

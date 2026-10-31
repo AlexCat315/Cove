@@ -6,7 +6,7 @@
 //! boundary → destination conversion exactly.
 
 use cove_ui_compose::primitives::data::lists::{
-    drop_indicator_y, reorder_row_height, ReorderableListModel,
+    ReorderableListModel, drop_indicator_y, reorder_row_height,
 };
 
 #[test]
@@ -34,8 +34,14 @@ fn auto_scroll_adds_to_pointer_travel() {
 
 #[test]
 fn the_boundary_is_clamped_to_the_list() {
-    assert_eq!(ReorderableListModel::drop_boundary(0, -500.0, 0.0, 40.0, 5), 0);
-    assert_eq!(ReorderableListModel::drop_boundary(4, 500.0, 0.0, 40.0, 5), 5);
+    assert_eq!(
+        ReorderableListModel::drop_boundary(0, -500.0, 0.0, 40.0, 5),
+        0
+    );
+    assert_eq!(
+        ReorderableListModel::drop_boundary(4, 500.0, 0.0, 40.0, 5),
+        5
+    );
 }
 
 #[test]

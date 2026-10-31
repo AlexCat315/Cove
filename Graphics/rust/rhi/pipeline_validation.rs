@@ -1,9 +1,9 @@
 //! Translation of NativeRHI/Validation/PipelineValidation.swift: per-command
 //! capability and interface checks inside a recorded pass body.
 use super::{
-    BindingLayout, CommandBuffer, ComputeCommand, DeviceCaches, PipelineLayout, PipelineLayoutDescriptor,
-    RecordedCommand, RenderCommand, RhiError, RhiResult, ShaderStage, ThreadgroupSize, rhi_count,
-    rhi_require,
+    BindingLayout, CommandBuffer, ComputeCommand, DeviceCaches, PipelineLayout,
+    PipelineLayoutDescriptor, RecordedCommand, RenderCommand, RhiError, RhiResult, ShaderStage,
+    ThreadgroupSize, rhi_count, rhi_require,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -51,11 +51,16 @@ impl super::PipelineInterfaces {
     fn use_of(&self, id: u32, kind: PipelineKind) -> RhiResult<PipelineUse> {
         match self.uses.get(&id) {
             Some(use_of) if use_of.kind == kind => Ok(*use_of),
-            _ => Err(RhiError::invalid_argument("unknown pipeline or incorrect pipeline kind")),
+            _ => Err(RhiError::invalid_argument(
+                "unknown pipeline or incorrect pipeline kind",
+            )),
         }
     }
 
-    fn layout_descriptor(&self, pipeline: Option<PipelineUse>) -> Option<&PipelineLayoutDescriptor> {
+    fn layout_descriptor(
+        &self,
+        pipeline: Option<PipelineUse>,
+    ) -> Option<&PipelineLayoutDescriptor> {
         let pipeline = pipeline?;
         self.pipelines.get(&pipeline.layout.id())
     }
@@ -89,7 +94,11 @@ impl super::PipelineInterfaces {
             .bindings
             .get(&set_layout.id())
             .map(|layout| {
-                layout.entries.iter().filter(|entry| entry.buffer.has_dynamic_offset).count()
+                layout
+                    .entries
+                    .iter()
+                    .filter(|entry| entry.buffer.has_dynamic_offset)
+                    .count()
             })
             .unwrap_or(0);
         rhi_require(
@@ -142,22 +151,30 @@ impl super::PipelineInterfaces {
                     }
                     pipeline = Some(self.use_of(handle.id(), PipelineKind::Mesh)?);
                 }
-                RenderCommand::SetBindingSet { slot, set, dynamic_offsets } => {
+                RenderCommand::SetBindingSet {
+                    slot,
+                    set,
+                    dynamic_offsets,
+                } => {
                     self.binding(set.id(), *slot, dynamic_offsets, pipeline, caches)?;
                 }
                 RenderCommand::PushConstant { stage, slot, data } => {
                     self.constants(data, *slot, *stage, pipeline)?;
                 }
-                RenderCommand::SetIndexBuffer { offset, index_type, .. } => {
+                RenderCommand::SetIndexBuffer {
+                    offset, index_type, ..
+                } => {
                     let alignment = index_type.size() as usize;
-                    rhi_require(
-                        offset % alignment == 0,
-                        "invalid index buffer offset",
-                    )?;
+                    rhi_require(offset % alignment == 0, "invalid index buffer offset")?;
                     indexed = true;
                 }
                 RenderCommand::SetVertexBuffer { .. } => {}
-                RenderCommand::Draw { vertex_count, instance_count, first_vertex, first_instance } => {
+                RenderCommand::Draw {
+                    vertex_count,
+                    instance_count,
+                    first_vertex,
+                    first_instance,
+                } => {
                     rhi_require(
                         pipeline.map(|use_of| use_of.kind) == Some(PipelineKind::Graphics),
                         "draw requires a graphics pipeline",
@@ -185,7 +202,9 @@ impl super::PipelineInterfaces {
                         "vertex offset exceeds Int32",
                     )?;
                 }
-                RenderCommand::DrawIndirect { offset, draw_count, .. } => {
+                RenderCommand::DrawIndirect {
+                    offset, draw_count, ..
+                } => {
                     rhi_require(
                         pipeline.map(|use_of| use_of.kind) == Some(PipelineKind::Graphics)
                             && offset % 4 == 0,
@@ -242,25 +261,34 @@ impl super::PipelineInterfaces {
         Ok(())
     }
 
-    fn validate_compute(&self, commands: &[ComputeCommand], caches: &DeviceCaches) -> RhiResult<()> {
+    fn validate_compute(
+        &self,
+        commands: &[ComputeCommand],
+        caches: &DeviceCaches,
+    ) -> RhiResult<()> {
         let mut pipeline: Option<PipelineUse> = None;
         for command in commands {
             match command {
                 ComputeCommand::SetPipeline(handle) => {
                     pipeline = Some(self.use_of(handle.id(), PipelineKind::Compute)?);
                 }
-                ComputeCommand::SetBindingSet { slot, set, dynamic_offsets } => {
+                ComputeCommand::SetBindingSet {
+                    slot,
+                    set,
+                    dynamic_offsets,
+                } => {
                     self.binding(set.id(), *slot, dynamic_offsets, pipeline, caches)?;
                 }
                 ComputeCommand::PushConstant { stage, slot, data } => {
                     self.constants(data, *slot, *stage, pipeline)?;
                 }
-                ComputeCommand::Dispatch { groups_x, groups_y, groups_z } => {
+                ComputeCommand::Dispatch {
+                    groups_x,
+                    groups_y,
+                    groups_z,
+                } => {
                     rhi_require(
-                        pipeline.is_some()
-                            && *groups_x > 0
-                            && *groups_y > 0
-                            && *groups_z > 0,
+                        pipeline.is_some() && *groups_x > 0 && *groups_y > 0 && *groups_z > 0,
                         "dispatch requires a pipeline and positive workgroups",
                     )?;
                     for count in [groups_x, groups_y, groups_z] {
@@ -308,10 +336,9 @@ mod tests {
         // `set_layouts` makes every `set_binding_set` call fail the slot lookup,
         // so the "matching layout" case could never succeed.
         let set_layout = super::super::BindingLayout::new(77);
-        interfaces.pipelines.insert(
-            1,
-            PipelineLayoutDescriptor::new(vec![set_layout]),
-        );
+        interfaces
+            .pipelines
+            .insert(1, PipelineLayoutDescriptor::new(vec![set_layout]));
         (interfaces, layout)
     }
 
@@ -335,7 +362,11 @@ mod tests {
         assert!(interfaces.validate_commands(&ok, &caches, false).is_ok());
 
         let missing = render_pass(|encoder| encoder.draw(3, 1, 0, 0));
-        assert!(interfaces.validate_commands(&missing, &caches, false).is_err());
+        assert!(
+            interfaces
+                .validate_commands(&missing, &caches, false)
+                .is_err()
+        );
     }
 
     #[test]
@@ -346,7 +377,11 @@ mod tests {
             encoder.set_mesh_pipeline(MeshPipeline::new(12));
             encoder.draw_mesh_tasks(1, 1, 1);
         });
-        assert!(interfaces.validate_commands(&buffer, &caches, false).is_err());
+        assert!(
+            interfaces
+                .validate_commands(&buffer, &caches, false)
+                .is_err()
+        );
         assert!(interfaces.validate_commands(&buffer, &caches, true).is_ok());
     }
 
@@ -358,7 +393,11 @@ mod tests {
             encoder.set_pipeline(GraphicsPipeline::new(10));
             encoder.draw_indexed(super::super::DrawIndexedArguments::new(3));
         });
-        assert!(interfaces.validate_commands(&buffer, &caches, false).is_err());
+        assert!(
+            interfaces
+                .validate_commands(&buffer, &caches, false)
+                .is_err()
+        );
     }
 
     #[test]
@@ -369,7 +408,11 @@ mod tests {
         buffer.compute_pass(|encoder: &mut ComputePassEncoder| {
             encoder.dispatch(1, 1, 1);
         });
-        assert!(interfaces.validate_commands(&buffer, &caches, false).is_err());
+        assert!(
+            interfaces
+                .validate_commands(&buffer, &caches, false)
+                .is_err()
+        );
 
         let mut good = CommandBuffer::new();
         good.compute_pass(|encoder| {
@@ -388,10 +431,18 @@ mod tests {
             encoder.set_pipeline(GraphicsPipeline::new(10));
             encoder.set_binding_set(BindingSet::new(50), 0, Vec::new());
         });
-        assert!(interfaces.validate_commands(&buffer, &caches, false).is_err());
+        assert!(
+            interfaces
+                .validate_commands(&buffer, &caches, false)
+                .is_err()
+        );
 
         // The set must name the layout the pipeline declared at slot 0.
         caches.store_binding_set(50, 77);
-        assert!(interfaces.validate_commands(&buffer, &caches, false).is_ok());
+        assert!(
+            interfaces
+                .validate_commands(&buffer, &caches, false)
+                .is_ok()
+        );
     }
 }

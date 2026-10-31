@@ -4,20 +4,20 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use cove_core::Binding;
 use cove_core::scene::{
     AccessibilityActions, AccessibilityRole, AccessibilitySemantics, Display, EventPhase,
     EventResult, FocusChainHolder, HoverPhase, InputHandlerRoute, InteractionRegistryHolder,
     LayoutNode, Node, NodeResource, PointerCaptureAttachmentKey, PointerCaptureHolder,
     PointerPhase,
 };
-use cove_core::Binding;
 use cove_platform::{MouseButton, SystemCursor};
 
 use super::height_limits::EditorHeightLimits;
 use crate::modifiers::interaction::CursorExt;
 use crate::primitives::layout::scroll_reveal::ScrollReveal;
 use crate::theme::theme_for_node;
-use crate::{impl_primitive_view, PrimitiveView, View};
+use crate::{PrimitiveView, View, impl_primitive_view};
 
 const START: &str = "editor.resize.start";
 const BASIS: &str = "editor.resize.basis";
@@ -54,7 +54,13 @@ impl EditorHeightHandle {
         is_enabled: bool,
         extent: f32,
     ) -> Self {
-        Self { value, limits, label: label.into(), is_enabled, extent }
+        Self {
+            value,
+            limits,
+            label: label.into(),
+            is_enabled,
+            extent,
+        }
     }
 
     fn current(&self) -> f32 {
@@ -84,7 +90,9 @@ impl EditorHeightHandle {
         {
             capture.release();
         }
-        node.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("editor.resize"));
+        node.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+            "editor.resize",
+        ));
     }
 }
 
@@ -101,7 +109,11 @@ impl PrimitiveView for EditorHeightHandle {
     }
 
     fn update_layout(&self, layout: &LayoutNode) {
-        layout.set_display(if self.is_enabled { Display::Flex } else { Display::None });
+        layout.set_display(if self.is_enabled {
+            Display::Flex
+        } else {
+            Display::None
+        });
         layout.set_height(Some(self.extent));
         layout.set_flex_shrink(0.0);
     }
@@ -130,7 +142,8 @@ impl PrimitiveView for EditorHeightHandle {
             role: AccessibilityRole::Slider,
             label: self.label.clone(),
             value: format!("{} pt", current.round() as i64),
-            help: "Use Up/Down to resize, Shift for larger steps, Home/End for the limits".to_string(),
+            help: "Use Up/Down to resize, Shift for larger steps, Home/End for the limits"
+                .to_string(),
             ..Default::default()
         }));
 
@@ -160,9 +173,15 @@ impl PrimitiveView for EditorHeightHandle {
         let weak = node.downgrade();
         let is_enabled = self.is_enabled;
         node.update_draw(
-            (basis.minimum.to_bits(), basis.maximum.to_bits(), basis.extent.to_bits()),
+            (
+                basis.minimum.to_bits(),
+                basis.maximum.to_bits(),
+                basis.extent.to_bits(),
+            ),
             move |list, origin| {
-                let Some(owner) = Node::upgrade(&weak) else { return };
+                let Some(owner) = Node::upgrade(&weak) else {
+                    return;
+                };
                 if !owner.is_layout_visible() {
                     return;
                 }
@@ -260,7 +279,9 @@ impl PrimitiveView for EditorHeightHandle {
                 }
             })),
             set_value: Some(Rc::new(move |text: &str| {
-                let Ok(next) = text.trim().parse::<f32>() else { return };
+                let Ok(next) = text.trim().parse::<f32>() else {
+                    return;
+                };
                 if !next.is_finite() {
                     return;
                 }
@@ -275,18 +296,25 @@ impl PrimitiveView for EditorHeightHandle {
             ..Default::default()
         });
 
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
 
         let hover_node = node.downgrade();
-        registry.set_hover(node, Rc::new(move |phase| {
-            let Some(owner) = Node::upgrade(&hover_node) else { return };
-            let hovered = phase == HoverPhase::Enter
-                && crate::primitives::controls::adaptive::supports_control_hover(&owner);
-            owner.set_attachment(HOVER, hovered);
-            owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
-                "editor.resize",
-            ));
-        }));
+        registry.set_hover(
+            node,
+            Rc::new(move |phase| {
+                let Some(owner) = Node::upgrade(&hover_node) else {
+                    return;
+                };
+                let hovered = phase == HoverPhase::Enter
+                    && crate::primitives::controls::adaptive::supports_control_hover(&owner);
+                owner.set_attachment(HOVER, hovered);
+                owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                    "editor.resize",
+                ));
+            }),
+        );
 
         let pointer_node = node.downgrade();
         let pointer_binding = self.value.clone();
@@ -387,14 +415,20 @@ impl PrimitiveView for EditorHeightHandle {
                 if phase != EventPhase::Target {
                     return EventResult::Ignored;
                 }
-                if event.modifiers.has_ctrl() || event.modifiers.has_gui() || event.modifiers.has_alt()
+                if event.modifiers.has_ctrl()
+                    || event.modifiers.has_gui()
+                    || event.modifiers.has_alt()
                 {
                     return EventResult::Ignored;
                 }
                 let Some(owner) = Node::upgrade(&key_node) else {
                     return EventResult::Ignored;
                 };
-                let step = if event.modifiers.has_shift() { 64.0 } else { 16.0 };
+                let step = if event.modifiers.has_shift() {
+                    64.0
+                } else {
+                    16.0
+                };
                 let current = key_binding.get();
                 let next = match event.scancode {
                     crate::Scancode::ARROW_UP => current - step,

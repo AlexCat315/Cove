@@ -161,10 +161,7 @@ impl<E: ProcessEventSize> ProcessEventBuffer<E> {
     }
 
     /// Synchronous discovery shares the same single-consumer rule.
-    pub fn next_synchronously(
-        &self,
-        deadline: Option<Instant>,
-    ) -> Result<Option<E>, Failure> {
+    pub fn next_synchronously(&self, deadline: Option<Instant>) -> Result<Option<E>, Failure> {
         self.next_until(deadline)
     }
 }

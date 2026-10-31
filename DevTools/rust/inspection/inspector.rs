@@ -4,15 +4,17 @@
 //! composition graph owns it. Swift used `@MainActor` to serialize access; here
 //! the contract is the same — every method must run on the UI thread — and the
 //! shared ownership simply makes that explicit.
-use cove_core::scene::{
-    InvalidationLog, InvalidationPhase, InvalidationSource, LayoutInsets, Node, NodeTree, RenderTree,
-};
-use cove_core::Rect;
-use cove_devtools_protocol::{
-    InspectionInsets, InvalidationRecord, InputInventory, NodeFlags, NodeFrame, NodeLayoutInfo, NodePoint,
-    NodeStyleInfo, NodeSummary, Recomposition, RecompositionReason, RenderInventory, SourceLocation, TreeSnapshot,
-};
 use crate::inspection::editor::SceneEditor;
+use cove_core::Rect;
+use cove_core::scene::{
+    InvalidationLog, InvalidationPhase, InvalidationSource, LayoutInsets, Node, NodeTree,
+    RenderTree,
+};
+use cove_devtools_protocol::{
+    InputInventory, InspectionInsets, InvalidationRecord, NodeFlags, NodeFrame, NodeLayoutInfo,
+    NodePoint, NodeStyleInfo, NodeSummary, Recomposition, RecompositionReason, RenderInventory,
+    SourceLocation, TreeSnapshot,
+};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -73,10 +75,12 @@ impl SceneInspector {
     pub fn snapshot(&self) -> TreeSnapshot {
         // `state()` prunes stale overrides, so it is deliberately `&self`.
         let inspection = self.editor.state();
-        let invalidations = self
-            .invalidation_log
-            .as_ref()
-            .map(|log| log.snapshot(Some(64)).into_iter().map(encode_invalidation).collect());
+        let invalidations = self.invalidation_log.as_ref().map(|log| {
+            log.snapshot(Some(64))
+                .into_iter()
+                .map(encode_invalidation)
+                .collect()
+        });
         let render_inventory = self.render_tree.as_ref().map(|tree| RenderInventory {
             object_count: tree.object_count(),
             layer_roots: tree
@@ -101,7 +105,11 @@ impl SceneInspector {
                 }
                 stack.extend(node.children());
             }
-            InputInventory { node_count, focusables, hit_testables }
+            InputInventory {
+                node_count,
+                focusables,
+                hit_testables,
+            }
         });
         TreeSnapshot {
             root: root.map(|root| summarize(&root, None)),
@@ -167,7 +175,11 @@ fn summarize(node: &Node, owner_scope_id: Option<&str>) -> NodeSummary {
         }
     });
     let overrides: Vec<String> = [
-        ("padding", node.layout_node().is_some_and(|layout| layout.debug_padding().is_some())),
+        (
+            "padding",
+            node.layout_node()
+                .is_some_and(|layout| layout.debug_padding().is_some()),
+        ),
         ("backgroundColor", node.debug_background_color().is_some()),
         ("foregroundColor", node.debug_foreground_color().is_some()),
     ]
@@ -180,13 +192,19 @@ fn summarize(node: &Node, owner_scope_id: Option<&str>) -> NodeSummary {
         debug_name: node.attachment::<String>(DebugAttachmentKey::DEBUG_NAME),
         frame: encode_frame(node.frame()),
         absolute_frame: Some(encode_frame(absolute)),
-        content_offset: Some(NodePoint { x: node.content_offset().x as f64, y: node.content_offset().y as f64 }),
+        content_offset: Some(NodePoint {
+            x: node.content_offset().x as f64,
+            y: node.content_offset().y as f64,
+        }),
         z_index: Some(node.z_index() as f64),
         opacity: Some(node.opacity() as f64),
         layout_role: node.attachment::<String>(DebugAttachmentKey::LAYOUT_ROLE),
         semantic_role: node
             .attachment::<String>(DebugAttachmentKey::SEMANTIC_ROLE)
-            .or_else(|| node.accessibility().map(|semantics| format!("{:?}", semantics.role))),
+            .or_else(|| {
+                node.accessibility()
+                    .map(|semantics| format!("{:?}", semantics.role))
+            }),
         flags: NodeFlags {
             hit_testable: node.is_hit_testable(),
             focusable: node.is_focusable(),
@@ -238,7 +256,12 @@ fn insets(value: LayoutInsets) -> InspectionInsets {
 }
 
 fn encode_frame(frame: Rect) -> NodeFrame {
-    NodeFrame { x: frame.x as f64, y: frame.y as f64, w: frame.width as f64, h: frame.height as f64 }
+    NodeFrame {
+        x: frame.x as f64,
+        y: frame.y as f64,
+        w: frame.width as f64,
+        h: frame.height as f64,
+    }
 }
 
 fn encode_invalidation(reason: cove_core::scene::DirtyReason) -> InvalidationRecord {
@@ -264,6 +287,9 @@ fn describe_source(source: &InvalidationSource) -> String {
 
 impl std::fmt::Debug for SceneInspector {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.debug_struct("SceneInspector").field("editor", &self.editor).finish_non_exhaustive()
+        formatter
+            .debug_struct("SceneInspector")
+            .field("editor", &self.editor)
+            .finish_non_exhaustive()
     }
 }

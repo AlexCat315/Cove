@@ -7,9 +7,9 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::primitives::text::text_buffer::TextBuffer;
 use cove_core::scene::{Node, NodeResource};
 use cove_platform::KeyEvent;
-use crate::primitives::text::text_buffer::TextBuffer;
 
 /// How a completion's insert text is interpreted.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -41,7 +41,8 @@ impl TextSnippet {
         let characters: Vec<char> = template.chars().collect();
         let mut output = String::new();
         let mut length = 0usize;
-        let mut found: std::collections::HashMap<usize, (usize, usize)> = std::collections::HashMap::new();
+        let mut found: std::collections::HashMap<usize, (usize, usize)> =
+            std::collections::HashMap::new();
         let mut index = 0usize;
 
         fn read_number(characters: &[char], index: &mut usize) -> Option<usize> {
@@ -111,7 +112,9 @@ impl TextSnippet {
                 return;
             }
             if *index >= characters.len() || characters[*index] != '{' {
-                if *index < characters.len() && (characters[*index].is_alphabetic() || characters[*index] == '_') {
+                if *index < characters.len()
+                    && (characters[*index].is_alphabetic() || characters[*index] == '_')
+                {
                     while *index < characters.len()
                         && (characters[*index].is_alphabetic() || characters[*index] == '_')
                     {
@@ -125,7 +128,9 @@ impl TextSnippet {
             }
             *index += 1;
             if *index < characters.len() && characters[*index].is_ascii_digit() {
-                let Some(number) = read_number(characters, index) else { return };
+                let Some(number) = read_number(characters, index) else {
+                    return;
+                };
                 let start = *length;
                 if *index < characters.len() && characters[*index] == ':' {
                     *index += 1;
@@ -192,7 +197,13 @@ impl TextSnippet {
                 continue;
             }
             if character == '$' {
-                parse_dollar(&characters, &mut index, &mut output, &mut length, &mut found);
+                parse_dollar(
+                    &characters,
+                    &mut index,
+                    &mut output,
+                    &mut length,
+                    &mut found,
+                );
                 continue;
             }
             output.push(character);
@@ -210,8 +221,15 @@ impl TextSnippet {
             })
             .collect();
         let (start, end) = found.get(&0).copied().unwrap_or((length, length));
-        stops.push(TextSnippetStop { number: 0, start, end });
-        Self { text: output, stops }
+        stops.push(TextSnippetStop {
+            number: 0,
+            start,
+            end,
+        });
+        Self {
+            text: output,
+            stops,
+        }
     }
 }
 
@@ -235,7 +253,12 @@ impl TextSnippetSession {
     }
 
     /// Start after an insertion; returns the first stop to select.
-    pub fn start(&self, snippet: &TextSnippet, offset: usize, buffer: &TextBuffer) -> Option<(usize, usize)> {
+    pub fn start(
+        &self,
+        snippet: &TextSnippet,
+        offset: usize,
+        buffer: &TextBuffer,
+    ) -> Option<(usize, usize)> {
         let stops: Vec<(usize, usize)> = snippet
             .stops
             .iter()
@@ -298,12 +321,16 @@ impl TextSnippetSession {
 
     fn synchronize(&self, next: &TextBuffer) -> bool {
         let previous = { self.buffer.borrow().clone() };
-        let Some(previous) = previous else { return false };
+        let Some(previous) = previous else {
+            return false;
+        };
         *self.buffer.borrow_mut() = Some(next.clone());
         if previous.has_same_contents(next) {
             return true;
         }
-        let Some(delta) = next.edit_delta(&previous) else { return true };
+        let Some(delta) = next.edit_delta(&previous) else {
+            return true;
+        };
         let current = *self.current.borrow();
         let stop = {
             let stops = self.stops.borrow();

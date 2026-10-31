@@ -91,14 +91,20 @@ struct Counter {
 
 impl Counter {
     fn new(name: &str) -> Self {
-        Self { name: name.to_string(), count: State::new(0) }
+        Self {
+            name: name.to_string(),
+            count: State::new(0),
+        }
     }
 }
 
 /// `Option<T>: View` requires `Clone`; cloning shares the same `State` handle.
 impl Clone for Counter {
     fn clone(&self) -> Self {
-        Self { name: self.name.clone(), count: self.count.clone() }
+        Self {
+            name: self.name.clone(),
+            count: self.count.clone(),
+        }
     }
 }
 
@@ -130,16 +136,23 @@ fn probe(root: &Node, name: &str) -> Option<Node> {
 }
 
 fn root_of(graph: &Rc<ViewGraph>) -> Node {
-    graph.tree.borrow().root().expect("an installed graph has a root")
+    graph
+        .tree
+        .borrow()
+        .root()
+        .expect("an installed graph has a root")
 }
 
 fn probe_count(node: &Node) -> i32 {
-    node.attachment::<i32>("probe-count").expect("a probe stamps its count")
+    node.attachment::<i32>("probe-count")
+        .expect("a probe stamps its count")
 }
 
 fn activate(node: &Node) {
     let actions = node.accessibility_actions();
-    let activate = actions.activate.expect("a probe installs an activate action");
+    let activate = actions
+        .activate
+        .expect("a probe installs an activate action");
     activate();
 }
 
@@ -185,12 +198,16 @@ impl View for ConditionalHarness {
 fn conditional() {
     GlobalTestLock::locked(|| {
         let graph = graph();
-        let harness = ConditionalHarness { revision: State::new(0), shown: State::new(true) };
+        let harness = ConditionalHarness {
+            revision: State::new(0),
+            shown: State::new(true),
+        };
         let revision = harness.revision.clone();
         let shown = harness.shown.clone();
         graph.install(harness, Default::default());
 
-        let first = probe(&root_of(&graph), "counter").expect("the conditional counter is installed");
+        let first =
+            probe(&root_of(&graph), "counter").expect("the conditional counter is installed");
         let id: ElementId = first.id();
         activate(&first);
         graph.recomposer.commit_all();
@@ -201,18 +218,29 @@ fn conditional() {
             graph.recomposer.commit_all();
             let node = probe(&root_of(&graph), "counter").expect("still installed");
             assert_eq!(node.id(), id, "revision {value} keeps the child identity");
-            assert_eq!(probe_count(&node), 1, "revision {value} keeps the child-local count");
+            assert_eq!(
+                probe_count(&node),
+                1,
+                "revision {value} keeps the child-local count"
+            );
         }
 
         // Toggling the branch away drops the child, and its state with it.
         shown.set(false);
         graph.recomposer.commit_all();
-        assert!(probe(&root_of(&graph), "counter").is_none(), "the branch is gone");
+        assert!(
+            probe(&root_of(&graph), "counter").is_none(),
+            "the branch is gone"
+        );
 
         shown.set(true);
         graph.recomposer.commit_all();
         let restored = probe(&root_of(&graph), "counter").expect("the branch is back");
-        assert_eq!(probe_count(&restored), 0, "a restored branch starts from fresh state");
+        assert_eq!(
+            probe_count(&restored),
+            0,
+            "a restored branch starts from fresh state"
+        );
     });
 }
 
@@ -248,8 +276,10 @@ impl View for ArrayHarness {
 fn arrays() {
     GlobalTestLock::locked(|| {
         let graph = graph();
-        let harness =
-            ArrayHarness { names: State::new(strings(&["a", "b"])), revision: State::new(0) };
+        let harness = ArrayHarness {
+            names: State::new(strings(&["a", "b"])),
+            revision: State::new(0),
+        };
         let names = harness.names.clone();
         let revision = harness.revision.clone();
         graph.install(harness, Default::default());
@@ -265,8 +295,16 @@ fn arrays() {
             revision.set(revision.get() + 1);
             graph.recomposer.commit_all();
             let node = probe(&root_of(&graph), "a").expect("`a` survives every edit");
-            assert_eq!(node.id(), id, "the key `a` keeps its identity through {next:?}");
-            assert_eq!(probe_count(&node), 1, "the key `a` keeps its state through {next:?}");
+            assert_eq!(
+                node.id(),
+                id,
+                "the key `a` keeps its identity through {next:?}"
+            );
+            assert_eq!(
+                probe_count(&node),
+                1,
+                "the key `a` keeps its state through {next:?}"
+            );
         }
     });
 }
@@ -305,7 +343,10 @@ impl View for IdentifiedConditional {
 fn identified_conditional() {
     GlobalTestLock::locked(|| {
         let graph = graph();
-        let harness = IdentifiedConditional { revision: State::new(0), identity: State::new(0) };
+        let harness = IdentifiedConditional {
+            revision: State::new(0),
+            identity: State::new(0),
+        };
         let revision = harness.revision.clone();
         let identity = harness.identity.clone();
         graph.install(harness, Default::default());
@@ -321,8 +362,16 @@ fn identified_conditional() {
             revision.set(value);
             graph.recomposer.commit_all();
             let node = probe(&root_of(&graph), "identified").expect("still installed");
-            assert_eq!(node.id(), id, "revision {value} survives both outer modifiers");
-            assert_eq!(probe_count(&node), 1, "revision {value} keeps the child-local count");
+            assert_eq!(
+                node.id(),
+                id,
+                "revision {value} survives both outer modifiers"
+            );
+            assert_eq!(
+                probe_count(&node),
+                1,
+                "revision {value} keeps the child-local count"
+            );
         }
 
         // A new identity is the one thing that rebuilds the subtree.
@@ -330,7 +379,11 @@ fn identified_conditional() {
         graph.recomposer.commit_all();
         let replaced = probe(&root_of(&graph), "identified").expect("still installed");
         assert_ne!(replaced.id(), id, "a new identity replaces the node");
-        assert_eq!(probe_count(&replaced), 0, "the replacement starts from fresh state");
+        assert_eq!(
+            probe_count(&replaced),
+            0,
+            "the replacement starts from fresh state"
+        );
     });
 }
 
@@ -402,18 +455,33 @@ fn identified_arrays() {
             "groups reorder without rebuilding their children",
         );
         assert_eq!(reordered_second.id(), second_id);
-        assert_eq!(probe_count(&reordered_first), 1, "the first group keeps its child state");
-        assert_eq!(probe_count(&reordered_second), 0, "the untouched group keeps its own state");
+        assert_eq!(
+            probe_count(&reordered_first),
+            1,
+            "the first group keeps its child state"
+        );
+        assert_eq!(
+            probe_count(&reordered_second),
+            0,
+            "the untouched group keeps its own state"
+        );
 
         // Dropping a group releases it; bringing it back starts fresh.
         groups.set(strings(&["second"]));
         graph.recomposer.commit_all();
-        assert!(probe(&root_of(&graph), "first-a").is_none(), "the removed group is gone");
+        assert!(
+            probe(&root_of(&graph), "first-a").is_none(),
+            "the removed group is gone"
+        );
 
         groups.set(strings(&["first", "second"]));
         graph.recomposer.commit_all();
         let restored = probe(&root_of(&graph), "first-a").expect("the group is back");
         assert_ne!(restored.id(), first_id, "a returned group builds new nodes");
-        assert_eq!(probe_count(&restored), 0, "a returned group starts from fresh state");
+        assert_eq!(
+            probe_count(&restored),
+            0,
+            "a returned group starts from fresh state"
+        );
     });
 }

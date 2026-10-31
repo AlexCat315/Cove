@@ -1,6 +1,6 @@
 //! Translation of CoveUIComposeCore/LayoutDebugModifier.swift.
-use cove_core::scene::Node;
 use crate::{ModifiedContent, View, ViewExt, ViewModifier};
+use cove_core::scene::Node;
 
 pub struct LayoutDebugAttachmentKey;
 impl LayoutDebugAttachmentKey {
@@ -15,7 +15,11 @@ pub struct LayoutDebugModifier {
     pub debug_name: Option<String>,
 }
 impl LayoutDebugModifier {
-    pub fn new(layout_role: Option<&str>, semantic_role: Option<&str>, debug_name: Option<&str>) -> Self {
+    pub fn new(
+        layout_role: Option<&str>,
+        semantic_role: Option<&str>,
+        debug_name: Option<&str>,
+    ) -> Self {
         Self {
             layout_role: layout_role.map(str::to_string),
             semantic_role: semantic_role.map(str::to_string),

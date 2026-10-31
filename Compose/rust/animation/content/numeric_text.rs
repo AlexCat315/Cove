@@ -1,15 +1,15 @@
 //! Animated number text translated from Animation/Content/NumericText.swift.
-use cove_core::scene::{
-    AccessibilityRole, AccessibilitySemantics, Animation, AnimationController,
-    ActiveAnimationContext, AnimatorScheduler, AnyAnimationController, FlexDirection, Align,
-    LayoutNode, Node, NodeResource,
-};
-use cove_core::State;
 use crate::primitives::text::Text;
-use crate::{impl_primitive_view, AnyView, DynamicField, PrimitiveView, View};
+use crate::theme::{SemanticMotionRef, theme_for_node};
+use crate::{AnyView, DynamicField, PrimitiveView, View, impl_primitive_view};
+use cove_core::State;
+use cove_core::scene::{
+    AccessibilityRole, AccessibilitySemantics, ActiveAnimationContext, Align, Animation,
+    AnimationController, AnimatorScheduler, AnyAnimationController, FlexDirection, LayoutNode,
+    Node, NodeResource,
+};
 use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
-use crate::theme::{theme_for_node, SemanticMotionRef};
 
 /// A number whose visual label interpolates while assistive technology receives
 /// the final value as soon as the target changes.
@@ -35,7 +35,12 @@ impl NumericText {
         format: impl Fn(f64) -> String + 'static,
     ) -> Self {
         let value = finite(value);
-        Self { value, animation, format: Rc::new(format), displayed: State::new(value) }
+        Self {
+            value,
+            animation,
+            format: Rc::new(format),
+            displayed: State::new(value),
+        }
     }
 }
 
@@ -89,7 +94,13 @@ impl PrimitiveView for NumberHost {
 
         if let Some(session) = node.first_resource::<NumberSession>() {
             let publish = self.publish.clone();
-            session.update(self.value, self.animation.clone(), node.prefers_reduced_motion(), Rc::new(move |value| publish.set(value)), node);
+            session.update(
+                self.value,
+                self.animation.clone(),
+                node.prefers_reduced_motion(),
+                Rc::new(move |value| publish.set(value)),
+                node,
+            );
         }
     }
 
@@ -147,14 +158,20 @@ impl NumberSession {
             self.stop();
             self.current.set(value);
             self.target.set(Some(value));
-            if changed { self.publish_value(value); }
+            if changed {
+                self.publish_value(value);
+            }
             return;
         }
 
         if reduced_motion {
             let changed = self.target.get() != Some(value)
                 || self.current.get() != value
-                || self.controller.borrow().as_ref().is_some_and(|controller| !controller.is_finished());
+                || self
+                    .controller
+                    .borrow()
+                    .as_ref()
+                    .is_some_and(|controller| !controller.is_finished());
             if self.target.get() == Some(value) {
                 if let Some(controller) = self.controller.borrow().as_ref() {
                     controller.finish_immediately();
@@ -163,11 +180,15 @@ impl NumberSession {
             self.stop();
             self.current.set(value);
             self.target.set(Some(value));
-            if changed { self.publish_value(value); }
+            if changed {
+                self.publish_value(value);
+            }
             return;
         }
 
-        if self.target.get() == Some(value) { return; }
+        if self.target.get() == Some(value) {
+            return;
+        }
         let mounted = self.target.get().is_some();
         self.target.set(Some(value));
         self.stop();
@@ -181,12 +202,13 @@ impl NumberSession {
             .or(context.animation)
             .unwrap_or_else(|| SemanticMotionRef::medium().resolve(&theme_for_node(node)));
         let weak: Weak<Self> = Rc::downgrade(self);
-        let controller = AnimationController::new(self.current.get(), value, animation, 0.0, move |value| {
-            if let Some(session) = weak.upgrade() {
-                session.current.set(value);
-                session.publish_value(value);
-            }
-        });
+        let controller =
+            AnimationController::new(self.current.get(), value, animation, 0.0, move |value| {
+                if let Some(session) = weak.upgrade() {
+                    session.current.set(value);
+                    session.publish_value(value);
+                }
+            });
         if let Some(completion) = context.completion {
             completion.attach(&controller);
         }
@@ -209,7 +231,9 @@ impl NodeResource for NumberSession {
         self.scheduler.borrow_mut().take();
     }
 
-    fn as_any_rc(self: Rc<Self>) -> Rc<dyn std::any::Any> { self }
+    fn as_any_rc(self: Rc<Self>) -> Rc<dyn std::any::Any> {
+        self
+    }
 }
 
 fn finite(value: f64) -> f64 {

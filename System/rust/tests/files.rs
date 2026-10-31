@@ -49,7 +49,10 @@ fn failed_atomic_write_cleans_staging_files() {
     fs::write(destination.join("child"), b"keep").expect("write child");
 
     assert!(atomic_write(&destination, b"new", Access::Inherit).is_err());
-    assert_eq!(fs::read_to_string(destination.join("child")).unwrap(), "keep");
+    assert_eq!(
+        fs::read_to_string(destination.join("child")).unwrap(),
+        "keep"
+    );
 
     let entries: Vec<_> = fs::read_dir(root.path())
         .unwrap()
@@ -73,7 +76,10 @@ fn owner_only_files_remain_readable_and_writable() {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        assert_eq!(fs::metadata(&file).unwrap().permissions().mode() & 0o777, 0o600);
+        assert_eq!(
+            fs::metadata(&file).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
         assert_eq!(
             fs::metadata(root.path()).unwrap().permissions().mode() & 0o777,
             0o700

@@ -123,7 +123,8 @@ impl Files {
         if let Some(parent) = url.parent() {
             Self::directory(parent)?;
         }
-        let mut bytes = serde_json::to_vec_pretty(value).map_err(|error| ToolError::invalid(error.to_string()))?;
+        let mut bytes = serde_json::to_vec_pretty(value)
+            .map_err(|error| ToolError::invalid(error.to_string()))?;
         bytes.push(b'\n');
         atomic_write(url, &bytes)
     }
@@ -148,31 +149,12 @@ impl Files {
         relative_path(file, root)
             .components()
             .filter_map(|component| match component {
-                std::path::Component::Normal(value) => {
-                    Some(value.to_string_lossy().into_owned())
-                }
+                std::path::Component::Normal(value) => Some(value.to_string_lossy().into_owned()),
                 std::path::Component::ParentDir => Some("..".to_string()),
                 _ => None,
             })
             .collect::<Vec<_>>()
             .join("/")
-    }
-
-    /// Swift accepts JSON's usual escapes but uses `\u{...}` for control scalars.
-    pub fn swift_literal(value: &str) -> String {
-        let mut result = String::from("\"");
-        for character in value.chars() {
-            match character {
-                '"' => result.push_str("\\\""),
-                '\\' => result.push_str("\\\\"),
-                control if (control as u32) < 32 || control as u32 == 127 => {
-                    result.push_str(&format!("\\u{{{:x}}}", control as u32));
-                }
-                other => result.push(other),
-            }
-        }
-        result.push('"');
-        result
     }
 }
 
@@ -250,9 +232,8 @@ impl Shell {
         name: &str,
         environment: &BTreeMap<String, String>,
     ) -> Result<PathBuf, ToolError> {
-        locate(name, environment).ok_or_else(|| {
-            ToolError::invalid(format!("Executable not found on PATH: {name}"))
-        })
+        locate(name, environment)
+            .ok_or_else(|| ToolError::invalid(format!("Executable not found on PATH: {name}")))
     }
 
     /// Starts a child and returns its handle.
@@ -337,8 +318,14 @@ impl Shell {
         limits.timeout = Duration::from_secs(60 * 60 * 24 * 365 * 100);
         let mut session = ProcessSession::spawn(&request, limits).map_err(io_error)?;
         session.close_input();
-        let mut output_stream = ProcessStream::new(command, "stdout", if capture { None } else { Some(stdout) }, capture);
-        let mut error_stream = ProcessStream::new(command, "stderr", Some(StdoutTarget::StandardError), false);
+        let mut output_stream = ProcessStream::new(
+            command,
+            "stdout",
+            if capture { None } else { Some(stdout) },
+            capture,
+        );
+        let mut error_stream =
+            ProcessStream::new(command, "stderr", Some(StdoutTarget::StandardError), false);
         let mut status = 0;
         while let Some(event) = session.next_event() {
             match event {
@@ -429,7 +416,11 @@ impl Shell {
         let data = output_stream.finish(session.pid as i32);
         let errors = error_stream.finish(session.pid as i32);
         let _ = Termination::Exited;
-        Ok((String::from_utf8_lossy(&data).trim().to_string(), errors, status))
+        Ok((
+            String::from_utf8_lossy(&data).trim().to_string(),
+            errors,
+            status,
+        ))
     }
 }
 
@@ -642,11 +633,22 @@ impl DeveloperTool {
             true,
             StdoutTarget::StandardOutput,
         )?;
-        let name = if cfg!(windows) { "cove-dev.exe" } else { "cove-dev" };
+        let name = if cfg!(windows) {
+            "cove-dev.exe"
+        } else {
+            "cove-dev"
+        };
         let executable = Path::new(products.trim()).join(name);
         let mut command = vec![executable.display().to_string()];
         command.extend(arguments.iter().cloned());
-        Shell::run(&command, Some(root), &child_environment, false, quiet, StdoutTarget::StandardOutput)?;
+        Shell::run(
+            &command,
+            Some(root),
+            &child_environment,
+            false,
+            quiet,
+            StdoutTarget::StandardOutput,
+        )?;
         Ok(())
     }
 }

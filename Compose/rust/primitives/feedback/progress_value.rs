@@ -1,8 +1,6 @@
 //! Shared animated value state for determinate progress indicators.
-use cove_core::scene::{
-    ActiveAnimationContext, Animation, Node, NodeResource,
-};
-use crate::theme::{theme_for_node, SemanticMotionRef};
+use crate::theme::{SemanticMotionRef, theme_for_node};
+use cove_core::scene::{ActiveAnimationContext, Animation, Node, NodeResource};
 use std::cell::Cell;
 use std::rc::{Rc, Weak};
 
@@ -15,10 +13,15 @@ pub struct ProgressValue {
 
 impl ProgressValue {
     pub fn new() -> Rc<Self> {
-        Rc::new(Self { value: Cell::new(0.0), is_determinate: Cell::new(false) })
+        Rc::new(Self {
+            value: Cell::new(0.0),
+            is_determinate: Cell::new(false),
+        })
     }
 
-    pub fn value(&self) -> f64 { self.value.get() }
+    pub fn value(&self) -> f64 {
+        self.value.get()
+    }
 
     pub fn update(self: &Rc<Self>, node: &Node, target: f64, determinate: bool) {
         let was_determinate = self.is_determinate.replace(determinate);
@@ -33,10 +36,16 @@ impl ProgressValue {
             let weak_self: Weak<Self> = Rc::downgrade(self);
             let weak_node = node.downgrade();
             node.animatable_set_with("progress.value", self.value.get(), target, move |value| {
-                let Some(session) = weak_self.upgrade() else { return };
-                if session.value.replace(value) == value { return; }
+                let Some(session) = weak_self.upgrade() else {
+                    return;
+                };
+                if session.value.replace(value) == value {
+                    return;
+                }
                 if let Some(node) = Node::upgrade(&weak_node) {
-                    node.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("progress.value"));
+                    node.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                        "progress.value",
+                    ));
                 }
             });
         };
@@ -50,7 +59,12 @@ impl ProgressValue {
 }
 
 impl Default for ProgressValue {
-    fn default() -> Self { Self { value: Cell::new(0.0), is_determinate: Cell::new(false) } }
+    fn default() -> Self {
+        Self {
+            value: Cell::new(0.0),
+            is_determinate: Cell::new(false),
+        }
+    }
 }
 
 impl NodeResource for ProgressValue {
@@ -60,6 +74,7 @@ impl NodeResource for ProgressValue {
         node.cancel_animation("progress.value");
     }
 
-    fn as_any_rc(self: Rc<Self>) -> Rc<dyn std::any::Any> { self }
+    fn as_any_rc(self: Rc<Self>) -> Rc<dyn std::any::Any> {
+        self
+    }
 }
-

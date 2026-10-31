@@ -1,6 +1,6 @@
 //! Composition boundary for the selected route.
-use cove_core::Binding;
 use crate::{AnyView, View, ViewExt};
+use cove_core::Binding;
 use std::hash::Hash;
 use std::rc::Rc;
 
@@ -18,8 +18,14 @@ where
     Route: Clone + Hash + Eq + 'static,
     Content: View + 'static,
 {
-    pub fn new(selection: Binding<Route>, destination: impl Fn(Route) -> Content + 'static) -> Self {
-        Self { selection, destination: Rc::new(destination) }
+    pub fn new(
+        selection: Binding<Route>,
+        destination: impl Fn(Route) -> Content + 'static,
+    ) -> Self {
+        Self {
+            selection,
+            destination: Rc::new(destination),
+        }
     }
 }
 

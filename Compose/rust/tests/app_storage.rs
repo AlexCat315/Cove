@@ -92,7 +92,11 @@ fn the_file_store_round_trips_values_across_instances() {
             Some(AppStorageValue::Double(0.5)),
             "a double survives a reopen"
         );
-        assert_eq!(reloaded.value("missing"), None, "a missing key reads as none");
+        assert_eq!(
+            reloaded.value("missing"),
+            None,
+            "a missing key reads as none"
+        );
 
         let _ = std::fs::remove_dir_all(&directory);
     });
@@ -116,7 +120,9 @@ fn corrupt_json_is_quarantined_before_fresh_preferences() {
             store.load_warning().is_some(),
             "the caller is told the file could not be read"
         );
-        let quarantined = store.quarantined_path().expect("the bad file was moved aside");
+        let quarantined = store
+            .quarantined_path()
+            .expect("the bad file was moved aside");
         assert!(
             quarantined.is_file(),
             "the quarantine keeps the unreadable bytes"
@@ -125,7 +131,10 @@ fn corrupt_json_is_quarantined_before_fresh_preferences() {
 
         store.set("theme", Some(AppStorageValue::String("light".into())));
         assert_eq!(store.last_save_error(), None, "the fresh write succeeds");
-        assert!(quarantined.is_file(), "quarantining is not undone by a write");
+        assert!(
+            quarantined.is_file(),
+            "quarantining is not undone by a write"
+        );
         assert_eq!(
             FileAppStorageStore::new(&path).value("theme"),
             Some(AppStorageValue::String("light".into())),
@@ -208,7 +217,11 @@ fn two_wrappers_over_one_key_stay_in_sync() {
         // Both handles read through the shared box, so a write is visible to
         // the other immediately.
         assert_eq!(first.get(), "light", "the writing handle sees its value");
-        assert_eq!(second.get(), "light", "the sibling handle sees the same value");
+        assert_eq!(
+            second.get(),
+            "light",
+            "the sibling handle sees the same value"
+        );
         assert_eq!(
             store.values().get("test.view.theme"),
             Some(&AppStorageValue::String("light".into())),
@@ -249,15 +262,14 @@ fn the_memory_store_keeps_values_per_key() {
     store.set("a", Some(AppStorageValue::Int(1)));
     store.set("b", Some(AppStorageValue::String("two".into())));
     assert_eq!(store.value("a"), Some(AppStorageValue::Int(1)));
-    assert_eq!(store.value("b"), Some(AppStorageValue::String("two".into())));
+    assert_eq!(
+        store.value("b"),
+        Some(AppStorageValue::String("two".into()))
+    );
 
     store.set("a", None);
     assert_eq!(store.value("a"), None, "setting none removes the key");
-    assert_eq!(
-        store.values().len(),
-        1,
-        "only the remaining key is present"
-    );
+    assert_eq!(store.values().len(), 1, "only the remaining key is present");
 }
 
 #[test]

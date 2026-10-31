@@ -3,8 +3,8 @@
 //! A natural-size stack algorithm for custom and candidate layouts. Children
 //! receive the offered cross-axis size and an intrinsic main axis; use the Box
 //! containers when flex growth or compression is required.
-use cove_core::{Point, Rect, Size};
 use crate::{Alignment, HorizontalAlignment, Layout, LayoutSubview, ProposedViewSize};
+use cove_core::{Point, Rect, Size};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum StackAxis {
@@ -22,17 +22,29 @@ pub struct StackLayout {
 
 impl Default for StackLayout {
     fn default() -> Self {
-        Self { axis: StackAxis::Vertical, spacing: 0.0, alignment: Alignment::TopLeading }
+        Self {
+            axis: StackAxis::Vertical,
+            spacing: 0.0,
+            alignment: Alignment::TopLeading,
+        }
     }
 }
 
 impl StackLayout {
     pub fn new(axis: StackAxis, spacing: f32, alignment: Alignment) -> Self {
-        Self { axis, spacing, alignment }
+        Self {
+            axis,
+            spacing,
+            alignment,
+        }
     }
 
     fn resolved_spacing(&self) -> f32 {
-        if self.spacing.is_finite() { self.spacing.max(0.0) } else { 0.0 }
+        if self.spacing.is_finite() {
+            self.spacing.max(0.0)
+        } else {
+            0.0
+        }
     }
 
     fn proposal_for_child(&self, proposal: ProposedViewSize) -> ProposedViewSize {
@@ -42,9 +54,16 @@ impl StackLayout {
         }
     }
 
-    fn arrangement(&self, proposal: ProposedViewSize, subviews: &[LayoutSubview]) -> (Vec<Size>, Size) {
+    fn arrangement(
+        &self,
+        proposal: ProposedViewSize,
+        subviews: &[LayoutSubview],
+    ) -> (Vec<Size>, Size) {
         let child_proposal = self.proposal_for_child(proposal);
-        let sizes: Vec<Size> = subviews.iter().map(|subview| subview.size_that_fits(child_proposal)).collect();
+        let sizes: Vec<Size> = subviews
+            .iter()
+            .map(|subview| subview.size_that_fits(child_proposal))
+            .collect();
         let mut main = self.resolved_spacing() * sizes.len().saturating_sub(1) as f32;
         let mut cross: f32 = 0.0;
         for size in &sizes {
@@ -60,8 +79,14 @@ impl StackLayout {
             }
         }
         let total = match self.axis {
-            StackAxis::Horizontal => Size { width: main, height: cross },
-            StackAxis::Vertical => Size { width: cross, height: main },
+            StackAxis::Horizontal => Size {
+                width: main,
+                height: cross,
+            },
+            StackAxis::Vertical => Size {
+                width: cross,
+                height: main,
+            },
         };
         (sizes, total)
     }
@@ -69,9 +94,21 @@ impl StackLayout {
     fn horizontal_offset(&self, available: f32, rtl: bool) -> f32 {
         let (horizontal, _) = self.alignment.components();
         match horizontal {
-            HorizontalAlignment::Leading => if rtl { available } else { 0.0 },
+            HorizontalAlignment::Leading => {
+                if rtl {
+                    available
+                } else {
+                    0.0
+                }
+            }
             HorizontalAlignment::Center => available / 2.0,
-            HorizontalAlignment::Trailing => if rtl { 0.0 } else { available },
+            HorizontalAlignment::Trailing => {
+                if rtl {
+                    0.0
+                } else {
+                    available
+                }
+            }
         }
     }
 
@@ -90,11 +127,18 @@ impl Layout for StackLayout {
         self.arrangement(proposal, subviews).1
     }
 
-    fn place_subviews(&self, bounds: Rect, _proposal: ProposedViewSize, subviews: &[LayoutSubview]) {
+    fn place_subviews(
+        &self,
+        bounds: Rect,
+        _proposal: ProposedViewSize,
+        subviews: &[LayoutSubview],
+    ) {
         let offered = ProposedViewSize::new(Some(bounds.width), Some(bounds.height));
         let (sizes, total) = self.arrangement(offered, subviews);
         let child_proposal = self.proposal_for_child(offered);
-        let rtl = subviews.first().is_some_and(|subview| subview.layout_direction == cove_core::scene::Direction::Rtl);
+        let rtl = subviews
+            .first()
+            .is_some_and(|subview| subview.layout_direction == cove_core::scene::Direction::Rtl);
         let start_x = bounds.x + self.horizontal_offset(bounds.width - total.width, rtl);
         let start_y = bounds.y + self.vertical_offset(bounds.height - total.height);
         let mut cursor = 0.0_f32;

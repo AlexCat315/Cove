@@ -6,12 +6,12 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use cove_core::scene::{Node, Point, Rect};
-use cove_core::{Font, TextLayoutResult, TextLine};
-use cove_text::TextEnvironment;
 use crate::primitives::text::text_buffer::TextBuffer;
 use crate::primitives::text::text_document_layout::{TextDocumentLayout, TextLineGeometry};
 use crate::primitives::text::text_field::text_field_horizontal_scroll::HorizontalScrollState;
+use cove_core::scene::{Node, Point, Rect};
+use cove_core::{Font, TextLayoutResult, TextLine};
+use cove_text::TextEnvironment;
 
 pub const RENDER_CACHE_KEY: &str = "__textfield_render_cache";
 pub const DOCUMENT_LAYOUT_KEY: &str = "__textfield_document_layout";
@@ -212,7 +212,11 @@ pub fn make_render_state(
     } else {
         composition.text.chars().count()
     };
-    let prefix: String = composition.text.chars().take(offset.min(composition.text.chars().count())).collect();
+    let prefix: String = composition
+        .text
+        .chars()
+        .take(offset.min(composition.text.chars().count()))
+        .collect();
     let caret_byte = start_byte + prefix.len();
     let mut first = preview.character_index_for_utf8_offset(start_byte);
     if preview.utf8_offset_for_character_index(first) > start_byte {
@@ -227,7 +231,10 @@ pub fn make_render_state(
     }
 }
 
-pub fn selection_range(buffer: &TextBuffer, selection: &FieldSelectionState) -> Option<(usize, usize)> {
+pub fn selection_range(
+    buffer: &TextBuffer,
+    selection: &FieldSelectionState,
+) -> Option<(usize, usize)> {
     let anchor = selection.anchor?;
     if anchor == selection.cursor_index {
         return None;
@@ -235,7 +242,11 @@ pub fn selection_range(buffer: &TextBuffer, selection: &FieldSelectionState) -> 
     let count = buffer.character_count();
     let lower = anchor.min(selection.cursor_index).min(count);
     let upper = anchor.max(selection.cursor_index).min(count);
-    if lower == upper { None } else { Some((lower, upper)) }
+    if lower == upper {
+        None
+    } else {
+        Some((lower, upper))
+    }
 }
 
 /// Geometry for one document revision.
@@ -264,7 +275,11 @@ pub fn document_geometry(
 }
 
 /// Update the scroll bounds for a freshly measured document.
-pub fn update_scroll(scroll: &mut FieldScrollState, document: &TextDocumentLayout, line_height: f32) {
+pub fn update_scroll(
+    scroll: &mut FieldScrollState,
+    document: &TextDocumentLayout,
+    line_height: f32,
+) {
     scroll.content_height = document.index().row_count() as f32 * line_height;
     scroll.max_y = (scroll.content_height - scroll.visible_height).max(0.0);
     scroll.offset_y = scroll.offset_y.clamp(0.0, scroll.max_y);
@@ -303,20 +318,29 @@ pub fn visible_layout(
                     let (mut lower, mut upper) = (0usize, line.glyphs.len());
                     while lower < upper {
                         let middle = (lower + upper) / 2;
-                        if line.glyphs[middle].x < x { lower = middle + 1 } else { upper = middle }
+                        if line.glyphs[middle].x < x {
+                            lower = middle + 1
+                        } else {
+                            upper = middle
+                        }
                     }
                     lower
                 };
                 let lower = first_at_least(low - margin);
                 let upper = first_at_least(high + margin);
                 TextLine {
-                    glyphs: line.glyphs[lower.min(line.glyphs.len())..upper.min(line.glyphs.len())].to_vec(),
+                    glyphs: line.glyphs[lower.min(line.glyphs.len())..upper.min(line.glyphs.len())]
+                        .to_vec(),
                     ..line
                 }
             })
             .collect();
     }
-    TextLayoutResult { lines, total_width: layout.total_width, total_height: layout.total_height }
+    TextLayoutResult {
+        lines,
+        total_width: layout.total_width,
+        total_height: layout.total_height,
+    }
 }
 
 /// Vertical scrollbar geometry, or `None` while the document fits.
@@ -334,11 +358,17 @@ pub fn scrollbar_metrics(
     let x = origin.x + frame.width - thickness - inset;
     let y = origin.y + inset;
     let height = (frame.height - inset * 2.0).max(thickness * 2.0);
-    let thumb_height = (height * scroll.visible_height / scroll.content_height.max(1.0)).max(thickness * 2.0);
+    let thumb_height =
+        (height * scroll.visible_height / scroll.content_height.max(1.0)).max(thickness * 2.0);
     let progress = scroll.offset_y / scroll.max_y;
     Some(ScrollbarMetrics {
         track_rect: Rect::new(x, y, thickness, height),
-        thumb_rect: Rect::new(x, y + (height - thumb_height) * progress, thickness, thumb_height),
+        thumb_rect: Rect::new(
+            x,
+            y + (height - thumb_height) * progress,
+            thickness,
+            thumb_height,
+        ),
     })
 }
 
@@ -361,7 +391,12 @@ pub fn horizontal_scrollbar_metrics(
     let y = origin.y + frame.height - thickness - inset;
     Some(ScrollbarMetrics {
         track_rect: Rect::new(x, y, width, thickness),
-        thumb_rect: Rect::new(x + (width - thumb) * horizontal.offset / horizontal.maximum(), y, thumb, thickness),
+        thumb_rect: Rect::new(
+            x + (width - thumb) * horizontal.offset / horizontal.maximum(),
+            y,
+            thumb,
+            thickness,
+        ),
     })
 }
 
@@ -387,7 +422,10 @@ pub struct FieldLayoutCache {
 
 impl FieldLayoutCache {
     pub fn new() -> Self {
-        Self { document: std::cell::RefCell::new(None), render: std::cell::RefCell::new(None) }
+        Self {
+            document: std::cell::RefCell::new(None),
+            render: std::cell::RefCell::new(None),
+        }
     }
 }
 

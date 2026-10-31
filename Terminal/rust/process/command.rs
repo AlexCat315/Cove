@@ -20,8 +20,12 @@ impl std::fmt::Display for TerminalError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::ExecutableNotFound(name) => write!(f, "Executable not found: {name}"),
-            Self::SpawnFailed(code) => write!(f, "Could not start the terminal program (error {code})"),
-            Self::UnsupportedPlatform => f.write_str("Pseudo terminals are not available on this platform"),
+            Self::SpawnFailed(code) => {
+                write!(f, "Could not start the terminal program (error {code})")
+            }
+            Self::UnsupportedPlatform => {
+                f.write_str("Pseudo terminals are not available on this platform")
+            }
             Self::AlreadyStarted => f.write_str("The terminal session is already running"),
         }
     }
@@ -99,7 +103,10 @@ impl TerminalCommand {
         result.insert("TERM".into(), "xterm-256color".into());
         result.insert("COLORTERM".into(), "truecolor".into());
         result.insert("TERM_PROGRAM".into(), "CoveUI".into());
-        if !result.contains_key("LANG") && !result.contains_key("LC_ALL") && !result.contains_key("LC_CTYPE") {
+        if !result.contains_key("LANG")
+            && !result.contains_key("LC_ALL")
+            && !result.contains_key("LC_CTYPE")
+        {
             result.insert("LANG".into(), "en_US.UTF-8".into());
         }
         for (key, value) in &self.environment {
@@ -117,8 +124,15 @@ impl TerminalCommand {
         )
     }
 
-    #[cfg_attr(unix, allow(unused_variables, reason = "PATHEXT is a Windows-only search rule"))]
-    pub fn resolved_executable_with(&self, path: Option<&str>, path_extensions: Option<&str>) -> Option<String> {
+    #[cfg_attr(
+        unix,
+        allow(unused_variables, reason = "PATHEXT is a Windows-only search rule")
+    )]
+    pub fn resolved_executable_with(
+        &self,
+        path: Option<&str>,
+        path_extensions: Option<&str>,
+    ) -> Option<String> {
         #[cfg(windows)]
         {
             let separator = ';';
@@ -146,7 +160,8 @@ impl TerminalCommand {
             }
             for directory in path.unwrap_or(default_path).split(separator) {
                 for suffix in &extensions {
-                    let candidate = windows_path(format!("{directory}/{}", self.executable) + suffix);
+                    let candidate =
+                        windows_path(format!("{directory}/{}", self.executable) + suffix);
                     if runnable(&candidate) {
                         return Some(candidate);
                     }
@@ -163,10 +178,12 @@ impl TerminalCommand {
             let is_runnable = |candidate: &Path| is_executable(candidate);
             let default_path = "/usr/bin:/bin";
             if self.executable.contains(slashes) {
-                return is_runnable(Path::new(&self.executable)).then(|| windows_path(self.executable.clone()));
+                return is_runnable(Path::new(&self.executable))
+                    .then(|| windows_path(self.executable.clone()));
             }
             for directory in path.unwrap_or(default_path).split(separator) {
-                let candidate = windows_path(format!("{directory}/{}", executable.to_string_lossy()));
+                let candidate =
+                    windows_path(format!("{directory}/{}", executable.to_string_lossy()));
                 if is_runnable(Path::new(&candidate)) {
                     return Some(candidate);
                 }
@@ -187,7 +204,9 @@ fn is_executable(path: &Path) -> bool {
 /// `NAME=value` pairs in a stable order, with a `Vec` of owned `CString`s kept
 /// alive for the duration of `execve`.
 #[cfg(unix)]
-pub(super) fn environment_c_strings(environment: &BTreeMap<String, String>) -> Vec<std::ffi::CString> {
+pub(super) fn environment_c_strings(
+    environment: &BTreeMap<String, String>,
+) -> Vec<std::ffi::CString> {
     environment
         .iter()
         .filter_map(|(key, value)| std::ffi::CString::new(format!("{key}={value}")).ok())

@@ -14,9 +14,7 @@
 
 mod support;
 
-use cove_platform::{
-    MouseButton, MouseButtonEvent, MouseMotionEvent, PointerKind,
-};
+use cove_platform::{MouseButton, MouseButtonEvent, MouseMotionEvent, PointerKind};
 use cove_ui_compose::primitives::text::rich::text_selection::TextBoundaries;
 
 #[test]

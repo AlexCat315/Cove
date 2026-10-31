@@ -22,7 +22,10 @@ fn fragmented_output_uses_byte_budget() {
         "the 129th byte exceeds the budget"
     );
     // Terminal events are never charged against the budget.
-    assert!(buffer.append(ProcessEvent::Exit { code: 0, reason: cove_system::process::Termination::Exited }));
+    assert!(buffer.append(ProcessEvent::Exit {
+        code: 0,
+        reason: cove_system::process::Termination::Exited
+    }));
     buffer.finish();
 
     let mut output: Vec<u8> = Vec::new();

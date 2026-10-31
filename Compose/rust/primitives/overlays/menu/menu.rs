@@ -4,16 +4,16 @@
 //! focus handling; the level owns highlight, submenu timing and type-ahead.
 use std::rc::Rc;
 
-use cove_core::scene::{LayoutNode, Node};
-use cove_imaging::BundleImageResource;
 use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::controls::KeyboardShortcut;
 use crate::{AnyView, PrimitiveView, View};
+use cove_core::scene::{LayoutNode, Node};
+use cove_imaging::BundleImageResource;
 
 use super::menu_descriptor::{MenuDescriptor, MenuItemDescriptor};
 use super::menu_item_row::MenuItemRowHost;
 use super::menu_navigation::{
-    MenuRowEvents, MenuRowPresentation, MenuSession, MENU_ITEM_ID, MENU_SCROLL_MARKER,
+    MENU_ITEM_ID, MENU_SCROLL_MARKER, MenuRowEvents, MenuRowPresentation, MenuSession,
 };
 use super::row_content::MenuItemContent;
 
@@ -91,7 +91,14 @@ pub struct MenuSubmenu {
 
 impl MenuSubmenu {
     pub fn new(id: u64, title: impl Into<String>, entries: Vec<MenuEntry>) -> Self {
-        Self { id, title: title.into(), entries, is_enabled: true, width: 220.0, icon: None }
+        Self {
+            id,
+            title: title.into(),
+            entries,
+            is_enabled: true,
+            width: 220.0,
+            icon: None,
+        }
     }
 
     pub fn enabled(mut self, is_enabled: bool) -> Self {
@@ -100,7 +107,11 @@ impl MenuSubmenu {
     }
 
     pub fn width(mut self, width: f32) -> Self {
-        self.width = if width.is_finite() { width.max(80.0) } else { 220.0 };
+        self.width = if width.is_finite() {
+            width.max(80.0)
+        } else {
+            220.0
+        };
         self
     }
 
@@ -125,7 +136,10 @@ impl MenuEntry {
     }
 
     pub fn label(id: u64, title: impl Into<String>) -> Self {
-        Self::Label { id, title: title.into() }
+        Self::Label {
+            id,
+            title: title.into(),
+        }
     }
 
     pub fn id(&self) -> u64 {
@@ -203,11 +217,21 @@ pub struct Menu {
 
 impl Menu {
     pub fn new(entries: Vec<MenuEntry>) -> Self {
-        Self { entries, width: None, max_visible_rows: 8, on_item_activated: None, on_dismiss: None }
+        Self {
+            entries,
+            width: None,
+            max_visible_rows: 8,
+            on_item_activated: None,
+            on_dismiss: None,
+        }
     }
 
     pub fn width(mut self, width: f32) -> Self {
-        self.width = Some(if width.is_finite() { width.max(80.0) } else { 220.0 });
+        self.width = Some(if width.is_finite() {
+            width.max(80.0)
+        } else {
+            220.0
+        });
         self
     }
 
@@ -240,7 +264,12 @@ impl Menu {
                 match item {
                     MenuItemDescriptor::Separator => MenuEntry::separator(id),
                     MenuItemDescriptor::Label(title) => MenuEntry::label(id, title.clone()),
-                    MenuItemDescriptor::Action { title, shortcut, is_enabled, action } => {
+                    MenuItemDescriptor::Action {
+                        title,
+                        shortcut,
+                        is_enabled,
+                        action,
+                    } => {
                         let shortcut = shortcut.as_ref().map(KeyboardShortcut::display_string);
                         let action = action.clone();
                         MenuEntry::Item(
@@ -249,23 +278,29 @@ impl Menu {
                                 .enabled(*is_enabled),
                         )
                     }
-                    MenuItemDescriptor::Submenu { title, is_enabled, items } => {
-                        MenuEntry::Submenu(
-                            MenuSubmenu::new(id, title.clone(), Self::entries(items))
-                                .enabled(*is_enabled),
-                        )
-                    }
+                    MenuItemDescriptor::Submenu {
+                        title,
+                        is_enabled,
+                        items,
+                    } => MenuEntry::Submenu(
+                        MenuSubmenu::new(id, title.clone(), Self::entries(items))
+                            .enabled(*is_enabled),
+                    ),
                 }
             })
             .collect()
     }
 
     fn configuration(&self) -> MenuLevelConfiguration {
-        let on_item_activated = self.on_item_activated.clone().unwrap_or_else(|| Rc::new(|| {}));
-        let on_dismiss = self
-            .on_dismiss
+        let on_item_activated = self
+            .on_item_activated
             .clone()
-            .unwrap_or_else(|| self.on_item_activated.clone().unwrap_or_else(|| Rc::new(|| {})));
+            .unwrap_or_else(|| Rc::new(|| {}));
+        let on_dismiss = self.on_dismiss.clone().unwrap_or_else(|| {
+            self.on_item_activated
+                .clone()
+                .unwrap_or_else(|| Rc::new(|| {}))
+        });
         MenuLevelConfiguration {
             entries: self.entries.clone(),
             width: self.width,
@@ -295,7 +330,9 @@ impl MenuItem {
 
 impl View for Menu {
     fn body(&self) -> AnyView {
-        AnyView::new(MenuPresentationHost { configuration: self.configuration() })
+        AnyView::new(MenuPresentationHost {
+            configuration: self.configuration(),
+        })
     }
 }
 
@@ -330,11 +367,17 @@ pub struct MenuLevel {
 
 impl MenuLevel {
     pub fn new(configuration: MenuLevelConfiguration) -> Self {
-        Self { configuration, session: MenuSession::new() }
+        Self {
+            configuration,
+            session: MenuSession::new(),
+        }
     }
 
     fn with_session(configuration: MenuLevelConfiguration, session: Rc<MenuSession>) -> Self {
-        Self { configuration, session }
+        Self {
+            configuration,
+            session,
+        }
     }
 
     fn enabled(&self) -> Vec<u64> {
@@ -386,7 +429,9 @@ impl MenuLevel {
                         MenuEntry::Label { title, .. } => AnyView::new(
                             crate::primitives::text::Text::new(title.clone())
                                 .semantic_font(crate::theme::SemanticFontRef::caption())
-                                .semantic_foreground(crate::theme::SemanticColorRef::on_surface_muted()),
+                                .semantic_foreground(
+                                    crate::theme::SemanticColorRef::on_surface_muted(),
+                                ),
                         ),
                         _ => AnyView::new(crate::primitives::text::Divider::new(
                             None,
@@ -438,41 +483,46 @@ impl MenuLevel {
                     }),
                 };
                 let submenu = match entry {
-                    MenuEntry::Submenu(branch) if self.session.navigation().opened == Some(branch.id) => {
-                        Some(AnyView::new(MenuLevel::with_session(MenuLevelConfiguration {
-                            entries: branch.entries.clone(),
-                            width: Some(branch.width),
-                            max_visible_rows: 12,
-                            on_item_activated: Rc::new({
-                                let session = self.session.clone();
-                                let handler = self.configuration.on_item_activated.clone();
-                                move || {
-                                    let mut state = session.navigation();
-                                    state.opened = None;
-                                    session.set_navigation(state);
-                                    handler();
-                                }
-                            }),
-                            on_dismiss: Rc::new({
-                                let session = self.session.clone();
-                                let handler = self.configuration.on_dismiss.clone();
-                                move || {
-                                    let mut state = session.navigation();
-                                    state.opened = None;
-                                    session.set_navigation(state);
-                                    handler();
-                                }
-                            }),
-                            on_close_level: Some(Rc::new({
-                                let session = self.session.clone();
-                                move || {
-                                    let mut state = session.navigation();
-                                    state.opened = None;
-                                    session.set_navigation(state);
-                                }
-                            })),
-                            on_frame: None,
-                        }, self.session.clone())))
+                    MenuEntry::Submenu(branch)
+                        if self.session.navigation().opened == Some(branch.id) =>
+                    {
+                        Some(AnyView::new(MenuLevel::with_session(
+                            MenuLevelConfiguration {
+                                entries: branch.entries.clone(),
+                                width: Some(branch.width),
+                                max_visible_rows: 12,
+                                on_item_activated: Rc::new({
+                                    let session = self.session.clone();
+                                    let handler = self.configuration.on_item_activated.clone();
+                                    move || {
+                                        let mut state = session.navigation();
+                                        state.opened = None;
+                                        session.set_navigation(state);
+                                        handler();
+                                    }
+                                }),
+                                on_dismiss: Rc::new({
+                                    let session = self.session.clone();
+                                    let handler = self.configuration.on_dismiss.clone();
+                                    move || {
+                                        let mut state = session.navigation();
+                                        state.opened = None;
+                                        session.set_navigation(state);
+                                        handler();
+                                    }
+                                }),
+                                on_close_level: Some(Rc::new({
+                                    let session = self.session.clone();
+                                    move || {
+                                        let mut state = session.navigation();
+                                        state.opened = None;
+                                        session.set_navigation(state);
+                                    }
+                                })),
+                                on_frame: None,
+                            },
+                            self.session.clone(),
+                        )))
                     }
                     _ => None,
                 };
@@ -514,7 +564,12 @@ pub struct MenuEntryRef {
 }
 
 impl MenuEntryRef {
-    fn activate(&self, session: &Rc<MenuSession>, configuration: &MenuLevelConfiguration, node: &Node) {
+    fn activate(
+        &self,
+        session: &Rc<MenuSession>,
+        configuration: &MenuLevelConfiguration,
+        node: &Node,
+    ) {
         session.hover_intent.cancel_all();
         if session.navigation().highlighted != Some(self.id) {
             let mut state = session.navigation();
@@ -555,25 +610,33 @@ impl MenuEntryRef {
             }
         }
         let opened = session.navigation().opened;
-        let crossing = opened.is_some() && opened != Some(self.id) && session.pointer.borrow().is_heading_to_submenu();
+        let crossing = opened.is_some()
+            && opened != Some(self.id)
+            && session.pointer.borrow().is_heading_to_submenu();
         let delay = if crossing { 0.45 } else { 0.18 };
         let session_inner = session.clone();
         let id = self.id;
         let is_submenu = self.is_submenu;
         let weak = node.downgrade();
-        session.hover_intent.schedule(id, delay, Rc::new(move || {
-            let Some(owner) = Node::upgrade(&weak) else { return };
-            if !owner.accepts_subtree_input() {
-                return;
-            }
-            let next = if is_submenu { Some(id) } else { None };
-            if next != session_inner.navigation().opened {
-                session_inner.pointer.borrow_mut().submenu_frame = None;
-            }
-            let mut state = session_inner.navigation();
-            state.opened = next;
-            session_inner.set_navigation(state);
-        }));
+        session.hover_intent.schedule(
+            id,
+            delay,
+            Rc::new(move || {
+                let Some(owner) = Node::upgrade(&weak) else {
+                    return;
+                };
+                if !owner.accepts_subtree_input() {
+                    return;
+                }
+                let next = if is_submenu { Some(id) } else { None };
+                if next != session_inner.navigation().opened {
+                    session_inner.pointer.borrow_mut().submenu_frame = None;
+                }
+                let mut state = session_inner.navigation();
+                state.opened = next;
+                session_inner.set_navigation(state);
+            }),
+        );
     }
 }
 
@@ -586,7 +649,9 @@ fn reveal_row(session: &Rc<MenuSession>, row: &Node) {
             // The panel insets its rows, and revealing keeps that same gutter:
             // aligning the row flush to the viewport edge would hide the padding
             // the highlight is meant to sit inside.
-            let inset = node.attachment::<f32>(super::menu_navigation::MENU_SCROLL_INSET).unwrap_or(0.0);
+            let inset = node
+                .attachment::<f32>(super::menu_navigation::MENU_SCROLL_INSET)
+                .unwrap_or(0.0);
             let mut next = session.scroll_offset();
             if rect.y < viewport.y {
                 next.y = (next.y + rect.y - viewport.y - inset).max(0.0);
@@ -630,7 +695,9 @@ impl MenuLevel {
                 return true;
             }
             crate::Scancode::ARROW_LEFT => {
-                let Some(close) = self.configuration.on_close_level.as_ref() else { return false };
+                let Some(close) = self.configuration.on_close_level.as_ref() else {
+                    return false;
+                };
                 self.session.hover_intent.cancel_all();
                 let mut state = self.session.navigation();
                 state.opened = None;
@@ -645,17 +712,28 @@ impl MenuLevel {
                 if event.is_repeat {
                     return true;
                 }
-                let Some(id) = self.effective_highlight() else { return false };
-                let Some(entry) = self.configuration.entries.iter().find(|entry| entry.id() == id) else {
+                let Some(id) = self.effective_highlight() else {
                     return false;
                 };
-                let Some(row) = super::menu_navigation::menu_row(id, root) else { return false };
+                let Some(entry) = self
+                    .configuration
+                    .entries
+                    .iter()
+                    .find(|entry| entry.id() == id)
+                else {
+                    return false;
+                };
+                let Some(row) = super::menu_navigation::menu_row(id, root) else {
+                    return false;
+                };
                 if event.scancode == crate::Scancode::ARROW_RIGHT
                     && !matches!(entry, MenuEntry::Submenu(_))
                 {
                     return false;
                 }
-                entry.clone_for_events().activate(&self.session, &self.configuration, &row);
+                entry
+                    .clone_for_events()
+                    .activate(&self.session, &self.configuration, &row);
                 return true;
             }
             _ => return false,
@@ -676,17 +754,21 @@ impl MenuLevel {
             .entries
             .iter()
             .filter_map(|entry| entry.row().filter(|row| row.is_enabled))
-            .map(|row| super::menu_navigation::MenuTypeaheadRow { id: row.id, title: row.title.clone() })
+            .map(|row| super::menu_navigation::MenuTypeaheadRow {
+                id: row.id,
+                title: row.title.clone(),
+            })
             .collect();
         let time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|duration| duration.as_secs_f64())
             .unwrap_or(0.0);
-        let target = self
-            .session
-            .typeahead
-            .borrow_mut()
-            .destination(text, &rows, self.effective_highlight(), time);
+        let target = self.session.typeahead.borrow_mut().destination(
+            text,
+            &rows,
+            self.effective_highlight(),
+            time,
+        );
         if let Some(target) = target {
             self.select(target, root);
         }
@@ -733,6 +815,9 @@ impl View for MenuLevel {
 
 impl MenuLevel {
     fn snapshot(&self) -> MenuLevel {
-        MenuLevel { configuration: self.configuration.clone(), session: self.session.clone() }
+        MenuLevel {
+            configuration: self.configuration.clone(),
+            session: self.session.clone(),
+        }
     }
 }

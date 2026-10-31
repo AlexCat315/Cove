@@ -7,8 +7,7 @@
 use std::collections::HashMap;
 
 use crate::rhi::{
-    PresentationMode, RhiError, RhiResult, SurfaceDescriptor, Swapchain, TextureFormat,
-    rhi_require,
+    PresentationMode, RhiError, RhiResult, SurfaceDescriptor, Swapchain, TextureFormat, rhi_require,
 };
 
 use super::formats;
@@ -27,7 +26,10 @@ pub fn create_native_surface(
     context: &VulkanContext,
     descriptor: &SurfaceDescriptor,
 ) -> RhiResult<sys::VkSurfaceKHR> {
-    rhi_require(descriptor.native_handle != 0, "Vulkan requires a native surface handle")?;
+    rhi_require(
+        descriptor.native_handle != 0,
+        "Vulkan requires a native surface handle",
+    )?;
     // SAFETY: each branch below resolves the one entry point its platform needs and
     // passes a struct whose layout matches that extension.
     unsafe { create_native_surface_impl(context, descriptor) }
@@ -65,7 +67,9 @@ unsafe fn create_native_surface_impl(
             .loader
             .load(context.instance, c"vkCreateWin32SurfaceKHR")
     }
-    .ok_or_else(|| RhiError::unsupported_feature("Vulkan loader does not support Win32 presentation"))?;
+    .ok_or_else(|| {
+        RhiError::unsupported_feature("Vulkan loader does not support Win32 presentation")
+    })?;
     let info = CreateInfo {
         s_type: STRUCTURE_TYPE,
         p_next: core::ptr::null(),
@@ -79,7 +83,10 @@ unsafe fn create_native_surface_impl(
     let mut surface: sys::VkSurfaceKHR = sys::VK_NULL_HANDLE;
     // SAFETY: `info` outlives the call and the out-parameter is a live local.
     let status = unsafe { create(context.instance, &info, core::ptr::null(), &mut surface) };
-    rhi_require(status == sys::VK_SUCCESS && surface != sys::VK_NULL_HANDLE, "native Vulkan surface creation failed")?;
+    rhi_require(
+        status == sys::VK_SUCCESS && surface != sys::VK_NULL_HANDLE,
+        "native Vulkan surface creation failed",
+    )?;
     Ok(surface)
 }
 
@@ -109,10 +116,14 @@ unsafe fn create_native_surface_impl(
         *mut sys::VkSurfaceKHR,
     ) -> sys::VkResult;
     // SAFETY: the caller guarantees the instance is live.
-    let create: Create = unsafe { context.loader.load(context.instance, c"vkCreateAndroidSurfaceKHR") }
-        .ok_or_else(|| {
-            RhiError::unsupported_feature("Vulkan loader does not support Android presentation")
-        })?;
+    let create: Create = unsafe {
+        context
+            .loader
+            .load(context.instance, c"vkCreateAndroidSurfaceKHR")
+    }
+    .ok_or_else(|| {
+        RhiError::unsupported_feature("Vulkan loader does not support Android presentation")
+    })?;
     let info = CreateInfo {
         s_type: STRUCTURE_TYPE,
         p_next: core::ptr::null(),
@@ -122,7 +133,10 @@ unsafe fn create_native_surface_impl(
     let mut surface: sys::VkSurfaceKHR = sys::VK_NULL_HANDLE;
     // SAFETY: `info` outlives the call and the out-parameter is a live local.
     let status = unsafe { create(context.instance, &info, core::ptr::null(), &mut surface) };
-    rhi_require(status == sys::VK_SUCCESS && surface != sys::VK_NULL_HANDLE, "native Vulkan surface creation failed")?;
+    rhi_require(
+        status == sys::VK_SUCCESS && surface != sys::VK_NULL_HANDLE,
+        "native Vulkan surface creation failed",
+    )?;
     Ok(surface)
 }
 
@@ -134,7 +148,10 @@ unsafe fn create_native_surface_impl(
     use core::ffi::c_void;
 
     if descriptor.kind == crate::rhi::NativeSurfaceKind::WaylandSurface {
-        rhi_require(descriptor.display != 0, "Vulkan Wayland surface needs a display")?;
+        rhi_require(
+            descriptor.display != 0,
+            "Vulkan Wayland surface needs a display",
+        )?;
         /// `VkWaylandSurfaceCreateInfoKHR`.
         #[repr(C)]
         struct CreateInfo {
@@ -153,7 +170,9 @@ unsafe fn create_native_surface_impl(
         ) -> sys::VkResult;
         // SAFETY: the caller guarantees the instance is live.
         let create: Create = unsafe {
-            context.loader.load(context.instance, c"vkCreateWaylandSurfaceKHR")
+            context
+                .loader
+                .load(context.instance, c"vkCreateWaylandSurfaceKHR")
         }
         .ok_or_else(|| {
             RhiError::unsupported_feature("Vulkan loader does not support Wayland presentation")
@@ -179,7 +198,10 @@ unsafe fn create_native_surface_impl(
         descriptor.kind == crate::rhi::NativeSurfaceKind::XlibWindow,
         "Vulkan requires a Win32, Xlib, Wayland or Android surface",
     )?;
-    rhi_require(descriptor.display != 0, "Vulkan Xlib surface needs a display")?;
+    rhi_require(
+        descriptor.display != 0,
+        "Vulkan Xlib surface needs a display",
+    )?;
     /// `VkXlibSurfaceCreateInfoKHR`. `window` is an `unsigned long` in C.
     #[repr(C)]
     struct CreateInfo {
@@ -197,10 +219,14 @@ unsafe fn create_native_surface_impl(
         *mut sys::VkSurfaceKHR,
     ) -> sys::VkResult;
     // SAFETY: the caller guarantees the instance is live.
-    let create: Create = unsafe { context.loader.load(context.instance, c"vkCreateXlibSurfaceKHR") }
-        .ok_or_else(|| {
-            RhiError::unsupported_feature("Vulkan loader does not support Xlib presentation")
-        })?;
+    let create: Create = unsafe {
+        context
+            .loader
+            .load(context.instance, c"vkCreateXlibSurfaceKHR")
+    }
+    .ok_or_else(|| {
+        RhiError::unsupported_feature("Vulkan loader does not support Xlib presentation")
+    })?;
     let info = CreateInfo {
         s_type: STRUCTURE_TYPE,
         p_next: core::ptr::null(),
@@ -211,7 +237,10 @@ unsafe fn create_native_surface_impl(
     let mut surface: sys::VkSurfaceKHR = sys::VK_NULL_HANDLE;
     // SAFETY: `info` outlives the call and the out-parameter is a live local.
     let status = unsafe { create(context.instance, &info, core::ptr::null(), &mut surface) };
-    rhi_require(status == sys::VK_SUCCESS && surface != sys::VK_NULL_HANDLE, "native Vulkan surface creation failed")?;
+    rhi_require(
+        status == sys::VK_SUCCESS && surface != sys::VK_NULL_HANDLE,
+        "native Vulkan surface creation failed",
+    )?;
     Ok(surface)
 }
 
@@ -253,7 +282,10 @@ pub struct SurfaceState {
 impl SurfaceState {
     pub fn from_capabilities(capabilities: &sys::VkSurfaceCapabilitiesKHR) -> Self {
         Self {
-            extent: [capabilities.currentExtent.width, capabilities.currentExtent.height],
+            extent: [
+                capabilities.currentExtent.width,
+                capabilities.currentExtent.height,
+            ],
             transform: capabilities.currentTransform,
         }
     }
@@ -270,13 +302,21 @@ pub fn choose_presentation_mode(
     let preference: &[PresentationMode] = if vsync_enabled {
         &[PresentationMode::Fifo]
     } else {
-        &[PresentationMode::Immediate, PresentationMode::Mailbox, PresentationMode::Fifo]
+        &[
+            PresentationMode::Immediate,
+            PresentationMode::Mailbox,
+            PresentationMode::Fifo,
+        ]
     };
-    preference.iter().copied().find(|mode| supported_modes.contains(mode)).ok_or_else(|| {
-        RhiError::unsupported_feature(
-            "Vulkan surface has no supported presentation mode for the requested VSync policy",
-        )
-    })
+    preference
+        .iter()
+        .copied()
+        .find(|mode| supported_modes.contains(mode))
+        .ok_or_else(|| {
+            RhiError::unsupported_feature(
+                "Vulkan surface has no supported presentation mode for the requested VSync policy",
+            )
+        })
 }
 
 /// The native present mode for a chosen RHI mode.
@@ -413,7 +453,12 @@ impl VulkanSwapchain {
 
     /// Acquires the next image into `semaphore`, returning its index and the raw
     /// result so the caller can handle `OUT_OF_DATE`/`SUBOPTIMAL`.
-    pub fn acquire(&self, context: &VulkanContext, semaphore: sys::VkSemaphore, timeout: u64) -> (u32, sys::VkResult) {
+    pub fn acquire(
+        &self,
+        context: &VulkanContext,
+        semaphore: sys::VkSemaphore,
+        timeout: u64,
+    ) -> (u32, sys::VkResult) {
         let mut index: u32 = 0;
         // SAFETY: the swapchain is live and the out-parameter is a live local; a
         // null fence means "signal the semaphore only".
@@ -475,7 +520,11 @@ impl VulkanSwapchain {
     }
 
     /// Destroys the swapchain, its views and the surface.
-    pub fn destroy(self, context: &VulkanContext, registries: &std::sync::Arc<std::sync::Mutex<VulkanRegistries>>) {
+    pub fn destroy(
+        self,
+        context: &VulkanContext,
+        registries: &std::sync::Arc<std::sync::Mutex<VulkanRegistries>>,
+    ) {
         {
             let mut registries = lock(registries);
             for id in self.texture_ids {
@@ -494,7 +543,11 @@ impl VulkanSwapchain {
         // SAFETY: the device is idle and this swapchain is no longer presented.
         unsafe {
             (context.sync.destroy_swapchain)(context.device, self.handle, core::ptr::null());
-            (context.instance_commands.destroy_surface)(context.instance, self.surface, core::ptr::null());
+            (context.instance_commands.destroy_surface)(
+                context.instance,
+                self.surface,
+                core::ptr::null(),
+            );
         }
     }
 
@@ -517,20 +570,30 @@ impl VulkanSwapchain {
                 &mut capabilities,
             )
         };
-        rhi_require(status == sys::VK_SUCCESS, "Vulkan surface capabilities unavailable")?;
+        rhi_require(
+            status == sys::VK_SUCCESS,
+            "Vulkan surface capabilities unavailable",
+        )?;
 
         let extent = if capabilities.currentExtent.width != u32::MAX {
             capabilities.currentExtent
         } else {
             rhi_require(
-                width > 0 && height > 0 && width <= u32::MAX as usize && height <= u32::MAX as usize,
+                width > 0
+                    && height > 0
+                    && width <= u32::MAX as usize
+                    && height <= u32::MAX as usize,
                 "Vulkan surface needs a positive drawable extent",
             )?;
             sys::VkExtent2D {
-                width: (width as u32)
-                    .clamp(capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
-                height: (height as u32)
-                    .clamp(capabilities.minImageExtent.height, capabilities.maxImageExtent.height),
+                width: (width as u32).clamp(
+                    capabilities.minImageExtent.width,
+                    capabilities.maxImageExtent.width,
+                ),
+                height: (height as u32).clamp(
+                    capabilities.minImageExtent.height,
+                    capabilities.maxImageExtent.height,
+                ),
             }
         };
         rhi_require(
@@ -540,7 +603,10 @@ impl VulkanSwapchain {
 
         let formats = surface_formats(context, surface)?;
         let desired = formats::vk_format(color_format);
-        let mut chosen = formats.iter().copied().find(|format| format.format == desired);
+        let mut chosen = formats
+            .iter()
+            .copied()
+            .find(|format| format.format == desired);
         if chosen.is_none() && formats.len() == 1 && formats[0].format == sys::VK_FORMAT_UNDEFINED {
             chosen = Some(sys::VkSurfaceFormatKHR {
                 format: desired,
@@ -548,12 +614,16 @@ impl VulkanSwapchain {
             });
         }
         let chosen = chosen.ok_or_else(|| {
-            RhiError::unsupported_feature("Vulkan surface cannot present the requested color format")
+            RhiError::unsupported_feature(
+                "Vulkan surface cannot present the requested color format",
+            )
         })?;
 
         let native_modes = present_modes(context, surface)?;
-        let supported: Vec<PresentationMode> =
-            native_modes.iter().filter_map(|mode| presentation_mode(*mode)).collect();
+        let supported: Vec<PresentationMode> = native_modes
+            .iter()
+            .filter_map(|mode| presentation_mode(*mode))
+            .collect();
         let selected_mode = choose_presentation_mode(vsync, &supported)?;
         let present_mode = vk_present_mode(selected_mode)?;
 
@@ -638,7 +708,10 @@ impl VulkanSwapchain {
                 images.as_mut_ptr(),
             )
         };
-        rhi_require(status == sys::VK_SUCCESS, "Vulkan swapchain image enumeration failed")?;
+        rhi_require(
+            status == sys::VK_SUCCESS,
+            "Vulkan swapchain image enumeration failed",
+        )?;
         images.truncate(actual_count as usize);
 
         // Wrap each swapchain image as a texture record in the fixed pool.
@@ -739,7 +812,10 @@ impl VulkanSwapchain {
     }
 }
 
-fn surface_formats(context: &VulkanContext, surface: sys::VkSurfaceKHR) -> RhiResult<Vec<sys::VkSurfaceFormatKHR>> {
+fn surface_formats(
+    context: &VulkanContext,
+    surface: sys::VkSurfaceKHR,
+) -> RhiResult<Vec<sys::VkSurfaceFormatKHR>> {
     let mut count: u32 = 0;
     // SAFETY: the surface is live and `count` is a live local.
     let status = unsafe {
@@ -764,7 +840,10 @@ fn surface_formats(context: &VulkanContext, surface: sys::VkSurfaceKHR) -> RhiRe
             formats.as_mut_ptr(),
         )
     };
-    rhi_require(status == sys::VK_SUCCESS, "Vulkan surface format enumeration failed")?;
+    rhi_require(
+        status == sys::VK_SUCCESS,
+        "Vulkan surface format enumeration failed",
+    )?;
     formats.truncate(count as usize);
     Ok(formats)
 }
@@ -825,7 +904,11 @@ pub fn mark_acquired(window: &mut VulkanWindowSwapchain, texture: u32) {
 }
 
 /// Resolves the image index for a previously acquired texture handle.
-pub fn image_index(window: &VulkanWindowSwapchain, image: Swapchain, texture: u32) -> RhiResult<u32> {
+pub fn image_index(
+    window: &VulkanWindowSwapchain,
+    image: Swapchain,
+    texture: u32,
+) -> RhiResult<u32> {
     rhi_require(
         window.chain.texture_ids.iter().any(|id| *id == texture),
         "image was not acquired from this swapchain",
@@ -847,9 +930,15 @@ mod tests {
     #[test]
     fn vsync_prefers_fifo_and_never_immediate() {
         let modes = [PresentationMode::Immediate, PresentationMode::Fifo];
-        assert_eq!(choose_presentation_mode(true, &modes), Ok(PresentationMode::Fifo));
+        assert_eq!(
+            choose_presentation_mode(true, &modes),
+            Ok(PresentationMode::Fifo)
+        );
         // An unsynchronized request prefers immediate, then mailbox, then fifo.
-        assert_eq!(choose_presentation_mode(false, &modes), Ok(PresentationMode::Immediate));
+        assert_eq!(
+            choose_presentation_mode(false, &modes),
+            Ok(PresentationMode::Immediate)
+        );
         assert_eq!(
             choose_presentation_mode(false, &[PresentationMode::Mailbox, PresentationMode::Fifo]),
             Ok(PresentationMode::Mailbox)
@@ -866,7 +955,10 @@ mod tests {
     #[test]
     fn native_modes_round_trip() {
         for (native, expected) in [
-            (sys::VK_PRESENT_MODE_IMMEDIATE_KHR, PresentationMode::Immediate),
+            (
+                sys::VK_PRESENT_MODE_IMMEDIATE_KHR,
+                PresentationMode::Immediate,
+            ),
             (sys::VK_PRESENT_MODE_MAILBOX_KHR, PresentationMode::Mailbox),
             (sys::VK_PRESENT_MODE_FIFO_KHR, PresentationMode::Fifo),
         ] {
@@ -880,7 +972,10 @@ mod tests {
     #[test]
     fn surface_state_compares_extent_and_transform() {
         let mut capabilities = sys::VkSurfaceCapabilitiesKHR::default();
-        capabilities.currentExtent = sys::VkExtent2D { width: 800, height: 600 };
+        capabilities.currentExtent = sys::VkExtent2D {
+            width: 800,
+            height: 600,
+        };
         capabilities.currentTransform = sys::VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
         let state = SurfaceState::from_capabilities(&capabilities);
         assert_eq!(state.extent, [800, 600]);
@@ -896,13 +991,19 @@ mod tests {
             surface: 1,
             handle: 2,
             format: sys::VK_FORMAT_B8G8R8A8_UNORM,
-            extent: sys::VkExtent2D { width: 1, height: 1 },
+            extent: sys::VkExtent2D {
+                width: 1,
+                height: 1,
+            },
             presentation_mode: PresentationMode::Fifo,
             images: vec![10, 11],
             texture_ids: vec![20, 21],
             vsync: true,
             requested_color_format: TextureFormat::Bgra8Unorm,
-            surface_state: SurfaceState { extent: [1, 1], transform: 1 },
+            surface_state: SurfaceState {
+                extent: [1, 1],
+                transform: 1,
+            },
         };
         let window = VulkanWindowSwapchain::new(chain, 1);
         assert_eq!(image_index(&window, Swapchain::new(1), 21), Ok(1));

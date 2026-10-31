@@ -7,8 +7,8 @@
 
 use cove_examples::gallery_content::catalog::GalleryPage;
 use cove_examples::gallery_content::stories::adaptive_examples::{
-    frame_height, unsupported_pages, AdaptiveControlExamples, ALL_PAGES, FRAME_PADDING,
-    PREVIEW_WIDTHS, SUPPORTED,
+    ALL_PAGES, AdaptiveControlExamples, FRAME_PADDING, PREVIEW_WIDTHS, SUPPORTED, frame_height,
+    unsupported_pages,
 };
 
 #[test]
@@ -16,7 +16,11 @@ fn the_supported_set_has_no_duplicates() {
     let mut seen = SUPPORTED.to_vec();
     seen.sort_by_key(|page| page.raw_value());
     seen.dedup();
-    assert_eq!(seen.len(), SUPPORTED.len(), "a duplicated page would render twice");
+    assert_eq!(
+        seen.len(),
+        SUPPORTED.len(),
+        "a duplicated page would render twice"
+    );
 }
 
 #[test]
@@ -84,7 +88,10 @@ fn a_content_sized_control_hugs_its_content() {
 fn the_height_bands_match_the_authored_values() {
     assert_eq!(GalleryPage::Calendar.adaptive_sample_height(), Some(440.0));
     assert_eq!(GalleryPage::List.adaptive_sample_height(), Some(144.0));
-    assert_eq!(GalleryPage::Disclosure.adaptive_sample_height(), Some(120.0));
+    assert_eq!(
+        GalleryPage::Disclosure.adaptive_sample_height(),
+        Some(120.0)
+    );
     assert_eq!(
         GalleryPage::VirtualStack.adaptive_sample_height(),
         Some(130.0)

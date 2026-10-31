@@ -245,11 +245,7 @@ fn zero_height_metrics_do_not_panic() {
         VIEWPORT_HEIGHT,
         0,
     );
-    assert_eq!(
-        windows.rows(0).len(),
-        0,
-        "an empty table mounts no rows"
-    );
+    assert_eq!(windows.rows(0).len(), 0, "an empty table mounts no rows");
     assert_eq!(metrics.total(), 0.0, "and has no scrollable extent");
 }
 

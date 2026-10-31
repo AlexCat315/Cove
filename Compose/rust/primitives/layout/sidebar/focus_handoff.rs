@@ -30,7 +30,10 @@ pub struct SidebarFocusHandoff {
 
 impl SidebarFocusHandoff {
     pub fn new() -> Self {
-        Self { visible: Cell::new(true), ..Default::default() }
+        Self {
+            visible: Cell::new(true),
+            ..Default::default()
+        }
     }
 
     pub fn set_navigation(&self, node: &Node) {
@@ -47,7 +50,12 @@ impl SidebarFocusHandoff {
 
     /// Record the focus owner before the slots change visibility, so
     /// `complete` can hand off only if it actually became inactive.
-    pub fn prepare(&self, next: SidebarMode, is_modal: bool, chain: Option<std::rc::Rc<FocusChain>>) {
+    pub fn prepare(
+        &self,
+        next: SidebarMode,
+        is_modal: bool,
+        chain: Option<std::rc::Rc<FocusChain>>,
+    ) {
         let previous_mode = self.mode.get();
         self.mode.set(Some(next));
         self.is_modal.set(is_modal);
@@ -60,8 +68,15 @@ impl SidebarFocusHandoff {
         if previous_mode == next {
             return;
         }
-        let Some(focused) = chain.focused() else { return };
-        let destination = if self.resizer.borrow().as_ref().is_some_and(|resizer| *resizer == focused) {
+        let Some(focused) = chain.focused() else {
+            return;
+        };
+        let destination = if self
+            .resizer
+            .borrow()
+            .as_ref()
+            .is_some_and(|resizer| *resizer == focused)
+        {
             if next == SidebarMode::Expanded {
                 return;
             }
@@ -76,12 +91,16 @@ impl SidebarFocusHandoff {
             } else {
                 HandoffDestination::Navigation
             })
-        } else if Self::contains(&focused, self.trigger.borrow().as_ref()) && next != SidebarMode::Compact {
+        } else if Self::contains(&focused, self.trigger.borrow().as_ref())
+            && next != SidebarMode::Compact
+        {
             Some(HandoffDestination::Navigation)
         } else {
             None
         };
-        let Some(destination) = destination else { return };
+        let Some(destination) = destination else {
+            return;
+        };
         *self.previous.borrow_mut() = Some(focused);
         self.visible.set(chain.is_focus_visible());
         self.destination.set(Some(destination));
@@ -98,11 +117,13 @@ impl SidebarFocusHandoff {
             {
                 let mode = self.mode.get();
                 if Self::contains(&previous, self.navigation.borrow().as_ref()) {
-                    self.destination.set(Some(if mode == Some(SidebarMode::Compact) && !self.is_modal.get() {
-                        HandoffDestination::Trigger
-                    } else {
-                        HandoffDestination::Navigation
-                    }));
+                    self.destination.set(Some(
+                        if mode == Some(SidebarMode::Compact) && !self.is_modal.get() {
+                            HandoffDestination::Trigger
+                        } else {
+                            HandoffDestination::Navigation
+                        },
+                    ));
                 } else if Self::contains(&previous, self.trigger.borrow().as_ref())
                     && mode != Some(SidebarMode::Compact)
                 {
@@ -110,7 +131,9 @@ impl SidebarFocusHandoff {
                 }
             }
         }
-        let Some(destination) = self.destination.get() else { return };
+        let Some(destination) = self.destination.get() else {
+            return;
+        };
         let target = match destination {
             HandoffDestination::Trigger => self.trigger.borrow().clone(),
             HandoffDestination::Navigation => self.first_focusable_in_navigation(),
@@ -125,15 +148,22 @@ impl SidebarFocusHandoff {
     /// Move focus to the control whose accessible label matches `label`, used
     /// when a row disappears and the shell needs to recover.
     pub fn focus_opener(&self, label: &str) {
-        let Some(chain) = self.chain.borrow().clone() else { return };
+        let Some(chain) = self.chain.borrow().clone() else {
+            return;
+        };
         let visible = chain.is_focus_visible();
-        for root in [self.trigger.borrow().clone(), self.navigation.borrow().clone()].into_iter().flatten() {
-            if let Some(opener) = Self::focusables(&root)
-                .into_iter()
-                .find(|candidate| {
-                    candidate.accessibility().is_some_and(|semantics| semantics.label == label)
-                })
-            {
+        for root in [
+            self.trigger.borrow().clone(),
+            self.navigation.borrow().clone(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            if let Some(opener) = Self::focusables(&root).into_iter().find(|candidate| {
+                candidate
+                    .accessibility()
+                    .is_some_and(|semantics| semantics.label == label)
+            }) {
                 chain.focus(Some(&opener), visible);
                 return;
             }
@@ -141,7 +171,9 @@ impl SidebarFocusHandoff {
     }
 
     fn first_focusable_in_navigation(&self) -> Option<Node> {
-        Self::focusables(self.navigation.borrow().as_ref()?).into_iter().next()
+        Self::focusables(self.navigation.borrow().as_ref()?)
+            .into_iter()
+            .next()
     }
 
     fn focusables(root: &Node) -> Vec<Node> {
@@ -157,7 +189,9 @@ impl SidebarFocusHandoff {
     }
 
     fn contains(candidate: &Node, ancestor: Option<&Node>) -> bool {
-        let Some(ancestor) = ancestor else { return false };
+        let Some(ancestor) = ancestor else {
+            return false;
+        };
         let mut current = Some(candidate.clone());
         while let Some(node) = current {
             if node == *ancestor {

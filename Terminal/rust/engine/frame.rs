@@ -15,7 +15,11 @@ pub struct TerminalRGB {
 }
 
 impl TerminalRGB {
-    pub const WHITE: Self = Self { r: 0xFF, g: 0xFF, b: 0xFF };
+    pub const WHITE: Self = Self {
+        r: 0xFF,
+        g: 0xFF,
+        b: 0xFF,
+    };
     pub const BLACK: Self = Self { r: 0, g: 0, b: 0 };
 
     pub const fn new(r: u8, g: u8, b: u8) -> Self {
@@ -30,16 +34,27 @@ impl TerminalRGB {
             }
             (value * 255.0).round().clamp(0.0, 255.0) as u8
         }
-        Self { r: channel(color.r), g: channel(color.g), b: channel(color.b) }
+        Self {
+            r: channel(color.r),
+            g: channel(color.g),
+            b: channel(color.b),
+        }
     }
 
     pub fn to_color(self) -> cove_core::Color {
-        cove_core::Color { r: self.r as f32 / 255.0, g: self.g as f32 / 255.0, b: self.b as f32 / 255.0, a: 1.0 }
+        cove_core::Color {
+            r: self.r as f32 / 255.0,
+            g: self.g as f32 / 255.0,
+            b: self.b as f32 / 255.0,
+            a: 1.0,
+        }
     }
 }
 
 /// SGR attributes that change how a cell is painted.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 #[serde(transparent)]
 pub struct TerminalCellAttributes(pub u8);
 
@@ -81,7 +96,9 @@ impl std::ops::BitOrAssign for TerminalCellAttributes {
 }
 
 /// Grid column width of a cell.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum CellWidth {
     #[default]
     Narrow,
@@ -132,7 +149,9 @@ impl TerminalCell {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum CursorShape {
     Bar,
     #[default]
@@ -153,12 +172,20 @@ pub struct TerminalCursor {
 
 impl Default for TerminalCursor {
     fn default() -> Self {
-        Self { is_visible: true, column: 0, row: 0, shape: CursorShape::Block, is_blinking: false }
+        Self {
+            is_visible: true,
+            column: 0,
+            row: 0,
+            shape: CursorShape::Block,
+            is_blinking: false,
+        }
     }
 }
 
 /// Viewport position inside the scrollback, in rows.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub struct TerminalScrollPosition {
     pub total: usize,
     pub offset: usize,

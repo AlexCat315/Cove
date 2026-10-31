@@ -8,14 +8,20 @@ pub struct MenuDescriptor {
 }
 
 impl MenuDescriptor {
-    pub fn new(items: Vec<MenuItemDescriptor>) -> Self { Self { items } }
+    pub fn new(items: Vec<MenuItemDescriptor>) -> Self {
+        Self { items }
+    }
 }
 
 #[derive(Clone)]
 pub enum MenuItemDescriptor {
     Separator,
     Label(String),
-    Submenu { title: String, is_enabled: bool, items: Vec<MenuItemDescriptor> },
+    Submenu {
+        title: String,
+        is_enabled: bool,
+        items: Vec<MenuItemDescriptor>,
+    },
     Action {
         title: String,
         shortcut: Option<KeyboardShortcut>,
@@ -26,7 +32,11 @@ pub enum MenuItemDescriptor {
 
 impl MenuItemDescriptor {
     pub fn submenu(title: impl Into<String>, is_enabled: bool, items: Vec<Self>) -> Self {
-        Self::Submenu { title: title.into(), is_enabled, items }
+        Self::Submenu {
+            title: title.into(),
+            is_enabled,
+            items,
+        }
     }
 
     pub fn action(
@@ -35,12 +45,24 @@ impl MenuItemDescriptor {
         is_enabled: bool,
         action: impl Fn() + Send + Sync + 'static,
     ) -> Self {
-        Self::Action { title: title.into(), shortcut, is_enabled, action: Arc::new(action) }
+        Self::Action {
+            title: title.into(),
+            shortcut,
+            is_enabled,
+            action: Arc::new(action),
+        }
     }
 
     pub fn invoke(&self) -> bool {
         match self {
-            Self::Action { is_enabled: true, action, .. } => { action(); true }
+            Self::Action {
+                is_enabled: true,
+                action,
+                ..
+            } => {
+                action();
+                true
+            }
             _ => false,
         }
     }

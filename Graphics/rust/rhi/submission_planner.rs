@@ -15,9 +15,9 @@ use std::collections::{HashMap, HashSet};
 use super::{
     AccessKind, AccessStage, AccessTracker, BarrierCommand, BarrierPassScope, BarrierSyncAction,
     BindingResource, BindingSet, BindingSetEntry, ComputePassRecord, CopyPassRecord,
-    QueueClass, RecordedCommand, RenderPassRecord, RenderCommand, ResourceAccess, ResourceKind,
-    ResourceRef, ResourceState, RhiError, RhiResult, StateTracker, SubmitDescriptor, SubmitPlan,
-    PlannedCommand, PlannedSubmit, TimelineSemaphore,
+    PlannedCommand, PlannedSubmit, QueueClass, RecordedCommand, RenderCommand, RenderPassRecord,
+    ResourceAccess, ResourceKind, ResourceRef, ResourceState, RhiError, RhiResult, StateTracker,
+    SubmitDescriptor, SubmitPlan, TimelineSemaphore,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -54,7 +54,10 @@ pub struct Tracking {
 }
 impl Tracking {
     fn new() -> Self {
-        Self { next_timeline_semaphore_id: 1, ..Default::default() }
+        Self {
+            next_timeline_semaphore_id: 1,
+            ..Default::default()
+        }
     }
 }
 
@@ -70,7 +73,10 @@ pub struct SubmissionPlanner {
 }
 impl SubmissionPlanner {
     pub fn new() -> Self {
-        Self { tracking: Tracking::new(), binding_set_entries: HashMap::new() }
+        Self {
+            tracking: Tracking::new(),
+            binding_set_entries: HashMap::new(),
+        }
     }
 
     /// Captures the unsubmitted plan as a value, including queue timeline
@@ -121,9 +127,15 @@ impl SubmissionPlanner {
     /// storage before it is submitted). Their next GPU reader still needs a
     /// transfer-write dependency and, on another queue, a timeline handoff.
     pub fn record_immediate_write(&mut self, resource: ResourceRef) {
-        self.tracking.state_tracker.set_current_state(resource, ResourceState::COPY_DESTINATION);
-        self.tracking.resource_queues.insert(resource.tracker_key(), QueueClass::Graphics);
-        self.tracking.pending_transfers.remove(&resource.tracker_key());
+        self.tracking
+            .state_tracker
+            .set_current_state(resource, ResourceState::COPY_DESTINATION);
+        self.tracking
+            .resource_queues
+            .insert(resource.tracker_key(), QueueClass::Graphics);
+        self.tracking
+            .pending_transfers
+            .remove(&resource.tracker_key());
         self.tracking.access_tracker.observe(
             ResourceAccess::write(resource, AccessStage::TRANSFER),
             QueueClass::Graphics,
@@ -133,8 +145,12 @@ impl SubmissionPlanner {
     /// The backend's presentation command transitions the acquired image back to
     /// the external present layout. The next use must plan from that state.
     pub fn record_presentation(&mut self, resource: ResourceRef) {
-        self.tracking.state_tracker.set_current_state(resource, ResourceState::PRESENT);
-        self.tracking.resource_queues.insert(resource.tracker_key(), QueueClass::Graphics);
+        self.tracking
+            .state_tracker
+            .set_current_state(resource, ResourceState::PRESENT);
+        self.tracking
+            .resource_queues
+            .insert(resource.tracker_key(), QueueClass::Graphics);
     }
 
     // MARK: Plan entry point
@@ -276,7 +292,12 @@ impl SubmissionPlanner {
                 self.collect(
                     reference,
                     ResourceState::RENDER_TARGET,
-                    Self::make_access(reference, ResourceState::RENDER_TARGET, AccessStage::FRAGMENT, true),
+                    Self::make_access(
+                        reference,
+                        ResourceState::RENDER_TARGET,
+                        AccessStage::FRAGMENT,
+                        true,
+                    ),
                     BarrierPassScope::BeforePass,
                     queue,
                     barriers,
@@ -290,7 +311,12 @@ impl SubmissionPlanner {
             self.collect(
                 reference,
                 ResourceState::DEPTH_WRITE,
-                Self::make_access(reference, ResourceState::DEPTH_WRITE, AccessStage::FRAGMENT, true),
+                Self::make_access(
+                    reference,
+                    ResourceState::DEPTH_WRITE,
+                    AccessStage::FRAGMENT,
+                    true,
+                ),
                 BarrierPassScope::BeforePass,
                 queue,
                 barriers,
@@ -328,7 +354,12 @@ impl SubmissionPlanner {
                     self.collect(
                         reference,
                         ResourceState::VERTEX_BUFFER,
-                        Self::make_access(reference, ResourceState::VERTEX_BUFFER, AccessStage::VERTEX, false),
+                        Self::make_access(
+                            reference,
+                            ResourceState::VERTEX_BUFFER,
+                            AccessStage::VERTEX,
+                            false,
+                        ),
                         BarrierPassScope::BeforePass,
                         queue,
                         barriers,
@@ -342,7 +373,12 @@ impl SubmissionPlanner {
                     self.collect(
                         reference,
                         ResourceState::INDEX_BUFFER,
-                        Self::make_access(reference, ResourceState::INDEX_BUFFER, AccessStage::VERTEX, false),
+                        Self::make_access(
+                            reference,
+                            ResourceState::INDEX_BUFFER,
+                            AccessStage::VERTEX,
+                            false,
+                        ),
                         BarrierPassScope::BeforePass,
                         queue,
                         barriers,
@@ -356,7 +392,12 @@ impl SubmissionPlanner {
                     self.collect(
                         reference,
                         ResourceState::INDIRECT_ARGUMENT,
-                        Self::make_access(reference, ResourceState::INDIRECT_ARGUMENT, AccessStage::VERTEX, false),
+                        Self::make_access(
+                            reference,
+                            ResourceState::INDIRECT_ARGUMENT,
+                            AccessStage::VERTEX,
+                            false,
+                        ),
                         BarrierPassScope::BeforePass,
                         queue,
                         barriers,
@@ -398,7 +439,12 @@ impl SubmissionPlanner {
                     self.collect(
                         reference,
                         ResourceState::INDIRECT_ARGUMENT,
-                        Self::make_access(reference, ResourceState::INDIRECT_ARGUMENT, AccessStage::COMPUTE, false),
+                        Self::make_access(
+                            reference,
+                            ResourceState::INDIRECT_ARGUMENT,
+                            AccessStage::COMPUTE,
+                            false,
+                        ),
                         BarrierPassScope::BeforePass,
                         queue,
                         barriers,
@@ -423,19 +469,39 @@ impl SubmissionPlanner {
             let pairs: [(ResourceRef, ResourceState); 2] = match copy_command {
                 super::CopyCommand::CopyTexture { src, dst, .. } => [
                     (ResourceRef::texture(src.id()), ResourceState::COPY_SOURCE),
-                    (ResourceRef::texture(dst.id()), ResourceState::COPY_DESTINATION),
+                    (
+                        ResourceRef::texture(dst.id()),
+                        ResourceState::COPY_DESTINATION,
+                    ),
                 ],
                 super::CopyCommand::CopyBuffer { src, dst, .. } => [
                     (ResourceRef::buffer(src.id()), ResourceState::COPY_SOURCE),
-                    (ResourceRef::buffer(dst.id()), ResourceState::COPY_DESTINATION),
+                    (
+                        ResourceRef::buffer(dst.id()),
+                        ResourceState::COPY_DESTINATION,
+                    ),
                 ],
                 super::CopyCommand::CopyBufferToTexture(upload) => [
-                    (ResourceRef::buffer(upload.buffer.id()), ResourceState::COPY_SOURCE),
-                    (ResourceRef::texture(upload.texture.id()), ResourceState::COPY_DESTINATION),
+                    (
+                        ResourceRef::buffer(upload.buffer.id()),
+                        ResourceState::COPY_SOURCE,
+                    ),
+                    (
+                        ResourceRef::texture(upload.texture.id()),
+                        ResourceState::COPY_DESTINATION,
+                    ),
                 ],
-                super::CopyCommand::CopyTextureToBuffer { texture, buffer, .. } => [
-                    (ResourceRef::texture(texture.id()), ResourceState::COPY_SOURCE),
-                    (ResourceRef::buffer(buffer.id()), ResourceState::COPY_DESTINATION),
+                super::CopyCommand::CopyTextureToBuffer {
+                    texture, buffer, ..
+                } => [
+                    (
+                        ResourceRef::texture(texture.id()),
+                        ResourceState::COPY_SOURCE,
+                    ),
+                    (
+                        ResourceRef::buffer(buffer.id()),
+                        ResourceState::COPY_DESTINATION,
+                    ),
                 ],
             };
             for (reference, state) in pairs {
@@ -464,7 +530,9 @@ impl SubmissionPlanner {
         split_releases: &mut Vec<SplitReleaseRequest>,
         waits: &mut Vec<TimelineSemaphore>,
     ) {
-        let Some(entries) = self.binding_set_entries.get(&set.id()).cloned() else { return };
+        let Some(entries) = self.binding_set_entries.get(&set.id()).cloned() else {
+            return;
+        };
         for tracked in entries {
             let access = ResourceAccess {
                 resource: tracked.resource,
@@ -498,7 +566,11 @@ impl SubmissionPlanner {
         }
     }
 
-    fn tracked_resource(&self, resource: &BindingResource, read_only: bool) -> Option<TrackedBinding> {
+    fn tracked_resource(
+        &self,
+        resource: &BindingResource,
+        read_only: bool,
+    ) -> Option<TrackedBinding> {
         match *resource {
             BindingResource::Sampler(_) => None,
             BindingResource::Texture(texture) => Some(TrackedBinding {
@@ -633,7 +705,11 @@ impl SubmissionPlanner {
 
     /// Derives the access kind (read/write) from a resource state.
     fn access_kind(state: ResourceState) -> AccessKind {
-        if state.intersects(Self::write_states()) { AccessKind::Write } else { AccessKind::Read }
+        if state.intersects(Self::write_states()) {
+            AccessKind::Write
+        } else {
+            AccessKind::Read
+        }
     }
 
     /// Builds a `ResourceAccess` for a collected resource.
@@ -730,12 +806,18 @@ impl SubmissionPlanner {
         split_releases: &mut Vec<SplitReleaseRequest>,
         waits: &mut Vec<TimelineSemaphore>,
     ) {
-        if let Some(pending) = self.matching_pending_transfer(resource, src_queue, dst_queue, state) {
+        if let Some(pending) = self.matching_pending_transfer(resource, src_queue, dst_queue, state)
+        {
             append_unique(waits, pending.semaphore);
         } else {
             append_split_release(
                 split_releases,
-                SplitReleaseRequest { resource, src_state: state, src_queue, dst_queue },
+                SplitReleaseRequest {
+                    resource,
+                    src_state: state,
+                    src_queue,
+                    dst_queue,
+                },
             );
         }
     }
@@ -745,8 +827,12 @@ impl SubmissionPlanner {
         let key = resource.tracker_key();
         match barrier.sync_action {
             BarrierSyncAction::Full => {
-                self.tracking.state_tracker.set_current_state(resource, barrier.destination_state);
-                self.tracking.resource_queues.insert(key, barrier.destination_queue);
+                self.tracking
+                    .state_tracker
+                    .set_current_state(resource, barrier.destination_state);
+                self.tracking
+                    .resource_queues
+                    .insert(key, barrier.destination_queue);
                 self.tracking.pending_transfers.remove(&key);
             }
             BarrierSyncAction::Acquire => {
@@ -761,13 +847,21 @@ impl SubmissionPlanner {
                     }
                     self.tracking.pending_transfers.remove(&key);
                 }
-                self.tracking.state_tracker.set_current_state(resource, barrier.destination_state);
-                self.tracking.resource_queues.insert(key, barrier.destination_queue);
+                self.tracking
+                    .state_tracker
+                    .set_current_state(resource, barrier.destination_state);
+                self.tracking
+                    .resource_queues
+                    .insert(key, barrier.destination_queue);
             }
             BarrierSyncAction::Release => {
                 let released_state = barrier.source_state;
-                self.tracking.state_tracker.set_current_state(resource, released_state);
-                self.tracking.resource_queues.insert(key, barrier.source_queue);
+                self.tracking
+                    .state_tracker
+                    .set_current_state(resource, released_state);
+                self.tracking
+                    .resource_queues
+                    .insert(key, barrier.source_queue);
                 if barrier.source_queue == barrier.destination_queue {
                     self.tracking.pending_transfers.remove(&key);
                     return Ok(());
@@ -870,7 +964,12 @@ impl SubmissionPlanner {
     }
 
     fn next_queue_timeline(&mut self, queue: QueueClass) -> TimelineSemaphore {
-        let mut timeline = self.tracking.queue_timelines.get(&queue).copied().unwrap_or_default();
+        let mut timeline = self
+            .tracking
+            .queue_timelines
+            .get(&queue)
+            .copied()
+            .unwrap_or_default();
         if timeline.id == 0 {
             timeline.id = self.tracking.next_timeline_semaphore_id;
             self.tracking.next_timeline_semaphore_id += 1;
@@ -889,7 +988,10 @@ impl SubmissionPlanner {
         dst_queue: QueueClass,
         state: ResourceState,
     ) -> Option<PendingTransfer> {
-        let pending = *self.tracking.pending_transfers.get(&resource.tracker_key())?;
+        let pending = *self
+            .tracking
+            .pending_transfers
+            .get(&resource.tracker_key())?;
         if pending.src_queue != src_queue
             || pending.dst_queue != dst_queue
             || pending.released_state != state
@@ -961,8 +1063,14 @@ mod tests {
         assert_eq!(plan.submits.len(), 1);
         // The two buffers transition from their initial state, so one barrier
         // block precedes the copy pass.
-        assert!(matches!(plan.submits[0].commands[0], PlannedCommand::Barriers(_)));
-        assert!(matches!(plan.submits[0].commands[1], PlannedCommand::CopyPass(_)));
+        assert!(matches!(
+            plan.submits[0].commands[0],
+            PlannedCommand::Barriers(_)
+        ));
+        assert!(matches!(
+            plan.submits[0].commands[1],
+            PlannedCommand::CopyPass(_)
+        ));
     }
 
     #[test]
@@ -979,7 +1087,10 @@ mod tests {
         let first = planner
             .build_plan(QueueClass::Graphics, &commands, &SubmitDescriptor::new())
             .expect("plan");
-        assert!(matches!(first.submits[0].commands[0], PlannedCommand::Barriers(_)));
+        assert!(matches!(
+            first.submits[0].commands[0],
+            PlannedCommand::Barriers(_)
+        ));
 
         let second = planner
             .build_plan(QueueClass::Graphics, &commands, &SubmitDescriptor::new())
@@ -1016,7 +1127,11 @@ mod tests {
             }],
         })];
         let plan = planner
-            .build_plan(QueueClass::Compute, &compute_commands, &SubmitDescriptor::new())
+            .build_plan(
+                QueueClass::Compute,
+                &compute_commands,
+                &SubmitDescriptor::new(),
+            )
             .expect("plan");
         assert_eq!(plan.submits.len(), 2);
         assert_eq!(plan.submits[0].queue, QueueClass::Graphics);
@@ -1067,7 +1182,11 @@ mod tests {
             },
         );
         let plan = planner
-            .build_plan(QueueClass::Graphics, buffer.commands(), &SubmitDescriptor::new())
+            .build_plan(
+                QueueClass::Graphics,
+                buffer.commands(),
+                &SubmitDescriptor::new(),
+            )
             .expect("plan");
         assert_eq!(plan.submits.len(), 1);
         planner.remove_binding_set_entries(9);
@@ -1084,7 +1203,9 @@ mod tests {
         );
         let mut encoder = CopyPassEncoder::default();
         encoder.upload_buffer_to_texture(upload);
-        let commands = vec![RecordedCommand::CopyPass(CopyPassRecord { body: encoder.body().to_vec() })];
+        let commands = vec![RecordedCommand::CopyPass(CopyPassRecord {
+            body: encoder.body().to_vec(),
+        })];
         let plan = planner
             .build_plan(QueueClass::Graphics, &commands, &SubmitDescriptor::new())
             .expect("plan");

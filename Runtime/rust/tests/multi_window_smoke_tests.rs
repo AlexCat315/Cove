@@ -29,12 +29,12 @@ use std::rc::Rc;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::time::Duration;
 
+use cove_core::Rect;
 use cove_core::scene::{
     EventResult, FocusChainHolder, InputHandlerRoute, InteractionRegistry,
     InteractionRegistryHolder, Node, NodeTree, PlatformInputContext, PointerCaptureHolder,
     PointerPhase, Recomposer, TextInputAttachmentKey,
 };
-use cove_core::Rect;
 use cove_platform::{
     InputEvent, MouseButton, MouseButtonEvent, MouseMotionEvent, SystemCursor, TextInputArea,
     WindowId, WindowInputEvent,
@@ -76,7 +76,12 @@ struct MockWindowHandle {
 
 impl MockWindowHandle {
     fn new(id: WindowId, size: (u32, u32)) -> Self {
-        Self { id, render_surface: Cell::new(None), size, is_visible: Cell::new(true) }
+        Self {
+            id,
+            render_surface: Cell::new(None),
+            size,
+            is_visible: Cell::new(true),
+        }
     }
 }
 
@@ -233,7 +238,12 @@ impl Shell for MockShell {
     }
     fn window_ids(&self) -> Vec<WindowId> {
         let state = self.0.borrow();
-        state.order.iter().copied().filter(|id| state.handles.contains_key(id)).collect()
+        state
+            .order
+            .iter()
+            .copied()
+            .filter(|id| state.handles.contains_key(id))
+            .collect()
     }
     fn is_running(&self) -> bool {
         let state = self.0.borrow();
@@ -303,7 +313,10 @@ impl Shell for MockShell {
         self.0.borrow_mut().text_input_areas.insert(id, area);
     }
     fn set_cursor(&self, id: WindowId, cursor: SystemCursor) {
-        self.0.borrow_mut().cursor_requests.push(CursorRequest { window_id: id, cursor });
+        self.0.borrow_mut().cursor_requests.push(CursorRequest {
+            window_id: id,
+            cursor,
+        });
     }
     fn global_pointer_position(&self) -> Option<(f32, f32)> {
         None
@@ -418,7 +431,9 @@ impl Harness {
     }
 
     fn run(&self) {
-        self.host.run_open_windows().expect("the mock shell keeps the loop runnable");
+        self.host
+            .run_open_windows()
+            .expect("the mock shell keeps the loop runnable");
     }
 }
 
@@ -505,14 +520,20 @@ fn unchanged_commit_does_not_request_frame() {
             }
             if iteration.get() == 3 {
                 let target = root.clone();
-                poll_session.recomposer.invalidate(scope, None, None, move || {
-                    target.set_opacity(0.5);
-                });
+                poll_session
+                    .recomposer
+                    .invalidate(scope, None, None, move || {
+                        target.set_opacity(0.5);
+                    });
             }
         }));
 
         harness.run();
-        assert_eq!(frames.get(), 2, "an unchanged commit submits no extra frame");
+        assert_eq!(
+            frames.get(),
+            2,
+            "an unchanged commit submits no extra frame"
+        );
     });
 }
 
@@ -521,7 +542,9 @@ fn hidden_fixed_rate_host_sleeps() {
     GlobalTestLock::locked(|| {
         let harness = harness(4);
         let session = harness.open("A");
-        harness.host.set_frame_rate_mode(PlatformFrameRateMode::Fixed(60.0));
+        harness
+            .host
+            .set_frame_rate_mode(PlatformFrameRateMode::Fixed(60.0));
 
         let iteration = Cell::new(0);
         let host = harness.host.clone();
@@ -589,14 +612,26 @@ fn presentation_lifecycle_is_per_window() {
         }));
 
         harness.run();
-        assert_eq!(*transitions.borrow(), [false, true], "presentation suspends then restores");
+        assert_eq!(
+            *transitions.borrow(),
+            [false, true],
+            "presentation suspends then restores"
+        );
         assert_eq!(
             suspended_at_hide.get(),
             Some(true),
             "hiding suspends presentation synchronously",
         );
-        assert_eq!(frames.get(), 2, "the hidden window skips frames while suspended");
-        assert_eq!(sibling_frames.get(), 4, "the sibling window keeps rendering");
+        assert_eq!(
+            frames.get(),
+            2,
+            "the hidden window skips frames while suspended"
+        );
+        assert_eq!(
+            sibling_frames.get(),
+            4,
+            "the sibling window keeps rendering"
+        );
     });
 }
 
@@ -613,13 +648,17 @@ fn routes_events_per_window() {
         let session_b = harness.open_tree("B", &tree_b);
 
         let a_counter = hits_a.clone();
-        tree_a.borrow_mut().set_root(Some(hit_tree(&session_a.interactions(), move || {
-            a_counter.set(a_counter.get() + 1)
-        })));
+        tree_a
+            .borrow_mut()
+            .set_root(Some(hit_tree(&session_a.interactions(), move || {
+                a_counter.set(a_counter.get() + 1)
+            })));
         let b_counter = hits_b.clone();
-        tree_b.borrow_mut().set_root(Some(hit_tree(&session_b.interactions(), move || {
-            b_counter.set(b_counter.get() + 1)
-        })));
+        tree_b
+            .borrow_mut()
+            .set_root(Some(hit_tree(&session_b.interactions(), move || {
+                b_counter.set(b_counter.get() + 1)
+            })));
 
         let context_a = Rc::new(Cell::new(false));
         let expected = (
@@ -631,7 +670,8 @@ fn routes_events_per_window() {
         *session_a.callbacks.on_event.borrow_mut() = Some(Rc::new(move |_: &InputEvent| {
             let matches = InteractionRegistryHolder::current()
                 .is_some_and(|current| Rc::ptr_eq(&current, &expected.0))
-                && FocusChainHolder::current().is_some_and(|current| Rc::ptr_eq(&current, &expected.1))
+                && FocusChainHolder::current()
+                    .is_some_and(|current| Rc::ptr_eq(&current, &expected.1))
                 && PointerCaptureHolder::current()
                     .is_some_and(|current| Rc::ptr_eq(&current, &expected.2));
             flag.set(matches);
@@ -647,7 +687,8 @@ fn routes_events_per_window() {
         *session_b.callbacks.on_event.borrow_mut() = Some(Rc::new(move |_: &InputEvent| {
             let matches = InteractionRegistryHolder::current()
                 .is_some_and(|current| Rc::ptr_eq(&current, &expected.0))
-                && FocusChainHolder::current().is_some_and(|current| Rc::ptr_eq(&current, &expected.1))
+                && FocusChainHolder::current()
+                    .is_some_and(|current| Rc::ptr_eq(&current, &expected.1))
                 && PointerCaptureHolder::current()
                     .is_some_and(|current| Rc::ptr_eq(&current, &expected.2));
             flag.set(matches);
@@ -668,8 +709,14 @@ fn routes_events_per_window() {
 
         assert_eq!(hits_a.get(), 1, "window A receives its own routed event");
         assert_eq!(hits_b.get(), 1, "window B receives its own routed event");
-        assert!(context_a.get(), "window A's holders are current for its callback");
-        assert!(context_b.get(), "window B's holders are current for its callback");
+        assert!(
+            context_a.get(),
+            "window A's holders are current for its callback"
+        );
+        assert!(
+            context_b.get(),
+            "window B's holders are current for its callback"
+        );
     });
 }
 
@@ -682,12 +729,22 @@ fn routes_cursor_per_window() {
         let session_a = harness.open_tree("A", &tree_a);
         let session_b = harness.open_tree("B", &tree_b);
 
-        tree_a.borrow_mut().set_root(Some(cursor_tree(SystemCursor::Pointer)));
-        tree_b.borrow_mut().set_root(Some(cursor_tree(SystemCursor::Move)));
+        tree_a
+            .borrow_mut()
+            .set_root(Some(cursor_tree(SystemCursor::Pointer)));
+        tree_b
+            .borrow_mut()
+            .set_root(Some(cursor_tree(SystemCursor::Move)));
 
         harness.shell.set_batches(vec![vec![
-            WindowInputEvent { window_id: session_a.id, event: motion(16.0, 16.0, 1.0, 1.0) },
-            WindowInputEvent { window_id: session_b.id, event: motion(16.0, 16.0, 1.0, 1.0) },
+            WindowInputEvent {
+                window_id: session_a.id,
+                event: motion(16.0, 16.0, 1.0, 1.0),
+            },
+            WindowInputEvent {
+                window_id: session_b.id,
+                event: motion(16.0, 16.0, 1.0, 1.0),
+            },
         ]]);
 
         harness.run();
@@ -696,13 +753,15 @@ fn routes_cursor_per_window() {
         assert!(
             requests
                 .iter()
-                .any(|request| request.window_id == session_a.id && request.cursor == SystemCursor::Pointer),
+                .any(|request| request.window_id == session_a.id
+                    && request.cursor == SystemCursor::Pointer),
             "window A resolves the pointer cursor",
         );
         assert!(
             requests
                 .iter()
-                .any(|request| request.window_id == session_b.id && request.cursor == SystemCursor::Move),
+                .any(|request| request.window_id == session_b.id
+                    && request.cursor == SystemCursor::Move),
             "window B resolves the move cursor",
         );
     });
@@ -734,7 +793,11 @@ fn render_dirty_triggers_frame() {
         }));
 
         harness.run();
-        assert_eq!(frames.get(), 2, "a render-dirty node requests the next frame");
+        assert_eq!(
+            frames.get(),
+            2,
+            "a render-dirty node requests the next frame"
+        );
     });
 }
 
@@ -744,7 +807,8 @@ fn input_events_request_redraw() {
         let harness = harness(3);
         let tree = Rc::new(RefCell::new(NodeTree::new()));
         let session = harness.open_tree("A", &tree);
-        tree.borrow_mut().set_root(Some(hit_tree(&session.interactions(), || {})));
+        tree.borrow_mut()
+            .set_root(Some(hit_tree(&session.interactions(), || {})));
         harness.shell.set_surface(session.id, MOCK_SURFACE);
 
         harness.shell.set_batches(vec![
@@ -758,7 +822,11 @@ fn input_events_request_redraw() {
         let frames = count_frames(&session);
 
         harness.run();
-        assert_eq!(frames.get(), 2, "window input requests a redraw after the initial frame");
+        assert_eq!(
+            frames.get(),
+            2,
+            "window input requests a redraw after the initial frame"
+        );
     });
 }
 
@@ -777,11 +845,14 @@ fn external_display_requests_redraw_every_window() {
 
         let drain = Rc::new(Cell::new(0));
         let drain_counter = drain.clone();
-        *harness.host.callbacks().external_display_request_drain.borrow_mut() =
-            Some(Rc::new(move || {
-                drain_counter.set(drain_counter.get() + 1);
-                drain_counter.get() == 2
-            }));
+        *harness
+            .host
+            .callbacks()
+            .external_display_request_drain
+            .borrow_mut() = Some(Rc::new(move || {
+            drain_counter.set(drain_counter.get() + 1);
+            drain_counter.get() == 2
+        }));
 
         let frames_a = count_frames(&session_a);
         let frames_b = count_frames(&session_b);
@@ -801,12 +872,17 @@ fn event_driven_host_waits_when_idle() {
         tree.borrow_mut().set_root(Some(Node::new()));
         harness.shell.set_surface(session.id, MOCK_SURFACE);
         count_frames(&session);
-        harness.host.set_frame_rate_mode(PlatformFrameRateMode::EventDriven);
+        harness
+            .host
+            .set_frame_rate_mode(PlatformFrameRateMode::EventDriven);
 
         harness.run();
         let timeouts = harness.shell.wait_timeouts();
         assert!(!timeouts.is_empty(), "an idle event-driven host waits");
-        assert!(timeouts.iter().all(|timeout| !timeout.is_zero()), "idle waits are non-zero");
+        assert!(
+            timeouts.iter().all(|timeout| !timeout.is_zero()),
+            "idle waits are non-zero"
+        );
     });
 }
 
@@ -831,7 +907,9 @@ fn failed_frame_callbacks_retry() {
         harness.host.set_frame_clock(move || clock.get());
         let tick = time.clone();
         let poll_shell = harness.shell.clone();
-        harness.shell.set_poll(Box::new(move || tick.set(tick.get() + 0.01)));
+        harness
+            .shell
+            .set_poll(Box::new(move || tick.set(tick.get() + 0.01)));
 
         let delayed_waits = Rc::new(Cell::new(0));
         let recorder = delayed_waits.clone();
@@ -846,8 +924,15 @@ fn failed_frame_callbacks_retry() {
         }));
 
         harness.run();
-        assert_eq!(attempts.get(), 2, "the failed frame is retried exactly once");
-        assert!(delayed_waits.get() > 0, "the retry is throttled by a wait deadline");
+        assert_eq!(
+            attempts.get(),
+            2,
+            "the failed frame is retried exactly once"
+        );
+        assert!(
+            delayed_waits.get() > 0,
+            "the retry is throttled by a wait deadline"
+        );
     });
 }
 
@@ -859,14 +944,18 @@ fn unavailable_surface_preserves_dirty_work() {
         let session = harness.open_tree("Occluded", &tree);
         let root = Node::new();
         tree.borrow_mut().set_root(Some(root.clone()));
-        root.mark_render_dirty(cove_core::scene::InvalidationSource::StyleSet { field: "test".into() });
+        root.mark_render_dirty(cove_core::scene::InvalidationSource::StyleSet {
+            field: "test".into(),
+        });
         harness.shell.set_surface(session.id, MOCK_SURFACE);
 
         let time = Rc::new(Cell::new(0.0_f64));
         let clock = time.clone();
         harness.host.set_frame_clock(move || clock.get());
         let tick = time.clone();
-        harness.shell.set_poll(Box::new(move || tick.set(tick.get() + 0.002)));
+        harness
+            .shell
+            .set_poll(Box::new(move || tick.set(tick.get() + 0.002)));
 
         let attempts = Rc::new(Cell::new(0));
         let counter = attempts.clone();
@@ -876,8 +965,15 @@ fn unavailable_surface_preserves_dirty_work() {
         }));
 
         harness.run();
-        assert_eq!(attempts.get(), 1, "a failing frame is not retried within the throttle window");
-        assert!(tree.borrow().has_render_updates(), "dirty work survives the failed attempt");
+        assert_eq!(
+            attempts.get(),
+            1,
+            "a failing frame is not retried within the throttle window"
+        );
+        assert!(
+            tree.borrow().has_render_updates(),
+            "dirty work survives the failed attempt"
+        );
         assert!(
             harness
                 .shell
@@ -892,7 +988,11 @@ fn unavailable_surface_preserves_dirty_work() {
 /// Records whether the native window survives each event-loop iteration. The
 /// loop stops once the last window is destroyed, so a released close yields a
 /// single sample while a vetoed close keeps sampling to the end of the batch.
-fn sample_window_liveness(harness: &Harness, batches: usize, id: WindowId) -> Rc<RefCell<Vec<bool>>> {
+fn sample_window_liveness(
+    harness: &Harness,
+    batches: usize,
+    id: WindowId,
+) -> Rc<RefCell<Vec<bool>>> {
     harness.shell.set_batches(vec![Vec::new(); batches]);
     let samples = Rc::new(RefCell::new(Vec::new()));
     let recorder = samples.clone();
@@ -920,7 +1020,11 @@ fn os_close_request_releases_window_resources() {
         let samples = sample_window_liveness(&harness, 4, session.id);
         harness.run();
 
-        assert_eq!(*torn_down.borrow(), [session.id], "the host tore the window down");
+        assert_eq!(
+            *torn_down.borrow(),
+            [session.id],
+            "the host tore the window down"
+        );
         assert_eq!(
             samples.borrow().as_slice(),
             [true],
@@ -938,8 +1042,11 @@ fn os_close_veto_keeps_native_window_alive() {
         let log = torn_down.clone();
         *harness.host.callbacks().on_window_teardown.borrow_mut() =
             Some(Rc::new(move |id: WindowId| log.borrow_mut().push(id)));
-        *harness.host.callbacks().window_close_interceptor.borrow_mut() =
-            Some(Rc::new(move |_: Option<WindowId>| false));
+        *harness
+            .host
+            .callbacks()
+            .window_close_interceptor
+            .borrow_mut() = Some(Rc::new(move |_: Option<WindowId>| false));
 
         assert!(
             !harness.shell.request_close(session.id),
@@ -948,7 +1055,10 @@ fn os_close_veto_keeps_native_window_alive() {
         let samples = sample_window_liveness(&harness, 4, session.id);
         harness.run();
 
-        assert!(torn_down.borrow().is_empty(), "a vetoed close tears nothing down");
+        assert!(
+            torn_down.borrow().is_empty(),
+            "a vetoed close tears nothing down"
+        );
         assert_eq!(
             samples.borrow().as_slice(),
             [true, true, true, true],
@@ -968,7 +1078,13 @@ fn focused_text_input_area_syncs_to_shell() {
         let root = Node::new();
         let field = Node::new();
         field.set_is_focusable(true);
-        let area = TextInputArea { x: 18.0, y: 24.0, width: 12.0, height: 20.0, cursor_x: 0.0 };
+        let area = TextInputArea {
+            x: 18.0,
+            y: 24.0,
+            width: 12.0,
+            height: 20.0,
+            cursor_x: 0.0,
+        };
         field.set_attachment(TextInputAttachmentKey::AREA, area.clone());
         root.add_child(&field);
         tree.borrow_mut().set_root(Some(root));
@@ -978,7 +1094,13 @@ fn focused_text_input_area_syncs_to_shell() {
 
         harness.run();
         assert_eq!(
-            harness.shell.0.borrow().text_input_areas.get(&session.id).cloned(),
+            harness
+                .shell
+                .0
+                .borrow()
+                .text_input_areas
+                .get(&session.id)
+                .cloned(),
             Some(Some(area)),
             "the host reads the focused node's text-input area live",
         );

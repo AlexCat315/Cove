@@ -13,8 +13,6 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
 
-use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
-use cove_core::Binding;
 use crate::adaptive::{ContainerSizeReader, SurfaceReader};
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::modifiers::style::SemanticStyleViewExt;
@@ -24,6 +22,8 @@ use crate::primitives::columns::{
 use crate::primitives::data::lists::table::{ColumnVisibility, TableColumn, TableColumnPlan};
 use crate::primitives::layout::scroll_view::ScrollView as ScrollViewPrimitive;
 use crate::{AnyView, BoxView, View};
+use cove_core::Binding;
+use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 
 /// The shared columns track for one authored table, so the picker and the
 /// planner read the same widths and priorities.
@@ -148,79 +148,91 @@ impl<Record: 'static> View for TableColumns<Record> {
         let shows_picker = self.shows_picker();
         let is_enabled = self.is_enabled;
 
-        AnyView::new(SurfaceReader::new(move |environment: &cove_core::Environment| {
-            let columns = columns.clone();
-            let widths = widths.clone();
-            let overrides = overrides.clone();
-            let pinned = pinned.clone();
-            let content = content.clone();
-            let touch = environment.input.contains(cove_core::InputCapabilities::TOUCH);
-            AnyView::new(ContainerSizeReader::new(move |size: cove_core::Size| {
-                let gutter = if touch { 0.0 } else { ScrollViewPrimitive::scrollbar_gutter_width() };
-                let plan = TableColumnPlan::resolve(
-                    &columns,
-                    &widths,
-                    &overrides.get(),
-                    (size.width - gutter).max(0.0),
-                    frozen,
-                    &pinned,
-                );
-                let picker = shows_picker.then(|| {
-                    let tracks = shared_tracks(&columns, &widths);
-                    let shared = ColumnVisibilityPlan {
-                        indices: plan.indices.clone(),
-                        required_ids: plan.required_ids.clone(),
+        AnyView::new(SurfaceReader::new(
+            move |environment: &cove_core::Environment| {
+                let columns = columns.clone();
+                let widths = widths.clone();
+                let overrides = overrides.clone();
+                let pinned = pinned.clone();
+                let content = content.clone();
+                let touch = environment
+                    .input
+                    .contains(cove_core::InputCapabilities::TOUCH);
+                AnyView::new(ContainerSizeReader::new(move |size: cove_core::Size| {
+                    let gutter = if touch {
+                        0.0
+                    } else {
+                        ScrollViewPrimitive::scrollbar_gutter_width()
                     };
-                    ColumnVisibilityPickerModel::new(
-                        &tracks,
-                        &shared,
+                    let plan = TableColumnPlan::resolve(
+                        &columns,
+                        &widths,
                         &overrides.get(),
-                        is_enabled,
-                        false,
-                    )
-                });
-
-                let mut children = Vec::new();
-                if let Some(picker) = picker {
-                    // The menu host for these entries is the toolbar command
-                    // surface; the model is the shared contract both tables read.
-                    let summary = picker.summary.clone();
-                    children.push(AnyView::new(
-                        AnyView::new(
-                            crate::primitives::text::Text::new(summary)
-                                .semantic_font(crate::theme::SemanticFontRef::caption())
-                                .semantic_foreground(crate::theme::SemanticColorRef::on_surface_muted()),
+                        (size.width - gutter).max(0.0),
+                        frozen,
+                        &pinned,
+                    );
+                    let picker = shows_picker.then(|| {
+                        let tracks = shared_tracks(&columns, &widths);
+                        let shared = ColumnVisibilityPlan {
+                            indices: plan.indices.clone(),
+                            required_ids: plan.required_ids.clone(),
+                        };
+                        ColumnVisibilityPickerModel::new(
+                            &tracks,
+                            &shared,
+                            &overrides.get(),
+                            is_enabled,
+                            false,
                         )
-                        .flex_with(0.0, 0.0, None),
-                    ));
-                }
-                children.push(AnyView::new(
-                    AnyView::new(content(plan)).flex_with(1.0, 1.0, Some(0.0)).frame(
-                        None,
-                        None,
-                        Some(0.0),
-                        Some(0.0),
-                        None,
-                        None,
-                    ),
-                ));
+                    });
 
-                AnyView::new(
+                    let mut children = Vec::new();
+                    if let Some(picker) = picker {
+                        // The menu host for these entries is the toolbar command
+                        // surface; the model is the shared contract both tables read.
+                        let summary = picker.summary.clone();
+                        children.push(AnyView::new(
+                            AnyView::new(
+                                crate::primitives::text::Text::new(summary)
+                                    .semantic_font(crate::theme::SemanticFontRef::caption())
+                                    .semantic_foreground(
+                                        crate::theme::SemanticColorRef::on_surface_muted(),
+                                    ),
+                            )
+                            .flex_with(0.0, 0.0, None),
+                        ));
+                    }
+                    children.push(AnyView::new(
+                        AnyView::new(content(plan))
+                            .flex_with(1.0, 1.0, Some(0.0))
+                            .frame(None, None, Some(0.0), Some(0.0), None, None),
+                    ));
+
                     AnyView::new(
-                        AnyView::new(BoxView::new(
-                            FlexDirection::Column,
-                            Align::Stretch,
-                            Justify::FlexStart,
-                            Wrap::NoWrap,
-                            0.0,
-                            AnyView::new(crate::TupleView::new(children)),
-                        ))
-                        .flex_with(1.0, 1.0, Some(0.0))
-                        .frame(None, None, Some(0.0), Some(0.0), None, None),
+                        AnyView::new(
+                            AnyView::new(BoxView::new(
+                                FlexDirection::Column,
+                                Align::Stretch,
+                                Justify::FlexStart,
+                                Wrap::NoWrap,
+                                0.0,
+                                AnyView::new(crate::TupleView::new(children)),
+                            ))
+                            .flex_with(1.0, 1.0, Some(0.0))
+                            .frame(
+                                None,
+                                None,
+                                Some(0.0),
+                                Some(0.0),
+                                None,
+                                None,
+                            ),
+                        )
+                        .flex_with(1.0, 1.0, None),
                     )
-                    .flex_with(1.0, 1.0, None),
-                )
-            }))
-        }))
+                }))
+            },
+        ))
     }
 }

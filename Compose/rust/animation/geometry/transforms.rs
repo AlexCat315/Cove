@@ -1,6 +1,6 @@
 //! Scale and offset view transforms translated from Animation/Geometry/Transforms.swift.
+use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
 use cove_core::scene::{LayoutNode, Node, NodeTransform, Point};
-use crate::{impl_primitive_view, AnyView, PrimitiveView, View};
 
 struct TransformHost {
     factor: f32,
@@ -16,7 +16,9 @@ impl PrimitiveView for TransformHost {
         node
     }
 
-    fn make_layout_node(&self) -> Option<LayoutNode> { Some(LayoutNode::new()) }
+    fn make_layout_node(&self) -> Option<LayoutNode> {
+        Some(LayoutNode::new())
+    }
 
     fn update_layout(&self, layout: &LayoutNode) {
         layout.set_flex_direction(cove_core::scene::FlexDirection::Column);
@@ -25,10 +27,20 @@ impl PrimitiveView for TransformHost {
 
     fn update_node(&self, node: &Node) {
         let current = node.transform();
-        node.set_transform(NodeTransform { anchor: self.anchor, scales_shadow: true, ..current });
-        let mounted = node.attachment::<bool>("motion.transform.mounted").unwrap_or(false);
+        node.set_transform(NodeTransform {
+            anchor: self.anchor,
+            scales_shadow: true,
+            ..current
+        });
+        let mounted = node
+            .attachment::<bool>("motion.transform.mounted")
+            .unwrap_or(false);
         if !mounted {
-            node.set_transform(NodeTransform { scale: self.factor, anchor: self.anchor, scales_shadow: true });
+            node.set_transform(NodeTransform {
+                scale: self.factor,
+                anchor: self.anchor,
+                scales_shadow: true,
+            });
             node.set_content_offset(self.offset);
             node.set_attachment("motion.transform.mounted", true);
             return;
@@ -43,19 +55,32 @@ impl PrimitiveView for TransformHost {
             }
         });
         let owner = node.downgrade();
-        node.animatable_set_with("motion.offset", node.content_offset(), self.offset, move |offset| {
-            if let Some(owner) = Node::upgrade(&owner) { owner.set_content_offset(offset); }
-        });
+        node.animatable_set_with(
+            "motion.offset",
+            node.content_offset(),
+            self.offset,
+            move |offset| {
+                if let Some(owner) = Node::upgrade(&owner) {
+                    owner.set_content_offset(offset);
+                }
+            },
+        );
     }
 
-    fn children(&self, _node: &Node) -> Vec<AnyView> { vec![self.content.clone()] }
+    fn children(&self, _node: &Node) -> Vec<AnyView> {
+        vec![self.content.clone()]
+    }
 }
 impl_primitive_view!(TransformHost);
 
 /// Apply a non-negative scale around a normalized anchor point.
 pub fn scale_effect(content: impl View + 'static, factor: f32, anchor: Point) -> impl View {
     TransformHost {
-        factor: if factor.is_finite() { factor.max(0.0) } else { 1.0 },
+        factor: if factor.is_finite() {
+            factor.max(0.0)
+        } else {
+            1.0
+        },
         anchor: Point::new(finite_or(anchor.x, 0.5), finite_or(anchor.y, 0.5)),
         offset: Point::default(),
         content: AnyView::new(content),
@@ -76,7 +101,11 @@ fn finite_or(value: f32, fallback: f32) -> f32 {
     if value.is_finite() { value } else { fallback }
 }
 
-pub fn scale_effect_anchored(content: impl View + 'static, factor: f32, anchor: Point) -> impl View {
+pub fn scale_effect_anchored(
+    content: impl View + 'static,
+    factor: f32,
+    anchor: Point,
+) -> impl View {
     scale_effect(content, factor, anchor)
 }
 

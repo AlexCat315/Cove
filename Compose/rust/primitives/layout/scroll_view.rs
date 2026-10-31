@@ -8,23 +8,23 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use cove_core::scene::scrolling::{ScrollAnimator, ScrollPhysics};
+use crate::LayoutContainer;
+use crate::modifiers::layout::{FrameDimension, LayoutFrameExt};
+use crate::primitives::layout::horizontal_scroll_origin::HorizontalScrollOrigin;
+use crate::scrolling::ScrollPhysicsEnvironment;
+use crate::theme::theme_for_node;
+use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
+use cove_composition::LayoutDebugExt;
 use cove_core::scene::ScrollConsumePolicy;
+use cove_core::scene::scrolling::{ScrollAnimator, ScrollPhysics};
 use cove_core::scene::{
     AccessibilityActions, AccessibilityRole, AccessibilitySemantics, Align, EventPhase,
     EventResult, FlexDirection, FocusChainHolder, HoverPhase, InputHandlerRoute,
-    InteractionRegistryHolder, Justify, LayoutNode, Node, NodeResource, Overflow, PointerCaptureHolder,
-    PointerPhase, Wrap,
+    InteractionRegistryHolder, Justify, LayoutNode, Node, NodeResource, Overflow,
+    PointerCaptureHolder, PointerPhase, Wrap,
 };
 use cove_core::{Binding, Color, Point, Rect, Size};
 use cove_platform::{KeyEvent, MouseButton, MouseWheelEvent};
-use crate::modifiers::layout::{FrameDimension, LayoutFrameExt};
-use cove_composition::LayoutDebugExt;
-use crate::primitives::layout::horizontal_scroll_origin::HorizontalScrollOrigin;
-use crate::LayoutContainer;
-use crate::scrolling::ScrollPhysicsEnvironment;
-use crate::theme::theme_for_node;
-use crate::{impl_primitive_view, AnyView, PrimitiveView, View};
 
 const DRAG_STATE: &str = "__scrollview_scrollbar_drag_state";
 const CONTENT_DRAG_STATE: &str = "__scrollview_content_drag_state";
@@ -77,7 +77,11 @@ impl ScrollRequest {
                 if offset.x.is_finite() { offset.x } else { 0.0 },
                 if offset.y.is_finite() { offset.y } else { 0.0 },
             ),
-            duration: if duration.is_finite() { duration.max(0.0) } else { 0.0 },
+            duration: if duration.is_finite() {
+                duration.max(0.0)
+            } else {
+                0.0
+            },
         }
     }
 }
@@ -265,14 +269,21 @@ impl ScrollView {
 
     /// The lane `Stable` actually reserves on a hover-capable surface.
     pub fn stable_gutter_width(supports_hover: bool) -> f32 {
-        if supports_hover { Self::scrollbar_gutter_width() } else { 0.0 }
+        if supports_hover {
+            Self::scrollbar_gutter_width()
+        } else {
+            0.0
+        }
     }
 }
 
 // MARK: - Geometry helpers
 
 pub(crate) fn size_of(rect: Rect) -> Size {
-    Size { width: rect.width, height: rect.height }
+    Size {
+        width: rect.width,
+        height: rect.height,
+    }
 }
 
 pub(crate) fn visible_viewport_rect(node: &Node) -> Rect {
@@ -289,7 +300,12 @@ pub(crate) fn visible_viewport_rect(node: &Node) -> Rect {
         }
         ancestor = current.parent();
     }
-    Rect::new(visible.x - origin.x, visible.y - origin.y, visible.width, visible.height)
+    Rect::new(
+        visible.x - origin.x,
+        visible.y - origin.y,
+        visible.width,
+        visible.height,
+    )
 }
 
 fn intersect(lhs: Rect, rhs: Rect) -> Rect {
@@ -313,7 +329,12 @@ fn content_bounds(node: &Node, origin: Point) -> Option<Rect> {
         return None;
     }
     let frame = node.frame();
-    let placed = Rect::new(origin.x + frame.x, origin.y + frame.y, frame.width, frame.height);
+    let placed = Rect::new(
+        origin.x + frame.x,
+        origin.y + frame.y,
+        frame.width,
+        frame.height,
+    );
     let is_origin = node
         .attachment::<String>("__layoutDebug.role")
         .is_some_and(|role| role == HORIZONTAL_ORIGIN_ROLE);
@@ -363,13 +384,20 @@ fn cached_scrollable_content_size(node: &Node) -> Size {
 
 fn refresh_scrollable_content_size(node: &Node) -> Size {
     let next = scrollable_content_size(node);
-    let previous = node.attachment::<ContentSizeCache>(CONTENT_SIZE).map(|cache| cache.size);
+    let previous = node
+        .attachment::<ContentSizeCache>(CONTENT_SIZE)
+        .map(|cache| cache.size);
     if previous != Some(next) {
-        node.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("scrollContentSize"));
+        node.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+            "scrollContentSize",
+        ));
     }
     node.set_attachment(
         CONTENT_SIZE,
-        ContentSizeCache { size: next, structure_version: node.subtree_structure_version() },
+        ContentSizeCache {
+            size: next,
+            structure_version: node.subtree_structure_version(),
+        },
     );
     let viewport = size_of(visible_viewport_rect(node));
     let max_x = (next.width - viewport.width).max(0.0);
@@ -446,7 +474,12 @@ fn publish_scroll_range(motion: &ScrollAnimator, node: &Node) -> bool {
     true
 }
 
-fn scrollbar_geometry(node: &Node, axes: ScrollAxis, thickness: f32, inset: f32) -> ScrollbarGeometry {
+fn scrollbar_geometry(
+    node: &Node,
+    axes: ScrollAxis,
+    thickness: f32,
+    inset: f32,
+) -> ScrollbarGeometry {
     let viewport = visible_viewport_rect(node);
     let content = cached_scrollable_content_size(node);
     let max_x = (content.width - viewport.width).max(0.0);
@@ -472,8 +505,8 @@ fn scrollbar_geometry(node: &Node, axes: ScrollAxis, thickness: f32, inset: f32)
             (viewport.height - 2.0 * inset).max(0.0),
         );
         let shrink = thumb_shrink(offset.y, max_y, viewport.height);
-        let thumb_height =
-            thickness.max((thickness * 2.0).max(track.height * (viewport.height / content.height)) * shrink);
+        let thumb_height = thickness
+            .max((thickness * 2.0).max(track.height * (viewport.height / content.height)) * shrink);
         let fraction = thumb_fraction(offset.y, max_y);
         result.vertical_track = Some(track);
         result.vertical_thumb = Some(Rect::new(
@@ -495,8 +528,8 @@ fn scrollbar_geometry(node: &Node, axes: ScrollAxis, thickness: f32, inset: f32)
             thickness,
         );
         let shrink = thumb_shrink(offset.x, max_x, viewport.width);
-        let thumb_width =
-            thickness.max((thickness * 2.0).max(track.width * (viewport.width / content.width)) * shrink);
+        let thumb_width = thickness
+            .max((thickness * 2.0).max(track.width * (viewport.width / content.width)) * shrink);
         let fraction = thumb_fraction(offset.x, max_x);
         result.horizontal_track = Some(track);
         result.horizontal_thumb = Some(Rect::new(
@@ -525,17 +558,26 @@ fn track_length(axis: DragAxis, track: Rect) -> f32 {
 
 fn expanded_hit_track(axis: DragAxis, track: Rect, hit_slop: f32) -> Rect {
     match axis {
-        DragAxis::Vertical => {
-            Rect::new(track.x - hit_slop, track.y, track.width + 2.0 * hit_slop, track.height)
-        }
-        DragAxis::Horizontal => {
-            Rect::new(track.x, track.y - hit_slop, track.width, track.height + 2.0 * hit_slop)
-        }
+        DragAxis::Vertical => Rect::new(
+            track.x - hit_slop,
+            track.y,
+            track.width + 2.0 * hit_slop,
+            track.height,
+        ),
+        DragAxis::Horizontal => Rect::new(
+            track.x,
+            track.y - hit_slop,
+            track.width,
+            track.height + 2.0 * hit_slop,
+        ),
     }
 }
 
 fn contains(rect: Rect, point: Point) -> bool {
-    point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height
+    point.x >= rect.x
+        && point.x <= rect.x + rect.width
+        && point.y >= rect.y
+        && point.y <= rect.y + rect.height
 }
 
 fn begin_scrollbar_drag(
@@ -547,12 +589,18 @@ fn begin_scrollbar_drag(
     motion: &ScrollAnimator,
 ) -> Option<ScrollbarDragState> {
     let (track, thumb, max_offset, pointer) = match axis {
-        DragAxis::Vertical => {
-            (geometry.vertical_track?, geometry.vertical_thumb?, geometry.max_offset_y, local.y)
-        }
-        DragAxis::Horizontal => {
-            (geometry.horizontal_track?, geometry.horizontal_thumb?, geometry.max_offset_x, local.x)
-        }
+        DragAxis::Vertical => (
+            geometry.vertical_track?,
+            geometry.vertical_thumb?,
+            geometry.max_offset_y,
+            local.y,
+        ),
+        DragAxis::Horizontal => (
+            geometry.horizontal_track?,
+            geometry.horizontal_thumb?,
+            geometry.max_offset_x,
+            local.x,
+        ),
     };
     if max_offset <= 0.0 {
         return None;
@@ -598,7 +646,9 @@ fn set_scrollbar_chrome_visible(node: &Node, visible: bool) {
     node.animatable_set_with(CHROME_OPACITY, current, target, move |opacity| {
         if let Some(owner) = Node::upgrade(&weak) {
             owner.set_attachment(CHROME_OPACITY, opacity);
-            owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("scrollbarChromeOpacity"));
+            owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                "scrollbarChromeOpacity",
+            ));
         }
     });
 }
@@ -611,7 +661,9 @@ fn flash_touch_indicator(node: &Node) {
     let apply = move |opacity: f32| {
         if let Some(owner) = Node::upgrade(&weak) {
             owner.set_attachment(CHROME_OPACITY, opacity);
-            owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("scrollbarChromeOpacity"));
+            owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                "scrollbarChromeOpacity",
+            ));
         }
     };
     let current = node.attachment::<f32>(CHROME_OPACITY).unwrap_or(0.0);
@@ -620,12 +672,19 @@ fn flash_touch_indicator(node: &Node) {
         return;
     }
     let weak = node.downgrade();
-    node.animatable_set_with("__scrollview.chromeFade", 1.0_f32, 0.0_f32, move |opacity| {
-        if let Some(owner) = Node::upgrade(&weak) {
-            owner.set_attachment(CHROME_OPACITY, opacity);
-            owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("scrollbarChromeOpacity"));
-        }
-    });
+    node.animatable_set_with(
+        "__scrollview.chromeFade",
+        1.0_f32,
+        0.0_f32,
+        move |opacity| {
+            if let Some(owner) = Node::upgrade(&weak) {
+                owner.set_attachment(CHROME_OPACITY, opacity);
+                owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                    "scrollbarChromeOpacity",
+                ));
+            }
+        },
+    );
 }
 
 fn motion_animator(node: &Node, physics: ScrollPhysics) -> Rc<ScrollAnimator> {
@@ -640,7 +699,9 @@ fn motion_animator(node: &Node, physics: ScrollPhysics) -> Rc<ScrollAnimator> {
         Size::default(),
         node.content_offset(),
         Some(Rc::new(move |offset: Point| {
-            let Some(owner) = Node::upgrade(&weak) else { return };
+            let Some(owner) = Node::upgrade(&weak) else {
+                return;
+            };
             if owner.content_offset() != offset
                 && owner.attachment::<bool>(TOUCH_INDICATOR) == Some(true)
             {
@@ -653,7 +714,9 @@ fn motion_animator(node: &Node, physics: ScrollPhysics) -> Rc<ScrollAnimator> {
         })),
     );
     node.set_attachment(MOTION, animator.clone());
-    let lifetime: Rc<dyn NodeResource> = Rc::new(ScrollMotionLifetime { animator: animator.clone() });
+    let lifetime: Rc<dyn NodeResource> = Rc::new(ScrollMotionLifetime {
+        animator: animator.clone(),
+    });
     node.add_resource(lifetime);
     animator
 }
@@ -707,11 +770,18 @@ fn update_anchor(node: &Node, motion: &ScrollAnimator, axes: ScrollAxis) {
             visible.push(anchor);
         }
     }
-    let mut fully_visible: Vec<&Node> = visible.iter().copied().filter(|anchor| relative(anchor).y >= 0.0).collect();
+    let mut fully_visible: Vec<&Node> = visible
+        .iter()
+        .copied()
+        .filter(|anchor| relative(anchor).y >= 0.0)
+        .collect();
     fully_visible.sort_by(|lhs, rhs| relative(lhs).y.total_cmp(&relative(rhs).y));
     let selected: &Node = if let Some(first) = fully_visible.first() {
         first
-    } else if let Some(last) = visible.iter().max_by(|lhs, rhs| relative(lhs).y.total_cmp(&relative(rhs).y)) {
+    } else if let Some(last) = visible
+        .iter()
+        .max_by(|lhs, rhs| relative(lhs).y.total_cmp(&relative(rhs).y))
+    {
         last
     } else {
         &anchors[0]
@@ -720,10 +790,15 @@ fn update_anchor(node: &Node, motion: &ScrollAnimator, axes: ScrollAxis) {
     let mut baseline = relative(selected);
     if let Some(previous) = node.attachment::<AnchorState>(ANCHOR_STATE)
         && previous.content_size != content
-        && let Some(old) = anchors.iter().find(|anchor| node_identity(anchor) == previous.node_id)
+        && let Some(old) = anchors
+            .iter()
+            .find(|anchor| node_identity(anchor) == previous.node_id)
     {
         let current = relative(old);
-        let delta = Point::new(current.x - previous.relative.x, current.y - previous.relative.y);
+        let delta = Point::new(
+            current.x - previous.relative.x,
+            current.y - previous.relative.y,
+        );
         let mut offset = node.content_offset();
         if axes != ScrollAxis::Vertical {
             offset.x += delta.x;
@@ -736,7 +811,11 @@ fn update_anchor(node: &Node, motion: &ScrollAnimator, axes: ScrollAxis) {
     }
     node.set_attachment(
         ANCHOR_STATE,
-        AnchorState { node_id: node_identity(selected), relative: baseline, content_size: content },
+        AnchorState {
+            node_id: node_identity(selected),
+            relative: baseline,
+            content_size: content,
+        },
     );
 }
 
@@ -764,15 +843,27 @@ fn update_accessibility(node: &Node, view: &ScrollViewObservers) {
         return;
     }
     let offset = node.content_offset();
-    let x = if max_x > 0.0 { ((offset.x / max_x * 100.0).round() as i64).clamp(0, 100) } else { 0 };
-    let y = if max_y > 0.0 { ((offset.y / max_y * 100.0).round() as i64).clamp(0, 100) } else { 0 };
+    let x = if max_x > 0.0 {
+        ((offset.x / max_x * 100.0).round() as i64).clamp(0, 100)
+    } else {
+        0
+    };
+    let y = if max_y > 0.0 {
+        ((offset.y / max_y * 100.0).round() as i64).clamp(0, 100)
+    } else {
+        0
+    };
     let value = match view.axes {
         ScrollAxis::Vertical => format!("{y}%"),
         ScrollAxis::Horizontal => format!("{x}%"),
         ScrollAxis::Both => format!("Horizontal {x}%, vertical {y}%"),
     };
     let label = view.accessibility_label.clone().unwrap_or_else(|| {
-        if view.combines_accessibility { String::new() } else { "Scrollable content".to_string() }
+        if view.combines_accessibility {
+            String::new()
+        } else {
+            "Scrollable content".to_string()
+        }
     });
     node.set_accessibility(Some(AccessibilitySemantics {
         role: AccessibilityRole::ScrollArea,
@@ -785,11 +876,21 @@ fn update_accessibility(node: &Node, view: &ScrollViewObservers) {
 }
 
 fn page_scroll(node: &Node, axes: ScrollAxis, forward: bool) {
-    let Some(motion) = node.attachment::<Rc<ScrollAnimator>>(MOTION) else { return };
+    let Some(motion) = node.attachment::<Rc<ScrollAnimator>>(MOTION) else {
+        return;
+    };
     let viewport = visible_viewport_rect(node);
     let sign = if forward { 1.0 } else { -1.0 };
-    let dx = if axes == ScrollAxis::Vertical { 0.0 } else { (viewport.width - 40.0).max(40.0) * sign };
-    let dy = if axes == ScrollAxis::Horizontal { 0.0 } else { (viewport.height - 40.0).max(40.0) * sign };
+    let dx = if axes == ScrollAxis::Vertical {
+        0.0
+    } else {
+        (viewport.width - 40.0).max(40.0) * sign
+    };
+    let dy = if axes == ScrollAxis::Horizontal {
+        0.0
+    } else {
+        (viewport.height - 40.0).max(40.0) * sign
+    };
     motion.scroll_directly(Point::new(dx, dy));
 }
 
@@ -821,7 +922,12 @@ fn local_point(node: &Node, x: f32, y: f32) -> Point {
     node.convert_from_window(Point::new(x, y))
 }
 
-fn scroll_to_request(node: &Node, motion: &ScrollAnimator, request: &ScrollRequest, axes: ScrollAxis) {
+fn scroll_to_request(
+    node: &Node,
+    motion: &ScrollAnimator,
+    request: &ScrollRequest,
+    axes: ScrollAxis,
+) {
     let maximum = motion.maximum_offset();
     let mut target = Point::new(
         request.offset.x.clamp(0.0, maximum.x),
@@ -840,7 +946,13 @@ fn scroll_to_request(node: &Node, motion: &ScrollAnimator, request: &ScrollReque
     }
 }
 
-fn install_interaction(node: &Node, view: &ScrollViewObservers, wheel_step: f32, consume_policy: ScrollConsumePolicy, gutter: ScrollbarGutter) {
+fn install_interaction(
+    node: &Node,
+    view: &ScrollViewObservers,
+    wheel_step: f32,
+    consume_policy: ScrollConsumePolicy,
+    gutter: ScrollbarGutter,
+) {
     let axes = view.axes;
     let touch_indicator = !crate::primitives::controls::adaptive::supports_control_hover(node);
     node.set_attachment(TOUCH_INDICATOR, touch_indicator);
@@ -850,8 +962,22 @@ fn install_interaction(node: &Node, view: &ScrollViewObservers, wheel_step: f32,
         } else {
             0.0
         };
-        layout.set_padding(if axes != ScrollAxis::Horizontal { lane } else { 0.0 }, cove_core::scene::Edge::End);
-        layout.set_padding(if axes != ScrollAxis::Vertical { lane } else { 0.0 }, cove_core::scene::Edge::Bottom);
+        layout.set_padding(
+            if axes != ScrollAxis::Horizontal {
+                lane
+            } else {
+                0.0
+            },
+            cove_core::scene::Edge::End,
+        );
+        layout.set_padding(
+            if axes != ScrollAxis::Vertical {
+                lane
+            } else {
+                0.0
+            },
+            cove_core::scene::Edge::Bottom,
+        );
     }
     let track_thickness = if touch_indicator { 3.0 } else { 8.0 };
     let track_inset = if touch_indicator { 3.0 } else { 2.0 };
@@ -870,10 +996,14 @@ fn install_interaction(node: &Node, view: &ScrollViewObservers, wheel_step: f32,
         motion.adopt(node.content_offset());
     }
     if let Some(request) = node.attachment::<ScrollRequest>(TIMED_REQUEST) {
-        if motion.maximum_offset() == Point::default() && (request.offset.x != 0.0 || request.offset.y != 0.0) {
+        if motion.maximum_offset() == Point::default()
+            && (request.offset.x != 0.0 || request.offset.y != 0.0)
+        {
             // Content is not measured yet; keep the request for the first
             // layout pass instead of clamping it to zero.
-            node.mark_dirty(cove_core::scene::InvalidationSource::style_set("scrollView.request"));
+            node.mark_dirty(cove_core::scene::InvalidationSource::style_set(
+                "scrollView.request",
+            ));
         } else {
             node.remove_attachment(TIMED_REQUEST);
             scroll_to_request(node, &motion, &request, axes);
@@ -884,8 +1014,12 @@ fn install_interaction(node: &Node, view: &ScrollViewObservers, wheel_step: f32,
 
     let reveal_node = node.downgrade();
     node.set_scroll_reveal(Some(Rc::new(move |target: Rect| {
-        let Some(owner) = Node::upgrade(&reveal_node) else { return };
-        let Some(motion) = owner.attachment::<Rc<ScrollAnimator>>(MOTION) else { return };
+        let Some(owner) = Node::upgrade(&reveal_node) else {
+            return;
+        };
+        let Some(motion) = owner.attachment::<Rc<ScrollAnimator>>(MOTION) else {
+            return;
+        };
         let previous = owner.content_offset();
         refresh_scrollable_content_size(&owner);
         publish_scroll_range(&motion, &owner);
@@ -909,12 +1043,18 @@ fn install_interaction(node: &Node, view: &ScrollViewObservers, wheel_step: f32,
         let mut offset = current;
         if axes != ScrollAxis::Vertical {
             offset.x += crate::primitives::layout::ScrollReveal::delta(
-                target.x, target.x + target.width, viewport.x, viewport.x + viewport.width,
+                target.x,
+                target.x + target.width,
+                viewport.x,
+                viewport.x + viewport.width,
             );
         }
         if axes != ScrollAxis::Horizontal {
             offset.y += crate::primitives::layout::ScrollReveal::delta(
-                target.y, target.y + target.height, viewport.y, viewport.y + viewport.height,
+                target.y,
+                target.y + target.height,
+                viewport.y,
+                viewport.y + viewport.height,
             );
         }
         motion.adopt(offset);
@@ -984,300 +1124,389 @@ fn install_interaction(node: &Node, view: &ScrollViewObservers, wheel_step: f32,
         return;
     }
 
-    let Some(registry) = InteractionRegistryHolder::current() else { return };
+    let Some(registry) = InteractionRegistryHolder::current() else {
+        return;
+    };
 
     let hover_node = node.downgrade();
     let hover_axes = axes;
-    registry.set_hover(node, Rc::new(move |phase| {
-        let Some(owner) = Node::upgrade(&hover_node) else { return };
-        match phase {
-            HoverPhase::Enter => {
-                owner.set_attachment(IS_HOVERED, true);
-                if touch_indicator {
-                    return;
+    registry.set_hover(
+        node,
+        Rc::new(move |phase| {
+            let Some(owner) = Node::upgrade(&hover_node) else {
+                return;
+            };
+            match phase {
+                HoverPhase::Enter => {
+                    owner.set_attachment(IS_HOVERED, true);
+                    if touch_indicator {
+                        return;
+                    }
+                    set_scrollbar_chrome_visible(&owner, true);
                 }
-                set_scrollbar_chrome_visible(&owner, true);
+                HoverPhase::Leave => {
+                    owner.set_attachment(IS_HOVERED, false);
+                    let is_dragging = owner.attachment::<ScrollbarDragState>(DRAG_STATE).is_some();
+                    set_scrollbar_chrome_visible(&owner, is_dragging);
+                }
             }
-            HoverPhase::Leave => {
-                owner.set_attachment(IS_HOVERED, false);
-                let is_dragging = owner.attachment::<ScrollbarDragState>(DRAG_STATE).is_some();
-                set_scrollbar_chrome_visible(&owner, is_dragging);
-            }
-        }
-        let _ = hover_axes;
-    }));
+            let _ = hover_axes;
+        }),
+    );
 
     let wheel_node = node.downgrade();
     let wheel_observers = view.clone_for_report();
-    registry.set_wheel(node, InputHandlerRoute::scroll(), Rc::new(move |event: &MouseWheelEvent, _phase| {
-        let Some(owner) = Node::upgrade(&wheel_node) else { return EventResult::Ignored };
-        if !event.input.is_continuation()
-            && let (Some(mouse_x), Some(mouse_y)) = (event.mouse_x, event.mouse_y)
-        {
-            let local = local_point(&owner, mouse_x, mouse_y);
-            if !contains(visible_viewport_rect(&owner), local) {
+    registry.set_wheel(
+        node,
+        InputHandlerRoute::scroll(),
+        Rc::new(move |event: &MouseWheelEvent, _phase| {
+            let Some(owner) = Node::upgrade(&wheel_node) else {
                 return EventResult::Ignored;
-            }
-        }
-        let viewport = visible_viewport_rect(&owner);
-        let (delta_x, delta_y) = event.displacement(wheel_step, viewport.width, viewport.height);
-        let mut dx = if wheel_observers.axes != ScrollAxis::Vertical { -delta_x } else { 0.0 };
-        let mut dy = if wheel_observers.axes != ScrollAxis::Horizontal { -delta_y } else { 0.0 };
-        let previous = owner.content_offset();
-        let Some(motion) = owner.attachment::<Rc<ScrollAnimator>>(MOTION) else {
-            return consume_policy.result(false, false);
-        };
-        // Nothing measured yet — keep letting the event bubble.
-        if !publish_scroll_range(&motion, &owner) {
-            return consume_policy.result(false, false);
-        }
-        let maximum = motion.maximum_offset();
-        let horizontal_overflow = wheel_observers.axes != ScrollAxis::Vertical && maximum.x > 0.0;
-        let vertical_overflow = wheel_observers.axes != ScrollAxis::Horizontal && maximum.y > 0.0;
-        if dx == 0.0 && dy == 0.0 {
-            if event.input.phase != cove_platform::ScrollPhase::None
-                || event.input.momentum_phase != cove_platform::ScrollPhase::None
+            };
+            if !event.input.is_continuation()
+                && let (Some(mouse_x), Some(mouse_y)) = (event.mouse_x, event.mouse_y)
             {
-                motion.scroll_directly(Point::default());
-            }
-            // Zero-delta lifecycle packets cannot identify an axis. An existing
-            // phased stream already retains its owner.
-            return consume_policy.result(false, false);
-        }
-        // Overflow owns the input at either bound. An empty axis still passes
-        // through, so a horizontal child does not trap a vertical parent's input.
-        if !horizontal_overflow {
-            dx = 0.0;
-        }
-        if !vertical_overflow {
-            dy = 0.0;
-        }
-        if dx == 0.0 && dy == 0.0 {
-            return consume_policy.result(false, false);
-        }
-        // Precise input already contains the OS's acceleration and momentum.
-        // Line wheels are discrete placements. Neither may infer another fling
-        // or start a spring between input packets.
-        motion.adopt(previous);
-        let next = motion.scroll_directly(Point::new(dx, dy));
-        consume_policy.result(next != previous, true)
-    }));
-
-    let key_node = node.downgrade();
-    let key_axes = axes;
-    registry.set_key(node, InputHandlerRoute::scroll(), Rc::new(move |event: &KeyEvent, phase| {
-        if phase != EventPhase::Target {
-            return EventResult::Ignored;
-        }
-        let Some(owner) = Node::upgrade(&key_node) else { return EventResult::Ignored };
-        let Some(motion) = owner.attachment::<Rc<ScrollAnimator>>(MOTION) else {
-            return EventResult::Ignored;
-        };
-        if !publish_scroll_range(&motion, &owner) {
-            return EventResult::Ignored;
-        }
-        let viewport = visible_viewport_rect(&owner);
-        let line = 40.0_f32;
-        let page = (viewport.height * 0.9).max(line);
-        let mut dx = 0.0_f32;
-        let mut dy = 0.0_f32;
-        match event.scancode {
-            crate::Scancode::ARROW_UP => dy = -line,
-            crate::Scancode::ARROW_DOWN => dy = line,
-            crate::Scancode::ARROW_LEFT => dx = -line,
-            crate::Scancode::ARROW_RIGHT => dx = line,
-            crate::Scancode::PAGE_UP => dy = -page,
-            crate::Scancode::PAGE_DOWN => dy = page,
-            crate::Scancode::HOME => {
-                dx = -motion.offset().x;
-                dy = -motion.offset().y;
-            }
-            crate::Scancode::END => {
-                let maximum = motion.maximum_offset();
-                dx = maximum.x - motion.offset().x;
-                dy = maximum.y - motion.offset().y;
-            }
-            _ => return EventResult::Ignored,
-        }
-        if key_axes == ScrollAxis::Vertical {
-            dx = 0.0;
-        }
-        if key_axes == ScrollAxis::Horizontal {
-            dy = 0.0;
-        }
-        if dx == 0.0 && dy == 0.0 {
-            return EventResult::Ignored;
-        }
-        let previous = motion.offset();
-        motion.stop_coasting();
-        let next = motion.scroll_directly(Point::new(dx, dy));
-        if next != previous { EventResult::Handled } else { EventResult::Ignored }
-    }));
-
-    let pointer_node = node.downgrade();
-    let pointer_axes = axes;
-    registry.set_pointer(node, InputHandlerRoute::scroll_chrome(), Rc::new(move |event, pointer_phase, event_phase| {
-        let Some(owner) = Node::upgrade(&pointer_node) else { return EventResult::Ignored };
-        match pointer_phase {
-            PointerPhase::Down => {
-                if event.button != MouseButton::Left {
-                    return EventResult::Ignored;
-                }
-                let local = local_point(&owner, event.x, event.y);
-                // Chrome routes are global. Its expanded hit lane must remain
-                // inside this viewport and every ancestor clip.
+                let local = local_point(&owner, mouse_x, mouse_y);
                 if !contains(visible_viewport_rect(&owner), local) {
                     return EventResult::Ignored;
                 }
-                // Pressing anywhere inside the container grabs content that is
-                // still coasting — the same "touch to stop" every scrollable
-                // surface has. Never consumes the event, so a press that was
-                // meant for a child still reaches it.
-                let Some(motion) = owner.attachment::<Rc<ScrollAnimator>>(MOTION) else {
-                    return EventResult::Ignored;
-                };
-                motion.stop_coasting();
-                if event_phase != EventPhase::Capture && event_phase != EventPhase::Target {
-                    return EventResult::Ignored;
-                }
-                let geometry = scrollbar_geometry(&owner, pointer_axes, track_thickness, track_inset);
-                if !touch_indicator
-                    && let Some(state) = begin_scrollbar_drag(
-                        &owner, DragAxis::Vertical, local, &geometry, track_hit_slop, &motion,
-                    )
+            }
+            let viewport = visible_viewport_rect(&owner);
+            let (delta_x, delta_y) =
+                event.displacement(wheel_step, viewport.width, viewport.height);
+            let mut dx = if wheel_observers.axes != ScrollAxis::Vertical {
+                -delta_x
+            } else {
+                0.0
+            };
+            let mut dy = if wheel_observers.axes != ScrollAxis::Horizontal {
+                -delta_y
+            } else {
+                0.0
+            };
+            let previous = owner.content_offset();
+            let Some(motion) = owner.attachment::<Rc<ScrollAnimator>>(MOTION) else {
+                return consume_policy.result(false, false);
+            };
+            // Nothing measured yet — keep letting the event bubble.
+            if !publish_scroll_range(&motion, &owner) {
+                return consume_policy.result(false, false);
+            }
+            let maximum = motion.maximum_offset();
+            let horizontal_overflow =
+                wheel_observers.axes != ScrollAxis::Vertical && maximum.x > 0.0;
+            let vertical_overflow =
+                wheel_observers.axes != ScrollAxis::Horizontal && maximum.y > 0.0;
+            if dx == 0.0 && dy == 0.0 {
+                if event.input.phase != cove_platform::ScrollPhase::None
+                    || event.input.momentum_phase != cove_platform::ScrollPhase::None
                 {
-                    owner.set_attachment(DRAG_STATE, state);
-                    if let Some(capture) = PointerCaptureHolder::current() {
-                        capture.acquire(&owner, true);
-                    }
-                    set_scrollbar_chrome_visible(&owner, true);
-                    return EventResult::Handled;
+                    motion.scroll_directly(Point::default());
                 }
-                if !touch_indicator
-                    && let Some(state) = begin_scrollbar_drag(
-                        &owner, DragAxis::Horizontal, local, &geometry, track_hit_slop, &motion,
-                    )
-                {
-                    owner.set_attachment(DRAG_STATE, state);
-                    if let Some(capture) = PointerCaptureHolder::current() {
-                        capture.acquire(&owner, true);
-                    }
-                    set_scrollbar_chrome_visible(&owner, true);
-                    return EventResult::Handled;
+                // Zero-delta lifecycle packets cannot identify an axis. An existing
+                // phased stream already retains its owner.
+                return consume_policy.result(false, false);
+            }
+            // Overflow owns the input at either bound. An empty axis still passes
+            // through, so a horizontal child does not trap a vertical parent's input.
+            if !horizontal_overflow {
+                dx = 0.0;
+            }
+            if !vertical_overflow {
+                dy = 0.0;
+            }
+            if dx == 0.0 && dy == 0.0 {
+                return consume_policy.result(false, false);
+            }
+            // Precise input already contains the OS's acceleration and momentum.
+            // Line wheels are discrete placements. Neither may infer another fling
+            // or start a spring between input packets.
+            motion.adopt(previous);
+            let next = motion.scroll_directly(Point::new(dx, dy));
+            consume_policy.result(next != previous, true)
+        }),
+    );
+
+    let key_node = node.downgrade();
+    let key_axes = axes;
+    registry.set_key(
+        node,
+        InputHandlerRoute::scroll(),
+        Rc::new(move |event: &KeyEvent, phase| {
+            if phase != EventPhase::Target {
+                return EventResult::Ignored;
+            }
+            let Some(owner) = Node::upgrade(&key_node) else {
+                return EventResult::Ignored;
+            };
+            let Some(motion) = owner.attachment::<Rc<ScrollAnimator>>(MOTION) else {
+                return EventResult::Ignored;
+            };
+            if !publish_scroll_range(&motion, &owner) {
+                return EventResult::Ignored;
+            }
+            let viewport = visible_viewport_rect(&owner);
+            let line = 40.0_f32;
+            let page = (viewport.height * 0.9).max(line);
+            let mut dx = 0.0_f32;
+            let mut dy = 0.0_f32;
+            match event.scancode {
+                crate::Scancode::ARROW_UP => dy = -line,
+                crate::Scancode::ARROW_DOWN => dy = line,
+                crate::Scancode::ARROW_LEFT => dx = -line,
+                crate::Scancode::ARROW_RIGHT => dx = line,
+                crate::Scancode::PAGE_UP => dy = -page,
+                crate::Scancode::PAGE_DOWN => dy = page,
+                crate::Scancode::HOME => {
+                    dx = -motion.offset().x;
+                    dy = -motion.offset().y;
                 }
-                if supports_touch_drag {
-                    owner.set_attachment(
-                        CONTENT_DRAG_STATE,
-                        ContentDragState { start: local, offset_start: owner.content_offset(), dragged: false },
-                    );
+                crate::Scancode::END => {
+                    let maximum = motion.maximum_offset();
+                    dx = maximum.x - motion.offset().x;
+                    dy = maximum.y - motion.offset().y;
                 }
+                _ => return EventResult::Ignored,
+            }
+            if key_axes == ScrollAxis::Vertical {
+                dx = 0.0;
+            }
+            if key_axes == ScrollAxis::Horizontal {
+                dy = 0.0;
+            }
+            if dx == 0.0 && dy == 0.0 {
+                return EventResult::Ignored;
+            }
+            let previous = motion.offset();
+            motion.stop_coasting();
+            let next = motion.scroll_directly(Point::new(dx, dy));
+            if next != previous {
+                EventResult::Handled
+            } else {
                 EventResult::Ignored
             }
-            PointerPhase::Up => {
-                if owner.attachment::<ScrollbarDragState>(DRAG_STATE).is_some() {
-                    owner.remove_attachment(DRAG_STATE);
-                    if let Some(capture) = PointerCaptureHolder::current() {
-                        capture.release();
-                    }
-                    // A thumb release preserves its absolute placement.
-                    if let Some(motion) = owner.attachment::<Rc<ScrollAnimator>>(MOTION) {
-                        motion.finish_immediately();
-                    }
-                    let is_hovered = owner.attachment::<bool>(IS_HOVERED).unwrap_or(false);
-                    set_scrollbar_chrome_visible(&owner, is_hovered);
-                    return EventResult::Handled;
-                }
-                if let Some(state) = owner.attachment::<ContentDragState>(CONTENT_DRAG_STATE) {
-                    owner.remove_attachment(CONTENT_DRAG_STATE);
-                    if !state.dragged {
+        }),
+    );
+
+    let pointer_node = node.downgrade();
+    let pointer_axes = axes;
+    registry.set_pointer(
+        node,
+        InputHandlerRoute::scroll_chrome(),
+        Rc::new(move |event, pointer_phase, event_phase| {
+            let Some(owner) = Node::upgrade(&pointer_node) else {
+                return EventResult::Ignored;
+            };
+            match pointer_phase {
+                PointerPhase::Down => {
+                    if event.button != MouseButton::Left {
                         return EventResult::Ignored;
                     }
-                    if let Some(capture) = PointerCaptureHolder::current() {
-                        capture.release();
+                    let local = local_point(&owner, event.x, event.y);
+                    // Chrome routes are global. Its expanded hit lane must remain
+                    // inside this viewport and every ancestor clip.
+                    if !contains(visible_viewport_rect(&owner), local) {
+                        return EventResult::Ignored;
                     }
-                    if let Some(motion) = owner.attachment::<Rc<ScrollAnimator>>(MOTION) {
-                        motion.settle();
+                    // Pressing anywhere inside the container grabs content that is
+                    // still coasting — the same "touch to stop" every scrollable
+                    // surface has. Never consumes the event, so a press that was
+                    // meant for a child still reaches it.
+                    let Some(motion) = owner.attachment::<Rc<ScrollAnimator>>(MOTION) else {
+                        return EventResult::Ignored;
+                    };
+                    motion.stop_coasting();
+                    if event_phase != EventPhase::Capture && event_phase != EventPhase::Target {
+                        return EventResult::Ignored;
                     }
-                    return EventResult::Handled;
+                    let geometry =
+                        scrollbar_geometry(&owner, pointer_axes, track_thickness, track_inset);
+                    if !touch_indicator
+                        && let Some(state) = begin_scrollbar_drag(
+                            &owner,
+                            DragAxis::Vertical,
+                            local,
+                            &geometry,
+                            track_hit_slop,
+                            &motion,
+                        )
+                    {
+                        owner.set_attachment(DRAG_STATE, state);
+                        if let Some(capture) = PointerCaptureHolder::current() {
+                            capture.acquire(&owner, true);
+                        }
+                        set_scrollbar_chrome_visible(&owner, true);
+                        return EventResult::Handled;
+                    }
+                    if !touch_indicator
+                        && let Some(state) = begin_scrollbar_drag(
+                            &owner,
+                            DragAxis::Horizontal,
+                            local,
+                            &geometry,
+                            track_hit_slop,
+                            &motion,
+                        )
+                    {
+                        owner.set_attachment(DRAG_STATE, state);
+                        if let Some(capture) = PointerCaptureHolder::current() {
+                            capture.acquire(&owner, true);
+                        }
+                        set_scrollbar_chrome_visible(&owner, true);
+                        return EventResult::Handled;
+                    }
+                    if supports_touch_drag {
+                        owner.set_attachment(
+                            CONTENT_DRAG_STATE,
+                            ContentDragState {
+                                start: local,
+                                offset_start: owner.content_offset(),
+                                dragged: false,
+                            },
+                        );
+                    }
+                    EventResult::Ignored
                 }
-                EventResult::Ignored
+                PointerPhase::Up => {
+                    if owner.attachment::<ScrollbarDragState>(DRAG_STATE).is_some() {
+                        owner.remove_attachment(DRAG_STATE);
+                        if let Some(capture) = PointerCaptureHolder::current() {
+                            capture.release();
+                        }
+                        // A thumb release preserves its absolute placement.
+                        if let Some(motion) = owner.attachment::<Rc<ScrollAnimator>>(MOTION) {
+                            motion.finish_immediately();
+                        }
+                        let is_hovered = owner.attachment::<bool>(IS_HOVERED).unwrap_or(false);
+                        set_scrollbar_chrome_visible(&owner, is_hovered);
+                        return EventResult::Handled;
+                    }
+                    if let Some(state) = owner.attachment::<ContentDragState>(CONTENT_DRAG_STATE) {
+                        owner.remove_attachment(CONTENT_DRAG_STATE);
+                        if !state.dragged {
+                            return EventResult::Ignored;
+                        }
+                        if let Some(capture) = PointerCaptureHolder::current() {
+                            capture.release();
+                        }
+                        if let Some(motion) = owner.attachment::<Rc<ScrollAnimator>>(MOTION) {
+                            motion.settle();
+                        }
+                        return EventResult::Handled;
+                    }
+                    EventResult::Ignored
+                }
             }
-        }
-    }));
+        }),
+    );
 
     let motion_node = node.downgrade();
     let motion_axes = axes;
-    registry.set_motion(node, InputHandlerRoute::scroll_chrome(), Rc::new(move |event, phase| {
-        let Some(owner) = Node::upgrade(&motion_node) else { return EventResult::Ignored };
-        // Let the deepest content gesture claim a touch drag first. Ancestors
-        // also observed the down event; handling capture here would steal
-        // nested scrolling, swipes and refreshes.
-        if phase == EventPhase::Capture && owner.attachment::<ScrollbarDragState>(DRAG_STATE).is_none() {
-            return EventResult::Ignored;
-        }
-        if let Some(state) = owner.attachment::<ContentDragState>(CONTENT_DRAG_STATE) {
+    registry.set_motion(
+        node,
+        InputHandlerRoute::scroll_chrome(),
+        Rc::new(move |event, phase| {
+            let Some(owner) = Node::upgrade(&motion_node) else {
+                return EventResult::Ignored;
+            };
+            // Let the deepest content gesture claim a touch drag first. Ancestors
+            // also observed the down event; handling capture here would steal
+            // nested scrolling, swipes and refreshes.
+            if phase == EventPhase::Capture
+                && owner.attachment::<ScrollbarDragState>(DRAG_STATE).is_none()
+            {
+                return EventResult::Ignored;
+            }
+            if let Some(state) = owner.attachment::<ContentDragState>(CONTENT_DRAG_STATE) {
+                let local = local_point(&owner, event.x, event.y);
+                let dx = local.x - state.start.x;
+                let dy = local.y - state.start.y;
+                if !state.dragged {
+                    let along = match motion_axes {
+                        ScrollAxis::Horizontal => dx.abs(),
+                        ScrollAxis::Vertical => dy.abs(),
+                        ScrollAxis::Both => dx.abs().max(dy.abs()),
+                    };
+                    let across = match motion_axes {
+                        ScrollAxis::Horizontal => dy.abs(),
+                        ScrollAxis::Vertical => dx.abs(),
+                        ScrollAxis::Both => 0.0,
+                    };
+                    if along < 4.0 || along < across {
+                        return EventResult::Ignored;
+                    }
+                }
+                let mut next_state = ContentDragState {
+                    start: state.start,
+                    offset_start: state.offset_start,
+                    dragged: state.dragged,
+                };
+                if !next_state.dragged {
+                    next_state.dragged = true;
+                    if let Some(capture) = PointerCaptureHolder::current() {
+                        capture.acquire(&owner, true);
+                    }
+                }
+                owner.set_attachment(CONTENT_DRAG_STATE, next_state);
+                if let Some(motion) = owner.attachment::<Rc<ScrollAnimator>>(MOTION) {
+                    motion.move_to(Point::new(
+                        if motion_axes == ScrollAxis::Vertical {
+                            state.offset_start.x
+                        } else {
+                            state.offset_start.x - dx
+                        },
+                        if motion_axes == ScrollAxis::Horizontal {
+                            state.offset_start.y
+                        } else {
+                            state.offset_start.y - dy
+                        },
+                    ));
+                }
+                return EventResult::Handled;
+            }
+            let Some(state) = owner.attachment::<ScrollbarDragState>(DRAG_STATE) else {
+                return EventResult::Ignored;
+            };
+            let Some(motion) = owner.attachment::<Rc<ScrollAnimator>>(MOTION) else {
+                return EventResult::Handled;
+            };
+            if !publish_scroll_range(&motion, &owner) {
+                return EventResult::Handled;
+            }
+            motion.adopt(owner.content_offset());
             let local = local_point(&owner, event.x, event.y);
-            let dx = local.x - state.start.x;
-            let dy = local.y - state.start.y;
-            if !state.dragged {
-                let along = match motion_axes {
-                    ScrollAxis::Horizontal => dx.abs(),
-                    ScrollAxis::Vertical => dy.abs(),
-                    ScrollAxis::Both => dx.abs().max(dy.abs()),
-                };
-                let across = match motion_axes {
-                    ScrollAxis::Horizontal => dy.abs(),
-                    ScrollAxis::Vertical => dx.abs(),
-                    ScrollAxis::Both => 0.0,
-                };
-                if along < 4.0 || along < across {
-                    return EventResult::Ignored;
-                }
+            let pointer = match state.axis {
+                DragAxis::Vertical => local.y,
+                DragAxis::Horizontal => local.x,
+            };
+            let available_track = (state.track_length - state.thumb_length).max(1.0);
+            // A scrollbar is an absolute placement, including release.
+            let raw_offset = state.offset_start
+                + ((pointer - state.pointer_start) / available_track) * state.max_offset;
+            let mut next_position = motion.position();
+            match state.axis {
+                DragAxis::Vertical => next_position.y = raw_offset,
+                DragAxis::Horizontal => next_position.x = raw_offset,
             }
-            let mut next_state = ContentDragState { start: state.start, offset_start: state.offset_start, dragged: state.dragged };
-            if !next_state.dragged {
-                next_state.dragged = true;
-                if let Some(capture) = PointerCaptureHolder::current() {
-                    capture.acquire(&owner, true);
-                }
-            }
-            owner.set_attachment(CONTENT_DRAG_STATE, next_state);
-            if let Some(motion) = owner.attachment::<Rc<ScrollAnimator>>(MOTION) {
-                motion.move_to(Point::new(
-                    if motion_axes == ScrollAxis::Vertical { state.offset_start.x } else { state.offset_start.x - dx },
-                    if motion_axes == ScrollAxis::Horizontal { state.offset_start.y } else { state.offset_start.y - dy },
-                ));
-            }
-            return EventResult::Handled;
-        }
-        let Some(state) = owner.attachment::<ScrollbarDragState>(DRAG_STATE) else {
-            return EventResult::Ignored;
-        };
-        let Some(motion) = owner.attachment::<Rc<ScrollAnimator>>(MOTION) else {
-            return EventResult::Handled;
-        };
-        if !publish_scroll_range(&motion, &owner) {
-            return EventResult::Handled;
-        }
-        motion.adopt(owner.content_offset());
-        let local = local_point(&owner, event.x, event.y);
-        let pointer = match state.axis { DragAxis::Vertical => local.y, DragAxis::Horizontal => local.x };
-        let available_track = (state.track_length - state.thumb_length).max(1.0);
-        // A scrollbar is an absolute placement, including release.
-        let raw_offset = state.offset_start + ((pointer - state.pointer_start) / available_track) * state.max_offset;
-        let mut next_position = motion.position();
-        match state.axis {
-            DragAxis::Vertical => next_position.y = raw_offset,
-            DragAxis::Horizontal => next_position.x = raw_offset,
-        }
-        let current = motion.offset();
-        motion.scroll_directly(Point::new(next_position.x - current.x, next_position.y - current.y));
-        EventResult::Handled
-    }));
+            let current = motion.offset();
+            motion.scroll_directly(Point::new(
+                next_position.x - current.x,
+                next_position.y - current.y,
+            ));
+            EventResult::Handled
+        }),
+    );
 
-    let track_color = if touch_indicator { Color::CLEAR } else { theme_for_node(node).colors.surface_variant };
+    let track_color = if touch_indicator {
+        Color::CLEAR
+    } else {
+        theme_for_node(node).colors.surface_variant
+    };
     let thumb_color = if touch_indicator {
-        theme_for_node(node).colors.on_surface_muted.multiplied_alpha(0.6)
+        theme_for_node(node)
+            .colors
+            .on_surface_muted
+            .multiplied_alpha(0.6)
     } else {
         theme_for_node(node).colors.on_surface_muted
     };
@@ -1291,7 +1520,9 @@ fn install_interaction(node: &Node, view: &ScrollViewObservers, wheel_step: f32,
             thumb_bits: color_bits(thumb_color),
         },
         move |list, origin| {
-            let Some(owner) = Node::upgrade(&paint_node) else { return };
+            let Some(owner) = Node::upgrade(&paint_node) else {
+                return;
+            };
             let viewport = visible_viewport_rect(&owner);
             let viewport_size = size_of(viewport);
             let content = cached_scrollable_content_size(&owner);
@@ -1322,7 +1553,8 @@ fn install_interaction(node: &Node, view: &ScrollViewObservers, wheel_step: f32,
                 && content.height > viewport.height + overflow_tolerance
                 && viewport.height > 0.0
             {
-                let track_x = origin.x + viewport.x + viewport.width - track_thickness - track_inset;
+                let track_x =
+                    origin.x + viewport.x + viewport.width - track_thickness - track_inset;
                 let track_y = origin.y + viewport.y + track_inset;
                 let track_height = viewport.height - 2.0 * track_inset;
                 let _ = list.add_rounded_rect(
@@ -1333,7 +1565,8 @@ fn install_interaction(node: &Node, view: &ScrollViewObservers, wheel_step: f32,
                 let max_off = content.height - viewport.height;
                 let shrink = thumb_shrink(offset.y, max_off, viewport.height);
                 let thumb_height = track_thickness.max(
-                    (track_thickness * 2.0).max(track_height * (viewport.height / content.height)) * shrink,
+                    (track_thickness * 2.0).max(track_height * (viewport.height / content.height))
+                        * shrink,
                 );
                 let fraction = thumb_fraction(offset.y, max_off);
                 let thumb_y = track_y + (track_height - thumb_height) * fraction;
@@ -1347,7 +1580,8 @@ fn install_interaction(node: &Node, view: &ScrollViewObservers, wheel_step: f32,
                 && content.width > viewport.width + overflow_tolerance
                 && viewport.width > 0.0
             {
-                let track_y = origin.y + viewport.y + viewport.height - track_thickness - track_inset;
+                let track_y =
+                    origin.y + viewport.y + viewport.height - track_thickness - track_inset;
                 let track_x = origin.x + viewport.x + track_inset;
                 let track_width = viewport.width - 2.0 * track_inset;
                 let _ = list.add_rounded_rect(
@@ -1358,7 +1592,8 @@ fn install_interaction(node: &Node, view: &ScrollViewObservers, wheel_step: f32,
                 let max_off = content.width - viewport.width;
                 let shrink = thumb_shrink(offset.x, max_off, viewport.width);
                 let thumb_width = track_thickness.max(
-                    (track_thickness * 2.0).max(track_width * (viewport.width / content.width)) * shrink,
+                    (track_thickness * 2.0).max(track_width * (viewport.width / content.width))
+                        * shrink,
                 );
                 let fraction = thumb_fraction(offset.x, max_off);
                 let thumb_x = track_x + (track_width - thumb_width) * fraction;
@@ -1419,9 +1654,8 @@ impl ScrollKeyboardFocus {
         let focusable = has_viewport && !Self::has_control(node);
         node.set_is_focusable(focusable);
         if !focusable
-            && FocusChainHolder::current().is_some_and(|chain| {
-                chain.focused().is_some_and(|focused| focused == *node)
-            })
+            && FocusChainHolder::current()
+                .is_some_and(|chain| chain.focused().is_some_and(|focused| focused == *node))
             && let Some(chain) = FocusChainHolder::current()
         {
             chain.clear();
@@ -1530,7 +1764,8 @@ impl PrimitiveView for ScrollView {
         if self.clips_only_overflow {
             let content = cached_scrollable_content_size(node);
             let viewport = visible_viewport_rect(node);
-            let overflows = content.width - viewport.width > 0.5 || content.height - viewport.height > 0.5;
+            let overflows =
+                content.width - viewport.width > 0.5 || content.height - viewport.height > 0.5;
             node.set_clips_to_bounds(overflows);
         }
     }
@@ -1542,12 +1777,19 @@ impl PrimitiveView for ScrollView {
         // Yoga right-aligns an oversized RTL child at a negative x. Scrolling
         // uses physical offsets starting at zero, so normalize that origin
         // while retaining the content's inherited logical direction.
-        let container = AnyView::new(LayoutContainer::<HorizontalScrollOrigin, AnyView>::with_erased_content(
-            HorizontalScrollOrigin,
-            self.content.clone(),
-        ));
+        let container = AnyView::new(
+            LayoutContainer::<HorizontalScrollOrigin, AnyView>::with_erased_content(
+                HorizontalScrollOrigin,
+                self.content.clone(),
+            ),
+        );
         let sized = AnyView::new(container.frame(
-            Some(FrameDimension::Percent(100.0)), None, None, None, None, None,
+            Some(FrameDimension::Percent(100.0)),
+            None,
+            None,
+            None,
+            None,
+            None,
         ));
         vec![AnyView::new(sized.layout_role(HORIZONTAL_ORIGIN_ROLE))]
     }

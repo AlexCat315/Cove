@@ -1,9 +1,9 @@
 //! Translation of Theme/Styles/Buttons/SegmentButtonStyle.swift.
-use cove_core::scene::{with_animation, Align, Animation, Edge, FlexDirection, LayoutNode, Node};
+use cove_core::scene::{Align, Animation, Edge, FlexDirection, LayoutNode, Node, with_animation};
 use cove_core::{Color, SurfaceShadow};
 
 use crate::theme::{ControlSize, SemanticColorRef, SemanticFontRef, SemanticStyleViewExt, Theme};
-use crate::{impl_primitive_view, AnyView};
+use crate::{AnyView, impl_primitive_view};
 
 use super::button_style::{ButtonInteractionKey, ButtonStyle, ButtonStyleConfiguration};
 
@@ -44,7 +44,11 @@ struct SegmentChrome {
 
 impl SegmentChrome {
     fn fill(&self) -> Color {
-        let base = if self.is_selected { self.theme.colors.surface_raised } else { Color::CLEAR };
+        let base = if self.is_selected {
+            self.theme.colors.surface_raised
+        } else {
+            Color::CLEAR
+        };
         if !self.is_enabled {
             base
         } else if self.is_pressed {
@@ -66,11 +70,25 @@ impl crate::PrimitiveView for SegmentChrome {
 
     fn update_node(&self, node: &Node) {
         let fill = self.fill();
-        let border = if self.is_focused { self.theme.colors.focus_ring } else { Color::CLEAR };
+        let border = if self.is_focused {
+            self.theme.colors.focus_ring
+        } else {
+            Color::CLEAR
+        };
         let border_width = if self.is_focused { 2.0 } else { 0.0 };
         let radius = 3.0f32.max(self.theme.radius.md - 3.0);
         let shadow = if self.is_selected {
-            SurfaceShadow { color: Some(Color { r: 0.0, g: 0.0, b: 0.0, a: 0.12 }), offset_x: 0.0, offset_y: 1.0, blur: 2.0 }
+            SurfaceShadow {
+                color: Some(Color {
+                    r: 0.0,
+                    g: 0.0,
+                    b: 0.0,
+                    a: 0.12,
+                }),
+                offset_x: 0.0,
+                offset_y: 1.0,
+                blur: 2.0,
+            }
         } else {
             SurfaceShadow::NONE
         };
@@ -81,14 +99,24 @@ impl crate::PrimitiveView for SegmentChrome {
         let apply = || {
             let owner = node.clone();
             let current = node.background_color();
-            node.animatable_set_optional("segment.backgroundColor", current, Some(fill), move |value| {
-                owner.set_background_color(value);
-            });
+            node.animatable_set_optional(
+                "segment.backgroundColor",
+                current,
+                Some(fill),
+                move |value| {
+                    owner.set_background_color(value);
+                },
+            );
             let owner = node.clone();
             let current = node.border_color();
-            node.animatable_set_optional("segment.borderColor", current, Some(border), move |value| {
-                owner.set_border_color(value);
-            });
+            node.animatable_set_optional(
+                "segment.borderColor",
+                current,
+                Some(border),
+                move |value| {
+                    owner.set_border_color(value);
+                },
+            );
             let owner = node.clone();
             let current = node.border_width();
             node.animatable_set_with("segment.borderWidth", current, border_width, move |value| {

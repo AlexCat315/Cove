@@ -5,8 +5,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cove_core::scene::{Node, NodeResource};
 use crate::primitives::text::text_buffer::TextBuffer;
+use cove_core::scene::{Node, NodeResource};
 
 /// Half of the surrounding lexical window inspected for a match.
 const SCAN_RADIUS: usize = 65_536;
@@ -53,7 +53,8 @@ impl TextBracketMatching {
         self.result.borrow_mut().clear();
 
         let byte = source.utf8_offset_for_character_index(index);
-        let neighbors = source.utf8_bytes(byte.saturating_sub(1)..(byte + 1).min(source.utf8_length()));
+        let neighbors =
+            source.utf8_bytes(byte.saturating_sub(1)..(byte + 1).min(source.utf8_length()));
         if !neighbors.iter().any(|value| Self::is_bracket(*value)) {
             return None;
         }
@@ -71,7 +72,9 @@ impl TextBracketMatching {
             None
         };
         let Some(target) = target else { return None };
-        let Some(matched) = Self::matching_bracket(&bytes, &code, target) else { return None };
+        let Some(matched) = Self::matching_bracket(&bytes, &code, target) else {
+            return None;
+        };
         let mut result = self.result.borrow_mut();
         result.clear();
         result.push(start + target);
@@ -81,7 +84,10 @@ impl TextBracketMatching {
 
     fn pair_from(result: &[usize]) -> Option<BracketPair> {
         match result {
-            [open, close, ..] => Some(BracketPair { open: *open, close: *close }),
+            [open, close, ..] => Some(BracketPair {
+                open: *open,
+                close: *close,
+            }),
             _ => None,
         }
     }

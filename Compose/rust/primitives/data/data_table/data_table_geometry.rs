@@ -10,7 +10,12 @@ pub struct DataTableColumnGeometry {
 
 impl Clone for DataTableColumnGeometry {
     fn clone(&self) -> Self {
-        Self { widths: self.widths.clone(), starts: self.starts.clone(), frozen_count: self.frozen_count, total_width: self.total_width }
+        Self {
+            widths: self.widths.clone(),
+            starts: self.starts.clone(),
+            frozen_count: self.frozen_count,
+            total_width: self.total_width,
+        }
     }
 }
 
@@ -23,7 +28,12 @@ impl DataTableColumnGeometry {
             starts.push(total_width);
             total_width += *width;
         }
-        Self { widths, starts, frozen_count, total_width }
+        Self {
+            widths,
+            starts,
+            frozen_count,
+            total_width,
+        }
     }
 
     /// Left edge of every column, in header coordinates.
@@ -32,10 +42,15 @@ impl DataTableColumnGeometry {
     }
 
     pub fn frozen_width(&self) -> f32 {
-        self.starts.get(self.frozen_count).copied().unwrap_or(self.total_width)
+        self.starts
+            .get(self.frozen_count)
+            .copied()
+            .unwrap_or(self.total_width)
     }
 
-    pub fn moving_width(&self) -> f32 { self.total_width - self.frozen_width() }
+    pub fn moving_width(&self) -> f32 {
+        self.total_width - self.frozen_width()
+    }
 
     pub fn visible_columns(&self, offset: f32, width: f32) -> Range<usize> {
         if self.frozen_count >= self.widths.len() {
@@ -47,7 +62,11 @@ impl DataTableColumnGeometry {
             let (mut lower, mut upper) = (self.frozen_count, self.starts.len());
             while lower < upper {
                 let middle = (lower + upper) / 2;
-                if self.starts[middle] < value { lower = middle + 1; } else { upper = middle; }
+                if self.starts[middle] < value {
+                    lower = middle + 1;
+                } else {
+                    upper = middle;
+                }
             }
             lower
         };

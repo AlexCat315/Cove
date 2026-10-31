@@ -30,7 +30,8 @@ impl PathIdentity {
     }
 
     pub fn contains(candidate: &Path, root: &Path, including_root: bool) -> bool {
-        let (Some(candidate), Some(root)) = (Self::resolved_url(candidate), Self::resolved_url(root))
+        let (Some(candidate), Some(root)) =
+            (Self::resolved_url(candidate), Self::resolved_url(root))
         else {
             return false;
         };
@@ -165,9 +166,7 @@ impl PathIdentity {
             value
                 .components()
                 .filter_map(|component| match component {
-                    std::path::Component::Normal(part) => {
-                        Some(part.to_string_lossy().into_owned())
-                    }
+                    std::path::Component::Normal(part) => Some(part.to_string_lossy().into_owned()),
                     std::path::Component::Prefix(prefix) => {
                         Some(prefix.as_os_str().to_string_lossy().into_owned())
                     }

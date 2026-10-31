@@ -14,13 +14,11 @@ pub mod resize_handle;
 pub mod resizing;
 pub mod sidebar;
 
-pub use adaptive_sidebar::AdaptiveSidebar;
-pub use adaptive_hosts::{
-    SidebarBackdrop, SidebarLayer, SidebarShellHost, SidebarTriggerHost,
-};
+pub use adaptive_hosts::{SidebarBackdrop, SidebarLayer, SidebarShellHost, SidebarTriggerHost};
 pub use adaptive_options::{
     AdaptiveSidebarOptions, SidebarGeometry, SidebarLayoutPolicy, SidebarMode,
 };
+pub use adaptive_sidebar::AdaptiveSidebar;
 pub use destination::{RailDestinationLabel, SidebarDestination};
 pub use drawer::{NavigationDrawer, NavigationDrawerOptions};
 pub use focus_handoff::SidebarFocusHandoff;

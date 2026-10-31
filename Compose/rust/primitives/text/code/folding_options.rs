@@ -5,8 +5,8 @@
 //! state.
 use std::collections::BTreeSet;
 
-use cove_core::Binding;
 use crate::primitives::text::text_buffer::TextBuffer;
+use cove_core::Binding;
 
 /// Retains the header line and hides the following lines through the closing
 /// line.
@@ -18,7 +18,10 @@ pub struct TextFoldRegion {
 
 impl TextFoldRegion {
     pub fn new(first_line: usize, last_line: usize) -> Self {
-        Self { first_line, last_line }
+        Self {
+            first_line,
+            last_line,
+        }
     }
 
     pub fn contains(&self, line: usize) -> bool {
@@ -57,7 +60,11 @@ pub struct TextEditorFolding {
 
 impl TextEditorFolding {
     pub fn new() -> Self {
-        Self { regions: Vec::new(), is_ready: true, collapsed_lines: None }
+        Self {
+            regions: Vec::new(),
+            is_ready: true,
+            collapsed_lines: None,
+        }
     }
 }
 
@@ -79,7 +86,12 @@ impl TextLineRebase {
             next.character_index_for_utf8_offset(edit.new_end_utf8_offset),
         );
         let starts_at_line_start = edit.character_range.start == previous.line_range(first).start;
-        Some(Self { first, last, new_last, starts_at_line_start })
+        Some(Self {
+            first,
+            last,
+            new_last,
+            starts_at_line_start,
+        })
     }
 
     /// New index for an old line, or `None` when the line was deleted.
@@ -91,7 +103,11 @@ impl TextLineRebase {
             if !self.starts_at_line_start {
                 return Some(line);
             }
-            return if self.first == self.last { Some(self.new_last) } else { None };
+            return if self.first == self.last {
+                Some(self.new_last)
+            } else {
+                None
+            };
         }
         if line < self.last {
             return None;

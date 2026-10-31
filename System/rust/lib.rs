@@ -9,8 +9,8 @@
 pub mod atomic_file;
 pub mod command;
 pub mod event_buffer;
-pub mod files;
 pub mod file_lock;
+pub mod files;
 pub mod io_state;
 mod native;
 pub mod native_process;

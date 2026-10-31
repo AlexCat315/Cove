@@ -108,7 +108,10 @@ fn cubic_monotone() {
 
 #[test]
 fn spring_anchors_and_overshoots() {
-    let curve = AnimationCurve::Spring { response: 0.40, damping_fraction: 0.82 };
+    let curve = AnimationCurve::Spring {
+        response: 0.40,
+        damping_fraction: 0.82,
+    };
     assert!(curve.evaluate(0.0).abs() < 1e-4);
     assert!((curve.evaluate(1.0) - 1.0).abs() < 1e-4);
 
@@ -128,7 +131,10 @@ fn spring_anchors_and_overshoots() {
 #[test]
 fn overshoot_is_opt_in() {
     let spring = Animation::spring(0.4, 0.6);
-    assert!(!spring.allows_overshoot, "springs do not overshoot by default");
+    assert!(
+        !spring.allows_overshoot,
+        "springs do not overshoot by default"
+    );
 
     let peak = |animation: Animation| {
         let highest = Rc::new(Cell::new(0.0_f32));
@@ -146,13 +152,22 @@ fn overshoot_is_opt_in() {
         allows_overshoot: true,
         ..spring.clone()
     };
-    assert!(peak(spring) <= 1.0, "a non-overshooting animation clamps to its target");
-    assert!(peak(permissive) > 1.0, "opting in lets the overshoot through");
+    assert!(
+        peak(spring) <= 1.0,
+        "a non-overshooting animation clamps to its target"
+    );
+    assert!(
+        peak(permissive) > 1.0,
+        "opting in lets the overshoot through"
+    );
 }
 
 #[test]
 fn spring_critical_monotone() {
-    let curve = AnimationCurve::Spring { response: 0.35, damping_fraction: 1.0 };
+    let curve = AnimationCurve::Spring {
+        response: 0.35,
+        damping_fraction: 1.0,
+    };
     let mut last = -1.0_f32;
     let mut raw = 0.0_f32;
     while raw <= 1.0 {
@@ -195,17 +210,26 @@ fn ease_in_out_factory() {
 #[test]
 fn spring_factory() {
     let animation = Animation::spring(0.6, 0.9).with_delay(0.1);
-    assert!((animation.duration - 0.6).abs() < 1e-8, "response is the duration");
+    assert!(
+        (animation.duration - 0.6).abs() < 1e-8,
+        "response is the duration"
+    );
     assert!((animation.delay - 0.1).abs() < 1e-8);
     assert_eq!(
         animation.curve,
-        AnimationCurve::Spring { response: 0.6, damping_fraction: 0.9 }
+        AnimationCurve::Spring {
+            response: 0.6,
+            damping_fraction: 0.9
+        }
     );
 }
 
 #[test]
 fn spring_presets() {
-    for (name, animation) in [("snappy", Animation::snappy()), ("bouncy", Animation::bouncy())] {
+    for (name, animation) in [
+        ("snappy", Animation::snappy()),
+        ("bouncy", Animation::bouncy()),
+    ] {
         assert!(
             matches!(animation.curve, AnimationCurve::Spring { .. }),
             "{name} is spring-based"

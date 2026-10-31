@@ -1,5 +1,8 @@
 //! Translation of CoveUIScene/Input/FocusChain.swift.
-use crate::scene::{Node, ObservableStateRegistrar, StateAccessKey, TextEditActions, TextEditCommand, TextInputAttachmentKey};
+use crate::scene::{
+    Node, ObservableStateRegistrar, StateAccessKey, TextEditActions, TextEditCommand,
+    TextInputAttachmentKey,
+};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -12,7 +15,13 @@ struct Scope {
 }
 impl Scope {
     fn new(root: &Node, previous: Option<Node>, visible: bool, restores_commands: bool) -> Self {
-        Self { root: Some(root.clone()), previous_tree_root: previous.as_ref().map(tree_root), previous, visible, restores_commands }
+        Self {
+            root: Some(root.clone()),
+            previous_tree_root: previous.as_ref().map(tree_root),
+            previous,
+            visible,
+            restores_commands,
+        }
     }
 }
 
@@ -25,7 +34,13 @@ struct Accessory {
 }
 impl Accessory {
     fn new(root: &Node, owner: &Node, previous: Option<Node>, visible: bool) -> Self {
-        Self { root: Some(root.clone()), owner: Some(owner.clone()), previous_tree_root: previous.as_ref().map(tree_root), previous, visible }
+        Self {
+            root: Some(root.clone()),
+            owner: Some(owner.clone()),
+            previous_tree_root: previous.as_ref().map(tree_root),
+            previous,
+            visible,
+        }
     }
 }
 
@@ -62,7 +77,13 @@ pub struct FocusChain {
 }
 impl FocusChain {
     pub fn new() -> Self {
-        Self { focused: RefCell::new(None), is_focus_visible: Cell::new(true), scopes: RefCell::new(Vec::new()), accessories: RefCell::new(Vec::new()), registrar: ObservableStateRegistrar::new() }
+        Self {
+            focused: RefCell::new(None),
+            is_focus_visible: Cell::new(true),
+            scopes: RefCell::new(Vec::new()),
+            accessories: RefCell::new(Vec::new()),
+            registrar: ObservableStateRegistrar::new(),
+        }
     }
     pub fn focused(&self) -> Option<Node> {
         self.focused.borrow().clone()
@@ -71,13 +92,24 @@ impl FocusChain {
         self.is_focus_visible.get()
     }
     pub fn active_scope_root(&self) -> Option<Node> {
-        self.scopes.borrow().last().and_then(|scope| scope.root.clone())
+        self.scopes
+            .borrow()
+            .last()
+            .and_then(|scope| scope.root.clone())
     }
     pub fn has_modal_scope(&self) -> bool {
-        self.scopes.borrow().iter().any(|scope| !scope.restores_commands && scope.root.is_some())
+        self.scopes
+            .borrow()
+            .iter()
+            .any(|scope| !scope.restores_commands && scope.root.is_some())
     }
     pub fn modal_root(&self) -> Option<Node> {
-        self.scopes.borrow().iter().rev().find(|scope| !scope.restores_commands).and_then(|scope| scope.root.clone())
+        self.scopes
+            .borrow()
+            .iter()
+            .rev()
+            .find(|scope| !scope.restores_commands)
+            .and_then(|scope| scope.root.clone())
     }
     pub fn current_focus(&self) -> Option<Node> {
         self.registrar.access(StateAccessKey::text("focus"));
@@ -106,38 +138,64 @@ impl FocusChain {
                 return true;
             }
         }
-        let modal = self.scopes.borrow().iter().rev().find(|scope| !scope.restores_commands).and_then(|scope| scope.root.clone());
+        let modal = self
+            .scopes
+            .borrow()
+            .iter()
+            .rev()
+            .find(|scope| !scope.restores_commands)
+            .and_then(|scope| scope.root.clone());
         modal.is_none_or(|root| self.belongs_to_scope(node, &root, &mut Vec::new()))
     }
     pub fn permits_keyboard_input(&self, node: &Node) -> bool {
-        self.active_scope_root().is_none_or(|root| self.belongs_to_scope(node, &root, &mut Vec::new()))
+        self.active_scope_root()
+            .is_none_or(|root| self.belongs_to_scope(node, &root, &mut Vec::new()))
     }
     /// A detached interactive portal belongs to its trigger's scope without
     /// taking keyboard focus merely because the pointer revealed it.
     pub fn attach_accessory(&self, root: &Node, owner: &Node) {
         let mut accessories = self.accessories.borrow_mut();
         accessories.retain(|accessory| accessory.root.is_some() && accessory.owner.is_some());
-        if accessories.iter().any(|accessory| accessory.root.as_ref() == Some(root)) {
+        if accessories
+            .iter()
+            .any(|accessory| accessory.root.as_ref() == Some(root))
+        {
             return;
         }
-        accessories.push(Accessory::new(root, owner, self.focused(), self.is_focus_visible.get()));
+        accessories.push(Accessory::new(
+            root,
+            owner,
+            self.focused(),
+            self.is_focus_visible.get(),
+        ));
     }
     pub fn detach_accessory(&self, root: &Node) {
         let removed = {
             let mut accessories = self.accessories.borrow_mut();
-            accessories.iter().position(|accessory| accessory.root.as_ref() == Some(root)).map(|index| accessories.remove(index))
+            accessories
+                .iter()
+                .position(|accessory| accessory.root.as_ref() == Some(root))
+                .map(|index| accessories.remove(index))
         };
         let Some(accessory) = removed else { return };
         let focused = self.focused();
-        if focused.is_none() || focused.as_ref().is_some_and(|focused| is_descendant(focused, root)) {
-            let restorable = accessory.previous.as_ref().zip(accessory.previous_tree_root.as_ref()).is_some_and(|(previous, tree_root)| {
-                previous.parent().is_some()
-                    && is_descendant(previous, tree_root)
-                    && previous.is_focusable()
-                    && previous.accepts_subtree_input()
-                    && self.permits_input(previous)
-                    && self.permits_keyboard_input(previous)
-            });
+        if focused.is_none()
+            || focused
+                .as_ref()
+                .is_some_and(|focused| is_descendant(focused, root))
+        {
+            let restorable = accessory
+                .previous
+                .as_ref()
+                .zip(accessory.previous_tree_root.as_ref())
+                .is_some_and(|(previous, tree_root)| {
+                    previous.parent().is_some()
+                        && is_descendant(previous, tree_root)
+                        && previous.is_focusable()
+                        && previous.accepts_subtree_input()
+                        && self.permits_input(previous)
+                        && self.permits_keyboard_input(previous)
+                });
             if restorable {
                 self.focus(accessory.previous.as_ref(), accessory.visible);
             } else {
@@ -158,14 +216,22 @@ impl FocusChain {
                 if !owner.accepts_subtree_input() || !self.permits_input(owner) {
                     return None;
                 }
-                if modal.as_ref().is_some_and(|modal| is_descendant(root, modal)) {
+                if modal
+                    .as_ref()
+                    .is_some_and(|modal| is_descendant(root, modal))
+                {
                     return None;
                 }
                 Some(root.clone())
             })
             .collect()
     }
-    fn belongs_to_scope(&self, node: &Node, root: &Node, visited: &mut Vec<crate::ElementId>) -> bool {
+    fn belongs_to_scope(
+        &self,
+        node: &Node,
+        root: &Node,
+        visited: &mut Vec<crate::ElementId>,
+    ) -> bool {
         if is_descendant(node, root) {
             return true;
         }
@@ -175,16 +241,36 @@ impl FocusChain {
         visited.push(node.id());
         let accessories = self.accessories.borrow();
         accessories.iter().any(|accessory| {
-            let (Some(accessory_root), Some(owner)) = (accessory.root.as_ref(), accessory.owner.as_ref()) else { return false };
-            owner.accepts_subtree_input() && is_descendant(node, accessory_root) && self.belongs_to_scope(owner, root, visited)
+            let (Some(accessory_root), Some(owner)) =
+                (accessory.root.as_ref(), accessory.owner.as_ref())
+            else {
+                return false;
+            };
+            owner.accepts_subtree_input()
+                && is_descendant(node, accessory_root)
+                && self.belongs_to_scope(owner, root, visited)
         })
     }
     pub fn push_scope(&self, root: &Node, restores_commands: bool) {
-        if self.scopes.borrow().iter().any(|scope| scope.root.as_ref() == Some(root)) {
+        if self
+            .scopes
+            .borrow()
+            .iter()
+            .any(|scope| scope.root.as_ref() == Some(root))
+        {
             return;
         }
-        self.scopes.borrow_mut().push(Scope::new(root, self.focused(), self.is_focus_visible.get(), restores_commands));
-        let target = self.focusables(root).first().cloned().unwrap_or_else(|| root.clone());
+        self.scopes.borrow_mut().push(Scope::new(
+            root,
+            self.focused(),
+            self.is_focus_visible.get(),
+            restores_commands,
+        ));
+        let target = self
+            .focusables(root)
+            .first()
+            .cloned()
+            .unwrap_or_else(|| root.clone());
         self.focus(Some(&target), self.is_focus_visible.get());
     }
     pub fn settle_scope(&self, root: &Node) {
@@ -193,10 +279,20 @@ impl FocusChain {
         }
         let focused = self.focused();
         if focused.is_none() || focused.as_ref() == Some(root) {
-            let candidates: Vec<Node> = self.focusables(root).into_iter().filter(|candidate| candidate != root).collect();
+            let candidates: Vec<Node> = self
+                .focusables(root)
+                .into_iter()
+                .filter(|candidate| candidate != root)
+                .collect();
             let target = candidates
                 .iter()
-                .find(|candidate| candidate.attachment::<super::TextInputAreaResolver>(TextInputAttachmentKey::AREA_RESOLVER).is_some())
+                .find(|candidate| {
+                    candidate
+                        .attachment::<super::TextInputAreaResolver>(
+                            TextInputAttachmentKey::AREA_RESOLVER,
+                        )
+                        .is_some()
+                })
                 .or_else(|| candidates.first())
                 .cloned();
             if let Some(target) = target {
@@ -205,9 +301,15 @@ impl FocusChain {
         }
     }
     pub fn pop_scope(&self, root: &Node) {
-        let index = self.scopes.borrow().iter().position(|scope| scope.root.as_ref() == Some(root));
+        let index = self
+            .scopes
+            .borrow()
+            .iter()
+            .position(|scope| scope.root.as_ref() == Some(root));
         let Some(index) = index else { return };
-        let should_restore = self.focused().is_none_or(|focused| is_descendant(&focused, root));
+        let should_restore = self
+            .focused()
+            .is_none_or(|focused| is_descendant(&focused, root));
         let scope = self.scopes.borrow_mut().remove(index);
         if index < self.scopes.borrow().len() {
             let mut scopes = self.scopes.borrow_mut();
@@ -227,13 +329,17 @@ impl FocusChain {
         {
             return;
         }
-        let restorable = scope.previous.as_ref().zip(scope.previous_tree_root.as_ref()).is_some_and(|(previous, tree_root)| {
-            is_descendant(previous, tree_root)
-                && previous.parent().is_some()
-                && previous.is_focusable()
-                && previous.accepts_subtree_input()
-                && self.permits_input(previous)
-        });
+        let restorable = scope
+            .previous
+            .as_ref()
+            .zip(scope.previous_tree_root.as_ref())
+            .is_some_and(|(previous, tree_root)| {
+                is_descendant(previous, tree_root)
+                    && previous.parent().is_some()
+                    && previous.is_focusable()
+                    && previous.accepts_subtree_input()
+                    && self.permits_input(previous)
+            });
         if restorable {
             self.focus(scope.previous.as_ref(), scope.visible);
         } else if let Some(active) = self.active_scope_root() {
@@ -276,7 +382,9 @@ impl FocusChain {
             return None;
         }
         let focused = self.focused();
-        let index = focused.as_ref().and_then(|focused| chain.iter().position(|candidate| candidate == focused));
+        let index = focused
+            .as_ref()
+            .and_then(|focused| chain.iter().position(|candidate| candidate == focused));
         let next = match index {
             Some(index) => chain[(index + 1) % chain.len()].clone(),
             None => chain[0].clone(),
@@ -292,7 +400,9 @@ impl FocusChain {
             return None;
         }
         let focused = self.focused();
-        let index = focused.as_ref().and_then(|focused| chain.iter().position(|candidate| candidate == focused));
+        let index = focused
+            .as_ref()
+            .and_then(|focused| chain.iter().position(|candidate| candidate == focused));
         let previous = match index {
             Some(index) => chain[(index + chain.len() - 1) % chain.len()].clone(),
             None => chain[chain.len() - 1].clone(),
@@ -319,10 +429,13 @@ impl FocusChain {
         }
     }
     pub fn text_edit_availability(&self, command: TextEditCommand) -> Option<bool> {
-        self.text_edit_actions().map(|actions| (actions.can_perform)(command))
+        self.text_edit_actions()
+            .map(|actions| (actions.can_perform)(command))
     }
     pub fn perform_text_edit(&self, command: TextEditCommand) -> bool {
-        let Some(actions) = self.text_edit_actions() else { return false };
+        let Some(actions) = self.text_edit_actions() else {
+            return false;
+        };
         if (actions.can_perform)(command) {
             (actions.perform)(command);
         }
@@ -341,7 +454,11 @@ impl FocusChain {
         out
     }
     fn notify_focus_change(&self, node: Option<&Node>, is_focused: bool) {
-        if let Some(handler) = node.and_then(|node| node.attachment::<super::TextInputFocusChangeHandler>(TextInputAttachmentKey::FOCUS_CHANGE_HANDLER)) {
+        if let Some(handler) = node.and_then(|node| {
+            node.attachment::<super::TextInputFocusChangeHandler>(
+                TextInputAttachmentKey::FOCUS_CHANGE_HANDLER,
+            )
+        }) {
             handler(is_focused);
         }
     }

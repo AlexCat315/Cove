@@ -131,7 +131,10 @@ fn fold_latin1(character: char) -> char {
 
 /// Ranks `items` against `query`, dropping non-matches.
 pub fn ranked(items: &[CommandItem], query: &str) -> Vec<CommandItem> {
-    let terms: Vec<String> = normalize(query).split_whitespace().map(str::to_owned).collect();
+    let terms: Vec<String> = normalize(query)
+        .split_whitespace()
+        .map(str::to_owned)
+        .collect();
     if terms.is_empty() {
         return items.to_vec();
     }
@@ -152,13 +155,20 @@ pub fn ranked(items: &[CommandItem], query: &str) -> Vec<CommandItem> {
             right.0.cmp(&left.0)
         }
     });
-    scored.into_iter().map(|(_, _, item)| item.clone()).collect()
+    scored
+        .into_iter()
+        .map(|(_, _, item)| item.clone())
+        .collect()
 }
 
 /// Scores one item, or `None` when any term fails to match.
 fn score(item: &CommandItem, terms: &[String]) -> Option<i32> {
     let title = normalize(&item.title);
-    let aliases: Vec<String> = item.keywords.iter().map(|keyword| normalize(keyword)).collect();
+    let aliases: Vec<String> = item
+        .keywords
+        .iter()
+        .map(|keyword| normalize(keyword))
+        .collect();
     let context = normalize(&format!("{} {}", item.subtitle, item.group));
     let words: Vec<&str> = title.split_whitespace().collect();
     let mut total = 0;
@@ -192,7 +202,10 @@ fn subsequence(text: &str, term: &str) -> Option<i32> {
     let mut skipped = 0i32;
     let mut previous: Option<usize> = None;
     for wanted in term.chars() {
-        let found = characters[cursor..].iter().position(|value| *value == wanted)? + cursor;
+        let found = characters[cursor..]
+            .iter()
+            .position(|value| *value == wanted)?
+            + cursor;
         if let Some(previous) = previous {
             skipped += (found - previous) as i32 - 1;
         }
@@ -210,7 +223,8 @@ pub fn entries(items: &[CommandItem], groups_results: bool) -> Vec<CommandEntry>
     }
     // Group order follows first appearance, so the list does not reshuffle.
     let mut order: Vec<&str> = Vec::new();
-    let mut buckets: std::collections::HashMap<&str, Vec<CommandItem>> = std::collections::HashMap::new();
+    let mut buckets: std::collections::HashMap<&str, Vec<CommandItem>> =
+        std::collections::HashMap::new();
     for item in items {
         let group = item.group.as_str();
         if !buckets.contains_key(group) {

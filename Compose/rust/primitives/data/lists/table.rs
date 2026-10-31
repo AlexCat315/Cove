@@ -9,19 +9,19 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use cove_core::scene::{
-    AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, Justify, Node, Wrap,
-};
-use cove_core::{Binding, TextAlignment};
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::AppearanceExt;
+use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::feedback::EmptyState;
 use crate::primitives::layout::grid::{ColumnVisibilityPlan, ColumnVisibilityTrack};
 use crate::primitives::layout::{ScrollAxis, ScrollView, ScrollbarGutter};
 use crate::primitives::text::Text;
-use crate::modifiers::style::SemanticStyleViewExt;
-use crate::theme::{theme_for_node, SemanticFontRef};
+use crate::theme::{SemanticFontRef, theme_for_node};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
+use cove_core::scene::{
+    AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, Justify, Node, Wrap,
+};
+use cove_core::{Binding, TextAlignment};
 
 /// Which way a column is sorted.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -40,7 +40,10 @@ pub struct TableSort {
 
 impl TableSort {
     pub fn new(column_id: impl Into<String>) -> Self {
-        Self { column_id: column_id.into(), direction: TableSortDirection::Ascending }
+        Self {
+            column_id: column_id.into(),
+            direction: TableSortDirection::Ascending,
+        }
     }
 
     pub fn descending(mut self) -> Self {
@@ -77,7 +80,11 @@ impl TableColumnLayout {
     }
 
     pub fn constrained(&self, value: f32) -> f32 {
-        let minimum = if self.min_width.is_finite() { self.min_width.max(24.0) } else { 60.0 };
+        let minimum = if self.min_width.is_finite() {
+            self.min_width.max(24.0)
+        } else {
+            60.0
+        };
         let maximum = if self.max_width.is_finite() {
             self.max_width.max(minimum)
         } else {
@@ -134,7 +141,11 @@ impl<Record> TableTextEditing<Record> {
         text: impl Fn(&Record) -> String + 'static,
         update: impl Fn(&mut Record, &str) + 'static,
     ) -> Self {
-        Self { text: Rc::new(text), update: Rc::new(update), validate: None }
+        Self {
+            text: Rc::new(text),
+            update: Rc::new(update),
+            validate: None,
+        }
     }
 
     pub fn validate(mut self, validate: impl Fn(&str) -> Option<String> + 'static) -> Self {
@@ -255,7 +266,11 @@ impl TableLayout {
     }
 
     pub fn validate(&mut self) {
-        self.row_height = if self.row_height.is_finite() { self.row_height.max(24.0) } else { 36.0 };
+        self.row_height = if self.row_height.is_finite() {
+            self.row_height.max(24.0)
+        } else {
+            36.0
+        };
         self.header_height = if self.header_height.is_finite() {
             self.header_height.max(24.0)
         } else {
@@ -404,14 +419,22 @@ impl<Record: 'static, Id: PartialEq + Clone + 'static> Table<Record, Id> {
             Some(binding) => binding.get().get(&column.id).copied(),
             None => self.session.borrow().widths.get(&column.id).copied(),
         };
-        column.layout.constrained(stored.unwrap_or(column.layout.width))
+        column
+            .layout
+            .constrained(stored.unwrap_or(column.layout.width))
     }
 
     /// Cycle a column's sort: ascending, then descending, then source order.
     pub fn cycle_sort(&self, column_id: &str) {
         let next = match self.sort() {
-            Some(sort) if sort.column_id == column_id && sort.direction == TableSortDirection::Ascending => {
-                Some(TableSort { column_id: column_id.to_string(), direction: TableSortDirection::Descending })
+            Some(sort)
+                if sort.column_id == column_id
+                    && sort.direction == TableSortDirection::Ascending =>
+            {
+                Some(TableSort {
+                    column_id: column_id.to_string(),
+                    direction: TableSortDirection::Descending,
+                })
             }
             Some(sort) if sort.column_id == column_id => None,
             _ => Some(TableSort::new(column_id)),
@@ -424,13 +447,19 @@ impl<Record: 'static, Id: PartialEq + Clone + 'static> Table<Record, Id> {
 
     /// Sort records, keeping source order for equal comparisons in both
     /// directions.
-    pub fn sorted(records: &[Record], columns: &[TableColumn<Record>], sort: Option<&TableSort>) -> Vec<usize> {
+    pub fn sorted(
+        records: &[Record],
+        columns: &[TableColumn<Record>],
+        sort: Option<&TableSort>,
+    ) -> Vec<usize> {
         let mut order: Vec<usize> = (0..records.len()).collect();
         let Some(sort) = sort else { return order };
         let Some(column) = columns.iter().find(|column| column.id == sort.column_id) else {
             return order;
         };
-        let Some(compare) = column.compare.as_ref() else { return order };
+        let Some(compare) = column.compare.as_ref() else {
+            return order;
+        };
         order.sort_by(|lhs, rhs| {
             let comparison = compare(&records[*lhs], &records[*rhs]);
             match comparison {
@@ -463,17 +492,27 @@ impl<Record: 'static, Id: PartialEq + Clone + 'static> View for Table<Record, Id
         // Explicit per-column overrides win: `false` hides, `true` forces shown.
         // Automatic fitting needs the Columns/Visibility resolver, which is not
         // ported; absent overrides therefore leave a column as authored.
-        let overrides = self.options.column_visibility.as_ref().map(|binding| binding.get());
+        let overrides = self
+            .options
+            .column_visibility
+            .as_ref()
+            .map(|binding| binding.get());
         let visible: Vec<bool> = self
             .columns
             .iter()
-            .map(|column| match overrides.as_ref().and_then(|map| map.get(&column.id)) {
-                Some(false) => false,
-                Some(true) => true,
-                None => column.visibility != ColumnVisibility::Hidden,
-            })
+            .map(
+                |column| match overrides.as_ref().and_then(|map| map.get(&column.id)) {
+                    Some(false) => false,
+                    Some(true) => true,
+                    None => column.visibility != ColumnVisibility::Hidden,
+                },
+            )
             .collect();
-        let widths: Vec<f32> = self.columns.iter().map(|column| self.width_of(column)).collect();
+        let widths: Vec<f32> = self
+            .columns
+            .iter()
+            .map(|column| self.width_of(column))
+            .collect();
         let total_width: f32 = widths.iter().sum();
 
         let mut header_cells: Vec<AnyView> = Vec::new();
@@ -481,8 +520,13 @@ impl<Record: 'static, Id: PartialEq + Clone + 'static> View for Table<Record, Id
             if !visible[index] {
                 continue;
             }
-            let is_sorted = sort.as_ref().is_some_and(|sort| sort.column_id == column.id);
-            let direction = sort.as_ref().filter(|_| is_sorted).map(|sort| sort.direction);
+            let is_sorted = sort
+                .as_ref()
+                .is_some_and(|sort| sort.column_id == column.id);
+            let direction = sort
+                .as_ref()
+                .filter(|_| is_sorted)
+                .map(|sort| sort.direction);
             let table_session = self.session.clone();
             let sort_binding = self.options.sort.clone();
             let enabled = self.options.is_enabled;
@@ -502,10 +546,18 @@ impl<Record: 'static, Id: PartialEq + Clone + 'static> View for Table<Record, Id
                     let table_session = table_session.clone();
                     let sort_binding = sort_binding.clone();
                     Rc::new(move || {
-                        let next = match (sort_binding.as_ref().map(|binding| binding.get()).flatten(), is_sorted) {
-                            (Some(current), true) if current.direction == TableSortDirection::Ascending => Some(
-                                TableSort { column_id: column_id.clone(), direction: TableSortDirection::Descending },
-                            ),
+                        let next = match (
+                            sort_binding.as_ref().map(|binding| binding.get()).flatten(),
+                            is_sorted,
+                        ) {
+                            (Some(current), true)
+                                if current.direction == TableSortDirection::Ascending =>
+                            {
+                                Some(TableSort {
+                                    column_id: column_id.clone(),
+                                    direction: TableSortDirection::Descending,
+                                })
+                            }
                             (_, true) => None,
                             _ => Some(TableSort::new(column_id.clone())),
                         };
@@ -521,7 +573,11 @@ impl<Record: 'static, Id: PartialEq + Clone + 'static> View for Table<Record, Id
         let header = AnyView::new(TableHeaderPaint {
             content: AnyView::new(
                 BoxView::new(
-                    FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    0.0,
                     AnyView::new(TupleView::new(header_cells)),
                 )
                 .frame(None, None, None, Some(layout.header_height), None, None),
@@ -529,9 +585,10 @@ impl<Record: 'static, Id: PartialEq + Clone + 'static> View for Table<Record, Id
         });
 
         if order.is_empty() {
-            return AnyView::new(
-                EmptyState::new(layout.empty_title.clone(), "Change your filters or add a record."),
-            );
+            return AnyView::new(EmptyState::new(
+                layout.empty_title.clone(),
+                "Change your filters or add a record.",
+            ));
         }
 
         let mut rows: Vec<AnyView> = Vec::new();
@@ -576,10 +633,21 @@ impl<Record: 'static, Id: PartialEq + Clone + 'static> View for Table<Record, Id
                 }),
                 content: AnyView::new(
                     BoxView::new(
-                        FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                        FlexDirection::Row,
+                        Align::Center,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        0.0,
                         AnyView::new(TupleView::new(cells)),
                     )
-                    .frame(None, None, None, Some(layout.row_height), None, None),
+                    .frame(
+                        None,
+                        None,
+                        None,
+                        Some(layout.row_height),
+                        None,
+                        None,
+                    ),
                 ),
             }));
         }
@@ -589,24 +657,33 @@ impl<Record: 'static, Id: PartialEq + Clone + 'static> View for Table<Record, Id
             AnyView::new(TupleView::new(vec![
                 header,
                 AnyView::new(crate::primitives::text::Divider::new(
-                    None, 1.0, crate::primitives::text::DividerAxis::Horizontal,
+                    None,
+                    1.0,
+                    crate::primitives::text::DividerAxis::Horizontal,
                 )),
                 AnyView::new(
-                    ScrollView::vertical(AnyView::new(
-                        BoxView::new(
-                            FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 0.0,
-                            AnyView::new(TupleView::new(rows)),
-                        ),
-                    ))
+                    ScrollView::vertical(AnyView::new(BoxView::new(
+                        FlexDirection::Column,
+                        Align::Stretch,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        0.0,
+                        AnyView::new(TupleView::new(rows)),
+                    )))
                     .flex_with(1.0, 1.0, Some(0.0)),
                 ),
             ])),
         )
         .scrollbar_gutter(ScrollbarGutter::Stable);
         AnyView::new(TableChromeHost {
-            content: AnyView::new(
-                AnyView::new(scroll).frame(None, None, None, None, Some(total_width + 14.0), None),
-            ),
+            content: AnyView::new(AnyView::new(scroll).frame(
+                None,
+                None,
+                None,
+                None,
+                Some(total_width + 14.0),
+                None,
+            )),
             is_enabled: self.options.is_enabled,
         })
     }
@@ -695,7 +772,9 @@ impl PrimitiveView for TableRowPaint {
         } else {
             None
         });
-        let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() else { return };
+        let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() else {
+            return;
+        };
         if !self.is_enabled {
             registry.remove(node);
             return;
@@ -778,7 +857,9 @@ impl PrimitiveView for TableHeaderCell {
 
     fn update_node(&self, node: &Node) {
         node.set_attachment("table.columnId", self.column_id.clone());
-        let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() else { return };
+        let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() else {
+            return;
+        };
         if !self.is_enabled || !self.sortable {
             registry.remove(node);
             return;
@@ -815,7 +896,11 @@ impl PrimitiveView for TableHeaderCell {
         }
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 6.0,
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                6.0,
                 AnyView::new(TupleView::new(row)),
             )
             .padding_edges(10.0, 0.0)
@@ -872,7 +957,11 @@ impl PrimitiveView for TableCell {
         };
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Row, Align::Center, justify, Wrap::NoWrap, 0.0,
+                FlexDirection::Row,
+                Align::Center,
+                justify,
+                Wrap::NoWrap,
+                0.0,
                 self.content.clone(),
             )
             .padding_edges(10.0, 4.0)
@@ -907,7 +996,9 @@ pub struct TableColumnPlan {
 /// `Hidden` is handled by the table before planning (the column is filtered out
 /// entirely), so only `Required` and `Optional` reach the resolver. Optional
 /// columns all share priority 0, which keeps them in authored order.
-fn table_visibility(visibility: ColumnVisibility) -> crate::primitives::layout::grid::ColumnVisibility {
+fn table_visibility(
+    visibility: ColumnVisibility,
+) -> crate::primitives::layout::grid::ColumnVisibility {
     match visibility {
         ColumnVisibility::Required => crate::primitives::layout::grid::ColumnVisibility::Required,
         ColumnVisibility::Optional | ColumnVisibility::Hidden => {
@@ -953,13 +1044,23 @@ impl TableColumnPlan {
 
         // Pinned columns and the frozen prefix can never be dropped.
         let mut required: std::collections::HashSet<String> = pinned_ids.clone();
-        required.extend(columns.iter().take(frozen_count).map(|column| column.id.clone()));
+        required.extend(
+            columns
+                .iter()
+                .take(frozen_count)
+                .map(|column| column.id.clone()),
+        );
 
-        let plan = ColumnVisibilityPlan::resolve(&tracks, overrides, available_width, 0.0, &required);
+        let plan =
+            ColumnVisibilityPlan::resolve(&tracks, overrides, available_width, 0.0, &required);
 
         // A frozen prefix that fills the viewport cannot stay frozen: there would
         // be no scrollable region left for the remaining columns.
-        let frozen_width: f32 = tracks.iter().take(frozen_count).map(|track| track.width).sum();
+        let frozen_width: f32 = tracks
+            .iter()
+            .take(frozen_count)
+            .map(|track| track.width)
+            .sum();
         let frozen_count = if frozen_width >= available_width.max(0.0) {
             0
         } else {

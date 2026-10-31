@@ -41,7 +41,11 @@ pub struct VirtualStack<Id: Ord + Clone + 'static> {
 
 impl<Id: Ord + Clone + 'static> VirtualStack<Id> {
     fn resolved_spacing(&self) -> f32 {
-        if self.spacing.is_finite() { self.spacing.max(0.0) } else { 0.0 }
+        if self.spacing.is_finite() {
+            self.spacing.max(0.0)
+        } else {
+            0.0
+        }
     }
 }
 
@@ -87,7 +91,11 @@ impl<Id: Ord + Clone + 'static> VirtualStack<Id> {
     }
 
     pub fn spacing(mut self, spacing: f32) -> Self {
-        self.spacing = if spacing.is_finite() { spacing.max(0.0) } else { 0.0 };
+        self.spacing = if spacing.is_finite() {
+            spacing.max(0.0)
+        } else {
+            0.0
+        };
         self
     }
 
@@ -107,11 +115,7 @@ impl<Id: Ord + Clone + 'static> VirtualStack<Id> {
     }
 
     /// Build the concrete stack for a data set and row factory.
-    pub fn build(
-        &self,
-        ids: Vec<Id>,
-        row_content: impl Fn(&Id) -> AnyView + 'static,
-    ) -> AnyView {
+    pub fn build(&self, ids: Vec<Id>, row_content: impl Fn(&Id) -> AnyView + 'static) -> AnyView {
         let spacing = self.resolved_spacing();
         let content = Rc::new(row_content);
         match &self.rows {
@@ -131,7 +135,10 @@ impl<Id: Ord + Clone + 'static> VirtualStack<Id> {
                 let mut stack = VariableVirtualStack::new(
                     ids,
                     move |id, width, scale| {
-                        let index = ids_for_measure.iter().position(|candidate| candidate == id).unwrap_or(0);
+                        let index = ids_for_measure
+                            .iter()
+                            .position(|candidate| candidate == id)
+                            .unwrap_or(0);
                         measure(&(index as u64), width, scale)
                     },
                     move |id| content(id),

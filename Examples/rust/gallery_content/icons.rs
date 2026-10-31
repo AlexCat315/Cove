@@ -4,8 +4,8 @@
 //! (dates, times) share a glyph so neighbouring sidebar rows stay
 //! distinguishable.
 
-use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use cove_imaging::BundleImageResource;
+use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 
 use super::catalog::GalleryPage;
 

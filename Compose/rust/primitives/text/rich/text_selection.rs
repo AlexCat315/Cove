@@ -7,11 +7,11 @@ use crate::primitives::text::text_buffer::TextBuffer;
 use cove_core::scene::{
     AccessibilityRevision, CompositionLocal, InvalidationSource, Node, NodeResource, NodeWeak,
 };
+use cove_core::scene::{FocusChainHolder, InputRoutingPriority, InteractionRegistryHolder};
 use cove_core::{
     Clip, Color, DrawList, InvalidationSource as _, Node as _, Painter, Point, Rect, RoundedRect,
     paint_scaled,
 };
-use cove_core::scene::{FocusChainHolder, InputRoutingPriority, InteractionRegistryHolder};
 use cove_text::TextEnvironmentHolder;
 use std::any::Any;
 use std::cell::RefCell;
@@ -202,11 +202,8 @@ impl TextSelectionScope {
         }
         let previous_ids = self.ordered_ids.clone();
         let previous_span = self.selection_span();
-        self.members.retain(|_, member| {
-            member
-                .node()
-                .is_some_and(|node| node.parent().is_some())
-        });
+        self.members
+            .retain(|_, member| member.node().is_some_and(|node| node.parent().is_some()));
         let mut ids: Vec<u64> = Vec::with_capacity(self.members.len());
         self.frames.clear();
         self.frames.reserve(self.members.len());
@@ -229,11 +226,7 @@ impl TextSelectionScope {
                 cove_selection_sort(self.frames.as_mut_ptr(), self.frames.len());
             }
         }
-        self.ordered_ids = self
-            .frames
-            .iter()
-            .map(|frame| ids[frame.member])
-            .collect();
+        self.ordered_ids = self.frames.iter().map(|frame| ids[frame.member]).collect();
         self.member_indices = self
             .ordered_ids
             .iter()
@@ -246,8 +239,7 @@ impl TextSelectionScope {
         if previous_ids != self.ordered_ids {
             let previous = self.ranges_in(previous_span, &previous_ids);
             let current = self.ranges_in(self.selection_span(), &self.ordered_ids);
-            let mut changed: std::collections::HashSet<u64> =
-                previous.keys().copied().collect();
+            let mut changed: std::collections::HashSet<u64> = previous.keys().copied().collect();
             changed.extend(current.keys().copied());
             for id in changed {
                 if previous.get(&id) != current.get(&id) {
@@ -433,10 +425,7 @@ impl TextSelectionScope {
         let Some(focus) = self.focus else {
             return false;
         };
-        let Some(mut index) = list
-            .iter()
-            .position(|(id, _)| *id == focus.member)
-        else {
+        let Some(mut index) = list.iter().position(|(id, _)| *id == focus.member) else {
             return false;
         };
         let mut offset = focus.offset;
@@ -566,10 +555,7 @@ impl TextSelectionScope {
         } else {
             (member.offset_at)(point)
         };
-        Some(TextSelectionPosition {
-            member: id,
-            offset,
-        })
+        Some(TextSelectionPosition { member: id, offset })
     }
 
     /// Whether a window-space point lands on a paragraph this scope owns.
@@ -644,8 +630,7 @@ impl TextSelectionScope {
     /// Interior paragraphs shared by both spans keep their cached drawing.
     /// Only entering/leaving paragraphs and the four possible endpoints change.
     fn invalidate(&mut self, previous: Option<SelectionSpan>, current: Option<SelectionSpan>) {
-        let mut endpoints: std::collections::HashSet<usize> =
-            std::collections::HashSet::new();
+        let mut endpoints: std::collections::HashSet<usize> = std::collections::HashSet::new();
         for value in [
             previous.map(|span| span.lower),
             previous.map(|span| span.upper),
@@ -748,7 +733,11 @@ impl TextSelectionChrome {
 
     /// The endpoint under a node-local point, or none when the press missed
     /// both.
-    pub fn endpoint(local: Point, start: Option<Rect>, end: Option<Rect>) -> Option<TextSelectionEndpoint> {
+    pub fn endpoint(
+        local: Point,
+        start: Option<Rect>,
+        end: Option<Rect>,
+    ) -> Option<TextSelectionEndpoint> {
         if let Some(start) = start {
             if Self::distance(local, Self::handle_center(start, true)) <= Self::HIT_SLOP {
                 return Some(TextSelectionEndpoint::Start);
@@ -780,8 +769,7 @@ impl TextSelectionChrome {
                 Self::HANDLE_RADIUS * 2.0,
             );
             let _ = list.add_rounded_rect(rect, Self::HANDLE_RADIUS, fill);
-            let _ =
-                list.add_rounded_rect_stroke(rect, Self::HANDLE_RADIUS, 1.0, border);
+            let _ = list.add_rounded_rect_stroke(rect, Self::HANDLE_RADIUS, 1.0, border);
         }
     }
 
@@ -797,10 +785,7 @@ impl TextSelectionChrome {
         draw_text: Rc<dyn Fn(&mut DrawList, f32)>,
     ) {
         let radius = Self::LOUPE_RADIUS;
-        let center = Point::new(
-            finger.x,
-            finger.y - radius - Self::LOUPE_LIFT,
-        );
+        let center = Point::new(finger.x, finger.y - radius - Self::LOUPE_LIFT);
         let rect = Rect::new(
             center.x - radius,
             center.y - radius,
@@ -946,9 +931,10 @@ impl cove_composition::PrimitiveView for TextSelectionRoot {
     fn children(&self, _node: &Node) -> Vec<cove_composition::AnyView> {
         use cove_composition::ViewExt;
         vec![cove_composition::AnyView::new(
-            self.content
-                .clone()
-                .composition_local(TextSelectionScope::key(), Some(TextSelectionHandle(self.scope.clone()))),
+            self.content.clone().composition_local(
+                TextSelectionScope::key(),
+                Some(TextSelectionHandle(self.scope.clone())),
+            ),
         )]
     }
 }
@@ -989,9 +975,9 @@ pub trait TextSelectionViewExt: cove_composition::View + Sized + 'static {
     fn text_selection(self, enabled: bool) -> cove_composition::AnyView {
         use cove_composition::ViewExt;
         if enabled {
-            cove_composition::AnyView::new(TextSelectionRoot::new(
-                cove_composition::AnyView::new(self),
-            ))
+            cove_composition::AnyView::new(TextSelectionRoot::new(cove_composition::AnyView::new(
+                self,
+            )))
         } else {
             cove_composition::AnyView::new(
                 self.composition_local(TextSelectionScope::key(), None::<TextSelectionHandle>),

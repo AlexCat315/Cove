@@ -12,7 +12,7 @@ use crate::rhi::{
     BindingLayout, BindingLayoutDescriptor, BindingLayoutEntry, BindingResource, BindingSet,
     BindingSetEntry, BindingType, ComputePipeline, ComputePipelineDescriptor, GraphicsPipeline,
     GraphicsPipelineDescriptor, MeshPipeline, MeshPipelineDescriptor, PipelineLayout,
-    PipelineLayoutDescriptor, RhiCompiledObject, RhiCompilationWork, RhiError, RhiResult,
+    PipelineLayoutDescriptor, RhiCompilationWork, RhiCompiledObject, RhiError, RhiResult,
     rhi_require,
 };
 
@@ -98,7 +98,10 @@ pub fn register_pipeline_layout(
     let push_ranges: Vec<VulkanPushRange> = descriptor
         .push_constants
         .iter()
-        .map(|declaration| VulkanPushRange { declaration: *declaration, offset: 0 })
+        .map(|declaration| VulkanPushRange {
+            declaration: *declaration,
+            offset: 0,
+        })
         .collect();
     let native_ranges: Vec<sys::VkPushConstantRange> = push_ranges
         .iter()
@@ -133,7 +136,11 @@ pub fn register_pipeline_layout(
     }
     lock(registries).pipeline_layouts.insert(
         handle.id(),
-        VulkanPipelineLayoutRecord { native, descriptor, push_ranges },
+        VulkanPipelineLayoutRecord {
+            native,
+            descriptor,
+            push_ranges,
+        },
     );
     Ok(())
 }
@@ -180,9 +187,13 @@ pub fn register_binding_set(
     }
 
     // A failed write releases the set so it cannot leak from the pool.
-    if let Err(error) =
-        write_descriptors(context, registries, descriptor_set, &layout_entries, &set_entries)
-    {
+    if let Err(error) = write_descriptors(
+        context,
+        registries,
+        descriptor_set,
+        &layout_entries,
+        &set_entries,
+    ) {
         // SAFETY: the set was allocated above and holds no live GPU references
         // beyond the descriptors being rewritten.
         unsafe {
@@ -196,7 +207,10 @@ pub fn register_binding_set(
         return Err(error);
     }
 
-    let dynamic_count = layout_entries.iter().filter(|entry| entry.buffer.has_dynamic_offset).count();
+    let dynamic_count = layout_entries
+        .iter()
+        .filter(|entry| entry.buffer.has_dynamic_offset)
+        .count();
     lock(registries).binding_sets.insert(
         handle.id(),
         VulkanBindingSetRecord {
@@ -223,8 +237,7 @@ fn write_descriptors(
     let mut buffer_infos: Vec<sys::VkDescriptorBufferInfo> = Vec::new();
     let mut image_infos: Vec<sys::VkDescriptorImageInfo> = Vec::new();
     let mut acceleration_handles: Vec<sys::VkAccelerationStructureKHR> = Vec::new();
-    let mut acceleration_infos: Vec<sys::VkWriteDescriptorSetAccelerationStructureKHR> =
-        Vec::new();
+    let mut acceleration_infos: Vec<sys::VkWriteDescriptorSetAccelerationStructureKHR> = Vec::new();
     let mut writes: Vec<sys::VkWriteDescriptorSet> = Vec::new();
 
     buffer_infos.reserve(set_entries.len());
@@ -257,7 +270,11 @@ fn write_descriptors(
             };
 
             match set_entry.resource {
-                BindingResource::UniformBuffer { buffer, offset, size } => {
+                BindingResource::UniformBuffer {
+                    buffer,
+                    offset,
+                    size,
+                } => {
                     let record = registries.buffers.get(&buffer.id()).ok_or_else(|| {
                         RhiError::invalid_argument("unknown buffer or invalid binding offset")
                     })?;
@@ -311,9 +328,10 @@ fn write_descriptors(
                     write.pBufferInfo = buffer_infos.last().expect("just pushed");
                 }
                 BindingResource::Texture(texture) | BindingResource::StorageTexture(texture) => {
-                    let record = registries.textures.get(&texture.id()).ok_or_else(|| {
-                        RhiError::invalid_argument("unknown texture")
-                    })?;
+                    let record = registries
+                        .textures
+                        .get(&texture.id())
+                        .ok_or_else(|| RhiError::invalid_argument("unknown texture"))?;
                     image_infos.push(sys::VkDescriptorImageInfo {
                         sampler: sys::VK_NULL_HANDLE,
                         imageView: record.view,
@@ -326,9 +344,10 @@ fn write_descriptors(
                     write.pImageInfo = image_infos.last().expect("just pushed");
                 }
                 BindingResource::Sampler(sampler) => {
-                    let record = registries.samplers.get(&sampler.id()).ok_or_else(|| {
-                        RhiError::invalid_argument("unknown sampler")
-                    })?;
+                    let record = registries
+                        .samplers
+                        .get(&sampler.id())
+                        .ok_or_else(|| RhiError::invalid_argument("unknown sampler"))?;
                     image_infos.push(sys::VkDescriptorImageInfo {
                         sampler: record.sampler,
                         imageView: sys::VK_NULL_HANDLE,
@@ -341,9 +360,7 @@ fn write_descriptors(
                         .acceleration_structures
                         .get(&structure.id())
                         .ok_or_else(|| {
-                            RhiError::invalid_argument(
-                                "unknown acceleration structure binding",
-                            )
+                            RhiError::invalid_argument("unknown acceleration structure binding")
                         })?;
                     acceleration_handles.push(record.native);
                     acceleration_infos.push(sys::VkWriteDescriptorSetAccelerationStructureKHR {
@@ -353,7 +370,8 @@ fn write_descriptors(
                         accelerationStructureCount: 1,
                         pAccelerationStructures: acceleration_handles.last().expect("just pushed"),
                     });
-                    write.pNext = acceleration_infos.last().expect("just pushed") as *const _ as *const core::ffi::c_void;
+                    write.pNext = acceleration_infos.last().expect("just pushed") as *const _
+                        as *const core::ffi::c_void;
                 }
             }
             writes.push(write);
@@ -384,12 +402,19 @@ pub fn unregister_binding_set(
     descriptor_pool: sys::VkDescriptorPool,
     handle: BindingSet,
 ) {
-    let Some(record) = lock(registries).binding_sets.remove(&handle.id()) else { return };
+    let Some(record) = lock(registries).binding_sets.remove(&handle.id()) else {
+        return;
+    };
     let descriptor_set = record.descriptor_set;
     // SAFETY: the frame ring waited for every submission that could use this set,
     // and the set was allocated from this pool.
     unsafe {
-        (context.resources.free_descriptor_sets)(context.device, descriptor_pool, 1, &descriptor_set)
+        (context.resources.free_descriptor_sets)(
+            context.device,
+            descriptor_pool,
+            1,
+            &descriptor_set,
+        )
     };
 }
 
@@ -420,15 +445,22 @@ impl SpecializationStorage {
                 size: 4,
             })
             .collect();
-        let data: Vec<u32> =
-            record.specialization_constants.iter().map(|constant| constant.value.bits()).collect();
+        let data: Vec<u32> = record
+            .specialization_constants
+            .iter()
+            .map(|constant| constant.value.bits())
+            .collect();
         let info = sys::VkSpecializationInfo {
             mapEntryCount: entries.len() as u32,
             pMapEntries: entries.as_ptr(),
             dataSize: data.len() * 4,
             pData: data.as_ptr().cast(),
         };
-        Some(Self { entries, data, info })
+        Some(Self {
+            entries,
+            data,
+            info,
+        })
     }
 }
 
@@ -456,8 +488,10 @@ impl StageGroup {
                 .get(&handle.id())
                 .filter(|record| record.stage == *expected)
                 .ok_or_else(|| RhiError::invalid_argument("unknown shader module for its stage"))?;
-            let entry_point = std::ffi::CString::new(record.entry_point.as_str())
-                .map_err(|_| RhiError::invalid_argument("shader entry point contains a NUL byte"))?;
+            let entry_point =
+                std::ffi::CString::new(record.entry_point.as_str()).map_err(|_| {
+                    RhiError::invalid_argument("shader entry point contains a NUL byte")
+                })?;
             let stage = sys::VkPipelineShaderStageCreateInfo {
                 sType: sys::VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
                 pNext: core::ptr::null(),
@@ -469,7 +503,9 @@ impl StageGroup {
                 pSpecializationInfo: core::ptr::null(),
             };
             group.entry_points.push(entry_point);
-            group.specializations.push(SpecializationStorage::build(registries, *handle));
+            group
+                .specializations
+                .push(SpecializationStorage::build(registries, *handle));
             group.stages.push(stage);
         }
         group.refresh();
@@ -489,7 +525,9 @@ impl StageGroup {
     }
 
     fn contains_mesh_stage(&self) -> bool {
-        self.stages.iter().any(|stage| stage.stage == sys::VK_SHADER_STAGE_MESH_BIT_EXT)
+        self.stages
+            .iter()
+            .any(|stage| stage.stage == sys::VK_SHADER_STAGE_MESH_BIT_EXT)
     }
 }
 
@@ -517,7 +555,9 @@ impl FixedFunctionState {
                     binding: index as u32,
                     stride: buffer_layout.stride as u32,
                     inputRate: match buffer_layout.step_rate {
-                        crate::rhi::VertexInputRate::PerInstance => sys::VK_VERTEX_INPUT_RATE_INSTANCE,
+                        crate::rhi::VertexInputRate::PerInstance => {
+                            sys::VK_VERTEX_INPUT_RATE_INSTANCE
+                        }
                         crate::rhi::VertexInputRate::PerVertex => sys::VK_VERTEX_INPUT_RATE_VERTEX,
                     },
                 });
@@ -561,7 +601,10 @@ impl FixedFunctionState {
             vertex_bindings,
             vertex_attributes,
             blend_attachments,
-            dynamic_states: [sys::VK_DYNAMIC_STATE_VIEWPORT, sys::VK_DYNAMIC_STATE_SCISSOR],
+            dynamic_states: [
+                sys::VK_DYNAMIC_STATE_VIEWPORT,
+                sys::VK_DYNAMIC_STATE_SCISSOR,
+            ],
         })
     }
 }
@@ -690,8 +733,16 @@ fn create_graphics_pipeline_native(
         flags: 0,
         stageCount: raw_stages.len() as u32,
         pStages: raw_stages.as_ptr(),
-        pVertexInputState: if is_mesh { core::ptr::null() } else { &vertex_input },
-        pInputAssemblyState: if is_mesh { core::ptr::null() } else { &assembly },
+        pVertexInputState: if is_mesh {
+            core::ptr::null()
+        } else {
+            &vertex_input
+        },
+        pInputAssemblyState: if is_mesh {
+            core::ptr::null()
+        } else {
+            &assembly
+        },
         pTessellationState: core::ptr::null(),
         pViewportState: &viewport,
         pRasterizationState: &raster,
@@ -721,7 +772,9 @@ fn create_graphics_pipeline_native(
         )
     };
     if status != sys::VK_SUCCESS || pipeline == sys::VK_NULL_HANDLE {
-        return Err(RhiError::invalid_argument("Vulkan graphics pipeline failed"));
+        return Err(RhiError::invalid_argument(
+            "Vulkan graphics pipeline failed",
+        ));
     }
     // The pipeline keeps its own reference to the render pass, so the pass objects
     // are released here; the driver's pipeline object no longer needs them.
@@ -750,7 +803,9 @@ pub fn prepare_compute_compilation(
         let layout = registries
             .pipeline_layouts
             .get(&descriptor.layout.id())
-            .ok_or_else(|| RhiError::invalid_argument("unknown compute shader or pipeline layout"))?;
+            .ok_or_else(|| {
+                RhiError::invalid_argument("unknown compute shader or pipeline layout")
+            })?;
         let group = StageGroup::build(
             &registries,
             &[(descriptor.shader, crate::rhi::ShaderStage::Compute)],
@@ -795,9 +850,13 @@ pub fn prepare_compute_compilation(
         let shared_publish = Arc::clone(&shared);
         Ok(RhiCompiledObject::new(
             move || {
-                lock(&shared_publish)
-                    .compute_pipelines
-                    .insert(id, VulkanComputePipelineRecord { pipeline, descriptor });
+                lock(&shared_publish).compute_pipelines.insert(
+                    id,
+                    VulkanComputePipelineRecord {
+                        pipeline,
+                        descriptor,
+                    },
+                );
             },
             // SAFETY: the pipeline was created above and is only destroyed when
             // this object is dropped without being installed.
@@ -811,7 +870,9 @@ pub fn destroy_compute_pipeline(
     registries: &Arc<Mutex<VulkanRegistries>>,
     handle: ComputePipeline,
 ) {
-    let Some(record) = lock(registries).compute_pipelines.remove(&handle.id()) else { return };
+    let Some(record) = lock(registries).compute_pipelines.remove(&handle.id()) else {
+        return;
+    };
     // SAFETY: the frame ring waited for every submission that could use it.
     unsafe {
         (context.resources.destroy_pipeline)(context.device, record.pipeline, core::ptr::null());
@@ -847,9 +908,12 @@ pub fn prepare_graphics_compilation(
 
     let (group, layout_native) = {
         let registries = lock(registries);
-        let layout = registries.pipeline_layouts.get(&descriptor.layout.id()).ok_or_else(|| {
-            RhiError::invalid_argument("unknown graphics shader or pipeline layout")
-        })?;
+        let layout = registries
+            .pipeline_layouts
+            .get(&descriptor.layout.id())
+            .ok_or_else(|| {
+                RhiError::invalid_argument("unknown graphics shader or pipeline layout")
+            })?;
         let mut modules = vec![(descriptor.vertex, crate::rhi::ShaderStage::Vertex)];
         if let Some(fragment) = descriptor.fragment {
             modules.push((fragment, crate::rhi::ShaderStage::Fragment));
@@ -879,9 +943,13 @@ pub fn prepare_graphics_compilation(
         let shared_publish = Arc::clone(&shared);
         Ok(RhiCompiledObject::new(
             move || {
-                lock(&shared_publish)
-                    .graphics_pipelines
-                    .insert(id, VulkanGraphicsPipelineRecord { pipeline, descriptor });
+                lock(&shared_publish).graphics_pipelines.insert(
+                    id,
+                    VulkanGraphicsPipelineRecord {
+                        pipeline,
+                        descriptor,
+                    },
+                );
             },
             // SAFETY: the pipeline was created above and is only destroyed when
             // this object is dropped without being installed.
@@ -895,7 +963,9 @@ pub fn destroy_graphics_pipeline(
     registries: &Arc<Mutex<VulkanRegistries>>,
     handle: GraphicsPipeline,
 ) {
-    let Some(record) = lock(registries).graphics_pipelines.remove(&handle.id()) else { return };
+    let Some(record) = lock(registries).graphics_pipelines.remove(&handle.id()) else {
+        return;
+    };
     // SAFETY: the frame ring waited for every submission that could use it.
     unsafe {
         (context.resources.destroy_pipeline)(context.device, record.pipeline, core::ptr::null());
@@ -927,9 +997,12 @@ pub fn prepare_mesh_compilation(
 
     let (group, layout_native) = {
         let registries = lock(registries);
-        let layout = registries.pipeline_layouts.get(&descriptor.layout.id()).ok_or_else(|| {
-            RhiError::unsupported_feature("Vulkan mesh shader unavailable or invalid layout")
-        })?;
+        let layout = registries
+            .pipeline_layouts
+            .get(&descriptor.layout.id())
+            .ok_or_else(|| {
+                RhiError::unsupported_feature("Vulkan mesh shader unavailable or invalid layout")
+            })?;
         let mut modules = vec![(descriptor.mesh, crate::rhi::ShaderStage::Mesh)];
         if let Some(task) = descriptor.task {
             modules.push((task, crate::rhi::ShaderStage::Task));
@@ -951,15 +1024,25 @@ pub fn prepare_mesh_compilation(
     Ok(RhiCompilationWork::new(move || {
         let mut group = group;
         group.refresh();
-        let (pipeline, render_objects) =
-            create_graphics_pipeline_native(device, create, rendering, &graphics, &group, layout_native)?;
+        let (pipeline, render_objects) = create_graphics_pipeline_native(
+            device,
+            create,
+            rendering,
+            &graphics,
+            &group,
+            layout_native,
+        )?;
         drop(render_objects);
         let shared_publish = Arc::clone(&shared);
         Ok(RhiCompiledObject::new(
             move || {
-                lock(&shared_publish)
-                    .mesh_pipelines
-                    .insert(id, VulkanMeshPipelineRecord { pipeline, descriptor });
+                lock(&shared_publish).mesh_pipelines.insert(
+                    id,
+                    VulkanMeshPipelineRecord {
+                        pipeline,
+                        descriptor,
+                    },
+                );
             },
             // SAFETY: the pipeline was created above and is only destroyed when
             // this object is dropped without being installed.
@@ -988,7 +1071,9 @@ pub fn destroy_mesh_pipeline(
     registries: &Arc<Mutex<VulkanRegistries>>,
     handle: MeshPipeline,
 ) {
-    let Some(record) = lock(registries).mesh_pipelines.remove(&handle.id()) else { return };
+    let Some(record) = lock(registries).mesh_pipelines.remove(&handle.id()) else {
+        return;
+    };
     // SAFETY: the frame ring waited for every submission that could use it.
     unsafe {
         (context.resources.destroy_pipeline)(context.device, record.pipeline, core::ptr::null());
@@ -997,17 +1082,29 @@ pub fn destroy_mesh_pipeline(
 
 /// Dynamic-offset positions follow the ascending dynamic binding slot.
 pub fn dynamic_slot_positions(layout_entries: &[BindingLayoutEntry]) -> Vec<(u32, u32)> {
-    let mut dynamic: Vec<&BindingLayoutEntry> =
-        layout_entries.iter().filter(|entry| entry.buffer.has_dynamic_offset).collect();
+    let mut dynamic: Vec<&BindingLayoutEntry> = layout_entries
+        .iter()
+        .filter(|entry| entry.buffer.has_dynamic_offset)
+        .collect();
     dynamic.sort_by_key(|entry| entry.slot);
-    dynamic.into_iter().enumerate().map(|(index, entry)| (entry.slot, index as u32)).collect()
+    dynamic
+        .into_iter()
+        .enumerate()
+        .map(|(index, entry)| (entry.slot, index as u32))
+        .collect()
 }
 
 /// Rejects layouts whose slots collide or exceed the device's descriptor budget.
-pub fn validate_binding_layout(entries: &[BindingLayoutEntry], max_descriptors: u32) -> RhiResult<()> {
+pub fn validate_binding_layout(
+    entries: &[BindingLayoutEntry],
+    max_descriptors: u32,
+) -> RhiResult<()> {
     let mut seen: HashSet<u32> = HashSet::new();
     for entry in entries {
-        rhi_require(seen.insert(entry.slot), "binding slots must be unique within a layout")?;
+        rhi_require(
+            seen.insert(entry.slot),
+            "binding slots must be unique within a layout",
+        )?;
     }
     rhi_require(
         entries.len() as u32 <= max_descriptors,
@@ -1040,7 +1137,10 @@ mod tests {
     fn duplicate_binding_slots_are_rejected() {
         assert!(validate_binding_layout(&[entry(0, false), entry(1, false)], 8).is_ok());
         assert!(validate_binding_layout(&[entry(0, false), entry(0, true)], 8).is_err());
-        assert!(validate_binding_layout(&[entry(0, false), entry(1, false), entry(2, false)], 2).is_err());
+        assert!(
+            validate_binding_layout(&[entry(0, false), entry(1, false), entry(2, false)], 2)
+                .is_err()
+        );
     }
 
     #[test]
@@ -1060,7 +1160,13 @@ mod tests {
             crate::rhi::ShaderModule::new(2),
         );
         let state = FixedFunctionState::build(&descriptor).expect("builds");
-        assert_eq!(state.dynamic_states, [sys::VK_DYNAMIC_STATE_VIEWPORT, sys::VK_DYNAMIC_STATE_SCISSOR]);
+        assert_eq!(
+            state.dynamic_states,
+            [
+                sys::VK_DYNAMIC_STATE_VIEWPORT,
+                sys::VK_DYNAMIC_STATE_SCISSOR
+            ]
+        );
         assert!(state.vertex_bindings.is_empty());
         assert!(state.blend_attachments.is_empty());
     }

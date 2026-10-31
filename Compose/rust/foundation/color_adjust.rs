@@ -10,7 +10,12 @@ pub trait ColorAdjustExt {
 impl ColorAdjustExt for Color {
     fn darker(self, amount: f32) -> Color {
         let amount = amount.clamp(0.0, 1.0);
-        Color { r: self.r * (1.0 - amount), g: self.g * (1.0 - amount), b: self.b * (1.0 - amount), a: self.a }
+        Color {
+            r: self.r * (1.0 - amount),
+            g: self.g * (1.0 - amount),
+            b: self.b * (1.0 - amount),
+            a: self.a,
+        }
     }
 
     fn lighter(self, amount: f32) -> Color {

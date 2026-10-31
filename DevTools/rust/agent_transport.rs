@@ -48,7 +48,10 @@ impl AgentLocalServer {
     }
 
     pub fn bound_port(&self) -> Option<u16> {
-        self.state.lock().unwrap_or_else(|error| error.into_inner()).port
+        self.state
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .port
     }
 
     pub fn start(&self) -> io::Result<()> {
@@ -115,7 +118,9 @@ impl Drop for AgentLocalServer {
 /// queued lines or an oversized response closes the connection rather than
 /// growing without limit.
 fn serve(stream: TcpStream, handler: &Handler) {
-    let Ok(writer_stream) = stream.try_clone() else { return };
+    let Ok(writer_stream) = stream.try_clone() else {
+        return;
+    };
     let mut writer = std::io::BufWriter::new(writer_stream);
     let mut reader = BufReader::new(stream);
     let mut line = Vec::new();
@@ -146,7 +151,10 @@ fn serve(stream: TcpStream, handler: &Handler) {
         if response.len() > MAX_RESPONSE_BYTES {
             break;
         }
-        if writer.write_all(&response).is_err() || writer.write_all(b"\n").is_err() || writer.flush().is_err() {
+        if writer.write_all(&response).is_err()
+            || writer.write_all(b"\n").is_err()
+            || writer.flush().is_err()
+        {
             break;
         }
         pending -= 1;
@@ -159,7 +167,10 @@ enum LineError {
 }
 
 /// Read one line without exceeding `MAX_LINE_BYTES`.
-fn read_bounded_line(reader: &mut BufReader<TcpStream>, out: &mut Vec<u8>) -> Result<usize, LineError> {
+fn read_bounded_line(
+    reader: &mut BufReader<TcpStream>,
+    out: &mut Vec<u8>,
+) -> Result<usize, LineError> {
     let mut byte = [0u8; 1];
     loop {
         match std::io::Read::read(reader, &mut byte) {
@@ -196,15 +207,23 @@ pub fn serve_stdio(handler: Handler) -> io::Result<()> {
             return Ok(());
         }
         if line.len() > MAX_LINE_BYTES {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "request exceeds 1 MiB"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "request exceeds 1 MiB",
+            ));
         }
         let trimmed = line.trim_end_matches(['\n', '\r']);
         if trimmed.is_empty() {
             continue;
         }
-        let Some(response) = handler(trimmed.as_bytes()) else { continue };
+        let Some(response) = handler(trimmed.as_bytes()) else {
+            continue;
+        };
         if response.len() > MAX_RESPONSE_BYTES {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "response exceeds 2 MiB"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "response exceeds 2 MiB",
+            ));
         }
         writer.write_all(&response)?;
         writer.write_all(b"\n")?;
@@ -234,7 +253,9 @@ mod tests {
         // returns at EOF, so the client must close its writing half first —
         // otherwise the client waits for EOF while the server waits for more
         // input, and the test deadlocks.
-        stream.shutdown(std::net::Shutdown::Write).expect("half-close");
+        stream
+            .shutdown(std::net::Shutdown::Write)
+            .expect("half-close");
         let mut response = Vec::new();
         stream.read_to_end(&mut response).expect("read");
         let text = String::from_utf8_lossy(&response);

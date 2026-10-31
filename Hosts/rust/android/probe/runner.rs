@@ -1,8 +1,8 @@
 //! Translation of Android/CoveAndroidProbe/Runner.swift.
 
 use cove_graphics::rhi::{Device, QueueClass, ShaderArtifact, Texture, TextureSubresource};
-use std::sync::Arc;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 /// Probe failure with the Swift `CustomStringConvertible` description.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -23,7 +23,11 @@ impl ProbeFailure {
 }
 
 pub fn require(condition: bool, message: &str) -> Result<(), ProbeFailure> {
-    if condition { Ok(()) } else { Err(ProbeFailure::new(message)) }
+    if condition {
+        Ok(())
+    } else {
+        Err(ProbeFailure::new(message))
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

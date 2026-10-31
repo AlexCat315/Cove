@@ -20,7 +20,7 @@
 use std::path::Path;
 
 use cove_core::{
-    layout_text, Backdrop, Color, DrawList, Point, Rect, TextLayoutOptions, TextLayoutResult,
+    Backdrop, Color, DrawList, Point, Rect, TextLayoutOptions, TextLayoutResult, layout_text,
 };
 use cove_text::DrawListText;
 use cove_text::{FontAtlas, TextShaper};
@@ -39,7 +39,9 @@ fn test_font_path() -> Option<&'static str> {
             "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
             "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
         ];
-        CANDIDATES.into_iter().find(|candidate| Path::new(candidate).is_file())
+        CANDIDATES
+            .into_iter()
+            .find(|candidate| Path::new(candidate).is_file())
     })
 }
 
@@ -69,32 +71,51 @@ fn add_rect_geometry() {
     // Vertices: top-left, top-right, bottom-right, bottom-left.
     assert_eq!((list.vertices()[0].x, list.vertices()[0].y), (10.0, 20.0));
     assert_eq!((list.vertices()[2].x, list.vertices()[2].y), (40.0, 60.0));
-    assert_eq!(list.vertices()[0].u, -1.0, "a solid fill uses the sentinel UV");
+    assert_eq!(
+        list.vertices()[0].u,
+        -1.0,
+        "a solid fill uses the sentinel UV"
+    );
 }
 
 #[test]
 fn line_coverage() {
     let mut list = DrawList::default();
     list.pixel_scale = 2.0;
-    list.add_line(Point { x: 2.0, y: 3.0 }, Point { x: 42.0, y: 23.0 }, 2.0, Color::WHITE)
-        .expect("the line is accepted");
+    list.add_line(
+        Point { x: 2.0, y: 3.0 },
+        Point { x: 42.0, y: 23.0 },
+        2.0,
+        Color::WHITE,
+    )
+    .expect("the line is accepted");
 
     assert!(list.vertices().len() > 4);
     assert!(list.indices().len() > 6);
     assert!(
-        list.indices().iter().all(|index| (*index as usize) < list.vertices().len()),
+        list.indices()
+            .iter()
+            .all(|index| (*index as usize) < list.vertices().len()),
         "every index stays in range",
     );
-    assert!(list.vertices().iter().any(|vertex| alpha(vertex) == 0xFF), "an opaque core");
-    assert!(list.vertices().iter().any(|vertex| alpha(vertex) == 0), "a transparent fringe");
+    assert!(
+        list.vertices().iter().any(|vertex| alpha(vertex) == 0xFF),
+        "an opaque core"
+    );
+    assert!(
+        list.vertices().iter().any(|vertex| alpha(vertex) == 0),
+        "a transparent fringe"
+    );
     assert_eq!(list.batches().len(), 1);
 }
 
 #[test]
 fn merge_adjacent_batches() {
     let mut list = DrawList::default();
-    list.add_rect(Rect::new(0.0, 0.0, 10.0, 10.0), Color::WHITE).expect("first rect");
-    list.add_rect(Rect::new(20.0, 0.0, 10.0, 10.0), Color::BLACK).expect("second rect");
+    list.add_rect(Rect::new(0.0, 0.0, 10.0, 10.0), Color::WHITE)
+        .expect("first rect");
+    list.add_rect(Rect::new(20.0, 0.0, 10.0, 10.0), Color::BLACK)
+        .expect("second rect");
 
     assert_eq!(list.vertices().len(), 8);
     assert_eq!(list.indices().len(), 12);
@@ -114,18 +135,27 @@ fn backdrop_starts_own_batch() {
         blur_radius: 12.0,
         opacity: 1.0,
     };
-    list.add_rect(Rect::new(0.0, 0.0, 40.0, 40.0), Color::BLACK).expect("the shadow rect");
+    list.add_rect(Rect::new(0.0, 0.0, 40.0, 40.0), Color::BLACK)
+        .expect("the shadow rect");
     list.begin_backdrop(backdrop);
     list.add_rounded_rect(Rect::new(4.0, 4.0, 32.0, 32.0), 6.0, Color::WHITE)
         .expect("the frosted fill");
     // The request is consumed: the row after the fill merges as usual.
-    list.add_rect(Rect::new(4.0, 4.0, 32.0, 32.0), Color::WHITE).expect("the trailing rect");
+    list.add_rect(Rect::new(4.0, 4.0, 32.0, 32.0), Color::WHITE)
+        .expect("the trailing rect");
 
     assert_eq!(list.batches().len(), 2);
-    assert!(list.batches()[0].backdrop.is_none(), "the shadow keeps its own plain batch");
+    assert!(
+        list.batches()[0].backdrop.is_none(),
+        "the shadow keeps its own plain batch"
+    );
     assert_eq!(list.batches()[0].index_count, 6);
     let frosted = &list.batches()[1];
-    assert_eq!(frosted.backdrop, Some(backdrop), "the request rides on the fill's batch");
+    assert_eq!(
+        frosted.backdrop,
+        Some(backdrop),
+        "the request rides on the fill's batch"
+    );
     assert_eq!(frosted.index_offset, 6);
     assert_eq!(
         frosted.index_count,
@@ -137,7 +167,8 @@ fn backdrop_starts_own_batch() {
 #[test]
 fn texture_splits_batches() {
     let mut list = DrawList::default();
-    list.add_rect(Rect::new(0.0, 0.0, 10.0, 10.0), Color::WHITE).expect("first rect");
+    list.add_rect(Rect::new(0.0, 0.0, 10.0, 10.0), Color::WHITE)
+        .expect("first rect");
     list.add_glyph_quad(
         Rect::new(20.0, 0.0, 10.0, 10.0),
         1,
@@ -146,7 +177,8 @@ fn texture_splits_batches() {
         Point { x: 1.0, y: 1.0 },
     )
     .expect("the glyph quad");
-    list.add_rect(Rect::new(40.0, 0.0, 10.0, 10.0), Color::WHITE).expect("last rect");
+    list.add_rect(Rect::new(40.0, 0.0, 10.0, 10.0), Color::WHITE)
+        .expect("last rect");
 
     assert_eq!(list.batches().len(), 3);
     assert_eq!(list.batches()[0].texture_id, 0);
@@ -161,13 +193,17 @@ fn clip_stack() {
     let inner = Rect::new(10.0, 10.0, 50.0, 50.0);
 
     list.push_clip_rect(outer);
-    list.add_rect(Rect::new(0.0, 0.0, 10.0, 10.0), Color::WHITE).expect("outer rect");
+    list.add_rect(Rect::new(0.0, 0.0, 10.0, 10.0), Color::WHITE)
+        .expect("outer rect");
     list.push_clip_rect(inner);
-    list.add_rect(Rect::new(20.0, 20.0, 5.0, 5.0), Color::WHITE).expect("inner rect");
+    list.add_rect(Rect::new(20.0, 20.0, 5.0, 5.0), Color::WHITE)
+        .expect("inner rect");
     list.pop_clip_rect();
-    list.add_rect(Rect::new(30.0, 30.0, 10.0, 10.0), Color::WHITE).expect("outer rect again");
+    list.add_rect(Rect::new(30.0, 30.0, 10.0, 10.0), Color::WHITE)
+        .expect("outer rect again");
     list.pop_clip_rect();
-    list.add_rect(Rect::new(0.0, 0.0, 5.0, 5.0), Color::WHITE).expect("unclipped rect");
+    list.add_rect(Rect::new(0.0, 0.0, 5.0, 5.0), Color::WHITE)
+        .expect("unclipped rect");
 
     let scissors: Vec<Option<Rect>> = list.batches().iter().map(|batch| batch.scissor).collect();
     assert_eq!(
@@ -197,23 +233,39 @@ fn rounded_rect_geometry() {
         let mut list = DrawList::default();
         list.pixel_scale = scale;
         let tint = Color::from_rgba8(40, 90, 180, 128);
-        list.add_rounded_rect(Rect::new(0.0, 0.0, 100.0, 60.0), 10.0, tint).expect("the fill");
+        list.add_rounded_rect(Rect::new(0.0, 0.0, 100.0, 60.0), 10.0, tint)
+            .expect("the fill");
 
         assert_eq!(list.batches().len(), 1, "scale {scale}: one batch");
         assert_eq!(list.batches()[0].index_count, list.indices().len() as u32);
         assert!(
-            list.indices().iter().all(|index| (*index as usize) < list.vertices().len()),
+            list.indices()
+                .iter()
+                .all(|index| (*index as usize) < list.vertices().len()),
             "scale {scale}: every index stays in range",
         );
         assert!(
-            list.vertices().iter().all(|vertex| alpha(vertex) == 128 || alpha(vertex) == 0),
+            list.vertices()
+                .iter()
+                .all(|vertex| alpha(vertex) == 128 || alpha(vertex) == 0),
             "scale {scale}: source alpha is preserved exactly",
         );
 
-        let left = list.vertices().iter().map(|v| v.x).fold(f32::INFINITY, f32::min);
-        let right = list.vertices().iter().map(|v| v.x).fold(f32::NEG_INFINITY, f32::max);
+        let left = list
+            .vertices()
+            .iter()
+            .map(|v| v.x)
+            .fold(f32::INFINITY, f32::min);
+        let right = list
+            .vertices()
+            .iter()
+            .map(|v| v.x)
+            .fold(f32::NEG_INFINITY, f32::max);
         let half = 0.5 / scale;
-        assert!((left + half).abs() < 0.001, "scale {scale}: left coverage is within half a pixel");
+        assert!(
+            (left + half).abs() < 0.001,
+            "scale {scale}: left coverage is within half a pixel"
+        );
         assert!(
             (right - 100.0 - half).abs() < 0.001,
             "scale {scale}: right coverage is within half a pixel",
@@ -249,7 +301,15 @@ fn shaped_hi() -> Option<(FontAtlas, TextLayoutResult)> {
     let mut shaper = TextShaper::default();
     shaper.set_face(atlas.font_face()?, 16.0);
     let shaped = shaper.shape("Hi", None, None, None);
-    let result = layout_text(&shaped, "Hi", &atlas, TextLayoutOptions { line_height: 20.0, ..Default::default() });
+    let result = layout_text(
+        &shaped,
+        "Hi",
+        &atlas,
+        TextLayoutOptions {
+            line_height: 20.0,
+            ..Default::default()
+        },
+    );
     Some((atlas, result))
 }
 
@@ -260,8 +320,15 @@ fn add_text_geometry() {
         return;
     };
     let mut list = DrawList::default();
-    list.add_text(&result, Point { x: 0.0, y: 0.0 }, Color::WHITE, 7, Some(&atlas), None)
-        .expect("the text is accepted");
+    list.add_text(
+        &result,
+        Point { x: 0.0, y: 0.0 },
+        Color::WHITE,
+        7,
+        Some(&atlas),
+        None,
+    )
+    .expect("the text is accepted");
 
     // Two visible glyphs → 8 vertices, 12 indices, one batch with texture 7.
     assert_eq!(list.vertices().len(), 8);
@@ -272,7 +339,11 @@ fn add_text_geometry() {
     let info = atlas
         .rasterize_codepoint('H', 0)
         .expect("`H` rasterises in the primary face");
-    assert_eq!(list.vertices()[0].u, info.uv_min_x, "the first quad takes the `H` UV origin");
+    assert_eq!(
+        list.vertices()[0].u,
+        info.uv_min_x,
+        "the first quad takes the `H` UV origin"
+    );
     assert_eq!(list.vertices()[0].v, info.uv_min_y);
 }
 
@@ -299,14 +370,23 @@ fn add_text_pixel_snap() {
     list.add_text(&result, origin, Color::WHITE, 7, Some(&atlas), None)
         .expect("the text is accepted");
 
-    assert_eq!(list.vertices()[0].x, raw_x.round(), "glyph quads snap to whole pixels in x");
-    assert_eq!(list.vertices()[0].y, raw_y.round(), "glyph quads snap to whole pixels in y");
+    assert_eq!(
+        list.vertices()[0].x,
+        raw_x.round(),
+        "glyph quads snap to whole pixels in x"
+    );
+    assert_eq!(
+        list.vertices()[0].y,
+        raw_y.round(),
+        "glyph quads snap to whole pixels in y"
+    );
 }
 
 #[test]
 fn reset_clears() {
     let mut list = DrawList::default();
-    list.add_rect(Rect::new(0.0, 0.0, 10.0, 10.0), Color::WHITE).expect("a rect");
+    list.add_rect(Rect::new(0.0, 0.0, 10.0, 10.0), Color::WHITE)
+        .expect("a rect");
     list.reset();
 
     assert!(list.vertices().is_empty());
@@ -319,10 +399,14 @@ fn reset_clears() {
 fn translated_append() {
     let mut source = DrawList::default();
     source.push_clip_rect(Rect::new(0.0, 0.0, 100.0, 80.0));
-    source.add_rect(Rect::new(10.0, 20.0, 30.0, 40.0), Color::WHITE).expect("the source rect");
+    source
+        .add_rect(Rect::new(10.0, 20.0, 30.0, 40.0), Color::WHITE)
+        .expect("the source rect");
 
     let mut destination = DrawList::default();
-    destination.add_rect(Rect::new(0.0, 0.0, 1.0, 1.0), Color::BLACK).expect("the leading rect");
+    destination
+        .add_rect(Rect::new(0.0, 0.0, 1.0, 1.0), Color::BLACK)
+        .expect("the leading rect");
     destination
         .append(&source, Point { x: 7.0, y: -5.0 })
         .expect("the translated append");
@@ -341,10 +425,14 @@ fn translated_append() {
 #[test]
 fn empty_append_copy_on_write() {
     let mut source = DrawList::default();
-    source.add_rect(Rect::new(10.0, 20.0, 30.0, 40.0), Color::WHITE).expect("the source rect");
+    source
+        .add_rect(Rect::new(10.0, 20.0, 30.0, 40.0), Color::WHITE)
+        .expect("the source rect");
 
     let mut destination = DrawList::default();
-    destination.append(&source, Point::default()).expect("the append");
+    destination
+        .append(&source, Point::default())
+        .expect("the append");
 
     assert_eq!(destination.vertices().len(), source.vertices().len());
     assert_eq!(destination.vertices()[0].x, source.vertices()[0].x);
@@ -352,13 +440,19 @@ fn empty_append_copy_on_write() {
     assert_eq!(destination.indices(), source.indices());
     assert_eq!(destination.batches().len(), source.batches().len());
 
-    destination.add_rect(Rect::new(50.0, 60.0, 10.0, 10.0), Color::BLACK).expect("a new rect");
+    destination
+        .add_rect(Rect::new(50.0, 60.0, 10.0, 10.0), Color::BLACK)
+        .expect("a new rect");
     assert_eq!(destination.vertices().len(), 8, "the destination grew");
     assert_eq!(source.vertices().len(), 4, "the source stayed put");
     assert_eq!(source.indices().len(), 6);
 
     destination.reset();
     assert!(destination.vertices().is_empty());
-    assert_eq!(source.vertices().len(), 4, "resetting the destination leaves the source intact");
+    assert_eq!(
+        source.vertices().len(),
+        4,
+        "resetting the destination leaves the source intact"
+    );
     assert_eq!(source.indices().len(), 6);
 }

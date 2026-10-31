@@ -11,12 +11,12 @@
 mod support;
 
 use cove_composition::{AnyView, View, ViewExt};
-use cove_core::scene::Node;
 use cove_core::Color;
+use cove_core::scene::Node;
 use cove_ui_compose::modifiers::style::{
-    SemanticStyleViewExt, FONT as FONT_KEY, LINE_HEIGHT as LINE_HEIGHT_KEY,
+    FONT as FONT_KEY, LINE_HEIGHT as LINE_HEIGHT_KEY, SemanticStyleViewExt,
 };
-use cove_ui_compose::theme::theme_environment::{theme_for_node, ThemeViewExt};
+use cove_ui_compose::theme::theme_environment::{ThemeViewExt, theme_for_node};
 use cove_ui_compose::theme::{SemanticColorRef, SemanticFontRef, Theme};
 
 use support::{DebugNode, GlobalTestLock};
@@ -40,14 +40,24 @@ fn deepest_theme(root: AnyView) -> Theme {
 fn theme_provision_reaches_descendants() {
     GlobalTestLock::locked(|| {
         let mut custom = Theme::default_dark();
-        custom.colors.accent = Color { r: 0.9, g: 0.1, b: 0.1, a: 1.0 };
+        custom.colors.accent = Color {
+            r: 0.9,
+            g: 0.1,
+            b: 0.1,
+            a: 1.0,
+        };
 
         let theme = deepest_theme(AnyView::new(
             AnyView::new(DebugNode::new("leaf")).theme(custom),
         ));
         assert_eq!(
             theme.colors.accent,
-            Color { r: 0.9, g: 0.1, b: 0.1, a: 1.0 },
+            Color {
+                r: 0.9,
+                g: 0.1,
+                b: 0.1,
+                a: 1.0
+            },
             "the provided theme reaches the leaf"
         );
     });
@@ -69,7 +79,12 @@ fn absent_provider_falls_back_to_the_dark_preset() {
 fn semantic_background_resolves_against_the_provided_theme() {
     GlobalTestLock::locked(|| {
         let mut custom = Theme::default_dark();
-        custom.colors.surface = Color { r: 0.5, g: 0.0, b: 0.5, a: 1.0 };
+        custom.colors.surface = Color {
+            r: 0.5,
+            g: 0.0,
+            b: 0.5,
+            a: 1.0,
+        };
 
         let graph = support::graph();
         graph.install_view(
@@ -84,7 +99,12 @@ fn semantic_background_resolves_against_the_provided_theme() {
         let leaf = descendant(&root);
         assert_eq!(
             leaf.background_color(),
-            Some(Color { r: 0.5, g: 0.0, b: 0.5, a: 1.0 }),
+            Some(Color {
+                r: 0.5,
+                g: 0.0,
+                b: 0.5,
+                a: 1.0
+            }),
             "the semantic background resolved on first install"
         );
     });
@@ -94,7 +114,12 @@ fn semantic_background_resolves_against_the_provided_theme() {
 fn semantic_foreground_resolves_against_the_provided_theme() {
     GlobalTestLock::locked(|| {
         let mut custom = Theme::default_dark();
-        custom.colors.on_surface = Color { r: 0.1, g: 0.9, b: 0.2, a: 1.0 };
+        custom.colors.on_surface = Color {
+            r: 0.1,
+            g: 0.9,
+            b: 0.2,
+            a: 1.0,
+        };
 
         let graph = support::graph();
         graph.install_view(
@@ -109,7 +134,12 @@ fn semantic_foreground_resolves_against_the_provided_theme() {
         let leaf = descendant(&root);
         assert_eq!(
             leaf.foreground_color(),
-            Some(Color { r: 0.1, g: 0.9, b: 0.2, a: 1.0 }),
+            Some(Color {
+                r: 0.1,
+                g: 0.9,
+                b: 0.2,
+                a: 1.0
+            }),
             "the semantic foreground resolved on first install"
         );
     });
@@ -153,9 +183,19 @@ fn semantic_font_writes_font_and_line_height() {
 fn a_nearer_theme_overrides_an_outer_one() {
     GlobalTestLock::locked(|| {
         let mut outer = Theme::default_dark();
-        outer.colors.accent = Color { r: 1.0, g: 0.0, b: 0.0, a: 1.0 };
+        outer.colors.accent = Color {
+            r: 1.0,
+            g: 0.0,
+            b: 0.0,
+            a: 1.0,
+        };
         let mut inner = Theme::default_dark();
-        inner.colors.accent = Color { r: 0.0, g: 1.0, b: 0.0, a: 1.0 };
+        inner.colors.accent = Color {
+            r: 0.0,
+            g: 1.0,
+            b: 0.0,
+            a: 1.0,
+        };
 
         // The modifier applied last is the innermost provider.
         let theme = deepest_theme(AnyView::new(
@@ -163,7 +203,12 @@ fn a_nearer_theme_overrides_an_outer_one() {
         ));
         assert_eq!(
             theme.colors.accent,
-            Color { r: 0.0, g: 1.0, b: 0.0, a: 1.0 },
+            Color {
+                r: 0.0,
+                g: 1.0,
+                b: 0.0,
+                a: 1.0
+            },
             "the innermost provider wins"
         );
     });
@@ -173,7 +218,12 @@ fn a_nearer_theme_overrides_an_outer_one() {
 fn every_semantic_color_slot_tracks_its_theme_slot() {
     GlobalTestLock::locked(|| {
         let mut custom = Theme::default_dark();
-        custom.colors.error = Color { r: 0.2, g: 0.4, b: 0.6, a: 1.0 };
+        custom.colors.error = Color {
+            r: 0.2,
+            g: 0.4,
+            b: 0.6,
+            a: 1.0,
+        };
 
         let graph = support::graph();
         let expected = custom.colors.error;

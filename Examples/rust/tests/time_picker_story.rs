@@ -6,14 +6,17 @@
 
 use cove_examples::gallery_content::catalog::GalleryOptions;
 use cove_examples::gallery_content::stories::time_picker_story::{
-    display_text, TimePickerStory, DEFAULT_HOUR, DEFAULT_MINUTE,
+    DEFAULT_HOUR, DEFAULT_MINUTE, TimePickerStory, display_text,
 };
 use cove_ui_compose::primitives::controls::date_values::TimeOfDay;
 
 #[test]
 fn the_story_opens_at_half_past_nine_am() {
     let story = TimePickerStory::new(GalleryOptions::default());
-    assert_eq!(story.time(), Some(TimeOfDay::new(DEFAULT_HOUR, DEFAULT_MINUTE, 0)));
+    assert_eq!(
+        story.time(),
+        Some(TimeOfDay::new(DEFAULT_HOUR, DEFAULT_MINUTE, 0))
+    );
     assert_eq!(story.display(), "09:30 AM");
 }
 
@@ -27,12 +30,18 @@ fn midnight_reads_as_twelve_am() {
 
 #[test]
 fn noon_reads_as_twelve_pm() {
-    assert_eq!(display_text(Some(TimeOfDay::new(12, 0, 0)), true, false), "12:00 PM");
+    assert_eq!(
+        display_text(Some(TimeOfDay::new(12, 0, 0)), true, false),
+        "12:00 PM"
+    );
 }
 
 #[test]
 fn one_pm_reads_as_one_pm() {
-    assert_eq!(display_text(Some(TimeOfDay::new(13, 45, 0)), true, false), "01:45 PM");
+    assert_eq!(
+        display_text(Some(TimeOfDay::new(13, 45, 0)), true, false),
+        "01:45 PM"
+    );
 }
 
 #[test]
@@ -45,9 +54,18 @@ fn eleven_fifty_nine_stays_am() {
 
 #[test]
 fn a_twenty_four_hour_clock_uses_zero_padding_and_no_marker() {
-    assert_eq!(display_text(Some(TimeOfDay::new(9, 5, 0)), false, false), "09:05");
-    assert_eq!(display_text(Some(TimeOfDay::new(0, 0, 0)), false, false), "00:00");
-    assert_eq!(display_text(Some(TimeOfDay::new(23, 59, 0)), false, false), "23:59");
+    assert_eq!(
+        display_text(Some(TimeOfDay::new(9, 5, 0)), false, false),
+        "09:05"
+    );
+    assert_eq!(
+        display_text(Some(TimeOfDay::new(0, 0, 0)), false, false),
+        "00:00"
+    );
+    assert_eq!(
+        display_text(Some(TimeOfDay::new(23, 59, 0)), false, false),
+        "23:59"
+    );
 }
 
 #[test]
@@ -56,7 +74,10 @@ fn seconds_are_appended_when_enabled() {
         display_text(Some(TimeOfDay::new(9, 30, 7)), true, true),
         "09:30:07 AM"
     );
-    assert_eq!(display_text(Some(TimeOfDay::new(9, 30, 7)), false, true), "09:30:07");
+    assert_eq!(
+        display_text(Some(TimeOfDay::new(9, 30, 7)), false, true),
+        "09:30:07"
+    );
 }
 
 #[test]

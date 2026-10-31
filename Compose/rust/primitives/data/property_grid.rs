@@ -19,23 +19,23 @@
 use std::collections::{BTreeMap, HashSet};
 use std::rc::Rc;
 
+use crate::modifiers::interaction::AccessibilityExt;
+use crate::modifiers::layout::{EdgeInsets, FlexExt, FrameDimension, LayoutFrameExt, PaddingExt};
+use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
+use crate::primitives::controls::Button;
+use crate::primitives::controls::form::label_placement::FieldLabelPlacement;
+use crate::primitives::layout::{ScrollAxis, ScrollView, ScrollbarGutter};
+use crate::primitives::media::{Icon, ui_icon_catalog};
+use crate::primitives::text::Text;
+use crate::theme::styles::buttons::ButtonStyleViewExt;
+use crate::theme::{SemanticColorRef, SemanticFontRef, theme_for_node};
+use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
+use cove_composition::ViewExt;
+use cove_core::State;
 use cove_core::scene::{
     AccessibilitySemantics, Align, FlexDirection, HoverPhase, InteractionRegistryHolder, Justify,
     LayoutNode, Node, Wrap,
 };
-use cove_core::State;
-use crate::modifiers::interaction::AccessibilityExt;
-use crate::modifiers::layout::{EdgeInsets, FlexExt, FrameDimension, LayoutFrameExt, PaddingExt};
-use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
-use crate::primitives::controls::form::label_placement::FieldLabelPlacement;
-use crate::primitives::controls::Button;
-use crate::primitives::layout::{ScrollAxis, ScrollbarGutter, ScrollView};
-use crate::primitives::media::{ui_icon_catalog, Icon};
-use crate::primitives::text::Text;
-use crate::theme::styles::buttons::ButtonStyleViewExt;
-use crate::theme::{theme_for_node, SemanticColorRef, SemanticFontRef};
-use cove_composition::ViewExt;
-use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
 
 const ROW_HOVERED: &str = "__property_grid_row_hovered";
 
@@ -137,7 +137,11 @@ pub struct PropertyGridSection {
 }
 
 impl PropertyGridSection {
-    pub fn new(id: impl Into<String>, title: impl Into<String>, rows: Vec<PropertyGridRow>) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        title: impl Into<String>,
+        rows: Vec<PropertyGridRow>,
+    ) -> Self {
         Self {
             id: id.into(),
             title: title.into(),
@@ -197,7 +201,9 @@ impl PropertyGridSection {
     pub fn secondary_text(&self) -> Option<String> {
         match &self.badge {
             Some(badge) => Some(badge.clone()),
-            None if self.shows_row_count && !self.rows.is_empty() => Some(self.rows.len().to_string()),
+            None if self.shows_row_count && !self.rows.is_empty() => {
+                Some(self.rows.len().to_string())
+            }
             None => None,
         }
     }
@@ -211,7 +217,10 @@ impl PropertyGridSection {
     ) -> bool {
         match controlled {
             Some(ids) => ids.contains(&self.id),
-            None => local.get(&self.id).copied().unwrap_or(self.starts_collapsed),
+            None => local
+                .get(&self.id)
+                .copied()
+                .unwrap_or(self.starts_collapsed),
         }
     }
 }
@@ -255,12 +264,20 @@ impl PropertyGrid {
     }
 
     pub fn label_width(mut self, label_width: f32) -> Self {
-        self.label_width = if label_width.is_finite() { label_width.max(0.0) } else { 96.0 };
+        self.label_width = if label_width.is_finite() {
+            label_width.max(0.0)
+        } else {
+            96.0
+        };
         self
     }
 
     pub fn min_value_width(mut self, min_value_width: f32) -> Self {
-        self.min_value_width = if min_value_width.is_finite() { min_value_width.max(1.0) } else { 220.0 };
+        self.min_value_width = if min_value_width.is_finite() {
+            min_value_width.max(1.0)
+        } else {
+            220.0
+        };
         self
     }
 
@@ -270,7 +287,11 @@ impl PropertyGrid {
     }
 
     pub fn row_height(mut self, row_height: f32) -> Self {
-        self.row_height = if row_height.is_finite() { row_height } else { 24.0 };
+        self.row_height = if row_height.is_finite() {
+            row_height
+        } else {
+            24.0
+        };
         self
     }
 
@@ -326,7 +347,6 @@ impl PropertyGrid {
             self.local_collapsed.set(local);
         }
     }
-
 }
 
 impl View for PropertyGrid {
@@ -372,9 +392,8 @@ impl View for PropertyGrid {
         );
 
         let scroll = match scroll_axes {
-            PropertyGridScrollAxes::Vertical => {
-                ScrollView::new(ScrollAxis::Vertical, content).scrollbar_gutter(ScrollbarGutter::Stable)
-            }
+            PropertyGridScrollAxes::Vertical => ScrollView::new(ScrollAxis::Vertical, content)
+                .scrollbar_gutter(ScrollbarGutter::Stable),
             PropertyGridScrollAxes::Horizontal => ScrollView::new(ScrollAxis::Horizontal, content),
             PropertyGridScrollAxes::Both => {
                 ScrollView::new(ScrollAxis::Both, content).scrollbar_gutter(ScrollbarGutter::Stable)
@@ -384,7 +403,10 @@ impl View for PropertyGrid {
     }
 
     fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
-        vec![crate::DynamicField::state("collapsed", &self.local_collapsed)]
+        vec![crate::DynamicField::state(
+            "collapsed",
+            &self.local_collapsed,
+        )]
     }
 }
 
@@ -451,10 +473,8 @@ impl PropertyGridSurface {
         let toggle_controlled = self.controlled.clone();
         let toggle_change = self.on_change.clone();
         let toggle = Rc::new(move || {
-            let was_collapsed = toggle_section.is_collapsed(
-                toggle_controlled.as_ref(),
-                &toggle_local.get(),
-            );
+            let was_collapsed =
+                toggle_section.is_collapsed(toggle_controlled.as_ref(), &toggle_local.get());
             let next = !was_collapsed;
             if let Some(handler) = &toggle_change {
                 handler(&toggle_section.id, next);
@@ -530,7 +550,8 @@ impl PropertyGridSurface {
             header_children.push(trailing.clone());
         }
 
-        let header_height = if section.header_leading.is_none() && section.header_trailing.is_none() {
+        let header_height = if section.header_leading.is_none() && section.header_trailing.is_none()
+        {
             26.0
         } else {
             32.0
@@ -545,7 +566,12 @@ impl PropertyGridSurface {
                 4.0,
                 AnyView::new(TupleView::new(header_children)),
             ))
-            .padding_insets(EdgeInsets::new(3.0, header_inline_padding, 3.0, header_inline_padding))
+            .padding_insets(EdgeInsets::new(
+                3.0,
+                header_inline_padding,
+                3.0,
+                header_inline_padding,
+            ))
             .frame(None, None, Some(0.0), Some(header_height), None, None),
         );
 
@@ -622,7 +648,12 @@ impl PropertyGridSurface {
         column
     }
 
-    fn row_view(&self, section: &PropertyGridSection, row: &PropertyGridRow, _index: usize) -> AnyView {
+    fn row_view(
+        &self,
+        section: &PropertyGridSection,
+        row: &PropertyGridRow,
+        _index: usize,
+    ) -> AnyView {
         let row_key = format!("{}/{}", section.id, row.id);
         let row_height = row.row_height.unwrap_or(self.row_height).max(1.0);
         let content = match row.layout {
@@ -697,9 +728,20 @@ impl PropertyGridSurface {
                             Justify::FlexStart,
                             Wrap::NoWrap,
                             0.0,
-                            AnyView::new(AnyView::new(value.clone()).flex_with(1.0, 1.0, Some(0.0))),
+                            AnyView::new(AnyView::new(value.clone()).flex_with(
+                                1.0,
+                                1.0,
+                                Some(0.0),
+                            )),
                         ))
-                        .frame(None, fixed_height.map(FrameDimension::Points), None, Some(row_height), None, None)
+                        .frame(
+                            None,
+                            fixed_height.map(FrameDimension::Points),
+                            None,
+                            Some(row_height),
+                            None,
+                            None,
+                        )
                         .padding_insets(EdgeInsets::new(
                             2.0,
                             if leading { 0.0 } else { 7.0 },
@@ -716,8 +758,16 @@ impl PropertyGridSurface {
 
                 AnyView::new(
                     AnyView::new(BoxView::new(
-                        if leading { FlexDirection::Row } else { FlexDirection::Column },
-                        if leading { Align::Center } else { Align::Stretch },
+                        if leading {
+                            FlexDirection::Row
+                        } else {
+                            FlexDirection::Column
+                        },
+                        if leading {
+                            Align::Center
+                        } else {
+                            Align::Stretch
+                        },
                         Justify::FlexStart,
                         Wrap::NoWrap,
                         if leading { 4.0 } else { 6.0 },
@@ -735,8 +785,9 @@ impl PropertyGridSurface {
         let vertical_padding = 6.0;
         let label_value_spacing = if label.is_empty() { 0.0 } else { 6.0 };
         let minimum_value_height = self.row_height.max(1.0);
-        let total_height = row_height
-            .max(label_height + label_value_spacing + vertical_padding * 2.0 + minimum_value_height);
+        let total_height = row_height.max(
+            label_height + label_value_spacing + vertical_padding * 2.0 + minimum_value_height,
+        );
         let value_height = match row.sizing {
             PropertyGridRowSizing::Fixed => {
                 Some(total_height - label_height - label_value_spacing - vertical_padding * 2.0)
@@ -768,7 +819,14 @@ impl PropertyGridSurface {
                     0.0,
                     AnyView::new(AnyView::new(value).flex_with(1.0, 1.0, Some(0.0))),
                 ))
-                .frame(None, value_height.map(FrameDimension::Points), None, None, None, None)
+                .frame(
+                    None,
+                    value_height.map(FrameDimension::Points),
+                    None,
+                    None,
+                    None,
+                    None,
+                )
                 .padding_insets(EdgeInsets::new(0.0, 7.0, 0.0, 7.0)),
             )
             .flex_with(0.0, 0.0, None),
@@ -805,10 +863,12 @@ impl PropertyGridSurface {
     fn sized_value(&self, row: &PropertyGridRow, height: Option<f32>) -> AnyView {
         let label = row.label.clone();
         let identifier = row.id.clone();
-        let value = AnyView::new(row.value().clone()).accessibility(move |semantics: &mut AccessibilitySemantics| {
-            semantics.label = label.clone();
-            semantics.identifier = identifier.clone();
-        });
+        let value = AnyView::new(row.value().clone()).accessibility(
+            move |semantics: &mut AccessibilitySemantics| {
+                semantics.label = label.clone();
+                semantics.identifier = identifier.clone();
+            },
+        );
         match height {
             Some(height) => AnyView::new(AnyView::new(value).frame_height(height)),
             None => AnyView::new(value),
@@ -877,15 +937,20 @@ impl PrimitiveView for PropertyGridRowHost {
         });
         paint();
 
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         let hover_node = node.downgrade();
         let hover_paint = paint.clone();
-        registry.set_hover(node, Rc::new(move |phase: HoverPhase| {
-            if let Some(owner) = Node::upgrade(&hover_node) {
-                owner.set_attachment(ROW_HOVERED, phase == HoverPhase::Enter);
-                hover_paint();
-            }
-        }));
+        registry.set_hover(
+            node,
+            Rc::new(move |phase: HoverPhase| {
+                if let Some(owner) = Node::upgrade(&hover_node) {
+                    owner.set_attachment(ROW_HOVERED, phase == HoverPhase::Enter);
+                    hover_paint();
+                }
+            }),
+        );
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {

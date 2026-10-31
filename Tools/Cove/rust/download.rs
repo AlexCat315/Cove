@@ -5,7 +5,7 @@
 //! Redirect resolution, digest verification and atomic publication stay here.
 
 use crate::sha256;
-use crate::support::{environment, Files, Shell, StdoutTarget, ToolError};
+use crate::support::{Files, Shell, StdoutTarget, ToolError, environment};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -34,9 +34,7 @@ pub fn redirected_url(remote: &str) -> Result<String, ToolError> {
         true,
         StdoutTarget::StandardOutput,
     )
-    .map_err(|error| {
-        ToolError::invalid(format!("HTTP request for {remote} failed: {error}"))
-    })?;
+    .map_err(|error| ToolError::invalid(format!("HTTP request for {remote} failed: {error}")))?;
     let url = output.trim().to_string();
     if url.is_empty() {
         return Err(ToolError::invalid(format!(
@@ -151,11 +149,7 @@ fn require_https(remote: &str) -> Result<(), ToolError> {
 }
 
 fn null_device() -> &'static str {
-    if cfg!(windows) {
-        "NUL"
-    } else {
-        "/dev/null"
-    }
+    if cfg!(windows) { "NUL" } else { "/dev/null" }
 }
 
 fn io_error(error: io::Error) -> ToolError {

@@ -5,13 +5,13 @@
 use cove_core::Color;
 use cove_imaging::BundleImageResource;
 
-use crate::primitives::text::text_diagnostic::TextDiagnostics;
-use crate::primitives::text::text_edit_history::TextEditHistory;
 use crate::primitives::text::code::folding_options::TextEditorFolding;
 use crate::primitives::text::code::gutter_options::TextEditorGutter;
-use crate::primitives::text::text_completion_rebase::TextCompletionItem;
-use crate::primitives::text::text_field::text_field_observation::TextFieldHoverAnchor;
 use crate::primitives::text::text_buffer::TextBuffer;
+use crate::primitives::text::text_completion_rebase::TextCompletionItem;
+use crate::primitives::text::text_diagnostic::TextDiagnostics;
+use crate::primitives::text::text_edit_history::TextEditHistory;
+use crate::primitives::text::text_field::text_field_observation::TextFieldHoverAnchor;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum TextFieldAxis {
@@ -157,7 +157,8 @@ pub struct TextFieldCodeEditing {
     pub line_number_color: Option<Color>,
     pub line_number_gutter_color: Option<Color>,
     pub syntax_revision: Option<u64>,
-    pub syntax_color_at_utf8_offset: Option<std::rc::Rc<dyn Fn(&TextBuffer, usize) -> Option<Color>>>,
+    pub syntax_color_at_utf8_offset:
+        Option<std::rc::Rc<dyn Fn(&TextBuffer, usize) -> Option<Color>>>,
 }
 
 /// What the field asks a completion provider for at the caret.
@@ -196,6 +197,8 @@ impl TextFieldCodeStorage {
 
 impl Default for TextFieldCodeStorage {
     fn default() -> Self {
-        Self { value: TextFieldCodeEditing::default() }
+        Self {
+            value: TextFieldCodeEditing::default(),
+        }
     }
 }

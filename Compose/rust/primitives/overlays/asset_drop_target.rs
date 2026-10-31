@@ -6,11 +6,9 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
 
-use cove_core::scene::{
-    Align, FlexDirection, LayoutNode, Node, NodeWeak,
-};
-use cove_core::{Binding, Point, Rect};
 use cove_composition::{AnyView, PrimitiveView, View};
+use cove_core::scene::{Align, FlexDirection, LayoutNode, Node, NodeWeak};
+use cove_core::{Binding, Point, Rect};
 
 use crate::theme::theme_for_node;
 
@@ -25,11 +23,7 @@ pub struct AssetDropPayload {
 }
 
 impl AssetDropPayload {
-    pub fn new(
-        id: impl Into<String>,
-        name: impl Into<String>,
-        kind: impl Into<String>,
-    ) -> Self {
+    pub fn new(id: impl Into<String>, name: impl Into<String>, kind: impl Into<String>) -> Self {
         Self {
             id: id.into(),
             name: name.into(),
@@ -87,7 +81,12 @@ impl AssetDropRegistry {
             existing.on_drop = on_drop;
             return;
         }
-        zones.push(Zone { node: weak, accepted_kinds, is_enabled, on_drop });
+        zones.push(Zone {
+            node: weak,
+            accepted_kinds,
+            is_enabled,
+            on_drop,
+        });
     }
 
     pub fn unregister(&self, node: &Node) {
@@ -102,7 +101,9 @@ impl AssetDropRegistry {
         self.prune();
         let zones = self.zones.borrow();
         for zone in zones.iter() {
-            let Some(node) = Node::upgrade(&zone.node) else { continue };
+            let Some(node) = Node::upgrade(&zone.node) else {
+                continue;
+            };
             if zone.is_enabled
                 && Self::accepts(payload.kind.clone(), zone)
                 && node.absolute_frame().contains(point)
@@ -127,7 +128,9 @@ impl AssetDropRegistry {
     }
 
     fn prune(&self) {
-        self.zones.borrow_mut().retain(|zone| Node::upgrade(&zone.node).is_some());
+        self.zones
+            .borrow_mut()
+            .retain(|zone| Node::upgrade(&zone.node).is_some());
     }
 }
 
@@ -165,7 +168,13 @@ impl AssetDropTarget {
         on_drop: Rc<dyn Fn(AssetDropPayload)>,
         content: AnyView,
     ) -> Self {
-        Self { active_payload, accepted_kinds, is_enabled, on_drop, content }
+        Self {
+            active_payload,
+            accepted_kinds,
+            is_enabled,
+            on_drop,
+            content,
+        }
     }
 }
 
@@ -230,7 +239,9 @@ impl PrimitiveView for AssetDropTargetHost {
         let payload_binding = self.active_payload.clone();
         let draw_node = node.clone();
         node.update_overlay_draw(identity, move |list, origin| {
-            let Some(payload) = payload_binding.get() else { return };
+            let Some(payload) = payload_binding.get() else {
+                return;
+            };
             if !is_enabled {
                 return;
             }
@@ -262,20 +273,24 @@ crate::impl_primitive_view!(AssetDropTargetHost);
 /// Paints a one-point border as four edge rectangles.
 fn add_border(rect: Rect, color: cove_core::Color, list: &mut cove_core::DrawList) {
     let thickness = 1.0;
+    let _ = list.add_rect(Rect::new(rect.x, rect.y, rect.width, thickness), color);
     let _ = list.add_rect(
-        Rect::new(rect.x, rect.y, rect.width, thickness),
+        Rect::new(
+            rect.x,
+            rect.y + rect.height - thickness,
+            rect.width,
+            thickness,
+        ),
         color,
     );
+    let _ = list.add_rect(Rect::new(rect.x, rect.y, thickness, rect.height), color);
     let _ = list.add_rect(
-        Rect::new(rect.x, rect.y + rect.height - thickness, rect.width, thickness),
-        color,
-    );
-    let _ = list.add_rect(
-        Rect::new(rect.x, rect.y, thickness, rect.height),
-        color,
-    );
-    let _ = list.add_rect(
-        Rect::new(rect.x + rect.width - thickness, rect.y, thickness, rect.height),
+        Rect::new(
+            rect.x + rect.width - thickness,
+            rect.y,
+            thickness,
+            rect.height,
+        ),
         color,
     );
 }

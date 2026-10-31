@@ -1,6 +1,6 @@
 //! Translation of CoveUIScene/Rendering/ContentMask.swift.
-use crate::{Rect, RoundedRect};
 use crate::scene::Node;
+use crate::{Rect, RoundedRect};
 
 /// The rounded mask a clipping container applies to its content and children:
 /// its box inset by the border, with the matching inner radius. Square
@@ -17,7 +17,11 @@ pub fn content_mask(
     if !node.clips_to_bounds() || radius <= 0.0 || width <= 0.0 || height <= 0.0 {
         return None;
     }
-    let inset = if node.border_color().is_some() && border_width > 0.0 { border_width } else { 0.0 };
+    let inset = if node.border_color().is_some() && border_width > 0.0 {
+        border_width
+    } else {
+        0.0
+    };
     let rect = Rect::new(
         x + inset,
         y + inset,

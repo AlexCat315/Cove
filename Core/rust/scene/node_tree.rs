@@ -16,8 +16,15 @@ pub struct NodeTree {
 }
 impl NodeTree {
     pub fn new() -> Self {
-        Self { root: None, timeline: Rc::new(RefCell::new(PerformanceTimeline::default())), cached_node_count: 0,
-            cached_node_count_version: 0, cached_node_count_root: None, node_count_stack: Vec::new(), flush_stack: Vec::new() }
+        Self {
+            root: None,
+            timeline: Rc::new(RefCell::new(PerformanceTimeline::default())),
+            cached_node_count: 0,
+            cached_node_count_version: 0,
+            cached_node_count_root: None,
+            node_count_stack: Vec::new(),
+            flush_stack: Vec::new(),
+        }
     }
     pub fn root(&self) -> Option<Node> {
         self.root.clone()
@@ -35,7 +42,9 @@ impl NodeTree {
             return 0;
         };
         let identity = root.cell() as *const _ as usize;
-        if self.cached_node_count_root == Some(identity) && self.cached_node_count_version == root.subtree_structure_version() {
+        if self.cached_node_count_root == Some(identity)
+            && self.cached_node_count_version == root.subtree_structure_version()
+        {
             return self.cached_node_count;
         }
         self.node_count_stack.clear();
@@ -59,7 +68,9 @@ impl NodeTree {
     /// Depth-first traversal that resets layout and render invalidation flags
     /// on every reachable node.
     pub fn flush(&mut self) {
-        let Some(root) = self.root.clone() else { return };
+        let Some(root) = self.root.clone() else {
+            return;
+        };
         let trace = self.timeline.borrow().begin();
         self.flush_stack.push(root);
         while let Some(node) = self.flush_stack.pop() {
@@ -74,7 +85,9 @@ impl NodeTree {
                 }
             }
         }
-        self.timeline.borrow_mut().end(trace, "frame", "Flush dirty flags", None, &[]);
+        self.timeline
+            .borrow_mut()
+            .end(trace, "frame", "Flush dirty flags", None, &[]);
     }
 }
 impl Default for NodeTree {

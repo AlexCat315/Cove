@@ -7,7 +7,10 @@ fn a_critically_damped_spring_arrives_without_crossing_its_target() {
         80.0,
         0.0,
         0.0,
-        ScrollSettleSettings { damping_fraction: 1.0, ..Default::default() },
+        ScrollSettleSettings {
+            damping_fraction: 1.0,
+            ..Default::default()
+        },
     );
     for _ in 0..240 {
         spring.advance(1.0 / 60.0);
@@ -23,7 +26,10 @@ fn an_underdamped_spring_crosses_the_bound_before_settling() {
         80.0,
         0.0,
         0.0,
-        ScrollSettleSettings { damping_fraction: 0.45, ..Default::default() },
+        ScrollSettleSettings {
+            damping_fraction: 0.45,
+            ..Default::default()
+        },
     );
     let mut crossed = false;
     for _ in 0..600 {
@@ -60,8 +66,7 @@ fn a_large_frame_follows_the_same_trajectory_as_many_small_frames() {
 
 #[test]
 fn starting_velocity_is_carried_into_the_first_frames() {
-    let mut away =
-        ScrollSpring::new(0.0, 400.0, 100.0, ScrollSettleSettings::default());
+    let mut away = ScrollSpring::new(0.0, 400.0, 100.0, ScrollSettleSettings::default());
     away.advance(1.0 / 60.0);
     assert!(away.value > 4.0);
 
@@ -92,8 +97,10 @@ fn zero_negative_and_nonfinite_frame_durations_leave_the_spring_unchanged() {
 #[test]
 fn all_damping_regimes_follow_the_same_path_across_uneven_frames() {
     for ratio in [0.5_f32, 1.0, 1.8] {
-        let settings =
-            ScrollSettleSettings { damping_fraction: ratio, ..Default::default() };
+        let settings = ScrollSettleSettings {
+            damping_fraction: ratio,
+            ..Default::default()
+        };
         let mut coarse = ScrollSpring::new(80.0, 420.0, 0.0, settings);
         let mut uneven = coarse;
         coarse.advance(0.3);

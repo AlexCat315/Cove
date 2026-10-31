@@ -1,6 +1,9 @@
 //! Translation of CoveUIScene/Input/PlatformInputContext.swift.
-use crate::scene::{FocusChain, FocusChainHolder, InteractionRegistry, InvalidationLog, InvalidationLogHolder, PointerCapture, PointerCaptureHolder};
 use crate::Point;
+use crate::scene::{
+    FocusChain, FocusChainHolder, InteractionRegistry, InvalidationLog, InvalidationLogHolder,
+    PointerCapture, PointerCaptureHolder,
+};
 use cove_platform::NativeMenuSnapshot;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -57,7 +60,11 @@ pub struct NativeMenuPresenter;
 impl NativeMenuPresenter {
     /// Presents the snapshot at a point and returns the chosen item's id.
     pub fn present(snapshot: &NativeMenuSnapshot, at: Point) -> Option<i64> {
-        NATIVE_MENU_PRESENTER.with(|slot| slot.borrow().as_ref().and_then(|present| present(snapshot, at)))
+        NATIVE_MENU_PRESENTER.with(|slot| {
+            slot.borrow()
+                .as_ref()
+                .and_then(|present| present(snapshot, at))
+        })
     }
     pub fn set_present(present: Option<Rc<dyn Fn(&NativeMenuSnapshot, Point) -> Option<i64>>>) {
         NATIVE_MENU_PRESENTER.with(|slot| *slot.borrow_mut() = present);
@@ -96,7 +103,10 @@ impl PlatformInputContext {
     /// Register a higher-layer ambient to be scoped with this context.
     pub fn add_scoped_ambient(&self, ambient: Rc<dyn ScopedAmbient>) {
         let mut ambients = self.scoped_ambients.borrow_mut();
-        if !ambients.iter().any(|existing| Rc::ptr_eq(existing, &ambient)) {
+        if !ambients
+            .iter()
+            .any(|existing| Rc::ptr_eq(existing, &ambient))
+        {
             ambients.push(ambient);
         }
     }
@@ -111,7 +121,12 @@ impl PlatformInputContext {
         PointerCaptureHolder::set_current(Some(self.pointer_capture.clone()));
         InvalidationLogHolder::set_current(Some(self.invalidation_log.clone()));
 
-        let restores: Vec<Box<dyn FnOnce()>> = self.scoped_ambients.borrow().iter().map(|ambient| ambient.activate()).collect();
+        let restores: Vec<Box<dyn FnOnce()>> = self
+            .scoped_ambients
+            .borrow()
+            .iter()
+            .map(|ambient| ambient.activate())
+            .collect();
         struct Restore {
             restores: Vec<Box<dyn FnOnce()>>,
             interactions: Option<Rc<InteractionRegistry>>,
@@ -130,7 +145,13 @@ impl PlatformInputContext {
                 InvalidationLogHolder::set_current(self.log.take());
             }
         }
-        let _restore = Restore { restores, interactions: previous_interactions, focus: previous_focus, capture: previous_capture, log: previous_log };
+        let _restore = Restore {
+            restores,
+            interactions: previous_interactions,
+            focus: previous_focus,
+            capture: previous_capture,
+            log: previous_log,
+        };
         body()
     }
 }
@@ -148,7 +169,9 @@ mod tests {
     fn context_installs_and_restores_ambients() {
         let context = PlatformInputContext::new();
         let pointer = context.pointer_capture.clone();
-        let observed = context.with_current(|| PointerCaptureHolder::current().map(|capture| Rc::ptr_eq(&capture, &pointer)));
+        let observed = context.with_current(|| {
+            PointerCaptureHolder::current().map(|capture| Rc::ptr_eq(&capture, &pointer))
+        });
         assert_eq!(observed, Some(true));
         assert!(PointerCaptureHolder::current().is_none());
         assert!(FocusChainHolder::current().is_none());

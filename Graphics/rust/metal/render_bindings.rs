@@ -61,14 +61,19 @@ impl MetalRenderBindings {
         slot: u32,
         stage: ShaderStage,
     ) -> bool {
-        let Some(index) = Self::index(slot, stage) else { return true };
+        let Some(index) = Self::index(slot, stage) else {
+            return true;
+        };
         if let Some(previous) = &self.buffers[index]
             && same_object(&previous.resource, resource)
             && previous.offset == offset
         {
             return false;
         }
-        self.buffers[index] = Some(BufferValue { resource: resource.clone(), offset });
+        self.buffers[index] = Some(BufferValue {
+            resource: resource.clone(),
+            offset,
+        });
         true
     }
 
@@ -78,7 +83,9 @@ impl MetalRenderBindings {
         slot: u32,
         stage: ShaderStage,
     ) -> bool {
-        let Some(index) = Self::index(slot, stage) else { return true };
+        let Some(index) = Self::index(slot, stage) else {
+            return true;
+        };
         if let Some(previous) = &self.textures[index]
             && same_object(previous, resource)
         {
@@ -94,7 +101,9 @@ impl MetalRenderBindings {
         slot: u32,
         stage: ShaderStage,
     ) -> bool {
-        let Some(index) = Self::index(slot, stage) else { return true };
+        let Some(index) = Self::index(slot, stage) else {
+            return true;
+        };
         if let Some(previous) = &self.samplers[index]
             && same_object(previous, resource)
         {

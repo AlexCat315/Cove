@@ -2,8 +2,8 @@
 
 #![cfg(unix)]
 
-use super::command::{string_c_strings, TerminalCommand, TerminalError};
 use super::PseudoTerminalSize;
+use super::command::{TerminalCommand, TerminalError, string_c_strings};
 use std::{
     ffi::CString,
     os::fd::RawFd,
@@ -19,7 +19,9 @@ pub(super) struct Channel {
 
 impl Channel {
     fn new(descriptor: RawFd) -> Self {
-        Self { lock: Mutex::new(Some(descriptor)) }
+        Self {
+            lock: Mutex::new(Some(descriptor)),
+        }
     }
 
     fn write(&self, bytes: &[u8]) {
@@ -103,7 +105,8 @@ impl PosixPseudoTerminal {
         let path = command
             .resolved_executable_with(environment.get("PATH").map(String::as_str), None)
             .ok_or_else(|| TerminalError::ExecutableNotFound(command.executable.clone()))?;
-        let executable = CString::new(path).map_err(|_| TerminalError::SpawnFailed(libc::EINVAL))?;
+        let executable =
+            CString::new(path).map_err(|_| TerminalError::SpawnFailed(libc::EINVAL))?;
 
         // Everything the child touches is allocated before the fork: between
         // fork and exec only async-signal-safe calls are allowed.
@@ -113,10 +116,12 @@ impl PosixPseudoTerminal {
                 .map(std::ffi::OsString::from)
                 .collect::<Vec<_>>(),
         );
-        let mut argv: Vec<*const libc::c_char> = arguments.iter().map(|value| value.as_ptr()).collect();
+        let mut argv: Vec<*const libc::c_char> =
+            arguments.iter().map(|value| value.as_ptr()).collect();
         argv.push(std::ptr::null());
         let environment = super::command::environment_c_strings(&environment);
-        let mut envp: Vec<*const libc::c_char> = environment.iter().map(|value| value.as_ptr()).collect();
+        let mut envp: Vec<*const libc::c_char> =
+            environment.iter().map(|value| value.as_ptr()).collect();
         envp.push(std::ptr::null());
         let directory = command
             .working_directory
@@ -148,7 +153,9 @@ impl PosixPseudoTerminal {
             )
         };
         if pid < 0 {
-            return Err(TerminalError::SpawnFailed(std::io::Error::last_os_error().raw_os_error().unwrap_or(-1)));
+            return Err(TerminalError::SpawnFailed(
+                std::io::Error::last_os_error().raw_os_error().unwrap_or(-1),
+            ));
         }
         if pid == 0 {
             // SAFETY: this is the child. The host or test runner may ignore or
@@ -158,7 +165,13 @@ impl PosixPseudoTerminal {
                 let mut action: libc::sigaction = std::mem::zeroed();
                 action.sa_sigaction = libc::SIG_DFL;
                 libc::sigemptyset(&mut action.sa_mask);
-                for signal in [libc::SIGHUP, libc::SIGINT, libc::SIGQUIT, libc::SIGTERM, libc::SIGPIPE] {
+                for signal in [
+                    libc::SIGHUP,
+                    libc::SIGINT,
+                    libc::SIGQUIT,
+                    libc::SIGTERM,
+                    libc::SIGPIPE,
+                ] {
                     libc::sigaction(signal, &action, std::ptr::null_mut());
                 }
                 let mut mask: libc::sigset_t = std::mem::zeroed();
@@ -178,7 +191,10 @@ impl PosixPseudoTerminal {
         }
         let channel = Arc::new(Channel::new(master));
         Self::start_reader(pid, master, channel.clone(), on_output, on_exit);
-        Ok(Self { process_id: pid, channel })
+        Ok(Self {
+            process_id: pid,
+            channel,
+        })
     }
 
     fn start_reader(
@@ -200,9 +216,8 @@ impl PosixPseudoTerminal {
                 loop {
                     // SAFETY: the descriptor is open (this thread owns the read
                     // side until it closes it) and the buffer is writable.
-                    let count = unsafe {
-                        libc::read(master, buffer.as_mut_ptr().cast(), buffer.len())
-                    };
+                    let count =
+                        unsafe { libc::read(master, buffer.as_mut_ptr().cast(), buffer.len()) };
                     if count > 0 {
                         on_output(&buffer[..count as usize]);
                         continue;
@@ -262,7 +277,11 @@ fn wait_status(pid: i32) -> i32 {
         std::thread::sleep(Duration::from_millis(1));
     }
     let signal = status & 0x7F;
-    if signal == 0 { (status >> 8) & 0xFF } else { 128 + signal }
+    if signal == 0 {
+        (status >> 8) & 0xFF
+    } else {
+        128 + signal
+    }
 }
 
 pub(super) fn window_size(size: PseudoTerminalSize) -> libc::winsize {

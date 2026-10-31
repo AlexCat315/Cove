@@ -32,13 +32,25 @@ fn clips_to_bounds_toggles_hit_testing() {
 
     // Point over the overflowing part of `c` (window 100,100): inside `c`
     // (window 70..110) but outside `p` (window 50..90).
-    assert_eq!(hit_id(&root, 100.0, 100.0), Some(c.id().0), "the overflowing child is hit");
+    assert_eq!(
+        hit_id(&root, 100.0, 100.0),
+        Some(c.id().0),
+        "the overflowing child is hit"
+    );
 
     p.set_clips_to_bounds(true);
 
     let after = hit_id(&root, 100.0, 100.0);
-    assert_ne!(after, Some(c.id().0), "clipping removes the child from the hit path");
-    assert_eq!(after, Some(root.id().0), "the point falls through to the root");
+    assert_ne!(
+        after,
+        Some(c.id().0),
+        "clipping removes the child from the hit path"
+    );
+    assert_eq!(
+        after,
+        Some(root.id().0),
+        "the point falls through to the root"
+    );
 }
 
 #[test]
@@ -52,11 +64,19 @@ fn is_hit_testable_flip_updates_hit_testing() {
     root.add_child(&a);
     a.add_child(&b);
 
-    assert_eq!(hit_id(&root, 20.0, 20.0), Some(b.id().0), "the child is hit first");
+    assert_eq!(
+        hit_id(&root, 20.0, 20.0),
+        Some(b.id().0),
+        "the child is hit first"
+    );
 
     b.set_is_hit_testable(false);
 
-    assert_eq!(hit_id(&root, 20.0, 20.0), Some(a.id().0), "the point falls through to the parent");
+    assert_eq!(
+        hit_id(&root, 20.0, 20.0),
+        Some(a.id().0),
+        "the point falls through to the parent"
+    );
 }
 
 #[test]
@@ -70,9 +90,17 @@ fn frame_move_updates_hit_testing() {
     root.add_child(&a);
     a.add_child(&b);
 
-    assert_eq!(hit_id(&root, 20.0, 20.0), Some(b.id().0), "the child is hit before the move");
+    assert_eq!(
+        hit_id(&root, 20.0, 20.0),
+        Some(b.id().0),
+        "the child is hit before the move"
+    );
 
     b.set_frame(Rect::new(100.0, 100.0, 30.0, 30.0));
 
-    assert_eq!(hit_id(&root, 20.0, 20.0), Some(a.id().0), "a pure layout move reflows immediately");
+    assert_eq!(
+        hit_id(&root, 20.0, 20.0),
+        Some(a.id().0),
+        "a pure layout move reflows immediately"
+    );
 }

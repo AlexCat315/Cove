@@ -7,15 +7,13 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
-use cove_core::{Binding, SizeClass};
 use crate::adaptive::WidthClassReader;
 use crate::animation::geometry::transforms::TransformViewExt;
 use crate::modifiers::layout::FlexExt;
-use crate::primitives::overlays::modal::{
-    Modal, ModalDismissal, ModalPlacement, SheetDragHandle,
-};
+use crate::primitives::overlays::modal::{Modal, ModalDismissal, ModalPlacement, SheetDragHandle};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
+use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
+use cove_core::{Binding, SizeClass};
 
 /// Detents and drag behavior for a bottom sheet.
 #[derive(Clone, Debug, PartialEq)]
@@ -57,16 +55,31 @@ impl BottomSheetOptions {
     }
 
     pub fn validated(mut self) -> Self {
-        self.detents.retain(|height| height.is_finite() && *height > 0.0);
+        self.detents
+            .retain(|height| height.is_finite() && *height > 0.0);
         if self.detents.is_empty() {
             self.detents = vec![320.0, 560.0];
         }
-        self.drag_dismiss_threshold =
-            if self.drag_dismiss_threshold.is_finite() { self.drag_dismiss_threshold.max(0.0) } else { 80.0 };
-        self.drag_dismiss_velocity =
-            if self.drag_dismiss_velocity.is_finite() { self.drag_dismiss_velocity.max(0.0) } else { 900.0 };
-        self.dialog_width = if self.dialog_width.is_finite() { self.dialog_width.max(120.0) } else { 560.0 };
-        self.dialog_inset = if self.dialog_inset.is_finite() { self.dialog_inset.max(0.0) } else { 16.0 };
+        self.drag_dismiss_threshold = if self.drag_dismiss_threshold.is_finite() {
+            self.drag_dismiss_threshold.max(0.0)
+        } else {
+            80.0
+        };
+        self.drag_dismiss_velocity = if self.drag_dismiss_velocity.is_finite() {
+            self.drag_dismiss_velocity.max(0.0)
+        } else {
+            900.0
+        };
+        self.dialog_width = if self.dialog_width.is_finite() {
+            self.dialog_width.max(120.0)
+        } else {
+            560.0
+        };
+        self.dialog_inset = if self.dialog_inset.is_finite() {
+            self.dialog_inset.max(0.0)
+        } else {
+            16.0
+        };
         self
     }
 }
@@ -81,7 +94,11 @@ struct BottomSheetState {
 impl BottomSheetState {
     fn new(initial_detent: usize, detent_count: usize) -> Rc<Self> {
         Rc::new(Self {
-            detent: Cell::new(if detent_count == 0 { 0 } else { initial_detent.min(detent_count - 1) }),
+            detent: Cell::new(if detent_count == 0 {
+                0
+            } else {
+                initial_detent.min(detent_count - 1)
+            }),
             drag_offset: Cell::new(0.0),
         })
     }
@@ -99,7 +116,12 @@ impl BottomSheet {
     pub fn new(is_presented: Binding<bool>, content: impl View + 'static) -> Self {
         let options = BottomSheetOptions::new();
         let state = BottomSheetState::new(options.initial_detent, options.detents.len());
-        Self { is_presented, options, content: AnyView::new(content), state }
+        Self {
+            is_presented,
+            options,
+            content: AnyView::new(content),
+            state,
+        }
     }
 
     pub fn options(mut self, options: BottomSheetOptions) -> Self {
@@ -114,7 +136,6 @@ impl BottomSheet {
         self.state = BottomSheetState::new(self.options.initial_detent, self.options.detents.len());
         self
     }
-
 }
 
 impl View for BottomSheet {
@@ -125,7 +146,10 @@ impl View for BottomSheet {
         let state = self.state.clone();
         AnyView::new(WidthClassReader::new(move |width_class: SizeClass| {
             let compact = width_class != SizeClass::Expanded;
-            let index = state.detent.get().min(options.detents.len().saturating_sub(1));
+            let index = state
+                .detent
+                .get()
+                .min(options.detents.len().saturating_sub(1));
             let height = options.detents.get(index).copied().unwrap_or(320.0);
 
             let mut modal_options = crate::primitives::overlays::modal::ModalOptions::default();
@@ -161,7 +185,8 @@ impl View for BottomSheet {
                         if translation < -threshold && detent + 1 < settle_options.detents.len() {
                             drag_state.detent.set(detent + 1);
                         } else if translation > threshold
-                            || (velocity > settle_options.drag_dismiss_velocity && translation > 0.0)
+                            || (velocity > settle_options.drag_dismiss_velocity
+                                && translation > 0.0)
                         {
                             if detent > 0 {
                                 drag_state.detent.set(detent - 1);

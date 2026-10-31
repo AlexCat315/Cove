@@ -19,15 +19,18 @@ use super::setup::VulkanContext;
 use super::sys;
 
 /// The device address of `buffer`, which every acceleration input needs.
-pub fn buffer_address(context: &VulkanContext, registries: &VulkanRegistries, handle: Buffer) -> RhiResult<sys::VkDeviceAddress> {
+pub fn buffer_address(
+    context: &VulkanContext,
+    registries: &VulkanRegistries,
+    handle: Buffer,
+) -> RhiResult<sys::VkDeviceAddress> {
     let record = registries
         .buffers
         .get(&handle.id())
         .ok_or_else(|| RhiError::invalid_argument("unknown device-address buffer"))?;
-    let query = context
-        .advanced
-        .buffer_device_address
-        .ok_or_else(|| RhiError::unsupported_feature("Vulkan buffer device addresses are unavailable"))?;
+    let query = context.advanced.buffer_device_address.ok_or_else(|| {
+        RhiError::unsupported_feature("Vulkan buffer device addresses are unavailable")
+    })?;
     let info = sys::VkBufferDeviceAddressInfo {
         sType: sys::VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
         pNext: core::ptr::null(),
@@ -49,9 +52,12 @@ pub fn structure_address(
         .acceleration_structures
         .get(&handle.id())
         .ok_or_else(|| RhiError::invalid_argument("unknown acceleration structure"))?;
-    let query = context.advanced.acceleration_structure_address.ok_or_else(|| {
-        RhiError::unsupported_feature("Vulkan acceleration structure addresses are unavailable")
-    })?;
+    let query = context
+        .advanced
+        .acceleration_structure_address
+        .ok_or_else(|| {
+            RhiError::unsupported_feature("Vulkan acceleration structure addresses are unavailable")
+        })?;
     let info = sys::VkAccelerationStructureDeviceAddressInfoKHR {
         sType: sys::VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR,
         pNext: core::ptr::null(),
@@ -109,8 +115,11 @@ pub fn pack_instances(
     // SAFETY: the record is `#[repr(C)]` and holds only floats and integers, so its
     // bytes are initialised and readable as `size_of_val` bytes.
     Ok(unsafe {
-        std::slice::from_raw_parts(records.as_ptr().cast::<u8>(), std::mem::size_of_val(&records[..]))
-            .to_vec()
+        std::slice::from_raw_parts(
+            records.as_ptr().cast::<u8>(),
+            std::mem::size_of_val(&records[..]),
+        )
+        .to_vec()
     })
 }
 
@@ -129,11 +138,15 @@ pub fn create_acceleration_structure(
     let sizes_query = context
         .advanced
         .acceleration_structure_build_sizes
-        .ok_or_else(|| RhiError::unsupported_feature("Vulkan acceleration structures unavailable"))?;
+        .ok_or_else(|| {
+            RhiError::unsupported_feature("Vulkan acceleration structures unavailable")
+        })?;
     let create = context
         .advanced
         .create_acceleration_structure
-        .ok_or_else(|| RhiError::unsupported_feature("Vulkan acceleration structures unavailable"))?;
+        .ok_or_else(|| {
+            RhiError::unsupported_feature("Vulkan acceleration structures unavailable")
+        })?;
 
     // Every buffer this call creates is released if a later step fails.
     let mut owned: Vec<Buffer> = Vec::new();
@@ -153,10 +166,9 @@ pub fn create_acceleration_structure(
                             .buffers
                             .get(&triangle.vertices.id())
                             .map(|record| record.size)
-                            .ok_or_else(|| {
-                                RhiError::invalid_argument("unknown BLAS vertices")
-                            })?;
-                        let address = buffer_address(context, &registries_guard, triangle.vertices)?;
+                            .ok_or_else(|| RhiError::invalid_argument("unknown BLAS vertices"))?;
+                        let address =
+                            buffer_address(context, &registries_guard, triangle.vertices)?;
                         (vertices, address)
                     };
                     let count = rhi_count(triangle.triangle_count)?;
@@ -185,7 +197,8 @@ pub fn create_acceleration_structure(
                         transformData: 0,
                     };
                     geometry.push(sys::VkAccelerationStructureGeometryKHR {
-                        sType: sys::VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR,
+                        sType:
+                            sys::VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR,
                         pNext: core::ptr::null(),
                         geometryType: sys::VK_GEOMETRY_TYPE_TRIANGLES_KHR,
                         geometry: sys::VkAccelerationStructureGeometryDataKHR {
@@ -218,7 +231,11 @@ pub fn create_acceleration_structure(
                                 RhiError::invalid_argument("TLAS must reference a BLAS")
                             })?;
                         rhi_require(!record.top_level, "TLAS must reference a BLAS")?;
-                        addresses.push(structure_address(context, &registries_guard, instance.structure)?);
+                        addresses.push(structure_address(
+                            context,
+                            &registries_guard,
+                            instance.structure,
+                        )?);
                     }
                 }
                 let bytes = pack_instances(instances, &addresses)?;
@@ -239,7 +256,8 @@ pub fn create_acceleration_structure(
                 super::submission::upload_buffer_data(context, registries, buffer, 0, &bytes)?;
                 instance_buffer = Some(buffer);
                 let instances_data = sys::VkAccelerationStructureGeometryInstancesDataKHR {
-                    sType: sys::VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR,
+                    sType:
+                        sys::VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR,
                     pNext: core::ptr::null(),
                     arrayOfPointers: sys::VK_FALSE,
                     data: buffer_address(context, &lock(registries), buffer)?,
@@ -248,7 +266,9 @@ pub fn create_acceleration_structure(
                     sType: sys::VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR,
                     pNext: core::ptr::null(),
                     geometryType: sys::VK_GEOMETRY_TYPE_INSTANCES_KHR,
-                    geometry: sys::VkAccelerationStructureGeometryDataKHR { instances: instances_data },
+                    geometry: sys::VkAccelerationStructureGeometryDataKHR {
+                        instances: instances_data,
+                    },
                     flags: 0,
                 });
                 ranges.push(sys::VkAccelerationStructureBuildRangeInfoKHR {
@@ -259,7 +279,10 @@ pub fn create_acceleration_structure(
                 });
             }
         }
-        rhi_require(!geometry.is_empty(), "acceleration structure requires input")?;
+        rhi_require(
+            !geometry.is_empty(),
+            "acceleration structure requires input",
+        )?;
 
         let build_info = sys::VkAccelerationStructureBuildGeometryInfoKHR {
             sType: sys::VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR,
@@ -333,8 +356,14 @@ pub fn create_acceleration_structure(
         };
         let mut created: sys::VkAccelerationStructureKHR = sys::VK_NULL_HANDLE;
         // SAFETY: the buffer is live and `create_info` outlives the call.
-        let status =
-            unsafe { (create)(context.device, &create_info, core::ptr::null(), &mut created) };
+        let status = unsafe {
+            (create)(
+                context.device,
+                &create_info,
+                core::ptr::null(),
+                &mut created,
+            )
+        };
         rhi_require(
             status == sys::VK_SUCCESS && created != sys::VK_NULL_HANDLE,
             "vkCreateAccelerationStructureKHR failed",
@@ -354,7 +383,9 @@ pub fn create_acceleration_structure(
 
     match build {
         Ok(record) => {
-            lock(registries).acceleration_structures.insert(handle.id(), record);
+            lock(registries)
+                .acceleration_structures
+                .insert(handle.id(), record);
             Ok(())
         }
         Err(error) => {
@@ -383,7 +414,10 @@ fn acceleration_buffer(
     size: sys::VkDeviceSize,
 ) -> RhiResult<Buffer> {
     let bytes = usize::try_from(size).map_err(|_| RhiError::OutOfMemory)?;
-    rhi_require(bytes > 0, "acceleration structure buffer size must be positive")?;
+    rhi_require(
+        bytes > 0,
+        "acceleration structure buffer size must be positive",
+    )?;
     let handle = Buffer::new(lock(registries).next_internal_id());
     create_buffer(
         context,
@@ -406,7 +440,12 @@ pub fn destroy_acceleration_structure(
     allocator: &mut VulkanMemoryAllocator,
     handle: AccelerationStructure,
 ) {
-    let Some(record) = lock(registries).acceleration_structures.remove(&handle.id()) else { return };
+    let Some(record) = lock(registries)
+        .acceleration_structures
+        .remove(&handle.id())
+    else {
+        return;
+    };
     if let Some(destroy) = context.advanced.destroy_acceleration_structure {
         // SAFETY: the frame ring waited for every submission that could use it.
         unsafe { (destroy)(context.device, record.native, core::ptr::null()) };
@@ -463,7 +502,8 @@ pub unsafe fn encode_build(
         ppGeometries: core::ptr::null(),
         scratchData: record.scratch_address,
     };
-    let range_pointer: *const sys::VkAccelerationStructureBuildRangeInfoKHR = record.ranges.as_ptr();
+    let range_pointer: *const sys::VkAccelerationStructureBuildRangeInfoKHR =
+        record.ranges.as_ptr();
     let ranges: [*const sys::VkAccelerationStructureBuildRangeInfoKHR; 1] = [range_pointer];
     // SAFETY: the build info, geometry and ranges all live in the registry record,
     // which outlives this call, and `cmd` is recording.
@@ -488,7 +528,10 @@ mod tests {
 
     #[test]
     fn instance_records_use_the_64_byte_gpu_layout() {
-        assert_eq!(std::mem::size_of::<sys::VkAccelerationStructureInstanceKHR>(), 64);
+        assert_eq!(
+            std::mem::size_of::<sys::VkAccelerationStructureInstanceKHR>(),
+            64
+        );
     }
 
     #[test]
@@ -507,15 +550,23 @@ mod tests {
             .chunks_exact(4)
             .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
             .collect();
-        assert_eq!(matrix, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0]);
+        assert_eq!(
+            matrix,
+            vec![
+                1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0
+            ]
+        );
         // Spec layout: transform 0..48, `customIndex:24|mask:8` at 48..52,
         // `offset|flags` at 52..56, then the 8-byte address at 56..64.
         let word = u32::from_le_bytes(bytes[48..52].try_into().unwrap());
-        assert_eq!(word >> 24, 0x42, "the mask is the high byte of the instance word");
+        assert_eq!(
+            word >> 24,
+            0x42,
+            "the mask is the high byte of the instance word"
+        );
         assert_eq!(word & 0x00FF_FFFF, 0, "instance 0 has custom index 0");
         assert_eq!(
-            u32::from_le_bytes(bytes[52..56].try_into().unwrap())
-                & 0x00FF_FFFF,
+            u32::from_le_bytes(bytes[52..56].try_into().unwrap()) & 0x00FF_FFFF,
             1,
             "the cull-disable flag is bit 0 of the offset word"
         );

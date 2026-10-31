@@ -1,10 +1,10 @@
 //! Translation of Android/CoveAndroidProbe/Transfer.swift.
 
-use super::runner::{require, ProbeContext, ProbeFailure};
+use super::runner::{ProbeContext, ProbeFailure, require};
 use cove_graphics::rhi::{
     BindingResource, BindingSetDescriptor, BindingSetEntry, BufferDescriptor, BufferUsage,
-    CommandBuffer, ComputePipelineDescriptor, PipelineLayoutDescriptor, QueueClass, TextureDescriptor,
-    TextureFormat, TextureSubresource, TextureUploadRegion, TextureUsage,
+    CommandBuffer, ComputePipelineDescriptor, PipelineLayoutDescriptor, QueueClass,
+    TextureDescriptor, TextureFormat, TextureSubresource, TextureUploadRegion, TextureUsage,
 };
 
 impl ProbeContext {
@@ -93,7 +93,9 @@ impl ProbeContext {
             // borrow ends before the buffers are destroyed.
             std::slice::from_raw_parts(groups.as_ptr().cast(), std::mem::size_of_val(&groups))
         };
-        self.device.upload_buffer_data(indirect, 0, bytes).map_err(fail)?;
+        self.device
+            .upload_buffer_data(indirect, 0, bytes)
+            .map_err(fail)?;
         let texture = self
             .device
             .make_texture(TextureDescriptor::new(
@@ -131,7 +133,14 @@ impl ProbeContext {
         let read = if result.is_ok() {
             let mut values = vec![0_u8; 16 * 4];
             self.device
-                .read_texture_data(texture, 16, 1, 64, TextureSubresource::default(), &mut values)
+                .read_texture_data(
+                    texture,
+                    16,
+                    1,
+                    64,
+                    TextureSubresource::default(),
+                    &mut values,
+                )
                 .map(|()| values)
                 .map_err(fail)
         } else {

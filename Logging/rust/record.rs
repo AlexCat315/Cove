@@ -142,10 +142,9 @@ impl LogQuery {
             return false;
         }
         if !self.labels.is_empty()
-            && !self
-                .labels
-                .iter()
-                .any(|label| record.label == *label || record.label.starts_with(&format!("{label}.")))
+            && !self.labels.iter().any(|label| {
+                record.label == *label || record.label.starts_with(&format!("{label}."))
+            })
         {
             return false;
         }

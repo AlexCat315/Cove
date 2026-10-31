@@ -1,24 +1,32 @@
 //! Translation of Modifiers/Layout/FrameCaptureModifier.swift.
-use cove_core::scene::{LayoutUpdateHook, Node, NodeResource};
+use crate::{ModifiedContent, View, ViewExt, ViewModifier};
 use cove_core::Rect;
+use cove_core::scene::{LayoutUpdateHook, Node, NodeResource};
 use std::any::Any;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
-use crate::{ModifiedContent, View, ViewExt, ViewModifier};
 
 /// Thread-safe snapshot of a node's most recently laid out absolute frame.
 #[derive(Clone, Default)]
 pub struct FrameBox(Arc<Mutex<Option<Rect>>>);
 
 impl FrameBox {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn current(&self) -> Option<Rect> {
-        *self.0.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+        *self
+            .0
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
     fn update(&self, frame: Rect) {
-        *self.0.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(frame);
+        *self
+            .0
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(frame);
     }
 }
 
@@ -33,7 +41,9 @@ impl NodeResource for FrameCaptureResource {
         *self.previous_layout.borrow_mut() = previous.clone();
         let frame = self.frame.clone();
         node.set_layout_did_update(Some(Rc::new(move |updated| {
-            if let Some(previous) = &previous { previous(updated); }
+            if let Some(previous) = &previous {
+                previous(updated);
+            }
             frame.update(updated.absolute_frame());
         })));
         self.frame.update(node.absolute_frame());
@@ -43,7 +53,9 @@ impl NodeResource for FrameCaptureResource {
         node.set_layout_did_update(self.previous_layout.borrow_mut().take());
     }
 
-    fn as_any_rc(self: Rc<Self>) -> Rc<dyn Any> { self }
+    fn as_any_rc(self: Rc<Self>) -> Rc<dyn Any> {
+        self
+    }
 }
 
 pub struct FrameCaptureModifier(pub FrameBox);

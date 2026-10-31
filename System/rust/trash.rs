@@ -19,7 +19,7 @@ impl FileTrash {
     pub fn r#move(source: &Path, recovery_directory: &Path) -> io::Result<PathBuf> {
         #[cfg(target_os = "macos")]
         {
-            return crate::files::trash(source, recovery_directory);
+            crate::files::trash(source, recovery_directory)
         }
         #[cfg(not(target_os = "macos"))]
         {

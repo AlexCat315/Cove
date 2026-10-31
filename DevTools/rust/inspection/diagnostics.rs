@@ -4,8 +4,10 @@
 //! every query projects into a bounded, serialisable record so a model cannot
 //! hold scene state across a step.
 use crate::inspection::inspector::{DebugAttachmentKey, SceneInspector};
-use cove_core::scene::{AccessibilitySemantics, Node, NodeTree, StateDescriptor, StateRegistry, StateValue};
 use cove_core::Rect;
+use cove_core::scene::{
+    AccessibilitySemantics, Node, NodeTree, StateDescriptor, StateRegistry, StateValue,
+};
 use cove_devtools_protocol::{
     Envelope, NodeFrame, NodeSummary, SourceLocation, StateObservation, StateWatch,
 };
@@ -125,8 +127,12 @@ impl DiagnosticCompactNode {
             role: semantics
                 .map(|semantics| format!("{:?}", semantics.role))
                 .or_else(|| item.node.semantic_role.clone()),
-            label: semantics.map(|semantics| semantics.label.clone()).filter(|label| !label.is_empty()),
-            value: semantics.map(|semantics| semantics.value.clone()).filter(|value| !value.is_empty()),
+            label: semantics
+                .map(|semantics| semantics.label.clone())
+                .filter(|label| !label.is_empty()),
+            value: semantics
+                .map(|semantics| semantics.value.clone())
+                .filter(|value| !value.is_empty()),
             state: (!state.is_empty()).then_some(state),
             frame: item.presentation.visible_frame.clone(),
             input_enabled: item.presentation.input_enabled,
@@ -222,7 +228,9 @@ impl std::error::Error for DiagnosticError {}
 impl From<DiagnosticError> for crate::agent::AgentError {
     fn from(error: DiagnosticError) -> Self {
         match error {
-            DiagnosticError::InvalidConfiguration(message) => crate::agent::AgentError::InvalidConfiguration(message),
+            DiagnosticError::InvalidConfiguration(message) => {
+                crate::agent::AgentError::InvalidConfiguration(message)
+            }
             DiagnosticError::UnknownTool(name) => crate::agent::AgentError::UnknownTool(name),
             DiagnosticError::InvalidResult => crate::agent::AgentError::InvalidResult,
         }
@@ -294,16 +302,22 @@ impl Diagnostics {
             stack.extend(node.children());
         }
         let snapshot = self.inspector.snapshot();
-        let Some(summary_root) = snapshot.root else { return Vec::new() };
+        let Some(summary_root) = snapshot.root else {
+            return Vec::new();
+        };
         let mut result = Vec::new();
         let mut stack = vec![(summary_root, None)];
         while let Some((mut summary, parent)) = stack.pop() {
             let children = std::mem::take(&mut summary.children);
             // Expose one canonical live identity to query clients.
-            summary.id = summary.element_id.clone().unwrap_or_else(|| summary.id.clone());
+            summary.id = summary
+                .element_id
+                .clone()
+                .unwrap_or_else(|| summary.id.clone());
             if let Some(entry) = presentation.get(&summary.id) {
                 result.push(DiagnosticNode {
-                    value_truncated: (Some(summary.id.as_str()) == value_node_id).then(|| truncated.unwrap_or(false)),
+                    value_truncated: (Some(summary.id.as_str()) == value_node_id)
+                        .then(|| truncated.unwrap_or(false)),
                     semantics: meanings.get(&summary.id).cloned(),
                     node: summary.clone(),
                     parent_id: parent.clone(),
@@ -347,58 +361,57 @@ impl Diagnostics {
         }
         let text = text.map(str::to_lowercase);
         let source = source.map(str::to_lowercase);
-        let matches: Vec<DiagnosticNode> = all
-            .into_iter()
-            .filter(|item| {
-                let node = &item.node;
-                if id.is_some_and(|id| node.id != id) {
-                    return false;
-                }
-                if visible_only && !item.presentation.is_visible {
-                    return false;
-                }
-                if input_enabled_only && !item.presentation.input_enabled {
-                    return false;
-                }
-                if let Some(text) = &text {
-                    let candidates = [
-                        node.debug_name.clone(),
-                        node.view_tag.clone(),
-                        item.semantics.as_ref().map(|s| s.label.clone()),
-                        item.semantics.as_ref().map(|s| s.value.clone()),
-                        item.semantics.as_ref().map(|s| s.help.clone()),
-                    ];
-                    if !candidates
-                        .into_iter()
-                        .flatten()
-                        .any(|candidate| candidate.to_lowercase().contains(text))
-                    {
+        let matches: Vec<DiagnosticNode> =
+            all.into_iter()
+                .filter(|item| {
+                    let node = &item.node;
+                    if id.is_some_and(|id| node.id != id) {
                         return false;
                     }
-                }
-                if let Some(role) = role {
-                    let matches = node.semantic_role.as_deref() == Some(role)
-                        || node.layout_role.as_deref() == Some(role)
-                        || item
-                            .semantics
-                            .as_ref()
-                            .is_some_and(|semantics| format!("{:?}", semantics.role) == role);
-                    if !matches {
+                    if visible_only && !item.presentation.is_visible {
                         return false;
                     }
-                }
-                if let Some(source) = &source {
-                    let matches = node
-                        .source
-                        .as_ref()
-                        .is_some_and(|location| location.file_path.to_lowercase().contains(source));
-                    if !matches {
+                    if input_enabled_only && !item.presentation.input_enabled {
                         return false;
                     }
-                }
-                true
-            })
-            .collect();
+                    if let Some(text) = &text {
+                        let candidates = [
+                            node.debug_name.clone(),
+                            node.view_tag.clone(),
+                            item.semantics.as_ref().map(|s| s.label.clone()),
+                            item.semantics.as_ref().map(|s| s.value.clone()),
+                            item.semantics.as_ref().map(|s| s.help.clone()),
+                        ];
+                        if !candidates
+                            .into_iter()
+                            .flatten()
+                            .any(|candidate| candidate.to_lowercase().contains(text))
+                        {
+                            return false;
+                        }
+                    }
+                    if let Some(role) = role {
+                        let matches = node.semantic_role.as_deref() == Some(role)
+                            || node.layout_role.as_deref() == Some(role)
+                            || item
+                                .semantics
+                                .as_ref()
+                                .is_some_and(|semantics| format!("{:?}", semantics.role) == role);
+                        if !matches {
+                            return false;
+                        }
+                    }
+                    if let Some(source) = &source {
+                        let matches = node.source.as_ref().is_some_and(|location| {
+                            location.file_path.to_lowercase().contains(source)
+                        });
+                        if !matches {
+                            return false;
+                        }
+                    }
+                    true
+                })
+                .collect();
         Ok(DiagnosticPage::new(&matches, offset, limit))
     }
 
@@ -415,7 +428,9 @@ impl Diagnostics {
             .nodes(None)
             .into_iter()
             .filter(|item| {
-                let Some(metrics) = &item.node.recomposition else { return false };
+                let Some(metrics) = &item.node.recomposition else {
+                    return false;
+                };
                 if metrics.count < minimum_count {
                     return false;
                 }
@@ -456,16 +471,31 @@ impl Diagnostics {
         };
         let watch = StateWatch { ids: ids.to_vec() };
         if !watch.is_valid() {
-            return Err(DiagnosticError::InvalidConfiguration("Invalid state IDs.".into()));
+            return Err(DiagnosticError::InvalidConfiguration(
+                "Invalid state IDs.".into(),
+            ));
         }
         let registered: Vec<StateDescriptor> = state
             .descriptors()
             .into_iter()
-            .filter(|descriptor| scope_id.is_none_or(|scope| descriptor.scope_id.as_deref() == Some(scope)))
+            .filter(|descriptor| {
+                scope_id.is_none_or(|scope| descriptor.scope_id.as_deref() == Some(scope))
+            })
             .collect();
-        let allowed: std::collections::BTreeSet<String> = registered.iter().map(|descriptor| descriptor.id.clone()).collect();
-        let requested: Vec<String> = ids.iter().filter(|id| allowed.contains(*id)).cloned().collect();
-        let missing: Vec<String> = ids.iter().filter(|id| !allowed.contains(*id)).cloned().collect();
+        let allowed: std::collections::BTreeSet<String> = registered
+            .iter()
+            .map(|descriptor| descriptor.id.clone())
+            .collect();
+        let requested: Vec<String> = ids
+            .iter()
+            .filter(|id| allowed.contains(*id))
+            .cloned()
+            .collect();
+        let missing: Vec<String> = ids
+            .iter()
+            .filter(|id| !allowed.contains(*id))
+            .cloned()
+            .collect();
         Ok(DiagnosticsStateQuery {
             metadata: DiagnosticPage::new(&registered, offset, limit),
             values: state.values(&requested),
@@ -477,7 +507,10 @@ impl Diagnostics {
     /// `StateRegistry.observation(ids:)`.
     pub fn state_observation(&self, ids: &[String]) -> StateObservation {
         let Some(state) = &self.state else {
-            return StateObservation { registered: Vec::new(), values: Vec::new() };
+            return StateObservation {
+                registered: Vec::new(),
+                values: Vec::new(),
+            };
         };
         StateObservation {
             registered: state
@@ -509,7 +542,12 @@ impl Diagnostics {
             .into_iter()
             .filter_map(|item| {
                 let frame = item.node.frame.clone();
-                let values = [("x", frame.x), ("y", frame.y), ("width", frame.w), ("height", frame.h)];
+                let values = [
+                    ("x", frame.x),
+                    ("y", frame.y),
+                    ("width", frame.w),
+                    ("height", frame.h),
+                ];
                 let invalid: BTreeMap<String, String> = values
                     .into_iter()
                     .filter(|(name, value)| {
@@ -538,11 +576,13 @@ impl Diagnostics {
     }
 
     pub fn overview(&self, limit: usize) -> DiagnosticOverview {
-        let nodes = self.query_nodes(None, None, None, None, false, false, false, 0, 1).unwrap_or(DiagnosticPage {
-            items: Vec::new(),
-            total: 0,
-            next_offset: None,
-        });
+        let nodes = self
+            .query_nodes(None, None, None, None, false, false, false, 0, 1)
+            .unwrap_or(DiagnosticPage {
+                items: Vec::new(),
+                total: 0,
+                next_offset: None,
+            });
         DiagnosticOverview {
             node_count: nodes.total,
             component_count: self.query_recomposition(None, 0, 0, 1).total,
@@ -558,11 +598,20 @@ impl Diagnostics {
         self.traces.borrow_mut().capture(&self.tree, duration_ms)
     }
 
-    pub fn query_trace(&self, id: &str, offset: usize, limit: usize) -> Result<TraceQuery, DiagnosticError> {
+    pub fn query_trace(
+        &self,
+        id: &str,
+        offset: usize,
+        limit: usize,
+    ) -> Result<TraceQuery, DiagnosticError> {
         self.traces.borrow().query(id, offset, limit)
     }
 
-    pub fn compare_traces(&self, baseline: &str, candidate: &str) -> Result<TraceComparison, DiagnosticError> {
+    pub fn compare_traces(
+        &self,
+        baseline: &str,
+        candidate: &str,
+    ) -> Result<TraceComparison, DiagnosticError> {
         self.traces.borrow().compare(baseline, candidate)
     }
 
@@ -575,7 +624,9 @@ impl Diagnostics {
     pub fn handle_read_request(&self, request: &Envelope) -> Envelope {
         match self.read_payload(request) {
             Ok(payload) => {
-                let mut response = request.ok().unwrap_or_else(|| Envelope::new(format!("{}.ok", request.r#type), request.id, None));
+                let mut response = request.ok().unwrap_or_else(|| {
+                    Envelope::new(format!("{}.ok", request.r#type), request.id, None)
+                });
                 response.payload = Some(payload);
                 response
             }
@@ -589,10 +640,7 @@ impl Diagnostics {
         }
     }
 
-    fn read_payload(
-        &self,
-        request: &Envelope,
-    ) -> Result<serde_json::Value, DiagnosticError> {
+    fn read_payload(&self, request: &Envelope) -> Result<serde_json::Value, DiagnosticError> {
         match request.r#type.as_str() {
             "diagnostics.tools" => {
                 let empty = request
@@ -605,14 +653,22 @@ impl Diagnostics {
                         "diagnostics.tools takes no payload".into(),
                     ));
                 }
-                let tools: Vec<serde_json::Value> = crate::inspection::tools::Tool::immediate_read_tools()
-                    .into_iter()
-                    .map(|tool| serde_json::to_value(tool.definition().mcp_definition()).unwrap_or_default())
-                    .collect();
+                let tools: Vec<serde_json::Value> =
+                    crate::inspection::tools::Tool::immediate_read_tools()
+                        .into_iter()
+                        .map(|tool| {
+                            serde_json::to_value(tool.definition().mcp_definition())
+                                .unwrap_or_default()
+                        })
+                        .collect();
                 Ok(serde_json::json!({ "tools": tools }))
             }
             "diagnostics.call" => {
-                let Some(object) = request.payload.as_ref().and_then(|payload| payload.as_object()) else {
+                let Some(object) = request
+                    .payload
+                    .as_ref()
+                    .and_then(|payload| payload.as_object())
+                else {
                     return Err(DiagnosticError::InvalidConfiguration(
                         "diagnostics.call requires a tool name and an arguments object".into(),
                     ));
@@ -632,7 +688,10 @@ impl Diagnostics {
                         "diagnostics.call requires a tool name and an arguments object".into(),
                     ));
                 }
-                let arguments = object.get("arguments").cloned().unwrap_or_else(|| serde_json::json!({}));
+                let arguments = object
+                    .get("arguments")
+                    .cloned()
+                    .unwrap_or_else(|| serde_json::json!({}));
                 if !arguments.is_object() {
                     return Err(DiagnosticError::InvalidConfiguration(
                         "diagnostics.call requires a tool name and an arguments object".into(),
@@ -646,7 +705,9 @@ impl Diagnostics {
                 }
                 self.execute_read_json(tool, &arguments)
             }
-            _ => Err(DiagnosticError::InvalidConfiguration("Unsupported diagnostic request".into())),
+            _ => Err(DiagnosticError::InvalidConfiguration(
+                "Unsupported diagnostic request".into(),
+            )),
         }
     }
 
@@ -663,7 +724,10 @@ impl Diagnostics {
                 serde_json::json!({ "ok": true, "data": memory.map(|provider| provider()) })
             }
             Tool::GetDiagnostics => {
-                let limit = arguments.get("limit").and_then(|value| value.as_u64()).unwrap_or(50) as usize;
+                let limit = arguments
+                    .get("limit")
+                    .and_then(|value| value.as_u64())
+                    .unwrap_or(50) as usize;
                 serde_json::json!({ "ok": true, "data": self.overview(limit) })
             }
             Tool::QueryUiNodes => {
@@ -672,14 +736,33 @@ impl Diagnostics {
                     arguments.get("text").and_then(|value| value.as_str()),
                     arguments.get("role").and_then(|value| value.as_str()),
                     arguments.get("source").and_then(|value| value.as_str()),
-                    arguments.get("visible_only").and_then(|value| value.as_bool()).unwrap_or(false),
-                    arguments.get("input_enabled_only").and_then(|value| value.as_bool()).unwrap_or(false),
-                    arguments.get("include_value").and_then(|value| value.as_bool()).unwrap_or(false),
-                    arguments.get("offset").and_then(|value| value.as_u64()).unwrap_or(0) as usize,
-                    arguments.get("limit").and_then(|value| value.as_u64()).unwrap_or(50) as usize,
+                    arguments
+                        .get("visible_only")
+                        .and_then(|value| value.as_bool())
+                        .unwrap_or(false),
+                    arguments
+                        .get("input_enabled_only")
+                        .and_then(|value| value.as_bool())
+                        .unwrap_or(false),
+                    arguments
+                        .get("include_value")
+                        .and_then(|value| value.as_bool())
+                        .unwrap_or(false),
+                    arguments
+                        .get("offset")
+                        .and_then(|value| value.as_u64())
+                        .unwrap_or(0) as usize,
+                    arguments
+                        .get("limit")
+                        .and_then(|value| value.as_u64())
+                        .unwrap_or(50) as usize,
                 )?;
                 self.validate_geometry(&page)?;
-                if arguments.get("compact").and_then(|value| value.as_bool()).unwrap_or(false) {
+                if arguments
+                    .get("compact")
+                    .and_then(|value| value.as_bool())
+                    .unwrap_or(false)
+                {
                     let compact = page.project(|item| DiagnosticCompactNode::from_node(&item));
                     serde_json::json!({ "ok": true, "data": compact })
                 } else {
@@ -689,9 +772,18 @@ impl Diagnostics {
             Tool::QueryUiRecomposition => {
                 let page = self.query_recomposition(
                     arguments.get("text").and_then(|value| value.as_str()),
-                    arguments.get("minimum_count").and_then(|value| value.as_u64()).unwrap_or(0),
-                    arguments.get("offset").and_then(|value| value.as_u64()).unwrap_or(0) as usize,
-                    arguments.get("limit").and_then(|value| value.as_u64()).unwrap_or(50) as usize,
+                    arguments
+                        .get("minimum_count")
+                        .and_then(|value| value.as_u64())
+                        .unwrap_or(0),
+                    arguments
+                        .get("offset")
+                        .and_then(|value| value.as_u64())
+                        .unwrap_or(0) as usize,
+                    arguments
+                        .get("limit")
+                        .and_then(|value| value.as_u64())
+                        .unwrap_or(50) as usize,
                 );
                 self.validate_geometry(&page)?;
                 serde_json::json!({ "ok": true, "data": page })
@@ -700,30 +792,55 @@ impl Diagnostics {
                 let ids: Vec<String> = arguments
                     .get("ids")
                     .and_then(|value| value.as_array())
-                    .map(|values| values.iter().filter_map(|value| value.as_str().map(str::to_string)).collect())
+                    .map(|values| {
+                        values
+                            .iter()
+                            .filter_map(|value| value.as_str().map(str::to_string))
+                            .collect()
+                    })
                     .unwrap_or_default();
                 let query = self.query_state(
                     &ids,
                     arguments.get("scope_id").and_then(|value| value.as_str()),
-                    arguments.get("offset").and_then(|value| value.as_u64()).unwrap_or(0) as usize,
-                    arguments.get("limit").and_then(|value| value.as_u64()).unwrap_or(50) as usize,
+                    arguments
+                        .get("offset")
+                        .and_then(|value| value.as_u64())
+                        .unwrap_or(0) as usize,
+                    arguments
+                        .get("limit")
+                        .and_then(|value| value.as_u64())
+                        .unwrap_or(50) as usize,
                 )?;
                 serde_json::json!({ "ok": true, "data": query })
             }
             Tool::GetUiTrace => {
                 let Some(id) = arguments.get("capture_id").and_then(|value| value.as_str()) else {
-                    return Err(DiagnosticError::InvalidConfiguration("capture_id is required".into()));
+                    return Err(DiagnosticError::InvalidConfiguration(
+                        "capture_id is required".into(),
+                    ));
                 };
                 let query = self.query_trace(
                     id,
-                    arguments.get("offset").and_then(|value| value.as_u64()).unwrap_or(0) as usize,
-                    arguments.get("limit").and_then(|value| value.as_u64()).unwrap_or(50) as usize,
+                    arguments
+                        .get("offset")
+                        .and_then(|value| value.as_u64())
+                        .unwrap_or(0) as usize,
+                    arguments
+                        .get("limit")
+                        .and_then(|value| value.as_u64())
+                        .unwrap_or(50) as usize,
                 )?;
                 serde_json::json!({ "ok": true, "data": query })
             }
             Tool::CompareUiTraces => {
-                let baseline = arguments.get("baseline_id").and_then(|value| value.as_str()).unwrap_or_default();
-                let candidate = arguments.get("candidate_id").and_then(|value| value.as_str()).unwrap_or_default();
+                let baseline = arguments
+                    .get("baseline_id")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or_default();
+                let candidate = arguments
+                    .get("candidate_id")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or_default();
                 let comparison = self.compare_traces(baseline, candidate)?;
                 serde_json::json!({ "ok": true, "data": comparison })
             }
@@ -737,7 +854,10 @@ impl Diagnostics {
                 serde_json::json!({ "ok": true, "data": items })
             }
             Tool::ReadSkill => {
-                let name = arguments.get("name").and_then(|value| value.as_str()).unwrap_or_default();
+                let name = arguments
+                    .get("name")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or_default();
                 let library = crate::inspection::tools::default_skill_library();
                 let skill = library
                     .read(name)
@@ -755,14 +875,24 @@ impl Diagnostics {
 
     /// Reject a page that would hand a client a node with unrepresentable
     /// geometry, pointing at the layout summary instead.
-    fn validate_geometry(&self, page: &DiagnosticPage<DiagnosticNode>) -> Result<(), DiagnosticError> {
+    fn validate_geometry(
+        &self,
+        page: &DiagnosticPage<DiagnosticNode>,
+    ) -> Result<(), DiagnosticError> {
         let invalid = page.items.iter().find_map(|item| {
             let frame = item.node.frame.clone();
-            let invalid: Vec<String> = [("x", frame.x), ("y", frame.y), ("width", frame.w), ("height", frame.h)]
-                .into_iter()
-                .filter(|(name, value)| !value.is_finite() || (matches!(*name, "width" | "height") && *value < 0.0))
-                .map(|(name, _)| name.to_string())
-                .collect();
+            let invalid: Vec<String> = [
+                ("x", frame.x),
+                ("y", frame.y),
+                ("width", frame.w),
+                ("height", frame.h),
+            ]
+            .into_iter()
+            .filter(|(name, value)| {
+                !value.is_finite() || (matches!(*name, "width" | "height") && *value < 0.0)
+            })
+            .map(|(name, _)| name.to_string())
+            .collect();
             (!invalid.is_empty()).then(|| (item.node.id.clone(), invalid))
         });
         match invalid {
@@ -798,7 +928,11 @@ fn collect_overflow(root: &Node) -> Vec<DiagnosticOverflowIssue> {
             continue;
         }
         let frame = node.absolute_frame();
-        if node.clips_to_bounds() && !node.is_scroll_viewport() && frame.width >= 1.0 && frame.height >= 1.0 {
+        if node.clips_to_bounds()
+            && !node.is_scroll_viewport()
+            && frame.width >= 1.0
+            && frame.height >= 1.0
+        {
             let bottom = node
                 .children()
                 .iter()
@@ -841,7 +975,8 @@ fn capture_presentation(root: &Node) -> BTreeMap<String, DiagnosticPresentation>
     fn modal_input(root: &Node) -> Option<std::rc::Rc<cove_core::scene::FocusChain>> {
         let mut pending = vec![root.clone()];
         while let Some(candidate) = pending.pop() {
-            if let Some(resource) = candidate.first_resource::<cove_core::scene::ModalFocusResource>()
+            if let Some(resource) =
+                candidate.first_resource::<cove_core::scene::ModalFocusResource>()
                 && let Some(chain) = resource.bound_focus_chain()
                 && chain.has_modal_scope()
             {
@@ -862,17 +997,32 @@ fn capture_presentation(root: &Node) -> BTreeMap<String, DiagnosticPresentation>
     ) -> Option<Rect> {
         let frame = node.frame();
         let bounds = node.absolute_frame();
-        let valid = [frame.x, frame.y, frame.width, frame.height, bounds.x, bounds.y, bounds.width, bounds.height]
-            .iter()
-            .all(|value| value.is_finite())
+        let valid = [
+            frame.x,
+            frame.y,
+            frame.width,
+            frame.height,
+            bounds.x,
+            bounds.y,
+            bounds.width,
+            bounds.height,
+        ]
+        .iter()
+        .all(|value| value.is_finite())
             && frame.width >= 0.0
             && frame.height >= 0.0;
-        let draws = draws && valid && node.is_layout_visible() && node.opacity() > 0.0 && node.subtree_opacity() > 0.0;
+        let draws = draws
+            && valid
+            && node.is_layout_visible()
+            && node.opacity() > 0.0
+            && node.subtree_opacity() > 0.0;
         let input = input
             && node.is_layout_visible()
             && node.allows_hit_testing()
             && node.is_interaction_enabled()
-            && node.accessibility().is_none_or(|semantics| semantics.state.is_enabled);
+            && node
+                .accessibility()
+                .is_none_or(|semantics| semantics.state.is_enabled);
         let mut own = None;
         if draws && bounds.width > 0.0 && bounds.height > 0.0 {
             let visible = match clip {
@@ -909,7 +1059,11 @@ fn capture_presentation(root: &Node) -> BTreeMap<String, DiagnosticPresentation>
         // A layout-transparent component anchor inherits its visible
         // descendants; Swift's `bounds.isEmpty` is true on either empty axis.
         let empty_bounds = bounds.width <= 0.0 || bounds.height <= 0.0;
-        let visible = if node.layout_node().is_none() && empty_bounds { descendants } else { own };
+        let visible = if node.layout_node().is_none() && empty_bounds {
+            descendants
+        } else {
+            own
+        };
         result.insert(
             node.id().0.to_string(),
             DiagnosticPresentation {
@@ -1011,7 +1165,11 @@ impl TraceStore {
 
     /// Sample the timeline for `milliseconds`. The caller must be on the UI
     /// thread; the sampling loop yields so the host keeps presenting frames.
-    fn capture(&mut self, tree: &Rc<RefCell<NodeTree>>, milliseconds: u64) -> Result<TraceCapture, DiagnosticError> {
+    fn capture(
+        &mut self,
+        tree: &Rc<RefCell<NodeTree>>,
+        milliseconds: u64,
+    ) -> Result<TraceCapture, DiagnosticError> {
         if !(50..=5000).contains(&milliseconds) {
             return Err(DiagnosticError::InvalidConfiguration(
                 "Capture duration must be 50–5000 ms; only one capture may run at a time.".into(),
@@ -1030,12 +1188,17 @@ impl TraceStore {
 
         let mut by_phase: BTreeMap<String, Vec<f64>> = BTreeMap::new();
         for event in &events {
-            by_phase.entry(event.phase.clone()).or_default().push(event.duration_ms);
+            by_phase
+                .entry(event.phase.clone())
+                .or_default()
+                .push(event.duration_ms);
         }
         let phases: Vec<TracePhase> = by_phase
             .into_iter()
             .map(|(phase, mut values)| {
-                values.sort_by(|left, right| left.partial_cmp(right).unwrap_or(std::cmp::Ordering::Equal));
+                values.sort_by(|left, right| {
+                    left.partial_cmp(right).unwrap_or(std::cmp::Ordering::Equal)
+                });
                 let count = values.len();
                 let sum: f64 = values.iter().sum();
                 let index = (((count.saturating_sub(1)) as f64) * 0.95).ceil() as usize;
@@ -1043,7 +1206,10 @@ impl TraceStore {
                     phase,
                     count,
                     average_ms: if count > 0 { sum / count as f64 } else { 0.0 },
-                    p95_ms: values.get(index.min(count.saturating_sub(1))).copied().unwrap_or(0.0),
+                    p95_ms: values
+                        .get(index.min(count.saturating_sub(1)))
+                        .copied()
+                        .unwrap_or(0.0),
                     maximum_ms: values.last().copied().unwrap_or(0.0),
                 }
             })
@@ -1058,7 +1224,10 @@ impl TraceStore {
         if self.records.len() == MAX_CAPTURES {
             self.records.remove(0);
         }
-        self.records.push(TraceRecord { summary: summary.clone(), events });
+        self.records.push(TraceRecord {
+            summary: summary.clone(),
+            events,
+        });
         Ok(summary)
     }
 
@@ -1066,7 +1235,11 @@ impl TraceStore {
         self.records
             .iter()
             .find(|record| record.summary.id == id)
-            .ok_or_else(|| DiagnosticError::InvalidConfiguration(format!("Capture is missing or expired: {id}")))
+            .ok_or_else(|| {
+                DiagnosticError::InvalidConfiguration(format!(
+                    "Capture is missing or expired: {id}"
+                ))
+            })
     }
 
     fn query(&self, id: &str, offset: usize, limit: usize) -> Result<TraceQuery, DiagnosticError> {
@@ -1077,7 +1250,11 @@ impl TraceStore {
         })
     }
 
-    fn compare(&self, baseline_id: &str, candidate_id: &str) -> Result<TraceComparison, DiagnosticError> {
+    fn compare(
+        &self,
+        baseline_id: &str,
+        candidate_id: &str,
+    ) -> Result<TraceComparison, DiagnosticError> {
         let baseline = self.record(baseline_id)?.summary.clone();
         let candidate = self.record(candidate_id)?.summary.clone();
         let mut names: Vec<String> = baseline
@@ -1091,8 +1268,16 @@ impl TraceStore {
         let changes = names
             .into_iter()
             .map(|phase| {
-                let before = baseline.phases.iter().find(|candidate| candidate.phase == phase).cloned();
-                let after = candidate.phases.iter().find(|candidate| candidate.phase == phase).cloned();
+                let before = baseline
+                    .phases
+                    .iter()
+                    .find(|candidate| candidate.phase == phase)
+                    .cloned();
+                let after = candidate
+                    .phases
+                    .iter()
+                    .find(|candidate| candidate.phase == phase)
+                    .cloned();
                 TracePhaseChange {
                     average_delta_ms: match (&before, &after) {
                         (Some(before), Some(after)) => Some(after.average_ms - before.average_ms),
@@ -1108,7 +1293,11 @@ impl TraceStore {
                 }
             })
             .collect();
-        Ok(TraceComparison { baseline, candidate, changes })
+        Ok(TraceComparison {
+            baseline,
+            candidate,
+            changes,
+        })
     }
 }
 

@@ -14,9 +14,7 @@
 
 #![cfg(any(target_os = "macos", target_os = "ios"))]
 
-use cove_ui_compose::primitives::media::{
-    AsyncImageError, ImageDownloadTransport,
-};
+use cove_ui_compose::primitives::media::{AsyncImageError, ImageDownloadTransport};
 use std::ffi::{CStr, c_char, c_void};
 
 pub const SCHEME_HTTP: bool = true;
@@ -128,7 +126,13 @@ mod runtime {
         // SAFETY: `error` is a valid out-parameter for this call and the class
         // object is live.
         let data = unsafe {
-            data_send(data_class, selector(c"dataWithContentsOfURL:options:error:"), ns_url, 0, &mut error)
+            data_send(
+                data_class,
+                selector(c"dataWithContentsOfURL:options:error:"),
+                ns_url,
+                0,
+                &mut error,
+            )
         };
         if data.is_null() {
             let detail = if error.is_null() {
@@ -169,7 +173,10 @@ mod runtime {
     // `NSData` carries no MIME type, so the format hint stays absent and
     // `DownloadedImage::new` falls back to the URL's path extension, exactly as
     // the Swift loader did when a response carried no `Content-Type`.
-    #[allow(clippy::unnecessary_wraps, reason = "mirrors the transport contract that may return a MIME type")]
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "mirrors the transport contract that may return a MIME type"
+    )]
     fn content_type(_url: Id) -> Option<String> {
         None
     }
@@ -193,7 +200,9 @@ mod runtime {
             return "NSData could not read the image URL".to_owned();
         }
         // SAFETY: the pointer is NUL terminated and valid while `value` lives.
-        unsafe { CStr::from_ptr(text) }.to_string_lossy().into_owned()
+        unsafe { CStr::from_ptr(text) }
+            .to_string_lossy()
+            .into_owned()
     }
 
     struct AutoreleasePool(Id);

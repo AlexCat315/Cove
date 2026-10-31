@@ -7,18 +7,18 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use crate::impl_primitive_view;
+use crate::primitives::media::image_data_download::AsyncImageError;
+use crate::primitives::media::image_geometry::{ImageContentMode, ImageRenderingMode};
+use crate::primitives::media::image_load_services::{
+    ImageInflightLoads, ImageLoadRequest, ImageLoadServices, ImagePayload, ImageProgress,
+};
+use crate::primitives::media::{Image, ImageSource};
+use crate::{AnyView, PrimitiveView, View};
 use cove_core::scene::{
     AnimatorScheduler, AnyAnimationController, InvalidationSource, LayoutNode, Node, NodeResource,
 };
 use cove_imaging::ImageAsset;
-use crate::impl_primitive_view;
-use crate::primitives::media::image_geometry::{ImageContentMode, ImageRenderingMode};
-use crate::primitives::media::{Image, ImageSource};
-use crate::primitives::media::image_data_download::AsyncImageError;
-use crate::primitives::media::image_load_services::{
-    ImageInflightLoads, ImageLoadRequest, ImageLoadServices, ImagePayload, ImageProgress,
-};
-use crate::{AnyView, PrimitiveView, View};
 
 pub use crate::primitives::media::image_data_download::ImageLoadingPolicy;
 
@@ -39,8 +39,16 @@ pub struct AsyncImageAnimation {
 }
 
 impl AsyncImageAnimation {
-    pub fn new(frames: Vec<std::sync::Arc<ImageAsset>>, durations: Vec<f64>, loop_count: i32) -> Self {
-        Self { frames, durations, loop_count }
+    pub fn new(
+        frames: Vec<std::sync::Arc<ImageAsset>>,
+        durations: Vec<f64>,
+        loop_count: i32,
+    ) -> Self {
+        Self {
+            frames,
+            durations,
+            loop_count,
+        }
     }
 
     pub fn total_duration(&self) -> f64 {
@@ -98,7 +106,11 @@ thread_local! {
 
 impl AsyncImageAnimationCache {
     fn new(capacity: usize) -> Self {
-        Self { entries: RefCell::new(HashMap::new()), clock: RefCell::new(0), capacity }
+        Self {
+            entries: RefCell::new(HashMap::new()),
+            clock: RefCell::new(0),
+            capacity,
+        }
     }
 
     pub fn shared() -> Rc<Self> {
@@ -121,7 +133,10 @@ impl AsyncImageAnimationCache {
         let mut entries = self.entries.borrow_mut();
         entries.insert(key.to_string(), (animation, now));
         if entries.len() > self.capacity
-            && let Some(oldest) = entries.iter().min_by_key(|(_, (_, used))| *used).map(|(key, _)| key.clone())
+            && let Some(oldest) = entries
+                .iter()
+                .min_by_key(|(_, (_, used))| *used)
+                .map(|(key, _)| key.clone())
         {
             entries.remove(&oldest);
         }
@@ -191,7 +206,12 @@ impl AsyncImageSession {
         }
     }
 
-    pub fn publish(&self, phase: AsyncImageStatus, request: &ImageLoadRequest, node: Option<&Node>) {
+    pub fn publish(
+        &self,
+        phase: AsyncImageStatus,
+        request: &ImageLoadRequest,
+        node: Option<&Node>,
+    ) {
         let unchanged = self.request.borrow().as_ref() == Some(request)
             && status_eq(&*self.phase.borrow(), &phase);
         if unchanged {
@@ -213,8 +233,12 @@ fn status_eq(lhs: &AsyncImageStatus, rhs: &AsyncImageStatus) -> bool {
     match (lhs, rhs) {
         (AsyncImageStatus::Empty, AsyncImageStatus::Empty) => true,
         (AsyncImageStatus::Loading, AsyncImageStatus::Loading) => true,
-        (AsyncImageStatus::Success(left), AsyncImageStatus::Success(right)) => std::sync::Arc::ptr_eq(left, right),
-        (AsyncImageStatus::Animated(left), AsyncImageStatus::Animated(right)) => Rc::ptr_eq(left, right),
+        (AsyncImageStatus::Success(left), AsyncImageStatus::Success(right)) => {
+            std::sync::Arc::ptr_eq(left, right)
+        }
+        (AsyncImageStatus::Animated(left), AsyncImageStatus::Animated(right)) => {
+            Rc::ptr_eq(left, right)
+        }
         (AsyncImageStatus::Failure(left), AsyncImageStatus::Failure(right)) => left == right,
         _ => false,
     }
@@ -241,8 +265,16 @@ impl AsyncImage {
     ) -> Self {
         Self {
             url: url.map(Into::into),
-            width: if width.is_finite() { width.clamp(1.0, 4096.0) } else { 32.0 },
-            height: if height.is_finite() { height.clamp(1.0, 4096.0) } else { 32.0 },
+            width: if width.is_finite() {
+                width.clamp(1.0, 4096.0)
+            } else {
+                32.0
+            },
+            height: if height.is_finite() {
+                height.clamp(1.0, 4096.0)
+            } else {
+                32.0
+            },
             content_mode: ImageContentMode::Fit,
             retry_id: 0,
             policy: ImageLoadingPolicy::default(),
@@ -283,7 +315,11 @@ impl AsyncImage {
 
 fn pixel_extent(points: f32, is_fill: bool) -> u32 {
     let density = crate::primitives::media::image::ContentScaleHolder::current();
-    let scale = if density.is_finite() { density.clamp(1.0, 8.0) } else { 1.0 };
+    let scale = if density.is_finite() {
+        density.clamp(1.0, 8.0)
+    } else {
+        1.0
+    };
     // Fill uses a larger aspect-preserving thumbnail before the central crop.
     let oversample = if is_fill { 2.0 } else { 1.0 };
     let value = (points * scale * oversample).round();
@@ -297,12 +333,22 @@ impl View for AsyncImage {
             AsyncImageStatus::Empty => AsyncImagePhase::Empty,
             AsyncImageStatus::Loading => AsyncImagePhase::Loading,
             AsyncImageStatus::Success(asset) => AsyncImagePhase::Success(image_for_asset(
-                asset, self.width, self.height, self.content_mode,
+                asset,
+                self.width,
+                self.height,
+                self.content_mode,
             )),
             AsyncImageStatus::Animated(animation) => {
-                let index = animation.frames.len().saturating_sub(1).min(self.session.frame_index());
+                let index = animation
+                    .frames
+                    .len()
+                    .saturating_sub(1)
+                    .min(self.session.frame_index());
                 AsyncImagePhase::Success(image_for_asset(
-                    animation.frames[index].clone(), self.width, self.height, self.content_mode,
+                    animation.frames[index].clone(),
+                    self.width,
+                    self.height,
+                    self.content_mode,
                 ))
             }
             AsyncImageStatus::Failure(error) => AsyncImagePhase::Failure(error),
@@ -322,7 +368,14 @@ fn image_for_asset(
     height: f32,
     content_mode: ImageContentMode,
 ) -> Image {
-    Image::new(ImageSource::Asset(asset), width, height, cove_core::Color::WHITE, content_mode, ImageRenderingMode::Color)
+    Image::new(
+        ImageSource::Asset(asset),
+        width,
+        height,
+        cove_core::Color::WHITE,
+        content_mode,
+        ImageRenderingMode::Color,
+    )
 }
 
 struct AsyncImageHost {
@@ -393,7 +446,11 @@ struct AsyncImageResource {
 
 impl AsyncImageResource {
     fn new() -> Self {
-        Self { node: RefCell::new(None), request: RefCell::new(None), generation: RefCell::new(0) }
+        Self {
+            node: RefCell::new(None),
+            request: RefCell::new(None),
+            generation: RefCell::new(0),
+        }
     }
 
     fn cancel(&self) {
@@ -413,7 +470,11 @@ impl AsyncImageResource {
             return;
         };
         let Some(services) = ImageLoadServices::current() else {
-            session.publish(AsyncImageStatus::Failure(AsyncImageError::HostUnavailable), request, node.as_ref());
+            session.publish(
+                AsyncImageStatus::Failure(AsyncImageError::HostUnavailable),
+                request,
+                node.as_ref(),
+            );
             return;
         };
         if let Some(asset) = (services.cached)(&key) {
@@ -421,7 +482,11 @@ impl AsyncImageResource {
             return;
         }
         if let Some(animation) = AsyncImageAnimationCache::shared().value(&key) {
-            session.publish(AsyncImageStatus::Animated(animation), request, node.as_ref());
+            session.publish(
+                AsyncImageStatus::Animated(animation),
+                request,
+                node.as_ref(),
+            );
             return;
         }
         session.publish(AsyncImageStatus::Loading, request, node.as_ref());
@@ -451,7 +516,9 @@ impl AsyncImageResource {
                         if let Ok(asset) = ImageAsset::new(image.clone()) {
                             session.publish_preview(asset, &request);
                             if let Some(node) = node.as_ref() {
-                                node.mark_render_dirty(InvalidationSource::style_set("asyncImage.phase"));
+                                node.mark_render_dirty(InvalidationSource::style_set(
+                                    "asyncImage.phase",
+                                ));
                             }
                         }
                     }));
@@ -467,7 +534,11 @@ impl AsyncImageResource {
             Ok(ImagePayload::Still(decoded)) => match ImageAsset::new(decoded) {
                 Ok(asset) => {
                     if let Ok(registered) = (services.register)(&key, clone_asset_image(&asset)) {
-                        session.publish(AsyncImageStatus::Success(registered), request, Some(&node));
+                        session.publish(
+                            AsyncImageStatus::Success(registered),
+                            request,
+                            Some(&node),
+                        );
                     } else {
                         session.publish(AsyncImageStatus::Success(asset), request, Some(&node));
                     }
@@ -485,13 +556,19 @@ impl AsyncImageResource {
                     match (services.register)(&frame_key, frame) {
                         Ok(asset) => frames.push(asset),
                         Err(error) => {
-                            session.publish(AsyncImageStatus::Failure(AsyncImageError::DecodeFailed(error)), request, Some(&node));
+                            session.publish(
+                                AsyncImageStatus::Failure(AsyncImageError::DecodeFailed(error)),
+                                request,
+                                Some(&node),
+                            );
                             return;
                         }
                     }
                 }
                 let animation = Rc::new(AsyncImageAnimation::new(
-                    frames, decoded.durations, decoded.loop_count as i32,
+                    frames,
+                    decoded.durations,
+                    decoded.loop_count as i32,
                 ));
                 AsyncImageAnimationCache::shared().store(animation.clone(), &key);
                 session.publish(AsyncImageStatus::Animated(animation), request, Some(&node));
@@ -507,7 +584,9 @@ fn clone_asset_image(asset: &std::sync::Arc<ImageAsset>) -> cove_imaging::Decode
         asset.image.height(),
         asset.image.pixels().to_vec(),
     )
-    .unwrap_or_else(|_| cove_core::Bitmap::new(1, 1, vec![0, 0, 0, 0]).expect("1x1 bitmap is always valid"))
+    .unwrap_or_else(|_| {
+        cove_core::Bitmap::new(1, 1, vec![0, 0, 0, 0]).expect("1x1 bitmap is always valid")
+    })
 }
 
 impl NodeResource for AsyncImageResource {
@@ -557,7 +636,9 @@ impl AnyAnimationController for PlaybackState {
         if *self.is_finished.borrow() {
             return;
         }
-        let Some(animation) = self.animation.borrow().clone() else { return };
+        let Some(animation) = self.animation.borrow().clone() else {
+            return;
+        };
         if !delta_time.is_finite() || delta_time < 0.0 {
             return;
         }
@@ -601,13 +682,24 @@ impl AsyncImagePlayback {
     }
 
     fn configure(&self, session: &Rc<AsyncImageSession>, reduced_motion: bool) {
-        let next = if reduced_motion { None } else { session.animation() };
+        let next = if reduced_motion {
+            None
+        } else {
+            session.animation()
+        };
         let same = match (&*self.state.animation.borrow(), &next) {
             (Some(current), Some(next)) => Rc::ptr_eq(current, next),
             (None, None) => true,
             _ => false,
         };
-        if same && self.state.session.borrow().as_ref().is_some_and(|current| Rc::ptr_eq(current, session)) {
+        if same
+            && self
+                .state
+                .session
+                .borrow()
+                .as_ref()
+                .is_some_and(|current| Rc::ptr_eq(current, session))
+        {
             return;
         }
         self.cancel();
@@ -624,9 +716,10 @@ impl AsyncImagePlayback {
     }
 
     fn cancel(&self) {
-        if let (Some(scheduler), Some(controller)) =
-            (self.scheduler.borrow().as_ref(), self.controller.borrow().as_ref())
-        {
+        if let (Some(scheduler), Some(controller)) = (
+            self.scheduler.borrow().as_ref(),
+            self.controller.borrow().as_ref(),
+        ) {
             scheduler.unregister(controller);
         }
         self.controller.borrow_mut().take();

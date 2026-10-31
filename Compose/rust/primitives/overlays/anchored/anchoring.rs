@@ -6,21 +6,23 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::animation::transition::Transition;
+use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
+use crate::primitives::overlays::focus_scope::FocusScope;
+use crate::primitives::overlays::portal::portal_registry::PortalResource;
+use crate::primitives::overlays::portal::{
+    PortalFitConstraints, PortalPlacementMode, PortalStoreEnvironment, PortalStoreHolder,
+    portal_window_bounds,
+};
+use crate::{AnyView, BoxView, PrimitiveView, View, impl_primitive_view};
 use cove_core::scene::{
     AccessibilityActions, EventResult, LayoutNode, Node, PointerCaptureHolder, PositionType,
 };
 use cove_core::{Point, Rect, Size};
-use crate::animation::transition::Transition;
-use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
-use crate::primitives::overlays::portal::portal_registry::PortalResource;
-use crate::primitives::overlays::portal::{
-    portal_window_bounds, PortalFitConstraints, PortalPlacementMode, PortalStoreEnvironment,
-    PortalStoreHolder,
-};
-use crate::primitives::overlays::focus_scope::FocusScope;
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, View};
 
-use super::placement::{PopoverEdge, PopoverGeometry, PopoverOverflow, PopoverPlacement, PopoverSurface};
+use super::placement::{
+    PopoverEdge, PopoverGeometry, PopoverOverflow, PopoverPlacement, PopoverSurface,
+};
 
 /// Anchor description for one presented overlay.
 pub struct PopoverAnchor {
@@ -33,7 +35,12 @@ pub struct PopoverAnchor {
 }
 
 impl PopoverAnchor {
-    pub fn new(owner: &Node, overflow: PopoverOverflow, surface: PopoverSurface, margin: f32) -> Self {
+    pub fn new(
+        owner: &Node,
+        overflow: PopoverOverflow,
+        surface: PopoverSurface,
+        margin: f32,
+    ) -> Self {
         Self {
             owner: Some(owner.clone()),
             surface: RefCell::new(None),
@@ -54,17 +61,22 @@ impl PopoverAnchor {
         if *self.painted.borrow() != Some(next) {
             *self.painted.borrow_mut() = Some(next);
             if let Some(surface) = self.surface.borrow().as_ref() {
-                surface.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("popoverAnchor"));
+                surface.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                    "popoverAnchor",
+                ));
             }
         }
-        if let (Some(surface), Some(layout)) = (self.surface.borrow().as_ref(), None::<LayoutNode>) {
+        if let (Some(surface), Some(layout)) = (self.surface.borrow().as_ref(), None::<LayoutNode>)
+        {
             let _ = (surface, layout);
         }
     }
 
     /// The nearest preceding sibling with a non-zero frame, walking outwards.
     pub fn frame(&self) -> Rect {
-        let Some(owner) = self.owner.as_ref() else { return Rect::new(0.0, 0.0, 0.0, 0.0) };
+        let Some(owner) = self.owner.as_ref() else {
+            return Rect::new(0.0, 0.0, 0.0, 0.0);
+        };
         let mut candidate = Some(owner.clone());
         while let Some(node) = candidate {
             let Some(parent) = node.parent() else { break };
@@ -104,7 +116,11 @@ impl PopoverAnchor {
             self.is_rtl(),
             self.overflow,
             self.margin,
-            if self.style == PopoverSurface::Bubble { PopoverGeometry::GAP } else { 0.0 },
+            if self.style == PopoverSurface::Bubble {
+                PopoverGeometry::GAP
+            } else {
+                0.0
+            },
         )
     }
 
@@ -138,7 +154,8 @@ pub struct AnchoredOverlayHost {
     pub surface: PopoverSurface,
     pub overflow: PopoverOverflow,
     pub on_dismiss: Rc<dyn Fn()>,
-    pub key_handler: Option<Rc<dyn Fn(&cove_platform::KeyEvent, cove_core::scene::EventPhase) -> EventResult>>,
+    pub key_handler:
+        Option<Rc<dyn Fn(&cove_platform::KeyEvent, cove_core::scene::EventPhase) -> EventResult>>,
     pub content: AnyView,
 }
 
@@ -189,7 +206,8 @@ impl AnchoredOverlayHost {
 
     pub fn key_handler(
         mut self,
-        handler: impl Fn(&cove_platform::KeyEvent, cove_core::scene::EventPhase) -> EventResult + 'static,
+        handler: impl Fn(&cove_platform::KeyEvent, cove_core::scene::EventPhase) -> EventResult
+        + 'static,
     ) -> Self {
         self.key_handler = Some(Rc::new(handler));
         self
@@ -206,9 +224,19 @@ fn place(
     provisional: Size,
 ) {
     anchor.refresh_paint();
-    let size = resource.frame().map(|frame| Size { width: frame.width, height: frame.height }).unwrap_or(provisional);
+    let size = resource
+        .frame()
+        .map(|frame| Size {
+            width: frame.width,
+            height: frame.height,
+        })
+        .unwrap_or(provisional);
     let geometry = anchor.geometry(size, placement);
-    let minimum_width = if sizing_anchor { anchor.frame().width } else { 0.0 };
+    let minimum_width = if sizing_anchor {
+        anchor.frame().width
+    } else {
+        0.0
+    };
     resource.update_fit(PortalFitConstraints {
         minimum_width,
         viewport_margin: margin,
@@ -240,7 +268,9 @@ impl PrimitiveView for AnchoredOverlayHost {
     }
 
     fn update_node(&self, node: &Node) {
-        let Some(resource) = node.first_resource::<PortalResource>() else { return };
+        let Some(resource) = node.first_resource::<PortalResource>() else {
+            return;
+        };
         if !self.is_presented {
             resource.dismiss(node);
             return;
@@ -258,10 +288,26 @@ impl PrimitiveView for AnchoredOverlayHost {
             6.0
         };
         let anchor = PopoverAnchor::new(node, self.overflow, self.surface, margin);
-        let minimum_width = if self.sizing_anchor { anchor.frame().width } else { 0.0 };
+        let minimum_width = if self.sizing_anchor {
+            anchor.frame().width
+        } else {
+            0.0
+        };
         let desired_width = self.width.map(|width| minimum_width.max(width));
-        let provisional = Size { width: desired_width.unwrap_or(300.0), height: 160.0 };
-        let geometry = anchor.geometry(resource.frame().map(|frame| Size { width: frame.width, height: frame.height }).unwrap_or(provisional), self.placement);
+        let provisional = Size {
+            width: desired_width.unwrap_or(300.0),
+            height: 160.0,
+        };
+        let geometry = anchor.geometry(
+            resource
+                .frame()
+                .map(|frame| Size {
+                    width: frame.width,
+                    height: frame.height,
+                })
+                .unwrap_or(provisional),
+            self.placement,
+        );
         let on_dismiss = self.on_dismiss.clone();
         let key_handler = self.key_handler.clone();
         let surface = self.surface;
@@ -275,9 +321,9 @@ impl PrimitiveView for AnchoredOverlayHost {
                     dismissed();
                     return true;
                 }
-                key_handler
-                    .as_ref()
-                    .is_some_and(|handler| handler(event, cove_core::scene::EventPhase::Target) == EventResult::Handled)
+                key_handler.as_ref().is_some_and(|handler| {
+                    handler(event, cove_core::scene::EventPhase::Target) == EventResult::Handled
+                })
             }),
             content: match surface {
                 PopoverSurface::Bubble => AnyView::new(PopoverSurfaceHost {
@@ -294,7 +340,9 @@ impl PrimitiveView for AnchoredOverlayHost {
                         0.0,
                         content.clone(),
                     )
-                    .padding_insets(crate::modifiers::layout::EdgeInsets::new(4.0, 0.0, 0.0, 0.0)),
+                    .padding_insets(crate::modifiers::layout::EdgeInsets::new(
+                        4.0, 0.0, 0.0, 0.0,
+                    )),
                 ),
             },
         })));
@@ -315,10 +363,14 @@ impl PrimitiveView for AnchoredOverlayHost {
                 let frame = placement_for_size.geometry(size, placement).frame;
                 Point::new(frame.x, frame.y)
             })),
-            Some(
-                Transition::opacity()
-                    .combined(Transition::offset(0.0, if surface == PopoverSurface::Content { -6.0 } else { 0.0 })),
-            ),
+            Some(Transition::opacity().combined(Transition::offset(
+                0.0,
+                if surface == PopoverSurface::Content {
+                    -6.0
+                } else {
+                    0.0
+                },
+            ))),
         );
         let dismissal_anchor = Rc::new(PopoverAnchor::new(node, self.overflow, surface, margin));
         let dismissal_anchor_inner = dismissal_anchor.clone();
@@ -327,16 +379,37 @@ impl PrimitiveView for AnchoredOverlayHost {
             Rc::new(move || dismissal_anchor_inner.frame()),
             Rc::new(move || dismiss()),
         );
-        place(node, &resource, &anchor, self.placement, self.sizing_anchor, margin_for_key, provisional);
+        place(
+            node,
+            &resource,
+            &anchor,
+            self.placement,
+            self.sizing_anchor,
+            margin_for_key,
+            provisional,
+        );
         let weak = node.downgrade();
         let placement_for_layout = self.placement;
         let sizing = self.sizing_anchor;
         node.set_layout_did_update(Some(Rc::new(move |_owner: &Node| {
-            let Some(node) = Node::upgrade(&weak) else { return };
-            let Some(resource) = node.first_resource::<PortalResource>() else { return };
+            let Some(node) = Node::upgrade(&weak) else {
+                return;
+            };
+            let Some(resource) = node.first_resource::<PortalResource>() else {
+                return;
+            };
             let margin = if sizing { 12.0 } else { 8.0 };
-            let anchor = PopoverAnchor::new(&node, PopoverOverflow::Flip, PopoverSurface::Bubble, margin);
-            place(&node, &resource, &anchor, placement_for_layout, sizing, margin, provisional);
+            let anchor =
+                PopoverAnchor::new(&node, PopoverOverflow::Flip, PopoverSurface::Bubble, margin);
+            place(
+                &node,
+                &resource,
+                &anchor,
+                placement_for_layout,
+                sizing,
+                margin,
+                provisional,
+            );
         }) as cove_core::scene::LayoutUpdateHook));
         let identity = AnchoredIdentity {
             width_bits: self.width.map(f32::to_bits),
@@ -347,13 +420,35 @@ impl PrimitiveView for AnchoredOverlayHost {
         };
         let weak = node.downgrade();
         node.update_overlay_draw(identity, move |_list, _origin| {
-            let Some(owner) = Node::upgrade(&weak) else { return };
-            let Some(resource) = owner.first_resource::<PortalResource>() else { return };
+            let Some(owner) = Node::upgrade(&weak) else {
+                return;
+            };
+            let Some(resource) = owner.first_resource::<PortalResource>() else {
+                return;
+            };
             let margin = if sizing { 12.0 } else { 8.0 };
-            let anchor = PopoverAnchor::new(&owner, PopoverOverflow::Flip, PopoverSurface::Bubble, margin);
-            place(&owner, &resource, &anchor, placement_for_layout, sizing, margin, provisional);
+            let anchor = PopoverAnchor::new(
+                &owner,
+                PopoverOverflow::Flip,
+                PopoverSurface::Bubble,
+                margin,
+            );
+            place(
+                &owner,
+                &resource,
+                &anchor,
+                placement_for_layout,
+                sizing,
+                margin,
+                provisional,
+            );
         });
-        let _ = (AccessibilityActions::default(), PointerCaptureHolder::current(), dismissal_anchor, on_dismiss);
+        let _ = (
+            AccessibilityActions::default(),
+            PointerCaptureHolder::current(),
+            dismissal_anchor,
+            on_dismiss,
+        );
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
@@ -380,14 +475,24 @@ impl PrimitiveView for MenuKeyHost {
     }
 
     fn update_node(&self, node: &Node) {
-        let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() else { return };
+        let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() else {
+            return;
+        };
         let on_key = self.on_key.clone();
-        registry.set_key(node, cove_core::scene::InputHandlerRoute::overlay(), Rc::new(move |event, phase| {
-            if phase == cove_core::scene::EventPhase::Capture {
-                return EventResult::Ignored;
-            }
-            if on_key(event) { EventResult::Handled } else { EventResult::Ignored }
-        }));
+        registry.set_key(
+            node,
+            cove_core::scene::InputHandlerRoute::overlay(),
+            Rc::new(move |event, phase| {
+                if phase == cove_core::scene::EventPhase::Capture {
+                    return EventResult::Ignored;
+                }
+                if on_key(event) {
+                    EventResult::Handled
+                } else {
+                    EventResult::Ignored
+                }
+            }),
+        );
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
@@ -423,7 +528,11 @@ impl PrimitiveView for PopoverSurfaceHost {
         } else {
             cove_core::scene::Direction::Ltr
         });
-        let maximum = self.anchor.geometry(Size::default(), self.placement).maximum_size.height;
+        let maximum = self
+            .anchor
+            .geometry(Size::default(), self.placement)
+            .maximum_size
+            .height;
         layout.set_max_height(Some(maximum));
     }
 
@@ -433,7 +542,9 @@ impl PrimitiveView for PopoverSurfaceHost {
         let weak = node.downgrade();
         let placement = self.placement;
         node.update_draw(placement, move |list, origin| {
-            let Some(owner) = Node::upgrade(&weak) else { return };
+            let Some(owner) = Node::upgrade(&weak) else {
+                return;
+            };
             let frame = owner.frame();
             if frame.width <= 20.0 || frame.height <= 20.0 {
                 return;
@@ -448,35 +559,73 @@ impl PrimitiveView for PopoverSurfaceHost {
             );
             // Panels use the tighter radius with a 20-pt lift shadow.
             let radius = theme.radius.lg.min(body.width.min(body.height) / 2.0);
-            let fill = theme.colors.surface_floating.multiplied_alpha(owner.opacity());
+            let fill = theme
+                .colors
+                .surface_floating
+                .multiplied_alpha(owner.opacity());
             let border = theme.colors.border.multiplied_alpha(owner.opacity());
             let _ = list.add_rounded_rect(body, radius, fill);
             let _ = list.add_rounded_rect_stroke(body, radius, 1.0, border);
-            let geometry = PopoverAnchor::new(&owner, super::placement::PopoverOverflow::Flip, super::placement::PopoverSurface::Bubble, 8.0)
-                .geometry(Size { width: frame.width, height: frame.height }, placement);
+            let geometry = PopoverAnchor::new(
+                &owner,
+                super::placement::PopoverOverflow::Flip,
+                super::placement::PopoverSurface::Bubble,
+                8.0,
+            )
+            .geometry(
+                Size {
+                    width: frame.width,
+                    height: frame.height,
+                },
+                placement,
+            );
             let half = 7.0_f32;
             let absolute = owner.absolute_frame();
             let anchor_frame = super::placement::PopoverGeometry::MARGIN;
             let _ = anchor_frame;
             let (a, b, tip) = if geometry.edge.is_vertical() {
                 let center = (body.x + radius + half).max(
-                    (origin.x + (anchor_frame - absolute.x)).min(body.x + body.width - radius - half),
+                    (origin.x + (anchor_frame - absolute.x))
+                        .min(body.x + body.width - radius - half),
                 );
-                let base = if geometry.edge == PopoverEdge::Top { body.y + body.height } else { body.y };
+                let base = if geometry.edge == PopoverEdge::Top {
+                    body.y + body.height
+                } else {
+                    body.y
+                };
                 (
                     Point::new(center - half, base),
                     Point::new(center + half, base),
-                    Point::new(center, base + if geometry.edge == PopoverEdge::Top { inset } else { -inset }),
+                    Point::new(
+                        center,
+                        base + if geometry.edge == PopoverEdge::Top {
+                            inset
+                        } else {
+                            -inset
+                        },
+                    ),
                 )
             } else {
                 let center = (body.y + radius + half).max(
-                    (origin.y + (anchor_frame - absolute.y)).min(body.y + body.height - radius - half),
+                    (origin.y + (anchor_frame - absolute.y))
+                        .min(body.y + body.height - radius - half),
                 );
-                let base = if geometry.edge == PopoverEdge::Left { body.x + body.width } else { body.x };
+                let base = if geometry.edge == PopoverEdge::Left {
+                    body.x + body.width
+                } else {
+                    body.x
+                };
                 (
                     Point::new(base, center - half),
                     Point::new(base, center + half),
-                    Point::new(base + if geometry.edge == PopoverEdge::Left { inset } else { -inset }, center),
+                    Point::new(
+                        base + if geometry.edge == PopoverEdge::Left {
+                            inset
+                        } else {
+                            -inset
+                        },
+                        center,
+                    ),
                 )
             };
             let _ = list.add_triangle(a, b, tip, fill);
@@ -486,7 +635,11 @@ impl PrimitiveView for PopoverSurfaceHost {
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
-        let maximum = self.anchor.geometry(Size::default(), self.placement).maximum_size.height;
+        let maximum = self
+            .anchor
+            .geometry(Size::default(), self.placement)
+            .maximum_size
+            .height;
         let scroll = crate::primitives::layout::ScrollView::new(
             crate::primitives::layout::ScrollAxis::Both,
             self.content.clone(),
@@ -494,7 +647,14 @@ impl PrimitiveView for PopoverSurfaceHost {
         .scrollbar_gutter(crate::primitives::layout::ScrollbarGutter::Overlay);
         vec![AnyView::new(
             AnyView::new(scroll)
-                .frame(None, None, None, None, None, Some((maximum - 48.0).max(0.0)))
+                .frame(
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some((maximum - 48.0).max(0.0)),
+                )
                 .padding(24.0),
         )]
     }

@@ -5,6 +5,9 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::modifiers::interaction::CursorExt;
+use crate::theme::theme_for_node;
+use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
 use cove_core::scene::{
     AccessibilityRole, AccessibilitySemantics, EventResult, InputHandlerRoute,
     InteractionRegistryHolder, LayoutNode, Node, PointerPhase, Rect,
@@ -12,12 +15,9 @@ use cove_core::scene::{
 use cove_core::{Color, Point};
 use cove_platform::{MouseButton, SystemCursor};
 use cove_text::{DrawListText, TextEnvironment, TextEnvironmentHolder};
-use crate::modifiers::interaction::CursorExt;
-use crate::theme::theme_for_node;
-use crate::{impl_primitive_view, AnyView, PrimitiveView, View};
 
 use super::flow::{RichParagraph, RichTextFlow};
-use super::link_anchor::{RichTextLinkAnchor, FOCUSED_LINK};
+use super::link_anchor::{FOCUSED_LINK, RichTextLinkAnchor};
 
 /// How a paragraph participates in its document.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -82,7 +82,12 @@ pub struct RichTextSurface {
 
 impl RichTextSurface {
     pub fn new(paragraph: RichParagraph) -> Self {
-        Self { paragraph, role: RichTextRole::Paragraph, destinations: Vec::new(), on_open_link: None }
+        Self {
+            paragraph,
+            role: RichTextRole::Paragraph,
+            destinations: Vec::new(),
+            on_open_link: None,
+        }
     }
 
     fn accessibility_role(&self) -> AccessibilityRole {
@@ -127,7 +132,12 @@ impl PrimitiveView for RichTextSurface {
         node.set_is_focusable(false);
         node.set_is_tab_stop(false);
 
-        install_pointer(node, &self.paragraph, self.destinations.clone(), self.on_open_link.clone());
+        install_pointer(
+            node,
+            &self.paragraph,
+            self.destinations.clone(),
+            self.on_open_link.clone(),
+        );
 
         let weak = node.downgrade();
         let paragraph = self.paragraph.clone();
@@ -139,7 +149,9 @@ impl PrimitiveView for RichTextSurface {
                 focused_link: node.attachment::<usize>(FOCUSED_LINK),
             },
             move |list, origin| {
-                let Some(owner) = Node::upgrade(&weak) else { return };
+                let Some(owner) = Node::upgrade(&weak) else {
+                    return;
+                };
                 paint(&owner, &paragraph, &destinations, list, origin);
             },
         );
@@ -154,7 +166,9 @@ fn paint(
     list: &mut cove_core::DrawList,
     origin: Point,
 ) {
-    let Some(environment) = TextEnvironmentHolder::current() else { return };
+    let Some(environment) = TextEnvironmentHolder::current() else {
+        return;
+    };
     let frame = node.frame();
     if frame.width <= 0.0 || frame.height <= 0.0 {
         return;
@@ -166,8 +180,13 @@ fn paint(
 
     // Code chips behind their spans, so the glyphs sit on top.
     for fragment in &flow.fragments {
-        let Some(span) = paragraph.spans.get(fragment.span) else { continue };
-        if !span.traits.contains(crate::primitives::text::rich::run::RichTextTraits::CODE) {
+        let Some(span) = paragraph.spans.get(fragment.span) else {
+            continue;
+        };
+        if !span
+            .traits
+            .contains(crate::primitives::text::rich::run::RichTextTraits::CODE)
+        {
             continue;
         }
         let line = flow.lines.get(fragment.line);
@@ -195,18 +214,28 @@ fn paint(
         Some(&|glyph: &cove_core::PositionedGlyph| {
             let span_index = flow.span(glyph_cluster(&flow, glyph));
             let span = span_index.and_then(|index| paragraph.spans.get(index))?;
-            if span.link.is_some() { Some(palette.link.multiplied_alpha(opacity)) } else { None }
+            if span.link.is_some() {
+                Some(palette.link.multiplied_alpha(opacity))
+            } else {
+                None
+            }
         }),
     );
 
     // Link underlines, plus a focus ring on the focused link's fragments.
     for fragment in &flow.fragments {
-        let Some(span) = paragraph.spans.get(fragment.span) else { continue };
+        let Some(span) = paragraph.spans.get(fragment.span) else {
+            continue;
+        };
         let Some(link) = span.link else { continue };
         let line = flow.lines.get(fragment.line);
         let bottom = line.map_or(0.0, |line| line.baseline + line.height * 0.12);
         let focused = focused_link == Some(link);
-        let color = if focused { palette.focus_ring } else { palette.link };
+        let color = if focused {
+            palette.focus_ring
+        } else {
+            palette.link
+        };
         let _ = list.add_rect(
             Rect::new(
                 origin.x + fragment.min_x,
@@ -221,8 +250,13 @@ fn paint(
 
     // Strike lines through struck spans.
     for fragment in &flow.fragments {
-        let Some(span) = paragraph.spans.get(fragment.span) else { continue };
-        if !span.traits.contains(crate::primitives::text::rich::run::RichTextTraits::STRIKETHROUGH) {
+        let Some(span) = paragraph.spans.get(fragment.span) else {
+            continue;
+        };
+        if !span
+            .traits
+            .contains(crate::primitives::text::rich::run::RichTextTraits::STRIKETHROUGH)
+        {
             continue;
         }
         let line = flow.lines.get(fragment.line);
@@ -252,55 +286,83 @@ fn install_pointer(
     destinations: Vec<String>,
     on_open_link: Option<Rc<dyn Fn(&str)>>,
 ) {
-    let Some(registry) = InteractionRegistryHolder::current() else { return };
+    let Some(registry) = InteractionRegistryHolder::current() else {
+        return;
+    };
     node.set_cursor(Some(SystemCursor::Ibeam));
     let pointer_paragraph = paragraph.clone();
     let pointer_destinations = destinations.clone();
     let open = on_open_link.clone();
     let weak = node.downgrade();
-    registry.set_pointer(node, InputHandlerRoute::control(), Rc::new(move |event, phase, _event_phase| {
-        if event.button != MouseButton::Left || phase != PointerPhase::Up {
-            return EventResult::Ignored;
-        }
-        let Some(owner) = Node::upgrade(&weak) else { return EventResult::Ignored };
-        let Some(environment) = TextEnvironmentHolder::current() else { return EventResult::Ignored };
-        let frame = owner.absolute_frame();
-        let flow = RichTextFlow::layout(&pointer_paragraph, frame.width, &environment);
-        let Some(fragment) = flow.fragment(event.x - frame.x, event.y - frame.y) else {
-            return EventResult::Ignored;
-        };
-        let Some(span) = pointer_paragraph.spans.get(fragment.span) else { return EventResult::Ignored };
-        let Some(link) = span.link else { return EventResult::Ignored };
-        let Some(destination) = pointer_destinations.get(link) else { return EventResult::Ignored };
-        match open.as_ref() {
-            Some(handler) => {
-                handler(destination);
-                EventResult::Handled
+    registry.set_pointer(
+        node,
+        InputHandlerRoute::control(),
+        Rc::new(move |event, phase, _event_phase| {
+            if event.button != MouseButton::Left || phase != PointerPhase::Up {
+                return EventResult::Ignored;
             }
-            None => EventResult::Ignored,
-        }
-    }));
+            let Some(owner) = Node::upgrade(&weak) else {
+                return EventResult::Ignored;
+            };
+            let Some(environment) = TextEnvironmentHolder::current() else {
+                return EventResult::Ignored;
+            };
+            let frame = owner.absolute_frame();
+            let flow = RichTextFlow::layout(&pointer_paragraph, frame.width, &environment);
+            let Some(fragment) = flow.fragment(event.x - frame.x, event.y - frame.y) else {
+                return EventResult::Ignored;
+            };
+            let Some(span) = pointer_paragraph.spans.get(fragment.span) else {
+                return EventResult::Ignored;
+            };
+            let Some(link) = span.link else {
+                return EventResult::Ignored;
+            };
+            let Some(destination) = pointer_destinations.get(link) else {
+                return EventResult::Ignored;
+            };
+            match open.as_ref() {
+                Some(handler) => {
+                    handler(destination);
+                    EventResult::Handled
+                }
+                None => EventResult::Ignored,
+            }
+        }),
+    );
 
     let hover_paragraph = paragraph.clone();
     let hover_node = node.downgrade();
     let hover_registry = InteractionRegistryHolder::current();
     if let Some(registry) = hover_registry {
         let hover_flow = Rc::new(RefCell::new(false));
-        registry.set_motion(node, InputHandlerRoute::control(), Rc::new(move |event, _phase| {
-            let Some(owner) = Node::upgrade(&hover_node) else { return EventResult::Ignored };
-            let Some(environment) = TextEnvironmentHolder::current() else { return EventResult::Ignored };
-            let frame = owner.absolute_frame();
-            let flow = RichTextFlow::layout(&hover_paragraph, frame.width, &environment);
-            let over_link = flow
-                .fragment(event.x - frame.x, event.y - frame.y)
-                .and_then(|fragment| hover_paragraph.spans.get(fragment.span))
-                .is_some_and(|span| span.link.is_some());
-            if *hover_flow.borrow() != over_link {
-                *hover_flow.borrow_mut() = over_link;
-                owner.set_cursor(Some(if over_link { SystemCursor::Pointer } else { SystemCursor::Ibeam }));
-            }
-            EventResult::Ignored
-        }));
+        registry.set_motion(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, _phase| {
+                let Some(owner) = Node::upgrade(&hover_node) else {
+                    return EventResult::Ignored;
+                };
+                let Some(environment) = TextEnvironmentHolder::current() else {
+                    return EventResult::Ignored;
+                };
+                let frame = owner.absolute_frame();
+                let flow = RichTextFlow::layout(&hover_paragraph, frame.width, &environment);
+                let over_link = flow
+                    .fragment(event.x - frame.x, event.y - frame.y)
+                    .and_then(|fragment| hover_paragraph.spans.get(fragment.span))
+                    .is_some_and(|span| span.link.is_some());
+                if *hover_flow.borrow() != over_link {
+                    *hover_flow.borrow_mut() = over_link;
+                    owner.set_cursor(Some(if over_link {
+                        SystemCursor::Pointer
+                    } else {
+                        SystemCursor::Ibeam
+                    }));
+                }
+                EventResult::Ignored
+            }),
+        );
     }
 }
 

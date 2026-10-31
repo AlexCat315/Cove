@@ -22,7 +22,12 @@ pub struct ChartStack {
 }
 
 impl ChartStack {
-    pub fn new(series: &[ChartSeries], visible: &[bool], style: &ChartStyle, axis: ChartValueAxis) -> Self {
+    pub fn new(
+        series: &[ChartSeries],
+        visible: &[bool],
+        style: &ChartStyle,
+        axis: ChartValueAxis,
+    ) -> Self {
         let shown: Vec<usize> = series
             .iter()
             .enumerate()
@@ -31,7 +36,9 @@ impl ChartStack {
             })
             .map(|(index, _)| index)
             .collect();
-        let has_bars = shown.iter().any(|index| series[*index].mark == ChartMark::Bar);
+        let has_bars = shown
+            .iter()
+            .any(|index| series[*index].mark == ChartMark::Bar);
         let sample_count = shown
             .iter()
             .map(|index| series[*index].data.len())
@@ -49,8 +56,7 @@ impl ChartStack {
             let data = &series[index].data;
             // Percent mode takes every series; otherwise only bars/areas stack.
             let stacks = is_percent
-                || (is_stacked
-                    && matches!(series[index].mark, ChartMark::Bar | ChartMark::Area));
+                || (is_stacked && matches!(series[index].mark, ChartMark::Bar | ChartMark::Area));
             bases[index] = data
                 .iter()
                 .enumerate()
@@ -130,9 +136,10 @@ impl ChartStack {
             .flat_map(|index| tops[*index].iter().copied())
             .filter(|value| value.is_finite())
             .collect();
-        if shown.iter().any(|index| {
-            matches!(series[*index].mark, ChartMark::Bar | ChartMark::Area)
-        }) {
+        if shown
+            .iter()
+            .any(|index| matches!(series[*index].mark, ChartMark::Bar | ChartMark::Area))
+        {
             extent.push(0.0);
         }
 
@@ -155,7 +162,11 @@ impl ChartStack {
         if !self.is_stacked {
             return true;
         }
-        let outermost = if value >= 0.0 { &self.outermost_up } else { &self.outermost_down };
+        let outermost = if value >= 0.0 {
+            &self.outermost_up
+        } else {
+            &self.outermost_down
+        };
         outermost.get(position).copied().flatten() == Some(series)
     }
 }

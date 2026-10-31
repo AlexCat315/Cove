@@ -31,7 +31,11 @@ impl Default for SplitConstraints {
 
 impl SplitConstraints {
     pub fn new(fraction_min: f32, fraction_max: f32) -> Self {
-        Self { fraction_min, fraction_max, ..Default::default() }
+        Self {
+            fraction_min,
+            fraction_max,
+            ..Default::default()
+        }
     }
 
     pub fn fraction_range(mut self, minimum: f32, maximum: f32) -> Self {
@@ -96,11 +100,19 @@ impl SplitConstraints {
 }
 
 fn clamp_unit(value: f32, fallback: f32) -> f32 {
-    if value.is_finite() { value.clamp(0.0, 1.0) } else { fallback }
+    if value.is_finite() {
+        value.clamp(0.0, 1.0)
+    } else {
+        fallback
+    }
 }
 
 fn finite_minimum(value: f32) -> f32 {
-    if value.is_finite() { value.max(0.0) } else { 0.0 }
+    if value.is_finite() {
+        value.max(0.0)
+    } else {
+        0.0
+    }
 }
 
 fn finite_maximum(value: Option<f32>, minimum: f32, available: f32) -> f32 {

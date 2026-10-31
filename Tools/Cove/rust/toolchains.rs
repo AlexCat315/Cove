@@ -4,17 +4,17 @@
 //! `Toolchains/Requirements.swift`, `Toolchains/Setup.swift`.
 //!
 //! Every check reports the same name, readiness and remedy text as the original
-//! so `cove doctor`/`cove setup` output stays byte-identical.
+//! so `cove doctor` output stays byte-identical.
 
 use crate::cli::{AppPlatform, Arguments, OptionKey};
 use crate::installation::CLIUpdate;
-use crate::platforms_android::{AndroidToolchain, NativeDependencies};
-use crate::project_sdk::{CoveSDK, NativeArtifacts};
-use crate::support::{environment, Shell, StdoutTarget, ToolError};
+use crate::platforms_android::AndroidToolchain;
+use crate::project_sdk::NativeArtifacts;
+use crate::support::{Shell, StdoutTarget, ToolError, environment};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-/// One row of `cove setup`/`cove doctor` output.
+/// One row of `cove doctor` output.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ToolchainCheck {
     pub name: String,
@@ -73,9 +73,7 @@ impl NativeSDK {
         let target = apple
             .map(AppleTarget::variant)
             .unwrap_or_else(CLIUpdate::platform);
-        if !from_source
-            && NativeArtifacts::install(root, &target, &installation_cache())?
-        {
+        if !from_source && NativeArtifacts::install(root, &target, &installation_cache())? {
             return Ok(());
         }
         if !NativeArtifacts::has_source_inputs(root) {
@@ -96,7 +94,11 @@ impl NativeSDK {
             } else {
                 root.join("third-party")
             };
-            let base = if native { root.join("Native") } else { root.to_path_buf() };
+            let base = if native {
+                root.join("Native")
+            } else {
+                root.to_path_buf()
+            };
             let build = base.join("build").join(match apple {
                 Some(apple) => apple.variant(),
                 None => "native".into(),
@@ -213,11 +215,11 @@ fn installation_cache() -> PathBuf {
     crate::installation::Installation::directory()
 }
 
-/// `cove setup --android` requirements: JDK 21, SDK packages, NDK r30, Swift SDK.
+/// `cove doctor --android` requirements: JDK 21, SDK packages, NDK r30.
 pub struct AndroidRequirements;
 
 impl AndroidRequirements {
-    pub fn inspect(arguments: &Arguments, root: &Path, version: &str) -> Vec<ToolchainCheck> {
+    pub fn inspect(arguments: &Arguments, root: &Path) -> Vec<ToolchainCheck> {
         let sdk = AndroidToolchain::sdk_directory(arguments);
         let install = format!(
             "Install Android Studio / Command-line Tools from https://developer.android.com/studio. \
@@ -269,29 +271,20 @@ impl AndroidRequirements {
             ));
         }
         let ndk = AndroidToolchain::ndk_directory(arguments, root);
-        let ndk_version = std::fs::read_to_string(ndk.join("source.properties")).unwrap_or_default();
+        let ndk_version =
+            std::fs::read_to_string(ndk.join("source.properties")).unwrap_or_default();
         checks.push(ToolchainCheck::new(
             "NDK r30",
             matches_pkg_revision_30(&ndk_version),
             format!("{install} Or supply --ndk PATH / ANDROID_NDK_HOME."),
         ));
-        let sdks = if version.is_empty() {
-            String::new()
-        } else {
-            Shell::run(
-                &[CoveSDK::swift(), "sdk".into(), "list".into()],
-                None,
-                &environment(),
-                true,
-                true,
-                StdoutTarget::StandardOutput,
-            )
-            .unwrap_or_default()
-        };
+        let linker = ndk
+            .join("toolchains/llvm/prebuilt")
+            .join("bin/aarch64-linux-android28-clang");
         checks.push(ToolchainCheck::new(
-            "Swift Android SDK 6.4.1",
-            sdks.contains(AndroidToolchain::SDK_ID),
-            "Run cove setup --android with the Swift 6.4.1 release compiler to install the verified Swift Android SDK. This target builds arm64-v8a / API 28+.",
+            "NDK arm64 linker",
+            linker.is_file(),
+            "Install NDK r30 with the arm64 API 28 toolchain, or supply --ndk PATH / ANDROID_NDK_HOME.",
         ));
         checks
     }
@@ -318,25 +311,6 @@ fn matches_pkg_revision_30(contents: &str) -> bool {
 pub struct ToolchainRequirements;
 
 impl ToolchainRequirements {
-    /// `Swift version 6\.4(?:\.[0-9]+)?(?:\s|$)`
-    pub fn supports_compiler(version: &str) -> bool {
-        let Some(index) = version.find("Swift version 6.4") else {
-            return false;
-        };
-        let rest = &version[index + "Swift version 6.4".len()..];
-        let rest = match rest.strip_prefix('.') {
-            Some(after) => {
-                let digits: String = after.chars().take_while(char::is_ascii_digit).collect();
-                if digits.is_empty() {
-                    return false;
-                }
-                &after[digits.len()..]
-            }
-            None => rest,
-        };
-        rest.is_empty() || rest.starts_with(|character: char| character.is_whitespace())
-    }
-
     pub fn inspect(arguments: &Arguments, root: &Path) -> Vec<ToolchainCheck> {
         let common = "Install Git, CMake and Ninja. macOS: brew install git cmake ninja; \
              Ubuntu/Debian: sudo apt-get install git cmake ninja-build build-essential pkg-config. \
@@ -377,7 +351,7 @@ impl ToolchainRequirements {
         .collect::<Vec<_>>();
 
         let version = Shell::run(
-            &[CoveSDK::swift(), "--version".into()],
+            &[crate::platforms_desktop::cargo(), "--version".into()],
             None,
             &environment(),
             true,
@@ -386,9 +360,9 @@ impl ToolchainRequirements {
         )
         .unwrap_or_default();
         commands.push(ToolchainCheck::new(
-            "Swift 6.4",
-            Self::supports_compiler(&version),
-            "Install Swift 6.4.1 from https://www.swift.org/install/. With Swiftly: swiftly install 6.4.1; swiftly use 6.4.1. COVE_SWIFT_EXECUTABLE can select an existing compiler.",
+            "Rust 1.90+ (edition 2024)",
+            !version.trim().is_empty(),
+            "Install Rust via https://rustup.rs; rust-toolchain.toml pins the channel.",
         ));
 
         if cfg!(target_os = "macos") {
@@ -425,13 +399,13 @@ impl ToolchainRequirements {
             }
         }
         if arguments.platform == AppPlatform::Android {
-            commands.extend(AndroidRequirements::inspect(arguments, root, &version));
+            commands.extend(AndroidRequirements::inspect(arguments, root));
         }
         commands
     }
 }
 
-/// `cove setup` and the checks behind `cove doctor`.
+/// The checks behind `cove doctor`.
 pub struct ToolchainSetup;
 
 impl ToolchainSetup {
@@ -445,7 +419,11 @@ impl ToolchainSetup {
         );
         let checks = ToolchainRequirements::inspect(arguments, root);
         for check in &checks {
-            println!("[{}] {}", if check.ready { "OK" } else { "MISSING" }, check.name);
+            println!(
+                "[{}] {}",
+                if check.ready { "OK" } else { "MISSING" },
+                check.name
+            );
         }
         let remedies: BTreeSet<&String> = checks
             .iter()
@@ -457,43 +435,9 @@ impl ToolchainSetup {
         }
         if !remedies.is_empty() {
             return Err(ToolError::invalid(
-                "Complete the target-specific steps above, then rerun cove setup.",
+                "Complete the target-specific steps above, then rerun cove doctor.",
             ));
         }
-        Ok(())
-    }
-
-    pub fn run(arguments: &Arguments, root: &Path) -> Result<(), ToolError> {
-        if arguments.platform == AppPlatform::Android {
-            let _ = AndroidToolchain::new(root, arguments)?;
-            AndroidToolchain::ensure_swift_sdk()?;
-        }
-        Self::report(arguments, root)?;
-        if arguments.platform == AppPlatform::Ios {
-            NativeSDK::prepare(
-                root,
-                Some(&AppleTarget {
-                    sdk: arguments
-                        .value(OptionKey::Sdk)
-                        .unwrap_or("iphonesimulator")
-                        .to_string(),
-                    architecture: arguments
-                        .value(OptionKey::Architecture)
-                        .unwrap_or("arm64")
-                        .to_string(),
-                }),
-                false,
-            )?;
-        } else if arguments.platform == AppPlatform::Android {
-            let _ = NativeDependencies::new(AndroidToolchain::new(root, arguments)?).prepare(false)?;
-        } else {
-            // SDK native archives are built once, shared by all application projects.
-            NativeSDK::prepare(root, None, false)?;
-        }
-        println!(
-            "Ready. cove create app MyApp; cove run MyApp --{}",
-            arguments.platform.raw_value()
-        );
         Ok(())
     }
 }

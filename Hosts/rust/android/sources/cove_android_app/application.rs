@@ -27,10 +27,17 @@ impl AndroidApplication {
         launch: SceneLaunch,
         runtime: RuntimeOptions,
     ) -> Result<Rc<Self>, String> {
-        let scale = if scale.is_finite() && scale > 0.0 { scale } else { 1.0 };
+        let scale = if scale.is_finite() && scale > 0.0 {
+            scale
+        } else {
+            1.0
+        };
         let device = Arc::new(
-            Device::make(DeviceConfig { enable_validation: false, ..DeviceConfig::default() })
-                .map_err(|error| error.to_string())?,
+            Device::make(DeviceConfig {
+                enable_validation: false,
+                ..DeviceConfig::default()
+            })
+            .map_err(|error| error.to_string())?,
         );
         let mut renderer = {
             let device = device.clone();
@@ -102,7 +109,11 @@ impl AndroidApplication {
     }
 
     pub fn update_scale(&self, value: f32) {
-        let next = if value.is_finite() && value > 0.0 { value } else { 1.0 };
+        let next = if value.is_finite() && value > 0.0 {
+            value
+        } else {
+            1.0
+        };
         if self.scale.get() == next {
             return;
         }

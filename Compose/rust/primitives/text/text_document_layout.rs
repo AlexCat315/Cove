@@ -3,9 +3,7 @@
 
 use super::text_buffer::TextBuffer;
 use super::text_field::text_visual_line_index::TextVisualLineIndex;
-use cove_core::{
-    Font, PositionedGlyph, TextAlignment, TextLayoutResult, TextLine,
-};
+use cove_core::{Font, PositionedGlyph, TextAlignment, TextLayoutResult, TextLine};
 use cove_text::TextEnvironment;
 use std::collections::HashMap;
 
@@ -87,8 +85,7 @@ impl TextDocumentLayout {
                 next.character_index_for_utf8_offset(delta.new_end_utf8_offset),
             );
             let shift = next.line_count() as isize - self.buffer.line_count() as isize;
-            self.index
-                .replace(first..(last + 1), new_last - first + 1);
+            self.index.replace(first..(last + 1), new_last - first + 1);
             // At most 256 retained entries are rebased; work is independent of
             // document length. The persistent row index splices in O(log n).
             let mut kept: HashMap<usize, MeasuredTextLine> = HashMap::new();
@@ -126,9 +123,7 @@ impl TextDocumentLayout {
         if let Some(entry) = self.lines.get(&row) {
             return entry.clone();
         }
-        let source = self
-            .buffer
-            .substring(self.buffer.line_range(row));
+        let source = self.buffer.substring(self.buffer.line_range(row));
         let text = if self.geometry.secure {
             "\u{2022}".repeat(source.chars().count())
         } else {
@@ -306,9 +301,7 @@ impl TextDocumentLayout {
             let entry = self.measured_line(line, env);
             let first_visual_row = self.index.first_row_of_line(line);
             let range = self.buffer.line_range(line);
-            let byte_start = self
-                .buffer
-                .utf8_offset_for_character_index(range.start);
+            let byte_start = self.buffer.utf8_offset_for_character_index(range.start);
             for (subrow, local) in entry.rows.iter().enumerate() {
                 let visual_row = first_visual_row + subrow;
                 if visual_row < first_row || visual_row >= end_row {
@@ -370,9 +363,7 @@ impl TextDocumentLayout {
             .cloned()
         {
             return self.caret(
-                self.buffer
-                    .line_range(hidden.start.saturating_sub(1))
-                    .end,
+                self.buffer.line_range(hidden.start.saturating_sub(1)).end,
                 line_end_affinity,
                 env,
             );
@@ -388,8 +379,7 @@ impl TextDocumentLayout {
         location = self.index.location_at_row(row);
         // Measuring can reveal more subrows of the same logical line.
         let column = line.character(location.1, x);
-        self.buffer
-            .character_index_for_line(location.0, column)
+        self.buffer.character_index_for_line(location.0, column)
     }
 }
 
@@ -404,12 +394,7 @@ pub struct MeasuredTextLine {
 }
 
 impl MeasuredTextLine {
-    pub fn new(
-        source: &str,
-        display: &str,
-        layout: &TextLayoutResult,
-        line_height: f32,
-    ) -> Self {
+    pub fn new(source: &str, display: &str, layout: &TextLayoutResult, line_height: f32) -> Self {
         let _ = source;
         let mut boundaries = vec![0usize];
         let mut offset = 0usize;

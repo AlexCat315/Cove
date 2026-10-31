@@ -11,6 +11,13 @@ pub struct SpacingScale {
 }
 impl SpacingScale {
     pub fn new(xs: f32, sm: f32, md: f32, lg: f32, xl: f32, xxl: f32) -> Self {
-        Self { xs, sm, md, lg, xl, xxl }
+        Self {
+            xs,
+            sm,
+            md,
+            lg,
+            xl,
+            xxl,
+        }
     }
 }

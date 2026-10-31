@@ -31,7 +31,12 @@ pub enum DevToolsTransportEvent {
 /// Socket-independent boundary for protocol dispatch.
 pub trait DevToolsTransport {
     fn bound_port(&self) -> Option<u16>;
-    fn start(&self, host: &str, port: u16, on_event: Arc<dyn Fn(DevToolsTransportEvent) + Send + Sync>) -> io::Result<()>;
+    fn start(
+        &self,
+        host: &str,
+        port: u16,
+        on_event: Arc<dyn Fn(DevToolsTransportEvent) + Send + Sync>,
+    ) -> io::Result<()>;
     fn stop(&self);
 }
 
@@ -87,11 +92,20 @@ impl StdDevToolsTransport {
 
 impl DevToolsTransport for StdDevToolsTransport {
     fn bound_port(&self) -> Option<u16> {
-        self.state.lock().unwrap_or_else(|error| error.into_inner()).port
+        self.state
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .port
     }
 
-    fn start(&self, host: &str, port: u16, on_event: Arc<dyn Fn(DevToolsTransportEvent) + Send + Sync>) -> io::Result<()> {
-        let address = resolve_bind_address(host)?;        let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
+    fn start(
+        &self,
+        host: &str,
+        port: u16,
+        on_event: Arc<dyn Fn(DevToolsTransportEvent) + Send + Sync>,
+    ) -> io::Result<()> {
+        let address = resolve_bind_address(host)?;
+        let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
         if state.listener.is_some() {
             return Ok(());
         }
@@ -144,11 +158,18 @@ impl DevToolsTransport for StdDevToolsTransport {
             state.shutdown.store(true, Ordering::SeqCst);
             let port = state.port;
             state.listener.take();
-            (port, state.connections.clone(), std::mem::take(&mut state.threads))
+            (
+                port,
+                state.connections.clone(),
+                std::mem::take(&mut state.threads),
+            )
         };
         // Wake the blocking accept with a throwaway connection.
         if let Some(port) = state.0 {
-            let _ = TcpStream::connect_timeout(&SocketAddr::from(([127, 0, 0, 1], port)), Duration::from_millis(100));
+            let _ = TcpStream::connect_timeout(
+                &SocketAddr::from(([127, 0, 0, 1], port)),
+                Duration::from_millis(100),
+            );
         }
         for connection in &state.1 {
             connection.close();
@@ -187,7 +208,10 @@ impl DevToolsConnection for StdConnection {
             return;
         }
         // A stalled mirror client must not accumulate unbounded frames.
-        let mut writer = self.writer.lock().unwrap_or_else(|error| error.into_inner());
+        let mut writer = self
+            .writer
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         if write_frame(&mut writer.stream, Opcode::Text, text).is_err() {
             self.close();
         }
@@ -197,7 +221,10 @@ impl DevToolsConnection for StdConnection {
         if self.closed.swap(true, Ordering::SeqCst) {
             return;
         }
-        let mut writer = self.writer.lock().unwrap_or_else(|error| error.into_inner());
+        let mut writer = self
+            .writer
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         let _ = write_frame(&mut writer.stream, Opcode::Close, &[0x03, 0xE8]);
         let _ = writer.stream.shutdown(std::net::Shutdown::Both);
     }
@@ -269,13 +296,17 @@ fn handshake(mut stream: TcpStream, access_token: Option<&str>) -> Option<Arc<St
     }
     let mut key = None;
     for line in lines {
-        let Some((name, value)) = line.split_once(':') else { continue };
+        let Some((name, value)) = line.split_once(':') else {
+            continue;
+        };
         if name.trim().eq_ignore_ascii_case("sec-websocket-key") {
             key = Some(value.trim().to_string());
         }
     }
     let key = key?;
-    let accept = base64(&sha1(format!("{key}258EAFA5-E914-47DA-95CA-C5AB0DC85B11").as_bytes()));
+    let accept = base64(&sha1(
+        format!("{key}258EAFA5-E914-47DA-95CA-C5AB0DC85B11").as_bytes(),
+    ));
     let response = format!(
         "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: {accept}\r\n\r\n"
     );
@@ -296,15 +327,23 @@ fn respond_forbidden(stream: &mut TcpStream) -> io::Result<()> {
 
 /// Read frames until the peer closes. Fragments are reassembled with a total
 /// limit, including when pings interrupt them.
-fn read_loop(connection: &Arc<StdConnection>, on_event: &Arc<dyn Fn(DevToolsTransportEvent) + Send + Sync>) {
+fn read_loop(
+    connection: &Arc<StdConnection>,
+    on_event: &Arc<dyn Fn(DevToolsTransportEvent) + Send + Sync>,
+) {
     let mut fragment_opcode: Option<Opcode> = None;
     let mut fragments: Vec<u8> = Vec::new();
     loop {
         let frame = {
-            let mut stream = connection.stream.lock().unwrap_or_else(|error| error.into_inner());
+            let mut stream = connection
+                .stream
+                .lock()
+                .unwrap_or_else(|error| error.into_inner());
             read_frame(&mut stream)
         };
-        let Some((fin, opcode, payload, masked)) = frame else { break };
+        let Some((fin, opcode, payload, masked)) = frame else {
+            break;
+        };
         // Clients must mask every frame.
         if !masked {
             connection.close();
@@ -312,7 +351,10 @@ fn read_loop(connection: &Arc<StdConnection>, on_event: &Arc<dyn Fn(DevToolsTran
         }
         match opcode {
             Opcode::Ping => {
-                let mut writer = connection.writer.lock().unwrap_or_else(|error| error.into_inner());
+                let mut writer = connection
+                    .writer
+                    .lock()
+                    .unwrap_or_else(|error| error.into_inner());
                 let _ = write_frame(&mut writer.stream, Opcode::Pong, &payload);
             }
             Opcode::Pong => {}
@@ -367,7 +409,11 @@ fn read_loop(connection: &Arc<StdConnection>, on_event: &Arc<dyn Fn(DevToolsTran
     }
 }
 
-fn append_fragment(connection: &Arc<StdConnection>, fragments: &mut Vec<u8>, payload: &[u8]) -> bool {
+fn append_fragment(
+    connection: &Arc<StdConnection>,
+    fragments: &mut Vec<u8>,
+    payload: &[u8],
+) -> bool {
     if fragments.len() + payload.len() > MAX_MESSAGE_BYTES {
         connection.close();
         return false;
@@ -398,7 +444,9 @@ fn read_frame(stream: &mut TcpStream) -> Option<(bool, Opcode, Vec<u8>, bool)> {
             read_exact_or_none(stream, &mut extended)?;
             let value = u64::from_be_bytes(extended);
             // A control frame claiming a huge length is malformed.
-            usize::try_from(value).ok().filter(|length| *length <= MAX_MESSAGE_BYTES)?
+            usize::try_from(value)
+                .ok()
+                .filter(|length| *length <= MAX_MESSAGE_BYTES)?
         }
         other => other as usize,
     };
@@ -449,7 +497,13 @@ fn write_frame(stream: &mut TcpStream, opcode: Opcode, payload: &[u8]) -> io::Re
 /// SHA-1 for the WebSocket accept token. This is a protocol fixed point, not a
 /// security primitive: the handshake requires exactly this digest.
 fn sha1(data: &[u8]) -> [u8; 20] {
-    let mut h = [0x67452301u32, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0];
+    let mut h = [
+        0x67452301u32,
+        0xEFCDAB89,
+        0x98BADCFE,
+        0x10325476,
+        0xC3D2E1F0,
+    ];
     let mut message = data.to_vec();
     let bit_length = (data.len() as u64) * 8;
     message.push(0x80);
@@ -468,7 +522,9 @@ fn sha1(data: &[u8]) -> [u8; 20] {
             ]);
         }
         for index in 16..80 {
-            words[index] = (words[index - 3] ^ words[index - 8] ^ words[index - 14] ^ words[index - 16]).rotate_left(1);
+            words[index] =
+                (words[index - 3] ^ words[index - 8] ^ words[index - 14] ^ words[index - 16])
+                    .rotate_left(1);
         }
         let (mut a, mut b, mut c, mut d, mut e) = (h[0], h[1], h[2], h[3], h[4]);
         for (index, word) in words.iter().enumerate() {
@@ -517,8 +573,16 @@ fn base64(bytes: &[u8]) -> String {
             | *chunk.get(2).unwrap_or(&0) as u32;
         output.push(ALPHABET[((triple >> 18) & 63) as usize] as char);
         output.push(ALPHABET[((triple >> 12) & 63) as usize] as char);
-        output.push(if chunk.len() > 1 { ALPHABET[((triple >> 6) & 63) as usize] as char } else { '=' });
-        output.push(if chunk.len() > 2 { ALPHABET[(triple & 63) as usize] as char } else { '=' });
+        output.push(if chunk.len() > 1 {
+            ALPHABET[((triple >> 6) & 63) as usize] as char
+        } else {
+            '='
+        });
+        output.push(if chunk.len() > 2 {
+            ALPHABET[(triple & 63) as usize] as char
+        } else {
+            '='
+        });
     }
     output
 }
@@ -545,12 +609,18 @@ mod tests {
     fn sha1_matches_the_fips_vectors() {
         let digest = sha1(b"abc");
         assert_eq!(
-            digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
+            digest
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>(),
             "a9993e364706816aba3e25717850c26c9cd0d89d"
         );
         let digest = sha1(b"");
         assert_eq!(
-            digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>(),
+            digest
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>(),
             "da39a3ee5e6b4b0d3255bfef95601890afd80709"
         );
     }
@@ -558,7 +628,9 @@ mod tests {
     #[test]
     fn websocket_accept_token_matches_the_rfc_example() {
         // RFC 6455 section 1.3.
-        let accept = base64(&sha1(b"dGhlIHNhbXBsZSBub25jZQ==258EAFA5-E914-47DA-95CA-C5AB0DC85B11"));
+        let accept = base64(&sha1(
+            b"dGhlIHNhbXBsZSBub25jZQ==258EAFA5-E914-47DA-95CA-C5AB0DC85B11",
+        ));
         assert_eq!(accept, "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");
     }
 

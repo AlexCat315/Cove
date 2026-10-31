@@ -65,7 +65,11 @@ pub struct TimeInputState {
 
 impl TimeInputState {
     pub fn new(value: Option<TimeOfDay>) -> Self {
-        Self { value, hour_buffer: String::new(), minute_buffer: String::new() }
+        Self {
+            value,
+            hour_buffer: String::new(),
+            minute_buffer: String::new(),
+        }
     }
 
     /// The displayed time; a default of 00:00 when nothing is selected.
@@ -91,7 +95,11 @@ impl TimeInputState {
 
     /// Writes the time, wrapping both fields and only reporting a change.
     pub fn set(&mut self, hour: i32, minute: i32) -> bool {
-        let next = TimeOfDay::new(hour.rem_euclid(24), minute.rem_euclid(60), self.time().second);
+        let next = TimeOfDay::new(
+            hour.rem_euclid(24),
+            minute.rem_euclid(60),
+            self.time().second,
+        );
         if Some(next) == self.value {
             return false;
         }

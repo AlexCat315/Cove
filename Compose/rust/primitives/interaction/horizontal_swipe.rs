@@ -6,13 +6,13 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
+use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
+use cove_core::Point;
 use cove_core::scene::{
     EventPhase, EventResult, InputHandlerRoute, InteractionRegistryHolder, LayoutNode, Node,
     NodeResource, PointerCaptureAttachmentKey, PointerCaptureHolder, PointerPhase,
 };
-use cove_core::Point;
 use cove_platform::MouseButton;
-use crate::{impl_primitive_view, AnyView, PrimitiveView, View};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum HorizontalSwipeDirection {
@@ -65,7 +65,9 @@ impl HorizontalSwipeSession {
     }
 
     fn pointer(&self, event: &cove_platform::MouseButtonEvent, phase: PointerPhase) -> EventResult {
-        let Some(node) = self.node.borrow().clone() else { return EventResult::Ignored };
+        let Some(node) = self.node.borrow().clone() else {
+            return EventResult::Ignored;
+        };
         if !self.is_enabled.get() {
             return EventResult::Ignored;
         }
@@ -89,7 +91,9 @@ impl HorizontalSwipeSession {
                     .and_then(|capture| capture.target())
                     .is_some_and(|target| target == node);
                 self.cancel_gesture();
-                let Gesture::Horizontal(start) = previous else { return EventResult::Ignored };
+                let Gesture::Horizontal(start) = previous else {
+                    return EventResult::Ignored;
+                };
                 if !owned_capture {
                     return EventResult::Ignored;
                 }
@@ -110,7 +114,9 @@ impl HorizontalSwipeSession {
     }
 
     fn motion(&self, event: &cove_platform::MouseMotionEvent) -> EventResult {
-        let Some(node) = self.node.borrow().clone() else { return EventResult::Ignored };
+        let Some(node) = self.node.borrow().clone() else {
+            return EventResult::Ignored;
+        };
         if !self.is_enabled.get() {
             return EventResult::Ignored;
         }
@@ -125,7 +131,8 @@ impl HorizontalSwipeSession {
                     self.gesture.set(Gesture::Rejected);
                     return EventResult::Ignored;
                 }
-                if let Some(captured) = PointerCaptureHolder::current().and_then(|capture| capture.target())
+                if let Some(captured) =
+                    PointerCaptureHolder::current().and_then(|capture| capture.target())
                     && captured != node
                 {
                     let mut is_ancestor = false;
@@ -215,7 +222,10 @@ pub struct HorizontalSwipe {
 }
 
 impl HorizontalSwipe {
-    pub fn new(on_swipe: impl Fn(HorizontalSwipeDirection) + 'static, content: impl View + 'static) -> Self {
+    pub fn new(
+        on_swipe: impl Fn(HorizontalSwipeDirection) + 'static,
+        content: impl View + 'static,
+    ) -> Self {
         Self {
             on_swipe: Rc::new(on_swipe),
             is_enabled: true,
@@ -253,40 +263,67 @@ impl PrimitiveView for HorizontalSwipe {
     }
 
     fn update_node(&self, node: &Node) {
-        let Some(session) = node.first_resource::<HorizontalSwipeSession>() else { return };
-        session.configure(self.is_enabled, self.should_begin.clone(), self.on_swipe.clone());
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(session) = node.first_resource::<HorizontalSwipeSession>() else {
+            return;
+        };
+        session.configure(
+            self.is_enabled,
+            self.should_begin.clone(),
+            self.on_swipe.clone(),
+        );
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         // Paging is a scroll gesture, not a control: a control route here would
         // make every label inside the page read as "inside a control" and stop
         // being selectable.
         let route = InputHandlerRoute::scroll();
         let pointer_session = session.clone();
-        registry.set_pointer(node, route.clone(), Rc::new(move |event, phase, event_phase| {
-            if event_phase == EventPhase::Bubble || event.button != MouseButton::Left {
-                return EventResult::Ignored;
-            }
-            pointer_session.pointer(event, phase)
-        }));
+        registry.set_pointer(
+            node,
+            route.clone(),
+            Rc::new(move |event, phase, event_phase| {
+                if event_phase == EventPhase::Bubble || event.button != MouseButton::Left {
+                    return EventResult::Ignored;
+                }
+                pointer_session.pointer(event, phase)
+            }),
+        );
         let motion_session = session.clone();
-        registry.set_motion(node, route, Rc::new(move |event, phase| {
-            if phase == EventPhase::Bubble {
-                return EventResult::Ignored;
-            }
-            motion_session.motion(event)
-        }));
+        registry.set_motion(
+            node,
+            route,
+            Rc::new(move |event, phase| {
+                if phase == EventPhase::Bubble {
+                    return EventResult::Ignored;
+                }
+                motion_session.motion(event)
+            }),
+        );
         let hover_session = session.clone();
-        registry.set_hover(node, Rc::new(move |phase| {
-            if phase == cove_core::scene::HoverPhase::Leave {
-                hover_session.pointer_left();
-            }
-        }));
+        registry.set_hover(
+            node,
+            Rc::new(move |phase| {
+                if phase == cove_core::scene::HoverPhase::Leave {
+                    hover_session.pointer_left();
+                }
+            }),
+        );
         let key_session = session;
-        registry.set_key(node, InputHandlerRoute::scroll(), Rc::new(move |event, phase| {
-            if phase == EventPhase::Capture || event.scancode != crate::Scancode::ESCAPE {
-                return EventResult::Ignored;
-            }
-            if key_session.cancel_gesture() { EventResult::Handled } else { EventResult::Ignored }
-        }));
+        registry.set_key(
+            node,
+            InputHandlerRoute::scroll(),
+            Rc::new(move |event, phase| {
+                if phase == EventPhase::Capture || event.scancode != crate::Scancode::ESCAPE {
+                    return EventResult::Ignored;
+                }
+                if key_session.cancel_gesture() {
+                    EventResult::Handled
+                } else {
+                    EventResult::Ignored
+                }
+            }),
+        );
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {

@@ -55,11 +55,7 @@ impl NativeProcess {
     ) -> io::Result<StartedPipes> {
         let legacy = crate::process::ProcessCommand {
             executable: command.executable.clone(),
-            arguments: command
-                .arguments
-                .iter()
-                .map(OsString::from)
-                .collect(),
+            arguments: command.arguments.iter().map(OsString::from).collect(),
             directory: command.directory.clone(),
             environment: command
                 .environment
@@ -118,11 +114,7 @@ impl NativeProcess {
             // SAFETY: the pid was recorded from the child this object owns, and
             // the child was placed in its own process group at spawn.
             unsafe {
-                let signal = if force {
-                    libc::SIGKILL
-                } else {
-                    libc::SIGTERM
-                };
+                let signal = if force { libc::SIGKILL } else { libc::SIGTERM };
                 libc::kill(-pid, signal);
                 libc::kill(pid, signal);
             }

@@ -18,11 +18,11 @@
 //! AppKit presenter) and the bridge routes chosen ids back to authored closures,
 //! so a separate target object would duplicate the action table.
 use cove_composition::{
-    impl_primitive_view, AnyView, LayoutDebugAttachmentKey, PrimitiveView, View, ViewExt,
+    AnyView, LayoutDebugAttachmentKey, PrimitiveView, View, ViewExt, impl_primitive_view,
 };
 use cove_core::scene::{
-    Align, FlexDirection, InputHandlerRoute, InputRoutingPriority, InteractionRegistryHolder, Justify, LayoutNode,
-    Node,
+    Align, FlexDirection, InputHandlerRoute, InputRoutingPriority, InteractionRegistryHolder,
+    Justify, LayoutNode, Node,
 };
 use cove_platform::MouseButton;
 use cove_shell::WindowChromeHitTest;
@@ -31,8 +31,8 @@ use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use std::rc::Rc;
 
 use super::chrome::{
-    platform_resize_border_width, AppWindowChromeContextHolder, ImmersiveWindowControlStyle, CONFIGURATION_KEY,
-    DRAG_REGION_KEY, INTERACTIVE_REGION_KEY,
+    AppWindowChromeContextHolder, CONFIGURATION_KEY, DRAG_REGION_KEY, INTERACTIVE_REGION_KEY,
+    ImmersiveWindowControlStyle, platform_resize_border_width,
 };
 use crate::desktop::application::composition::AppDisplayHandleHolder;
 use crate::desktop::display::AppDisplayHandle;
@@ -96,14 +96,20 @@ impl View for ImmersiveWindowTitleBar {
         let style = self.control_style.resolve();
         let mut children: Vec<AnyView> = Vec::new();
         if style == ImmersiveWindowControlStyle::Native {
-            children.push(AnyView::new(WindowChromeFixedSpace { width: self.native_controls_leading_inset }));
+            children.push(AnyView::new(WindowChromeFixedSpace {
+                width: self.native_controls_leading_inset,
+            }));
         }
-        children.push(AnyView::new(WindowChromeInteractiveRegion::new(self.leading.clone())));
-        children.push(AnyView::new(AnyView::new(WindowDragRegion::default()).modifier(WindowDragRegionHeight(self.height))));
+        children.push(AnyView::new(WindowChromeInteractiveRegion::new(
+            self.leading.clone(),
+        )));
+        children.push(AnyView::new(
+            AnyView::new(WindowDragRegion::default()).modifier(WindowDragRegionHeight(self.height)),
+        ));
         if style == ImmersiveWindowControlStyle::Custom {
-            children.push(
-                AnyView::new(AnyView::new(WindowControlStrip::new()).modifier(WindowControlStripFrame)),
-            );
+            children.push(AnyView::new(
+                AnyView::new(WindowControlStrip::new()).modifier(WindowControlStripFrame),
+            ));
         }
         AnyView::new(
             WindowChromeRow { children }.modifier(WindowTitleBarModifier {
@@ -188,8 +194,14 @@ impl cove_composition::ViewModifier for WindowTitleBarModifier {
             },
         );
         node.set_z_index(20_000.0);
-        node.set_attachment(LayoutDebugAttachmentKey::LAYOUT_ROLE, "app-window-title-bar".to_owned());
-        node.set_attachment(LayoutDebugAttachmentKey::DEBUG_NAME, "app-window-title-bar".to_owned());
+        node.set_attachment(
+            LayoutDebugAttachmentKey::LAYOUT_ROLE,
+            "app-window-title-bar".to_owned(),
+        );
+        node.set_attachment(
+            LayoutDebugAttachmentKey::DEBUG_NAME,
+            "app-window-title-bar".to_owned(),
+        );
         let colors = cove_ui_compose::theme::theme_for_node(node).colors;
         node.set_background_color(Some(colors.surface));
     }
@@ -233,7 +245,9 @@ pub struct WindowDragRegion {
 
 impl WindowDragRegion {
     pub fn new(min_length: f32) -> Self {
-        Self { min_length: min_length.max(0.0) }
+        Self {
+            min_length: min_length.max(0.0),
+        }
     }
 }
 
@@ -254,19 +268,23 @@ impl PrimitiveView for WindowDragRegion {
             InputRoutingPriority::CAPTURE,
             "window.chrome.dragRegion",
         );
-        registry.set_pointer(node, route, Rc::new(move |event, phase, _| {
-            if phase != cove_core::scene::PointerPhase::Down
-                || event.button != MouseButton::Left
-                || event.clicks < 2
-            {
-                return cove_core::scene::EventResult::Ignored;
-            }
-            with_display_handle(|handle| match AppWindowChromeContextHolder::current() {
-                Some(context) => handle.toggle_maximize_window_for(context.window_id),
-                None => handle.toggle_maximize_window(),
-            });
-            cove_core::scene::EventResult::Handled
-        }));
+        registry.set_pointer(
+            node,
+            route,
+            Rc::new(move |event, phase, _| {
+                if phase != cove_core::scene::PointerPhase::Down
+                    || event.button != MouseButton::Left
+                    || event.clicks < 2
+                {
+                    return cove_core::scene::EventResult::Ignored;
+                }
+                with_display_handle(|handle| match AppWindowChromeContextHolder::current() {
+                    Some(context) => handle.toggle_maximize_window_for(context.window_id),
+                    None => handle.toggle_maximize_window(),
+                });
+                cove_core::scene::EventResult::Handled
+            }),
+        );
     }
 
     fn make_layout_node(&self) -> Option<LayoutNode> {
@@ -290,13 +308,19 @@ pub struct WindowChromeInteractiveRegion {
 
 impl WindowChromeInteractiveRegion {
     pub fn new(content: impl View + 'static) -> Self {
-        Self { content: AnyView::new(content) }
+        Self {
+            content: AnyView::new(content),
+        }
     }
 }
 
 impl View for WindowChromeInteractiveRegion {
     fn body(&self) -> AnyView {
-        AnyView::new(self.content.clone().modifier(WindowChromeInteractiveRegionModifier))
+        AnyView::new(
+            self.content
+                .clone()
+                .modifier(WindowChromeInteractiveRegionModifier),
+        )
     }
 }
 
@@ -343,9 +367,17 @@ impl View for WindowControlStrip {
             },
         );
         let maximize = WindowControlButton::new(
-            if is_maximized { icons::navigation::shrink() } else { icons::navigation::maximize() },
+            if is_maximized {
+                icons::navigation::shrink()
+            } else {
+                icons::navigation::maximize()
+            },
             if is_maximized { "Restore" } else { "Maximize" },
-            if is_maximized { "window-control-restore" } else { "window-control-maximize" },
+            if is_maximized {
+                "window-control-restore"
+            } else {
+                "window-control-maximize"
+            },
             Background::Normal,
             move || {
                 with_display_handle(|handle| match window_id {
@@ -423,7 +455,10 @@ impl PrimitiveView for WindowControlButton {
 
     fn update_node(&self, node: &Node) {
         node.set_attachment(INTERACTIVE_REGION_KEY, true);
-        node.set_attachment(LayoutDebugAttachmentKey::DEBUG_NAME, self.debug_name.clone());
+        node.set_attachment(
+            LayoutDebugAttachmentKey::DEBUG_NAME,
+            self.debug_name.clone(),
+        );
         let mut semantics = cove_core::scene::AccessibilitySemantics::new(
             cove_core::scene::AccessibilityRole::Button,
         );
@@ -438,17 +473,22 @@ impl PrimitiveView for WindowControlButton {
             return;
         };
         let pointer_action = self.action.clone();
-        registry.set_pointer(node, InputHandlerRoute::new(
-            cove_core::scene::InputHandlerRole::Control,
-            InputRoutingPriority::CAPTURE,
-            "window.chrome.control",
-        ), Rc::new(move |event, phase, _| {
-            if phase != cove_core::scene::PointerPhase::Up || event.button != MouseButton::Left {
-                return cove_core::scene::EventResult::Ignored;
-            }
-            pointer_action();
-            cove_core::scene::EventResult::Handled
-        }));
+        registry.set_pointer(
+            node,
+            InputHandlerRoute::new(
+                cove_core::scene::InputHandlerRole::Control,
+                InputRoutingPriority::CAPTURE,
+                "window.chrome.control",
+            ),
+            Rc::new(move |event, phase, _| {
+                if phase != cove_core::scene::PointerPhase::Up || event.button != MouseButton::Left
+                {
+                    return cove_core::scene::EventResult::Ignored;
+                }
+                pointer_action();
+                cove_core::scene::EventResult::Handled
+            }),
+        );
     }
 
     fn make_layout_node(&self) -> Option<LayoutNode> {
@@ -544,9 +584,15 @@ mod tests {
     #[test]
     fn macos_needs_no_synthetic_resize_border() {
         #[cfg(target_os = "macos")]
-        assert_eq!(platform_resize_border_width(DEFAULT_RESIZE_BORDER_WIDTH), 0.0);
+        assert_eq!(
+            platform_resize_border_width(DEFAULT_RESIZE_BORDER_WIDTH),
+            0.0
+        );
         #[cfg(not(target_os = "macos"))]
-        assert_eq!(platform_resize_border_width(DEFAULT_RESIZE_BORDER_WIDTH), DEFAULT_RESIZE_BORDER_WIDTH);
+        assert_eq!(
+            platform_resize_border_width(DEFAULT_RESIZE_BORDER_WIDTH),
+            DEFAULT_RESIZE_BORDER_WIDTH
+        );
     }
 
     #[test]

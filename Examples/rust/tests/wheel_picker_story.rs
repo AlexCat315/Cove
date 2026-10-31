@@ -5,7 +5,7 @@
 
 use cove_examples::gallery_content::catalog::GalleryOptions;
 use cove_examples::gallery_content::stories::wheel_picker_story::{
-    hour_options, minute_options, period_options, time_label, volume_options, WheelPickerStory,
+    WheelPickerStory, hour_options, minute_options, period_options, time_label, volume_options,
 };
 
 fn story() -> WheelPickerStory {

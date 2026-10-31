@@ -22,16 +22,29 @@ pub fn create(
     handle: Texture,
     descriptor: &TextureDescriptor,
 ) -> RhiResult<()> {
-    let is_attachment = descriptor.usage.contains(crate::rhi::TextureUsage::COLOR_TARGET)
-        || descriptor.usage.contains(crate::rhi::TextureUsage::DEPTH_STENCIL_TARGET);
+    let is_attachment = descriptor
+        .usage
+        .contains(crate::rhi::TextureUsage::COLOR_TARGET)
+        || descriptor
+            .usage
+            .contains(crate::rhi::TextureUsage::DEPTH_STENCIL_TARGET);
     let mut flags = sys::D3D12_RESOURCE_FLAG_NONE;
-    if descriptor.usage.contains(crate::rhi::TextureUsage::COLOR_TARGET) {
+    if descriptor
+        .usage
+        .contains(crate::rhi::TextureUsage::COLOR_TARGET)
+    {
         flags |= sys::D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
     }
-    if descriptor.usage.contains(crate::rhi::TextureUsage::DEPTH_STENCIL_TARGET) {
+    if descriptor
+        .usage
+        .contains(crate::rhi::TextureUsage::DEPTH_STENCIL_TARGET)
+    {
         flags |= sys::D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
     }
-    if descriptor.usage.contains(crate::rhi::TextureUsage::STORAGE_WRITE) {
+    if descriptor
+        .usage
+        .contains(crate::rhi::TextureUsage::STORAGE_WRITE)
+    {
         flags |= sys::D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
     }
     let description = sys::D3D12_RESOURCE_DESC {
@@ -64,12 +77,21 @@ pub fn create(
 
     // Carve the views a render target or depth target needs.
     if is_attachment {
-        let descriptor_handle = allocate_descriptor(device, registries, if descriptor.format.is_depth() {
-            sys::D3D12_DESCRIPTOR_HEAP_TYPE_DSV
-        } else {
-            sys::D3D12_DESCRIPTOR_HEAP_TYPE_RTV
-        })?;
-        create_view(device, record.resource, descriptor.format, descriptor_handle)?;
+        let descriptor_handle = allocate_descriptor(
+            device,
+            registries,
+            if descriptor.format.is_depth() {
+                sys::D3D12_DESCRIPTOR_HEAP_TYPE_DSV
+            } else {
+                sys::D3D12_DESCRIPTOR_HEAP_TYPE_RTV
+            },
+        )?;
+        create_view(
+            device,
+            record.resource,
+            descriptor.format,
+            descriptor_handle,
+        )?;
         if descriptor.format.is_depth() {
             record.dsv = Some(descriptor_handle);
         } else {
@@ -88,7 +110,9 @@ fn create_committed(
     #[cfg(not(target_os = "windows"))]
     {
         let _ = (device, description);
-        Err(RhiError::unsupported_backend("DirectX 12 is only available on Windows"))
+        Err(RhiError::unsupported_backend(
+            "DirectX 12 is only available on Windows",
+        ))
     }
     #[cfg(target_os = "windows")]
     {
@@ -139,9 +163,17 @@ fn allocate_descriptor(
     heap_type: u32,
 ) -> RhiResult<sys::D3D12_CPU_DESCRIPTOR_HANDLE> {
     let (heap, index, size) = if heap_type == sys::D3D12_DESCRIPTOR_HEAP_TYPE_DSV {
-        (device.dsv_heap, device.next_rtv_index, device.rtv_descriptor_size)
+        (
+            device.dsv_heap,
+            device.next_rtv_index,
+            device.rtv_descriptor_size,
+        )
     } else {
-        (device.rtv_heap, device.next_rtv_index, device.rtv_descriptor_size)
+        (
+            device.rtv_heap,
+            device.next_rtv_index,
+            device.rtv_descriptor_size,
+        )
     };
     let _ = registries;
     // A descriptor handle is the heap base plus `index * size`; D3D12 also offers
@@ -157,7 +189,9 @@ fn heap_start(heap: sys::ComPtr) -> RhiResult<sys::D3D12_CPU_DESCRIPTOR_HANDLE> 
     #[cfg(not(target_os = "windows"))]
     {
         let _ = heap;
-        Err(RhiError::unsupported_backend("DirectX 12 is only available on Windows"))
+        Err(RhiError::unsupported_backend(
+            "DirectX 12 is only available on Windows",
+        ))
     }
     #[cfg(target_os = "windows")]
     {
@@ -191,7 +225,9 @@ fn create_view(
     #[cfg(not(target_os = "windows"))]
     {
         let _ = (device, resource, format, descriptor);
-        Err(RhiError::unsupported_backend("DirectX 12 is only available on Windows"))
+        Err(RhiError::unsupported_backend(
+            "DirectX 12 is only available on Windows",
+        ))
     }
     #[cfg(target_os = "windows")]
     {
@@ -287,13 +323,16 @@ fn write_sampler(
     #[cfg(not(target_os = "windows"))]
     {
         let _ = (device, description);
-        Err(RhiError::unsupported_backend("DirectX 12 is only available on Windows"))
+        Err(RhiError::unsupported_backend(
+            "DirectX 12 is only available on Windows",
+        ))
     }
     #[cfg(target_os = "windows")]
     {
         let base = heap_start(device.sampler_heap)?;
         let handle = sys::D3D12_CPU_DESCRIPTOR_HANDLE {
-            ptr: base.ptr + (device.next_rtv_index as usize) * device.sampler_descriptor_size as usize,
+            ptr: base.ptr
+                + (device.next_rtv_index as usize) * device.sampler_descriptor_size as usize,
         };
         // SAFETY: the device and sampler heap are live, the description outlives the
         // call, and the handle was computed inside the heap.
@@ -352,7 +391,15 @@ pub fn upload_snapshot(
         data.len(),
     )?;
     rhi_byte_range(0, byte_count, data.len())?;
-    transfer_upload(device, record, data, byte_count, region, bytes_per_row, subresource)
+    transfer_upload(
+        device,
+        record,
+        data,
+        byte_count,
+        region,
+        bytes_per_row,
+        subresource,
+    )
 }
 
 /// Reads one region back through a readback heap.
@@ -406,7 +453,17 @@ fn transfer_upload(
     bytes_per_row: usize,
     subresource: TextureSubresource,
 ) -> RhiResult<()> {
-    transfer(device, record, Some(bytes), None, byte_count, region, bytes_per_row, subresource, true)
+    transfer(
+        device,
+        record,
+        Some(bytes),
+        None,
+        byte_count,
+        region,
+        bytes_per_row,
+        subresource,
+        true,
+    )
 }
 
 /// One staged copy from the texture into `destination`.
@@ -419,7 +476,17 @@ fn transfer_read(
     bytes_per_row: usize,
     subresource: TextureSubresource,
 ) -> RhiResult<()> {
-    transfer(device, record, None, Some(destination), byte_count, region, bytes_per_row, subresource, false)
+    transfer(
+        device,
+        record,
+        None,
+        Some(destination),
+        byte_count,
+        region,
+        bytes_per_row,
+        subresource,
+        false,
+    )
 }
 
 /// One staged copy between a texture and a buffer.
@@ -436,8 +503,20 @@ fn transfer(
 ) -> RhiResult<()> {
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = (device, record, source, destination, byte_count, region, bytes_per_row, subresource, upload);
-        Err(RhiError::unsupported_backend("DirectX 12 is only available on Windows"))
+        let _ = (
+            device,
+            record,
+            source,
+            destination,
+            byte_count,
+            region,
+            bytes_per_row,
+            subresource,
+            upload,
+        );
+        Err(RhiError::unsupported_backend(
+            "DirectX 12 is only available on Windows",
+        ))
     }
     #[cfg(target_os = "windows")]
     {
@@ -449,11 +528,13 @@ fn transfer(
         } else {
             sys::D3D12_HEAP_TYPE_READBACK
         };
-        let staging = super::buffer::create_in_heap_for_transfer(device.device, byte_count.max(1), heap)?;
+        let staging =
+            super::buffer::create_in_heap_for_transfer(device.device, byte_count.max(1), heap)?;
         if upload {
             let pointer = staging.mapped;
             rhi_require(!pointer.is_null(), "upload heap is not mapped")?;
-            let bytes = source.ok_or_else(|| RhiError::invalid_argument("missing upload source"))?;
+            let bytes =
+                source.ok_or_else(|| RhiError::invalid_argument("missing upload source"))?;
             // SAFETY: the staging buffer holds at least `byte_count` bytes and the
             // source slice is distinct.
             unsafe {
@@ -501,18 +582,30 @@ fn record_copy(
 ) -> RhiResult<()> {
     let list = super::command_list::open_transfer_list(device)?;
     let (before, after) = if upload {
-        (sys::D3D12_RESOURCE_STATE_COPY_DEST, sys::D3D12_RESOURCE_STATE_COMMON)
+        (
+            sys::D3D12_RESOURCE_STATE_COPY_DEST,
+            sys::D3D12_RESOURCE_STATE_COMMON,
+        )
     } else {
-        (sys::D3D12_RESOURCE_STATE_COPY_SOURCE, sys::D3D12_RESOURCE_STATE_COMMON)
+        (
+            sys::D3D12_RESOURCE_STATE_COPY_SOURCE,
+            sys::D3D12_RESOURCE_STATE_COMMON,
+        )
     };
     // SAFETY: the texture resource and the list are live.
-    unsafe { super::resources::transition(list, record.resource, sys::D3D12_RESOURCE_STATE_COMMON, before) };
+    unsafe {
+        super::resources::transition(
+            list,
+            record.resource,
+            sys::D3D12_RESOURCE_STATE_COMMON,
+            before,
+        )
+    };
 
     let texture_location = sys::D3D12_TEXTURE_COPY_LOCATION {
         pResource: record.resource,
         Type: sys::D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX,
-        SubresourceIndex: (subresource.mip_level
-            + subresource.layer * record.mip_levels) as u32,
+        SubresourceIndex: (subresource.mip_level + subresource.layer * record.mip_levels) as u32,
         PlacedFootprintPadding: [0; 6],
     };
     let buffer_location = sys::D3D12_TEXTURE_COPY_LOCATION {
@@ -593,9 +686,8 @@ mod tests {
         #[cfg(not(target_os = "windows"))]
         {
             let description = sys::D3D12_RESOURCE_DESC::default();
-            let device = super::super::device::Dx12DeviceHandle::make(
-                crate::rhi::DeviceConfig::default(),
-            );
+            let device =
+                super::super::device::Dx12DeviceHandle::make(crate::rhi::DeviceConfig::default());
             assert!(device.is_err());
             let _ = description;
         }

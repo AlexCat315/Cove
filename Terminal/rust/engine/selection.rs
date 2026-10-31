@@ -21,7 +21,13 @@ pub struct TerminalPointer {
 
 impl TerminalPointer {
     pub fn new(column: usize, row: usize, x: f64, y: f64) -> Self {
-        Self { column, row, x, y, nanoseconds: 0 }
+        Self {
+            column,
+            row,
+            x,
+            y,
+            nanoseconds: 0,
+        }
     }
 }
 
@@ -53,7 +59,8 @@ impl SelectionGesture {
         // engine calls before the terminal it built them against.
         unsafe {
             let mut gesture: GhosttySelectionGesture = ptr::null_mut();
-            let gesture_ok = ffi::ghostty_selection_gesture_new(ptr::null(), &mut gesture) == ffi::GHOSTTY_SUCCESS;
+            let gesture_ok = ffi::ghostty_selection_gesture_new(ptr::null(), &mut gesture)
+                == ffi::GHOSTTY_SUCCESS;
             let press = Self::event(ffi::SELECTION_GESTURE_EVENT_TYPE_PRESS);
             let drag = Self::event(ffi::SELECTION_GESTURE_EVENT_TYPE_DRAG);
             let release = Self::event(ffi::SELECTION_GESTURE_EVENT_TYPE_RELEASE);
@@ -65,7 +72,12 @@ impl SelectionGesture {
                     ptr::addr_of!(interval).cast(),
                 );
             }
-            Self { gesture: if gesture_ok { gesture } else { ptr::null_mut() }, press, drag, release }
+            Self {
+                gesture: if gesture_ok { gesture } else { ptr::null_mut() },
+                press,
+                drag,
+                release,
+            }
         }
     }
 
@@ -122,12 +134,18 @@ impl SelectionGesture {
         // SAFETY: every handle is live and every pointer argument points at a
         // live local whose type matches the option's documented input type.
         unsafe {
-            if ffi::ghostty_terminal_grid_ref(terminal, ffi::GhosttyPoint::viewport(column, row), &mut reference)
-                != ffi::GHOSTTY_SUCCESS
+            if ffi::ghostty_terminal_grid_ref(
+                terminal,
+                ffi::GhosttyPoint::viewport(column, row),
+                &mut reference,
+            ) != ffi::GHOSTTY_SUCCESS
             {
                 return None;
             }
-            let position = ffi::GhosttySurfacePosition { x: pointer.x, y: pointer.y };
+            let position = ffi::GhosttySurfacePosition {
+                x: pointer.x,
+                y: pointer.y,
+            };
             let event = match phase {
                 SelectionPhase::Press => {
                     let time = pointer.nanoseconds;
@@ -166,7 +184,11 @@ impl SelectionGesture {
                 }
                 SelectionPhase::Release => self.release,
             };
-            ffi::ghostty_selection_gesture_event_set(event, ffi::SELECTION_EVENT_OPT_REF, ptr::addr_of!(reference).cast());
+            ffi::ghostty_selection_gesture_event_set(
+                event,
+                ffi::SELECTION_EVENT_OPT_REF,
+                ptr::addr_of!(reference).cast(),
+            );
             if phase != SelectionPhase::Release {
                 ffi::ghostty_selection_gesture_event_set(
                     event,
@@ -175,9 +197,16 @@ impl SelectionGesture {
                 );
             }
             let mut selection = ffi::sized_selection();
-            match ffi::ghostty_selection_gesture_event(self.gesture, terminal, event, &mut selection) {
+            match ffi::ghostty_selection_gesture_event(
+                self.gesture,
+                terminal,
+                event,
+                &mut selection,
+            ) {
                 ffi::GHOSTTY_SUCCESS => Some(SelectionOutcome::Select(selection)),
-                ffi::GHOSTTY_NO_VALUE => (phase == SelectionPhase::Press).then_some(SelectionOutcome::Clear),
+                ffi::GHOSTTY_NO_VALUE => {
+                    (phase == SelectionPhase::Press).then_some(SelectionOutcome::Clear)
+                }
                 _ => None,
             }
         }
@@ -186,7 +215,12 @@ impl SelectionGesture {
 
 impl TerminalEngine {
     /// Applies a pointer phase to the selection; returns whether it changed.
-    pub fn select(&mut self, phase: SelectionPhase, pointer: &TerminalPointer, rectangle: bool) -> bool {
+    pub fn select(
+        &mut self,
+        phase: SelectionPhase,
+        pointer: &TerminalPointer,
+        rectangle: bool,
+    ) -> bool {
         let (width, height) = self.cell_size();
         let outcome = self.selection.apply(
             phase,
@@ -203,7 +237,11 @@ impl TerminalEngine {
                 // SAFETY: the selection was produced for this terminal; the
                 // library copies it and converts it to tracked state immediately.
                 let result = unsafe {
-                    ffi::ghostty_terminal_set(self.terminal, ffi::OPT_SELECTION, ptr::addr_of!(range).cast())
+                    ffi::ghostty_terminal_set(
+                        self.terminal,
+                        ffi::OPT_SELECTION,
+                        ptr::addr_of!(range).cast(),
+                    )
                 };
                 result == ffi::GHOSTTY_SUCCESS
             }
@@ -227,7 +265,11 @@ impl TerminalEngine {
         let mut range = ffi::sized_selection();
         // SAFETY: the terminal is live and `range` is a GhosttySelection.
         let result = unsafe {
-            ffi::ghostty_terminal_get(self.terminal, ffi::DATA_SELECTION, ptr::addr_of_mut!(range).cast())
+            ffi::ghostty_terminal_get(
+                self.terminal,
+                ffi::DATA_SELECTION,
+                ptr::addr_of_mut!(range).cast(),
+            )
         };
         result == ffi::GHOSTTY_SUCCESS
     }
@@ -239,8 +281,11 @@ impl TerminalEngine {
         // SAFETY: handles stay live for the duration of the call; the formatter
         // allocation is freed with `ghostty_free` below.
         unsafe {
-            if ffi::ghostty_terminal_get(self.terminal, ffi::DATA_SELECTION, ptr::addr_of_mut!(range).cast())
-                != ffi::GHOSTTY_SUCCESS
+            if ffi::ghostty_terminal_get(
+                self.terminal,
+                ffi::DATA_SELECTION,
+                ptr::addr_of_mut!(range).cast(),
+            ) != ffi::GHOSTTY_SUCCESS
             {
                 return None;
             }
@@ -251,8 +296,13 @@ impl TerminalEngine {
             options.selection = ptr::addr_of!(range);
             let mut bytes: *mut u8 = ptr::null_mut();
             let mut length = 0usize;
-            if ffi::ghostty_terminal_selection_format_alloc(self.terminal, ptr::null(), options, &mut bytes, &mut length)
-                != ffi::GHOSTTY_SUCCESS
+            if ffi::ghostty_terminal_selection_format_alloc(
+                self.terminal,
+                ptr::null(),
+                options,
+                &mut bytes,
+                &mut length,
+            ) != ffi::GHOSTTY_SUCCESS
             {
                 return None;
             }

@@ -215,7 +215,11 @@ pub struct SortStats {
 impl SortStats {
     /// The state word in the status line.
     pub fn state_label(&self) -> &'static str {
-        if self.is_pending { "Sorting…" } else { "Ready" }
+        if self.is_pending {
+            "Sorting…"
+        } else {
+            "Ready"
+        }
     }
 
     /// The status line, with grouped row counts.
@@ -310,7 +314,8 @@ impl DataTableStory {
         let rows: Vec<WarehouseRow> = (0..count).map(WarehouseRow::generate).collect();
         *self.rows.borrow_mut() = rows;
         self.selection.set(Vec::new());
-        self.status.set(format!("{} rows loaded", group_thousands(count)));
+        self.status
+            .set(format!("{} rows loaded", group_thousands(count)));
         self.navigate_to(0);
     }
 

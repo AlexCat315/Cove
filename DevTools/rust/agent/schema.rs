@@ -63,12 +63,19 @@ pub struct JsonSchema {
 }
 
 impl JsonSchema {
-    pub fn object(properties: std::collections::BTreeMap<String, JsonSchema>, required: Vec<String>) -> Self {
+    pub fn object(
+        properties: std::collections::BTreeMap<String, JsonSchema>,
+        required: Vec<String>,
+    ) -> Self {
         let required_set: std::collections::BTreeSet<&String> = required.iter().collect();
         let properties = properties
             .into_iter()
             .map(|(key, schema)| {
-                let schema = if required_set.contains(&key) { schema } else { schema.accepting_null() };
+                let schema = if required_set.contains(&key) {
+                    schema
+                } else {
+                    schema.accepting_null()
+                };
                 (key, schema)
             })
             .collect();
@@ -104,19 +111,35 @@ impl JsonSchema {
     }
 
     pub fn integer(minimum: Option<f64>, maximum: Option<f64>) -> Self {
-        Self { r#type: Some(JsonSchemaType::Integer), minimum, maximum, ..Self::default() }
+        Self {
+            r#type: Some(JsonSchemaType::Integer),
+            minimum,
+            maximum,
+            ..Self::default()
+        }
     }
 
     pub fn number(minimum: Option<f64>, maximum: Option<f64>) -> Self {
-        Self { r#type: Some(JsonSchemaType::Number), minimum, maximum, ..Self::default() }
+        Self {
+            r#type: Some(JsonSchemaType::Number),
+            minimum,
+            maximum,
+            ..Self::default()
+        }
     }
 
     pub fn boolean() -> Self {
-        Self { r#type: Some(JsonSchemaType::Boolean), ..Self::default() }
+        Self {
+            r#type: Some(JsonSchemaType::Boolean),
+            ..Self::default()
+        }
     }
 
     pub fn null() -> Self {
-        Self { r#type: Some(JsonSchemaType::Null), ..Self::default() }
+        Self {
+            r#type: Some(JsonSchemaType::Null),
+            ..Self::default()
+        }
     }
 
     /// Any value. Never valid on a write-capability boundary.
@@ -125,7 +148,10 @@ impl JsonSchema {
     }
 
     pub fn choice(alternatives: Vec<JsonSchema>) -> Self {
-        Self { one_of: alternatives, ..Self::default() }
+        Self {
+            one_of: alternatives,
+            ..Self::default()
+        }
     }
 
     fn accepting_null(self) -> Self {
@@ -133,7 +159,10 @@ impl JsonSchema {
             return self;
         }
         if self.r#type == Some(JsonSchemaType::Null)
-            || self.one_of.iter().any(|candidate| candidate.r#type == Some(JsonSchemaType::Null))
+            || self
+                .one_of
+                .iter()
+                .any(|candidate| candidate.r#type == Some(JsonSchemaType::Null))
         {
             return self;
         }
@@ -145,16 +174,21 @@ impl JsonSchema {
     /// root object is strict.
     pub fn is_strict_capability_input(&self) -> bool {
         if !self.one_of.is_empty() {
-            return self.r#type.is_none() && self.one_of.iter().all(Self::is_strict_capability_input);
+            return self.r#type.is_none()
+                && self.one_of.iter().all(Self::is_strict_capability_input);
         }
         match self.r#type {
             Some(JsonSchemaType::Object) => {
                 self.additional_properties == Some(false)
-                    && self.properties.values().all(Self::is_strict_capability_input)
+                    && self
+                        .properties
+                        .values()
+                        .all(Self::is_strict_capability_input)
             }
-            Some(JsonSchemaType::Array) => {
-                self.items.as_ref().is_some_and(|item| item.is_strict_capability_input())
-            }
+            Some(JsonSchemaType::Array) => self
+                .items
+                .as_ref()
+                .is_some_and(|item| item.is_strict_capability_input()),
             Some(_) => true,
             None => false,
         }
@@ -191,7 +225,11 @@ impl JsonSchemaValidator {
         Self::validate_at(value, schema, "$")
     }
 
-    fn validate_at(value: &Value, schema: &JsonSchema, path: &str) -> Result<(), JsonSchemaViolation> {
+    fn validate_at(
+        value: &Value,
+        schema: &JsonSchema,
+        path: &str,
+    ) -> Result<(), JsonSchemaViolation> {
         if !schema.one_of.is_empty() {
             let matches = schema
                 .one_of
@@ -214,11 +252,16 @@ impl JsonSchemaValidator {
                     // An optional property accepted `null`; a required one may
                     // not be absent.
                     if object.get(key).is_none_or(Value::is_null) {
-                        return Err(violation(path, &format!("missing required property '{key}'")));
+                        return Err(violation(
+                            path,
+                            &format!("missing required property '{key}'"),
+                        ));
                     }
                 }
                 if schema.additional_properties == Some(false)
-                    && let Some(unknown) = object.keys().find(|key| !schema.properties.contains_key(*key))
+                    && let Some(unknown) = object
+                        .keys()
+                        .find(|key| !schema.properties.contains_key(*key))
                 {
                     return Err(violation(path, &format!("unknown property '{unknown}'")));
                 }
@@ -235,7 +278,10 @@ impl JsonSchemaValidator {
                 if let Some(minimum) = schema.minimum_items
                     && values.len() < minimum
                 {
-                    return Err(violation(path, &format!("requires at least {minimum} items")));
+                    return Err(violation(
+                        path,
+                        &format!("requires at least {minimum} items"),
+                    ));
                 }
                 if let Some(maximum) = schema.maximum_items
                     && values.len() > maximum
@@ -256,12 +302,18 @@ impl JsonSchemaValidator {
                 if let Some(minimum) = schema.minimum_length
                     && length < minimum
                 {
-                    return Err(violation(path, &format!("requires at least {minimum} characters")));
+                    return Err(violation(
+                        path,
+                        &format!("requires at least {minimum} characters"),
+                    ));
                 }
                 if let Some(maximum) = schema.maximum_length
                     && length > maximum
                 {
-                    return Err(violation(path, &format!("allows at most {maximum} characters")));
+                    return Err(violation(
+                        path,
+                        &format!("allows at most {maximum} characters"),
+                    ));
                 }
                 if let Some(pattern) = &schema.pattern
                     && !simple_pattern_matches(pattern, string)
@@ -307,11 +359,14 @@ impl JsonSchemaValidator {
             }
         }
         if !schema.allowed_values.is_empty() {
-            let matches = schema.allowed_values.iter().any(|candidate| match candidate {
-                JsonSchemaScalar::String(expected) => value.as_str() == Some(expected.as_str()),
-                JsonSchemaScalar::Number(expected) => numeric_value(value) == Some(*expected),
-                JsonSchemaScalar::Boolean(expected) => value.as_bool() == Some(*expected),
-            });
+            let matches = schema
+                .allowed_values
+                .iter()
+                .any(|candidate| match candidate {
+                    JsonSchemaScalar::String(expected) => value.as_str() == Some(expected.as_str()),
+                    JsonSchemaScalar::Number(expected) => numeric_value(value) == Some(*expected),
+                    JsonSchemaScalar::Boolean(expected) => value.as_bool() == Some(*expected),
+                });
             if !matches {
                 return Err(violation(path, "value is not in the allowed enum"));
             }
@@ -321,11 +376,16 @@ impl JsonSchemaValidator {
 }
 
 fn violation(path: &str, reason: &str) -> JsonSchemaViolation {
-    JsonSchemaViolation { path: path.to_string(), reason: reason.to_string() }
+    JsonSchemaViolation {
+        path: path.to_string(),
+        reason: reason.to_string(),
+    }
 }
 
 fn numeric_value(value: &Value) -> Option<f64> {
-    value.as_f64().or_else(|| value.as_i64().map(|value| value as f64))
+    value
+        .as_f64()
+        .or_else(|| value.as_i64().map(|value| value as f64))
 }
 
 /// The only pattern used by this crate's schemas is an anchored character class
@@ -335,7 +395,9 @@ fn numeric_value(value: &Value) -> Option<f64> {
 fn simple_pattern_matches(pattern: &str, value: &str) -> bool {
     if pattern == "^[a-z0-9][a-z0-9_-]{0,63}$" {
         let mut characters = value.chars();
-        let Some(first) = characters.next() else { return false };
+        let Some(first) = characters.next() else {
+            return false;
+        };
         if !first.is_ascii_lowercase() && !first.is_ascii_digit() {
             return false;
         }
@@ -355,21 +417,35 @@ mod tests {
     #[test]
     fn optional_properties_accept_null_but_required_ones_do_not() {
         let mut properties = std::collections::BTreeMap::new();
-        properties.insert("required_field".to_string(), JsonSchema::string(Some(1), Some(8)));
-        properties.insert("optional_field".to_string(), JsonSchema::integer(None, None));
+        properties.insert(
+            "required_field".to_string(),
+            JsonSchema::string(Some(1), Some(8)),
+        );
+        properties.insert(
+            "optional_field".to_string(),
+            JsonSchema::integer(None, None),
+        );
         let schema = JsonSchema::object(properties, vec!["required_field".into()]);
         // Omitted optional property is fine.
-        assert!(JsonSchemaValidator::validate(&serde_json::json!({"required_field": "a"}), &schema).is_ok());
+        assert!(
+            JsonSchemaValidator::validate(&serde_json::json!({"required_field": "a"}), &schema)
+                .is_ok()
+        );
         // Explicit null for the optional property is fine.
-        assert!(JsonSchemaValidator::validate(
-            &serde_json::json!({"required_field": "a", "optional_field": null}),
-            &schema
-        )
-        .is_ok());
+        assert!(
+            JsonSchemaValidator::validate(
+                &serde_json::json!({"required_field": "a", "optional_field": null}),
+                &schema
+            )
+            .is_ok()
+        );
         // Missing required property fails.
         assert!(JsonSchemaValidator::validate(&serde_json::json!({}), &schema).is_err());
         // Null required property fails.
-        assert!(JsonSchemaValidator::validate(&serde_json::json!({"required_field": null}), &schema).is_err());
+        assert!(
+            JsonSchemaValidator::validate(&serde_json::json!({"required_field": null}), &schema)
+                .is_err()
+        );
     }
 
     #[test]

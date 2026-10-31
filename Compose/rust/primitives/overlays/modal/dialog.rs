@@ -6,10 +6,6 @@
 
 use std::rc::Rc;
 
-use cove_core::scene::{
-    AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap,
-};
-use cove_core::{Binding, Environment, SizeClass};
 use crate::adaptive::SurfaceReader;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{EdgeInsets, FlexExt, LayoutFrameExt, PaddingExt};
@@ -17,15 +13,17 @@ use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{Button, ButtonIconSource, ButtonRole};
 use crate::primitives::feedback::StatusTone;
 use crate::primitives::layout::ActionGroupLayout;
+use crate::primitives::layout::{ScrollAxis, ScrollView, ScrollbarGutter};
 use crate::primitives::media::ui_icon_catalog;
 use crate::primitives::overlays::modal::{
-    uses_sheet, Modal, ModalDismissal, ModalGeometry, ModalOptions, ModalPlacement, SheetDragHandle,
+    Modal, ModalDismissal, ModalGeometry, ModalOptions, ModalPlacement, SheetDragHandle, uses_sheet,
 };
 use crate::primitives::text::{Divider, DividerAxis, Text};
-use crate::primitives::layout::{ScrollAxis, ScrollView, ScrollbarGutter};
 use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
 use crate::theme::{ControlSize, ControlSizeViewExt, SemanticColorRef, SemanticFontRef};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
+use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
+use cove_core::{Binding, Environment, SizeClass};
 
 /// Presentation knobs layered above `ModalOptions`.
 #[derive(Clone)]
@@ -107,7 +105,11 @@ impl View for Dialog {
                 && uses_sheet(surface);
             let fits = sheet || options.modal.fits_content_height;
             let safe = surface.safe_area.normalized();
-            let bottom = if sheet { safe.bottom.max(surface.keyboard.height.max(0.0)) } else { 0.0 };
+            let bottom = if sheet {
+                safe.bottom.max(surface.keyboard.height.max(0.0))
+            } else {
+                0.0
+            };
             let compact = surface.viewport.width_class() == SizeClass::Compact;
 
             let mut modal_options = options.modal.clone();
@@ -115,8 +117,7 @@ impl View for Dialog {
                 modal_options.geometry.placement = ModalPlacement::Bottom;
                 modal_options.geometry.inset = 0.0;
                 modal_options.geometry.corner_radius = 18.0;
-                modal_options.geometry.width =
-                    if compact { f32::MAX } else { 560.0 };
+                modal_options.geometry.width = if compact { f32::MAX } else { 560.0 };
                 modal_options.geometry.height =
                     (surface.viewport.height - safe.top - 12.0).max(64.0);
                 modal_options.fits_content_height = true;
@@ -200,7 +201,11 @@ impl View for Dialog {
             ));
 
             if !sheet {
-                column.push(AnyView::new(Divider::new(None, 1.0, DividerAxis::Horizontal)));
+                column.push(AnyView::new(Divider::new(
+                    None,
+                    1.0,
+                    DividerAxis::Horizontal,
+                )));
             }
 
             let body_insets = if sheet {
@@ -217,7 +222,11 @@ impl View for Dialog {
                         .shrink(0.0),
                 ),
             )
-            .scrollbar_gutter(if sheet { ScrollbarGutter::Overlay } else { ScrollbarGutter::Stable });
+            .scrollbar_gutter(if sheet {
+                ScrollbarGutter::Overlay
+            } else {
+                ScrollbarGutter::Stable
+            });
             column.push(AnyView::new(
                 AnyView::new(scroller)
                     .flex(if fits { 0.0 } else { 1.0 })
@@ -226,7 +235,11 @@ impl View for Dialog {
             ));
 
             if !sheet {
-                column.push(AnyView::new(Divider::new(None, 1.0, DividerAxis::Horizontal)));
+                column.push(AnyView::new(Divider::new(
+                    None,
+                    1.0,
+                    DividerAxis::Horizontal,
+                )));
             }
 
             if let Some(footer) = footer.clone() {
@@ -235,10 +248,15 @@ impl View for Dialog {
                 } else {
                     EdgeInsets::all(14.0)
                 };
-                let group = crate::LayoutContainer::<ActionGroupLayout, AnyView>::with_erased_content(
-                    ActionGroupLayout { stacks: compact, alignment: crate::HorizontalAlignment::Trailing, spacing: 8.0 },
-                    footer,
-                );
+                let group =
+                    crate::LayoutContainer::<ActionGroupLayout, AnyView>::with_erased_content(
+                        ActionGroupLayout {
+                            stacks: compact,
+                            alignment: crate::HorizontalAlignment::Trailing,
+                            spacing: 8.0,
+                        },
+                        footer,
+                    );
                 column.push(AnyView::new(
                     AnyView::new(group)
                         .padding_insets(footer_insets)
@@ -342,9 +360,11 @@ impl View for AlertDialog {
             let destructive = options.is_destructive;
             let dismiss_after = options.dismiss_after_confirm;
 
-            let cancel = Button::title(options.cancel_title.clone(), move || close_cancel.set(false))
-                .enabled(!confirming)
-                .button_style(crate::theme::styles::buttons::SecondaryButtonStyle);
+            let cancel = Button::title(options.cancel_title.clone(), move || {
+                close_cancel.set(false)
+            })
+            .enabled(!confirming)
+            .button_style(crate::theme::styles::buttons::SecondaryButtonStyle);
             let confirm_button = Button::title(options.confirm_title.clone(), move || {
                 if !close_confirm.get() || confirming {
                     return;
@@ -354,7 +374,11 @@ impl View for AlertDialog {
                     close_confirm.set(false);
                 }
             })
-            .role(if destructive { ButtonRole::Destructive } else { ButtonRole::Normal })
+            .role(if destructive {
+                ButtonRole::Destructive
+            } else {
+                ButtonRole::Normal
+            })
             .loading(confirming)
             .button_style_any(if destructive {
                 crate::theme::styles::buttons::AnyButtonStyle::new(
@@ -401,5 +425,9 @@ impl View for AlertDialog {
 
 /// Keeps `StatusTone` reachable for callers that tint a dialog footer.
 pub fn alert_dialog_tone(options: &AlertDialogOptions) -> StatusTone {
-    if options.is_destructive { StatusTone::Danger } else { StatusTone::Info }
+    if options.is_destructive {
+        StatusTone::Danger
+    } else {
+        StatusTone::Info
+    }
 }

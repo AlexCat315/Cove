@@ -4,23 +4,25 @@
 //! or rich title, detail line, shortcut or submenu chevron, and the link glyph.
 use std::rc::Rc;
 
+use crate::modifiers::interaction::CursorExt;
+use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
+use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
+use crate::primitives::controls::button::{ButtonIcon, ButtonIconSource};
+use crate::primitives::text::Text;
+use crate::theme::{SemanticFontRef, theme_for_node};
+use crate::{
+    AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View, impl_primitive_view,
+};
+use cove_core::Color;
 use cove_core::scene::{
     AccessibilityActions, AccessibilityRole, AccessibilitySemantics, AccessibilityState, Align,
     EventResult, FlexDirection, FocusChainHolder, HoverPhase, InputHandlerRoute,
     InteractionRegistryHolder, Justify, LayoutNode, Node, PointerCaptureHolder, PointerPhase, Wrap,
 };
-use cove_core::Color;
 use cove_platform::{MouseButton, SystemCursor};
-use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
-use crate::modifiers::interaction::CursorExt;
-use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
-use crate::primitives::controls::button::{ButtonIcon, ButtonIconSource};
-use crate::primitives::text::Text;
-use crate::theme::{theme_for_node, SemanticFontRef};
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View};
 
 use super::menu::MenuItemRole;
-use super::menu_navigation::{MenuRowEvents, MenuRowPresentation, MENU_ITEM_ID};
+use super::menu_navigation::{MENU_ITEM_ID, MenuRowEvents, MenuRowPresentation};
 
 const HOVERED: &str = "__menu_item_hovered";
 const PRESSED: &str = "__menu_item_pressed";
@@ -141,7 +143,9 @@ impl PrimitiveView for MenuItemRowHost {
         let is_highlighted = self.is_highlighted;
         let has_submenu = self.item.has_submenu;
         node.set_layout_did_update(Some(Rc::new(move |owner: &Node| {
-            let Some(node) = Node::upgrade(&weak) else { return };
+            let Some(node) = Node::upgrade(&weak) else {
+                return;
+            };
             if is_highlighted && node.attachment::<u64>(REVEAL_TOKEN) != Some(reveal_token) {
                 node.set_attachment(REVEAL_TOKEN, reveal_token);
                 reveal_events(&node);
@@ -171,7 +175,11 @@ impl PrimitiveView for MenuItemRowHost {
             state: AccessibilityState {
                 is_enabled: self.item.is_enabled,
                 is_selected: self.item.is_selected,
-                is_expanded: if self.item.has_submenu { Some(self.submenu.is_some()) } else { None },
+                is_expanded: if self.item.has_submenu {
+                    Some(self.submenu.is_some())
+                } else {
+                    None
+                },
                 ..Default::default()
             },
             combines_children: true,
@@ -219,7 +227,11 @@ impl PrimitiveView for MenuItemRowHost {
                 capture.release();
             }
         }
-        node.set_cursor(Some(if self.item.is_enabled { SystemCursor::Pointer } else { SystemCursor::NotAllowed }));
+        node.set_cursor(Some(if self.item.is_enabled {
+            SystemCursor::Pointer
+        } else {
+            SystemCursor::NotAllowed
+        }));
         node.set_attachment(HIGHLIGHTED, self.is_highlighted);
         node.set_attachment(ENABLED, self.item.is_enabled);
         update_fill(node);
@@ -233,17 +245,24 @@ impl PrimitiveView for MenuItemRowHost {
         };
         let weak = node.downgrade();
         node.update_draw(identity, move |list, origin| {
-            let Some(owner) = Node::upgrade(&weak) else { return };
-            let Some(background) = owner.attachment::<Color>(VISUAL_FILL) else { return };
+            let Some(owner) = Node::upgrade(&weak) else {
+                return;
+            };
+            let Some(background) = owner.attachment::<Color>(VISUAL_FILL) else {
+                return;
+            };
             let frame = owner.frame();
             // The panel insets the rows; the highlight fills the row so the
             // accent band runs to the same gutter on both sides.
             let rect = cove_core::Rect::new(origin.x, origin.y, frame.width, frame.height);
             let radius = theme_for_node(&owner).radius.md;
-            let _ = list.add_rounded_rect(rect, radius, background.multiplied_alpha(owner.opacity()));
+            let _ =
+                list.add_rounded_rect(rect, radius, background.multiplied_alpha(owner.opacity()));
         });
 
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         if !self.item.is_enabled {
             registry.remove(node);
             return;
@@ -251,78 +270,93 @@ impl PrimitiveView for MenuItemRowHost {
 
         let hover_events = self.events.hover.clone();
         let hover_node = node.downgrade();
-        registry.set_hover(node, Rc::new(move |phase| {
-            let Some(owner) = Node::upgrade(&hover_node) else { return };
-            match phase {
-                HoverPhase::Enter => {
-                    set_interaction(&owner, HOVERED, true);
-                    hover_events(&owner, true);
-                }
-                HoverPhase::Leave => {
-                    hover_events(&owner, false);
-                    owner.remove_attachment(ACTIVE_PRESS);
-                    if PointerCaptureHolder::current()
-                        .and_then(|capture| capture.target())
-                        .is_some_and(|target| target == owner)
-                        && let Some(capture) = PointerCaptureHolder::current()
-                    {
-                        capture.release();
+        registry.set_hover(
+            node,
+            Rc::new(move |phase| {
+                let Some(owner) = Node::upgrade(&hover_node) else {
+                    return;
+                };
+                match phase {
+                    HoverPhase::Enter => {
+                        set_interaction(&owner, HOVERED, true);
+                        hover_events(&owner, true);
                     }
-                    set_interaction(&owner, HOVERED, false);
-                    set_interaction(&owner, PRESSED, false);
+                    HoverPhase::Leave => {
+                        hover_events(&owner, false);
+                        owner.remove_attachment(ACTIVE_PRESS);
+                        if PointerCaptureHolder::current()
+                            .and_then(|capture| capture.target())
+                            .is_some_and(|target| target == owner)
+                            && let Some(capture) = PointerCaptureHolder::current()
+                        {
+                            capture.release();
+                        }
+                        set_interaction(&owner, HOVERED, false);
+                        set_interaction(&owner, PRESSED, false);
+                    }
                 }
-            }
-        }));
+            }),
+        );
 
         let pointer_events = self.events.activate.clone();
         let pointer_node = node.downgrade();
-        registry.set_pointer(node, InputHandlerRoute::control(), Rc::new(move |event, phase, _event_phase| {
-            if event.button != MouseButton::Left {
-                return EventResult::Ignored;
-            }
-            let Some(owner) = Node::upgrade(&pointer_node) else { return EventResult::Ignored };
-            match phase {
-                PointerPhase::Down => {
-                    owner.set_attachment(ACTIVE_PRESS, true);
-                    if let Some(capture) = PointerCaptureHolder::current() {
-                        capture.acquire(&owner, true);
-                    }
-                    set_interaction(&owner, PRESSED, true);
-                    EventResult::Handled
+        registry.set_pointer(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, phase, _event_phase| {
+                if event.button != MouseButton::Left {
+                    return EventResult::Ignored;
                 }
-                PointerPhase::Up => {
-                    let was_active = owner.attachment::<bool>(ACTIVE_PRESS) == Some(true);
-                    owner.remove_attachment(ACTIVE_PRESS);
-                    set_interaction(&owner, PRESSED, false);
-                    if PointerCaptureHolder::current()
-                        .and_then(|capture| capture.target())
-                        .is_some_and(|target| target == owner)
-                        && let Some(capture) = PointerCaptureHolder::current()
-                    {
-                        capture.release();
+                let Some(owner) = Node::upgrade(&pointer_node) else {
+                    return EventResult::Ignored;
+                };
+                match phase {
+                    PointerPhase::Down => {
+                        owner.set_attachment(ACTIVE_PRESS, true);
+                        if let Some(capture) = PointerCaptureHolder::current() {
+                            capture.acquire(&owner, true);
+                        }
+                        set_interaction(&owner, PRESSED, true);
+                        EventResult::Handled
                     }
-                    if !was_active {
-                        return EventResult::Ignored;
+                    PointerPhase::Up => {
+                        let was_active = owner.attachment::<bool>(ACTIVE_PRESS) == Some(true);
+                        owner.remove_attachment(ACTIVE_PRESS);
+                        set_interaction(&owner, PRESSED, false);
+                        if PointerCaptureHolder::current()
+                            .and_then(|capture| capture.target())
+                            .is_some_and(|target| target == owner)
+                            && let Some(capture) = PointerCaptureHolder::current()
+                        {
+                            capture.release();
+                        }
+                        if !was_active {
+                            return EventResult::Ignored;
+                        }
+                        let frame = owner.absolute_frame();
+                        if !(event.x >= frame.x
+                            && event.x <= frame.x + frame.width
+                            && event.y >= frame.y
+                            && event.y <= frame.y + frame.height)
+                        {
+                            return EventResult::Handled;
+                        }
+                        pointer_events(&owner);
+                        EventResult::Handled
                     }
-                    let frame = owner.absolute_frame();
-                    if !(event.x >= frame.x
-                        && event.x <= frame.x + frame.width
-                        && event.y >= frame.y
-                        && event.y <= frame.y + frame.height)
-                    {
-                        return EventResult::Handled;
-                    }
-                    pointer_events(&owner);
-                    EventResult::Handled
                 }
-            }
-        }));
+            }),
+        );
 
         let key_events = self.events.activate.clone();
         let key_node = node.downgrade();
-        registry.set_key(node, InputHandlerRoute::control(), Rc::new(move |event, _phase| {
-            match event.scancode {
-                crate::Scancode::RETURN | crate::Scancode::SPACE | crate::Scancode::KEYPAD_ENTER => {
+        registry.set_key(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, _phase| match event.scancode {
+                crate::Scancode::RETURN
+                | crate::Scancode::SPACE
+                | crate::Scancode::KEYPAD_ENTER => {
                     if !event.is_repeat
                         && let Some(owner) = Node::upgrade(&key_node)
                     {
@@ -331,8 +365,8 @@ impl PrimitiveView for MenuItemRowHost {
                     EventResult::Handled
                 }
                 _ => EventResult::Ignored,
-            }
-        }));
+            }),
+        );
     }
 
     fn children(&self, node: &Node) -> Vec<AnyView> {
@@ -341,13 +375,20 @@ impl PrimitiveView for MenuItemRowHost {
             .composition_value(&crate::adaptive::SurfaceEnvironment::key())
             .input
             .contains(cove_core::InputCapabilities::TOUCH);
-        let minimum_height = if touch { MINIMUM_ROW_HEIGHT.max(44.0) } else { MINIMUM_ROW_HEIGHT };
+        let minimum_height = if touch {
+            MINIMUM_ROW_HEIGHT.max(44.0)
+        } else {
+            MINIMUM_ROW_HEIGHT
+        };
         // A highlighted row is an accent band with light ink: the whole row
         // (label, icon, shortcut) inverts together instead of keeping dark text
         // on an accent face.
         let highlighted = self.item.is_enabled && self.is_highlighted;
         let title_color = if !self.item.is_enabled {
-            theme.text_emphasis.disabled.unwrap_or(theme.colors.on_surface_muted)
+            theme
+                .text_emphasis
+                .disabled
+                .unwrap_or(theme.colors.on_surface_muted)
         } else if highlighted {
             theme.colors.on_accent
         } else if self.item.role == MenuItemRole::Destructive {
@@ -355,7 +396,11 @@ impl PrimitiveView for MenuItemRowHost {
         } else {
             theme.colors.on_surface
         };
-        let secondary_color = if highlighted { theme.colors.on_accent } else { theme.colors.on_surface_muted };
+        let secondary_color = if highlighted {
+            theme.colors.on_accent
+        } else {
+            theme.colors.on_surface_muted
+        };
 
         let mut lanes: Vec<AnyView> = Vec::new();
         if self.shows_selection_column {
@@ -363,7 +408,9 @@ impl PrimitiveView for MenuItemRowHost {
             // title toward the center of the menu.
             let check = if self.item.is_selected {
                 AnyView::new(ButtonIcon::new(
-                    ButtonIconSource::resource(crate::primitives::media::ui_icon_catalog::action::check()),
+                    ButtonIconSource::resource(
+                        crate::primitives::media::ui_icon_catalog::action::check(),
+                    ),
                     Some(12.0),
                     Some(title_color),
                 ))
@@ -372,21 +419,33 @@ impl PrimitiveView for MenuItemRowHost {
             };
             lanes.push(AnyView::new(
                 BoxView::new(
-                    FlexDirection::Row, Align::Center, Justify::Center, Wrap::NoWrap, 0.0, check,
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::Center,
+                    Wrap::NoWrap,
+                    0.0,
+                    check,
                 )
                 .frame_width(12.0),
             ));
         }
         if self.shows_icon_column {
             let glyph = match self.item.content.icon.clone() {
-                Some(icon) => AnyView::new(
-                    ButtonIcon::new(ButtonIconSource::resource(icon), Some(12.0), Some(title_color)),
-                ),
+                Some(icon) => AnyView::new(ButtonIcon::new(
+                    ButtonIconSource::resource(icon),
+                    Some(12.0),
+                    Some(title_color),
+                )),
                 None => AnyView::new(crate::EmptyView),
             };
             lanes.push(AnyView::new(
                 BoxView::new(
-                    FlexDirection::Row, Align::Center, Justify::Center, Wrap::NoWrap, 0.0, glyph,
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::Center,
+                    Wrap::NoWrap,
+                    0.0,
+                    glyph,
                 )
                 .frame_width(12.0)
                 .flex(0.0)
@@ -418,7 +477,11 @@ impl PrimitiveView for MenuItemRowHost {
         }
         lanes.push(AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 1.0,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                1.0,
                 AnyView::new(TupleView::new(labels)),
             )
             .flex_with(1.0, 1.0, None)
@@ -426,7 +489,9 @@ impl PrimitiveView for MenuItemRowHost {
         ));
         if self.item.has_submenu {
             lanes.push(AnyView::new(ButtonIcon::new(
-                ButtonIconSource::resource(crate::primitives::media::ui_icon_catalog::navigation::chevron_right()),
+                ButtonIconSource::resource(
+                    crate::primitives::media::ui_icon_catalog::navigation::chevron_right(),
+                ),
                 Some(12.0),
                 Some(title_color),
             )));
@@ -441,7 +506,9 @@ impl PrimitiveView for MenuItemRowHost {
         }
         if self.item.is_link() {
             lanes.push(AnyView::new(ButtonIcon::new(
-                ButtonIconSource::resource(crate::primitives::media::ui_icon_catalog::action::external_link()),
+                ButtonIconSource::resource(
+                    crate::primitives::media::ui_icon_catalog::action::external_link(),
+                ),
                 Some(12.0),
                 Some(secondary_color),
             )));

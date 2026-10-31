@@ -11,7 +11,9 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use cove_system::process::{ProcessCommand, ProcessEvent, ProcessLimits, ProcessSession, Termination};
+use cove_system::process::{
+    ProcessCommand, ProcessEvent, ProcessLimits, ProcessSession, Termination,
+};
 
 /// Locates the fixture binary Cargo builds next to the test executable.
 fn fixture() -> PathBuf {
@@ -36,7 +38,10 @@ fn command(mode: &str) -> ProcessCommand {
 }
 
 fn limits() -> ProcessLimits {
-    ProcessLimits { timeout: Duration::from_secs(10), ..Default::default() }
+    ProcessLimits {
+        timeout: Duration::from_secs(10),
+        ..Default::default()
+    }
 }
 
 #[test]
@@ -110,14 +115,24 @@ fn cancellation_wakes_an_idle_reader() {
     // Draining after cancellation must terminate instead of blocking forever.
     let deadline = std::time::Instant::now() + Duration::from_secs(5);
     while session.next_event().is_some() {
-        assert!(std::time::Instant::now() < deadline, "reader released promptly");
+        assert!(
+            std::time::Instant::now() < deadline,
+            "reader released promptly"
+        );
     }
 }
 
 #[test]
 fn native_arguments_keep_quotes_whitespace_and_backslashes() {
     let mut request = command("arguments");
-    let arguments = ["", "space value", "🥭 中文", "quoted\"value", "trailing\\", "&|%PATH%"];
+    let arguments = [
+        "",
+        "space value",
+        "🥭 中文",
+        "quoted\"value",
+        "trailing\\",
+        "&|%PATH%",
+    ];
     for argument in arguments {
         request.arguments.push(argument.into());
     }

@@ -40,13 +40,19 @@ impl ChartWindow {
 
     pub fn replacing(&self, candidate: Option<ChartRange>) -> Self {
         let Some(candidate) = candidate else {
-            return Self { range: self.full, ..self.clone() };
+            return Self {
+                range: self.full,
+                ..self.clone()
+            };
         };
         if !candidate.lower.is_finite()
             || !candidate.upper.is_finite()
             || (self.kind == ChartScaleKind::Log && candidate.lower <= 0.0)
         {
-            return Self { range: self.full, ..self.clone() };
+            return Self {
+                range: self.full,
+                ..self.clone()
+            };
         }
         let lo = self.space(self.full.lower);
         let hi = self.space(self.full.upper);
@@ -80,16 +86,22 @@ impl ChartWindow {
         let start = self.space(self.range.lower);
         let span = self.space(self.range.upper) - start;
         let full_span = self.space(self.full.upper) - self.space(self.full.lower);
-        let next = (full_span * f64::from(self.minimum_fraction)).max(span * f64::from(factor)).min(full_span);
+        let next = (full_span * f64::from(self.minimum_fraction))
+            .max(span * f64::from(factor))
+            .min(full_span);
         let lower = start + (span - next) * a;
-        self.replacing(Some(ChartRange::new(self.value(lower), self.value(lower + next))))
+        self.replacing(Some(ChartRange::new(
+            self.value(lower),
+            self.value(lower + next),
+        )))
     }
 
     pub fn pan(&self, fraction: f32) -> Self {
         if !fraction.is_finite() {
             return self.clone();
         }
-        let delta = f64::from(fraction) * (self.space(self.range.upper) - self.space(self.range.lower));
+        let delta =
+            f64::from(fraction) * (self.space(self.range.upper) - self.space(self.range.lower));
         self.replacing(Some(ChartRange::new(
             self.value(self.space(self.range.lower) + delta),
             self.value(self.space(self.range.upper) + delta),

@@ -3,12 +3,12 @@
 //! Field chrome for a numeric field with a prefix chip: one rounded input whose
 //! leading addon slab is the scrub chip, separated by a hairline. The border,
 //! hover and focus ring wrap chip and text together.
-use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
-use cove_core::Color;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::modifiers::style::AppearanceExt;
 use crate::theme::styles::components::{TextFieldStyle, TextFieldStyleConfiguration};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
+use cove_core::Color;
+use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 
 /// Numeric field with a leading chip slab.
 #[derive(Clone)]
@@ -18,7 +18,9 @@ pub struct NumericPrefixFieldStyle {
 
 impl NumericPrefixFieldStyle {
     pub fn new(chip: impl View + 'static) -> Self {
-        Self { chip: AnyView::new(chip) }
+        Self {
+            chip: AnyView::new(chip),
+        }
     }
 
     /// Border tone for the current interaction state.
@@ -105,12 +107,20 @@ impl PrimitiveView for NumericPrefixChrome {
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Row, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                FlexDirection::Row,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(TupleView::new(vec![
                     AnyView::new(self.chip.clone().flex_with(0.0, 0.0, None)),
                     AnyView::new(
                         BoxView::new(
-                            FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                            FlexDirection::Column,
+                            Align::Stretch,
+                            Justify::FlexStart,
+                            Wrap::NoWrap,
+                            0.0,
                             AnyView::new(crate::EmptyView),
                         )
                         .frame_width(1.0)
@@ -118,7 +128,10 @@ impl PrimitiveView for NumericPrefixChrome {
                         .flex_with(0.0, 0.0, None),
                     ),
                     AnyView::new(
-                        self.content.clone().flex_with(1.0, 1.0, Some(0.0)).frame_min_width(0.0),
+                        self.content
+                            .clone()
+                            .flex_with(1.0, 1.0, Some(0.0))
+                            .frame_min_width(0.0),
                     ),
                 ])),
             )

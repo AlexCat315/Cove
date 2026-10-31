@@ -20,10 +20,6 @@ use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
-use cove_composition::Scancode;
-use cove_core::scene::{FocusChainHolder, Node};
-use cove_core::Binding;
-use cove_platform::KeyEvent;
 use crate::primitives::text::code::folding_options::{
     TextEditorFolding, TextFoldRegion, TextLineRebase,
 };
@@ -32,6 +28,10 @@ use crate::primitives::text::code::gutter_options::{
     TextBreakpoint, TextBreakpointState, TextEditorGutter, TextGutterMarker,
 };
 use crate::primitives::text::text_buffer::TextBuffer;
+use cove_composition::Scancode;
+use cove_core::Binding;
+use cove_core::scene::{FocusChainHolder, Node};
+use cove_platform::KeyEvent;
 
 /// Language-service fold regions plus the caller's collapsed set.
 #[derive(Default)]
@@ -195,7 +195,12 @@ impl TextGutterSession {
 
     /// Installs the field's gutter and folding configuration, groups markers by
     /// line and rebases any authored breakpoint lines.
-    pub fn configure(&self, gutter: TextEditorGutter, folding: &TextEditorFolding, buffer: &TextBuffer) {
+    pub fn configure(
+        &self,
+        gutter: TextEditorGutter,
+        folding: &TextEditorFolding,
+        buffer: &TextBuffer,
+    ) {
         let mut grouped: BTreeMap<usize, Vec<TextGutterMarker>> = BTreeMap::new();
         for marker in &gutter.markers {
             grouped.entry(marker.line).or_default().push(marker.clone());
@@ -250,7 +255,13 @@ impl TextGutterSession {
     }
 
     /// The gutter accepts input only where the field does.
-    pub fn is_available(&self, disabled: bool, secure: bool, shows_line_numbers: bool, vertical: bool) -> bool {
+    pub fn is_available(
+        &self,
+        disabled: bool,
+        secure: bool,
+        shows_line_numbers: bool,
+        vertical: bool,
+    ) -> bool {
         let node_accepts = self
             .node
             .borrow()
@@ -261,7 +272,9 @@ impl TextGutterSession {
     }
 
     pub fn toggle_breakpoint(&self, line: usize) {
-        let Some(binding) = self.gutter.borrow().breakpoints.clone() else { return };
+        let Some(binding) = self.gutter.borrow().breakpoints.clone() else {
+            return;
+        };
         let mut next = binding.get();
         if next.iter().any(|point| point.line == line) {
             next.retain(|point| point.line != line);
@@ -279,9 +292,13 @@ impl TextGutterSession {
     }
 
     pub fn toggle_breakpoint_enabled(&self, line: usize) {
-        let Some(binding) = self.gutter.borrow().breakpoints.clone() else { return };
+        let Some(binding) = self.gutter.borrow().breakpoints.clone() else {
+            return;
+        };
         let mut next = binding.get();
-        let Some(point) = next.iter_mut().find(|point| point.line == line) else { return };
+        let Some(point) = next.iter_mut().find(|point| point.line == line) else {
+            return;
+        };
         point.state = if point.state == TextBreakpointState::Disabled {
             TextBreakpointState::Enabled
         } else {
@@ -324,7 +341,9 @@ impl TextGutterSession {
     }
 
     pub fn return_to_editor(&self) {
-        let Some(node) = self.node.borrow().clone() else { return };
+        let Some(node) = self.node.borrow().clone() else {
+            return;
+        };
         if let Some(chain) = FocusChainHolder::current() {
             let visible = chain.is_focus_visible();
             chain.focus(Some(&node), visible);
@@ -338,7 +357,13 @@ impl TextGutterSession {
     }
 
     /// The gutter's keyboard contract. Returns whether the event was consumed.
-    pub fn handle_key(&self, event: &KeyEvent, cursor_line: usize, character_count: usize, read_only: bool) -> bool {
+    pub fn handle_key(
+        &self,
+        event: &KeyEvent,
+        cursor_line: usize,
+        character_count: usize,
+        read_only: bool,
+    ) -> bool {
         let breakpoints = self.gutter.borrow().breakpoints.is_some();
 
         if event.scancode == F9
@@ -355,7 +380,8 @@ impl TextGutterSession {
             return true;
         }
 
-        let arrow = event.scancode == Scancode::ARROW_LEFT || event.scancode == Scancode::ARROW_RIGHT;
+        let arrow =
+            event.scancode == Scancode::ARROW_LEFT || event.scancode == Scancode::ARROW_RIGHT;
         if event.modifiers.has_alt()
             && (event.modifiers.has_gui() || event.modifiers.has_ctrl())
             && arrow
@@ -368,7 +394,9 @@ impl TextGutterSession {
                 .filter(|region| region.contains(cursor_line))
                 .collect();
             candidates.sort_by_key(|region| region.last_line - region.first_line);
-            let Some(region) = candidates.first().copied() else { return false };
+            let Some(region) = candidates.first().copied() else {
+                return false;
+            };
             let wants_collapsed = event.scancode == Scancode::ARROW_LEFT;
             if self.folds.is_collapsed(region.first_line) == wants_collapsed {
                 return true;
@@ -389,9 +417,7 @@ impl TextGutterSession {
 
         // Removing a newline at a folded boundary first reveals what would be
         // edited, rather than silently deleting an invisible closing character.
-        if !read_only
-            && (event.scancode == Scancode::BACKSPACE || event.scancode == 76)
-        {
+        if !read_only && (event.scancode == Scancode::BACKSPACE || event.scancode == 76) {
             let target = if event.scancode == Scancode::BACKSPACE {
                 cursor_line.saturating_sub(1)
             } else {

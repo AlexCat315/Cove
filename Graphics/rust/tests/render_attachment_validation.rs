@@ -5,8 +5,8 @@
 //! runs on every host.
 
 use cove_graphics::{
-    rhi_render_pass_signature, RenderColorTarget, RenderDepthTarget, RenderPassDescriptor,
-    RenderTextureInfo, Texture, TextureFormat, TextureUsage,
+    RenderColorTarget, RenderDepthTarget, RenderPassDescriptor, RenderTextureInfo, Texture,
+    TextureFormat, TextureUsage, rhi_render_pass_signature,
 };
 
 fn info(
@@ -39,8 +39,8 @@ fn color_target(id: u32) -> RenderColorTarget {
 fn resolve_and_pipeline_signature() {
     let mut color = RenderColorTarget::new(Texture::new(1));
     color.resolve_texture = Some(Texture::new(2));
-    let pass = RenderPassDescriptor::new(vec![color])
-        .with_depth(RenderDepthTarget::new(Texture::new(3)));
+    let pass =
+        RenderPassDescriptor::new(vec![color]).with_depth(RenderDepthTarget::new(Texture::new(3)));
 
     // Resolve target: single sample, sampled-capable.
     let mut resolve = default_info(1, TextureFormat::Rgba8Unorm);
@@ -64,23 +64,39 @@ fn resolve_and_pipeline_signature() {
     assert_eq!(signature.extent, [32, 24]);
     assert_eq!(signature.sample_count, 4);
     signature
-        .validate(&[TextureFormat::Rgba8Unorm], Some(&TextureFormat::Depth32Float), 4)
+        .validate(
+            &[TextureFormat::Rgba8Unorm],
+            Some(&TextureFormat::Depth32Float),
+            4,
+        )
         .expect("matching pipeline");
 
     // A sample-count mismatch is rejected.
     assert!(
         signature
-            .validate(&[TextureFormat::Rgba8Unorm], Some(&TextureFormat::Depth32Float), 1)
+            .validate(
+                &[TextureFormat::Rgba8Unorm],
+                Some(&TextureFormat::Depth32Float),
+                1
+            )
             .is_err()
     );
     // A format mismatch is rejected.
     assert!(
         signature
-            .validate(&[TextureFormat::Bgra8Unorm], Some(&TextureFormat::Depth32Float), 4)
+            .validate(
+                &[TextureFormat::Bgra8Unorm],
+                Some(&TextureFormat::Depth32Float),
+                4
+            )
             .is_err()
     );
     // Omitting the depth attachment is rejected.
-    assert!(signature.validate(&[TextureFormat::Rgba8Unorm], None, 4).is_err());
+    assert!(
+        signature
+            .validate(&[TextureFormat::Rgba8Unorm], None, 4)
+            .is_err()
+    );
 }
 
 #[test]
@@ -94,15 +110,40 @@ fn resolve_rejects_shape_format_usage_samples_and_aliasing() {
     let invalid_resolves = [
         default_info(4, TextureFormat::Rgba8Unorm),
         default_info(1, TextureFormat::Bgra8Unorm),
-        info(1, TextureFormat::Rgba8Unorm, [33, 24], TextureUsage::COLOR_TARGET, true),
-        info(1, TextureFormat::Rgba8Unorm, [32, 24], TextureUsage::SAMPLED, true),
-        info(1, TextureFormat::Rgba8Unorm, [32, 24], TextureUsage::COLOR_TARGET, false),
+        info(
+            1,
+            TextureFormat::Rgba8Unorm,
+            [33, 24],
+            TextureUsage::COLOR_TARGET,
+            true,
+        ),
+        info(
+            1,
+            TextureFormat::Rgba8Unorm,
+            [32, 24],
+            TextureUsage::SAMPLED,
+            true,
+        ),
+        info(
+            1,
+            TextureFormat::Rgba8Unorm,
+            [32, 24],
+            TextureUsage::COLOR_TARGET,
+            false,
+        ),
     ];
     for resolve in invalid_resolves {
         let result = rhi_render_pass_signature(&pass, |texture| {
-            Ok(if texture.id() == 1 { default_info(4, TextureFormat::Rgba8Unorm) } else { resolve })
+            Ok(if texture.id() == 1 {
+                default_info(4, TextureFormat::Rgba8Unorm)
+            } else {
+                resolve
+            })
         });
-        assert!(result.is_err(), "resolve shape/format/usage/sample mismatch must be rejected");
+        assert!(
+            result.is_err(),
+            "resolve shape/format/usage/sample mismatch must be rejected"
+        );
     }
 
     // A single-sample color target cannot carry a resolve destination.
@@ -117,7 +158,11 @@ fn resolve_rejects_shape_format_usage_samples_and_aliasing() {
     integer.supports_color_resolve = false;
     assert!(
         rhi_render_pass_signature(&pass, |texture| {
-            Ok(if texture.id() == 1 { integer } else { default_info(1, TextureFormat::R32Uint) })
+            Ok(if texture.id() == 1 {
+                integer
+            } else {
+                default_info(1, TextureFormat::R32Uint)
+            })
         })
         .is_err(),
         "an integer format without resolve support cannot resolve"
@@ -156,9 +201,27 @@ fn attachments_reject_mismatched_depth_and_duplicate_sources() {
     // Depth attachment must be a depth format, share the extent, and be a
     // single-layer 2D texture.
     let invalid_depths = [
-        info(1, TextureFormat::Depth32Float, [32, 24], TextureUsage::DEPTH_STENCIL_TARGET, true),
-        info(4, TextureFormat::Depth32Float, [32, 25], TextureUsage::DEPTH_STENCIL_TARGET, true),
-        info(4, TextureFormat::Depth32Float, [32, 24], TextureUsage::DEPTH_STENCIL_TARGET, false),
+        info(
+            1,
+            TextureFormat::Depth32Float,
+            [32, 24],
+            TextureUsage::DEPTH_STENCIL_TARGET,
+            true,
+        ),
+        info(
+            4,
+            TextureFormat::Depth32Float,
+            [32, 25],
+            TextureUsage::DEPTH_STENCIL_TARGET,
+            true,
+        ),
+        info(
+            4,
+            TextureFormat::Depth32Float,
+            [32, 24],
+            TextureUsage::DEPTH_STENCIL_TARGET,
+            false,
+        ),
     ];
     for depth in invalid_depths {
         assert!(
@@ -195,9 +258,10 @@ fn attachments_reject_mismatched_depth_and_duplicate_sources() {
 #[test]
 fn empty_pass_is_rejected() {
     assert!(
-        rhi_render_pass_signature(&RenderPassDescriptor::new(vec![]), |_| Ok(
-            default_info(1, TextureFormat::Rgba8Unorm)
-        ))
+        rhi_render_pass_signature(&RenderPassDescriptor::new(vec![]), |_| Ok(default_info(
+            1,
+            TextureFormat::Rgba8Unorm
+        )))
         .is_err(),
         "a render pass requires at least one attachment"
     );

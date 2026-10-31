@@ -4,9 +4,10 @@
 //! `RefCell<NodeData>`; every `didSet` observer becomes the explicit setter
 //! that performs the same invalidation.
 use super::{
-    AccessibilityRevision, AccessibilitySemantics, AccessibilityValueProvider, ComponentRecompositionMetrics,
-    ComponentSourceLocation, CompositionLocal, CompositionLocalKey, DirtyReason, InvalidationLogHolder, InvalidationPhase,
-    InvalidationSource, LayoutNode, LayoutNodeWeak, NodeResource, RenderObject, RenderObjectWeak,
+    AccessibilityRevision, AccessibilitySemantics, AccessibilityValueProvider,
+    ComponentRecompositionMetrics, ComponentSourceLocation, CompositionLocal, CompositionLocalKey,
+    DirtyReason, InvalidationLogHolder, InvalidationPhase, InvalidationSource, LayoutNode,
+    LayoutNodeWeak, NodeResource, RenderObject, RenderObjectWeak,
 };
 use crate::{Color, DrawList, LinearGradient, Point, Rect, Reveal, SurfaceShadow};
 use cove_platform::SystemCursor;
@@ -242,7 +243,9 @@ impl Node {
     pub(crate) fn cell(&self) -> &NodeCell {
         &self.0
     }
-    pub fn upgrade(weak: &NodeWeak) -> Option<Self> { weak.upgrade().map(Self) }
+    pub fn upgrade(weak: &NodeWeak) -> Option<Self> {
+        weak.upgrade().map(Self)
+    }
     pub fn downgrade(&self) -> NodeWeak {
         Rc::downgrade(&self.0)
     }
@@ -264,9 +267,16 @@ impl Node {
     pub fn set_recomposition_metrics(&self, metrics: Option<ComponentRecompositionMetrics>) {
         self.0.borrow_mut().recomposition_metrics = metrics;
     }
-    pub fn record_recomposition(&self, milliseconds: f64, initial: bool, reasons: &[super::RecompositionReason]) {
+    pub fn record_recomposition(
+        &self,
+        milliseconds: f64,
+        initial: bool,
+        reasons: &[super::RecompositionReason],
+    ) {
         let mut data = self.0.borrow_mut();
-        data.recomposition_metrics.get_or_insert_with(ComponentRecompositionMetrics::new).record(milliseconds, initial, reasons);
+        data.recomposition_metrics
+            .get_or_insert_with(ComponentRecompositionMetrics::new)
+            .record(milliseconds, initial, reasons);
     }
 
     // MARK: - Tree links
@@ -293,7 +303,11 @@ impl Node {
     pub fn render_ordered_children(&self) -> Vec<Node> {
         let (cached, needs_sort, children) = {
             let data = self.0.borrow();
-            (data.cached_z_sorted_children.clone(), data.children_may_need_z_sort, data.children.clone())
+            (
+                data.cached_z_sorted_children.clone(),
+                data.children_may_need_z_sort,
+                data.children.clone(),
+            )
         };
         if let Some(cached) = cached {
             return cached;
@@ -305,7 +319,11 @@ impl Node {
         indexed.sort_by(|(left_offset, left), (right_offset, right)| {
             let left_z = left.z_index();
             let right_z = right.z_index();
-            if left_z == right_z { left_offset.cmp(right_offset) } else { left_z.total_cmp(&right_z) }
+            if left_z == right_z {
+                left_offset.cmp(right_offset)
+            } else {
+                left_z.total_cmp(&right_z)
+            }
         });
         let sorted: Vec<Node> = indexed.into_iter().map(|(_, node)| node).collect();
         self.0.borrow_mut().cached_z_sorted_children = Some(sorted.clone());
@@ -333,7 +351,8 @@ impl Node {
             let mut data = self.0.borrow_mut();
             let before = data.children.len();
             let removed_may_need_z_sort = child.0.borrow().z_index != 0.0;
-            data.children.retain(|candidate| !Rc::ptr_eq(&candidate.0, &child.0));
+            data.children
+                .retain(|candidate| !Rc::ptr_eq(&candidate.0, &child.0));
             let removed = data.children.len() != before;
             if removed {
                 child.0.borrow_mut().parent = Weak::new();
@@ -363,11 +382,23 @@ impl Node {
     /// Reassign this node's children to `ordered` without invoking teardown.
     pub fn reorder_children(&self, ordered: &[Node]) {
         let current = self.children();
-        assert_eq!(ordered.len(), current.len(), "reorderChildren: count mismatch");
-        let same_members = current.iter().all(|node| ordered.iter().any(|candidate| candidate == node))
-            && ordered.iter().all(|node| current.iter().any(|candidate| candidate == node));
+        assert_eq!(
+            ordered.len(),
+            current.len(),
+            "reorderChildren: count mismatch"
+        );
+        let same_members = current
+            .iter()
+            .all(|node| ordered.iter().any(|candidate| candidate == node))
+            && ordered
+                .iter()
+                .all(|node| current.iter().any(|candidate| candidate == node));
         assert!(same_members, "reorderChildren: membership mismatch");
-        if current.iter().zip(ordered).all(|(left, right)| left == right) {
+        if current
+            .iter()
+            .zip(ordered)
+            .all(|(left, right)| left == right)
+        {
             return;
         }
         self.0.borrow_mut().children = ordered.to_vec();
@@ -393,7 +424,10 @@ impl Node {
 
     /// Drop the memoised z-order on this node and its render mirror.
     pub(crate) fn invalidate_z_order(&self) {
-        let render_object = { self.0.borrow_mut().cached_z_sorted_children = None; self.render_object() };
+        let render_object = {
+            self.0.borrow_mut().cached_z_sorted_children = None;
+            self.render_object()
+        };
         if let Some(object) = render_object {
             object.invalidate_z_order();
         }
@@ -480,7 +514,8 @@ impl Node {
         }
     }
     pub fn accessibility_actions(&self) -> super::AccessibilityActions {
-        self.attachment::<super::AccessibilityActions>("__accessibility.actions").unwrap_or_default()
+        self.attachment::<super::AccessibilityActions>("__accessibility.actions")
+            .unwrap_or_default()
     }
     pub fn set_accessibility_actions(&self, actions: super::AccessibilityActions) {
         self.set_attachment("__accessibility.actions", actions);
@@ -493,7 +528,10 @@ impl Node {
         match provider {
             Some(provider) => self.set_attachment("__accessibility.valueProvider", provider),
             None => {
-                self.0.borrow_mut().attachments.remove("__accessibility.valueProvider");
+                self.0
+                    .borrow_mut()
+                    .attachments
+                    .remove("__accessibility.valueProvider");
             }
         }
         AccessibilityRevision::bump_structure();
@@ -504,7 +542,14 @@ impl Node {
             .map(|provider| (provider.read)())
             .or_else(|| self.accessibility().map(|semantics| semantics.value))
             .unwrap_or_default();
-        if self.accessibility().is_some_and(|semantics| semantics.state.is_secure) { "•".repeat(value.chars().count()) } else { value }
+        if self
+            .accessibility()
+            .is_some_and(|semantics| semantics.state.is_secure)
+        {
+            "•".repeat(value.chars().count())
+        } else {
+            value
+        }
     }
 
     pub fn subtree_opacity(&self) -> f32 {
@@ -553,13 +598,23 @@ impl Node {
         self.invalidate_geometry(InvalidationSource::LayoutChange);
     }
     pub fn layout_node(&self) -> Option<LayoutNode> {
-        self.0.borrow().layout_node.as_ref().and_then(Weak::upgrade).map(LayoutNode::from_cell)
+        self.0
+            .borrow()
+            .layout_node
+            .as_ref()
+            .and_then(Weak::upgrade)
+            .map(LayoutNode::from_cell)
     }
     pub fn set_layout_node(&self, layout_node: Option<&LayoutNode>) {
         self.0.borrow_mut().layout_node = layout_node.map(LayoutNode::downgrade);
     }
     pub fn render_object(&self) -> Option<RenderObject> {
-        self.0.borrow().render_object.as_ref().and_then(Weak::upgrade).map(RenderObject::from_cell)
+        self.0
+            .borrow()
+            .render_object
+            .as_ref()
+            .and_then(Weak::upgrade)
+            .map(RenderObject::from_cell)
     }
     pub fn set_render_object(&self, render_object: Option<&RenderObject>) {
         self.0.borrow_mut().render_object = render_object.map(RenderObject::downgrade);
@@ -601,7 +656,9 @@ impl Node {
         let value = self.is_layout_visible()
             && self.allows_hit_testing()
             && self.is_interaction_enabled()
-            && self.parent().is_none_or(|parent| parent.accepts_subtree_input());
+            && self
+                .parent()
+                .is_none_or(|parent| parent.accepts_subtree_input());
         {
             let mut data = self.0.borrow_mut();
             data.cached_input_revision = revision;
@@ -666,7 +723,8 @@ impl Node {
     }
     pub fn background_color(&self) -> Option<Color> {
         let data = self.0.borrow();
-        data.debug_background_color.or(data.authored_background_color)
+        data.debug_background_color
+            .or(data.authored_background_color)
     }
     pub fn set_background_color(&self, value: Option<Color>) {
         {
@@ -763,7 +821,8 @@ impl Node {
     }
     pub fn foreground_color(&self) -> Option<Color> {
         let data = self.0.borrow();
-        data.debug_foreground_color.or(data.authored_foreground_color)
+        data.debug_foreground_color
+            .or(data.authored_foreground_color)
     }
     pub fn set_foreground_color(&self, value: Option<Color>) {
         {
@@ -792,7 +851,10 @@ impl Node {
     }
     /// The nearest explicit tint, shared by text and monochrome icons.
     pub fn inherited_foreground_color(&self) -> Option<Color> {
-        self.foreground_color().or_else(|| self.parent().and_then(|parent| parent.inherited_foreground_color()))
+        self.foreground_color().or_else(|| {
+            self.parent()
+                .and_then(|parent| parent.inherited_foreground_color())
+        })
     }
     fn invalidate_inherited_foreground(&self) {
         for child in self.children() {
@@ -865,7 +927,11 @@ impl Node {
     }
     /// Refresh a custom painter, invalidating render caches only when its
     /// paint-affecting identity changed.
-    pub fn update_draw(&self, identity: impl PartialEq + 'static, draw: impl Fn(&mut DrawList, Point) + 'static) {
+    pub fn update_draw(
+        &self,
+        identity: impl PartialEq + 'static,
+        draw: impl Fn(&mut DrawList, Point) + 'static,
+    ) {
         let next = AnyRenderContentIdentity::new(identity);
         let changed = {
             let mut data = self.0.borrow_mut();
@@ -878,11 +944,16 @@ impl Node {
             self.mark_render_dirty(InvalidationSource::style_set("draw"));
         }
     }
-    pub fn update_overlay_draw(&self, identity: impl PartialEq + 'static, draw: impl Fn(&mut DrawList, Point) + 'static) {
+    pub fn update_overlay_draw(
+        &self,
+        identity: impl PartialEq + 'static,
+        draw: impl Fn(&mut DrawList, Point) + 'static,
+    ) {
         let next = AnyRenderContentIdentity::new(identity);
         let changed = {
             let mut data = self.0.borrow_mut();
-            let changed = data.stored_overlay_draw.is_none() || data.overlay_draw_identity.as_ref() != Some(&next);
+            let changed = data.stored_overlay_draw.is_none()
+                || data.overlay_draw_identity.as_ref() != Some(&next);
             data.stored_overlay_draw = Some(Rc::new(draw));
             data.overlay_draw_identity = Some(next);
             changed
@@ -941,10 +1012,17 @@ impl Node {
     }
     /// Side table for primitive-owned persistent state that must survive a recompose.
     pub fn attachment<T: Clone + 'static>(&self, key: &str) -> Option<T> {
-        self.0.borrow().attachments.get(key).and_then(|value| value.downcast_ref::<T>().cloned())
+        self.0
+            .borrow()
+            .attachments
+            .get(key)
+            .and_then(|value| value.downcast_ref::<T>().cloned())
     }
     pub fn set_attachment<T: 'static>(&self, key: &str, value: T) {
-        self.0.borrow_mut().attachments.insert(key.to_owned(), Rc::new(value));
+        self.0
+            .borrow_mut()
+            .attachments
+            .insert(key.to_owned(), Rc::new(value));
     }
     pub fn remove_attachment(&self, key: &str) {
         self.0.borrow_mut().attachments.remove(key);
@@ -952,8 +1030,15 @@ impl Node {
 
     // MARK: - CompositionLocal storage
 
-    pub fn set_composition_value<Value: 'static>(&self, local: &CompositionLocal<Value>, value: Value) {
-        self.0.borrow_mut().composition_values.insert(local.key(), Rc::new(value));
+    pub fn set_composition_value<Value: 'static>(
+        &self,
+        local: &CompositionLocal<Value>,
+        value: Value,
+    ) {
+        self.0
+            .borrow_mut()
+            .composition_values
+            .insert(local.key(), Rc::new(value));
         self.mark_render_dirty(InvalidationSource::style_set("compositionValue"));
         self.invalidate_composition_paint(local.key());
     }
@@ -968,10 +1053,19 @@ impl Node {
         }
     }
     /// Resolve `local` by walking up the parent chain.
-    pub fn composition_value<Value: Clone + 'static>(&self, local: &CompositionLocal<Value>) -> Value {
+    pub fn composition_value<Value: Clone + 'static>(
+        &self,
+        local: &CompositionLocal<Value>,
+    ) -> Value {
         let mut cursor = Some(self.clone());
         while let Some(node) = cursor {
-            if let Some(value) = node.0.borrow().composition_values.get(&local.key()).and_then(|raw| raw.downcast_ref::<Value>()) {
+            if let Some(value) = node
+                .0
+                .borrow()
+                .composition_values
+                .get(&local.key())
+                .and_then(|raw| raw.downcast_ref::<Value>())
+            {
                 return value.clone();
             }
             cursor = node.parent();
@@ -980,8 +1074,16 @@ impl Node {
     }
     /// Value provided for `local` directly on this node, without walking
     /// ancestors. Used by surface-theme probing and diagnostics.
-    pub fn composition_value_here<Value: Clone + 'static>(&self, local: &CompositionLocal<Value>) -> Option<Value> {
-        self.0.borrow().composition_values.get(&local.key()).and_then(|raw| raw.downcast_ref::<Value>()).cloned()
+    pub fn composition_value_here<Value: Clone + 'static>(
+        &self,
+        local: &CompositionLocal<Value>,
+    ) -> Option<Value> {
+        self.0
+            .borrow()
+            .composition_values
+            .get(&local.key())
+            .and_then(|raw| raw.downcast_ref::<Value>())
+            .cloned()
     }
 
     // MARK: - Resources
@@ -991,7 +1093,11 @@ impl Node {
         resource.mount(self);
     }
     pub fn first_resource<R: NodeResource + 'static>(&self) -> Option<Rc<R>> {
-        self.0.borrow().resources.iter().find_map(|resource| resource.clone().as_any_rc().downcast::<R>().ok())
+        self.0
+            .borrow()
+            .resources
+            .iter()
+            .find_map(|resource| resource.clone().as_any_rc().downcast::<R>().ok())
     }
     fn release_from_tree(&self) {
         let mut pending = vec![(self.clone(), false)];
@@ -1033,8 +1139,16 @@ impl Node {
     /// Mark this node dirty and propagate the flag upward to every ancestor.
     pub fn mark_dirty(&self, reason: InvalidationSource) {
         if let Some(log) = InvalidationLogHolder::current() {
-            log.record(DirtyReason::new(self.id(), reason.clone(), InvalidationPhase::Layout));
-            log.record(DirtyReason::new(self.id(), reason.clone(), InvalidationPhase::Render));
+            log.record(DirtyReason::new(
+                self.id(),
+                reason.clone(),
+                InvalidationPhase::Layout,
+            ));
+            log.record(DirtyReason::new(
+                self.id(),
+                reason.clone(),
+                InvalidationPhase::Render,
+            ));
         }
         self.propagate_dirty(true, true);
         if let Some(object) = self.render_object() {
@@ -1044,7 +1158,11 @@ impl Node {
     pub fn mark_render_dirty(&self, reason: InvalidationSource) {
         let was_render_dirty = self.render_dirty();
         if let Some(log) = InvalidationLogHolder::current() {
-            log.record(DirtyReason::new(self.id(), reason.clone(), InvalidationPhase::Render));
+            log.record(DirtyReason::new(
+                self.id(),
+                reason.clone(),
+                InvalidationPhase::Render,
+            ));
         }
         self.propagate_dirty(false, true);
         let object = self.render_object();
@@ -1087,6 +1205,11 @@ impl Node {
 }
 
 fn is_layer_classification_invalidation(reason: &InvalidationSource) -> bool {
-    let InvalidationSource::StyleSet { field } = reason else { return false };
-    matches!(field.as_str(), "clipsToBounds" | "opacity" | "shadow" | "ambientShadow" | "draw" | "overlayDraw")
+    let InvalidationSource::StyleSet { field } = reason else {
+        return false;
+    };
+    matches!(
+        field.as_str(),
+        "clipsToBounds" | "opacity" | "shadow" | "ambientShadow" | "draw" | "overlayDraw"
+    )
 }

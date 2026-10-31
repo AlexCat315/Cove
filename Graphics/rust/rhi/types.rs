@@ -294,7 +294,10 @@ impl TextureFormat {
         }
     }
     pub fn is_depth(self) -> bool {
-        matches!(self, Self::Depth24Unorm | Self::Depth24UnormStencil8 | Self::Depth32Float)
+        matches!(
+            self,
+            Self::Depth24Unorm | Self::Depth24UnormStencil8 | Self::Depth32Float
+        )
     }
 }
 

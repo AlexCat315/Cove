@@ -4,13 +4,14 @@
 //! pointer input.
 use std::rc::Rc;
 
-use cove_core::scene::CompositionLocal;
 use cove_core::Environment;
+use cove_core::scene::CompositionLocal;
 
 /// Whether overlays present as bottom sheets rather than anchored panels.
 pub fn uses_sheet(surface: &Environment) -> bool {
     surface.idiom == cove_core::Idiom::Phone
-        || (surface.input.contains(cove_core::InputCapabilities::TOUCH) && !surface.supports_hover())
+        || (surface.input.contains(cove_core::InputCapabilities::TOUCH)
+            && !surface.supports_hover())
 }
 
 /// Marks a subtree as rendering inside a touch sheet, so nested menus present in

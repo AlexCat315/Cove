@@ -7,27 +7,47 @@ use cove_core::scene::{Point, Rect};
 
 use super::axes::ChartValueAxes;
 use super::model::{
-    ChartDatum, ChartMark, ChartOrientation, ChartPoint, ChartSeries, ChartSlice,
-    ChartValueAxis, ChartXDomain,
+    ChartDatum, ChartMark, ChartOrientation, ChartPoint, ChartSeries, ChartSlice, ChartValueAxis,
+    ChartXDomain,
 };
 use super::scale::ChartScale;
 use super::viewport::ChartWindow;
 
 impl ChartOrientation {
     pub fn breadth(self, plot: Rect) -> f32 {
-        if self == Self::Vertical { plot.width } else { plot.height }
+        if self == Self::Vertical {
+            plot.width
+        } else {
+            plot.height
+        }
     }
     pub fn length(self, plot: Rect) -> f32 {
-        if self == Self::Vertical { plot.height } else { plot.width }
+        if self == Self::Vertical {
+            plot.height
+        } else {
+            plot.width
+        }
     }
     pub fn across_origin(self, plot: Rect) -> f32 {
-        if self == Self::Vertical { plot.x } else { plot.y }
+        if self == Self::Vertical {
+            plot.x
+        } else {
+            plot.y
+        }
     }
     pub fn along(self, scale: &ChartScale, value: f32, plot: Rect) -> f32 {
-        if self == Self::Vertical { scale.y(value, plot) } else { scale.x(value, plot) }
+        if self == Self::Vertical {
+            scale.y(value, plot)
+        } else {
+            scale.x(value, plot)
+        }
     }
     pub fn across(self, scale: &ChartScale, value: f32, plot: Rect) -> f32 {
-        if self == Self::Vertical { scale.x(value, plot) } else { scale.y(value, plot) }
+        if self == Self::Vertical {
+            scale.x(value, plot)
+        } else {
+            scale.y(value, plot)
+        }
     }
     pub fn point(self, across: f32, along: f32) -> Point {
         if self == Self::Vertical {
@@ -37,7 +57,11 @@ impl ChartOrientation {
         }
     }
     pub fn axes(self, point: Point) -> (f32, f32) {
-        if self == Self::Vertical { (point.x, point.y) } else { (point.y, point.x) }
+        if self == Self::Vertical {
+            (point.x, point.y)
+        } else {
+            (point.y, point.x)
+        }
     }
 }
 
@@ -98,7 +122,10 @@ impl ChartGeometry {
                 if x_domain.is_numeric() {
                     None
                 } else {
-                    Some(orientation.breadth(plot) / (window.range.upper - window.range.lower).max(0.001))
+                    Some(
+                        orientation.breadth(plot)
+                            / (window.range.upper - window.range.lower).max(0.001),
+                    )
                 }
             })
             .or_else(|| {
@@ -123,7 +150,10 @@ impl ChartGeometry {
             let group = if stacked {
                 0
             } else {
-                bar_series.iter().position(|value| *value == index).unwrap_or(0)
+                bar_series
+                    .iter()
+                    .position(|value| *value == index)
+                    .unwrap_or(0)
             };
             let group_offset =
                 (group as f32 - (groups.saturating_sub(1)) as f32 / 2.0) * (thickness + inner_gap);
@@ -134,7 +164,11 @@ impl ChartGeometry {
                 .map(|(i, datum)| {
                     let center = if let Some(window) = &window {
                         window.position(
-                            if x_domain.is_numeric() { datum.x } else { i as f32 },
+                            if x_domain.is_numeric() {
+                                datum.x
+                            } else {
+                                i as f32
+                            },
                             plot,
                             orientation,
                         )
@@ -145,10 +179,15 @@ impl ChartGeometry {
                     } else {
                         Self::across_index(i, slot_count, false, plot, orientation)
                     };
-                    let across = if item.mark == ChartMark::Bar { center + group_offset } else { center };
+                    let across = if item.mark == ChartMark::Bar {
+                        center + group_offset
+                    } else {
+                        center
+                    };
                     let x_visible = !x_domain.is_numeric()
                         || (datum.x.is_finite()
-                            && (window.as_ref().map(|window| window.kind) != Some(super::model::ChartScaleKind::Log)
+                            && (window.as_ref().map(|window| window.kind)
+                                != Some(super::model::ChartScaleKind::Log)
                                 || datum.x > 0.0));
                     if !datum.y.is_finite() || !x_visible {
                         return Mark {
@@ -259,7 +298,8 @@ impl ChartGeometry {
     }
 
     pub fn along_value(&self, value: f32, axis: ChartValueAxis) -> f32 {
-        self.orientation.along(self.axes.scale(axis), value, self.plot)
+        self.orientation
+            .along(self.axes.scale(axis), value, self.plot)
     }
 
     pub fn across_mark(&self, mark: &Mark) -> f32 {
@@ -336,7 +376,9 @@ impl ChartGeometry {
     }
 
     pub fn mark(&self, point: ChartPoint) -> Option<&Mark> {
-        self.marks.get(point.series).and_then(|marks| marks.get(point.index))
+        self.marks
+            .get(point.series)
+            .and_then(|marks| marks.get(point.index))
     }
 
     /// Crop before downsampling so zooming reveals detail instead of keeping
@@ -371,11 +413,7 @@ impl ChartGeometry {
 
     /// Each pixel column across the categories keeps its lowest and highest
     /// value, in run order, so a spike cannot vanish between samples.
-    pub fn decimated(
-        marks: &[Mark],
-        orientation: ChartOrientation,
-        length: f32,
-    ) -> Vec<Mark> {
+    pub fn decimated(marks: &[Mark], orientation: ChartOrientation, length: f32) -> Vec<Mark> {
         if marks.len() <= 2 || length < 1.0 {
             return marks.to_vec();
         }
@@ -384,7 +422,13 @@ impl ChartGeometry {
             return marks.to_vec();
         }
         let bucket = (2).max((marks.len() as f32 / columns as f32).ceil() as usize);
-        let value = |mark: &Mark| if orientation == ChartOrientation::Vertical { mark.y } else { mark.x };
+        let value = |mark: &Mark| {
+            if orientation == ChartOrientation::Vertical {
+                mark.y
+            } else {
+                mark.x
+            }
+        };
         let mut result = Vec::with_capacity(columns * 2 + 2);
         result.push(marks[0].clone());
         let mut start = 1;
@@ -459,18 +503,38 @@ impl PieGeometry {
             .map(|(index, _)| index)
             .collect();
         if sorts_by_value {
-            order.sort_by(|a, b| values[*b].partial_cmp(&values[*a]).unwrap_or(std::cmp::Ordering::Equal));
+            order.sort_by(|a, b| {
+                values[*b]
+                    .partial_cmp(&values[*a])
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
         }
-        let mut angle = -std::f32::consts::PI / 2.0 + if start_angle.is_finite() { start_angle } else { 0.0 };
+        let mut angle = -std::f32::consts::PI / 2.0
+            + if start_angle.is_finite() {
+                start_angle
+            } else {
+                0.0
+            };
         let mut wedges = Vec::new();
         if total > 0.0 {
             for index in order {
                 let sweep = values[index] / total * 2.0 * std::f32::consts::PI;
-                wedges.push(PieWedge { index, value: values[index], start: angle, end: angle + sweep });
+                wedges.push(PieWedge {
+                    index,
+                    value: values[index],
+                    start: angle,
+                    end: angle + sweep,
+                });
                 angle += sweep;
             }
         }
-        Self { center, radius, inner_radius, wedges, total }
+        Self {
+            center,
+            radius,
+            inner_radius,
+            wedges,
+            total,
+        }
     }
 
     pub fn wedge_at(&self, x: f32, y: f32) -> Option<&PieWedge> {
@@ -484,24 +548,35 @@ impl PieGeometry {
         if angle < -std::f32::consts::PI / 2.0 {
             angle += 2.0 * std::f32::consts::PI;
         }
-        self.wedges.iter().find(|wedge| angle >= wedge.start && angle < wedge.end)
+        self.wedges
+            .iter()
+            .find(|wedge| angle >= wedge.start && angle < wedge.end)
     }
 
     pub fn anchor(&self, wedge: &PieWedge) -> Point {
         let middle = (wedge.start + wedge.end) / 2.0;
         let radius = (self.radius + self.inner_radius) / 2.0;
-        Point::new(self.center.x + middle.cos() * radius, self.center.y + middle.sin() * radius)
+        Point::new(
+            self.center.x + middle.cos() * radius,
+            self.center.y + middle.sin() * radius,
+        )
     }
 
     pub fn ring_point(&self, wedge: &PieWedge) -> Point {
         let middle = (wedge.start + wedge.end) / 2.0;
-        Point::new(self.center.x + middle.cos() * self.radius, self.center.y + middle.sin() * self.radius)
+        Point::new(
+            self.center.x + middle.cos() * self.radius,
+            self.center.y + middle.sin() * self.radius,
+        )
     }
 
     pub fn label_anchor(&self, wedge: &PieWedge) -> Point {
         let middle = (wedge.start + wedge.end) / 2.0;
         let radius = self.radius + 8.0;
-        Point::new(self.center.x + middle.cos() * radius, self.center.y + middle.sin() * radius)
+        Point::new(
+            self.center.x + middle.cos() * radius,
+            self.center.y + middle.sin() * radius,
+        )
     }
 }
 

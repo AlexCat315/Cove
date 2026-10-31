@@ -12,7 +12,9 @@ struct TestChunk {
 
 impl TestChunk {
     fn new(capacity: usize) -> Self {
-        Self { storage: Arc::new(Mutex::new(vec![0; capacity])) }
+        Self {
+            storage: Arc::new(Mutex::new(vec![0; capacity])),
+        }
     }
 }
 
@@ -28,7 +30,9 @@ impl UploadRingChunk for TestChunk {
 
 impl Clone for TestChunk {
     fn clone(&self) -> Self {
-        Self { storage: Arc::clone(&self.storage) }
+        Self {
+            storage: Arc::clone(&self.storage),
+        }
     }
 }
 
@@ -84,9 +88,7 @@ fn write_copies_data() {
     let mut allocator = make_allocator(1024);
     let data = [1u8, 2, 3, 4];
     let allocation = allocator.write(&data, 1).unwrap();
-    let bytes = unsafe {
-        std::slice::from_raw_parts(allocation.pointer(), 4).to_vec()
-    };
+    let bytes = unsafe { std::slice::from_raw_parts(allocation.pointer(), 4).to_vec() };
     assert_eq!(bytes, vec![1, 2, 3, 4]);
 }
 

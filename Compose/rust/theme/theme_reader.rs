@@ -1,8 +1,8 @@
 //! Translation of Theme/ThemeReader.swift.
+use super::{Theme, theme_for_node};
+use crate::{AnyView, PrimitiveView, View, ViewKind};
 use cove_core::scene::{LayoutNode, Node};
 use std::rc::Rc;
-use crate::{AnyView, PrimitiveView, View, ViewKind};
-use super::{theme_for_node, Theme};
 
 /// Resolves the active theme while constructing content (for syntax colors
 /// and other palettes that cannot be expressed as a single semantic token).
@@ -11,7 +11,9 @@ pub struct ThemeReader<Content: View> {
 }
 impl<Content: View> ThemeReader<Content> {
     pub fn new(content: impl Fn(&Theme) -> Content + 'static) -> Self {
-        Self { content: Rc::new(content) }
+        Self {
+            content: Rc::new(content),
+        }
     }
 }
 impl<Content: View + 'static> PrimitiveView for ThemeReader<Content> {

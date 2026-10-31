@@ -14,15 +14,15 @@ use objc2_metal::{
 
 use crate::rhi::{
     BindingLayout, BindingLayoutDescriptor, BindingLayoutEntry, BindingResource, BindingSet,
-    BindingSetEntry, Buffer, PipelineLayout, PipelineLayoutDescriptor, RhiCompilationWork, RhiError,
-    RhiResult, ShaderVisibility, Swapchain, SwapchainImage, Texture, TextureSubresource,
-    TextureUploadRegion, rhi_byte_range,
-    rhi_require, rhi_texture_subresource_extent, rhi_texture_transfer_bytes, rhi_texture_upload_bytes,
+    BindingSetEntry, Buffer, PipelineLayout, PipelineLayoutDescriptor, RhiCompilationWork,
+    RhiError, RhiResult, ShaderVisibility, Swapchain, SwapchainImage, Texture, TextureSubresource,
+    TextureUploadRegion, rhi_byte_range, rhi_require, rhi_texture_subresource_extent,
+    rhi_texture_transfer_bytes, rhi_texture_upload_bytes,
 };
 
 use super::device::{MetalDeviceHandle, MetalWindowSwapchain, VERTEX_BUFFER_BASE_INDEX};
 use super::formats;
-use super::registries::{MetalBoundEntry, MetalBoundResource, MetalBoundValue, MetalBindingSet};
+use super::registries::{MetalBindingSet, MetalBoundEntry, MetalBoundResource, MetalBoundValue};
 use super::resources::lock;
 use super::upload_ring::{MetalFrameUploader, MetalUploadChunk};
 
@@ -87,19 +87,29 @@ fn resolve_binding_resource(
 ) -> RhiResult<MetalBoundResource> {
     let registries = lock(&device.registries);
     match resource {
-        BindingResource::UniformBuffer { buffer, offset, size } => {
+        BindingResource::UniformBuffer {
+            buffer,
+            offset,
+            size,
+        } => {
             let native = registries.buffers.get(&buffer.id()).ok_or_else(|| {
                 RhiError::invalid_argument("binding references an unknown buffer or invalid offset")
             })?;
             let capacity = native.length();
-            rhi_require(offset < capacity, "binding references an unknown buffer or invalid offset")?;
+            rhi_require(
+                offset < capacity,
+                "binding references an unknown buffer or invalid offset",
+            )?;
             if let Some(size) = size {
                 rhi_require(size > 0, "uniform binding size must be positive")?;
                 rhi_byte_range(offset, size, capacity)?;
             }
             Ok(MetalBoundResource {
                 id: buffer.id(),
-                value: MetalBoundValue::Buffer { buffer: native.clone(), offset },
+                value: MetalBoundValue::Buffer {
+                    buffer: native.clone(),
+                    offset,
+                },
             })
         }
         BindingResource::StorageBuffer { buffer, offset } => {
@@ -107,10 +117,16 @@ fn resolve_binding_resource(
                 RhiError::invalid_argument("binding references an unknown buffer or invalid offset")
             })?;
             let capacity = native.length();
-            rhi_require(offset < capacity, "binding references an unknown buffer or invalid offset")?;
+            rhi_require(
+                offset < capacity,
+                "binding references an unknown buffer or invalid offset",
+            )?;
             Ok(MetalBoundResource {
                 id: buffer.id(),
-                value: MetalBoundValue::Buffer { buffer: native.clone(), offset },
+                value: MetalBoundValue::Buffer {
+                    buffer: native.clone(),
+                    offset,
+                },
             })
         }
         BindingResource::Texture(texture) | BindingResource::StorageTexture(texture) => {
@@ -144,9 +160,14 @@ fn resolve_binding_resource(
             })
         }
         BindingResource::AccelerationStructure(structure) => {
-            let native = registries.acceleration_structures.get(&structure.id()).ok_or_else(|| {
-                RhiError::invalid_argument("binding references an unknown acceleration structure")
-            })?;
+            let native = registries
+                .acceleration_structures
+                .get(&structure.id())
+                .ok_or_else(|| {
+                    RhiError::invalid_argument(
+                        "binding references an unknown acceleration structure",
+                    )
+                })?;
             Ok(MetalBoundResource {
                 id: structure.id(),
                 value: MetalBoundValue::AccelerationStructure(std::sync::Arc::clone(native)),
@@ -294,8 +315,10 @@ fn run_blit(
     device: &MetalDeviceHandle,
     encode: impl FnOnce(&ProtocolObject<dyn MTLBlitCommandEncoder>) -> RhiResult<()>,
 ) -> RhiResult<()> {
-    let command_buffer =
-        device.graphics_queue.commandBuffer().ok_or(RhiError::OutOfMemory)?;
+    let command_buffer = device
+        .graphics_queue
+        .commandBuffer()
+        .ok_or(RhiError::OutOfMemory)?;
     let blit = command_buffer
         .blitCommandEncoder()
         .ok_or_else(|| RhiError::submit_failed("cannot create blit encoder"))?;
@@ -304,7 +327,9 @@ fn run_blit(
     command_buffer.commit();
     command_buffer.waitUntilCompleted();
     if let Some(error) = command_buffer.error() {
-        return Err(RhiError::submit_failed(error.localizedDescription().to_string()));
+        return Err(RhiError::submit_failed(
+            error.localizedDescription().to_string(),
+        ));
     }
     Ok(())
 }
@@ -507,14 +532,15 @@ pub fn configure_swapchain(
     // caller keeps alive until the device releases the surface.
     let layer = unsafe {
         Retained::retain(descriptor.native_handle as *mut objc2_quartz_core::CAMetalLayer)
-            .ok_or_else(|| RhiError::invalid_argument("surface nativeHandle is not a CAMetalLayer"))?
+            .ok_or_else(|| {
+                RhiError::invalid_argument("surface nativeHandle is not a CAMetalLayer")
+            })?
     };
     let layer_pointer = Retained::as_ptr(&layer);
     rhi_require(
-        !device
-            .swapchains
-            .iter()
-            .any(|(id, window)| *id != handle.id() && Retained::as_ptr(&window.layer) == layer_pointer),
+        !device.swapchains.iter().any(|(id, window)| {
+            *id != handle.id() && Retained::as_ptr(&window.layer) == layer_pointer
+        }),
         "CAMetalLayer already has a swapchain",
     )?;
     rhi_require(
@@ -524,7 +550,11 @@ pub fn configure_swapchain(
             .is_none_or(|window| window.current_drawable.is_none()),
         "present an acquired drawable before resizing",
     )?;
-    let generation = device.swapchains.get(&handle.id()).map_or(0, |window| window.generation) + 1;
+    let generation = device
+        .swapchains
+        .get(&handle.id())
+        .map_or(0, |window| window.generation)
+        + 1;
     destroy_swapchain(device, handle);
 
     layer.setDevice(Some(&device.device));
@@ -573,7 +603,9 @@ pub fn presentation_mode(
 }
 
 pub fn destroy_swapchain(device: &mut MetalDeviceHandle, handle: Swapchain) {
-    let Some(window) = device.swapchains.remove(&handle.id()) else { return };
+    let Some(window) = device.swapchains.remove(&handle.id()) else {
+        return;
+    };
     // Drawable textures are backend-internal handles; drop their records too.
     let ids: Vec<u32> = window.texture_ids.values().copied().collect();
     {
@@ -617,7 +649,13 @@ pub fn acquire_swapchain_image(
     lock(&registries_handle).textures.insert(id, texture);
     window.current_texture_id = Some(id);
     window.current_drawable = Some(drawable);
-    Ok(SwapchainImage::new(handle, window.generation, Texture::new(id), width, height))
+    Ok(SwapchainImage::new(
+        handle,
+        window.generation,
+        Texture::new(id),
+        width,
+        height,
+    ))
 }
 
 pub fn present(
@@ -626,16 +664,25 @@ pub fn present(
     completion: crate::rhi::Completion,
 ) -> RhiResult<()> {
     let Some(window) = device.swapchains.get_mut(&image.swapchain.id()) else {
-        return Err(RhiError::present_failed("image was not acquired from this swapchain"));
+        return Err(RhiError::present_failed(
+            "image was not acquired from this swapchain",
+        ));
     };
     let Some(drawable) = window.current_drawable.take() else {
-        return Err(RhiError::present_failed("image was not acquired from this swapchain"));
+        return Err(RhiError::present_failed(
+            "image was not acquired from this swapchain",
+        ));
     };
     if window.current_texture_id != Some(image.texture.id()) {
         window.current_drawable = Some(drawable);
-        return Err(RhiError::present_failed("image was not acquired from this swapchain"));
+        return Err(RhiError::present_failed(
+            "image was not acquired from this swapchain",
+        ));
     }
-    let commands = device.graphics_queue.commandBuffer().ok_or(RhiError::OutOfMemory)?;
+    let commands = device
+        .graphics_queue
+        .commandBuffer()
+        .ok_or(RhiError::OutOfMemory)?;
     add_completion_handler(
         &commands,
         std::sync::Arc::clone(&device.submission_status),
@@ -659,7 +706,9 @@ pub fn make_frame_uploader(
     // but the frontend owns it exclusively, so this returns a fresh handle onto
     // the same ring state and resets it for the new frame.
     let uploader = if let Some(existing) = device.uploaders.get(&slot) {
-        let mut guard = existing.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut guard = existing
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         crate::rhi::FrameUploader::reset(&mut *guard);
         std::sync::Arc::clone(existing)
     } else {
@@ -670,11 +719,15 @@ pub fn make_frame_uploader(
                 .newBufferWithLength_options(capacity, MTLResourceOptions::StorageModeShared)
                 .ok_or(RhiError::OutOfMemory)?;
             let handle = Buffer::new(lock(&registries_handle).next_internal_id());
-            lock(&registries_handle).buffers.insert(handle.id(), buffer.clone());
+            lock(&registries_handle)
+                .buffers
+                .insert(handle.id(), buffer.clone());
             Ok(MetalUploadChunk::new(buffer, handle))
         });
         let uploader = std::sync::Arc::new(std::sync::Mutex::new(uploader));
-        device.uploaders.insert(slot, std::sync::Arc::clone(&uploader));
+        device
+            .uploaders
+            .insert(slot, std::sync::Arc::clone(&uploader));
         uploader
     };
     Ok(Box::new(SharedFrameUploader { uploader }))
@@ -688,12 +741,18 @@ pub struct SharedFrameUploader {
 
 impl crate::rhi::FrameUploader for SharedFrameUploader {
     fn reset(&mut self) {
-        let mut guard = self.uploader.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut guard = self
+            .uploader
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         crate::rhi::FrameUploader::reset(&mut *guard);
     }
 
     fn write(&mut self, bytes: &[u8], alignment: usize) -> RhiResult<crate::rhi::UploadLocation> {
-        let mut guard = self.uploader.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut guard = self
+            .uploader
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         crate::rhi::FrameUploader::write(&mut *guard, bytes, alignment)
     }
 }

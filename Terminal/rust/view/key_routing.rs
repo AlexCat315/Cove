@@ -74,8 +74,8 @@ fn alt_encodes_escape(modifiers: PlatformModifiers) -> bool {
 /// as the key's unshifted codepoint (Control chords, Kitty protocol).
 fn unshifted_text(scancode: u32) -> Option<&'static str> {
     const LETTERS: [&str; 26] = [
-        "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t",
-        "u", "v", "w", "x", "y", "z",
+        "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r",
+        "s", "t", "u", "v", "w", "x", "y", "z",
     ];
     const DIGITS: [&str; 10] = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
     const NAMED: [(u32, &str); 29] = [
@@ -115,5 +115,8 @@ fn unshifted_text(scancode: u32) -> Option<&'static str> {
     if (30..=39).contains(&scancode) {
         return Some(DIGITS[(scancode - 30) as usize]);
     }
-    NAMED.iter().find(|(code, _)| *code == scancode).map(|(_, text)| *text)
+    NAMED
+        .iter()
+        .find(|(code, _)| *code == scancode)
+        .map(|(_, text)| *text)
 }

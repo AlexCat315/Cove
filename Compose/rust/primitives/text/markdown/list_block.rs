@@ -5,15 +5,15 @@
 //! item text rather than to the marker.
 use std::rc::Rc;
 
-use cove_core::scene::{
-    AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, Justify, Node, Wrap,
-};
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::controls::button::{ButtonIcon, ButtonIconSource};
 use crate::primitives::text::Text;
-use crate::theme::{theme_for_node, SemanticColorRef, SemanticFontRef};
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, TupleView, View};
+use crate::theme::{SemanticColorRef, SemanticFontRef, theme_for_node};
+use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_view};
+use cove_core::scene::{
+    AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, Justify, Node, Wrap,
+};
 
 use super::document::{MarkdownList, MarkdownListItem};
 
@@ -35,7 +35,11 @@ pub struct MarkdownListView {
 
 impl MarkdownListView {
     pub fn new(list: MarkdownList, depth: usize) -> Self {
-        Self { list, depth, render_block: None }
+        Self {
+            list,
+            depth,
+            render_block: None,
+        }
     }
 
     pub fn render_block(
@@ -76,7 +80,11 @@ impl View for MarkdownListView {
         }
         AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 6.0,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                6.0,
                 AnyView::new(TupleView::new(rows)),
             )
             .frame_min_width(0.0),
@@ -108,7 +116,9 @@ impl PrimitiveView for MarkdownListRow {
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         let marker = match self.item.is_checked {
-            Some(checked) => AnyView::new(MarkdownTaskMarker { is_checked: checked }),
+            Some(checked) => AnyView::new(MarkdownTaskMarker {
+                is_checked: checked,
+            }),
             None => match self.render_block {
                 _ if self.number > 0 && self.gutter > BULLET_GUTTER => AnyView::new(
                     Text::new(format!("{}.", self.number))
@@ -126,27 +136,37 @@ impl PrimitiveView for MarkdownListRow {
                 None => AnyView::new(crate::EmptyView),
             });
         }
-        vec![AnyView::new(
-            BoxView::new(
-                FlexDirection::Row, Align::FlexStart, Justify::FlexStart, Wrap::NoWrap, 6.0,
-                AnyView::new(TupleView::new(vec![
-                    AnyView::new(
-                        BoxView::new(
-                            FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 0.0,
-                            marker,
-                        )
-                        .frame_width(self.gutter),
-                    ),
-                    AnyView::new(
-                        BoxView::new(
-                            FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 6.0,
-                            AnyView::new(TupleView::new(blocks)),
-                        )
-                        .flex_with(1.0, 1.0, Some(0.0)),
-                    ),
-                ])),
-            ),
-        )]
+        vec![AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::FlexStart,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            6.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(
+                    BoxView::new(
+                        FlexDirection::Column,
+                        Align::Stretch,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        0.0,
+                        marker,
+                    )
+                    .frame_width(self.gutter),
+                ),
+                AnyView::new(
+                    BoxView::new(
+                        FlexDirection::Column,
+                        Align::Stretch,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        6.0,
+                        AnyView::new(TupleView::new(blocks)),
+                    )
+                    .flex_with(1.0, 1.0, Some(0.0)),
+                ),
+            ])),
+        ))]
     }
 }
 impl_primitive_view!(MarkdownListRow);
@@ -195,10 +215,18 @@ impl PrimitiveView for MarkdownBullet {
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
-        let (width, height) = if self.depth % 3 == 2 { (5.0, 5.0) } else { (6.0, 6.0) };
+        let (width, height) = if self.depth % 3 == 2 {
+            (5.0, 5.0)
+        } else {
+            (6.0, 6.0)
+        };
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(crate::EmptyView),
             )
             .frame_size(width, height),
@@ -218,7 +246,12 @@ impl PrimitiveView for MarkdownTaskMarker {
         node.set_is_hit_testable(false);
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Checkbox,
-            label: if self.is_checked { "Completed" } else { "Not completed" }.to_string(),
+            label: if self.is_checked {
+                "Completed"
+            } else {
+                "Not completed"
+            }
+            .to_string(),
             state: cove_core::scene::AccessibilityState {
                 is_selected: self.is_checked,
                 is_read_only: true,
@@ -254,7 +287,9 @@ impl PrimitiveView for MarkdownTaskMarker {
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         let glyph = if self.is_checked {
             AnyView::new(ButtonIcon::new(
-                ButtonIconSource::resource(crate::primitives::media::ui_icon_catalog::action::check()),
+                ButtonIconSource::resource(
+                    crate::primitives::media::ui_icon_catalog::action::check(),
+                ),
                 Some(12.0),
                 Some(cove_core::Color::WHITE),
             ))
@@ -262,8 +297,15 @@ impl PrimitiveView for MarkdownTaskMarker {
             AnyView::new(crate::EmptyView)
         };
         vec![AnyView::new(
-            BoxView::new(FlexDirection::Row, Align::Center, Justify::Center, Wrap::NoWrap, 0.0, glyph)
-                .frame_size(TASK_MARKER, TASK_MARKER),
+            BoxView::new(
+                FlexDirection::Row,
+                Align::Center,
+                Justify::Center,
+                Wrap::NoWrap,
+                0.0,
+                glyph,
+            )
+            .frame_size(TASK_MARKER, TASK_MARKER),
         )]
     }
 }

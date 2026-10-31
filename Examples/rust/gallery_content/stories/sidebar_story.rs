@@ -70,17 +70,34 @@ impl DestinationIcon {
 /// arbitrary destination, so the pane never claims a row is selected.
 pub fn destination_detail(selection: Option<&str>) -> DestinationDetail {
     match selection {
-        Some("overview") => DestinationDetail { title: "Overview", icon: DestinationIcon::Dashboard },
-        Some("downloads") => DestinationDetail { title: "Downloads", icon: DestinationIcon::Download },
-        Some("projects") => DestinationDetail { title: "Projects", icon: DestinationIcon::Folder },
-        Some("recent") => {
-            DestinationDetail { title: "Recent activity", icon: DestinationIcon::Activity }
-        }
-        Some("notifications") => {
-            DestinationDetail { title: "Notifications", icon: DestinationIcon::Bell }
-        }
-        Some("settings") => DestinationDetail { title: "Settings", icon: DestinationIcon::Settings },
-        _ => DestinationDetail { title: "Choose a destination", icon: DestinationIcon::Settings },
+        Some("overview") => DestinationDetail {
+            title: "Overview",
+            icon: DestinationIcon::Dashboard,
+        },
+        Some("downloads") => DestinationDetail {
+            title: "Downloads",
+            icon: DestinationIcon::Download,
+        },
+        Some("projects") => DestinationDetail {
+            title: "Projects",
+            icon: DestinationIcon::Folder,
+        },
+        Some("recent") => DestinationDetail {
+            title: "Recent activity",
+            icon: DestinationIcon::Activity,
+        },
+        Some("notifications") => DestinationDetail {
+            title: "Notifications",
+            icon: DestinationIcon::Bell,
+        },
+        Some("settings") => DestinationDetail {
+            title: "Settings",
+            icon: DestinationIcon::Settings,
+        },
+        _ => DestinationDetail {
+            title: "Choose a destination",
+            icon: DestinationIcon::Settings,
+        },
     }
 }
 
@@ -187,9 +204,13 @@ impl SidebarStory {
         let enabled = self.options.is_enabled;
         let icons_on = self.shows_icons.get();
         let badges_on = self.shows_badges.get();
-        let mut item = |id: &str, title: &str, icon: Option<cove_imaging::BundleImageResource>, badge: Option<&str>, is_enabled: bool| {
-            let mut row = SidebarItem::new(id.to_owned(), title.to_owned())
-                .enabled(enabled && is_enabled);
+        let mut item = |id: &str,
+                        title: &str,
+                        icon: Option<cove_imaging::BundleImageResource>,
+                        badge: Option<&str>,
+                        is_enabled: bool| {
+            let mut row =
+                SidebarItem::new(id.to_owned(), title.to_owned()).enabled(enabled && is_enabled);
             if icons_on && let Some(icon) = icon {
                 row = row.icon(icon);
             }
@@ -214,9 +235,27 @@ impl SidebarStory {
             SidebarSection::new(
                 "workspace",
                 vec![
-                    item("overview", "Overview", Some(icons::layout::dashboard()), None, true),
-                    item("downloads", "Downloads", Some(icons::action::download()), Some("8"), true),
-                    item("projects", "Projects", Some(icons::file::folder()), None, true),
+                    item(
+                        "overview",
+                        "Overview",
+                        Some(icons::layout::dashboard()),
+                        None,
+                        true,
+                    ),
+                    item(
+                        "downloads",
+                        "Downloads",
+                        Some(icons::action::download()),
+                        Some("8"),
+                        true,
+                    ),
+                    item(
+                        "projects",
+                        "Projects",
+                        Some(icons::file::folder()),
+                        None,
+                        true,
+                    ),
                     recent,
                 ],
             )
@@ -224,8 +263,20 @@ impl SidebarStory {
             SidebarSection::new(
                 "preferences",
                 vec![
-                    item("notifications", "Notifications", Some(icons::status::bell()), Some("3"), true),
-                    item("settings", "Settings", Some(icons::action::settings()), None, true),
+                    item(
+                        "notifications",
+                        "Notifications",
+                        Some(icons::status::bell()),
+                        Some("3"),
+                        true,
+                    ),
+                    item(
+                        "settings",
+                        "Settings",
+                        Some(icons::action::settings()),
+                        None,
+                        true,
+                    ),
                     item(
                         "permissions",
                         "Team permissions unavailable",

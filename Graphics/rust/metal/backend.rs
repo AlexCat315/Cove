@@ -15,8 +15,8 @@ use crate::rhi::{
     AccelerationStructure, AccelerationStructureDescriptor, AdapterCapabilities, BindingLayout,
     BindingLayoutDescriptor, BindingLayoutEntry, BindingSet, BindingSetEntry, Buffer,
     BufferDescriptor, Capabilities, Completion, ComputePipeline, ComputePipelineDescriptor,
-    DeviceConfig, FrameUploader, GraphicsApi, GraphicsPipeline, GraphicsPipelineDescriptor,
-    GpuTimestampProfile, MeshPipeline, MeshPipelineDescriptor, PipelineLayout,
+    DeviceConfig, FrameUploader, GpuTimestampProfile, GraphicsApi, GraphicsPipeline,
+    GraphicsPipelineDescriptor, MeshPipeline, MeshPipelineDescriptor, PipelineLayout,
     PipelineLayoutDescriptor, PlannedSubmit, PresentationMode, RhiBackend, RhiResult, Sampler,
     SamplerDescriptor, ShaderModule, ShaderModuleDescriptor, SubmissionCpuProfile,
     SurfaceDescriptor, Swapchain, SwapchainImage, Texture, TextureAllocation, TextureDescriptor,
@@ -36,7 +36,10 @@ pub struct MetalBackend {
 impl MetalBackend {
     /// Creates the backend for the current physical device.
     pub fn make(config: DeviceConfig) -> RhiResult<Self> {
-        Ok(Self { device: MetalDeviceHandle::make(config)?, gpu_timestamp_profile: None })
+        Ok(Self {
+            device: MetalDeviceHandle::make(config)?,
+            gpu_timestamp_profile: None,
+        })
     }
 }
 
@@ -130,8 +133,11 @@ impl RhiBackend for MetalBackend {
             .registries
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let structure =
-            acceleration::MetalAccelerationStructure::create(&self.device.device, &registries, &descriptor)?;
+        let structure = acceleration::MetalAccelerationStructure::create(
+            &self.device.device,
+            &registries,
+            &descriptor,
+        )?;
         drop(registries);
         self.device
             .registries
@@ -205,7 +211,13 @@ impl RhiBackend for MetalBackend {
         layout_entries: Vec<BindingLayoutEntry>,
         set_entries: Vec<BindingSetEntry>,
     ) -> RhiResult<()> {
-        transfer::register_binding_set(&mut self.device, handle, layout, layout_entries, set_entries)
+        transfer::register_binding_set(
+            &mut self.device,
+            handle,
+            layout,
+            layout_entries,
+            set_entries,
+        )
     }
 
     fn unregister_binding_set(&mut self, handle: BindingSet) {
@@ -214,12 +226,7 @@ impl RhiBackend for MetalBackend {
 
     // MARK: Immediate data transfer
 
-    fn upload_buffer_data(
-        &mut self,
-        buffer: Buffer,
-        offset: usize,
-        data: &[u8],
-    ) -> RhiResult<()> {
+    fn upload_buffer_data(&mut self, buffer: Buffer, offset: usize, data: &[u8]) -> RhiResult<()> {
         transfer::upload_buffer_data(&mut self.device, buffer, offset, data)
     }
 

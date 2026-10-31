@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+- **测试迁移启动（2026-10-31）**：新写 5 个集成测试并在 `Compose/Cargo.toml` 注册
+  `[[test]]`——`select_enumeration`、`offscreen_reuse`、`scratch_geometry`、
+  `recomposition_paint`、`chrome_component`，经 `cargo check -p cove-ui-compose --tests`
+  验证 0 error。重新生成清单后，测试已写入 118/424、剩余 306；另 15 个早已落盘但旧
+  JSON 漏标的 `[[test]]` 目标被正确置为 `written_unverified`（目标文件均真实存在）。
+  迁移期仍不运行 `cargo test`，待全部转换后统一验证。
 - **生产源码迁移完成**：984 个 Swift 生产文件中 983 个已有 Rust/C 实现，唯一例外是
   `NSNumber+Boolean.swift`（Objective-C 的 `NSNumber` 布尔扩展，Rust 无对等物且不需要）。
   SwiftPM 清单 25/25 已建立 Cargo 清单，CLI 项目模板 5/5 已改写为 Cargo 工程。

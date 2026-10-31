@@ -3,17 +3,20 @@
 //! Translation of `GalleryContent/Stories/Navigation/AppBarStory.swift`.
 
 use cove_examples::gallery_content::catalog::GalleryOptions;
-use cove_examples::gallery_content::stories::navigation_stories::{
-    back_title, header_height, inline_capacity, AppBarStory, LONG_TITLE, SHORT_TITLE,
-    UNAVAILABLE_TITLE,
-};
 use cove_examples::gallery_content::stories::AppBarStory as Reexported;
+use cove_examples::gallery_content::stories::navigation_stories::{
+    AppBarStory, LONG_TITLE, SHORT_TITLE, UNAVAILABLE_TITLE, back_title, header_height,
+    inline_capacity,
+};
 
 #[test]
 fn the_story_starts_with_the_long_title() {
     let story = AppBarStory::new(GalleryOptions::default());
     assert_eq!(story.title(), LONG_TITLE);
-    assert!(story.title().contains("👩🏽‍💻"), "the long title carries an emoji run");
+    assert!(
+        story.title().contains("👩🏽‍💻"),
+        "the long title carries an emoji run"
+    );
 }
 
 #[test]

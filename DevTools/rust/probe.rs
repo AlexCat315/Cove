@@ -5,8 +5,8 @@
 //! driven from a test or an example without spawning a process. The logic is
 //! identical: build a small scene, start the real server, and exercise it.
 use crate::inspection::{Diagnostics, SceneInspector};
-use crate::server::config::DevToolsConfig;
 use crate::server::DevServer;
+use crate::server::config::DevToolsConfig;
 use cove_core::scene::{InvalidationLog, LayoutNode, Node, NodeTree};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -55,7 +55,12 @@ pub fn build_scene() -> Rc<RefCell<NodeTree>> {
 pub fn start(port: u16) -> std::io::Result<(DevServer, ProbeReport)> {
     let _ = cove_logging::LogSystem::bootstrap(None, Default::default(), None);
     let tree = build_scene();
-    let mut server = DevServer::new(DevToolsConfig::new("127.0.0.1", port, "CoveUI transport probe", true));
+    let mut server = DevServer::new(DevToolsConfig::new(
+        "127.0.0.1",
+        port,
+        "CoveUI transport probe",
+        true,
+    ));
 
     let inspector = Rc::new(RefCell::new(SceneInspector::new(tree.clone(), None, None)));
     let diagnostics = Rc::new(RefCell::new(Diagnostics::new(tree.clone(), None)));
@@ -66,11 +71,19 @@ pub fn start(port: u16) -> std::io::Result<(DevServer, ProbeReport)> {
     let clear_inspector = inspector.clone();
     server.host.scene = crate::server::config::DevToolsHostScene {
         snapshot: Some(Rc::new(move || snapshot_inspector.borrow().snapshot())),
-        select: Some(Rc::new(move |id: &str| select_inspector.borrow().editor.select(Some(id)))),
-        clear_selection: Some(Rc::new(move || clear_inspector.borrow().editor.select(None))),
-        inspect: Some(Rc::new(move |request| inspect_inspector.borrow().editor.handle(request))),
+        select: Some(Rc::new(move |id: &str| {
+            select_inspector.borrow().editor.select(Some(id))
+        })),
+        clear_selection: Some(Rc::new(move || {
+            clear_inspector.borrow().editor.select(None)
+        })),
+        inspect: Some(Rc::new(move |request| {
+            inspect_inspector.borrow().editor.handle(request)
+        })),
         reset: Some(Rc::new(move || reset_inspector.borrow().editor.reset())),
-        diagnostics: Some(Rc::new(move |request| diagnostics.borrow().handle_read_request(request))),
+        diagnostics: Some(Rc::new(move |request| {
+            diagnostics.borrow().handle_read_request(request)
+        })),
     };
     let timeline_tree = tree.clone();
     let capture_tree = tree.clone();
@@ -97,7 +110,11 @@ pub fn start(port: u16) -> std::io::Result<(DevServer, ProbeReport)> {
             }
         })),
         capture: Some(Rc::new(move |enabled| {
-            capture_tree.borrow().timeline.borrow_mut().set_enabled(enabled);
+            capture_tree
+                .borrow()
+                .timeline
+                .borrow_mut()
+                .set_enabled(enabled);
         })),
     };
     server.advertised_capabilities = [
@@ -145,7 +162,11 @@ pub fn probe_inspection() -> TreeProbe {
     let overview = diagnostics.overview(50);
     TreeProbe {
         has_root: snapshot.root.is_some(),
-        child_count: snapshot.root.as_ref().map(|root| root.children.len()).unwrap_or(0),
+        child_count: snapshot
+            .root
+            .as_ref()
+            .map(|root| root.children.len())
+            .unwrap_or(0),
         found_root: found.is_some(),
         node_count: overview.node_count,
         layout_issue_total: overview.layout_issues.total,
@@ -163,7 +184,10 @@ pub struct TreeProbe {
 }
 
 /// Attach an invalidation log, mirroring the probe's optional wiring.
-pub fn with_invalidation_log(tree: Rc<RefCell<NodeTree>>, log: Arc<InvalidationLog>) -> SceneInspector {
+pub fn with_invalidation_log(
+    tree: Rc<RefCell<NodeTree>>,
+    log: Arc<InvalidationLog>,
+) -> SceneInspector {
     SceneInspector::new(tree, Some(log), None)
 }
 
@@ -176,7 +200,10 @@ mod tests {
         let report = probe_inspection();
         assert!(report.has_root);
         assert_eq!(report.child_count, 1);
-        assert!(report.found_root, "the snapshot id resolves back to a live node");
+        assert!(
+            report.found_root,
+            "the snapshot id resolves back to a live node"
+        );
         assert_eq!(report.node_count, 2);
     }
 

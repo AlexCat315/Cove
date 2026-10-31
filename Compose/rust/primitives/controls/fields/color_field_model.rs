@@ -37,7 +37,10 @@ fn clamp8(value: f32) -> u8 {
 pub fn parse_hex(text: &str) -> Option<Color> {
     let trimmed = text.trim();
     let digits = trimmed.strip_prefix('#').unwrap_or(trimmed);
-    if !digits.chars().all(|character| character.is_ascii_hexdigit()) {
+    if !digits
+        .chars()
+        .all(|character| character.is_ascii_hexdigit())
+    {
         return None;
     }
     let channel = |value: u32| (value & 0xFF) as f32 / 255.0;

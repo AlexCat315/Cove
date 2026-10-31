@@ -5,7 +5,10 @@
 //! uses. The pair shares one Tab stop, and Left/Right moves between the zones.
 use std::rc::Rc;
 
-use cove_core::scene::{Align, EventPhase, EventResult, FlexDirection, FocusChainHolder, InputHandlerRoute, InteractionRegistryHolder, Justify, Node, Wrap};
+use cove_core::scene::{
+    Align, EventPhase, EventResult, FlexDirection, FocusChainHolder, InputHandlerRoute,
+    InteractionRegistryHolder, Justify, Node, Wrap,
+};
 
 use crate::modifiers::layout::{FlexExt, PaddingExt};
 use crate::primitives::controls::button::{Button, ButtonRole};
@@ -14,7 +17,7 @@ use crate::primitives::overlays::menu::MenuEntry;
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, SecondaryButtonStyle};
 use crate::theme::theme_for_node;
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, View};
+use crate::{AnyView, BoxView, PrimitiveView, View, impl_primitive_view};
 
 /// Height floor for the pair.
 const SPLIT_MIN_HEIGHT: f32 = 32.0;
@@ -36,7 +39,11 @@ pub struct SplitButton {
 }
 
 impl SplitButton {
-    pub fn new(title: impl Into<String>, entries: Vec<MenuEntry>, action: impl Fn() + 'static) -> Self {
+    pub fn new(
+        title: impl Into<String>,
+        entries: Vec<MenuEntry>,
+        action: impl Fn() + 'static,
+    ) -> Self {
         Self {
             title: title.into(),
             action: Rc::new(action),
@@ -148,7 +155,9 @@ impl PrimitiveView for SplitButtonGroup {
         if !self.is_enabled {
             return;
         }
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         let weak = node.downgrade();
         registry.set_key(
             node,
@@ -162,10 +171,16 @@ impl PrimitiveView for SplitButtonGroup {
                 {
                     return EventResult::Ignored;
                 }
-                let Some(owner) = Node::upgrade(&weak) else { return EventResult::Ignored };
+                let Some(owner) = Node::upgrade(&weak) else {
+                    return EventResult::Ignored;
+                };
                 let buttons = focusable_buttons(&owner);
-                let Some(chain) = FocusChainHolder::current() else { return EventResult::Ignored };
-                let Some(focused) = chain.focused() else { return EventResult::Ignored };
+                let Some(chain) = FocusChainHolder::current() else {
+                    return EventResult::Ignored;
+                };
+                let Some(focused) = chain.focused() else {
+                    return EventResult::Ignored;
+                };
                 let Some(index) = buttons.iter().position(|button| button == &focused) else {
                     return EventResult::Ignored;
                 };
@@ -174,8 +189,14 @@ impl PrimitiveView for SplitButtonGroup {
                 } else {
                     buttons.get(index.saturating_sub(1))
                 };
-                let Some(target) = target else { return EventResult::Ignored };
-                let zone = if buttons.len() > 1 && target == &buttons[1] { 1 } else { 0 };
+                let Some(target) = target else {
+                    return EventResult::Ignored;
+                };
+                let zone = if buttons.len() > 1 && target == &buttons[1] {
+                    1
+                } else {
+                    0
+                };
                 owner.set_attachment("split.zone", zone);
                 chain.focus(Some(target), true);
                 EventResult::Handled
@@ -184,16 +205,18 @@ impl PrimitiveView for SplitButtonGroup {
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
-        vec![AnyView::new(
-            BoxView::new(
-                FlexDirection::Row, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 0.0,
-                AnyView::new(crate::TupleView::new(vec![
-                    self.primary.clone(),
-                    AnyView::new(SplitDivider),
-                    self.menu.clone(),
-                ])),
-            ),
-        )]
+        vec![AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            0.0,
+            AnyView::new(crate::TupleView::new(vec![
+                self.primary.clone(),
+                AnyView::new(SplitDivider),
+                self.menu.clone(),
+            ])),
+        ))]
     }
 }
 impl_primitive_view!(SplitButtonGroup);

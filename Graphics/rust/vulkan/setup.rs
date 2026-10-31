@@ -92,11 +92,17 @@ pub fn is_available() -> bool {
 /// Creates a throwaway instance and confirms at least one physical device (ICD)
 /// is enumerated. Any failure means the platform has no usable Vulkan driver.
 fn probe_availability() -> bool {
-    let Some(loader) = sys::VulkanLoader::open() else { return false };
-    let Ok(instance) = create_instance(&loader, false, false) else { return false };
+    let Some(loader) = sys::VulkanLoader::open() else {
+        return false;
+    };
+    let Ok(instance) = create_instance(&loader, false, false) else {
+        return false;
+    };
     let Some(commands) = sys::InstanceCommands::load(&loader, instance) else {
         // SAFETY: the instance was created above and has no children yet.
-        if let Some(destroy) = unsafe { loader.load::<sys::PFN_vkDestroyInstance>(instance, c"vkDestroyInstance") } {
+        if let Some(destroy) =
+            unsafe { loader.load::<sys::PFN_vkDestroyInstance>(instance, c"vkDestroyInstance") }
+        {
             // SAFETY: same as above; nothing else references the instance.
             unsafe { destroy(instance, core::ptr::null()) };
         }
@@ -104,7 +110,9 @@ fn probe_availability() -> bool {
     };
     let mut count: u32 = 0;
     // SAFETY: `commands` was resolved for this instance.
-    let result = unsafe { (commands.enumerate_physical_devices)(instance, &mut count, core::ptr::null_mut()) };
+    let result = unsafe {
+        (commands.enumerate_physical_devices)(instance, &mut count, core::ptr::null_mut())
+    };
     // SAFETY: the instance has no children; destroying it also frees the devices
     // list, which was never read.
     unsafe { (commands.destroy_instance)(instance, core::ptr::null()) };
@@ -153,7 +161,9 @@ pub fn create_instance(
         #[cfg(target_os = "android")]
         {
             rhi_require(
-                supported.iter().any(|name| name == "VK_KHR_android_surface"),
+                supported
+                    .iter()
+                    .any(|name| name == "VK_KHR_android_surface"),
                 "Vulkan loader does not support Android presentation",
             )?;
             names.push(c"VK_KHR_android_surface");
@@ -179,7 +189,10 @@ pub fn create_instance(
     // the loader's version stays at the 1.0 default, which the check below
     // rejects with a clear message.
     if let Some(enumerate_version) = unsafe {
-        loader.load::<sys::PFN_vkEnumerateInstanceVersion>(sys::VK_NULL_INSTANCE, c"vkEnumerateInstanceVersion")
+        loader.load::<sys::PFN_vkEnumerateInstanceVersion>(
+            sys::VK_NULL_INSTANCE,
+            c"vkEnumerateInstanceVersion",
+        )
     } {
         // SAFETY: the pointer refers to a live local and the call only writes it.
         unsafe { enumerate_version(&mut version) };
@@ -251,8 +264,15 @@ fn instance_extensions(
         if result == sys::VK_INCOMPLETE {
             continue;
         }
-        rhi_require(result == sys::VK_SUCCESS, "Vulkan instance extension enumeration failed")?;
-        return Ok(values.iter().take(count as usize).map(|value| value.name()).collect());
+        rhi_require(
+            result == sys::VK_SUCCESS,
+            "Vulkan instance extension enumeration failed",
+        )?;
+        return Ok(values
+            .iter()
+            .take(count as usize)
+            .map(|value| value.name())
+            .collect());
     }
     Err(RhiError::unsupported_backend(
         "Vulkan instance extensions changed repeatedly during enumeration",
@@ -268,16 +288,24 @@ struct QueueFamilies {
 }
 
 /// Builds a full context, throwing a clear error if any stage fails.
-pub fn make_context(loader: sys::VulkanLoader, enable_validation: bool) -> RhiResult<VulkanContext> {
+pub fn make_context(
+    loader: sys::VulkanLoader,
+    enable_validation: bool,
+) -> RhiResult<VulkanContext> {
     let loader = std::sync::Arc::new(loader);
     let instance = create_instance(&loader, enable_validation, true)?;
     let Some(instance_commands) = sys::InstanceCommands::load(&loader, instance) else {
         // SAFETY: the instance has no children yet, so it can be destroyed as-is.
         unsafe {
-            (loader.load::<sys::PFN_vkDestroyInstance>(instance, c"vkDestroyInstance")
-                .expect("vkDestroyInstance is a required entry point"))(instance, core::ptr::null())
+            (loader
+                .load::<sys::PFN_vkDestroyInstance>(instance, c"vkDestroyInstance")
+                .expect("vkDestroyInstance is a required entry point"))(
+                instance, core::ptr::null()
+            )
         };
-        return Err(RhiError::unsupported_backend("Vulkan loader is missing instance entry points"));
+        return Err(RhiError::unsupported_backend(
+            "Vulkan loader is missing instance entry points",
+        ));
     };
 
     // Every failure path releases whatever was created so far.
@@ -303,9 +331,8 @@ fn build_context(
     owned_device: &mut sys::VkDevice,
 ) -> RhiResult<VulkanContext> {
     let mut memory_properties = sys::VkPhysicalDeviceMemoryProperties::default();
-    let physical_device = select_physical_device(instance_commands, instance)?.ok_or_else(|| {
-        RhiError::unsupported_backend("no Vulkan physical device (ICD) found")
-    })?;
+    let physical_device = select_physical_device(instance_commands, instance)?
+        .ok_or_else(|| RhiError::unsupported_backend("no Vulkan physical device (ICD) found"))?;
 
     let mut properties = sys::VkPhysicalDeviceProperties::default();
     // SAFETY: the physical device is live and the out-parameter is a live local.
@@ -313,9 +340,15 @@ fn build_context(
     // The memory-type table is what the block allocator searches.
     // SAFETY: as above.
     unsafe {
-        (instance_commands.get_physical_device_memory_properties)(physical_device, &mut memory_properties)
+        (instance_commands.get_physical_device_memory_properties)(
+            physical_device,
+            &mut memory_properties,
+        )
     };
-    rhi_require(properties.apiVersion >= sys::api_version(1, 1), "NativeRHI requires Vulkan 1.1")?;
+    rhi_require(
+        properties.apiVersion >= sys::api_version(1, 1),
+        "NativeRHI requires Vulkan 1.1",
+    )?;
     let device_name = properties.device_name();
 
     let extensions = device_extensions(instance_commands, physical_device);
@@ -342,9 +375,8 @@ fn build_context(
     // SAFETY: `vkGetDeviceProcAddr` is an instance-level entry point with the
     // documented signature, and the device is live.
     let get_device_proc_addr: sys::PFN_vkGetDeviceProcAddr =
-        unsafe { loader.load(instance, c"vkGetDeviceProcAddr") }.ok_or_else(|| {
-            RhiError::unsupported_backend("vkGetDeviceProcAddr unavailable")
-        })?;
+        unsafe { loader.load(instance, c"vkGetDeviceProcAddr") }
+            .ok_or_else(|| RhiError::unsupported_backend("vkGetDeviceProcAddr unavailable"))?;
     let resolve = |name: &CStr| -> sys::PFN_vkVoidFunction {
         // SAFETY: the device is live and `name` is NUL-terminated.
         unsafe { get_device_proc_addr(device, name.as_ptr()) }
@@ -417,9 +449,18 @@ fn build_context(
         physical_device,
         device,
         queues: VulkanQueues {
-            graphics: VulkanQueue { handle: graphics_queue, family: families.graphics },
-            compute: VulkanQueue { handle: compute_queue, family: families.compute },
-            transfer: VulkanQueue { handle: transfer_queue, family: families.transfer },
+            graphics: VulkanQueue {
+                handle: graphics_queue,
+                family: families.graphics,
+            },
+            compute: VulkanQueue {
+                handle: compute_queue,
+                family: families.compute,
+            },
+            transfer: VulkanQueue {
+                handle: transfer_queue,
+                family: families.transfer,
+            },
         },
         device_name,
         extensions,
@@ -449,8 +490,9 @@ fn select_physical_device(
 ) -> RhiResult<Option<sys::VkPhysicalDevice>> {
     let mut count: u32 = 0;
     // SAFETY: `count` is a live local used as the out-parameter.
-    let status =
-        unsafe { (commands.enumerate_physical_devices)(instance, &mut count, core::ptr::null_mut()) };
+    let status = unsafe {
+        (commands.enumerate_physical_devices)(instance, &mut count, core::ptr::null_mut())
+    };
     if status != sys::VK_SUCCESS || count == 0 {
         return Ok(None);
     }
@@ -471,7 +513,8 @@ fn select_physical_device(
             chosen = Some(*device);
             break;
         }
-        if properties.deviceType == sys::VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU && chosen.is_none() {
+        if properties.deviceType == sys::VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU && chosen.is_none()
+        {
             chosen = Some(*device);
         }
     }
@@ -508,7 +551,11 @@ fn device_extensions(
     if status != sys::VK_SUCCESS {
         return HashSet::new();
     }
-    properties.iter().take(count as usize).map(|value| value.name()).collect()
+    properties
+        .iter()
+        .take(count as usize)
+        .map(|value| value.name())
+        .collect()
 }
 
 /// Finds one family per queue class. When no dedicated compute or transfer
@@ -526,7 +573,11 @@ fn find_queue_families(
             core::ptr::null_mut(),
         )
     };
-    let mut families = QueueFamilies { graphics: u32::MAX, compute: u32::MAX, transfer: u32::MAX };
+    let mut families = QueueFamilies {
+        graphics: u32::MAX,
+        compute: u32::MAX,
+        transfer: u32::MAX,
+    };
     if count == 0 {
         return families;
     }
@@ -618,7 +669,8 @@ fn create_logical_device(
     }
     if core_1_2 && extensions.contains("VK_KHR_acceleration_structure") {
         structure.pNext = tail;
-        tail = (&mut structure as *mut sys::VkPhysicalDeviceAccelerationStructureFeaturesKHR).cast();
+        tail =
+            (&mut structure as *mut sys::VkPhysicalDeviceAccelerationStructureFeaturesKHR).cast();
     }
     if core_1_2 {
         address.pNext = tail;
@@ -629,8 +681,8 @@ fn create_logical_device(
         tail = (&mut local_size as *mut sys::VkPhysicalDeviceMaintenance4Features).cast();
     }
     timeline.pNext = tail;
-    draw_parameters.pNext = (&mut timeline as *mut sys::VkPhysicalDeviceTimelineSemaphoreFeatures)
-        .cast();
+    draw_parameters.pNext =
+        (&mut timeline as *mut sys::VkPhysicalDeviceTimelineSemaphoreFeatures).cast();
 
     let mut supported = sys::VkPhysicalDeviceFeatures2::default();
     supported.pNext =
@@ -644,7 +696,8 @@ fn create_logical_device(
         "Vulkan timeline semaphore feature is unavailable",
     )?;
     rhi_require(
-        draw_parameters.shaderDrawParameters != 0 && supported.features.drawIndirectFirstInstance != 0,
+        draw_parameters.shaderDrawParameters != 0
+            && supported.features.drawIndirectFirstInstance != 0,
         "NativeRHI requires shader draw parameters and indirect firstInstance",
     )?;
 
@@ -689,7 +742,8 @@ fn create_logical_device(
     structure.accelerationStructure = u32::from(features.acceleration_structures);
     structure.pNext = tail;
     if features.acceleration_structures {
-        tail = (&mut structure as *mut sys::VkPhysicalDeviceAccelerationStructureFeaturesKHR).cast();
+        tail =
+            (&mut structure as *mut sys::VkPhysicalDeviceAccelerationStructureFeaturesKHR).cast();
     }
     address.bufferDeviceAddress = u32::from(features.acceleration_structures);
     address.pNext = tail;
@@ -770,8 +824,18 @@ fn create_logical_device(
     let mut device: sys::VkDevice = core::ptr::null_mut();
     // SAFETY: every pointer in `create_info` refers to a live local that outlives
     // the call, and the out-parameter is a live local.
-    let status = unsafe { (commands.create_device)(physical_device, &create_info, core::ptr::null(), &mut device) };
-    rhi_require(status == sys::VK_SUCCESS && !device.is_null(), "vkCreateDevice failed")?;
+    let status = unsafe {
+        (commands.create_device)(
+            physical_device,
+            &create_info,
+            core::ptr::null(),
+            &mut device,
+        )
+    };
+    rhi_require(
+        status == sys::VK_SUCCESS && !device.is_null(),
+        "vkCreateDevice failed",
+    )?;
     let _ = families;
     Ok((device, features))
 }
@@ -790,11 +854,23 @@ mod tests {
 
     #[test]
     fn queue_family_list_deduplicates_and_skips_missing_families() {
-        let families = QueueFamilies { graphics: 0, compute: 0, transfer: 0 };
+        let families = QueueFamilies {
+            graphics: 0,
+            compute: 0,
+            transfer: 0,
+        };
         assert_eq!(unique_family_list(&families), vec![0]);
-        let families = QueueFamilies { graphics: 0, compute: 1, transfer: 2 };
+        let families = QueueFamilies {
+            graphics: 0,
+            compute: 1,
+            transfer: 2,
+        };
         assert_eq!(unique_family_list(&families), vec![0, 1, 2]);
-        let families = QueueFamilies { graphics: u32::MAX, compute: u32::MAX, transfer: u32::MAX };
+        let families = QueueFamilies {
+            graphics: u32::MAX,
+            compute: u32::MAX,
+            transfer: u32::MAX,
+        };
         assert!(unique_family_list(&families).is_empty());
     }
 

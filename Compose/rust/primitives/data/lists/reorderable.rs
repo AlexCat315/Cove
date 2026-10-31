@@ -22,29 +22,28 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cove_composition::Scancode;
-use cove_core::scene::{
-    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, Align, EventPhase,
-    EventResult, FlexDirection, HoverPhase, InputHandlerRoute, InteractionRegistryHolder,
-    Justify, LayoutNode, Node, PointerCaptureAttachmentKey, PointerCaptureHolder, PointerPhase,
-    Wrap,
+use super::reorder_model::{
+    ReorderDragSession, ReorderPreviewOffset, ReorderableListModel, drop_indicator_y,
+    reorder_row_height,
 };
-use cove_core::State;
-use cove_platform::{KeyEvent, MouseButton, SystemCursor};
 use crate::modifiers::interaction::{AccessibilityExt, HitTestingExt};
-use cove_composition::ViewExt;
 use crate::modifiers::layout::{AbsolutePositionModifier, FlexExt, LayoutFrameExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::interaction::edge_auto_scroll::EdgeAutoScroll;
 use crate::primitives::layout::virtualization::fixed_stack::visible_range;
 use crate::primitives::layout::{ScrollAxis, ScrollView, ScrollViewport, ScrollbarGutter};
-use crate::primitives::media::{ui_icon_catalog, Icon};
+use crate::primitives::media::{Icon, ui_icon_catalog};
 use crate::theme::theme_for_node;
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
-use super::reorder_model::{
-    drop_indicator_y, reorder_row_height, ReorderDragSession, ReorderPreviewOffset,
-    ReorderableListModel,
+use cove_composition::Scancode;
+use cove_composition::ViewExt;
+use cove_core::State;
+use cove_core::scene::{
+    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, Align, EventPhase,
+    EventResult, FlexDirection, HoverPhase, InputHandlerRoute, InteractionRegistryHolder, Justify,
+    LayoutNode, Node, PointerCaptureAttachmentKey, PointerCaptureHolder, PointerPhase, Wrap,
 };
+use cove_platform::{KeyEvent, MouseButton, SystemCursor};
 
 const HANDLE_ACTIVE: &str = "__reorder.active";
 const HANDLE_START_Y: &str = "__reorder.startY";
@@ -120,8 +119,12 @@ impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> ReorderSession<Id
 
     pub fn update_drag(&self, travel: f32, scrolled: f32) {
         self.session.move_by(travel);
-        let Some(dragging) = self.dragging.get() else { return };
-        let Some(source) = self.index_of(&dragging) else { return };
+        let Some(dragging) = self.dragging.get() else {
+            return;
+        };
+        let Some(source) = self.index_of(&dragging) else {
+            return;
+        };
         let boundary = ReorderableListModel::drop_boundary(
             source,
             travel,
@@ -138,8 +141,12 @@ impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> ReorderSession<Id
         self.dragging.set(None);
         self.boundary.set(None);
         self.session.end();
-        let (Some(dragging), Some(boundary)) = (dragging, boundary) else { return };
-        let Some(source) = self.index_of(&dragging) else { return };
+        let (Some(dragging), Some(boundary)) = (dragging, boundary) else {
+            return;
+        };
+        let Some(source) = self.index_of(&dragging) else {
+            return;
+        };
         if let Some(destination) = ReorderableListModel::destination(source, boundary) {
             (self.on_move)(source, destination);
         }
@@ -192,8 +199,6 @@ impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> ReorderSession<Id
     pub fn preview_top(&self) -> f32 {
         self.session.preview_top()
     }
-
-
 }
 
 /// Vertical, keyboard-accessible reorderable list.
@@ -281,7 +286,12 @@ where
 
     /// The resolved row height: authored height after text scaling, raised to
     /// the minimum control extent on a touch surface.
-    pub fn resolved_row_height(&self, scaled: f32, is_touch: bool, minimum_control_extent: f32) -> f32 {
+    pub fn resolved_row_height(
+        &self,
+        scaled: f32,
+        is_touch: bool,
+        minimum_control_extent: f32,
+    ) -> f32 {
         reorder_row_height(scaled, is_touch, minimum_control_extent)
     }
 
@@ -366,8 +376,12 @@ where
                 AnyView::new(TupleView::new(rows)),
             ))
             .frame(
-                Some(crate::modifiers::layout::FrameDimension::Points(width.max(1.0))),
-                Some(crate::modifiers::layout::FrameDimension::Points(content_height.max(1.0))),
+                Some(crate::modifiers::layout::FrameDimension::Points(
+                    width.max(1.0),
+                )),
+                Some(crate::modifiers::layout::FrameDimension::Points(
+                    content_height.max(1.0),
+                )),
                 None,
                 None,
                 None,
@@ -388,7 +402,12 @@ where
                             "reorder-drop-indicator",
                         )),
                 )
-                .with_modifier(AbsolutePositionModifier::new(Some(8.0), Some(y), Some(8.0), None)),
+                .with_modifier(AbsolutePositionModifier::new(
+                    Some(8.0),
+                    Some(y),
+                    Some(8.0),
+                    None,
+                )),
             ));
         }
 
@@ -420,7 +439,11 @@ where
             }
         });
 
-        let mut surface = vec![AnyView::new(AnyView::new(scroll).flex_with(1.0, 1.0, Some(0.0)))];
+        let mut surface = vec![AnyView::new(AnyView::new(scroll).flex_with(
+            1.0,
+            1.0,
+            Some(0.0),
+        ))];
         if let Some(dragging) = dragging
             && let Some(item) = self.data.iter().find(|item| (self.id_of)(item) == dragging)
         {
@@ -487,7 +510,9 @@ struct ReorderRowSlot<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> 
     content: AnyView,
 }
 
-impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> PrimitiveView for ReorderRowSlot<Id> {
+impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> PrimitiveView
+    for ReorderRowSlot<Id>
+{
     fn make_node(&self) -> Node {
         let node = Node::new();
         node.set_is_hit_testable(false);
@@ -522,7 +547,11 @@ impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> PrimitiveView for
                 Wrap::NoWrap,
                 4.0,
                 AnyView::new(TupleView::new(vec![
-                    AnyView::new(AnyView::new(self.content.clone()).flex_with(1.0, 1.0, Some(0.0)).clipped()),
+                    AnyView::new(
+                        AnyView::new(self.content.clone())
+                            .flex_with(1.0, 1.0, Some(0.0))
+                            .clipped(),
+                    ),
                     AnyView::new(self.handle.clone()),
                 ])),
             ))
@@ -627,16 +656,21 @@ impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> PrimitiveView for
         });
         paint();
 
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
 
         let hover_node = node.downgrade();
         let hover_paint = paint.clone();
-        registry.set_hover(node, Rc::new(move |phase: HoverPhase| {
-            if let Some(owner) = Node::upgrade(&hover_node) {
-                owner.set_attachment(HANDLE_HOVERED, phase == HoverPhase::Enter && is_enabled);
-                hover_paint();
-            }
-        }));
+        registry.set_hover(
+            node,
+            Rc::new(move |phase: HoverPhase| {
+                if let Some(owner) = Node::upgrade(&hover_node) {
+                    owner.set_attachment(HANDLE_HOVERED, phase == HoverPhase::Enter && is_enabled);
+                    hover_paint();
+                }
+            }),
+        );
 
         let auto_scroll = EdgeAutoScroll::new();
         node.add_resource(auto_scroll.clone());
@@ -648,50 +682,60 @@ impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> PrimitiveView for
         registry.set_pointer(
             node,
             InputHandlerRoute::control(),
-            Rc::new(move |event: &cove_platform::MouseButtonEvent, phase: PointerPhase, delivery: EventPhase| {
-                if delivery != EventPhase::Target || !is_enabled || event.button != MouseButton::Left {
-                    return EventResult::Ignored;
-                }
-                match phase {
-                    PointerPhase::Down => {
-                        pointer_node.set_attachment(HANDLE_ACTIVE, true);
-                        pointer_node.set_attachment(HANDLE_START_Y, event.y);
-                        pointer_node.set_attachment(HANDLE_LAST_Y, event.y);
-                        let report_node = pointer_node.downgrade();
-                        let report_session = pointer_session.clone();
-                        let report_scroll = pointer_scroll.clone();
-                        (pointer_scroll).begin(
-                            event.y,
-                            Rc::new(move || {
-                                if let Some(owner) = Node::upgrade(&report_node)
-                                    && let Some(start) = owner.attachment::<f32>(HANDLE_START_Y)
-                                    && let Some(last) = owner.attachment::<f32>(HANDLE_LAST_Y)
-                                {
-                                    report_session.update_drag(last - start, report_scroll.scrolled_distance());
-                                }
-                            }),
-                        );
-                        if let Some(capture) = PointerCaptureHolder::current() {
-                            capture.acquire(&pointer_node, false);
-                        }
-                        pointer_paint();
-                        pointer_session.begin_drag(index);
-                        EventResult::Handled
+            Rc::new(
+                move |event: &cove_platform::MouseButtonEvent,
+                      phase: PointerPhase,
+                      delivery: EventPhase| {
+                    if delivery != EventPhase::Target
+                        || !is_enabled
+                        || event.button != MouseButton::Left
+                    {
+                        return EventResult::Ignored;
                     }
-                    PointerPhase::Up => {
-                        if pointer_node.attachment::<bool>(HANDLE_ACTIVE) != Some(true) {
-                            return EventResult::Ignored;
+                    match phase {
+                        PointerPhase::Down => {
+                            pointer_node.set_attachment(HANDLE_ACTIVE, true);
+                            pointer_node.set_attachment(HANDLE_START_Y, event.y);
+                            pointer_node.set_attachment(HANDLE_LAST_Y, event.y);
+                            let report_node = pointer_node.downgrade();
+                            let report_session = pointer_session.clone();
+                            let report_scroll = pointer_scroll.clone();
+                            (pointer_scroll).begin(
+                                event.y,
+                                Rc::new(move || {
+                                    if let Some(owner) = Node::upgrade(&report_node)
+                                        && let Some(start) = owner.attachment::<f32>(HANDLE_START_Y)
+                                        && let Some(last) = owner.attachment::<f32>(HANDLE_LAST_Y)
+                                    {
+                                        report_session.update_drag(
+                                            last - start,
+                                            report_scroll.scrolled_distance(),
+                                        );
+                                    }
+                                }),
+                            );
+                            if let Some(capture) = PointerCaptureHolder::current() {
+                                capture.acquire(&pointer_node, false);
+                            }
+                            pointer_paint();
+                            pointer_session.begin_drag(index);
+                            EventResult::Handled
                         }
-                        pointer_node.set_attachment(HANDLE_ACTIVE, false);
-                        pointer_node.remove_attachment(HANDLE_START_Y);
-                        pointer_scroll.end();
-                        PointerCaptureHolder::release_current();
-                        pointer_paint();
-                        pointer_session.finish_drag();
-                        EventResult::Handled
+                        PointerPhase::Up => {
+                            if pointer_node.attachment::<bool>(HANDLE_ACTIVE) != Some(true) {
+                                return EventResult::Ignored;
+                            }
+                            pointer_node.set_attachment(HANDLE_ACTIVE, false);
+                            pointer_node.remove_attachment(HANDLE_START_Y);
+                            pointer_scroll.end();
+                            PointerCaptureHolder::release_current();
+                            pointer_paint();
+                            pointer_session.finish_drag();
+                            EventResult::Handled
+                        }
                     }
-                }
-            }),
+                },
+            ),
         );
 
         let motion_session = session.clone();
@@ -700,52 +744,59 @@ impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> PrimitiveView for
         registry.set_motion(
             node,
             InputHandlerRoute::control(),
-            Rc::new(move |event: &cove_platform::MouseMotionEvent, _phase: EventPhase| {
-                if motion_node.attachment::<bool>(HANDLE_ACTIVE) != Some(true) {
-                    return EventResult::Ignored;
-                }
-                motion_node.set_attachment(HANDLE_LAST_Y, event.y);
-                motion_scroll.update(event.y);
-                if let Some(start) = motion_node.attachment::<f32>(HANDLE_START_Y) {
-                    motion_session.update_drag(event.y - start, motion_scroll.scrolled_distance());
-                }
-                EventResult::Handled
-            }),
+            Rc::new(
+                move |event: &cove_platform::MouseMotionEvent, _phase: EventPhase| {
+                    if motion_node.attachment::<bool>(HANDLE_ACTIVE) != Some(true) {
+                        return EventResult::Ignored;
+                    }
+                    motion_node.set_attachment(HANDLE_LAST_Y, event.y);
+                    motion_scroll.update(event.y);
+                    if let Some(start) = motion_node.attachment::<f32>(HANDLE_START_Y) {
+                        motion_session
+                            .update_drag(event.y - start, motion_scroll.scrolled_distance());
+                    }
+                    EventResult::Handled
+                },
+            ),
         );
 
         let key_session = session.clone();
         let key_node = node.downgrade();
         let key_scroll = auto_scroll.clone();
-        registry.set_key(node, InputHandlerRoute::control(), Rc::new(move |event: &KeyEvent, phase: EventPhase| {
-            if phase == EventPhase::Capture || !is_enabled {
-                return EventResult::Ignored;
-            }
-            match event.scancode {
-                Scancode::ARROW_UP => {
-                    key_session.move_row(index, -1);
-                    EventResult::Handled
+        registry.set_key(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event: &KeyEvent, phase: EventPhase| {
+                if phase == EventPhase::Capture || !is_enabled {
+                    return EventResult::Ignored;
                 }
-                Scancode::ARROW_DOWN => {
-                    key_session.move_row(index, 1);
-                    EventResult::Handled
-                }
-                Scancode::ESCAPE => {
-                    let Some(owner) = Node::upgrade(&key_node) else {
-                        return EventResult::Ignored;
-                    };
-                    if owner.attachment::<bool>(HANDLE_ACTIVE) != Some(true) {
-                        return EventResult::Ignored;
+                match event.scancode {
+                    Scancode::ARROW_UP => {
+                        key_session.move_row(index, -1);
+                        EventResult::Handled
                     }
-                    owner.set_attachment(HANDLE_ACTIVE, false);
-                    owner.remove_attachment(HANDLE_START_Y);
-                    key_scroll.end();
-                    PointerCaptureHolder::release_current();
-                    key_session.cancel_drag();
-                    EventResult::Handled
+                    Scancode::ARROW_DOWN => {
+                        key_session.move_row(index, 1);
+                        EventResult::Handled
+                    }
+                    Scancode::ESCAPE => {
+                        let Some(owner) = Node::upgrade(&key_node) else {
+                            return EventResult::Ignored;
+                        };
+                        if owner.attachment::<bool>(HANDLE_ACTIVE) != Some(true) {
+                            return EventResult::Ignored;
+                        }
+                        owner.set_attachment(HANDLE_ACTIVE, false);
+                        owner.remove_attachment(HANDLE_START_Y);
+                        key_scroll.end();
+                        PointerCaptureHolder::release_current();
+                        key_session.cancel_drag();
+                        EventResult::Handled
+                    }
+                    _ => EventResult::Ignored,
                 }
-                _ => EventResult::Ignored,
-            }
-        }));
+            }),
+        );
 
         let clear_node = node.downgrade();
         node.set_attachment(
@@ -791,7 +842,9 @@ struct ReorderPreviewHost<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'stat
     content: AnyView,
 }
 
-impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> PrimitiveView for ReorderPreviewHost<Id> {
+impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> PrimitiveView
+    for ReorderPreviewHost<Id>
+{
     fn make_node(&self) -> Node {
         let node = Node::new();
         node.set_is_hit_testable(false);
@@ -822,7 +875,11 @@ impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> PrimitiveView for
                 Wrap::NoWrap,
                 4.0,
                 AnyView::new(TupleView::new(vec![
-                    AnyView::new(AnyView::new(self.content.clone()).flex_with(1.0, 1.0, Some(0.0)).clipped()),
+                    AnyView::new(
+                        AnyView::new(self.content.clone())
+                            .flex_with(1.0, 1.0, Some(0.0))
+                            .clipped(),
+                    ),
                     AnyView::new(
                         AnyView::new(Icon::with_semantic(
                             ui_icon_catalog::action::grip(),
@@ -834,7 +891,9 @@ impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> PrimitiveView for
                 ])),
             ))
             .frame(
-                Some(crate::modifiers::layout::FrameDimension::Points(self.width.max(1.0))),
+                Some(crate::modifiers::layout::FrameDimension::Points(
+                    self.width.max(1.0),
+                )),
                 Some(crate::modifiers::layout::FrameDimension::Points(height)),
                 None,
                 None,
@@ -845,7 +904,9 @@ impl<Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static> PrimitiveView for
             .corner_radius(6.0)
             .border_color(cove_core::Color::from_rgba8(0, 0, 0, 26), 1.0)
             .shadow(cove_core::Color::from_rgba8(0, 0, 0, 71), 0.0, 4.0, 12.0)
-            .modifier(cove_composition::LayoutDebugModifier::debug_name("reorder-preview")),
+            .modifier(cove_composition::LayoutDebugModifier::debug_name(
+                "reorder-preview",
+            )),
         )]
     }
 }

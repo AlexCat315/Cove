@@ -1,7 +1,7 @@
 //! DevTools server: configuration, host adapters and protocol dispatch.
 use cove_devtools_protocol::{
-    Envelope, HelloHostInfo, HelloPayload, InputRecording, MirrorActivate, MirrorInput, MirrorStart, StateObservation,
-    TimelineSnapshot, TreeSnapshot, WindowResize,
+    Envelope, HelloHostInfo, HelloPayload, InputRecording, MirrorActivate, MirrorInput,
+    MirrorStart, StateObservation, TimelineSnapshot, TreeSnapshot, WindowResize,
 };
 use cove_logging::{Level, LogQuery, LogRecord, LogSystem};
 
@@ -17,13 +17,30 @@ pub struct DevToolsConfig {
 
 impl Default for DevToolsConfig {
     fn default() -> Self {
-        Self { host: "127.0.0.1".into(), port: 9229, app_title: "CoveUI".into(), enabled: true, launch: None }
+        Self {
+            host: "127.0.0.1".into(),
+            port: 9229,
+            app_title: "CoveUI".into(),
+            enabled: true,
+            launch: None,
+        }
     }
 }
 
 impl DevToolsConfig {
-    pub fn new(host: impl Into<String>, port: u16, app_title: impl Into<String>, enabled: bool) -> Self {
-        Self { host: host.into(), port, app_title: app_title.into(), enabled, launch: None }
+    pub fn new(
+        host: impl Into<String>,
+        port: u16,
+        app_title: impl Into<String>,
+        enabled: bool,
+    ) -> Self {
+        Self {
+            host: host.into(),
+            port,
+            app_title: app_title.into(),
+            enabled,
+            launch: None,
+        }
     }
 
     /// Enable the server when `COVE_DEVTOOLS=1`. Debug builds only, matching the
@@ -164,12 +181,23 @@ impl DevToolsLogFeed {
     /// Subscribe to the process logger. The callback only enqueues, so the
     /// logger's own thread is never blocked by a client.
     pub fn start(&self, sink: std::sync::Arc<dyn Fn(LogRecord) + Send + Sync>) {
-        let observation = LogSystem::observe(LogQuery::default(), false, std::sync::Arc::new(move |record| sink(record.clone())));
-        *self.observation.lock().unwrap_or_else(|error| error.into_inner()) = Some(observation);
+        let observation = LogSystem::observe(
+            LogQuery::default(),
+            false,
+            std::sync::Arc::new(move |record| sink(record.clone())),
+        );
+        *self
+            .observation
+            .lock()
+            .unwrap_or_else(|error| error.into_inner()) = Some(observation);
     }
 
     pub fn stop(&self) {
-        let observation = self.observation.lock().unwrap_or_else(|error| error.into_inner()).take();
+        let observation = self
+            .observation
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .take();
         if let Some(observation) = observation {
             observation.cancel();
         }
@@ -196,7 +224,12 @@ impl DevToolsLogFeed {
     }
 
     pub fn has_pending(&self) -> bool {
-        !self.inner.lock().unwrap_or_else(|error| error.into_inner()).pending.is_empty()
+        !self
+            .inner
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .pending
+            .is_empty()
     }
 
     /// Bounded newest-first snapshot, dropped when it would exceed the byte cap.
@@ -205,7 +238,9 @@ impl DevToolsLogFeed {
         let mut records = Vec::new();
         let mut bytes = 0usize;
         for record in snapshot.records.iter().rev().take(LOG_SNAPSHOT_RECORDS) {
-            let Ok(size) = serde_json::to_vec(record) else { continue };
+            let Ok(size) = serde_json::to_vec(record) else {
+                continue;
+            };
             if bytes + size.len() > LOG_SNAPSHOT_BYTES {
                 break;
             }

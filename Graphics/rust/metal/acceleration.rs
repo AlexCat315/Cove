@@ -9,10 +9,9 @@ use objc2_foundation::NSArray;
 use objc2_metal::{
     MTLAccelerationStructure, MTLAccelerationStructureDescriptor,
     MTLAccelerationStructureGeometryDescriptor, MTLAccelerationStructureInstanceDescriptor,
-    MTLAccelerationStructureInstanceOptions,
-    MTLAccelerationStructureTriangleGeometryDescriptor, MTLBuffer, MTLDevice,
-    MTLInstanceAccelerationStructureDescriptor, MTLPackedFloat3, MTLPackedFloat4x3,
-    MTLPrimitiveAccelerationStructureDescriptor, MTLResource,
+    MTLAccelerationStructureInstanceOptions, MTLAccelerationStructureTriangleGeometryDescriptor,
+    MTLBuffer, MTLDevice, MTLInstanceAccelerationStructureDescriptor, MTLPackedFloat3,
+    MTLPackedFloat4x3, MTLPrimitiveAccelerationStructureDescriptor, MTLResource,
 };
 
 use crate::rhi::{
@@ -96,10 +95,26 @@ pub fn packed_instance(
     MTLAccelerationStructureInstanceDescriptor {
         transformationMatrix: MTLPackedFloat4x3 {
             columns: [
-                MTLPackedFloat3 { x: transform.x[0], y: transform.y[0], z: transform.z[0] },
-                MTLPackedFloat3 { x: transform.x[1], y: transform.y[1], z: transform.z[1] },
-                MTLPackedFloat3 { x: transform.x[2], y: transform.y[2], z: transform.z[2] },
-                MTLPackedFloat3 { x: transform.x[3], y: transform.y[3], z: transform.z[3] },
+                MTLPackedFloat3 {
+                    x: transform.x[0],
+                    y: transform.y[0],
+                    z: transform.z[0],
+                },
+                MTLPackedFloat3 {
+                    x: transform.x[1],
+                    y: transform.y[1],
+                    z: transform.z[1],
+                },
+                MTLPackedFloat3 {
+                    x: transform.x[2],
+                    y: transform.y[2],
+                    z: transform.z[2],
+                },
+                MTLPackedFloat3 {
+                    x: transform.x[3],
+                    y: transform.y[3],
+                    z: transform.z[3],
+                },
             ],
         },
         options: MTLAccelerationStructureInstanceOptions::Opaque,
@@ -115,8 +130,11 @@ pub fn packed_bytes(instances: &[MTLAccelerationStructureInstanceDescriptor]) ->
     // holds only integers and packed floats, so every byte of the slice is
     // initialised and readable as `size_of_val` bytes.
     unsafe {
-        std::slice::from_raw_parts(instances.as_ptr().cast::<u8>(), std::mem::size_of_val(instances))
-            .to_vec()
+        std::slice::from_raw_parts(
+            instances.as_ptr().cast::<u8>(),
+            std::mem::size_of_val(instances),
+        )
+        .to_vec()
     }
 }
 
@@ -132,9 +150,11 @@ fn bottom_level(
         let buffer = registries
             .buffers
             .get(&geometry.vertices.id())
-            .ok_or_else(|| RhiError::invalid_argument("BLAS references an unknown vertex buffer"))?;
+            .ok_or_else(|| {
+                RhiError::invalid_argument("BLAS references an unknown vertex buffer")
+            })?;
         validate_triangle_geometry(geometry, buffer.length())?;
-        let triangle =  { MTLAccelerationStructureTriangleGeometryDescriptor::new() };
+        let triangle = { MTLAccelerationStructureTriangleGeometryDescriptor::new() };
         triangle.setVertexBuffer(Some(buffer));
         // SAFETY: `validate_triangle_geometry` proved `vertex_offset` is a
         // non-negative multiple of four, and the descriptor accepts any such
@@ -146,7 +166,7 @@ fn bottom_level(
         dependencies.push(as_resource(buffer.clone()));
         descriptors.push(Retained::into_super(triangle));
     }
-    let primitive =  { MTLPrimitiveAccelerationStructureDescriptor::new() };
+    let primitive = { MTLPrimitiveAccelerationStructureDescriptor::new() };
     primitive.setGeometryDescriptors(Some(&NSArray::from_retained_slice(&descriptors)));
     Ok(Retained::into_super(primitive))
 }
@@ -198,7 +218,7 @@ fn top_level(
     .ok_or(RhiError::OutOfMemory)?;
     dependencies.push(as_resource(buffer.clone()));
 
-    let instance =  { MTLInstanceAccelerationStructureDescriptor::new() };
+    let instance = { MTLInstanceAccelerationStructureDescriptor::new() };
     instance.setInstanceDescriptorBuffer(Some(&buffer));
     instance.setInstanceCount(instances.len());
     instance.setInstancedAccelerationStructures(Some(&NSArray::from_retained_slice(&structures)));
@@ -213,20 +233,25 @@ impl MetalAccelerationStructure {
         registries: &MetalRegistries,
         descriptor: &AccelerationStructureDescriptor,
     ) -> RhiResult<Self> {
-        rhi_require(device.supportsRaytracing(), "adapter has no ray tracing support")?;
+        rhi_require(
+            device.supportsRaytracing(),
+            "adapter has no ray tracing support",
+        )?;
         let mut dependencies = Vec::new();
         let (native, top_level) = match descriptor {
-            AccelerationStructureDescriptor::BottomLevel(geometries) => {
-                (bottom_level(registries, geometries, &mut dependencies)?, false)
-            }
-            AccelerationStructureDescriptor::TopLevel(instances) => {
-                (top_level(device, registries, instances, &mut dependencies)?, true)
-            }
+            AccelerationStructureDescriptor::BottomLevel(geometries) => (
+                bottom_level(registries, geometries, &mut dependencies)?,
+                false,
+            ),
+            AccelerationStructureDescriptor::TopLevel(instances) => (
+                top_level(device, registries, instances, &mut dependencies)?,
+                true,
+            ),
         };
-        let sizes =  { device.accelerationStructureSizesWithDescriptor(&native) };
-        let structure =
-            device.newAccelerationStructureWithSize(sizes.accelerationStructureSize)
-                .ok_or(RhiError::OutOfMemory)?;
+        let sizes = { device.accelerationStructureSizesWithDescriptor(&native) };
+        let structure = device
+            .newAccelerationStructureWithSize(sizes.accelerationStructureSize)
+            .ok_or(RhiError::OutOfMemory)?;
         Ok(Self {
             structure,
             descriptor: native,
@@ -247,7 +272,11 @@ mod tests {
         assert_eq!(record.accelerationStructureIndex, 3);
         assert_eq!(record.mask, 0xff);
         assert_eq!(record.intersectionFunctionTableOffset, 0);
-        assert!(record.options.contains(MTLAccelerationStructureInstanceOptions::Opaque));
+        assert!(
+            record
+                .options
+                .contains(MTLAccelerationStructureInstanceOptions::Opaque)
+        );
         // Row 0 of an identity transform is a basis vector, so column 0 keeps a
         // single one in its first component.
         assert_eq!(record.transformationMatrix.columns[0].x, 1.0);
@@ -260,7 +289,10 @@ mod tests {
     fn packed_records_serialize_to_their_repr_c_size() {
         let records = [packed_instance(&InstanceTransform::default(), 1, 0)];
         let bytes = packed_bytes(&records);
-        assert_eq!(bytes.len(), std::mem::size_of::<MTLAccelerationStructureInstanceDescriptor>());
+        assert_eq!(
+            bytes.len(),
+            std::mem::size_of::<MTLAccelerationStructureInstanceDescriptor>()
+        );
         assert!(!bytes.is_empty());
     }
 
@@ -281,5 +313,4 @@ mod tests {
         geometry.vertex_offset = i64::MAX;
         assert!(validate_triangle_geometry(&geometry, 4096).is_err());
     }
-
 }

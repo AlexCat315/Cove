@@ -6,10 +6,10 @@
 
 use cove_examples::gallery_content::catalog::GalleryOptions;
 use cove_examples::gallery_content::stories::navigation_stories_file::{
-    AccordionStory, AlertDialogStory, BottomSheetStory, BreadcrumbStory, ButtonGroupStory,
-    DialogStory, LabelStory, ModalEdge, NavigationStackStory, PaginationStory, SheetStory, TagStory,
-    BOTTOM_SHEET_DETENTS, DEFAULT_PAGE, DEFAULT_SECTION, DRAG_DISMISS_THRESHOLD, INITIAL_TAGS,
-    TOTAL_PAGES,
+    AccordionStory, AlertDialogStory, BOTTOM_SHEET_DETENTS, BottomSheetStory, BreadcrumbStory,
+    ButtonGroupStory, DEFAULT_PAGE, DEFAULT_SECTION, DRAG_DISMISS_THRESHOLD, DialogStory,
+    INITIAL_TAGS, LabelStory, ModalEdge, NavigationStackStory, PaginationStory, SheetStory,
+    TOTAL_PAGES, TagStory,
 };
 use cove_ui_compose::primitives::layout::navigation_components::PaginationItem;
 
@@ -29,7 +29,11 @@ fn the_accordion_starts_with_only_the_project_section_open() {
 fn single_mode_replaces_the_open_section() {
     let story = accordion();
     story.toggle("diagnostics");
-    assert_eq!(story.expanded().len(), 1, "single mode closes the previous section");
+    assert_eq!(
+        story.expanded().len(),
+        1,
+        "single mode closes the previous section"
+    );
     assert!(story.expanded().contains("diagnostics"));
     assert!(!story.expanded().contains(DEFAULT_SECTION));
 }
@@ -82,7 +86,10 @@ fn collapse_all_reopens_project_when_nothing_is_open() {
     story.toggle_all();
     assert!(story.expanded().is_empty(), "first press collapses");
     story.toggle_all();
-    assert!(story.expanded().contains(DEFAULT_SECTION), "second press reopens");
+    assert!(
+        story.expanded().contains(DEFAULT_SECTION),
+        "second press reopens"
+    );
 }
 
 #[test]
@@ -94,7 +101,10 @@ fn the_pagination_window_shows_a_gap_when_pages_were_skipped() {
     assert_eq!(items.first(), Some(&PaginationItem::Page(1)));
     assert_eq!(items.last(), Some(&PaginationItem::Page(TOTAL_PAGES)));
     assert!(items.contains(&PaginationItem::Page(DEFAULT_PAGE)));
-    assert!(items.contains(&PaginationItem::LeadingGap), "pages 2..6 are skipped");
+    assert!(
+        items.contains(&PaginationItem::LeadingGap),
+        "pages 2..6 are skipped"
+    );
     assert!(items.contains(&PaginationItem::TrailingGap));
 }
 
@@ -243,7 +253,11 @@ fn the_navigation_stack_pushes_and_pops_while_keeping_the_draft() {
     assert_eq!(story.caption(), "Path: details → settings");
     assert!(story.pop());
     assert_eq!(story.caption(), "Path: details");
-    assert_eq!(story.draft(), "edited", "the root owns the draft and keeps it");
+    assert_eq!(
+        story.draft(),
+        "edited",
+        "the root owns the draft and keeps it"
+    );
     assert!(story.pop());
     assert!(!story.pop(), "popping an empty stack is a no-op");
     assert_eq!(story.caption(), "Path: root");

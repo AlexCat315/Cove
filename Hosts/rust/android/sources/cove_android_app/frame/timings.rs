@@ -53,7 +53,11 @@ impl FrameTimings {
                     self.before.elapsed().as_nanos() as u64;
             }
         }
-        let record = Record { phases: &mut self.phases, phase, before };
+        let record = Record {
+            phases: &mut self.phases,
+            phase,
+            before,
+        };
         let value = operation();
         drop(record);
         value

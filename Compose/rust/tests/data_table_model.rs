@@ -23,9 +23,7 @@ use cove_platform::KeyModifiers;
 use cove_ui_compose::primitives::data::data_table::{
     DataTableColumnGeometry, DataTableModel, DataTableSelection, DataTableSelectionMode,
 };
-use cove_ui_compose::primitives::data::lists::table::{
-    ComparisonResult, TableSort,
-};
+use cove_ui_compose::primitives::data::lists::table::{ComparisonResult, TableSort};
 
 #[derive(Clone, Debug, PartialEq)]
 struct TableTestRow {
@@ -51,7 +49,10 @@ fn comparator() -> Option<Rc<dyn Fn(&TableTestRow, &TableTestRow) -> ComparisonR
 fn large_projection_is_stable_and_lookup_is_constant_time() {
     let model = DataTableModel::new(
         (0..200_000)
-            .map(|index| TableTestRow { id: index, value: (index % 10) as i32 })
+            .map(|index| TableTestRow {
+                id: index,
+                value: (index % 10) as i32,
+            })
             .collect::<Vec<_>>(),
         |row: &TableTestRow| row.id,
     );
@@ -102,7 +103,10 @@ fn large_projection_is_stable_and_lookup_is_constant_time() {
 
     // Returning to the ascending sort is a cache hit, not a rebuild.
     model.set_sort(Some(TableSort::new("value")), comparator());
-    assert!(!model.sorting().is_pending, "a cached sort has nothing pending");
+    assert!(
+        !model.sorting().is_pending,
+        "a cached sort has nothing pending"
+    );
     assert_eq!(
         model.sorting().cache_hits,
         1,
@@ -115,7 +119,11 @@ fn large_projection_is_stable_and_lookup_is_constant_time() {
     );
 
     model.set_sort(None, comparator());
-    assert_eq!(model.row_id_at(1), Some(1), "clearing the sort restores source order");
+    assert_eq!(
+        model.row_id_at(1),
+        Some(1),
+        "clearing the sort restores source order"
+    );
     assert_eq!(
         model.index_for(&199_999),
         Some(199_999),
@@ -127,7 +135,10 @@ fn large_projection_is_stable_and_lookup_is_constant_time() {
 fn edits_and_replacement_preserve_the_latest_data() {
     let model = DataTableModel::new(
         (0..10_000)
-            .map(|index| TableTestRow { id: index, value: 10_000 - index as i32 })
+            .map(|index| TableTestRow {
+                id: index,
+                value: 10_000 - index as i32,
+            })
             .collect::<Vec<_>>(),
         |row: &TableTestRow| row.id,
     );
@@ -176,7 +187,10 @@ fn edits_and_replacement_preserve_the_latest_data() {
 fn range_selection_follows_display_order() {
     let model = DataTableModel::new(
         (0..12)
-            .map(|index| TableTestRow { id: index, value: 12 - index as i32 })
+            .map(|index| TableTestRow {
+                id: index,
+                value: 12 - index as i32,
+            })
             .collect::<Vec<_>>(),
         |row: &TableTestRow| row.id,
     );
@@ -198,8 +212,16 @@ fn range_selection_follows_display_order() {
         vec![7, 8, 9, 10],
         "shift extends from the anchor through display order"
     );
-    assert_eq!(selection.anchor_id, Some(10), "the anchor stays the first click");
-    assert_eq!(selection.focused_id, Some(7), "focus moves to the last click");
+    assert_eq!(
+        selection.anchor_id,
+        Some(10),
+        "the anchor stays the first click"
+    );
+    assert_eq!(
+        selection.focused_id,
+        Some(7),
+        "focus moves to the last click"
+    );
 
     // A gui toggle removes the clicked row from the range. Display index 3 is
     // row id 8, so the toggle drops that member.
@@ -231,7 +253,10 @@ fn range_selection_follows_display_order() {
 fn deletion_cleanup_drops_ids_that_left_the_model() {
     let model = DataTableModel::new(
         (0..12)
-            .map(|index| TableTestRow { id: index, value: 12 - index as i32 })
+            .map(|index| TableTestRow {
+                id: index,
+                value: 12 - index as i32,
+            })
             .collect::<Vec<_>>(),
         |row: &TableTestRow| row.id,
     );
@@ -261,7 +286,11 @@ fn deletion_cleanup_drops_ids_that_left_the_model() {
 #[test]
 fn hundreds_of_columns_window_by_width_with_independent_frozen_columns() {
     let geometry = DataTableColumnGeometry::new(vec![100.0; 500], 2);
-    assert_eq!(geometry.frozen_width(), 200.0, "two frozen columns span 200pt");
+    assert_eq!(
+        geometry.frozen_width(),
+        200.0,
+        "two frozen columns span 200pt"
+    );
     assert_eq!(
         geometry.moving_width(),
         49_800.0,
@@ -287,7 +316,10 @@ fn hundreds_of_columns_window_by_width_with_independent_frozen_columns() {
 fn descending_sorts_do_not_reverse_ties() {
     let model = DataTableModel::new(
         (0..6)
-            .map(|index| TableTestRow { id: index, value: (index % 3) as i32 })
+            .map(|index| TableTestRow {
+                id: index,
+                value: (index % 3) as i32,
+            })
             .collect::<Vec<_>>(),
         |row: &TableTestRow| row.id,
     );
@@ -329,7 +361,11 @@ fn a_replaced_row_set_rebuilds_the_active_projection() {
         [Some(5), Some(4)],
         "the replacement is re-sorted under the active sort"
     );
-    assert_eq!(model.index_for(&4), Some(1), "lookup follows the projection");
+    assert_eq!(
+        model.index_for(&4),
+        Some(1),
+        "lookup follows the projection"
+    );
 }
 
 #[test]

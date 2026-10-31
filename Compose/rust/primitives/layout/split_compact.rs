@@ -3,17 +3,15 @@
 //! Opt-in single-pane presentation for a split that has room for only one pane.
 use std::rc::Rc;
 
-use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Wrap};
-use cove_core::Binding;
 use cove_composition::{AnyView, View};
+use cove_core::Binding;
+use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Wrap};
 
+use crate::BoxView;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::primitives::controls::button::Button;
-use crate::BoxView;
-use crate::primitives::overlays::roving_focus::{
-    roving_identity, RovingFocusHost, RovingItem,
-};
+use crate::primitives::overlays::roving_focus::{RovingFocusHost, RovingItem, roving_identity};
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, TabButtonStyle};
 
@@ -42,10 +40,7 @@ pub struct SplitCompactPresentation {
 }
 
 impl SplitCompactPresentation {
-    pub fn new(
-        first_title: impl Into<String>,
-        second_title: impl Into<String>,
-    ) -> Self {
+    pub fn new(first_title: impl Into<String>, second_title: impl Into<String>) -> Self {
         Self {
             first_title: first_title.into(),
             second_title: second_title.into(),
@@ -81,7 +76,10 @@ pub struct SplitPaneSelector {
 
 impl SplitPaneSelector {
     pub fn new(presentation: SplitCompactPresentation, selection: Binding<SplitPane>) -> Self {
-        Self { presentation, selection }
+        Self {
+            presentation,
+            selection,
+        }
     }
 }
 
@@ -92,8 +90,7 @@ impl View for SplitPaneSelector {
 
         let host_selection = selection.clone();
         let host_on_select = selection.clone();
-        let identity: Rc<dyn Fn(&SplitPane) -> u64> =
-            Rc::new(|pane| roving_identity(pane));
+        let identity: Rc<dyn Fn(&SplitPane) -> u64> = Rc::new(|pane| roving_identity(pane));
         let host = RovingFocusHost::new(
             SplitPane::all().to_vec(),
             move || Some(host_selection.get()),
@@ -113,7 +110,12 @@ impl View for SplitPaneSelector {
                     Wrap::NoWrap,
                     0.0,
                     AnyView::new(crate::TupleView::new(vec![
-                        pane_item(SplitPane::First, first_title, row_selection.clone(), identity.clone()),
+                        pane_item(
+                            SplitPane::First,
+                            first_title,
+                            row_selection.clone(),
+                            identity.clone(),
+                        ),
                         pane_item(SplitPane::Second, second_title, row_selection, identity),
                     ])),
                 );

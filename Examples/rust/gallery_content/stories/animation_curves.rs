@@ -4,10 +4,10 @@
 //! The story authors real curves through the shared `Animation` type, so it
 //! exercises the same evaluation the runtime uses.
 
+use cove_core::State;
 use cove_core::scene::animation::{
     Animation, AnimationCurve, AnimationStepPosition, LinearTimingCurve, TimingPoint,
 };
-use cove_core::State;
 
 /// The four curves the story offers.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -47,11 +47,26 @@ impl CurveChoice {
             Self::Steps => AnimationCurve::Steps(5, AnimationStepPosition::End),
             // Plateau at 0.6 then overshoot to 1.2 before settling at 1.
             Self::Linear => AnimationCurve::PiecewiseLinear(LinearTimingCurve::new(vec![
-                TimingPoint { time: 0.0, progress: 0.0 },
-                TimingPoint { time: 0.25, progress: 0.6 },
-                TimingPoint { time: 0.5, progress: 0.6 },
-                TimingPoint { time: 0.75, progress: 1.2 },
-                TimingPoint { time: 1.0, progress: 1.0 },
+                TimingPoint {
+                    time: 0.0,
+                    progress: 0.0,
+                },
+                TimingPoint {
+                    time: 0.25,
+                    progress: 0.6,
+                },
+                TimingPoint {
+                    time: 0.5,
+                    progress: 0.6,
+                },
+                TimingPoint {
+                    time: 0.75,
+                    progress: 1.2,
+                },
+                TimingPoint {
+                    time: 1.0,
+                    progress: 1.0,
+                },
             ])),
             Self::Bounce => AnimationCurve::BounceOut,
             Self::Elastic => AnimationCurve::ElasticOut,

@@ -19,8 +19,8 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use cove_composition::{AnyView, PrimitiveView, View, ViewKind};
-use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 use cove_core::State;
+use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 use cove_ui_compose::BoxView;
 
 use support::GlobalTestLock;
@@ -82,7 +82,10 @@ fn equal_inputs_keep_the_original_state_and_callbacks() {
                     Justify::FlexStart,
                     Wrap::NoWrap,
                     0.0,
-                    AnyView::new(CountingLeaf { builds, state: leaf_state.clone() }),
+                    AnyView::new(CountingLeaf {
+                        builds,
+                        state: leaf_state.clone(),
+                    }),
                 )),
                 Default::default(),
             );
@@ -102,17 +105,17 @@ fn equal_inputs_keep_the_original_state_and_callbacks() {
         );
 
         // The leaf's own state stays readable after those commits.
-        assert_eq!(leaf_state.get(), 0, "the leaf's state survives recomposition");
+        assert_eq!(
+            leaf_state.get(),
+            0,
+            "the leaf's state survives recomposition"
+        );
 
         // Changing the leaf's state is observed; the graph records skipped
         // parent updates rather than re-running untouched bodies.
         leaf_state.set(1);
         graph.recomposer.commit_all();
-        assert_eq!(
-            leaf_state.get(),
-            1,
-            "a state write is visible after commit"
-        );
+        assert_eq!(leaf_state.get(), 1, "a state write is visible after commit");
         assert!(
             graph.skipped_parent_updates() > 0 || builds.get() == first_builds,
             "an unrelated change skips untouched parents (skipped={}, builds={})",

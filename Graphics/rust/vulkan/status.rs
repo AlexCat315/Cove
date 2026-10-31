@@ -19,7 +19,10 @@ impl VulkanSubmissionStatus {
     /// Records the first GPU failure. Later failures never overwrite it, so the
     /// API thread reports the original cause.
     pub fn record(&self, description: impl Into<String>) {
-        let mut failure = self.failure.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut failure = self
+            .failure
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         if failure.is_none() {
             *failure = Some(RhiError::submit_failed(description));
         }
@@ -27,7 +30,10 @@ impl VulkanSubmissionStatus {
 
     /// Returns the recorded failure once, on the API thread.
     pub fn check(&self) -> RhiResult<()> {
-        let failure = self.failure.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let failure = self
+            .failure
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         match failure.as_ref() {
             Some(error) => Err(error.clone()),
             None => Ok(()),

@@ -66,7 +66,13 @@ impl SwapchainImage {
         width: usize,
         height: usize,
     ) -> Self {
-        Self { swapchain, generation, texture, width, height }
+        Self {
+            swapchain,
+            generation,
+            texture,
+            width,
+            height,
+        }
     }
 }
 
@@ -90,7 +96,12 @@ pub struct PlannedSubmit {
 }
 impl PlannedSubmit {
     pub fn new(queue: QueueClass, commands: Vec<PlannedCommand>) -> Self {
-        Self { queue, commands, wait_semaphores: Vec::new(), signal_semaphores: Vec::new() }
+        Self {
+            queue,
+            commands,
+            wait_semaphores: Vec::new(),
+            signal_semaphores: Vec::new(),
+        }
     }
 }
 
@@ -173,7 +184,9 @@ impl FrameRing {
         // A poisoned lock means another thread panicked while holding it. The
         // frame ring holds no invariants that a panic could corrupt beyond the
         // slot counters, so recovering keeps the render thread alive.
-        self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+        self.state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     pub fn slot_count(&self) -> usize {
@@ -192,7 +205,10 @@ impl FrameRing {
     /// identifiers that became runnable while opening it.
     pub fn begin(&self) -> (usize, Vec<u64>) {
         let mut state = self.lock();
-        assert!(state.current.is_none(), "end the current frame before beginning another");
+        assert!(
+            state.current.is_none(),
+            "end the current frame before beginning another"
+        );
         let slot_count = state.slots.len();
         let index = (state.epoch % slot_count as u64) as usize;
         while state.slots[index].in_flight {
@@ -217,7 +233,9 @@ impl FrameRing {
     /// Seals the current frame and returns retirements that became runnable.
     pub fn end(&self) -> Vec<u64> {
         let mut state = self.lock();
-        let Some(index) = state.current else { return Vec::new() };
+        let Some(index) = state.current else {
+            return Vec::new();
+        };
         state.slots[index].sealed = true;
         state.current = None;
         finish_if_ready(&mut state, index);
@@ -248,7 +266,10 @@ impl FrameRing {
     pub fn register_command_buffer(&self, slot_index: usize) {
         let mut state = self.lock();
         let slot = &state.slots[slot_index];
-        assert!(slot.in_flight && !slot.sealed, "register a command buffer inside an open frame");
+        assert!(
+            slot.in_flight && !slot.sealed,
+            "register a command buffer inside an open frame"
+        );
         state.slots[slot_index].pending_command_buffers += 1;
     }
 
@@ -283,7 +304,10 @@ impl FrameRing {
     /// runnable.
     pub fn wait_until_idle(&self) -> Vec<u64> {
         let mut state = self.lock();
-        assert!(state.current.is_none(), "end the active frame before waiting for idle");
+        assert!(
+            state.current.is_none(),
+            "end the active frame before waiting for idle"
+        );
         while state.slots.iter().any(|slot| slot.in_flight) {
             state = self
                 .condition
@@ -405,7 +429,11 @@ impl<C: UploadRingChunk + Clone> ChunkUploadAllocator<C> {
         for entry in &mut self.entries {
             entry.used = 0;
         }
-        self.current_index = if self.entries.is_empty() { None } else { Some(0) };
+        self.current_index = if self.entries.is_empty() {
+            None
+        } else {
+            Some(0)
+        };
     }
 
     pub fn total_chunk_capacity(&self) -> usize {
@@ -440,9 +468,15 @@ impl<C: UploadRingChunk + Clone> ChunkUploadAllocator<C> {
         let capacity = self.default_chunk_size.max(align(size, alignment));
         let chunk = (self.factory)(capacity)?;
         if chunk.capacity() < capacity {
-            return Err(RhiError::invalid_argument("upload chunk smaller than requested"));
+            return Err(RhiError::invalid_argument(
+                "upload chunk smaller than requested",
+            ));
         }
-        self.entries.push(ChunkEntry { chunk, used: 0, capacity });
+        self.entries.push(ChunkEntry {
+            chunk,
+            used: 0,
+            capacity,
+        });
         let index = self.entries.len() - 1;
         self.current_index = Some(index);
         self.attempt(index, size, alignment)
@@ -464,7 +498,12 @@ impl<C: UploadRingChunk + Clone> ChunkUploadAllocator<C> {
         Ok(allocation)
     }
 
-    fn attempt(&mut self, index: usize, size: usize, alignment: usize) -> Option<UploadAllocation<C>> {
+    fn attempt(
+        &mut self,
+        index: usize,
+        size: usize,
+        alignment: usize,
+    ) -> Option<UploadAllocation<C>> {
         let entry = &mut self.entries[index];
         let aligned_offset = align(entry.used, alignment);
         let end = aligned_offset.checked_add(size)?;
@@ -472,7 +511,10 @@ impl<C: UploadRingChunk + Clone> ChunkUploadAllocator<C> {
             return None;
         }
         entry.used = end;
-        Some(UploadAllocation { chunk: entry.chunk.clone(), offset: aligned_offset })
+        Some(UploadAllocation {
+            chunk: entry.chunk.clone(),
+            offset: aligned_offset,
+        })
     }
 }
 
@@ -545,7 +587,11 @@ impl SubmissionCpuProfile {
 
     /// Detail clocks are opt-in: reads zero when detail recording is off.
     pub fn begin_detail(&self, _phase: CpuProfilePhase) -> Option<Instant> {
-        if self.records_encoding_detail { Some(Instant::now()) } else { None }
+        if self.records_encoding_detail {
+            Some(Instant::now())
+        } else {
+            None
+        }
     }
 
     pub fn end_detail(&mut self, phase: CpuProfilePhase, since: Option<Instant>) {
@@ -577,7 +623,10 @@ pub struct GpuTimestampMarker {
 }
 impl GpuTimestampMarker {
     pub fn new(label: impl Into<String>, nanoseconds: u64) -> Self {
-        Self { label: label.into(), nanoseconds }
+        Self {
+            label: label.into(),
+            nanoseconds,
+        }
     }
 }
 
@@ -607,13 +656,18 @@ impl GpuTimestampProfile {
     /// Bounded so an unbounded session cannot grow the sample list for ever.
     pub fn new(marker_limit: usize) -> Self {
         Self {
-            state: Mutex::new(GpuTimestampState { status: "idle".to_owned(), ..Default::default() }),
+            state: Mutex::new(GpuTimestampState {
+                status: "idle".to_owned(),
+                ..Default::default()
+            }),
             marker_limit,
         }
     }
 
     fn lock(&self) -> MutexGuard<'_, GpuTimestampState> {
-        self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+        self.state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     /// Why recording is or is not producing markers. `ok` means the backend is
@@ -685,7 +739,9 @@ mod tests {
             // Cloning shares nothing in the real backends either: they wrap a
             // refcounted GPU object. A fresh allocation keeps the test honest
             // about capacity accounting only.
-            Self { storage: self.storage.clone() }
+            Self {
+                storage: self.storage.clone(),
+            }
         }
     }
     impl UploadRingChunk for FakeChunk {
@@ -712,8 +768,11 @@ mod tests {
         // GPU minimum, so the test uses realistic sizes rather than a 1024-byte
         // chunk that can never be created.
         let chunk = 64 * 1024;
-        let mut allocator =
-            ChunkUploadAllocator::new(chunk, |capacity| Ok(FakeChunk { storage: vec![0; capacity] }));
+        let mut allocator = ChunkUploadAllocator::new(chunk, |capacity| {
+            Ok(FakeChunk {
+                storage: vec![0; capacity],
+            })
+        });
         let first = allocator.allocate(100, 16).expect("first");
         assert_eq!(first.offset(), 0);
         let second = allocator.allocate(100, 16).expect("second");
@@ -754,7 +813,11 @@ mod tests {
         let mut profile = SubmissionCpuProfile::new(false);
         let start = profile.begin();
         profile.end(CpuProfilePhase::Validation, start);
-        assert!(profile.begin_detail(CpuProfilePhase::BindingApply).is_none());
+        assert!(
+            profile
+                .begin_detail(CpuProfilePhase::BindingApply)
+                .is_none()
+        );
         let mut detailed = SubmissionCpuProfile::new(true);
         let detail_start = detailed.begin_detail(CpuProfilePhase::BindingApply);
         assert!(detail_start.is_some());

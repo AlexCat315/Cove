@@ -6,7 +6,7 @@
 
 use cove_examples::gallery_content::catalog::GalleryOptions;
 use cove_examples::gallery_content::stories::markdown_story::{
-    MarkdownStory, COMPACT, DOCUMENT, EDITABLE, EDITOR_INDENTATION, EDITOR_LINE_HEIGHT,
+    COMPACT, DOCUMENT, EDITABLE, EDITOR_INDENTATION, EDITOR_LINE_HEIGHT, MarkdownStory,
 };
 
 fn story() -> MarkdownStory {
@@ -40,7 +40,10 @@ fn editing_replaces_the_draft() {
 fn the_full_document_parses_into_many_blocks() {
     let story = story();
     let count = story.block_count(DOCUMENT);
-    assert!(count >= 10, "the release notes have many blocks, parsed {count}");
+    assert!(
+        count >= 10,
+        "the release notes have many blocks, parsed {count}"
+    );
 }
 
 #[test]
@@ -71,7 +74,10 @@ fn the_documents_carry_the_features_they_advertise() {
     assert!(DOCUMENT.contains("> "), "a quote");
     assert!(DOCUMENT.contains("**"), "bold text");
     assert!(DOCUMENT.contains("~~"), "strikethrough");
-    assert!(DOCUMENT.contains("中文"), "a CJK paragraph for line breaking");
+    assert!(
+        DOCUMENT.contains("中文"),
+        "a CJK paragraph for line breaking"
+    );
 }
 
 #[test]

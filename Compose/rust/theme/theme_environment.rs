@@ -1,9 +1,9 @@
 //! Translation of Theme/ThemeEnvironment.swift.
+use super::theme::Theme;
+use super::tokens::TextStyleToken;
+use crate::{ModifiedContent, View, ViewExt};
 use cove_core::scene::{CompositionLocal, Node};
 use std::rc::Rc;
-use super::tokens::TextStyleToken;
-use super::theme::Theme;
-use crate::{ModifiedContent, View, ViewExt};
 
 /// `CompositionLocal` key carrying the active `Theme` down the composition
 /// tree. Always resolves: descendants without an ancestor `.theme(_:)`

@@ -54,7 +54,11 @@ pub type RhiResult<T> = Result<T, RhiError>;
 /// The `rhiRequire` precondition used across the RHI: a failed check is an
 /// `invalidArgument` error rather than a crash.
 pub fn rhi_require(condition: bool, message: &str) -> RhiResult<()> {
-    if condition { Ok(()) } else { Err(RhiError::InvalidArgument(message.to_string())) }
+    if condition {
+        Ok(())
+    } else {
+        Err(RhiError::InvalidArgument(message.to_string()))
+    }
 }
 
 #[cfg(test)]
@@ -73,6 +77,9 @@ mod tests {
     #[test]
     fn require_reports_invalid_argument() {
         assert!(rhi_require(true, "ok").is_ok());
-        assert_eq!(rhi_require(false, "nope"), Err(RhiError::InvalidArgument("nope".into())));
+        assert_eq!(
+            rhi_require(false, "nope"),
+            Err(RhiError::InvalidArgument("nope".into()))
+        );
     }
 }

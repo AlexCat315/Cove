@@ -8,7 +8,7 @@
 use std::collections::HashSet;
 
 use cove_ui_compose::primitives::controls::fields::{
-    minimum_axis_width, shows_mixed, Vec3, Vec3Axis, Vec3Codec, Vec3Constraints,
+    Vec3, Vec3Axis, Vec3Codec, Vec3Constraints, minimum_axis_width, shows_mixed,
 };
 
 #[test]
@@ -82,7 +82,11 @@ fn format_round_trips_through_parse() {
 
 #[test]
 fn writing_clamps_each_axis_and_reports_only_changes() {
-    let constraints = Vec3Constraints { minimum: Some(0.0), maximum: Some(10.0), reset: None };
+    let constraints = Vec3Constraints {
+        minimum: Some(0.0),
+        maximum: Some(10.0),
+        reset: None,
+    };
     let current = Vec3::new(1.0, 2.0, 3.0);
     // X stays, Y rises past the maximum, Z drops below the minimum.
     let changes = constraints.write(current, Vec3::new(1.0, 50.0, -5.0));

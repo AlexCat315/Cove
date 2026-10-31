@@ -6,21 +6,23 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cove_core::scene::{Align, EventResult, FlexDirection, Justify, Node, Wrap};
 use crate::foundation::{Calendar as FoundationCalendar, CalendarUnit, Date};
-use cove_core::scene::{AccessibilityRole, AccessibilitySemantics};
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{Button, ButtonIconSource, ButtonRole};
 use crate::primitives::layout::{ScrollAxis, ScrollView, ScrollbarGutter};
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
-use crate::theme::{theme_for_node, SemanticColorRef, SemanticFontRef};
+use crate::theme::{SemanticColorRef, SemanticFontRef, theme_for_node};
 use crate::{AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View};
+use cove_core::scene::{AccessibilityRole, AccessibilitySemantics};
+use cove_core::scene::{Align, EventResult, FlexDirection, Justify, Node, Wrap};
 
 use super::super::date_values::DateAvailability;
 use super::navigation::{CalendarCells, CalendarNavigation};
-use super::period::{CalendarGranularity, CalendarPanel, granularity_start, interval_start, year_page};
+use super::period::{
+    CalendarGranularity, CalendarPanel, granularity_start, interval_start, year_page,
+};
 
 /// Width reserved for the ISO week number column.
 pub const WEEK_NUMBER_WIDTH: f32 = 24.0;
@@ -40,13 +42,21 @@ pub struct CalendarPresentation {
 
 impl Default for CalendarPresentation {
     fn default() -> Self {
-        Self { cell_size: 34.0, number_of_months: 1, is_enabled: true }
+        Self {
+            cell_size: 34.0,
+            number_of_months: 1,
+            is_enabled: true,
+        }
     }
 }
 
 impl CalendarPresentation {
     pub fn validate(&mut self) {
-        self.cell_size = if self.cell_size.is_finite() { self.cell_size.max(26.0) } else { 34.0 };
+        self.cell_size = if self.cell_size.is_finite() {
+            self.cell_size.max(26.0)
+        } else {
+            34.0
+        };
         self.number_of_months = self.number_of_months.clamp(1, 12);
     }
 
@@ -127,7 +137,12 @@ impl CalendarView {
             focus_request: 0,
             panel,
         };
-        Self { selection, set_selection, options, session: Rc::new(RefCell::new(session)) }
+        Self {
+            selection,
+            set_selection,
+            options,
+            session: Rc::new(RefCell::new(session)),
+        }
     }
 
     /// Width of the open calendar for popover hosts.
@@ -143,7 +158,11 @@ impl CalendarView {
     fn panel_width(cell_size: f32, granularity: CalendarGranularity) -> f32 {
         cell_size * 7.0
             + 12.0
-            + if granularity == CalendarGranularity::Week { WEEK_NUMBER_WIDTH + 2.0 } else { 0.0 }
+            + if granularity == CalendarGranularity::Week {
+                WEEK_NUMBER_WIDTH + 2.0
+            } else {
+                0.0
+            }
     }
 
     fn set_month(&self, next: Date) {
@@ -172,10 +191,8 @@ impl CalendarView {
         let Some(parent) = panel.parent() else { return };
         let focus = (self.selection)().unwrap_or_else(|| {
             let calendar = &self.options.calendar;
-            CalendarCells::new(parent, self.options.granularity).start(
-                self.session.borrow().month,
-                calendar,
-            )
+            CalendarCells::new(parent, self.options.granularity)
+                .start(self.session.borrow().month, calendar)
         });
         self.show(parent, focus);
     }
@@ -183,7 +200,8 @@ impl CalendarView {
     fn show(&self, panel: CalendarPanel, date: Date) {
         let calendar = &self.options.calendar;
         let focused = CalendarCells::new(panel, self.options.granularity).start(date, calendar);
-        let month = crate::primitives::controls::date_values::CalendarGrid::month_start(date, calendar);
+        let month =
+            crate::primitives::controls::date_values::CalendarGrid::month_start(date, calendar);
         let mut session = self.session.borrow_mut();
         session.panel = panel;
         session.focused_day = focused;
@@ -202,7 +220,9 @@ impl CalendarView {
     /// Selected when the cell lies in the selected period, and only at the
     /// granularity's own panel.
     fn is_selected(&self, date: Date) -> bool {
-        let Some(selected) = (self.selection)() else { return false };
+        let Some(selected) = (self.selection)() else {
+            return false;
+        };
         let panel = self.session.borrow().panel;
         if panel != self.options.granularity.base_panel() {
             return false;
@@ -224,7 +244,9 @@ impl CalendarView {
 
 impl View for CalendarView {
     fn body(&self) -> AnyView {
-        AnyView::new(CalendarBody { view: self.snapshot() })
+        AnyView::new(CalendarBody {
+            view: self.snapshot(),
+        })
     }
 }
 
@@ -261,7 +283,9 @@ impl PrimitiveView for CalendarBody {
             label: "Calendar".to_string(),
             ..Default::default()
         }));
-        let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() else { return };
+        let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() else {
+            return;
+        };
         let view = self.view.snapshot();
         registry.set_key(
             node,
@@ -270,8 +294,8 @@ impl PrimitiveView for CalendarBody {
                 if phase != cove_core::scene::EventPhase::Bubble || !event.modifiers.is_empty() {
                     return EventResult::Ignored;
                 }
-                let Some(focused) = cove_core::scene::FocusChainHolder::current()
-                    .and_then(|chain| chain.focused())
+                let Some(focused) =
+                    cove_core::scene::FocusChainHolder::current().and_then(|chain| chain.focused())
                 else {
                     return EventResult::Ignored;
                 };
@@ -307,14 +331,18 @@ impl PrimitiveView for CalendarBody {
                     count: months,
                 }));
             }
-            AnyView::new(
-                BoxView::new(
-                    FlexDirection::Row, Align::FlexStart, Justify::FlexStart, Wrap::Wrap, 16.0,
-                    AnyView::new(TupleView::new(columns)),
-                ),
-            )
+            AnyView::new(BoxView::new(
+                FlexDirection::Row,
+                Align::FlexStart,
+                Justify::FlexStart,
+                Wrap::Wrap,
+                16.0,
+                AnyView::new(TupleView::new(columns)),
+            ))
         } else {
-            AnyView::new(CalendarPeriodPanel { view: view.snapshot() })
+            AnyView::new(CalendarPeriodPanel {
+                view: view.snapshot(),
+            })
         };
         vec![AnyView::new(
             ScrollView::new(ScrollAxis::Horizontal, content)
@@ -379,8 +407,9 @@ impl CalendarView {
                 if anchor >= first && anchor < end {
                     return;
                 }
-                let target =
-                    crate::primitives::controls::date_values::CalendarGrid::month_start(anchor, calendar);
+                let target = crate::primitives::controls::date_values::CalendarGrid::month_start(
+                    anchor, calendar,
+                );
                 if anchor < first {
                     self.set_month(target);
                 } else {
@@ -478,9 +507,7 @@ impl PrimitiveView for CalendarMonth {
             ));
         }
         for weekday in 0..DAYS_PER_WEEK {
-            let symbol = weekday_symbol(
-                (weekday as u32 + calendar.first_weekday() - 1) % 7,
-            );
+            let symbol = weekday_symbol((weekday as u32 + calendar.first_weekday() - 1) % 7);
             weekday_row.push(AnyView::new(
                 Text::new(symbol)
                     .semantic_font(SemanticFontRef::caption())
@@ -488,12 +515,14 @@ impl PrimitiveView for CalendarMonth {
                     .frame_size(cell_size, 24.0),
             ));
         }
-        column.push(AnyView::new(
-            BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 2.0,
-                AnyView::new(TupleView::new(weekday_row)),
-            ),
-        ));
+        column.push(AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            2.0,
+            AnyView::new(TupleView::new(weekday_row)),
+        )));
 
         for week in 0..WEEKS_PER_MONTH {
             let row: Vec<Date> = days
@@ -521,19 +550,25 @@ impl PrimitiveView for CalendarMonth {
                         cell_size,
                     }));
                 }
-                column.push(AnyView::new(
-                    BoxView::new(
-                        FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 2.0,
-                        AnyView::new(TupleView::new(cells)),
-                    ),
-                ));
+                column.push(AnyView::new(BoxView::new(
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    2.0,
+                    AnyView::new(TupleView::new(cells)),
+                )));
             }
         }
 
         let min_width = CalendarView::panel_width(cell_size, view.options.granularity) + 20.0;
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 6.0,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                6.0,
                 AnyView::new(TupleView::new(column)),
             )
             .padding(10.0)
@@ -558,32 +593,49 @@ impl CalendarMonth {
                 interval_start(CalendarUnit::Month, **day, calendar)
                     == interval_start(CalendarUnit::Month, self.month, calendar)
             })
-            .map(|day| {
-                CalendarCells::new(CalendarPanel::Days, granularity).start(*day, calendar)
-            })
+            .map(|day| CalendarCells::new(CalendarPanel::Days, granularity).start(*day, calendar))
             .filter(|candidate| {
                 enabled
-                    && CalendarCells::new(CalendarPanel::Days, granularity)
-                        .is_available(*candidate, calendar, availability)
+                    && CalendarCells::new(CalendarPanel::Days, granularity).is_available(
+                        *candidate,
+                        calendar,
+                        availability,
+                    )
             })
             .collect();
         candidates.sort();
         candidates.dedup();
         let focused = CalendarCells::new(CalendarPanel::Days, granularity)
             .start(self.view.session.borrow().focused_day, calendar);
-        if candidates.contains(&focused) { Some(focused) } else { candidates.first().copied() }
+        if candidates.contains(&focused) {
+            Some(focused)
+        } else {
+            candidates.first().copied()
+        }
     }
-
 }
 
 /// The month title, rendered as the month and year.
 fn month_title(date: Date, calendar: &FoundationCalendar) -> String {
     const NAMES: [&str; 12] = [
-        "January", "February", "March", "April", "May", "June", "July", "August", "September",
-        "October", "November", "December",
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
     ];
     let parts = calendar.parts(date);
-    let name = NAMES.get(parts.month.saturating_sub(1) as usize).copied().unwrap_or("January");
+    let name = NAMES
+        .get(parts.month.saturating_sub(1) as usize)
+        .copied()
+        .unwrap_or("January");
     format!("{name} {}", parts.year)
 }
 
@@ -628,7 +680,9 @@ impl PrimitiveView for CalendarHeader {
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         let previous = Button::icon_with_options(
-            ButtonIconSource::resource(crate::primitives::media::ui_icon_catalog::navigation::chevron_left()),
+            ButtonIconSource::resource(
+                crate::primitives::media::ui_icon_catalog::navigation::chevron_left(),
+            ),
             Some(12.0),
             None,
             ButtonRole::Normal,
@@ -643,7 +697,9 @@ impl PrimitiveView for CalendarHeader {
         )
         .button_style(GhostButtonStyle);
         let next = Button::icon_with_options(
-            ButtonIconSource::resource(crate::primitives::media::ui_icon_catalog::navigation::chevron_right()),
+            ButtonIconSource::resource(
+                crate::primitives::media::ui_icon_catalog::navigation::chevron_right(),
+            ),
             Some(12.0),
             None,
             ButtonRole::Normal,
@@ -661,7 +717,9 @@ impl PrimitiveView for CalendarHeader {
             let on_drill_up = self.on_drill_up.clone();
             AnyView::new(
                 Button::with_options(
-                    AnyView::new(Text::new(self.title.clone()).semantic_font(SemanticFontRef::body_strong())),
+                    AnyView::new(
+                        Text::new(self.title.clone()).semantic_font(SemanticFontRef::body_strong()),
+                    ),
                     move || on_drill_up(),
                     ButtonRole::Normal,
                     self.is_enabled,
@@ -716,18 +774,66 @@ impl PrimitiveView for CalendarDayCell {
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Button,
             label: match calendar.parts(self.day).month {
-                1 => format!("January {}, {}", calendar.parts(self.day).day, calendar.parts(self.day).year),
-                2 => format!("February {}, {}", calendar.parts(self.day).day, calendar.parts(self.day).year),
-                3 => format!("March {}, {}", calendar.parts(self.day).day, calendar.parts(self.day).year),
-                4 => format!("April {}, {}", calendar.parts(self.day).day, calendar.parts(self.day).year),
-                5 => format!("May {}, {}", calendar.parts(self.day).day, calendar.parts(self.day).year),
-                6 => format!("June {}, {}", calendar.parts(self.day).day, calendar.parts(self.day).year),
-                7 => format!("July {}, {}", calendar.parts(self.day).day, calendar.parts(self.day).year),
-                8 => format!("August {}, {}", calendar.parts(self.day).day, calendar.parts(self.day).year),
-                9 => format!("September {}, {}", calendar.parts(self.day).day, calendar.parts(self.day).year),
-                10 => format!("October {}, {}", calendar.parts(self.day).day, calendar.parts(self.day).year),
-                11 => format!("November {}, {}", calendar.parts(self.day).day, calendar.parts(self.day).year),
-                _ => format!("December {}, {}", calendar.parts(self.day).day, calendar.parts(self.day).year),
+                1 => format!(
+                    "January {}, {}",
+                    calendar.parts(self.day).day,
+                    calendar.parts(self.day).year
+                ),
+                2 => format!(
+                    "February {}, {}",
+                    calendar.parts(self.day).day,
+                    calendar.parts(self.day).year
+                ),
+                3 => format!(
+                    "March {}, {}",
+                    calendar.parts(self.day).day,
+                    calendar.parts(self.day).year
+                ),
+                4 => format!(
+                    "April {}, {}",
+                    calendar.parts(self.day).day,
+                    calendar.parts(self.day).year
+                ),
+                5 => format!(
+                    "May {}, {}",
+                    calendar.parts(self.day).day,
+                    calendar.parts(self.day).year
+                ),
+                6 => format!(
+                    "June {}, {}",
+                    calendar.parts(self.day).day,
+                    calendar.parts(self.day).year
+                ),
+                7 => format!(
+                    "July {}, {}",
+                    calendar.parts(self.day).day,
+                    calendar.parts(self.day).year
+                ),
+                8 => format!(
+                    "August {}, {}",
+                    calendar.parts(self.day).day,
+                    calendar.parts(self.day).year
+                ),
+                9 => format!(
+                    "September {}, {}",
+                    calendar.parts(self.day).day,
+                    calendar.parts(self.day).year
+                ),
+                10 => format!(
+                    "October {}, {}",
+                    calendar.parts(self.day).day,
+                    calendar.parts(self.day).year
+                ),
+                11 => format!(
+                    "November {}, {}",
+                    calendar.parts(self.day).day,
+                    calendar.parts(self.day).year
+                ),
+                _ => format!(
+                    "December {}, {}",
+                    calendar.parts(self.day).day,
+                    calendar.parts(self.day).year
+                ),
             },
             state: cove_core::scene::AccessibilityState {
                 is_enabled,
@@ -762,11 +868,21 @@ impl PrimitiveView for CalendarDayCell {
         let theme = theme_for_node(node);
         node.set_corner_radius(theme.radius.md);
         node.set_opacity(if in_month { 1.0 } else { 0.35 });
-        node.set_background_color(if is_selected { Some(theme.colors.accent) } else { None });
-        node.set_border_color(Some(if is_today { theme.colors.accent } else { cove_core::Color::CLEAR }));
+        node.set_background_color(if is_selected {
+            Some(theme.colors.accent)
+        } else {
+            None
+        });
+        node.set_border_color(Some(if is_today {
+            theme.colors.accent
+        } else {
+            cove_core::Color::CLEAR
+        }));
         node.set_border_width(if is_today { 1.0 } else { 0.0 });
 
-        let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() else { return };
+        let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() else {
+            return;
+        };
         let view = self.view.snapshot();
         let day = self.day;
         registry.set_pointer(
@@ -800,7 +916,11 @@ impl PrimitiveView for CalendarDayCell {
         };
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::Center, Wrap::NoWrap, 0.0,
+                FlexDirection::Row,
+                Align::Center,
+                Justify::Center,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(
                     Text::new(day.to_string())
                         .semantic_font(SemanticFontRef::label())
@@ -816,7 +936,11 @@ crate::impl_primitive_view!(CalendarDayCell);
 impl CalendarDayCell {
     fn is_enabled(&self, day: Date) -> bool {
         self.view.options.presentation.is_enabled
-            && self.view.options.availability.contains(day, &self.view.options.calendar)
+            && self
+                .view
+                .options
+                .availability
+                .contains(day, &self.view.options.calendar)
     }
 }
 
@@ -844,7 +968,9 @@ impl PrimitiveView for CalendarWeekRow {
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         let calendar = &self.view.options.calendar;
-        let Some(first) = self.days.first().copied() else { return Vec::new() };
+        let Some(first) = self.days.first().copied() else {
+            return Vec::new();
+        };
         let start = CalendarCells::new(CalendarPanel::Days, self.view.options.granularity)
             .start(first, calendar);
         let in_month = self.days.iter().any(|day| {
@@ -859,7 +985,11 @@ impl PrimitiveView for CalendarWeekRow {
 
         let mut row: Vec<AnyView> = vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::Center, Wrap::NoWrap, 0.0,
+                FlexDirection::Row,
+                Align::Center,
+                Justify::Center,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(
                     Text::new(week.to_string())
                         .semantic_font(SemanticFontRef::caption())
@@ -873,7 +1003,11 @@ impl PrimitiveView for CalendarWeekRow {
                 == interval_start(CalendarUnit::Month, self.month, calendar);
             row.push(AnyView::new(
                 BoxView::new(
-                    FlexDirection::Row, Align::Center, Justify::Center, Wrap::NoWrap, 0.0,
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::Center,
+                    Wrap::NoWrap,
+                    0.0,
                     AnyView::new(
                         Text::new(calendar.parts(*day).day.to_string())
                             .semantic_font(SemanticFontRef::label()),
@@ -890,12 +1024,14 @@ impl PrimitiveView for CalendarWeekRow {
             is_tab_stop: self.tab_cell == Some(start),
             available,
             is_selected,
-            content: AnyView::new(
-                BoxView::new(
-                    FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 2.0,
-                    AnyView::new(TupleView::new(row)),
-                ),
-            ),
+            content: AnyView::new(BoxView::new(
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                2.0,
+                AnyView::new(TupleView::new(row)),
+            )),
         })]
     }
 }
@@ -920,7 +1056,13 @@ impl PrimitiveView for CalendarWeekButton {
         node.set_is_hit_testable(self.available);
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Button,
-            label: format!("Week {}", self.view.options.calendar.component(CalendarUnit::WeekOfYear, self.start)),
+            label: format!(
+                "Week {}",
+                self.view
+                    .options
+                    .calendar
+                    .component(CalendarUnit::WeekOfYear, self.start)
+            ),
             state: cove_core::scene::AccessibilityState {
                 is_enabled: self.available,
                 is_selected: self.is_selected,
@@ -938,8 +1080,14 @@ impl PrimitiveView for CalendarWeekButton {
     fn update_node(&self, node: &Node) {
         let theme = theme_for_node(node);
         node.set_corner_radius(theme.radius.md);
-        node.set_background_color(if self.is_selected { Some(theme.colors.accent) } else { None });
-        let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() else { return };
+        node.set_background_color(if self.is_selected {
+            Some(theme.colors.accent)
+        } else {
+            None
+        });
+        let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() else {
+            return;
+        };
         if !self.available {
             registry.remove(node);
             return;
@@ -994,12 +1142,18 @@ impl PrimitiveView for CalendarPeriodPanel {
         let month = view.session.borrow().month;
         let (page_start, page_end) = if is_months {
             let start = interval_start(CalendarUnit::Year, month, calendar);
-            let end = calendar.date_interval_end(CalendarUnit::Year, month).unwrap_or(start);
+            let end = calendar
+                .date_interval_end(CalendarUnit::Year, month)
+                .unwrap_or(start);
             (start, end)
         } else {
             year_page(month, calendar)
         };
-        let unit = if is_months { CalendarUnit::Month } else { CalendarUnit::Year };
+        let unit = if is_months {
+            CalendarUnit::Month
+        } else {
+            CalendarUnit::Year
+        };
         let dates: Vec<Date> = (0..12)
             .filter_map(|offset| calendar.date_by_adding(unit, offset, page_start))
             .collect();
@@ -1030,7 +1184,11 @@ impl PrimitiveView for CalendarPeriodPanel {
             .collect();
         let focused = CalendarCells::new(panel, view.options.granularity)
             .start(view.session.borrow().focused_day, calendar);
-        let tab_cell = if available.contains(&focused) { Some(focused) } else { available.first().copied() };
+        let tab_cell = if available.contains(&focused) {
+            Some(focused)
+        } else {
+            available.first().copied()
+        };
 
         let mut column: Vec<AnyView> = vec![AnyView::new(CalendarHeader {
             title,
@@ -1041,22 +1199,26 @@ impl PrimitiveView for CalendarPeriodPanel {
             on_previous: {
                 let view = view.snapshot();
                 let step = if is_months { 12 } else { 144 };
-                Rc::new(move || view.set_month(
-                    view.options
-                        .calendar
-                        .date_by_adding(CalendarUnit::Month, -step, view.session.borrow().month)
-                        .unwrap_or_else(|| view.session.borrow().month),
-                ))
+                Rc::new(move || {
+                    view.set_month(
+                        view.options
+                            .calendar
+                            .date_by_adding(CalendarUnit::Month, -step, view.session.borrow().month)
+                            .unwrap_or_else(|| view.session.borrow().month),
+                    )
+                })
             },
             on_next: {
                 let view = view.snapshot();
                 let step = if is_months { 12 } else { 144 };
-                Rc::new(move || view.set_month(
-                    view.options
-                        .calendar
-                        .date_by_adding(CalendarUnit::Month, step, view.session.borrow().month)
-                        .unwrap_or_else(|| view.session.borrow().month),
-                ))
+                Rc::new(move || {
+                    view.set_month(
+                        view.options
+                            .calendar
+                            .date_by_adding(CalendarUnit::Month, step, view.session.borrow().month)
+                            .unwrap_or_else(|| view.session.borrow().month),
+                    )
+                })
             },
             on_drill_up: {
                 let view = view.snapshot();
@@ -1076,16 +1238,22 @@ impl PrimitiveView for CalendarPeriodPanel {
                     height: cell_height,
                 }));
             }
-            column.push(AnyView::new(
-                BoxView::new(
-                    FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 4.0,
-                    AnyView::new(TupleView::new(cells)),
-                ),
-            ));
+            column.push(AnyView::new(BoxView::new(
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                4.0,
+                AnyView::new(TupleView::new(cells)),
+            )));
         }
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 6.0,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                6.0,
                 AnyView::new(TupleView::new(column)),
             )
             .padding(10.0)
@@ -1151,7 +1319,9 @@ impl PrimitiveView for CalendarPeriodCell {
         } else {
             None
         });
-        let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() else { return };
+        let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() else {
+            return;
+        };
         if !self.is_available {
             registry.remove(node);
             return;
@@ -1182,7 +1352,11 @@ impl PrimitiveView for CalendarPeriodCell {
         };
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::Center, Wrap::NoWrap, 0.0,
+                FlexDirection::Row,
+                Align::Center,
+                Justify::Center,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(Text::new(text).semantic_font(SemanticFontRef::label())),
             )
             .frame_size(self.width, self.height),

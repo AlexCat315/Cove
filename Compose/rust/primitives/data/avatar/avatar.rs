@@ -7,10 +7,10 @@
 //! derivation, sizing, accessibility and status composition are preserved.
 use std::rc::Rc;
 
-use cove_core::scene::{AccessibilityRole, AccessibilitySemantics, LayoutNode, Node};
-use crate::theme::tokens::control_size::{ControlSize, ControlSizeEnvironment};
 use crate::theme::theme_environment::theme_for_node;
-use crate::{impl_primitive_view, AnyView, PrimitiveView, View};
+use crate::theme::tokens::control_size::{ControlSize, ControlSizeEnvironment};
+use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
+use cove_core::scene::{AccessibilityRole, AccessibilitySemantics, LayoutNode, Node};
 
 use super::status::{AvatarStatus, AvatarStatusGeometry, AvatarStatusIndicator};
 
@@ -26,7 +26,11 @@ impl AvatarShape {
             Self::Circle => diameter / 2.0,
             Self::Square => 0.0,
             Self::RoundedRectangle(radius) => {
-                if radius.is_finite() { radius.max(0.0).min(diameter / 2.0) } else { 8.0 }
+                if radius.is_finite() {
+                    radius.max(0.0).min(diameter / 2.0)
+                } else {
+                    8.0
+                }
             }
         }
     }
@@ -44,7 +48,11 @@ impl AvatarColors {
         foreground: cove_core::scene::Color,
         border: cove_core::scene::Color,
     ) -> Self {
-        Self { background, foreground, border }
+        Self {
+            background,
+            foreground,
+            border,
+        }
     }
 }
 
@@ -187,7 +195,10 @@ impl Avatar {
             );
         }
         let theme = theme_for_node(node);
-        AvatarIdentity::colors_for_initials(&initials, AvatarIdentity::is_dark(theme.colors.background))
+        AvatarIdentity::colors_for_initials(
+            &initials,
+            AvatarIdentity::is_dark(theme.colors.background),
+        )
     }
 }
 

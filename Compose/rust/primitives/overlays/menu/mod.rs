@@ -12,12 +12,12 @@ pub use menu::{
 pub use menu_descriptor::{MenuDescriptor, MenuItemDescriptor};
 pub mod native_menu_bridge;
 pub mod touch_menu;
-pub use native_menu_bridge::{NativeMenuBuild, NativeMenuBuilder};
-pub use touch_menu::{TouchMenu, TouchMenuLevel};
 pub use menu_item_row::MenuItemRowHost;
 pub use menu_level_host::{MenuLevelHost, PANEL_INSET};
 pub use menu_navigation::{
-    menu_row, MenuHoverIntent, MenuNavigationState, MenuRowEvents, MenuRowPresentation,
-    MenuSession, MenuTypeahead, MenuTypeaheadRow,
+    MenuHoverIntent, MenuNavigationState, MenuRowEvents, MenuRowPresentation, MenuSession,
+    MenuTypeahead, MenuTypeaheadRow, menu_row,
 };
+pub use native_menu_bridge::{NativeMenuBuild, NativeMenuBuilder};
 pub use row_content::{MenuItemContent, MenuPointerIntent};
+pub use touch_menu::{TouchMenu, TouchMenuLevel};

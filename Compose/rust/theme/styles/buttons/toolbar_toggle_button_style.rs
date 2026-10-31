@@ -1,9 +1,11 @@
 //! Translation of Theme/Styles/Buttons/ToolbarToggleButtonStyle.swift.
-use cove_core::scene::{with_animation, Align, Animation, Edge, FlexDirection, Justify, LayoutNode, Node};
 use cove_core::Color;
+use cove_core::scene::{
+    Align, Animation, Edge, FlexDirection, Justify, LayoutNode, Node, with_animation,
+};
 
 use crate::theme::{SemanticColorRef, SemanticFontRef, SemanticStyleViewExt, Theme};
-use crate::{impl_primitive_view, AnyView};
+use crate::{AnyView, impl_primitive_view};
 
 use super::button_style::{ButtonInteractionKey, ButtonStyle, ButtonStyleConfiguration};
 
@@ -15,7 +17,10 @@ pub struct ToolbarToggleButtonStyle {
 }
 impl ToolbarToggleButtonStyle {
     pub fn new() -> Self {
-        Self { height: 28.0, min_width: 28.0 }
+        Self {
+            height: 28.0,
+            min_width: 28.0,
+        }
     }
     /// Swift's `init(_ configure: (inout Self) -> Void)`.
     pub fn configured(configure: impl FnOnce(&mut Self)) -> Self {
@@ -89,7 +94,11 @@ impl crate::PrimitiveView for ToolbarToggleChrome {
         } else {
             Color::CLEAR
         };
-        let border = if self.is_focused { colors.focus_ring } else { Color::CLEAR };
+        let border = if self.is_focused {
+            colors.focus_ring
+        } else {
+            Color::CLEAR
+        };
         let border_width = if self.is_focused { 1.0 } else { 0.0 };
         let animate = node
             .attachment::<ButtonInteractionKey>(TOOLBAR_TOGGLE_KEY)
@@ -98,19 +107,34 @@ impl crate::PrimitiveView for ToolbarToggleChrome {
         let apply = || {
             let owner = node.clone();
             let current = node.background_color();
-            node.animatable_set_optional("toolbarToggle.backgroundColor", current, Some(fill), move |value| {
-                owner.set_background_color(value);
-            });
+            node.animatable_set_optional(
+                "toolbarToggle.backgroundColor",
+                current,
+                Some(fill),
+                move |value| {
+                    owner.set_background_color(value);
+                },
+            );
             let owner = node.clone();
             let current = node.border_color();
-            node.animatable_set_optional("toolbarToggle.borderColor", current, Some(border), move |value| {
-                owner.set_border_color(value);
-            });
+            node.animatable_set_optional(
+                "toolbarToggle.borderColor",
+                current,
+                Some(border),
+                move |value| {
+                    owner.set_border_color(value);
+                },
+            );
             let owner = node.clone();
             let current = node.border_width();
-            node.animatable_set_with("toolbarToggle.borderWidth", current, border_width, move |value| {
-                owner.set_border_width(value);
-            });
+            node.animatable_set_with(
+                "toolbarToggle.borderWidth",
+                current,
+                border_width,
+                move |value| {
+                    owner.set_border_width(value);
+                },
+            );
             node.set_corner_radius(self.theme.radius.sm);
         };
 

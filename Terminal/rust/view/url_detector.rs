@@ -25,7 +25,11 @@ pub fn find(frame: &TerminalFrame, row: usize, column: usize) -> Option<UrlMatch
         if cell.width == CellWidth::Spacer {
             continue;
         }
-        let piece = if cell.text.is_empty() { " " } else { cell.text.as_str() };
+        let piece = if cell.text.is_empty() {
+            " "
+        } else {
+            cell.text.as_str()
+        };
         for _ in piece.chars() {
             column_of_char.push(index);
         }
@@ -52,7 +56,11 @@ pub fn find(frame: &TerminalFrame, row: usize, column: usize) -> Option<UrlMatch
             link.to_owned()
         };
         if let Some(url) = link_opener::url(&candidate) {
-            return Some(UrlMatch { row, columns: (first, last_column), url });
+            return Some(UrlMatch {
+                row,
+                columns: (first, last_column),
+                url,
+            });
         }
     }
     None
@@ -63,7 +71,9 @@ pub fn find(frame: &TerminalFrame, row: usize, column: usize) -> Option<UrlMatch
 /// This mirrors the Swift regex `(?:(?:https?|ftp|file)://|mailto:|www\\.)[^\\s<>"'`{}|\\\\^]+`
 /// without pulling a regex engine into the crate hot path.
 fn url_spans(text: &str) -> Vec<(usize, usize)> {
-    const PREFIXES: [&str; 6] = ["https://", "http://", "ftp://", "file://", "mailto:", "www."];
+    const PREFIXES: [&str; 6] = [
+        "https://", "http://", "ftp://", "file://", "mailto:", "www.",
+    ];
     let lower = text.to_ascii_lowercase();
     let mut spans = Vec::new();
     let mut index = 0usize;
@@ -71,7 +81,11 @@ fn url_spans(text: &str) -> Vec<(usize, usize)> {
         // A prefix must start on a char boundary, which every ASCII prefix does.
         let Some((offset, prefix_len)) = PREFIXES
             .iter()
-            .filter_map(|prefix| lower[index..].find(prefix).map(|offset| (offset, prefix.len())))
+            .filter_map(|prefix| {
+                lower[index..]
+                    .find(prefix)
+                    .map(|offset| (offset, prefix.len()))
+            })
             .min_by_key(|(offset, _)| *offset)
         else {
             break;

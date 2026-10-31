@@ -3,22 +3,20 @@
 //! An anchored question with explicit Cancel and Confirm actions.
 use std::rc::Rc;
 
-use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Wrap};
 use cove_core::State;
+use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Wrap};
 use cove_imaging::BundleImageResource;
 
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::LayoutFrameExt;
+use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::controls::button::{Button, ButtonRole};
 use crate::primitives::media::Icon;
-use crate::primitives::overlays::anchored::{
-    PopoverOverflow, PopoverPlacement, PopoverSurface,
-};
+use crate::primitives::overlays::anchored::{PopoverOverflow, PopoverPlacement, PopoverSurface};
 use crate::primitives::overlays::popover::{Popover, PopoverTriggerDescription};
 use crate::primitives::text::Text;
-use crate::modifiers::style::SemanticStyleViewExt;
 use crate::theme::styles::buttons::{
-    destructive, primary, secondary, AnyButtonStyle, ButtonStyleViewExt,
+    AnyButtonStyle, ButtonStyleViewExt, destructive, primary, secondary,
 };
 use crate::theme::{SemanticColorRef, SemanticFontRef};
 use crate::{AnyView, BoxView, Row, TupleView, View};
@@ -181,7 +179,10 @@ impl Popconfirm {
             Justify::FlexEnd,
             Wrap::Wrap,
             8.0,
-            AnyView::new(TupleView::new(vec![AnyView::new(cancel), AnyView::new(confirm)])),
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(cancel),
+                AnyView::new(confirm),
+            ])),
         )
         .frame_min_width(0.0);
         column_items.push(AnyView::new(button_row));

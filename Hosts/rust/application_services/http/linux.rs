@@ -20,8 +20,7 @@ pub const SCHEME_HTTP: bool = true;
 pub const SCHEME_HTTPS: bool = false;
 
 /// Why `https://` cannot be served on this platform build.
-pub const HTTPS_LIMITATION: &str =
-    "https requires a TLS provider; the workspace dependency set ships none, so \
+pub const HTTPS_LIMITATION: &str = "https requires a TLS provider; the workspace dependency set ships none, so \
      Linux image loading is limited to http:// and file://";
 
 pub struct LinuxImageTransport {
@@ -30,24 +29,38 @@ pub struct LinuxImageTransport {
 
 impl Default for LinuxImageTransport {
     fn default() -> Self {
-        Self { timeout: Duration::from_secs(15) }
+        Self {
+            timeout: Duration::from_secs(15),
+        }
     }
 }
 
 impl LinuxImageTransport {
     pub fn new(timeout_seconds: f64) -> Self {
-        let seconds = if timeout_seconds.is_finite() { timeout_seconds.clamp(0.1, 300.0) } else { 15.0 };
-        Self { timeout: Duration::from_secs_f64(seconds) }
+        let seconds = if timeout_seconds.is_finite() {
+            timeout_seconds.clamp(0.1, 300.0)
+        } else {
+            15.0
+        };
+        Self {
+            timeout: Duration::from_secs_f64(seconds),
+        }
     }
 
-    fn fetch_once(&self, url: &Url, limit: usize) -> Result<(Vec<u8>, Option<String>), AsyncImageError> {
+    fn fetch_once(
+        &self,
+        url: &Url,
+        limit: usize,
+    ) -> Result<(Vec<u8>, Option<String>), AsyncImageError> {
         let address = format!("{}:{}", url.host, url.port);
         let stream = TcpStream::connect_timeout(
             &address
                 .to_socket_addrs()
                 .map_err(TransportIoError::network)?
                 .next()
-                .ok_or_else(|| TransportIoError::network(format!("{address} resolved no address")))?,
+                .ok_or_else(|| {
+                    TransportIoError::network(format!("{address} resolved no address"))
+                })?,
             self.timeout,
         )
         .map_err(|error| TransportIoError::network(error.to_string()))?;
@@ -133,21 +146,28 @@ impl ImageDownloadTransport for LinuxImageTransport {
             }
             let (body, content_type) = self.fetch_once(&current, limit)?;
             if content_type.as_deref() == Some("__redirect__") {
-                let target = String::from_utf8(body).map_err(|_| AsyncImageError::InvalidResponse)?;
+                let target =
+                    String::from_utf8(body).map_err(|_| AsyncImageError::InvalidResponse)?;
                 current = Url::parse(&target).or_else(|_| {
                     // A relative Location resolves against the current authority.
                     Url::parse(&format!(
                         "{}://{}{}",
                         if current.secure { "https" } else { "http" },
                         current.host_header(),
-                        if target.starts_with('/') { target.clone() } else { format!("/{target}") }
+                        if target.starts_with('/') {
+                            target.clone()
+                        } else {
+                            format!("/{target}")
+                        }
                     ))
                 })?;
                 continue;
             }
             return Ok((body, content_type));
         }
-        Err(AsyncImageError::NetworkFailed("too many image redirects".to_owned()))
+        Err(AsyncImageError::NetworkFailed(
+            "too many image redirects".to_owned(),
+        ))
     }
 }
 

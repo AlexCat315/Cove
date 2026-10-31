@@ -6,18 +6,16 @@
 
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{State, TextScale};
-use cove_ui_compose::primitives::layout::grid::{Grid, GridColumn, GridRowHeights, LazyGrid};
-use cove_ui_compose::primitives::layout::masonry::masonry::Masonry;
-use cove_ui_compose::primitives::controls::Button;
-use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use cove_ui_compose::modifiers::style::AppearanceExt;
-use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
+use cove_ui_compose::primitives::controls::Button;
+use cove_ui_compose::primitives::layout::grid::{Grid, GridColumn, GridRowHeights, LazyGrid};
+use cove_ui_compose::primitives::layout::masonry::masonry::Masonry;
+use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::styles::buttons::button_style::ButtonStyleViewExt;
 use cove_ui_compose::theme::styles::buttons::{GhostButtonStyle, SecondaryButtonStyle};
-use cove_ui_compose::{
-    Alignment, AnyView, BoxView, DynamicField, LayoutDebugExt, TupleView, View,
-};
+use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
+use cove_ui_compose::{Alignment, AnyView, BoxView, DynamicField, LayoutDebugExt, TupleView, View};
 
 use crate::gallery_content::catalog::GalleryOptions;
 use crate::gallery_content::stories::StorySection;
@@ -148,7 +146,9 @@ struct MasonryCards {
 impl View for MasonryCards {
     fn body(&self) -> AnyView {
         AnyView::new(cove_ui_compose::TupleView::new(
-            (0..self.count).map(|index| AnyView::new(MasonryCard { index })).collect(),
+            (0..self.count)
+                .map(|index| AnyView::new(MasonryCard { index }))
+                .collect(),
         ))
     }
 }
@@ -167,7 +167,11 @@ impl View for MasonryCard {
         } else {
             SemanticColorRef::surface_variant()
         };
-        let form = if self.index % 2 == 0 { "Long form" } else { "Short form" };
+        let form = if self.index % 2 == 0 {
+            "Long form"
+        } else {
+            "Short form"
+        };
         AnyView::new(
             BoxView::new(
                 FlexDirection::Column,
@@ -215,8 +219,14 @@ impl View for MasonrySample {
                 10.0,
                 Alignment::TopLeading,
                 AnyView::new(cove_ui_compose::TupleView::new(vec![
-                    AnyView::new(MasonrySampleCard { index: 1, height: 70.0 }),
-                    AnyView::new(MasonrySampleCard { index: 2, height: 100.0 }),
+                    AnyView::new(MasonrySampleCard {
+                        index: 1,
+                        height: 70.0,
+                    }),
+                    AnyView::new(MasonrySampleCard {
+                        index: 2,
+                        height: 100.0,
+                    }),
                 ])),
             )
             .debug_name("masonry-sample"),
@@ -280,8 +290,14 @@ impl View for LayoutGridStory {
             Grid::new(
                 vec![
                     GridColumn::Fixed(100.0),
-                    GridColumn::Flexible { minimum: 120.0, maximum: f32::INFINITY },
-                    GridColumn::Flexible { minimum: 120.0, maximum: f32::INFINITY },
+                    GridColumn::Flexible {
+                        minimum: 120.0,
+                        maximum: f32::INFINITY,
+                    },
+                    GridColumn::Flexible {
+                        minimum: 120.0,
+                        maximum: f32::INFINITY,
+                    },
                 ],
                 12.0,
                 12.0,
@@ -309,7 +325,10 @@ impl View for LayoutGridStory {
         // One adaptive track with a 150pt minimum: 1..n columns.
         let adaptive = AnyView::new(
             Grid::new(
-                vec![GridColumn::Adaptive { minimum: 150.0, maximum: f32::INFINITY }],
+                vec![GridColumn::Adaptive {
+                    minimum: 150.0,
+                    maximum: f32::INFINITY,
+                }],
                 12.0,
                 12.0,
                 Alignment::TopLeading,
@@ -430,7 +449,9 @@ impl View for LazyGridStory {
                 2,
                 None,
                 Some(90.0),
-                Some(std::rc::Rc::new(|index: &u64| if index % 7 == 0 { 2 } else { 1 })),
+                Some(std::rc::Rc::new(
+                    |index: &u64| if index % 7 == 0 { 2 } else { 1 },
+                )),
                 std::rc::Rc::new(|index: &u64| AnyView::new(LazyCell::new(format!("#{index}")))),
             )
             .frame_height(220.0)

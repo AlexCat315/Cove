@@ -1,8 +1,9 @@
 //! Translation of Theme/Styles/DefaultDarkTheme.swift.
-use cove_core::{Color, Font, FontWeight, LayeredShadow, SurfaceShadow};
 use crate::theme::{
-    ColorScheme, ElevationScale, Easing, MotionScale, RadiusScale, SpacingScale, TextStyleToken, Theme, Typography,
+    ColorScheme, Easing, ElevationScale, MotionScale, RadiusScale, SpacingScale, TextStyleToken,
+    Theme, Typography,
 };
+use cove_core::{Color, Font, FontWeight, LayeredShadow, SurfaceShadow};
 
 fn color(r: u8, g: u8, b: u8) -> Color {
     Color::from_rgba8(r, g, b, 255)
@@ -62,12 +63,37 @@ pub fn value() -> Theme {
         RadiusScale::new(0.0, 4.0, 6.0, 8.0, 10.0, 9999.0),
         ElevationScale::new(
             SurfaceShadow::NONE,
-            SurfaceShadow { color: Some(alpha(0, 0, 0, 0x4D)), offset_x: 0.0, offset_y: 1.0, blur: 2.0 },
-            SurfaceShadow { color: Some(alpha(0, 0, 0, 0x33)), offset_x: 0.0, offset_y: 1.0, blur: 3.0 },
-            SurfaceShadow { color: Some(alpha(0, 0, 0, 0x2E)), offset_x: 0.0, offset_y: 6.0, blur: 20.0 },
+            SurfaceShadow {
+                color: Some(alpha(0, 0, 0, 0x4D)),
+                offset_x: 0.0,
+                offset_y: 1.0,
+                blur: 2.0,
+            },
+            SurfaceShadow {
+                color: Some(alpha(0, 0, 0, 0x33)),
+                offset_x: 0.0,
+                offset_y: 1.0,
+                blur: 3.0,
+            },
+            SurfaceShadow {
+                color: Some(alpha(0, 0, 0, 0x2E)),
+                offset_x: 0.0,
+                offset_y: 6.0,
+                blur: 20.0,
+            },
             LayeredShadow {
-                ambient: SurfaceShadow { color: Some(alpha(0, 0, 0, 0x66)), offset_x: 0.0, offset_y: 0.0, blur: 40.0 },
-                key: SurfaceShadow { color: Some(alpha(0, 0, 0, 0x8C)), offset_x: 0.0, offset_y: 10.0, blur: 16.0 },
+                ambient: SurfaceShadow {
+                    color: Some(alpha(0, 0, 0, 0x66)),
+                    offset_x: 0.0,
+                    offset_y: 0.0,
+                    blur: 40.0,
+                },
+                key: SurfaceShadow {
+                    color: Some(alpha(0, 0, 0, 0x8C)),
+                    offset_x: 0.0,
+                    offset_y: 10.0,
+                    blur: 16.0,
+                },
             },
         ),
         MotionScale::new(0.08, 0.18, 0.32, Easing::EMPHASIZED, Easing::STANDARD),

@@ -26,10 +26,16 @@ impl ShaderVisibility {
     }
     /// Every stage named by this visibility set, in declaration order.
     pub fn stages(self) -> Vec<ShaderStage> {
-        [ShaderStage::Vertex, ShaderStage::Fragment, ShaderStage::Compute, ShaderStage::Task, ShaderStage::Mesh]
-            .into_iter()
-            .filter(|stage| self.contains(Self::from_stage(*stage)))
-            .collect()
+        [
+            ShaderStage::Vertex,
+            ShaderStage::Fragment,
+            ShaderStage::Compute,
+            ShaderStage::Task,
+            ShaderStage::Mesh,
+        ]
+        .into_iter()
+        .filter(|stage| self.contains(Self::from_stage(*stage)))
+        .collect()
     }
 }
 impl From<ShaderStage> for ShaderVisibility {
@@ -44,8 +50,14 @@ mod tests {
 
     #[test]
     fn stage_sets_expand_in_order() {
-        assert_eq!(ShaderVisibility::GRAPHICS.stages(), vec![ShaderStage::Vertex, ShaderStage::Fragment]);
+        assert_eq!(
+            ShaderVisibility::GRAPHICS.stages(),
+            vec![ShaderStage::Vertex, ShaderStage::Fragment]
+        );
         assert_eq!(ShaderVisibility::ALL.stages().len(), 5);
-        assert_eq!(ShaderVisibility::from(ShaderStage::Compute), ShaderVisibility::COMPUTE);
+        assert_eq!(
+            ShaderVisibility::from(ShaderStage::Compute),
+            ShaderVisibility::COMPUTE
+        );
     }
 }

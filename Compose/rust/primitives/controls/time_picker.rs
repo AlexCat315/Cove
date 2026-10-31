@@ -22,9 +22,9 @@ use crate::primitives::controls::adaptive::{apply_touch_control_extent, supports
 use crate::primitives::controls::date_values::TimeOfDay;
 use crate::primitives::controls::fields::wheel_picker::{WheelPicker, WheelPickerOption};
 use crate::primitives::text::Text;
-use crate::theme::{theme_for_node, SemanticColorRef, SemanticFontRef};
+use crate::theme::{SemanticColorRef, SemanticFontRef, theme_for_node};
 use crate::{
-    impl_primitive_view, AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View,
+    AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View, impl_primitive_view,
 };
 
 /// The hour cycle a time picker shows.
@@ -105,7 +105,11 @@ pub struct TimePicker {
 
 impl TimePicker {
     pub fn new(selection: Binding<Option<TimeOfDay>>, options: TimePickerOptions) -> Self {
-        Self { selection, options: options.validated(), on_change: None }
+        Self {
+            selection,
+            options: options.validated(),
+            on_change: None,
+        }
     }
 
     pub fn on_change(mut self, handler: impl Fn(TimeOfDay) + Send + Sync + 'static) -> Self {
@@ -125,7 +129,9 @@ impl TimePicker {
     fn current(&self) -> TimeOfDay {
         let candidate = self.selection.get().unwrap_or(self.options.minimum);
         TimeOfDay::new(
-            candidate.hour.clamp(self.options.minimum.hour, self.options.maximum.hour),
+            candidate
+                .hour
+                .clamp(self.options.minimum.hour, self.options.maximum.hour),
             candidate.minute,
             candidate.second,
         )
@@ -133,9 +139,10 @@ impl TimePicker {
 
     /// Writes a time, clamping its second count into the authored range.
     fn commit(&self, time: TimeOfDay) -> TimeOfDay {
-        let seconds = time
-            .seconds()
-            .clamp(self.options.minimum.seconds(), self.options.maximum.seconds());
+        let seconds = time.seconds().clamp(
+            self.options.minimum.seconds(),
+            self.options.maximum.seconds(),
+        );
         let next = TimeOfDay::new(seconds / 3600, (seconds / 60) % 60, seconds % 60);
         if self.selection.get() != Some(next) {
             self.selection.set(Some(next));
@@ -154,14 +161,19 @@ impl TimePicker {
                 let time = getter.current();
                 match getter.options.hour_cycle {
                     TimeHourCycle::Twelve => {
-                        if time.hour % 12 == 0 { 12 } else { time.hour % 12 }
+                        if time.hour % 12 == 0 {
+                            12
+                        } else {
+                            time.hour % 12
+                        }
                     }
                     TimeHourCycle::TwentyFour => time.hour,
                 }
             },
             move |value| {
                 let time = setter.current();
-                let base = if setter.options.hour_cycle == TimeHourCycle::Twelve && time.hour >= 12 {
+                let base = if setter.options.hour_cycle == TimeHourCycle::Twelve && time.hour >= 12
+                {
                     12
                 } else {
                     0
@@ -218,7 +230,9 @@ impl TimePicker {
             TimeHourCycle::Twelve => 1..=12,
             TimeHourCycle::TwentyFour => 0..=23,
         };
-        range.map(|hour| WheelPickerOption::new(hour, format!("{hour:02}"))).collect()
+        range
+            .map(|hour| WheelPickerOption::new(hour, format!("{hour:02}")))
+            .collect()
     }
 
     fn minutes(&self) -> Vec<WheelPickerOption<i32>> {
@@ -229,14 +243,24 @@ impl TimePicker {
     }
 
     fn seconds(&self) -> Vec<WheelPickerOption<i32>> {
-        (0..=59).map(|second| WheelPickerOption::new(second, format!("{second:02}"))).collect()
+        (0..=59)
+            .map(|second| WheelPickerOption::new(second, format!("{second:02}")))
+            .collect()
     }
 
     fn periods(&self) -> Vec<WheelPickerOption<i32>> {
-        vec![WheelPickerOption::new(0, "AM"), WheelPickerOption::new(1, "PM")]
+        vec![
+            WheelPickerOption::new(0, "AM"),
+            WheelPickerOption::new(1, "PM"),
+        ]
     }
 
-    fn wheel(&self, label: &str, options: Vec<WheelPickerOption<i32>>, value: Binding<i32>) -> AnyView {
+    fn wheel(
+        &self,
+        label: &str,
+        options: Vec<WheelPickerOption<i32>>,
+        value: Binding<i32>,
+    ) -> AnyView {
         AnyView::new(
             TimeWheel {
                 label: label.to_string(),
@@ -345,7 +369,9 @@ impl TimeWheel {
     }
 
     fn choose(&self, index: usize) {
-        let Some(option) = self.options.get(index) else { return };
+        let Some(option) = self.options.get(index) else {
+            return;
+        };
         if !option.is_enabled || option.value == self.value.get() {
             return;
         }
@@ -432,7 +458,10 @@ impl PrimitiveView for TimeWheel {
             label: self.label.clone(),
             value: self.value_label(&picker),
             help: "Use arrow keys, Home or End to choose a value".to_string(),
-            state: AccessibilityState { is_enabled: self.is_enabled, ..Default::default() },
+            state: AccessibilityState {
+                is_enabled: self.is_enabled,
+                ..Default::default()
+            },
             ..Default::default()
         }));
 
@@ -441,11 +470,19 @@ impl PrimitiveView for TimeWheel {
         let decrement = hosted.clone();
         let set_value = hosted.clone();
         node.set_accessibility_actions(AccessibilityActions {
-            increment: self.is_enabled.then(|| Rc::new(move || increment.step(1)) as Rc<dyn Fn()>),
-            decrement: self.is_enabled.then(|| Rc::new(move || decrement.step(-1)) as Rc<dyn Fn()>),
+            increment: self
+                .is_enabled
+                .then(|| Rc::new(move || increment.step(1)) as Rc<dyn Fn()>),
+            decrement: self
+                .is_enabled
+                .then(|| Rc::new(move || decrement.step(-1)) as Rc<dyn Fn()>),
             set_value: self.is_enabled.then(|| {
                 Rc::new(move |text: &str| {
-                    if let Some(index) = set_value.options.iter().position(|option| option.label == text) {
+                    if let Some(index) = set_value
+                        .options
+                        .iter()
+                        .position(|option| option.label == text)
+                    {
                         set_value.choose(index);
                     }
                 }) as Rc<dyn Fn(&str)>
@@ -455,7 +492,9 @@ impl PrimitiveView for TimeWheel {
 
         let weak = node.downgrade();
         node.update_draw(height.to_bits(), move |list, origin| {
-            let Some(owner) = Node::upgrade(&weak) else { return };
+            let Some(owner) = Node::upgrade(&weak) else {
+                return;
+            };
             let theme = theme_for_node(&owner);
             let height = Self::row_height_for(&owner);
             let band_height = (height - 4.0).max(0.0);
@@ -473,21 +512,30 @@ impl PrimitiveView for TimeWheel {
             );
         });
 
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         if !self.is_enabled {
             registry.remove(node);
             return;
         }
 
         let hover_node = node.downgrade();
-        registry.set_hover(node, Rc::new(move |phase| {
-            let Some(owner) = Node::upgrade(&hover_node) else { return };
-            let next = phase == HoverPhase::Enter && supports_control_hover(&owner);
-            if owner.attachment::<bool>(WHEEL_HOVERED) != Some(next) {
-                owner.set_attachment(WHEEL_HOVERED, next);
-                owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("timeWheelHover"));
-            }
-        }));
+        registry.set_hover(
+            node,
+            Rc::new(move |phase| {
+                let Some(owner) = Node::upgrade(&hover_node) else {
+                    return;
+                };
+                let next = phase == HoverPhase::Enter && supports_control_hover(&owner);
+                if owner.attachment::<bool>(WHEEL_HOVERED) != Some(next) {
+                    owner.set_attachment(WHEEL_HOVERED, next);
+                    owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                        "timeWheelHover",
+                    ));
+                }
+            }),
+        );
 
         let pointer = self.snapshot();
         let pointer_node = node.downgrade();
@@ -498,7 +546,9 @@ impl PrimitiveView for TimeWheel {
                 if event.button != MouseButton::Left || event_phase == EventPhase::Capture {
                     return EventResult::Ignored;
                 }
-                let Some(owner) = Node::upgrade(&pointer_node) else { return EventResult::Ignored };
+                let Some(owner) = Node::upgrade(&pointer_node) else {
+                    return EventResult::Ignored;
+                };
                 match phase {
                     PointerPhase::Down => {
                         if let Some(chain) = FocusChainHolder::current() {
@@ -585,7 +635,9 @@ impl PrimitiveView for TimeWheel {
         let selected = picker.value().and_then(|value| picker.index_of(value));
         let mut rows: Vec<AnyView> = Vec::new();
         for index in window {
-            let Some(option) = picker.options.get(index) else { continue };
+            let Some(option) = picker.options.get(index) else {
+                continue;
+            };
             let is_selected = Some(&option.value) == picker.value();
             let distance = selected.map_or(0.0, |selected| (index as f32 - selected as f32).abs());
             let alpha = if option.is_enabled {
@@ -607,8 +659,16 @@ impl PrimitiveView for TimeWheel {
             };
             rows.push(AnyView::new(
                 BoxView::new(
-                    FlexDirection::Row, Align::Center, Justify::Center, Wrap::NoWrap, 0.0,
-                    AnyView::new(Text::new(option.label.clone()).semantic_font(font).semantic_foreground(tint)),
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::Center,
+                    Wrap::NoWrap,
+                    0.0,
+                    AnyView::new(
+                        Text::new(option.label.clone())
+                            .semantic_font(font)
+                            .semantic_foreground(tint),
+                    ),
                 )
                 .opacity(alpha)
                 .frame_height(height),
@@ -616,7 +676,11 @@ impl PrimitiveView for TimeWheel {
         }
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::Center, Wrap::NoWrap, 0.0,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::Center,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(TupleView::new(rows)),
             )
             .frame_width(WHEEL_WIDTH),

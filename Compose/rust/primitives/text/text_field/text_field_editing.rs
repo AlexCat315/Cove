@@ -12,7 +12,9 @@ use super::text_field_observation::TextFieldCaretState;
 /// Delete the active selection, if any. Returns `true` when something was
 /// deleted, so the caller can skip its own delete-one logic.
 pub fn delete_selection(state: &mut FieldState) -> bool {
-    let Some((low, high)) = state.selection_range() else { return false };
+    let Some((low, high)) = state.selection_range() else {
+        return false;
+    };
     state.buffer = state.buffer.delete(low..high);
     state.selection.cursor_index = low;
     state.selection.anchor = None;
@@ -32,7 +34,8 @@ pub fn insert_replacing_selection(state: &mut FieldState, incoming: &str) {
     let removed = selection.map_or(0, |(low, high)| high - low);
     state.buffer = state.buffer.replace(cursor..(cursor + removed), incoming);
     state.clear_composition();
-    state.selection.cursor_index = (cursor + incoming.chars().count()).min(state.buffer.character_count());
+    state.selection.cursor_index =
+        (cursor + incoming.chars().count()).min(state.buffer.character_count());
     state.selection.anchor = None;
     state.selection.set_preferred_caret_x(None);
     record_caret_activity(state);
@@ -40,7 +43,12 @@ pub fn insert_replacing_selection(state: &mut FieldState, incoming: &str) {
 
 /// Move the caret, optionally growing a selection, and remember the preferred
 /// caret x for vertical moves.
-pub fn move_cursor(state: &mut FieldState, target: usize, extend_selection: bool, preferred_x: Option<f32>) {
+pub fn move_cursor(
+    state: &mut FieldState,
+    target: usize,
+    extend_selection: bool,
+    preferred_x: Option<f32>,
+) {
     let count = state.buffer.character_count();
     let bounded = target.min(count);
     if extend_selection {

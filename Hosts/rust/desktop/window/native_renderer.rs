@@ -4,9 +4,7 @@
 //! Presentation ownership is separate from layout and input. All calls occur on
 //! the UI thread; the renderer also coordinates scene frames.
 
-use super::super::application::memory::{
-    AppWindowMemorySnapshot, AppWindowRendererState,
-};
+use super::super::application::memory::{AppWindowMemorySnapshot, AppWindowRendererState};
 use cove_core::DrawList;
 use cove_graphics::rhi::{
     CommandBuffer, Device, RenderColorTarget, RhiResult, Swapchain, TextureDescriptor,
@@ -92,13 +90,10 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
     }
 
     fn memory_snapshot(&self) -> AppWindowMemorySnapshot {
-        let bytes = self
-            .framebuffer
-            .as_ref()
-            .map_or(0, |buffer| {
-                let descriptor = buffer.descriptor();
-                descriptor.width * descriptor.height * 4
-            });
+        let bytes = self.framebuffer.as_ref().map_or(0, |buffer| {
+            let descriptor = buffer.descriptor();
+            descriptor.width * descriptor.height * 4
+        });
         AppWindowMemorySnapshot {
             state: self.state,
             samples: self.settings.samples,
@@ -123,11 +118,7 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
         }
         let device = self.device.clone();
         device.with_frame_session(|| {
-            let descriptor = SurfaceFactory::native_descriptor(
-                native,
-                [size.0, size.1],
-                vsync,
-            );
+            let descriptor = SurfaceFactory::native_descriptor(native, [size.0, size.1], vsync);
             let swapchain = device.make_swapchain(descriptor)?;
             self.native = Some(native);
             self.swapchain = Some(swapchain);
@@ -160,7 +151,9 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
     }
 
     fn draw(&mut self, list: &DrawList, logical: (f32, f32)) -> RhiResult<bool> {
-        let Some(native) = self.native else { return Ok(false) };
+        let Some(native) = self.native else {
+            return Ok(false);
+        };
         if !self.presentation_active || self.size.0 == 0 || self.size.1 == 0 {
             return Ok(false);
         }
@@ -175,8 +168,13 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
                     vsync,
                 ))?);
             }
-            let Some(swapchain) = self.swapchain else { return Ok(false) };
-            self.renderer.configure(TextureFormat::Bgra8UnormSrgb, self.settings.samples as usize)?;
+            let Some(swapchain) = self.swapchain else {
+                return Ok(false);
+            };
+            self.renderer.configure(
+                TextureFormat::Bgra8UnormSrgb,
+                self.settings.samples as usize,
+            )?;
             device.begin_frame()?;
             struct EndFrame<'a>(&'a Device);
             impl Drop for EndFrame<'_> {
@@ -206,7 +204,9 @@ impl AppWindowRenderer for NativeAppWindowRenderer {
                     .with_label("ui-framebuffer"),
                 )?);
             }
-            let Some(framebuffer) = &self.framebuffer else { return Ok(false) };
+            let Some(framebuffer) = &self.framebuffer else {
+                return Ok(false);
+            };
             let mut commands = CommandBuffer::new();
             let viewport = NativeUIViewport::new([pixels.0, pixels.1], [logical.0, logical.1]);
             let frame = self.renderer.record_presentation(

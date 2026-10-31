@@ -15,10 +15,10 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use crate::{PrimitiveView, impl_primitive_view};
 use cove_core::scene::{Point, Rect, Size};
 use cove_core::{Color, TextureId};
 use cove_imaging::{ImageAsset, TextureImage};
-use crate::{impl_primitive_view, PrimitiveView};
 
 use super::image_geometry::{ImageContentMode, ImageGeometry, ImageRenderingMode};
 use super::vector_image_raster::VectorImageRaster;
@@ -39,7 +39,10 @@ impl ContentScaleHolder {
 /// Where an `Image` samples from.
 #[derive(Clone)]
 pub enum ImageSource {
-    Texture { texture_id: TextureId, size: Option<Size> },
+    Texture {
+        texture_id: TextureId,
+        size: Option<Size>,
+    },
     Asset(Arc<ImageAsset>),
     Rendered(Arc<TextureImage>),
 }
@@ -47,9 +50,16 @@ pub enum ImageSource {
 impl PartialEq for ImageSource {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Texture { texture_id: lhs, size: left }, Self::Texture { texture_id: rhs, size: right }) => {
-                lhs == rhs && left == right
-            }
+            (
+                Self::Texture {
+                    texture_id: lhs,
+                    size: left,
+                },
+                Self::Texture {
+                    texture_id: rhs,
+                    size: right,
+                },
+            ) => lhs == rhs && left == right,
             (Self::Asset(lhs), Self::Asset(rhs)) => Arc::ptr_eq(lhs, rhs),
             (Self::Rendered(lhs), Self::Rendered(rhs)) => Arc::ptr_eq(lhs, rhs),
             _ => false,
@@ -71,7 +81,10 @@ impl ImageSource {
         match self {
             Self::Texture { size, .. } => size.map(|size| (size.width, size.height)),
             Self::Asset(asset) => Some((asset.image.width() as f32, asset.image.height() as f32)),
-            Self::Rendered(image) => Some((image.pixel_size.width as f32, image.pixel_size.height as f32)),
+            Self::Rendered(image) => Some((
+                image.pixel_size.width as f32,
+                image.pixel_size.height as f32,
+            )),
         }
     }
 
@@ -130,7 +143,10 @@ struct PaintIdentity {
 impl Image {
     pub fn from_texture(texture_id: TextureId, width: f32, height: f32) -> Self {
         Self::new(
-            ImageSource::Texture { texture_id, size: None },
+            ImageSource::Texture {
+                texture_id,
+                size: None,
+            },
             width,
             height,
             Color::WHITE,
@@ -147,7 +163,16 @@ impl Image {
         content_mode: ImageContentMode,
         rendering_mode: ImageRenderingMode,
     ) -> Self {
-        Self { source, width, height, tint, content_mode, rendering_mode, foreground: None, vector_source_url: None }
+        Self {
+            source,
+            width,
+            height,
+            tint,
+            content_mode,
+            rendering_mode,
+            foreground: None,
+            vector_source_url: None,
+        }
     }
 
     /// Explicit fill for alpha-mask glyphs.
@@ -171,9 +196,10 @@ impl PrimitiveView for Image {
 
     fn update_node(&self, node: &cove_core::scene::Node) {
         let snapshot = self.clone();
-        let vector_raster = self.vector_source_url.clone().map(|path| {
-            VectorImageRaster::new(path, self.source.clone(), self.width, self.height)
-        });
+        let vector_raster = self
+            .vector_source_url
+            .clone()
+            .map(|path| VectorImageRaster::new(path, self.source.clone(), self.width, self.height));
         let identity = PaintIdentity {
             source: self.source.clone(),
             width: self.width,
@@ -188,8 +214,16 @@ impl PrimitiveView for Image {
         node.update_draw(identity, move |list, origin| {
             let node = &draw_node;
             let frame = node.frame();
-            let draw_width = if frame.width > 0.0 { frame.width } else { snapshot.width };
-            let draw_height = if frame.height > 0.0 { frame.height } else { snapshot.height };
+            let draw_width = if frame.width > 0.0 {
+                frame.width
+            } else {
+                snapshot.width
+            };
+            let draw_height = if frame.height > 0.0 {
+                frame.height
+            } else {
+                snapshot.height
+            };
             let modifier_tint = if snapshot.rendering_mode == ImageRenderingMode::AlphaMask {
                 snapshot
                     .foreground
@@ -218,7 +252,10 @@ impl PrimitiveView for Image {
             let mut rect = geometry.rect;
             let pixel_scale = list.pixel_scale.max(1.0);
             let selected = resolved.resolution(
-                Size { width: rect.width * pixel_scale, height: rect.height * pixel_scale },
+                Size {
+                    width: rect.width * pixel_scale,
+                    height: rect.height * pixel_scale,
+                },
                 Size {
                     width: geometry.uv_max.x - geometry.uv_min.x,
                     height: geometry.uv_max.y - geometry.uv_min.y,

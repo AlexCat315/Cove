@@ -1,10 +1,10 @@
 //! Translation of Primitives/Layout/BoundedScrollView.swift.
 //!
 //! A scroll view whose height is the content's extent clamped into a range.
-use cove_core::scene::ScrollConsumePolicy;
 use crate::modifiers::layout::LayoutFrameExt;
 use crate::primitives::layout::{ScrollAxis, ScrollView, ScrollbarGutter};
 use crate::{AnyView, View};
+use cove_core::scene::ScrollConsumePolicy;
 
 /// Scroll view sized to its content within a height range.
 pub struct BoundedScrollView {

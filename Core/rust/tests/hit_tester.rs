@@ -34,8 +34,12 @@ fn leaf_hit() {
     let leaf = plain(Rect::new(10.0, 10.0, 20.0, 20.0));
     root.add_child(&leaf);
 
-    let result = HitTester::hit_test(&root, Point { x: 15.0, y: 15.0 }).expect("point is inside the leaf");
-    assert!(same(Some(&result.node), &leaf), "the leaf is the deepest hit");
+    let result =
+        HitTester::hit_test(&root, Point { x: 15.0, y: 15.0 }).expect("point is inside the leaf");
+    assert!(
+        same(Some(&result.node), &leaf),
+        "the leaf is the deepest hit"
+    );
     assert_eq!(result.path.len(), 2, "path runs root -> leaf");
     assert!(same(result.path.first(), &root));
     assert!(same(result.path.last(), &leaf));
@@ -58,8 +62,12 @@ fn z_order() {
     root.add_child(&bottom);
     root.add_child(&top);
 
-    let result = HitTester::hit_test(&root, Point { x: 20.0, y: 20.0 }).expect("overlapping children");
-    assert!(same(Some(&result.node), &top), "the last child paints on top");
+    let result =
+        HitTester::hit_test(&root, Point { x: 20.0, y: 20.0 }).expect("overlapping children");
+    assert!(
+        same(Some(&result.node), &top),
+        "the last child paints on top"
+    );
 }
 
 #[test]
@@ -68,8 +76,8 @@ fn pass_through_parent() {
     let leaf = plain(Rect::new(10.0, 10.0, 20.0, 20.0));
     root.add_child(&leaf);
 
-    let hit_on_leaf =
-        HitTester::hit_test(&root, Point { x: 15.0, y: 15.0 }).expect("children of a pass-through still hit");
+    let hit_on_leaf = HitTester::hit_test(&root, Point { x: 15.0, y: 15.0 })
+        .expect("children of a pass-through still hit");
     assert!(same(Some(&hit_on_leaf.node), &leaf));
 
     // The point is inside the root but not the leaf, and the root does not
@@ -119,18 +127,26 @@ fn content_offset_affects_hit_test() {
     // Before scrolling, y=5 sits above the child.
     let before = HitTester::hit_test(&root, Point { x: 10.0, y: 5.0 });
     assert!(
-        !before.as_ref().is_some_and(|result| result.node.id() == child.id()),
+        !before
+            .as_ref()
+            .is_some_and(|result| result.node.id() == child.id()),
         "unscrolled, y=5 misses the child"
     );
 
     // Scrolling the content down by 30 moves the child to the top visually.
     root.set_content_offset(Point { x: 0.0, y: 30.0 });
 
-    let scrolled = HitTester::hit_test(&root, Point { x: 10.0, y: 5.0 }).expect("the child moved up");
-    assert!(same(Some(&scrolled.node), &child), "scrolled, y=5 hits the child");
+    let scrolled =
+        HitTester::hit_test(&root, Point { x: 10.0, y: 5.0 }).expect("the child moved up");
+    assert!(
+        same(Some(&scrolled.node), &child),
+        "scrolled, y=5 hits the child"
+    );
     let past = HitTester::hit_test(&root, Point { x: 10.0, y: 35.0 });
     assert!(
-        !past.as_ref().is_some_and(|result| result.node.id() == child.id()),
+        !past
+            .as_ref()
+            .is_some_and(|result| result.node.id() == child.id()),
         "scrolled, y=35 is past the child"
     );
 }

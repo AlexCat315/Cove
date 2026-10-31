@@ -159,8 +159,12 @@ impl EventDispatcher {
         // Scroll chrome belongs to the actual hit path. A portal above a
         // viewport must not arm a background touch gesture whose release
         // will only visit the portal's ancestors.
-        if self.deliver_priority(&hit.path, &kind, InputRoutingPriority::CHROME, EventPhase::Capture)
-            == EventResult::Handled
+        if self.deliver_priority(
+            &hit.path,
+            &kind,
+            InputRoutingPriority::CHROME,
+            EventPhase::Capture,
+        ) == EventResult::Handled
         {
             return;
         }
@@ -196,7 +200,9 @@ impl EventDispatcher {
             }
             return;
         }
-        let Some(hit) = self.hit_test(point) else { return };
+        let Some(hit) = self.hit_test(point) else {
+            return;
+        };
         let _ = self.deliver(&hit.path, &kind);
         self.refresh_hover(point);
     }
@@ -295,8 +301,15 @@ impl EventDispatcher {
             event.mouse_x = Some(last.x);
             event.mouse_y = Some(last.y);
         }
-        let hit_path = self.last_cursor.get().and_then(|cursor| self.hit_test(cursor)).map(|hit| hit.path);
-        let focused_path = self.focus_chain.focused().map(|focused| path_from_root(&focused));
+        let hit_path = self
+            .last_cursor
+            .get()
+            .and_then(|cursor| self.hit_test(cursor))
+            .map(|hit| hit.path);
+        let focused_path = self
+            .focus_chain
+            .focused()
+            .map(|focused| path_from_root(&focused));
         let preferred_focused_path = self.preferred_focused_wheel_path(focused_path.as_deref());
         let preferred_hit_path = hit_path.clone().filter(|path| {
             path.iter().any(|node| {
@@ -398,7 +411,10 @@ impl EventDispatcher {
         {
             return;
         }
-        let focused_path = self.focus_chain.focused().map(|focused| path_from_root(&focused));
+        let focused_path = self
+            .focus_chain
+            .focused()
+            .map(|focused| path_from_root(&focused));
         if let Some(path) = focused_path.as_deref()
             && self.deliver_key_path(path, event, phase) == EventResult::Handled
         {
@@ -408,7 +424,9 @@ impl EventDispatcher {
         // the framework's keyboard traversal rather than requiring a host hook.
         if phase == KeyPhase::Down
             && event.scancode == 43
-            && !(event.modifiers.has_ctrl() || event.modifiers.has_gui() || event.modifiers.has_alt())
+            && !(event.modifiers.has_ctrl()
+                || event.modifiers.has_gui()
+                || event.modifiers.has_alt())
             && let Some(root) = self.tree.borrow().root()
         {
             if event.modifiers.has_shift() {
@@ -436,13 +454,17 @@ impl EventDispatcher {
     }
 
     fn dispatch_text(&self, text: &str) {
-        let Some(focused) = self.focus_chain.focused() else { return };
+        let Some(focused) = self.focus_chain.focused() else {
+            return;
+        };
         let path = path_from_root(&focused);
         let _ = self.deliver(&path, &EventKind::Text(text.to_string()));
     }
 
     fn dispatch_text_editing(&self, event: &TextEditingEvent) {
-        let Some(focused) = self.focus_chain.focused() else { return };
+        let Some(focused) = self.focus_chain.focused() else {
+            return;
+        };
         let path = path_from_root(&focused);
         let _ = self.deliver(&path, &EventKind::Editing(event.clone()));
     }
@@ -450,7 +472,9 @@ impl EventDispatcher {
     // MARK: - Delivery
 
     fn deliver(&self, path: &[Node], kind: &EventKind) -> EventResult {
-        let Some((target, ancestors)) = path.split_last() else { return EventResult::Ignored };
+        let Some((target, ancestors)) = path.split_last() else {
+            return EventResult::Ignored;
+        };
 
         // Capture phase: root → target (exclusive of target).
         for node in ancestors {
@@ -475,11 +499,15 @@ impl EventDispatcher {
     }
 
     fn deliver_wheel(&self, path: &[Node], event: &MouseWheelEvent) -> EventResult {
-        let Some((target, ancestors)) = path.split_last() else { return EventResult::Ignored };
+        let Some((target, ancestors)) = path.split_last() else {
+            return EventResult::Ignored;
+        };
         let kind = EventKind::Wheel(event.clone());
 
         if self.invoke(target, &kind, EventPhase::Target) == EventResult::Handled {
-            self.wheel_gesture.borrow_mut().consumed(target, event.input);
+            self.wheel_gesture
+                .borrow_mut()
+                .consumed(target, event.input);
             return EventResult::Handled;
         }
 
@@ -515,8 +543,12 @@ impl EventDispatcher {
         min_priority: InputRoutingPriority,
         excluded: &HashSet<ElementId>,
     ) -> EventResult {
-        let Some(root) = self.tree.borrow().root() else { return EventResult::Ignored };
-        let routed = self.interactions.routed_nodes(handler_slot(kind), role, min_priority);
+        let Some(root) = self.tree.borrow().root() else {
+            return EventResult::Ignored;
+        };
+        let routed = self
+            .interactions
+            .routed_nodes(handler_slot(kind), role, min_priority);
         let mut candidates: Vec<RouteCandidate> = Vec::with_capacity(routed.len());
         for item in routed {
             let RoutedInputNode { node, route } = item;
@@ -526,24 +558,31 @@ impl EventDispatcher {
             if !node.accepts_subtree_input() {
                 continue;
             }
-            if matches!(kind, EventKind::Key(..) | EventKind::Text(_) | EventKind::Editing(_))
-                && !self.focus_chain.permits_keyboard_input(&node)
+            if matches!(
+                kind,
+                EventKind::Key(..) | EventKind::Text(_) | EventKind::Editing(_)
+            ) && !self.focus_chain.permits_keyboard_input(&node)
             {
                 continue;
             }
-            let Some(depth) = depth_under(&node, &root) else { continue };
+            let Some(depth) = depth_under(&node, &root) else {
+                continue;
+            };
             candidates.push(RouteCandidate { node, route, depth });
         }
         candidates.sort_by(route_candidate_cmp);
         for candidate in &candidates {
-            let phase = if *role == InputHandlerRole::Shortcut || *role == InputHandlerRole::ScrollChrome {
-                EventPhase::Capture
-            } else {
-                EventPhase::Target
-            };
+            let phase =
+                if *role == InputHandlerRole::Shortcut || *role == InputHandlerRole::ScrollChrome {
+                    EventPhase::Capture
+                } else {
+                    EventPhase::Target
+                };
             if self.invoke(&candidate.node, kind, phase) == EventResult::Handled {
                 if let EventKind::Wheel(event) = kind {
-                    self.wheel_gesture.borrow_mut().consumed(&candidate.node, event.input);
+                    self.wheel_gesture
+                        .borrow_mut()
+                        .consumed(&candidate.node, event.input);
                 }
                 return EventResult::Handled;
             }
@@ -560,11 +599,17 @@ impl EventDispatcher {
         let mut out: Vec<RouteCandidate> = Vec::new();
         for (index, node) in path.iter().enumerate() {
             let handlers = self.interactions.handlers(node);
-            let Some(route) = route_for(&handlers, kind) else { continue };
+            let Some(route) = route_for(&handlers, kind) else {
+                continue;
+            };
             if route.priority < min_priority {
                 continue;
             }
-            out.push(RouteCandidate { node: node.clone(), route, depth: index });
+            out.push(RouteCandidate {
+                node: node.clone(),
+                route,
+                depth: index,
+            });
         }
         out.sort_by(route_candidate_cmp);
         out
@@ -608,7 +653,9 @@ impl EventDispatcher {
             EventKind::Pointer(event, pointer_phase) => handlers
                 .pointer
                 .as_ref()
-                .map_or(EventResult::Ignored, |handler| handler(event, *pointer_phase, phase)),
+                .map_or(EventResult::Ignored, |handler| {
+                    handler(event, *pointer_phase, phase)
+                }),
             EventKind::Motion(event) => handlers
                 .motion
                 .as_ref()
@@ -715,7 +762,10 @@ fn route_candidate_cmp(lhs: &RouteCandidate, rhs: &RouteCandidate) -> std::cmp::
 }
 
 fn same_wheel_target(lhs: Option<&[Node]>, rhs: Option<&[Node]>) -> bool {
-    match (lhs.and_then(|path| path.last()), rhs.and_then(|path| path.last())) {
+    match (
+        lhs.and_then(|path| path.last()),
+        rhs.and_then(|path| path.last()),
+    ) {
         (Some(lhs), Some(rhs)) => lhs == rhs,
         _ => false,
     }
@@ -796,8 +846,8 @@ fn common_prefix_length(lhs: &[Node], rhs: &[Node]) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scene::PointerHandler;
     use crate::Rect;
+    use crate::scene::PointerHandler;
     use cove_platform::MouseButton;
     use std::cell::Cell;
 
@@ -840,10 +890,12 @@ mod tests {
             let order = order.clone();
             move |label: &'static str| {
                 let order = order.clone();
-                Rc::new(move |_: &MouseButtonEvent, _: PointerPhase, _: EventPhase| {
-                    order.borrow_mut().push(label);
-                    EventResult::Ignored
-                }) as PointerHandler
+                Rc::new(
+                    move |_: &MouseButtonEvent, _: PointerPhase, _: EventPhase| {
+                        order.borrow_mut().push(label);
+                        EventResult::Ignored
+                    },
+                ) as PointerHandler
             }
         };
         interactions.set_pointer(&root, InputHandlerRoute::control(), record("root"));
@@ -869,7 +921,11 @@ mod tests {
             &child,
             InputHandlerRoute::control(),
             Rc::new(|_, _, phase| {
-                if phase == EventPhase::Target { EventResult::Handled } else { EventResult::Ignored }
+                if phase == EventPhase::Target {
+                    EventResult::Handled
+                } else {
+                    EventResult::Ignored
+                }
             }),
         );
         dispatcher.dispatch(&down(20.0, 20.0));
@@ -887,7 +943,11 @@ mod tests {
             Rc::new(move |phase| logger.borrow_mut().push(phase)),
         );
         let motion = |x: f32, y: f32| {
-            InputEvent::MouseMotion(MouseMotionEvent { x, y, ..MouseMotionEvent::default() })
+            InputEvent::MouseMotion(MouseMotionEvent {
+                x,
+                y,
+                ..MouseMotionEvent::default()
+            })
         };
         dispatcher.dispatch(&motion(20.0, 20.0));
         assert_eq!(*log.borrow(), vec![HoverPhase::Enter]);

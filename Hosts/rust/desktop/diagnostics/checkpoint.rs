@@ -17,7 +17,10 @@ impl ApplicationCheckpoint {
         capture: impl Fn() -> BTreeMap<String, String> + 'static,
         restore: impl Fn(&BTreeMap<String, String>) -> bool + 'static,
     ) -> Self {
-        Self { capture: Rc::new(capture), restore: Rc::new(restore) }
+        Self {
+            capture: Rc::new(capture),
+            restore: Rc::new(restore),
+        }
     }
 
     pub fn capture(&self) -> BTreeMap<String, String> {

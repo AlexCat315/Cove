@@ -74,7 +74,10 @@ fn render_node(node: &Node, list: &mut DrawList, placed: Affine2D) {
     // to that too and keep only the visible fringe.
     let occluded = node.background_color().is_some().then_some(rect);
     list.add_shadow(
-        LayeredShadow { ambient: node.ambient_shadow().scaled(own.shadow_scale), key: node.shadow().scaled(own.shadow_scale) },
+        LayeredShadow {
+            ambient: node.ambient_shadow().scaled(own.shadow_scale),
+            key: node.shadow().scaled(own.shadow_scale),
+        },
         rect,
         radius,
         node.opacity(),
@@ -92,7 +95,16 @@ fn render_node(node: &Node, list: &mut DrawList, placed: Affine2D) {
 
     // 4. Background fill (inset by border width so it does not overdraw the
     //    border ring).
-    emit_background(node, list, abs_x, abs_y, width, height, radius, border_width);
+    emit_background(
+        node,
+        list,
+        abs_x,
+        abs_y,
+        width,
+        height,
+        radius,
+        border_width,
+    );
     if frosted {
         emit_border(node, list, rect, radius, border_width);
     }
@@ -112,7 +124,11 @@ fn render_node(node: &Node, list: &mut DrawList, placed: Affine2D) {
     //    fractional throughout motion and at rest.
     let content = node.placement_step(node.content_offset()).followed(placed);
     let descendant_start = list.vertices().len();
-    let children = if node.children_may_need_z_sort() { node.render_ordered_children() } else { node.children() };
+    let children = if node.children_may_need_z_sort() {
+        node.render_ordered_children()
+    } else {
+        node.children()
+    };
     for child in &children {
         render_node(child, list, content);
     }
@@ -133,12 +149,25 @@ fn render_node(node: &Node, list: &mut DrawList, placed: Affine2D) {
     }
 }
 
-pub(crate) fn emit_border(node: &Node, list: &mut DrawList, rect: Rect, radius: f32, border_width: f32) {
-    let Some(color) = node.border_color() else { return };
+pub(crate) fn emit_border(
+    node: &Node,
+    list: &mut DrawList,
+    rect: Rect,
+    radius: f32,
+    border_width: f32,
+) {
+    let Some(color) = node.border_color() else {
+        return;
+    };
     if border_width <= 0.0 || rect.width <= 0.0 || rect.height <= 0.0 {
         return;
     }
-    let _ = list.add_rounded_rect_stroke(rect, radius, border_width, apply_opacity(color, node.opacity()));
+    let _ = list.add_rounded_rect_stroke(
+        rect,
+        radius,
+        border_width,
+        apply_opacity(color, node.opacity()),
+    );
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -158,7 +187,11 @@ pub(crate) fn emit_background(
     if width <= 0.0 || height <= 0.0 {
         return;
     }
-    let inset = if node.border_color().is_some() && node.border_width() > 0.0 { border_width } else { 0.0 };
+    let inset = if node.border_color().is_some() && node.border_width() > 0.0 {
+        border_width
+    } else {
+        0.0
+    };
     let bg_width = (width - 2.0 * inset).max(0.0);
     let bg_height = (height - 2.0 * inset).max(0.0);
     if bg_width <= 0.0 || bg_height <= 0.0 {
@@ -177,7 +210,8 @@ pub(crate) fn emit_background(
         });
     }
     if let Some(gradient) = node.background_gradient() {
-        let _ = list.add_linear_gradient(rect, bg_radius, gradient.multiplied_alpha(node.opacity()));
+        let _ =
+            list.add_linear_gradient(rect, bg_radius, gradient.multiplied_alpha(node.opacity()));
     } else if let Some(background) = node.background_color() {
         let color = apply_opacity(background, node.opacity());
         if bg_radius > 0.0 {
@@ -192,7 +226,12 @@ pub(crate) fn apply_opacity(color: Color, opacity: f32) -> Color {
     if opacity >= 1.0 {
         return color;
     }
-    Color { r: color.r, g: color.g, b: color.b, a: color.a * opacity }
+    Color {
+        r: color.r,
+        g: color.g,
+        b: color.b,
+        a: color.a * opacity,
+    }
 }
 
 #[cfg(test)]
@@ -249,6 +288,9 @@ mod tests {
         root.add_child(&child);
         let mut list = DrawList::default();
         NodeRenderer::new().render(&root, &mut list);
-        assert_eq!(list.paint_bounds().unwrap(), Rect::new(0.0, -10.0, 10.0, 10.0));
+        assert_eq!(
+            list.paint_bounds().unwrap(),
+            Rect::new(0.0, -10.0, 10.0, 10.0)
+        );
     }
 }

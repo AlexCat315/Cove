@@ -27,9 +27,15 @@ pub const DEFAULT_MINUTE: i32 = 30;
 /// A 12-hour clock maps 0 and 12 to `12` and appends `AM`/`PM`; a 24-hour clock
 /// uses zero-padded hours and no marker.
 pub fn display_text(time: Option<TimeOfDay>, twelve_hour: bool, shows_seconds: bool) -> String {
-    let Some(time) = time else { return "No time".to_owned() };
+    let Some(time) = time else {
+        return "No time".to_owned();
+    };
     if twelve_hour {
-        let hour = if time.hour % 12 == 0 { 12 } else { time.hour % 12 };
+        let hour = if time.hour % 12 == 0 {
+            12
+        } else {
+            time.hour % 12
+        };
         let suffix = if time.hour < 12 { "AM" } else { "PM" };
         if shows_seconds {
             format!("{hour:02}:{:02}:{:02} {suffix}", time.minute, time.second)
@@ -90,7 +96,11 @@ impl TimePickerStory {
 
     /// The badge text for the current state.
     pub fn display(&self) -> String {
-        display_text(self.time.get(), self.twelve_hour.get(), self.shows_seconds.get())
+        display_text(
+            self.time.get(),
+            self.twelve_hour.get(),
+            self.shows_seconds.get(),
+        )
     }
 }
 
@@ -120,9 +130,10 @@ impl View for TimePickerStory {
             12.0,
             AnyView::new(TupleView::new(vec![
                 AnyView::new(
-                    cove_ui_compose::primitives::controls::button::Button::title("Now", move || {
-                        state.set(Some(TimeOfDay::new(DEFAULT_HOUR, DEFAULT_MINUTE, 0)))
-                    })
+                    cove_ui_compose::primitives::controls::button::Button::title(
+                        "Now",
+                        move || state.set(Some(TimeOfDay::new(DEFAULT_HOUR, DEFAULT_MINUTE, 0))),
+                    )
                     .enabled(enabled),
                 ),
                 AnyView::new(

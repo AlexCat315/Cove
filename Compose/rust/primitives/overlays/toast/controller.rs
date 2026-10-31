@@ -105,7 +105,13 @@ impl ToastNotification {
 
     /// `None` keeps the notification visible until dismissed.
     pub fn duration(mut self, duration: Option<f64>) -> Self {
-        self.duration = duration.map(|value| if value.is_finite() { value.max(0.0) } else { 5.0 });
+        self.duration = duration.map(|value| {
+            if value.is_finite() {
+                value.max(0.0)
+            } else {
+                5.0
+            }
+        });
         self
     }
 
@@ -147,7 +153,10 @@ pub struct ToastController {
 
 impl ToastController {
     pub fn new(max_visible: usize) -> Rc<Self> {
-        Rc::new(Self { max_visible: max_visible.max(1), sessions: RefCell::new(Vec::new()) })
+        Rc::new(Self {
+            max_visible: max_visible.max(1),
+            sessions: RefCell::new(Vec::new()),
+        })
     }
 
     pub fn notifications(&self) -> Vec<ToastNotification> {
@@ -160,7 +169,10 @@ impl ToastController {
     }
 
     pub fn queued_count(&self) -> usize {
-        self.sessions.borrow().len().saturating_sub(self.max_visible)
+        self.sessions
+            .borrow()
+            .len()
+            .saturating_sub(self.max_visible)
     }
 
     pub fn needs_clock(&self) -> bool {
@@ -180,7 +192,10 @@ impl ToastController {
             is_paused: false,
         };
         let mut sessions = self.sessions.borrow_mut();
-        match sessions.iter().position(|existing| existing.notification.id == session.notification.id) {
+        match sessions
+            .iter()
+            .position(|existing| existing.notification.id == session.notification.id)
+        {
             Some(index) => sessions[index] = session,
             None => sessions.push(session),
         }
@@ -193,7 +208,9 @@ impl ToastController {
 
     pub fn set_paused(&self, paused: bool, id: &str) {
         let mut sessions = self.sessions.borrow_mut();
-        if let Some(session) = sessions.iter_mut().find(|session| session.notification.id == id)
+        if let Some(session) = sessions
+            .iter_mut()
+            .find(|session| session.notification.id == id)
             && session.is_paused != paused
         {
             session.is_paused = paused;

@@ -36,13 +36,25 @@ pub struct SceneLaunch {
 
 impl Default for SceneLaunch {
     fn default() -> Self {
-        Self { mode: SceneLaunchMode::Gallery, component: "introduction".to_owned(), project: None }
+        Self {
+            mode: SceneLaunchMode::Gallery,
+            component: "introduction".to_owned(),
+            project: None,
+        }
     }
 }
 
 impl SceneLaunch {
-    pub fn new(mode: SceneLaunchMode, component: impl Into<String>, project: Option<String>) -> Self {
-        Self { mode, component: component.into(), project }
+    pub fn new(
+        mode: SceneLaunchMode,
+        component: impl Into<String>,
+        project: Option<String>,
+    ) -> Self {
+        Self {
+            mode,
+            component: component.into(),
+            project,
+        }
     }
 
     pub fn from_json(bytes: &[u8]) -> Result<Self, serde_json::Error> {

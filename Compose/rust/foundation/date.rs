@@ -36,7 +36,9 @@ impl Date {
     }
 
     pub fn adding_seconds(self, seconds: i64) -> Self {
-        Self { seconds: self.seconds.saturating_add(seconds) }
+        Self {
+            seconds: self.seconds.saturating_add(seconds),
+        }
     }
 
     pub fn seconds_since(self, other: Self) -> i64 {
@@ -45,7 +47,9 @@ impl Date {
 
     /// Midnight UTC of this instant's day, ignoring any time zone.
     pub fn floor_day(self) -> Self {
-        Self { seconds: self.seconds.div_euclid(Self::SECONDS_PER_DAY) * Self::SECONDS_PER_DAY }
+        Self {
+            seconds: self.seconds.div_euclid(Self::SECONDS_PER_DAY) * Self::SECONDS_PER_DAY,
+        }
     }
 
     /// Whole days between two instants' UTC days.
@@ -59,7 +63,9 @@ impl Date {
     }
 
     pub fn from_epoch_day(day: i64) -> Self {
-        Self { seconds: day * Self::SECONDS_PER_DAY }
+        Self {
+            seconds: day * Self::SECONDS_PER_DAY,
+        }
     }
 }
 
@@ -71,14 +77,35 @@ impl PartialOrd for DateParts {
 
 impl Ord for DateParts {
     fn cmp(&self, other: &Self) -> Ordering {
-        (self.year, self.month, self.day, self.hour, self.minute, self.second)
-            .cmp(&(other.year, other.month, other.day, other.hour, other.minute, other.second))
+        (
+            self.year,
+            self.month,
+            self.day,
+            self.hour,
+            self.minute,
+            self.second,
+        )
+            .cmp(&(
+                other.year,
+                other.month,
+                other.day,
+                other.hour,
+                other.minute,
+                other.second,
+            ))
     }
 }
 
 impl DateParts {
     pub fn new(year: i32, month: u32, day: u32) -> Self {
-        Self { year, month, day, hour: 0, minute: 0, second: 0 }
+        Self {
+            year,
+            month,
+            day,
+            hour: 0,
+            minute: 0,
+            second: 0,
+        }
     }
 
     /// Days since 1970-01-01 for this civil date (Howard Hinnant's algorithm).
@@ -130,7 +157,11 @@ pub fn weekday_of(epoch_day: i64) -> u32 {
 /// ISO weekday, Monday = 1.
 pub fn iso_weekday_of(epoch_day: i64) -> u32 {
     let sunday_based = weekday_of(epoch_day);
-    if sunday_based == 1 { 7 } else { sunday_based - 1 }
+    if sunday_based == 1 {
+        7
+    } else {
+        sunday_based - 1
+    }
 }
 
 pub fn is_leap_year(year: i32) -> bool {

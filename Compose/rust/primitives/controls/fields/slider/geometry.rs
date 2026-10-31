@@ -57,11 +57,19 @@ impl SliderGeometry {
 
     pub fn value_fraction(&self, position: f32) -> f32 {
         let fraction = (position / self.length.max(1.0)).clamp(0.0, 1.0);
-        if self.is_reversed { 1.0 - fraction } else { fraction }
+        if self.is_reversed {
+            1.0 - fraction
+        } else {
+            fraction
+        }
     }
 
     pub fn position(&self, fraction: f32) -> f32 {
-        let fraction = if self.is_reversed { 1.0 - fraction } else { fraction };
+        let fraction = if self.is_reversed {
+            1.0 - fraction
+        } else {
+            fraction
+        };
         fraction * self.length
     }
 
@@ -77,13 +85,7 @@ impl SliderGeometry {
 
 impl SliderGeometry {
     /// Knob rectangle centred on `center` along the axis.
-    pub fn thumb_rect(
-        &self,
-        center: f32,
-        length: f32,
-        diameter: f32,
-        origin: Point,
-    ) -> Rect {
+    pub fn thumb_rect(&self, center: f32, length: f32, diameter: f32, origin: Point) -> Rect {
         if self.axis.is_horizontal() {
             Rect::new(
                 origin.x + center - length / 2.0,

@@ -13,24 +13,25 @@ use objc2::runtime::ProtocolObject;
 use objc2_metal::{
     MTLAccelerationStructureCommandEncoder, MTLBlitCommandEncoder, MTLBuffer, MTLCommandBuffer,
     MTLCommandBufferDescriptor, MTLCommandEncoder, MTLCommandQueue, MTLComputeCommandEncoder,
-    MTLDevice, MTLIndexType, MTLPrimitiveType, MTLRenderCommandEncoder, MTLRenderPassDescriptor, MTLRenderPassDepthAttachmentDescriptor, MTLResource,
-    MTLResourceOptions, MTLResourceUsage, MTLScissorRect, MTLSize, MTLSamplerState, MTLStorageMode, MTLTexture,
-    MTLViewport,
+    MTLDevice, MTLIndexType, MTLPrimitiveType, MTLRenderCommandEncoder,
+    MTLRenderPassDepthAttachmentDescriptor, MTLRenderPassDescriptor, MTLResource,
+    MTLResourceOptions, MTLResourceUsage, MTLSamplerState, MTLScissorRect, MTLSize, MTLStorageMode,
+    MTLTexture, MTLViewport,
 };
 
 use crate::rhi::{
     ColorLoadAction, Completion, ComputeCommand, ComputePassRecord, CopyCommand, CopyPassRecord,
     CpuProfilePhase, DepthLoadAction, GpuTimestampMarker, MeshPipeline, PlannedCommand,
-    PlannedSubmit, QueueClass, RenderCommand, RenderPassRecord, RhiError, RhiResult,
-    SubmissionCpuProfile, rhi_byte_range, rhi_color_texture_copy_extent,
-    rhi_count, rhi_render_pass_signature, rhi_require, rhi_texture_subresource_extent,
-    rhi_texture_transfer_bytes, rhi_texture_upload_bytes, RenderTextureInfo, Texture, TextureUsage,
+    PlannedSubmit, QueueClass, RenderCommand, RenderPassRecord, RenderTextureInfo, RhiError,
+    RhiResult, SubmissionCpuProfile, Texture, TextureUsage, rhi_byte_range,
+    rhi_color_texture_copy_extent, rhi_count, rhi_render_pass_signature, rhi_require,
+    rhi_texture_subresource_extent, rhi_texture_transfer_bytes, rhi_texture_upload_bytes,
 };
 
 use super::device::{MetalDeviceHandle, VERTEX_BUFFER_BASE_INDEX};
 use super::formats;
 use super::registries::{
-    MetalBindingSet, MetalBoundValue, MetalBoundEntry, MetalDynamicKey, MetalMeshPipeline,
+    MetalBindingSet, MetalBoundEntry, MetalBoundValue, MetalDynamicKey, MetalMeshPipeline,
 };
 use super::resources::lock;
 use super::transfer::as_event;
@@ -45,11 +46,12 @@ pub fn submit(
     device.submission_status.check()?;
     let encoding_start = cpu_profile.as_deref().and_then(SubmissionCpuProfile::begin);
     let queue = device.queue_for(submit.queue).clone();
-    let descriptor =  { MTLCommandBufferDescriptor::new() };
+    let descriptor = { MTLCommandBufferDescriptor::new() };
     if device.config.enable_validation {
-        descriptor.setErrorOptions(objc2_metal::MTLCommandBufferErrorOption::EncoderExecutionStatus);
+        descriptor
+            .setErrorOptions(objc2_metal::MTLCommandBufferErrorOption::EncoderExecutionStatus);
     }
-    let command_buffer =  { queue.commandBufferWithDescriptor(&descriptor) }
+    let command_buffer = { queue.commandBufferWithDescriptor(&descriptor) }
         .ok_or_else(|| RhiError::submit_failed("cannot create command buffer"))?;
 
     // Wait on timeline semaphores (cross-queue release fences).
@@ -282,9 +284,10 @@ impl<'a> PassEncoder<'a> {
         let signature = {
             let registries = lock(registries);
             rhi_render_pass_signature(&record.descriptor, |handle| {
-                let texture = registries.textures.get(&handle.id()).ok_or_else(|| {
-                    RhiError::invalid_argument("unknown render attachment")
-                })?;
+                let texture = registries
+                    .textures
+                    .get(&handle.id())
+                    .ok_or_else(|| RhiError::invalid_argument("unknown render attachment"))?;
                 describe_texture(texture)
             })?
         };
@@ -361,20 +364,21 @@ impl<'a> PassEncoder<'a> {
         record: &RenderPassRecord,
         mut cpu_profile: Option<&mut SubmissionCpuProfile>,
     ) -> RhiResult<()> {
-        let setup_start = cpu_profile.as_deref().and_then(|profile| {
-            profile.begin_detail(CpuProfilePhase::PassSetup)
-        });
+        let setup_start = cpu_profile
+            .as_deref()
+            .and_then(|profile| profile.begin_detail(CpuProfilePhase::PassSetup));
         self.validate_render_attachments(record)?;
-        let pass_descriptor =  { MTLRenderPassDescriptor::new() };
+        let pass_descriptor = { MTLRenderPassDescriptor::new() };
         let color_attachments = pass_descriptor.colorAttachments();
 
         {
             let registries = lock(&self.registries);
             for (index, target) in record.descriptor.color_targets.iter().enumerate() {
                 rhi_require(index < 8, "invalid render color target")?;
-                let texture = registries.textures.get(&target.texture.id()).ok_or_else(|| {
-                    RhiError::invalid_argument("invalid render color target")
-                })?;
+                let texture = registries
+                    .textures
+                    .get(&target.texture.id())
+                    .ok_or_else(|| RhiError::invalid_argument("invalid render color target"))?;
                 // SAFETY: the check above keeps the index inside the eight
                 // slots the attachment array exposes.
                 let attachment = unsafe { color_attachments.objectAtIndexedSubscript(index) };
@@ -406,9 +410,12 @@ impl<'a> PassEncoder<'a> {
             }
 
             if let Some(depth) = record.descriptor.depth_target {
-                let texture = registries.textures.get(&depth.texture.id()).ok_or_else(|| {
-                    RhiError::invalid_argument("render pass references unknown depth texture")
-                })?;
+                let texture = registries
+                    .textures
+                    .get(&depth.texture.id())
+                    .ok_or_else(|| {
+                        RhiError::invalid_argument("render pass references unknown depth texture")
+                    })?;
                 let attachment: Retained<MTLRenderPassDepthAttachmentDescriptor> =
                     pass_descriptor.depthAttachment();
                 attachment.setTexture(Some(texture));
@@ -427,9 +434,9 @@ impl<'a> PassEncoder<'a> {
         if let Some(profile) = cpu_profile.as_deref_mut() {
             profile.end_detail(CpuProfilePhase::PassSetup, setup_start);
         }
-        let create_start = cpu_profile.as_deref().and_then(|profile| {
-            profile.begin_detail(CpuProfilePhase::EncoderCreation)
-        });
+        let create_start = cpu_profile
+            .as_deref()
+            .and_then(|profile| profile.begin_detail(CpuProfilePhase::EncoderCreation));
         let encoder = self
             .command_buffer
             .renderCommandEncoderWithDescriptor(&pass_descriptor)
@@ -442,9 +449,9 @@ impl<'a> PassEncoder<'a> {
             profile.end_detail(CpuProfilePhase::EncoderCreation, create_start);
         }
 
-        let replay_start = cpu_profile.as_deref().and_then(|profile| {
-            profile.begin_detail(CpuProfilePhase::CommandReplay)
-        });
+        let replay_start = cpu_profile
+            .as_deref()
+            .and_then(|profile| profile.begin_detail(CpuProfilePhase::CommandReplay));
         for command in &record.body {
             self.encode_render_command(command, cpu_profile.as_deref_mut())?;
         }
@@ -459,7 +466,13 @@ impl<'a> PassEncoder<'a> {
         command: &RenderCommand,
         mut cpu_profile: Option<&mut SubmissionCpuProfile>,
     ) -> RhiResult<()> {
-        let name = |command: &RenderCommand| format!("{command:?}").split(['(', ' ']).next().unwrap_or("command").to_owned();
+        let name = |command: &RenderCommand| {
+            format!("{command:?}")
+                .split(['(', ' '])
+                .next()
+                .unwrap_or("command")
+                .to_owned()
+        };
         let _ = name(command);
         let Some(encoder) = self.render_encoder.clone() else {
             return Err(RhiError::invalid_argument("render encoder is not active"));
@@ -468,9 +481,10 @@ impl<'a> PassEncoder<'a> {
             RenderCommand::SetMeshPipeline(handle) => {
                 let pipeline = {
                     let registries = lock(&self.registries);
-                    let mesh = registries.mesh_pipelines.get(&handle.id()).ok_or_else(|| {
-                        RhiError::invalid_argument("unknown mesh pipeline")
-                    })?;
+                    let mesh = registries
+                        .mesh_pipelines
+                        .get(&handle.id())
+                        .ok_or_else(|| RhiError::invalid_argument("unknown mesh pipeline"))?;
                     (
                         mesh.state.clone(),
                         mesh.rasterization,
@@ -523,9 +537,10 @@ impl<'a> PassEncoder<'a> {
                 self.current_mesh_pipeline = None;
                 let (state, primitive, depth_state, raster) = {
                     let registries = lock(&self.registries);
-                    let pipeline = registries.render_pipelines.get(&handle.id()).ok_or_else(|| {
-                        RhiError::invalid_argument("unknown graphics pipeline")
-                    })?;
+                    let pipeline = registries
+                        .render_pipelines
+                        .get(&handle.id())
+                        .ok_or_else(|| RhiError::invalid_argument("unknown graphics pipeline"))?;
                     (
                         pipeline.state.clone(),
                         registries
@@ -549,23 +564,35 @@ impl<'a> PassEncoder<'a> {
                 }
                 Ok(())
             }
-            RenderCommand::SetBindingSet { slot, set, dynamic_offsets } => {
-                rhi_require(*slot == 0, "Metal direct binding currently supports set 0 only")?;
-                let bind_start = cpu_profile.as_deref().and_then(|profile| {
-                    profile.begin_detail(CpuProfilePhase::BindingApply)
-                });
+            RenderCommand::SetBindingSet {
+                slot,
+                set,
+                dynamic_offsets,
+            } => {
+                rhi_require(
+                    *slot == 0,
+                    "Metal direct binding currently supports set 0 only",
+                )?;
+                let bind_start = cpu_profile
+                    .as_deref()
+                    .and_then(|profile| profile.begin_detail(CpuProfilePhase::BindingApply));
                 self.bind_render_binding_set(*set, dynamic_offsets, &encoder)?;
                 if let Some(profile) = cpu_profile.as_deref_mut() {
                     profile.end_detail(CpuProfilePhase::BindingApply, bind_start);
                 }
                 Ok(())
             }
-            RenderCommand::SetVertexBuffer { slot, buffer, offset } => {
+            RenderCommand::SetVertexBuffer {
+                slot,
+                buffer,
+                offset,
+            } => {
                 let native = {
                     let registries = lock(&self.registries);
-                    let native = registries.buffers.get(&buffer.id()).ok_or_else(|| {
-                        RhiError::invalid_argument("unknown buffer or texture")
-                    })?;
+                    let native = registries
+                        .buffers
+                        .get(&buffer.id())
+                        .ok_or_else(|| RhiError::invalid_argument("unknown buffer or texture"))?;
                     rhi_byte_range(*offset, 0, native.length())?;
                     native.clone()
                 };
@@ -575,12 +602,17 @@ impl<'a> PassEncoder<'a> {
                 unsafe { encoder.setVertexBuffer_offset_atIndex(Some(&native), *offset, index) };
                 Ok(())
             }
-            RenderCommand::SetIndexBuffer { buffer, offset, index_type } => {
+            RenderCommand::SetIndexBuffer {
+                buffer,
+                offset,
+                index_type,
+            } => {
                 let native = {
                     let registries = lock(&self.registries);
-                    let native = registries.buffers.get(&buffer.id()).ok_or_else(|| {
-                        RhiError::invalid_argument("unknown buffer or texture")
-                    })?;
+                    let native = registries
+                        .buffers
+                        .get(&buffer.id())
+                        .ok_or_else(|| RhiError::invalid_argument("unknown buffer or texture"))?;
                     rhi_byte_range(*offset, 0, native.length())?;
                     native.clone()
                 };
@@ -609,14 +641,13 @@ impl<'a> PassEncoder<'a> {
                             data.len(),
                             index,
                         ),
-                        crate::rhi::ShaderStage::Fragment => {
-                            encoder.setFragmentBytes_length_atIndex(
+                        crate::rhi::ShaderStage::Fragment => encoder
+                            .setFragmentBytes_length_atIndex(
                                 core::ptr::NonNull::new(data.as_ptr() as *mut core::ffi::c_void)
                                     .expect("a non-empty slice has a pointer"),
                                 data.len(),
                                 index,
-                            )
-                        }
+                            ),
                         crate::rhi::ShaderStage::Task => encoder.setObjectBytes_length_atIndex(
                             core::ptr::NonNull::new(data.as_ptr() as *mut core::ffi::c_void)
                                 .expect("a non-empty slice has a pointer"),
@@ -679,7 +710,11 @@ impl<'a> PassEncoder<'a> {
                         "drawIndexed requires an index buffer",
                     ));
                 };
-                let index_size = if self.current_index_type == MTLIndexType::UInt16 { 2 } else { 4 };
+                let index_size = if self.current_index_type == MTLIndexType::UInt16 {
+                    2
+                } else {
+                    4
+                };
                 let first_index = rhi_count(args.first_index)? as usize;
                 let offset = self.current_index_offset + first_index * index_size;
                 // SAFETY: the index range was validated when the buffer was
@@ -698,14 +733,21 @@ impl<'a> PassEncoder<'a> {
                 };
                 Ok(())
             }
-            RenderCommand::DrawIndirect { buffer, offset, draw_count } => {
+            RenderCommand::DrawIndirect {
+                buffer,
+                offset,
+                draw_count,
+            } => {
                 let native = {
                     let registries = lock(&self.registries);
-                    registries.buffers.get(&buffer.id()).cloned().ok_or_else(|| {
-                        RhiError::invalid_argument("unknown indirect draw buffer")
-                    })?
+                    registries
+                        .buffers
+                        .get(&buffer.id())
+                        .cloned()
+                        .ok_or_else(|| RhiError::invalid_argument("unknown indirect draw buffer"))?
                 };
-                let stride = core::mem::size_of::<objc2_metal::MTLDrawPrimitivesIndirectArguments>();
+                let stride =
+                    core::mem::size_of::<objc2_metal::MTLDrawPrimitivesIndirectArguments>();
                 let count = rhi_count(*draw_count)? as usize;
                 let size = count.checked_mul(stride).ok_or_else(|| {
                     RhiError::invalid_argument("indirect draw arguments exceed buffer bounds")
@@ -744,7 +786,10 @@ impl<'a> PassEncoder<'a> {
     ) -> RhiResult<()> {
         let Some(binding_set) = ({
             let registries = lock(&self.registries);
-            registries.binding_sets.get(handle.id()).map(shallow_clone_binding_set)
+            registries
+                .binding_sets
+                .get(handle.id())
+                .map(shallow_clone_binding_set)
         }) else {
             return Err(RhiError::invalid_argument("unknown render binding set"));
         };
@@ -770,7 +815,10 @@ impl<'a> PassEncoder<'a> {
                 MetalBoundValue::Buffer { buffer, offset } => {
                     let resolved = binding_set
                         .dynamic_offset_index
-                        .get(&MetalDynamicKey { stage: apply.stage, index: apply.index })
+                        .get(&MetalDynamicKey {
+                            stage: apply.stage,
+                            index: apply.index,
+                        })
                         .map(|position| dynamic_offsets[*position] as usize)
                         .unwrap_or(*offset);
                     self.apply_buffer(buffer, resolved, apply.stage, apply.index, encoder);
@@ -788,7 +836,9 @@ impl<'a> PassEncoder<'a> {
         index: usize,
         encoder: &ProtocolObject<dyn MTLRenderCommandEncoder>,
     ) {
-        let Some(bindings) = self.render_bindings.as_mut() else { return };
+        let Some(bindings) = self.render_bindings.as_mut() else {
+            return;
+        };
         let slot = index as u32;
         if !bindings.sampler_changed(state, slot, stage) {
             return;
@@ -822,7 +872,9 @@ impl<'a> PassEncoder<'a> {
         index: usize,
         encoder: &ProtocolObject<dyn MTLRenderCommandEncoder>,
     ) {
-        let Some(bindings) = self.render_bindings.as_mut() else { return };
+        let Some(bindings) = self.render_bindings.as_mut() else {
+            return;
+        };
         let slot = index as u32;
         if !bindings.texture_changed(texture, slot, stage) {
             return;
@@ -857,7 +909,9 @@ impl<'a> PassEncoder<'a> {
         index: usize,
         encoder: &ProtocolObject<dyn MTLRenderCommandEncoder>,
     ) {
-        let Some(bindings) = self.render_bindings.as_mut() else { return };
+        let Some(bindings) = self.render_bindings.as_mut() else {
+            return;
+        };
         let slot = index as u32;
         if !bindings.buffer_changed(buffer, offset, slot, stage) {
             return;
@@ -907,9 +961,10 @@ impl<'a> PassEncoder<'a> {
             ComputeCommand::SetPipeline(handle) => {
                 let (state, size) = {
                     let registries = lock(&self.registries);
-                    let state = registries.compute_pipelines.get(&handle.id()).ok_or_else(|| {
-                        RhiError::invalid_argument("unknown compute pipeline")
-                    })?;
+                    let state = registries
+                        .compute_pipelines
+                        .get(&handle.id())
+                        .ok_or_else(|| RhiError::invalid_argument("unknown compute pipeline"))?;
                     (
                         state.clone(),
                         registries
@@ -923,11 +978,21 @@ impl<'a> PassEncoder<'a> {
                 encoder.setComputePipelineState(&state);
                 Ok(())
             }
-            ComputeCommand::SetBindingSet { slot, set, dynamic_offsets } => {
-                rhi_require(*slot == 0, "Metal direct binding currently supports set 0 only")?;
+            ComputeCommand::SetBindingSet {
+                slot,
+                set,
+                dynamic_offsets,
+            } => {
+                rhi_require(
+                    *slot == 0,
+                    "Metal direct binding currently supports set 0 only",
+                )?;
                 let Some(binding_set) = ({
                     let registries = lock(&self.registries);
-                    registries.binding_sets.get(set.id()).map(shallow_clone_binding_set)
+                    registries
+                        .binding_sets
+                        .get(set.id())
+                        .map(shallow_clone_binding_set)
                 }) else {
                     return Err(RhiError::invalid_argument("unknown compute binding set"));
                 };
@@ -975,7 +1040,11 @@ impl<'a> PassEncoder<'a> {
                             // SAFETY: the offset was range-checked at set
                             // registration and the buffer outlives the encoder.
                             unsafe {
-                                encoder.setBuffer_offset_atIndex(Some(buffer), resolved, apply.index)
+                                encoder.setBuffer_offset_atIndex(
+                                    Some(buffer),
+                                    resolved,
+                                    apply.index,
+                                )
                             };
                         }
                     }
@@ -998,7 +1067,11 @@ impl<'a> PassEncoder<'a> {
                 };
                 Ok(())
             }
-            ComputeCommand::Dispatch { groups_x, groups_y, groups_z } => {
+            ComputeCommand::Dispatch {
+                groups_x,
+                groups_y,
+                groups_z,
+            } => {
                 let grid = crate::rhi::ThreadgroupSize::new(*groups_x, *groups_y, *groups_z);
                 grid.validate()?;
                 let local = self.compute_threadgroup_size;
@@ -1022,9 +1095,10 @@ impl<'a> PassEncoder<'a> {
             ComputeCommand::DispatchIndirect { buffer, offset } => {
                 let native = {
                     let registries = lock(&self.registries);
-                    let native = registries.buffers.get(&buffer.id()).ok_or_else(|| {
-                        RhiError::invalid_argument("unknown buffer or texture")
-                    })?;
+                    let native = registries
+                        .buffers
+                        .get(&buffer.id())
+                        .ok_or_else(|| RhiError::invalid_argument("unknown buffer or texture"))?;
                     rhi_byte_range(*offset, 12, native.length())?;
                     native.clone()
                 };
@@ -1074,7 +1148,12 @@ impl<'a> PassEncoder<'a> {
     ) -> RhiResult<()> {
         let registries = lock(&self.registries);
         match command {
-            CopyCommand::CopyTexture { src, dst, width, height } => {
+            CopyCommand::CopyTexture {
+                src,
+                dst,
+                width,
+                height,
+            } => {
                 let source = registries
                     .textures
                     .get(&src.id())
@@ -1122,7 +1201,13 @@ impl<'a> PassEncoder<'a> {
                 };
                 Ok(())
             }
-            CopyCommand::CopyBuffer { src, src_offset, dst, dst_offset, size } => {
+            CopyCommand::CopyBuffer {
+                src,
+                src_offset,
+                dst,
+                dst_offset,
+                size,
+            } => {
                 let source = registries
                     .buffers
                     .get(&src.id())
@@ -1212,7 +1297,14 @@ impl<'a> PassEncoder<'a> {
                 };
                 Ok(())
             }
-            CopyCommand::CopyTextureToBuffer { texture, width, height, buffer, offset, bytes_per_row } => {
+            CopyCommand::CopyTextureToBuffer {
+                texture,
+                width,
+                height,
+                buffer,
+                offset,
+                bytes_per_row,
+            } => {
                 let source = registries
                     .textures
                     .get(&texture.id())
@@ -1268,7 +1360,10 @@ fn describe_texture(
     );
     // Metal reports render-target capability through its own usage bits, so the
     // classification comes from the native usage rather than the descriptor.
-    let usage = if texture.usage().contains(objc2_metal::MTLTextureUsage::RenderTarget) {
+    let usage = if texture
+        .usage()
+        .contains(objc2_metal::MTLTextureUsage::RenderTarget)
+    {
         if is_depth {
             TextureUsage::DEPTH_STENCIL_TARGET
         } else {
@@ -1294,10 +1389,7 @@ fn describe_texture(
 }
 
 /// Whether a texture was allocated with memoryless (tile-only) storage.
-fn is_memoryless(
-    registries: &super::registries::MetalRegistries,
-    handle: Texture,
-) -> bool {
+fn is_memoryless(registries: &super::registries::MetalRegistries, handle: Texture) -> bool {
     registries
         .textures
         .get(&handle.id())
@@ -1343,6 +1435,9 @@ mod tests {
         let set = MetalBindingSet::new(Vec::new(), &dynamic);
         let copy = shallow_clone_binding_set(&set);
         assert_eq!(copy.graphics_applies.len(), set.graphics_applies.len());
-        assert_eq!(copy.dynamic_offset_index.len(), set.dynamic_offset_index.len());
+        assert_eq!(
+            copy.dynamic_offset_index.len(),
+            set.dynamic_offset_index.len()
+        );
     }
 }

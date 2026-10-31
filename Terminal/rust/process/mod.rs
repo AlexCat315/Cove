@@ -8,10 +8,10 @@
 pub mod command;
 pub mod windows_command_line;
 
-#[cfg(unix)]
-mod posix;
 #[cfg(windows)]
 mod conpty;
+#[cfg(unix)]
+mod posix;
 
 pub use command::{TerminalCommand, TerminalError};
 pub use windows_command_line::{command_line_string, environment_block_utf16};
@@ -27,7 +27,12 @@ pub struct PseudoTerminalSize {
 
 impl PseudoTerminalSize {
     pub fn new(columns: usize, rows: usize, cell_width: usize, cell_height: usize) -> Self {
-        Self { columns, rows, cell_width, cell_height }
+        Self {
+            columns,
+            rows,
+            cell_width,
+            cell_height,
+        }
     }
 }
 
@@ -63,13 +68,19 @@ impl PseudoTerminal {
         {
             let backend = posix::PosixPseudoTerminal::spawn(command, size, on_output, on_exit)?;
             let process_id = backend.process_id;
-            Ok(Self { backend: Backend::Posix(backend), process_id })
+            Ok(Self {
+                backend: Backend::Posix(backend),
+                process_id,
+            })
         }
         #[cfg(windows)]
         {
             let backend = conpty::ConPty::spawn(command, size, on_output, on_exit)?;
             let process_id = backend.process_id;
-            Ok(Self { backend: Backend::ConPty(backend), process_id })
+            Ok(Self {
+                backend: Backend::ConPty(backend),
+                process_id,
+            })
         }
         #[cfg(not(any(unix, windows)))]
         {

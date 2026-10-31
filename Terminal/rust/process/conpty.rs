@@ -6,9 +6,9 @@
 
 #![cfg(windows)]
 
+use super::PseudoTerminalSize;
 use super::command::{TerminalCommand, TerminalError};
 use super::windows_command_line;
-use super::PseudoTerminalSize;
 use std::{
     ffi::c_void,
     os::windows::ffi::OsStrExt,
@@ -94,14 +94,32 @@ struct Coord {
 
 #[link(name = "kernel32")]
 unsafe extern "system" {
-    fn CreatePipe(read: *mut Handle, write: *mut Handle, attributes: *mut c_void, size: u32) -> i32;
+    fn CreatePipe(read: *mut Handle, write: *mut Handle, attributes: *mut c_void, size: u32)
+    -> i32;
     fn CloseHandle(handle: Handle) -> i32;
-    fn ReadFile(handle: Handle, buffer: *mut c_void, length: u32, read: *mut u32, overlapped: *mut c_void) -> i32;
-    fn WriteFile(handle: Handle, buffer: *const c_void, length: u32, written: *mut u32, overlapped: *mut c_void) -> i32;
+    fn ReadFile(
+        handle: Handle,
+        buffer: *mut c_void,
+        length: u32,
+        read: *mut u32,
+        overlapped: *mut c_void,
+    ) -> i32;
+    fn WriteFile(
+        handle: Handle,
+        buffer: *const c_void,
+        length: u32,
+        written: *mut u32,
+        overlapped: *mut c_void,
+    ) -> i32;
     fn WaitForSingleObject(handle: Handle, milliseconds: u32) -> u32;
     fn GetExitCodeProcess(process: Handle, code: *mut u32) -> i32;
     fn GetLastError() -> u32;
-    fn InitializeProcThreadAttributeList(list: *mut c_void, count: u32, flags: u32, size: *mut usize) -> i32;
+    fn InitializeProcThreadAttributeList(
+        list: *mut c_void,
+        count: u32,
+        flags: u32,
+        size: *mut usize,
+    ) -> i32;
     fn UpdateProcThreadAttribute(
         list: *mut c_void,
         flags: u32,
@@ -124,7 +142,13 @@ unsafe extern "system" {
         startup_info: *mut StartupInfo,
         information: *mut ProcessInformation,
     ) -> i32;
-    fn CreatePseudoConsole(size: Coord, input: Handle, output: Handle, flags: u32, console: *mut Hpcon) -> i32;
+    fn CreatePseudoConsole(
+        size: Coord,
+        input: Handle,
+        output: Handle,
+        flags: u32,
+        console: *mut Hpcon,
+    ) -> i32;
     fn ResizePseudoConsole(console: Hpcon, size: Coord) -> i32;
     fn ClosePseudoConsole(console: Hpcon);
 }
@@ -155,7 +179,10 @@ impl ConPty {
         let environment = command.resolved_environment();
         let path = command
             .resolved_executable_with(
-                environment.get("Path").or_else(|| environment.get("PATH")).map(String::as_str),
+                environment
+                    .get("Path")
+                    .or_else(|| environment.get("PATH"))
+                    .map(String::as_str),
                 std::env::var("PATHEXT").ok().as_deref(),
             )
             .ok_or_else(|| TerminalError::ExecutableNotFound(command.executable.clone()))?;
@@ -174,7 +201,8 @@ impl ConPty {
             }
             // Keep the console's pipe ends alive until the client is attached.
             let mut console: Hpcon = ptr::null_mut();
-            let created = CreatePseudoConsole(coord(size), input_read, output_write, 0, &mut console);
+            let created =
+                CreatePseudoConsole(coord(size), input_read, output_write, 0, &mut console);
             if created != S_OK || console.is_null() {
                 CloseHandle(input_read);
                 CloseHandle(input_write);
@@ -219,7 +247,9 @@ impl ConPty {
             startup.attribute_list = attributes;
             let mut information: ProcessInformation = std::mem::zeroed();
             let launch_line = windows_command_line::command_line_string(
-                &std::iter::once(path).chain(command.arguments.iter().cloned()).collect::<Vec<_>>(),
+                &std::iter::once(path)
+                    .chain(command.arguments.iter().cloned())
+                    .collect::<Vec<_>>(),
             );
             let mut command_line: Vec<u16> = launch_line.encode_utf16().collect();
             command_line.push(0);
@@ -260,7 +290,10 @@ impl ConPty {
                 process: information.process,
             });
             Self::start_reading(state.clone(), output_read, on_output, on_exit);
-            Ok(Self { process_id: information.process_id as i32, state })
+            Ok(Self {
+                process_id: information.process_id as i32,
+                state,
+            })
         }
     }
 
@@ -271,51 +304,61 @@ impl ConPty {
         on_exit: super::ExitHandler,
     ) {
         let reader_state = state.clone();
-        let _ = std::thread::Builder::new().name("cove.terminal.conpty.read".into()).spawn(move || {
-            let mut buffer = vec![0u8; 64 * 1024];
-            loop {
-                let mut count: u32 = 0;
-                // SAFETY: the output pipe handle is owned by this reader until
-                // it closes it below.
-                let ok = unsafe {
-                    ReadFile(
-                        output,
-                        buffer.as_mut_ptr().cast(),
-                        buffer.len() as u32,
-                        &mut count,
-                        ptr::null_mut(),
-                    )
-                };
-                if ok == 0 || count == 0 {
-                    break;
+        let _ = std::thread::Builder::new()
+            .name("cove.terminal.conpty.read".into())
+            .spawn(move || {
+                let mut buffer = vec![0u8; 64 * 1024];
+                loop {
+                    let mut count: u32 = 0;
+                    // SAFETY: the output pipe handle is owned by this reader until
+                    // it closes it below.
+                    let ok = unsafe {
+                        ReadFile(
+                            output,
+                            buffer.as_mut_ptr().cast(),
+                            buffer.len() as u32,
+                            &mut count,
+                            ptr::null_mut(),
+                        )
+                    };
+                    if ok == 0 || count == 0 {
+                        break;
+                    }
+                    on_output(&buffer[..count as usize]);
                 }
-                on_output(&buffer[..count as usize]);
-            }
-            // SAFETY: the handle is closed exactly once, here.
-            unsafe { CloseHandle(output) };
-            let mut code: u32 = 0;
-            // SAFETY: the process handle is held by `reader_state` for the
-            // duration of both calls.
-            unsafe {
-                WaitForSingleObject(reader_state.process, INFINITE);
-                GetExitCodeProcess(reader_state.process, &mut code);
-            }
-            reader_state.close_console();
-            on_exit(code as i32);
-        });
+                // SAFETY: the handle is closed exactly once, here.
+                unsafe { CloseHandle(output) };
+                let mut code: u32 = 0;
+                // SAFETY: the process handle is held by `reader_state` for the
+                // duration of both calls.
+                unsafe {
+                    WaitForSingleObject(reader_state.process, INFINITE);
+                    GetExitCodeProcess(reader_state.process, &mut code);
+                }
+                reader_state.close_console();
+                on_exit(code as i32);
+            });
 
         let watch_state = state;
-        let _ = std::thread::Builder::new().name("cove.terminal.conpty.exit".into()).spawn(move || {
-            // Closing emits the final console frame; the reader remains alive
-            // until that frame is drained and the pipe reaches EOF.
-            // SAFETY: the process handle is held by `watch_state`.
-            unsafe { WaitForSingleObject(watch_state.process, INFINITE) };
-            watch_state.close_console();
-        });
+        let _ = std::thread::Builder::new()
+            .name("cove.terminal.conpty.exit".into())
+            .spawn(move || {
+                // Closing emits the final console frame; the reader remains alive
+                // until that frame is drained and the pipe reaches EOF.
+                // SAFETY: the process handle is held by `watch_state`.
+                unsafe { WaitForSingleObject(watch_state.process, INFINITE) };
+                watch_state.close_console();
+            });
     }
 
     pub(super) fn write(&self, bytes: &[u8]) {
-        if self.state.console.lock().unwrap_or_else(|error| error.into_inner()).is_none() {
+        if self
+            .state
+            .console
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .is_none()
+        {
             return;
         }
         let mut offset = 0usize;
@@ -340,7 +383,11 @@ impl ConPty {
     }
 
     pub(super) fn resize(&self, size: PseudoTerminalSize) {
-        let guard = self.state.console.lock().unwrap_or_else(|error| error.into_inner());
+        let guard = self
+            .state
+            .console
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         if let Some(console) = *guard {
             // SAFETY: the console handle is live while the lock is held.
             unsafe { ResizePseudoConsole(console, coord(size)) };
@@ -357,7 +404,10 @@ impl ConPty {
 impl ConPtyState {
     fn close_console(&self) {
         let closing = {
-            let mut guard = self.console.lock().unwrap_or_else(|error| error.into_inner());
+            let mut guard = self
+                .console
+                .lock()
+                .unwrap_or_else(|error| error.into_inner());
             guard.take()
         };
         if let Some(console) = closing {
@@ -380,5 +430,8 @@ impl Drop for ConPty {
 }
 
 fn coord(size: PseudoTerminalSize) -> Coord {
-    Coord { x: size.columns.clamp(1, i16::MAX as usize) as i16, y: size.rows.clamp(1, i16::MAX as usize) as i16 }
+    Coord {
+        x: size.columns.clamp(1, i16::MAX as usize) as i16,
+        y: size.rows.clamp(1, i16::MAX as usize) as i16,
+    }
 }

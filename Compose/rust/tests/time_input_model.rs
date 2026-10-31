@@ -23,7 +23,11 @@ fn a_twelve_hour_clock_reads_midnight_and_noon_as_twelve() {
     assert_eq!(noon.period_text(), "PM");
 
     let afternoon = TimeInputState::new(Some(TimeOfDay::new(13, 30, 0)));
-    assert_eq!(afternoon.hour_text(TWELVE), "1", "no leading zero on a 12-hour clock");
+    assert_eq!(
+        afternoon.hour_text(TWELVE),
+        "1",
+        "no leading zero on a 12-hour clock"
+    );
     assert_eq!(afternoon.minute_text(), "30");
 }
 
@@ -91,7 +95,10 @@ fn toggling_period_moves_twelve_hours() {
 fn typing_a_high_first_digit_advances_immediately() {
     // In a 24-hour clock, 3*10 >= 24, so focus advances after one digit.
     let mut state = TimeInputState::new(Some(TimeOfDay::new(0, 0, 0)));
-    assert!(state.type_hour(3, TWENTY_FOUR), "a high first digit completes the hour");
+    assert!(
+        state.type_hour(3, TWENTY_FOUR),
+        "a high first digit completes the hour"
+    );
     assert_eq!(state.value, Some(TimeOfDay::new(3, 0, 0)));
 }
 
@@ -107,7 +114,10 @@ fn typing_a_low_first_digit_waits_for_the_second() {
 #[test]
 fn a_leading_zero_in_a_twelve_hour_clock_waits() {
     let mut state = TimeInputState::new(Some(TimeOfDay::new(0, 0, 0)));
-    assert!(!state.type_hour(0, TWELVE), "0 alone is not a 12-hour value");
+    assert!(
+        !state.type_hour(0, TWELVE),
+        "0 alone is not a 12-hour value"
+    );
     state.type_hour(5, TWELVE);
     assert_eq!(state.value, Some(TimeOfDay::new(5, 0, 0)));
 }
@@ -123,7 +133,11 @@ fn typing_minutes_completes_on_a_high_digit() {
     // the value is unchanged and the buffer resets. Swift returns `true` here
     // because the segment is done either way.
     assert!(state.type_minute(4));
-    assert_eq!(state.value, Some(TimeOfDay::new(10, 7, 0)), "74 is not a minute");
+    assert_eq!(
+        state.value,
+        Some(TimeOfDay::new(10, 7, 0)),
+        "74 is not a minute"
+    );
 
     // A fresh low digit then waits for its second.
     assert!(!state.type_minute(4));

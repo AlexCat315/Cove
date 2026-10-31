@@ -13,14 +13,12 @@ use cove_core::scene::{
 use cove_core::{Point, Rect};
 use cove_platform::MouseButton;
 
+use crate::animation::transition::Transition;
 use crate::primitives::overlays::focus_scope::FocusScope;
 use crate::primitives::overlays::menu::{Menu, MenuEntry};
-use crate::primitives::overlays::portal::{
-    PortalPlacementMode, PortalResource, PortalStoreHolder,
-};
-use crate::animation::transition::Transition;
+use crate::primitives::overlays::portal::{PortalPlacementMode, PortalResource, PortalStoreHolder};
+use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
 use cove_core::scene::NodeResource;
-use crate::{impl_primitive_view, AnyView, PrimitiveView, View};
 
 const HOST_MARKER: &str = "context-menu-anchor";
 
@@ -53,7 +51,11 @@ impl ContextMenu {
     }
 
     pub fn width(mut self, width: f32) -> Self {
-        self.width = if width.is_finite() { width.max(80.0) } else { 220.0 };
+        self.width = if width.is_finite() {
+            width.max(80.0)
+        } else {
+            220.0
+        };
         self
     }
 
@@ -78,7 +80,11 @@ impl View for ContextMenu {
         let interested = self.is_interested.clone();
         AnyView::new(ContextMenuHost {
             content: self.content.clone(),
-            entries: if point.is_some() { entries() } else { Vec::new() },
+            entries: if point.is_some() {
+                entries()
+            } else {
+                Vec::new()
+            },
             width: self.width,
             point,
             interested,

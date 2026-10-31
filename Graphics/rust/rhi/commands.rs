@@ -48,10 +48,20 @@ pub struct RenderColorTarget {
 }
 impl RenderColorTarget {
     pub fn new(texture: Texture) -> Self {
-        Self { resolve_texture: None, texture, load_action: ColorLoadAction::DontCare, store: true }
+        Self {
+            resolve_texture: None,
+            texture,
+            load_action: ColorLoadAction::DontCare,
+            store: true,
+        }
     }
     pub fn clearing(texture: Texture, color: [f32; 4]) -> Self {
-        Self { resolve_texture: None, texture, load_action: ColorLoadAction::Clear(color), store: true }
+        Self {
+            resolve_texture: None,
+            texture,
+            load_action: ColorLoadAction::Clear(color),
+            store: true,
+        }
     }
     pub const fn with_resolve(mut self, resolve_texture: Texture) -> Self {
         self.resolve_texture = Some(resolve_texture);
@@ -71,7 +81,11 @@ pub struct RenderDepthTarget {
 }
 impl RenderDepthTarget {
     pub fn new(texture: Texture) -> Self {
-        Self { texture, load_action: DepthLoadAction::Clear(1.0), store: true }
+        Self {
+            texture,
+            load_action: DepthLoadAction::Clear(1.0),
+            store: true,
+        }
     }
     pub const fn with_load_action(mut self, load_action: DepthLoadAction) -> Self {
         self.load_action = load_action;
@@ -93,7 +107,11 @@ pub struct RenderPassDescriptor {
 }
 impl RenderPassDescriptor {
     pub fn new(color_targets: Vec<RenderColorTarget>) -> Self {
-        Self { color_targets, depth_target: None, label: None }
+        Self {
+            color_targets,
+            depth_target: None,
+            label: None,
+        }
     }
     pub fn with_depth(mut self, depth_target: RenderDepthTarget) -> Self {
         self.depth_target = Some(depth_target);
@@ -116,10 +134,24 @@ pub struct Viewport {
 }
 impl Viewport {
     pub const fn new(width: f64, height: f64) -> Self {
-        Self { x: 0.0, y: 0.0, width, height, min_depth: 0.0, max_depth: 1.0 }
+        Self {
+            x: 0.0,
+            y: 0.0,
+            width,
+            height,
+            min_depth: 0.0,
+            max_depth: 1.0,
+        }
     }
     pub const fn at(x: f64, y: f64, width: f64, height: f64) -> Self {
-        Self { x, y, width, height, min_depth: 0.0, max_depth: 1.0 }
+        Self {
+            x,
+            y,
+            width,
+            height,
+            min_depth: 0.0,
+            max_depth: 1.0,
+        }
     }
     pub const fn with_depth_range(mut self, min_depth: f64, max_depth: f64) -> Self {
         self.min_depth = min_depth;
@@ -137,10 +169,20 @@ pub struct ScissorRect {
 }
 impl ScissorRect {
     pub const fn new(width: i64, height: i64) -> Self {
-        Self { x: 0, y: 0, width, height }
+        Self {
+            x: 0,
+            y: 0,
+            width,
+            height,
+        }
     }
     pub const fn at(x: i64, y: i64, width: i64, height: i64) -> Self {
-        Self { x, y, width, height }
+        Self {
+            x,
+            y,
+            width,
+            height,
+        }
     }
 }
 
@@ -154,7 +196,13 @@ pub struct DrawIndexedArguments {
 }
 impl DrawIndexedArguments {
     pub const fn new(index_count: i64) -> Self {
-        Self { index_count, instance_count: 1, first_index: 0, vertex_offset: 0, first_instance: 0 }
+        Self {
+            index_count,
+            instance_count: 1,
+            first_index: 0,
+            vertex_offset: 0,
+            first_instance: 0,
+        }
     }
 }
 
@@ -165,34 +213,85 @@ pub enum RenderCommand {
     SetPipeline(GraphicsPipeline),
     SetMeshPipeline(MeshPipeline),
     DrawMeshTasks(ThreadgroupSize),
-    SetBindingSet { slot: u32, set: BindingSet, dynamic_offsets: Vec<u32> },
-    SetVertexBuffer { slot: u32, buffer: Buffer, offset: usize },
-    SetIndexBuffer { buffer: Buffer, offset: usize, index_type: IndexType },
+    SetBindingSet {
+        slot: u32,
+        set: BindingSet,
+        dynamic_offsets: Vec<u32>,
+    },
+    SetVertexBuffer {
+        slot: u32,
+        buffer: Buffer,
+        offset: usize,
+    },
+    SetIndexBuffer {
+        buffer: Buffer,
+        offset: usize,
+        index_type: IndexType,
+    },
     /// Small constants copied into per-frame upload storage and bound at the
     /// given argument index (Metal push-constant model).
-    PushConstant { stage: ShaderStage, slot: u32, data: Vec<u8> },
+    PushConstant {
+        stage: ShaderStage,
+        slot: u32,
+        data: Vec<u8>,
+    },
     SetViewport(Viewport),
     SetScissor(ScissorRect),
-    Draw { vertex_count: i64, instance_count: i64, first_vertex: i64, first_instance: i64 },
+    Draw {
+        vertex_count: i64,
+        instance_count: i64,
+        first_vertex: i64,
+        first_instance: i64,
+    },
     DrawIndexed(DrawIndexedArguments),
-    DrawIndirect { buffer: Buffer, offset: usize, draw_count: i64 },
+    DrawIndirect {
+        buffer: Buffer,
+        offset: usize,
+        draw_count: i64,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ComputeCommand {
     SetPipeline(ComputePipeline),
-    SetBindingSet { slot: u32, set: BindingSet, dynamic_offsets: Vec<u32> },
-    PushConstant { stage: ShaderStage, slot: u32, data: Vec<u8> },
-    Dispatch { groups_x: i64, groups_y: i64, groups_z: i64 },
-    DispatchIndirect { buffer: Buffer, offset: usize },
+    SetBindingSet {
+        slot: u32,
+        set: BindingSet,
+        dynamic_offsets: Vec<u32>,
+    },
+    PushConstant {
+        stage: ShaderStage,
+        slot: u32,
+        data: Vec<u8>,
+    },
+    Dispatch {
+        groups_x: i64,
+        groups_y: i64,
+        groups_z: i64,
+    },
+    DispatchIndirect {
+        buffer: Buffer,
+        offset: usize,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CopyCommand {
     /// Top-left base-level copy between distinct single-sample 2D color
     /// textures.
-    CopyTexture { src: Texture, dst: Texture, width: i64, height: i64 },
-    CopyBuffer { src: Buffer, src_offset: usize, dst: Buffer, dst_offset: usize, size: usize },
+    CopyTexture {
+        src: Texture,
+        dst: Texture,
+        width: i64,
+        height: i64,
+    },
+    CopyBuffer {
+        src: Buffer,
+        src_offset: usize,
+        dst: Buffer,
+        dst_offset: usize,
+        size: usize,
+    },
     CopyBufferToTexture(TextureBufferUpload),
     CopyTextureToBuffer {
         texture: Texture,
@@ -273,7 +372,8 @@ impl RenderPassEncoder {
     }
 
     pub fn draw_mesh_tasks(&mut self, x: i64, y: i64, z: i64) {
-        self.body.push(RenderCommand::DrawMeshTasks(ThreadgroupSize::new(x, y, z)));
+        self.body
+            .push(RenderCommand::DrawMeshTasks(ThreadgroupSize::new(x, y, z)));
     }
 
     pub fn set_pipeline(&mut self, pipeline: GraphicsPipeline) {
@@ -281,19 +381,35 @@ impl RenderPassEncoder {
     }
 
     pub fn set_binding_set(&mut self, set: BindingSet, slot: u32, dynamic_offsets: Vec<u32>) {
-        self.body.push(RenderCommand::SetBindingSet { slot, set, dynamic_offsets });
+        self.body.push(RenderCommand::SetBindingSet {
+            slot,
+            set,
+            dynamic_offsets,
+        });
     }
 
     pub fn set_vertex_buffer(&mut self, buffer: Buffer, offset: usize, slot: u32) {
-        self.body.push(RenderCommand::SetVertexBuffer { slot, buffer, offset });
+        self.body.push(RenderCommand::SetVertexBuffer {
+            slot,
+            buffer,
+            offset,
+        });
     }
 
     pub fn set_index_buffer(&mut self, buffer: Buffer, offset: usize, index_type: IndexType) {
-        self.body.push(RenderCommand::SetIndexBuffer { buffer, offset, index_type });
+        self.body.push(RenderCommand::SetIndexBuffer {
+            buffer,
+            offset,
+            index_type,
+        });
     }
 
     pub fn push_constant_bytes(&mut self, stage: ShaderStage, slot: u32, data: &[u8]) {
-        self.body.push(RenderCommand::PushConstant { stage, slot, data: data.to_vec() });
+        self.body.push(RenderCommand::PushConstant {
+            stage,
+            slot,
+            data: data.to_vec(),
+        });
     }
 
     /// Copies the raw bytes of `value` into the recorded command. The shader
@@ -337,7 +453,11 @@ impl RenderPassEncoder {
     }
 
     pub fn draw_indirect(&mut self, buffer: Buffer, offset: usize, draw_count: i64) {
-        self.body.push(RenderCommand::DrawIndirect { buffer, offset, draw_count });
+        self.body.push(RenderCommand::DrawIndirect {
+            buffer,
+            offset,
+            draw_count,
+        });
     }
 }
 
@@ -355,11 +475,19 @@ impl ComputePassEncoder {
     }
 
     pub fn set_binding_set(&mut self, set: BindingSet, slot: u32, dynamic_offsets: Vec<u32>) {
-        self.body.push(ComputeCommand::SetBindingSet { slot, set, dynamic_offsets });
+        self.body.push(ComputeCommand::SetBindingSet {
+            slot,
+            set,
+            dynamic_offsets,
+        });
     }
 
     pub fn push_constant_bytes(&mut self, stage: ShaderStage, slot: u32, data: &[u8]) {
-        self.body.push(ComputeCommand::PushConstant { stage, slot, data: data.to_vec() });
+        self.body.push(ComputeCommand::PushConstant {
+            stage,
+            slot,
+            data: data.to_vec(),
+        });
     }
 
     pub fn push_constant<T: Copy>(&mut self, stage: ShaderStage, slot: u32, value: T) {
@@ -374,11 +502,16 @@ impl ComputePassEncoder {
 
     /// Dispatches workgroups; each group uses the shader module's local size.
     pub fn dispatch(&mut self, groups_x: i64, groups_y: i64, groups_z: i64) {
-        self.body.push(ComputeCommand::Dispatch { groups_x, groups_y, groups_z });
+        self.body.push(ComputeCommand::Dispatch {
+            groups_x,
+            groups_y,
+            groups_z,
+        });
     }
 
     pub fn dispatch_indirect(&mut self, buffer: Buffer, offset: usize) {
-        self.body.push(ComputeCommand::DispatchIndirect { buffer, offset });
+        self.body
+            .push(ComputeCommand::DispatchIndirect { buffer, offset });
     }
 }
 
@@ -392,7 +525,12 @@ impl CopyPassEncoder {
     }
 
     pub fn copy_texture(&mut self, src: Texture, dst: Texture, width: i64, height: i64) {
-        self.body.push(CopyCommand::CopyTexture { src, dst, width, height });
+        self.body.push(CopyCommand::CopyTexture {
+            src,
+            dst,
+            width,
+            height,
+        });
     }
 
     pub fn copy_buffer(
@@ -403,7 +541,13 @@ impl CopyPassEncoder {
         dst_offset: usize,
         size: usize,
     ) {
-        self.body.push(CopyCommand::CopyBuffer { src, src_offset, dst, dst_offset, size });
+        self.body.push(CopyCommand::CopyBuffer {
+            src,
+            src_offset,
+            dst,
+            dst_offset,
+            size,
+        });
     }
 
     pub fn upload_buffer_to_texture(&mut self, upload: TextureBufferUpload) {
@@ -445,7 +589,8 @@ impl CommandBuffer {
     }
 
     pub(crate) fn build_acceleration_structure(&mut self, build: AccelerationStructureBuild) {
-        self.commands.push(RecordedCommand::AccelerationStructureBuild(build));
+        self.commands
+            .push(RecordedCommand::AccelerationStructureBuild(build));
     }
 
     pub fn reset(&mut self) {
@@ -463,10 +608,11 @@ impl CommandBuffer {
     ) {
         let mut encoder = RenderPassEncoder::default();
         body(&mut encoder);
-        self.commands.push(RecordedCommand::RenderPass(RenderPassRecord {
-            descriptor,
-            body: encoder.body,
-        }));
+        self.commands
+            .push(RecordedCommand::RenderPass(RenderPassRecord {
+                descriptor,
+                body: encoder.body,
+            }));
     }
 
     /// Fallible variant of [`Self::render_pass`]; nothing is recorded if the
@@ -478,17 +624,21 @@ impl CommandBuffer {
     ) -> RhiResult<()> {
         let mut encoder = RenderPassEncoder::default();
         body(&mut encoder)?;
-        self.commands.push(RecordedCommand::RenderPass(RenderPassRecord {
-            descriptor,
-            body: encoder.body,
-        }));
+        self.commands
+            .push(RecordedCommand::RenderPass(RenderPassRecord {
+                descriptor,
+                body: encoder.body,
+            }));
         Ok(())
     }
 
     pub fn compute_pass(&mut self, body: impl FnOnce(&mut ComputePassEncoder)) {
         let mut encoder = ComputePassEncoder::default();
         body(&mut encoder);
-        self.commands.push(RecordedCommand::ComputePass(ComputePassRecord { body: encoder.body }));
+        self.commands
+            .push(RecordedCommand::ComputePass(ComputePassRecord {
+                body: encoder.body,
+            }));
     }
 
     pub fn try_compute_pass(
@@ -497,14 +647,20 @@ impl CommandBuffer {
     ) -> RhiResult<()> {
         let mut encoder = ComputePassEncoder::default();
         body(&mut encoder)?;
-        self.commands.push(RecordedCommand::ComputePass(ComputePassRecord { body: encoder.body }));
+        self.commands
+            .push(RecordedCommand::ComputePass(ComputePassRecord {
+                body: encoder.body,
+            }));
         Ok(())
     }
 
     pub fn copy_pass(&mut self, body: impl FnOnce(&mut CopyPassEncoder)) {
         let mut encoder = CopyPassEncoder::default();
         body(&mut encoder);
-        self.commands.push(RecordedCommand::CopyPass(CopyPassRecord { body: encoder.body }));
+        self.commands
+            .push(RecordedCommand::CopyPass(CopyPassRecord {
+                body: encoder.body,
+            }));
     }
 
     pub fn try_copy_pass(
@@ -513,7 +669,10 @@ impl CommandBuffer {
     ) -> RhiResult<()> {
         let mut encoder = CopyPassEncoder::default();
         body(&mut encoder)?;
-        self.commands.push(RecordedCommand::CopyPass(CopyPassRecord { body: encoder.body }));
+        self.commands
+            .push(RecordedCommand::CopyPass(CopyPassRecord {
+                body: encoder.body,
+            }));
         Ok(())
     }
 

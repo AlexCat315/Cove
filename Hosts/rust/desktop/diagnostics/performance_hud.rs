@@ -33,7 +33,9 @@ impl PerformanceHud {
     }
 
     pub fn draw(&mut self, list: &mut DrawList) {
-        let Some(environment) = TextEnvironmentHolder::current() else { return };
+        let Some(environment) = TextEnvironmentHolder::current() else {
+            return;
+        };
         let now = Instant::now();
         let elapsed = now.duration_since(self.sample_time).as_secs_f64();
         if elapsed >= 0.5 {
@@ -59,7 +61,12 @@ impl PerformanceHud {
         let _ = list.add_rounded_rect(
             Rect::new(14.0, 14.0, layout.total_width + 20.0, line_height + 16.0),
             10.0,
-            Color { r: 0.08, g: 0.10, b: 0.13, a: 0.88 },
+            Color {
+                r: 0.08,
+                g: 0.10,
+                b: 0.13,
+                a: 0.88,
+            },
         );
         let _ = list.add_text(
             &layout,

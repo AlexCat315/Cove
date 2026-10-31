@@ -16,15 +16,17 @@
 use std::rc::Rc;
 use std::sync::Arc;
 
-use cove_core::scene::{AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, Justify, Wrap};
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, PaddingExt};
 use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::data::chart::{ChartSeries, ChartSlice, ChartXDomain, Selection};
-use crate::primitives::text::{Divider, DividerAxis, Text};
 use crate::primitives::text::TextAlignment;
+use crate::primitives::text::{Divider, DividerAxis, Text};
 use crate::theme::{SemanticColorRef, SemanticFontRef};
 use crate::{AnyView, BoxView, TupleView, View};
+use cove_core::scene::{
+    AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, Justify, Wrap,
+};
 
 /// The gap marker for a value that was never measured, or a slot the series
 /// does not reach.
@@ -80,26 +82,27 @@ impl ChartDataTable {
                 .flat_map(|index| {
                     let text = text.clone();
                     let series = &series[*index];
-                    series
-                        .data
-                        .iter()
-                        .map(move |datum| ChartDataTableEntry {
-                            label: Self::name(&series.title, *index),
-                            cells: vec![
-                                text(datum.x),
-                                if datum.y.is_finite() {
-                                    text(datum.y)
-                                } else {
-                                    CHART_DATA_GAP.to_string()
-                                },
-                            ],
-                        })
+                    series.data.iter().map(move |datum| ChartDataTableEntry {
+                        label: Self::name(&series.title, *index),
+                        cells: vec![
+                            text(datum.x),
+                            if datum.y.is_finite() {
+                                text(datum.y)
+                            } else {
+                                CHART_DATA_GAP.to_string()
+                            },
+                        ],
+                    })
                 })
                 .collect();
             let axis_label = axis_label.into();
             return Self {
                 label,
-                axis_label: if axis_label.is_empty() { "Series".to_string() } else { axis_label },
+                axis_label: if axis_label.is_empty() {
+                    "Series".to_string()
+                } else {
+                    axis_label
+                },
                 columns: vec!["X".to_string(), "Value".to_string()],
                 omitted: entries.len().saturating_sub(limit),
                 rows: entries.into_iter().take(limit).collect(),
@@ -112,7 +115,10 @@ impl ChartDataTable {
             .filter_map(|index| series.get(*index).map(|series| series.data.len()))
             .max()
             .unwrap_or(0);
-        let columns: Vec<String> = shown.iter().map(|index| Self::name(&series[*index].title, *index)).collect();
+        let columns: Vec<String> = shown
+            .iter()
+            .map(|index| Self::name(&series[*index].title, *index))
+            .collect();
         let rows: Vec<ChartDataTableEntry> = (0..count.min(limit))
             .map(|position| ChartDataTableEntry {
                 label: Self::position(&x, position, first, &text),
@@ -149,7 +155,13 @@ impl ChartDataTable {
         let limit = maximum_rows.max(1);
         let total: f32 = slices
             .iter()
-            .map(|slice| if slice.value.is_finite() { slice.value.max(0.0) } else { 0.0 })
+            .map(|slice| {
+                if slice.value.is_finite() {
+                    slice.value.max(0.0)
+                } else {
+                    0.0
+                }
+            })
             .sum();
         let rows: Vec<ChartDataTableEntry> = slices
             .iter()
@@ -169,7 +181,11 @@ impl ChartDataTable {
                     },
                     cells: vec![
                         text(slice.value),
-                        if total > 0.0 { format!("{share}%") } else { CHART_DATA_GAP.to_string() },
+                        if total > 0.0 {
+                            format!("{share}%")
+                        } else {
+                            CHART_DATA_GAP.to_string()
+                        },
                     ],
                 }
             })
@@ -197,7 +213,11 @@ impl ChartDataTable {
     }
 
     fn name(title: &str, index: usize) -> String {
-        if title.is_empty() { format!("Series {}", index + 1) } else { title.to_string() }
+        if title.is_empty() {
+            format!("Series {}", index + 1)
+        } else {
+            title.to_string()
+        }
     }
 
     /// What the x axis calls this position: the category name, or the value on
@@ -209,9 +229,10 @@ impl ChartDataTable {
         text: &Rc<dyn Fn(f32) -> String>,
     ) -> String {
         match x {
-            ChartXDomain::Categorical(labels) => {
-                labels.get(index).cloned().unwrap_or_else(|| format!("{}", index + 1))
-            }
+            ChartXDomain::Categorical(labels) => labels
+                .get(index)
+                .cloned()
+                .unwrap_or_else(|| format!("{}", index + 1)),
             ChartXDomain::Numeric => match series.and_then(|series| series.data.get(index)) {
                 Some(datum) => text(datum.x),
                 None => format!("{}", index + 1),
@@ -232,7 +253,10 @@ impl View for ChartDataTable {
             .semantic_background(SemanticColorRef::surface_variant()),
         );
 
-        let mut children = vec![header, AnyView::new(Divider::new(None, 1.0, DividerAxis::Horizontal))];
+        let mut children = vec![
+            header,
+            AnyView::new(Divider::new(None, 1.0, DividerAxis::Horizontal)),
+        ];
         for row in &self.rows {
             children.push(AnyView::new(ChartDataTableRow {
                 label: row.label.clone(),
@@ -244,16 +268,14 @@ impl View for ChartDataTable {
         if self.omitted > 0 {
             let noun = if self.omitted == 1 { "row" } else { "rows" };
             children.push(AnyView::new(
-                AnyView::new(
+                AnyView::new(AnyView::new(
                     AnyView::new(
-                        AnyView::new(
-                            Text::new(format!("{} more {noun} not shown", self.omitted))
-                                .semantic_font(SemanticFontRef::caption())
-                                .semantic_foreground(SemanticColorRef::on_surface_muted()),
-                        )
-                        .padding_edges(8.0, 6.0),
-                    ),
-                )
+                        Text::new(format!("{} more {noun} not shown", self.omitted))
+                            .semantic_font(SemanticFontRef::caption())
+                            .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                    )
+                    .padding_edges(8.0, 6.0),
+                ))
                 .accessibility(|semantics: &mut AccessibilitySemantics| {
                     semantics.role = AccessibilityRole::Status;
                 }),
@@ -262,19 +284,23 @@ impl View for ChartDataTable {
 
         let label = self.label.clone();
         AnyView::new(
-            AnyView::new(AnyView::new(BoxView::new(
-                FlexDirection::Column,
-                Align::Stretch,
-                Justify::FlexStart,
-                Wrap::NoWrap,
-                0.0,
-                AnyView::new(TupleView::new(children)),
-            ))
-            .accessibility(move |semantics: &mut AccessibilitySemantics| {
-                semantics.role = AccessibilityRole::Table;
-                semantics.label = label.clone();
-            }))
-            .with_modifier(cove_composition::LayoutDebugModifier::debug_name("chart-data-table")),
+            AnyView::new(
+                AnyView::new(BoxView::new(
+                    FlexDirection::Column,
+                    Align::Stretch,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    0.0,
+                    AnyView::new(TupleView::new(children)),
+                ))
+                .accessibility(move |semantics: &mut AccessibilitySemantics| {
+                    semantics.role = AccessibilityRole::Table;
+                    semantics.label = label.clone();
+                }),
+            )
+            .with_modifier(cove_composition::LayoutDebugModifier::debug_name(
+                "chart-data-table",
+            )),
         )
     }
 }
@@ -322,7 +348,11 @@ impl View for ChartDataTableRow {
             )
             .accessibility(move |semantics: &mut AccessibilitySemantics| {
                 semantics.role = AccessibilityRole::Row;
-                semantics.label = if is_header { "Columns".to_string() } else { label.clone() };
+                semantics.label = if is_header {
+                    "Columns".to_string()
+                } else {
+                    label.clone()
+                };
             }),
         )
     }
@@ -339,7 +369,11 @@ struct ChartDataTableCell {
 
 impl View for ChartDataTableCell {
     fn body(&self) -> AnyView {
-        let alignment = if self.column.is_none() { TextAlignment::Leading } else { TextAlignment::Trailing };
+        let alignment = if self.column.is_none() {
+            TextAlignment::Leading
+        } else {
+            TextAlignment::Trailing
+        };
         let grow = if self.column.is_none() { 0.0 } else { 1.0 };
         let _ = grow;
         let text = AnyView::new(
@@ -358,20 +392,26 @@ impl View for ChartDataTableCell {
                         SemanticColorRef::on_surface_variant()
                     }),
             )
-            .flex_with(if self.column.is_none() { 1.2 } else { 1.0 }, 1.0, Some(0.0)),
+            .flex_with(
+                if self.column.is_none() { 1.2 } else { 1.0 },
+                1.0,
+                Some(0.0),
+            ),
         );
 
         if self.is_header {
             return text;
         }
-        let Some(column) = self.column.clone() else { return text };
+        let Some(column) = self.column.clone() else {
+            return text;
+        };
         let value = self.text.clone();
-        AnyView::new(
-            AnyView::new(text).accessibility(move |semantics: &mut AccessibilitySemantics| {
+        AnyView::new(AnyView::new(text).accessibility(
+            move |semantics: &mut AccessibilitySemantics| {
                 semantics.role = AccessibilityRole::Cell;
                 semantics.label = column.clone();
                 semantics.value = value.clone();
-            }),
-        )
+            },
+        ))
     }
 }

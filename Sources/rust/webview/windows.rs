@@ -14,10 +14,12 @@
 //! surface reports `Loading`, exactly like a slow page load.
 #![cfg(target_os = "windows")]
 
-use super::{WebViewCommand, WebViewGeometry, WebViewHost, WebViewRequest, WebViewState, WebViewSurface};
+use super::{
+    WebViewCommand, WebViewGeometry, WebViewHost, WebViewRequest, WebViewState, WebViewSurface,
+};
 use crate::webview::WebViewPhase;
 use std::cell::{Cell, RefCell};
-use std::ffi::{c_char, c_void, OsStr};
+use std::ffi::{OsStr, c_char, c_void};
 use std::os::windows::ffi::OsStrExt;
 use std::rc::Rc;
 
@@ -47,19 +49,49 @@ struct Guid {
 }
 
 const fn guid(data1: u32, data2: u16, data3: u16, data4: [u8; 8]) -> Guid {
-    Guid { data1, data2, data3, data4 }
+    Guid {
+        data1,
+        data2,
+        data3,
+        data4,
+    }
 }
 
 /// IID_ICoreWebView2Environment.
-const IID_ENVIRONMENT: Guid = guid(0xB96D755E, 0x0319, 0x4E92, [0xA2, 0x96, 0x34, 0x49, 0xF2, 0x37, 0x4A, 0x2B]);
+const IID_ENVIRONMENT: Guid = guid(
+    0xB96D755E,
+    0x0319,
+    0x4E92,
+    [0xA2, 0x96, 0x34, 0x49, 0xF2, 0x37, 0x4A, 0x2B],
+);
 /// IID_ICoreWebView2Controller.
-const IID_CONTROLLER: Guid = guid(0x4D00C0D1, 0x9434, 0x4EB6, [0x80, 0x78, 0x86, 0x97, 0xA5, 0x60, 0x33, 0x70]);
+const IID_CONTROLLER: Guid = guid(
+    0x4D00C0D1,
+    0x9434,
+    0x4EB6,
+    [0x80, 0x78, 0x86, 0x97, 0xA5, 0x60, 0x33, 0x70],
+);
 /// IID_ICoreWebView2.
-const IID_WEBVIEW: Guid = guid(0x76ECEACB, 0x0462, 0x4D94, [0x9A, 0xC7, 0x43, 0x49, 0xA0, 0xCA, 0x0B, 0x31]);
+const IID_WEBVIEW: Guid = guid(
+    0x76ECEACB,
+    0x0462,
+    0x4D94,
+    [0x9A, 0xC7, 0x43, 0x49, 0xA0, 0xCA, 0x0B, 0x31],
+);
 /// IID_ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler.
-const IID_ENVIRONMENT_HANDLER: Guid = guid(0x4E8A3389, 0xC9D8, 0x4BD2, [0xB6, 0xB5, 0x12, 0x4F, 0xEE, 0x6C, 0xC1, 0x4D]);
+const IID_ENVIRONMENT_HANDLER: Guid = guid(
+    0x4E8A3389,
+    0xC9D8,
+    0x4BD2,
+    [0xB6, 0xB5, 0x12, 0x4F, 0xEE, 0x6C, 0xC1, 0x4D],
+);
 /// IID_ICoreWebView2CreateCoreWebView2ControllerCompletedHandler.
-const IID_CONTROLLER_HANDLER: Guid = guid(0x6C4819F3, 0xC9B7, 0x4260, [0x81, 0x27, 0xC9, 0xF5, 0xBD, 0xE7, 0xF6, 0x8C]);
+const IID_CONTROLLER_HANDLER: Guid = guid(
+    0x6C4819F3,
+    0xC9B7,
+    0x4260,
+    [0x81, 0x27, 0xC9, 0xF5, 0xBD, 0xE7, 0xF6, 0x8C],
+);
 
 // Interface slot indices. All interfaces below derive from IUnknown, whose
 // three methods occupy slots 0..=2.
@@ -97,7 +129,10 @@ unsafe fn com_slot<F>(this: *mut c_void, slot: usize) -> F {
 }
 
 fn wide(value: &str) -> Vec<u16> {
-    OsStr::new(value).encode_wide().chain(std::iter::once(0)).collect()
+    OsStr::new(value)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect()
 }
 
 unsafe extern "system" {
@@ -113,7 +148,8 @@ fn release(pointer: *mut c_void) {
     if pointer.is_null() {
         return;
     }
-    let release: unsafe extern "system" fn(*mut c_void) -> u32 = unsafe { com_slot(pointer, SLOT_RELEASE) };
+    let release: unsafe extern "system" fn(*mut c_void) -> u32 =
+        unsafe { com_slot(pointer, SLOT_RELEASE) };
     unsafe { release(pointer) };
 }
 
@@ -231,7 +267,8 @@ struct EnvironmentHandler {
 
 #[repr(C)]
 struct EnvironmentHandlerVtable {
-    query_interface: unsafe extern "system" fn(*mut c_void, *const Guid, *mut *mut c_void) -> HRESULT,
+    query_interface:
+        unsafe extern "system" fn(*mut c_void, *const Guid, *mut *mut c_void) -> HRESULT,
     add_ref: unsafe extern "system" fn(*mut c_void) -> u32,
     release: unsafe extern "system" fn(*mut c_void) -> u32,
     invoke: unsafe extern "system" fn(*mut c_void, HRESULT, *mut c_void) -> HRESULT,
@@ -244,7 +281,11 @@ static ENVIRONMENT_VTABLE: EnvironmentHandlerVtable = EnvironmentHandlerVtable {
     invoke: environment_invoke,
 };
 
-unsafe extern "system" fn environment_query_interface(this: *mut c_void, iid: *const Guid, out: *mut *mut c_void) -> HRESULT {
+unsafe extern "system" fn environment_query_interface(
+    this: *mut c_void,
+    iid: *const Guid,
+    out: *mut *mut c_void,
+) -> HRESULT {
     let handler = this as *mut EnvironmentHandler;
     if iid.is_null() || out.is_null() {
         return -2147467261; // E_POINTER
@@ -256,7 +297,15 @@ unsafe extern "system" fn environment_query_interface(this: *mut c_void, iid: *c
         return S_OK;
     }
     // IUnknown is the identity interface.
-    if guid_matches(&requested, &guid(0x00000000, 0x0000, 0x0000, [0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46])) {
+    if guid_matches(
+        &requested,
+        &guid(
+            0x00000000,
+            0x0000,
+            0x0000,
+            [0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46],
+        ),
+    ) {
         unsafe { *out = this };
         unsafe { environment_add_ref(this) };
         let _ = handler;
@@ -284,11 +333,17 @@ unsafe extern "system" fn environment_release(this: *mut c_void) -> u32 {
     next
 }
 
-unsafe extern "system" fn environment_invoke(this: *mut c_void, result: HRESULT, environment: *mut c_void) -> HRESULT {
+unsafe extern "system" fn environment_invoke(
+    this: *mut c_void,
+    result: HRESULT,
+    environment: *mut c_void,
+) -> HRESULT {
     let handler = unsafe { &*(this as *const EnvironmentHandler) };
     if result != S_OK || environment.is_null() {
         let mut state = handler.state.borrow_mut();
-        state.creation_failed = Some(format!("WebView2 environment creation failed (0x{result:08X})"));
+        state.creation_failed = Some(format!(
+            "WebView2 environment creation failed (0x{result:08X})"
+        ));
         state.state.phase = WebViewPhase::Failed;
         state.state.error_description = state.creation_failed.clone();
         state.publish();
@@ -314,7 +369,8 @@ struct ControllerHandler {
 
 #[repr(C)]
 struct ControllerHandlerVtable {
-    query_interface: unsafe extern "system" fn(*mut c_void, *const Guid, *mut *mut c_void) -> HRESULT,
+    query_interface:
+        unsafe extern "system" fn(*mut c_void, *const Guid, *mut *mut c_void) -> HRESULT,
     add_ref: unsafe extern "system" fn(*mut c_void) -> u32,
     release: unsafe extern "system" fn(*mut c_void) -> u32,
     invoke: unsafe extern "system" fn(*mut c_void, HRESULT, *mut c_void) -> HRESULT,
@@ -327,13 +383,25 @@ static CONTROLLER_VTABLE: ControllerHandlerVtable = ControllerHandlerVtable {
     invoke: controller_invoke,
 };
 
-unsafe extern "system" fn controller_query_interface(this: *mut c_void, iid: *const Guid, out: *mut *mut c_void) -> HRESULT {
+unsafe extern "system" fn controller_query_interface(
+    this: *mut c_void,
+    iid: *const Guid,
+    out: *mut *mut c_void,
+) -> HRESULT {
     if iid.is_null() || out.is_null() {
         return -2147467261;
     }
     let requested = unsafe { *iid };
     if guid_matches(&requested, &IID_CONTROLLER_HANDLER)
-        || guid_matches(&requested, &guid(0x00000000, 0x0000, 0x0000, [0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46]))
+        || guid_matches(
+            &requested,
+            &guid(
+                0x00000000,
+                0x0000,
+                0x0000,
+                [0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46],
+            ),
+        )
     {
         unsafe { *out = this };
         unsafe { controller_add_ref(this) };
@@ -360,11 +428,17 @@ unsafe extern "system" fn controller_release(this: *mut c_void) -> u32 {
     next
 }
 
-unsafe extern "system" fn controller_invoke(this: *mut c_void, result: HRESULT, controller: *mut c_void) -> HRESULT {
+unsafe extern "system" fn controller_invoke(
+    this: *mut c_void,
+    result: HRESULT,
+    controller: *mut c_void,
+) -> HRESULT {
     let handler = unsafe { &*(this as *const ControllerHandler) };
     if result != S_OK || controller.is_null() {
         let mut state = handler.state.borrow_mut();
-        state.creation_failed = Some(format!("WebView2 controller creation failed (0x{result:08X})"));
+        state.creation_failed = Some(format!(
+            "WebView2 controller creation failed (0x{result:08X})"
+        ));
         state.state.phase = WebViewPhase::Failed;
         state.state.error_description = state.creation_failed.clone();
         state.publish();
@@ -405,11 +479,15 @@ unsafe extern "system" fn controller_invoke(this: *mut c_void, result: HRESULT, 
 }
 
 fn guid_matches(left: &Guid, right: &Guid) -> bool {
-    left.data1 == right.data1 && left.data2 == right.data2 && left.data3 == right.data3 && left.data4 == right.data4
+    left.data1 == right.data1
+        && left.data2 == right.data2
+        && left.data3 == right.data3
+        && left.data4 == right.data4
 }
 
 /// `CreateCoreWebView2EnvironmentWithOptions` resolution.
-type CreateEnvironmentFn = unsafe extern "system" fn(PCWSTR, PCWSTR, *mut c_void, *mut c_void, *mut c_void) -> HRESULT;
+type CreateEnvironmentFn =
+    unsafe extern "system" fn(PCWSTR, PCWSTR, *mut c_void, *mut c_void, *mut c_void) -> HRESULT;
 
 fn create_environment(state: &Rc<RefCell<WindowsWebView2State>>) {
     let loaded = unsafe {
@@ -418,8 +496,11 @@ fn create_environment(state: &Rc<RefCell<WindowsWebView2State>>) {
         if module.is_null() {
             None
         } else {
-            let symbol = GetProcAddress(module, c"CreateCoreWebView2EnvironmentWithOptions".as_ptr());
-            (!symbol.is_null()).then_some(std::mem::transmute::<*mut c_void, CreateEnvironmentFn>(symbol))
+            let symbol =
+                GetProcAddress(module, c"CreateCoreWebView2EnvironmentWithOptions".as_ptr());
+            (!symbol.is_null()).then_some(std::mem::transmute::<*mut c_void, CreateEnvironmentFn>(
+                symbol,
+            ))
         }
     };
     let Some(create) = loaded else {
@@ -454,7 +535,9 @@ fn create_environment(state: &Rc<RefCell<WindowsWebView2State>>) {
         // A failed call never invokes the handler, so release our reference.
         unsafe { environment_release(handler_pointer) };
         let mut state = state.borrow_mut();
-        state.creation_failed = Some(format!("WebView2 environment request failed (0x{result:08X})"));
+        state.creation_failed = Some(format!(
+            "WebView2 environment request failed (0x{result:08X})"
+        ));
         state.state.phase = WebViewPhase::Failed;
         state.state.error_description = state.creation_failed.clone();
         state.publish();
@@ -484,7 +567,9 @@ fn create_controller(state: &Rc<RefCell<WindowsWebView2State>>) {
     if result != S_OK {
         unsafe { controller_release(handler_pointer) };
         let mut state = state.borrow_mut();
-        state.creation_failed = Some(format!("WebView2 controller request failed (0x{result:08X})"));
+        state.creation_failed = Some(format!(
+            "WebView2 controller request failed (0x{result:08X})"
+        ));
         state.state.phase = WebViewPhase::Failed;
         state.state.error_description = state.creation_failed.clone();
         state.publish();
@@ -501,8 +586,14 @@ pub struct WindowsWebView2Host {
 impl WindowsWebView2Host {
     /// `parent_provider` returns the HWND the web view parents itself to;
     /// `None` falls back to the active window.
-    pub fn new(parent_provider: impl Fn() -> Option<HWND> + 'static, user_data_folder: impl Into<String>) -> Self {
-        Self { parent_provider: Rc::new(parent_provider), user_data_folder: user_data_folder.into() }
+    pub fn new(
+        parent_provider: impl Fn() -> Option<HWND> + 'static,
+        user_data_folder: impl Into<String>,
+    ) -> Self {
+        Self {
+            parent_provider: Rc::new(parent_provider),
+            user_data_folder: user_data_folder.into(),
+        }
     }
 }
 
@@ -543,7 +634,10 @@ impl WebViewSurface for WindowsWebView2Surface {
             if state.detached {
                 return;
             }
-            state.state = WebViewState { phase: WebViewPhase::Loading, ..WebViewState::default() };
+            state.state = WebViewState {
+                phase: WebViewPhase::Loading,
+                ..WebViewState::default()
+            };
         }
         if state_handle.borrow().environment.is_null() {
             // `create_environment` re-enters this `RefCell`, so the borrow must
@@ -635,7 +729,12 @@ impl WebViewSurface for WindowsWebView2Surface {
                 bottom: (visible.y + visible.height).round() as i32,
             }
         } else {
-            Rect { left: 0, top: 0, right: 0, bottom: 0 }
+            Rect {
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+            }
         };
         let put_bounds: unsafe extern "system" fn(*mut c_void, Rect) -> HRESULT =
             unsafe { com_slot(controller, CONTROLLER_PUT_BOUNDS) };

@@ -69,7 +69,11 @@ mod ndk {
             // SAFETY: `name` is NUL terminated and the handle is live for the
             // process lifetime. The caller guarantees `T` is the symbol's type.
             let pointer = unsafe { dlsym(self.0, name.as_ptr()) };
-            if pointer.is_null() { None } else { Some(unsafe { std::mem::transmute_copy(&pointer) }) }
+            if pointer.is_null() {
+                None
+            } else {
+                Some(unsafe { std::mem::transmute_copy(&pointer) })
+            }
         }
     }
 
@@ -83,13 +87,17 @@ mod ndk {
     /// `libandroid.so` provides the `ANativeWindow` accessors.
     fn android_library() -> Option<&'static Library> {
         static LIBRARY: std::sync::OnceLock<Option<Library>> = std::sync::OnceLock::new();
-        LIBRARY.get_or_init(|| Library::open(c"libandroid.so")).as_ref()
+        LIBRARY
+            .get_or_init(|| Library::open(c"libandroid.so"))
+            .as_ref()
     }
 
     /// Writes one record to logcat under `tag`.
     pub fn log_write(tag: &CStr, message: &CStr) -> bool {
         const ANDROID_LOG_INFO: c_int = 4;
-        let Some(write) = log_library().and_then(|library| library.symbol::<LogWrite>(c"__android_log_write")) else {
+        let Some(write) =
+            log_library().and_then(|library| library.symbol::<LogWrite>(c"__android_log_write"))
+        else {
             return false;
         };
         // SAFETY: both C strings are borrowed for the duration of the call.
@@ -219,8 +227,12 @@ fn log(message: &str, level: Level, label: &str) {
 
 /// Forwards one record to Android's log facility when `liblog` is available.
 fn forward_to_logcat(message: &str) {
-    let Ok(tag) = std::ffi::CString::new("CoveHost") else { return };
-    let Ok(text) = std::ffi::CString::new(message.replace('\0', "")) else { return };
+    let Ok(tag) = std::ffi::CString::new("CoveHost") else {
+        return;
+    };
+    let Ok(text) = std::ffi::CString::new(message.replace('\0', "")) else {
+        return;
+    };
     ndk::log_write(&tag, &text);
 }
 
@@ -314,7 +326,11 @@ pub unsafe extern "C" fn cove_android_create_application(
         );
         return std::ptr::null_mut();
     }
-    log("Application starting", Level::Info, "com.cove.android.application");
+    log(
+        "Application starting",
+        Level::Info,
+        "com.cove.android.application",
+    );
     match AndroidApplication::new(scale, &checkpoint, launch, runtime) {
         Ok(application) => Rc::into_raw(application).cast_mut().cast(),
         Err(error) => {
@@ -394,10 +410,7 @@ pub unsafe extern "C" fn cove_android_open(
     }
     // A surface can be reconfigured by the window system between the Java
     // callback and this call; prefer the geometry the NDK reports.
-    let (width_px, height_px) = match (
-        NativeWindow::width(window),
-        NativeWindow::height(window),
-    ) {
+    let (width_px, height_px) = match (NativeWindow::width(window), NativeWindow::height(window)) {
         (Some(0) | None, _) | (_, Some(0) | None) => (width as usize, height as usize),
         (Some(ndk_width), Some(ndk_height)) => (ndk_width as usize, ndk_height as usize),
     };
@@ -424,11 +437,17 @@ pub unsafe extern "C" fn cove_android_open(
 /// `pointer` must be null or a live session pointer.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cove_android_frame(pointer: SessionPointer, timestamp: u64) -> i32 {
-    let Some(handle) = (unsafe { session(pointer) }) else { return 0 };
+    let Some(handle) = (unsafe { session(pointer) }) else {
+        return 0;
+    };
     match handle.session_mut().frame(timestamp) {
         Ok(presented) => i32::from(presented),
         Err(error) => {
-            log(&format!("Frame failed: {error}"), Level::Error, "com.cove.android.frame");
+            log(
+                &format!("Frame failed: {error}"),
+                Level::Error,
+                "com.cove.android.frame",
+            );
             -1
         }
     }
@@ -439,13 +458,10 @@ pub unsafe extern "C" fn cove_android_frame(pointer: SessionPointer, timestamp: 
 /// # Safety
 /// `pointer` must be null or a live session pointer.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn cove_android_pointer(
-    pointer: SessionPointer,
-    kind: i32,
-    x: f32,
-    y: f32,
-) {
-    let Some(handle) = (unsafe { session(pointer) }) else { return };
+pub unsafe extern "C" fn cove_android_pointer(pointer: SessionPointer, kind: i32, x: f32, y: f32) {
+    let Some(handle) = (unsafe { session(pointer) }) else {
+        return;
+    };
     handle.session().scene().pointer(kind, x, y);
 }
 
@@ -461,7 +477,9 @@ pub unsafe extern "C" fn cove_android_text(
     count: i32,
     composing: i32,
 ) {
-    let Some(handle) = (unsafe { session(pointer) }) else { return };
+    let Some(handle) = (unsafe { session(pointer) }) else {
+        return;
+    };
     // SAFETY: forwarded pointer/count contract from the caller.
     let text = unsafe { utf16_string(text, count) };
     // SAFETY: the handle is live for the duration of this call.
@@ -473,13 +491,14 @@ pub unsafe extern "C" fn cove_android_text(
 /// # Safety
 /// `pointer` must be null or a live session pointer.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn cove_android_key(
-    pointer: SessionPointer,
-    scancode: u32,
-    modifiers: u16,
-) {
-    let Some(handle) = (unsafe { session(pointer) }) else { return };
-    handle.session().scene().key(scancode, KeyModifiers(modifiers));
+pub unsafe extern "C" fn cove_android_key(pointer: SessionPointer, scancode: u32, modifiers: u16) {
+    let Some(handle) = (unsafe { session(pointer) }) else {
+        return;
+    };
+    handle
+        .session()
+        .scene()
+        .key(scancode, KeyModifiers(modifiers));
 }
 
 /// `cove_android_scroll`
@@ -494,7 +513,9 @@ pub unsafe extern "C" fn cove_android_scroll(
     delta_x: f32,
     delta_y: f32,
 ) {
-    let Some(handle) = (unsafe { session(pointer) }) else { return };
+    let Some(handle) = (unsafe { session(pointer) }) else {
+        return;
+    };
     handle.session().scene().scroll(x, y, delta_x, delta_y);
 }
 
@@ -519,19 +540,25 @@ pub unsafe extern "C" fn cove_android_surface(
     text_sizes: *const f32,
     text_count: i32,
 ) {
-    let Some(handle) = (unsafe { session(pointer) }) else { return };
+    let Some(handle) = (unsafe { session(pointer) }) else {
+        return;
+    };
     if text_sizes.is_null() || !(0..=128).contains(&text_count) || text_count % 2 != 0 {
         return;
     }
     // SAFETY: the caller guarantees `text_count` readable floats.
     let sizes = unsafe { std::slice::from_raw_parts(text_sizes, text_count as usize) };
-    let text_scale = TextScale::from_samples(
-        sizes
-            .chunks_exact(2)
-            .map(|pair| TextScaleSample { size: pair[0], scaled_size: pair[1] }),
-    );
+    let text_scale = TextScale::from_samples(sizes.chunks_exact(2).map(|pair| TextScaleSample {
+        size: pair[0],
+        scaled_size: pair[1],
+    }));
     handle.session().application().update_scale(density);
-    let safe_area = Insets { top, bottom, leading, trailing };
+    let safe_area = Insets {
+        top,
+        bottom,
+        leading,
+        trailing,
+    };
     let idiom = match idiom {
         0 => Idiom::Phone,
         1 => Idiom::Tablet,
@@ -551,7 +578,9 @@ pub unsafe extern "C" fn cove_android_surface(
 /// `pointer` must be null or a live session pointer.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cove_android_system_bar_icons(pointer: SessionPointer) -> i32 {
-    let Some(handle) = (unsafe { session(pointer) }) else { return -1 };
+    let Some(handle) = (unsafe { session(pointer) }) else {
+        return -1;
+    };
     // SAFETY: the handle is live for the duration of this call.
     handle.session().scene().content().system_bar_icon_style()
 }
@@ -561,15 +590,16 @@ pub unsafe extern "C" fn cove_android_system_bar_icons(pointer: SessionPointer) 
 /// # Safety
 /// `pointer` must be null or a live session pointer.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn cove_android_key_state(
-    pointer: SessionPointer,
-    scancode: u32,
-    down: i32,
-) {
-    let Some(handle) = (unsafe { session(pointer) }) else { return };
+pub unsafe extern "C" fn cove_android_key_state(pointer: SessionPointer, scancode: u32, down: i32) {
+    let Some(handle) = (unsafe { session(pointer) }) else {
+        return;
+    };
     if down != 0 {
         // SAFETY: the handle is live for the duration of this call.
-        handle.session().scene().key(scancode, KeyModifiers::default());
+        handle
+            .session()
+            .scene()
+            .key(scancode, KeyModifiers::default());
     }
 }
 
@@ -584,7 +614,9 @@ pub unsafe extern "C" fn cove_android_snapshot(
     output: *mut u16,
     capacity: i32,
 ) -> i32 {
-    let Some(handle) = (unsafe { session(pointer) }) else { return 0 };
+    let Some(handle) = (unsafe { session(pointer) }) else {
+        return 0;
+    };
     // SAFETY: the handle is live for the duration of this call.
     let text = handle.session().scene().snapshot();
     // SAFETY: forwarded output contract from the caller.
@@ -602,7 +634,9 @@ pub unsafe extern "C" fn cove_android_input_snapshot(
     output: *mut u16,
     capacity: i32,
 ) -> i32 {
-    let Some(handle) = (unsafe { session(pointer) }) else { return 0 };
+    let Some(handle) = (unsafe { session(pointer) }) else {
+        return 0;
+    };
     // SAFETY: the handle is live for the duration of this call.
     let text = handle.session().scene().input_snapshot();
     // SAFETY: forwarded output contract from the caller.
@@ -620,7 +654,9 @@ pub unsafe extern "C" fn cove_android_edit(
     start: i32,
     end: i32,
 ) {
-    let Some(handle) = (unsafe { session(pointer) }) else { return };
+    let Some(handle) = (unsafe { session(pointer) }) else {
+        return;
+    };
     handle.session().scene().edit(kind, start, end);
 }
 

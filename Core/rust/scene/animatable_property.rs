@@ -11,7 +11,7 @@
 //! ported modifiers name their property with a `&'static str`. The semantics —
 //! one live controller per node per property — are unchanged.
 use super::{
-    ActiveAnimationContext, AnimatorScheduler, AnyAnimationController, AnimationController,
+    ActiveAnimationContext, AnimationController, AnimatorScheduler, AnyAnimationController,
     Interpolatable, Node, NodeResource,
 };
 use std::cell::RefCell;
@@ -40,9 +40,16 @@ impl AnimatablePropertyRegistry {
         self.controllers.borrow().len()
     }
 
-    pub fn replace_controller(&self, key: &'static str, controller: Option<Rc<dyn AnyAnimationController>>) {
+    pub fn replace_controller(
+        &self,
+        key: &'static str,
+        controller: Option<Rc<dyn AnyAnimationController>>,
+    ) {
         let mut controllers = self.controllers.borrow_mut();
-        if let Some(existing) = controllers.get(key).and_then(|entry| entry.controller.upgrade()) {
+        if let Some(existing) = controllers
+            .get(key)
+            .and_then(|entry| entry.controller.upgrade())
+        {
             existing.cancel();
             if let Some(entry) = controllers.get(key) {
                 entry.scheduler.unregister(&existing);
@@ -88,7 +95,12 @@ impl AnimatablePropertyRegistry {
 impl NodeResource for AnimatablePropertyRegistry {
     fn mount(&self, _node: &Node) {}
     fn unmount(&self, _node: &Node) {
-        let entries: Vec<WeakAnimationControllerBox> = self.controllers.borrow_mut().drain().map(|(_, entry)| entry).collect();
+        let entries: Vec<WeakAnimationControllerBox> = self
+            .controllers
+            .borrow_mut()
+            .drain()
+            .map(|(_, entry)| entry)
+            .collect();
         for entry in entries {
             if let Some(controller) = entry.controller.upgrade() {
                 controller.cancel();
@@ -116,41 +128,77 @@ impl Node {
         created
     }
 
-    pub fn replace_animation_controller(&self, key: &'static str, controller: Option<Rc<dyn AnyAnimationController>>) {
+    pub fn replace_animation_controller(
+        &self,
+        key: &'static str,
+        controller: Option<Rc<dyn AnyAnimationController>>,
+    ) {
         if controller.is_none() && self.existing_animatable_property_registry().is_none() {
             return;
         }
-        self.animatable_property_registry().replace_controller(key, controller);
+        self.animatable_property_registry()
+            .replace_controller(key, controller);
     }
 
     pub fn has_animation_controller(&self, key: &'static str) -> bool {
-        self.existing_animatable_property_registry().is_some_and(|registry| registry.has_active_controller(key))
+        self.existing_animatable_property_registry()
+            .is_some_and(|registry| registry.has_active_controller(key))
     }
 
-    pub fn inherit_motion<T: Interpolatable + 'static>(&self, key: &'static str, controller: &Rc<AnimationController<T>>) {
-        let Some(registry) = self.existing_animatable_property_registry() else { return };
-        let Some(previous) = registry.live_controller(key) else { return };
+    pub fn inherit_motion<T: Interpolatable + 'static>(
+        &self,
+        key: &'static str,
+        controller: &Rc<AnimationController<T>>,
+    ) {
+        let Some(registry) = self.existing_animatable_property_registry() else {
+            return;
+        };
+        let Some(previous) = registry.live_controller(key) else {
+            return;
+        };
         if let Some(previous) = previous.as_any().downcast_ref::<AnimationController<T>>() {
             controller.inherit_motion(previous);
         }
     }
 
-    pub fn continues_animation<T: Interpolatable + PartialEq + 'static>(&self, key: &'static str, target: &T) -> bool {
+    pub fn continues_animation<T: Interpolatable + PartialEq + 'static>(
+        &self,
+        key: &'static str,
+        target: &T,
+    ) -> bool {
         if self.prefers_reduced_motion() || ActiveAnimationContext::current().disables_animations {
             return false;
         }
-        let Some(registry) = self.existing_animatable_property_registry() else { return false };
-        let Some(controller) = registry.live_controller(key) else { return false };
-        controller.as_any().downcast_ref::<AnimationController<T>>().is_some_and(|controller| &controller.to == target)
+        let Some(registry) = self.existing_animatable_property_registry() else {
+            return false;
+        };
+        let Some(controller) = registry.live_controller(key) else {
+            return false;
+        };
+        controller
+            .as_any()
+            .downcast_ref::<AnimationController<T>>()
+            .is_some_and(|controller| &controller.to == target)
     }
 
-    pub fn finishes_reduced_animation<T: Interpolatable + PartialEq + 'static>(&self, key: &'static str, target: &T) -> bool {
+    pub fn finishes_reduced_animation<T: Interpolatable + PartialEq + 'static>(
+        &self,
+        key: &'static str,
+        target: &T,
+    ) -> bool {
         if !self.prefers_reduced_motion() {
             return false;
         }
-        let Some(registry) = self.existing_animatable_property_registry() else { return false };
-        let Some(controller) = registry.live_controller(key) else { return false };
-        let matches = controller.as_any().downcast_ref::<AnimationController<T>>().is_some_and(|controller| &controller.to == target);
+        let Some(registry) = self.existing_animatable_property_registry() else {
+            return false;
+        };
+        let Some(controller) = registry.live_controller(key) else {
+            return false;
+        };
+        let matches = controller
+            .as_any()
+            .downcast_ref::<AnimationController<T>>()
+            .is_some_and(|controller| &controller.to == target);
         if !matches {
             return false;
         }
@@ -180,7 +228,10 @@ mod tests {
         // assertion below would be testing the drop, not the replacement.
         let second = AnimationController::new(0.5_f32, 1.0, animation, 0.0, |_| {});
         node.replace_animation_controller("opacity", Some(second.clone()));
-        assert!(first.is_finished(), "the outgoing controller must be cancelled");
+        assert!(
+            first.is_finished(),
+            "the outgoing controller must be cancelled"
+        );
         assert!(node.has_animation_controller("opacity"));
     }
 
@@ -194,7 +245,13 @@ mod tests {
     #[test]
     fn finished_controllers_are_pruned_on_lookup() {
         let node = Node::new();
-        let controller = AnimationController::new(0.0_f32, 1.0, Animation::new(0.0, AnimationCurve::Linear), 0.0, |_| {});
+        let controller = AnimationController::new(
+            0.0_f32,
+            1.0,
+            Animation::new(0.0, AnimationCurve::Linear),
+            0.0,
+            |_| {},
+        );
         node.replace_animation_controller("opacity", Some(controller));
         assert!(!node.has_animation_controller("opacity"));
     }

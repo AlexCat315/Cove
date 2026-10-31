@@ -9,9 +9,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
+use crate::foundation::{CalendarUnit, Date};
 use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 use cove_core::{Binding, Color};
-use crate::foundation::{CalendarUnit, Date};
 
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
@@ -26,8 +26,10 @@ use crate::primitives::overlays::anchored::{PopoverOverflow, PopoverSurface};
 use crate::primitives::overlays::popover::Popover;
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle, ToggleButtonStyle};
-use crate::theme::{theme_for_node, SemanticColorRef, SemanticFontRef};
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View};
+use crate::theme::{SemanticColorRef, SemanticFontRef, theme_for_node};
+use crate::{
+    AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View, impl_primitive_view,
+};
 
 /// Trigger padding and floor.
 const TRIGGER_PADDING_HORIZONTAL: f32 = 10.0;
@@ -51,7 +53,14 @@ pub struct DateRange {
 
 impl DateRange {
     pub fn new(lower: Date, upper: Date) -> Self {
-        if lower <= upper { Self { lower, upper } } else { Self { lower: upper, upper: lower } }
+        if lower <= upper {
+            Self { lower, upper }
+        } else {
+            Self {
+                lower: upper,
+                upper: lower,
+            }
+        }
     }
 
     pub fn contains(self, day: Date) -> bool {
@@ -139,10 +148,17 @@ struct RangeSession {
 }
 
 impl DateRangeCalendar {
-    pub fn new(selection: Binding<Option<DateRange>>, options: CalendarOptions, rules: DateRangeRules) -> Self {
+    pub fn new(
+        selection: Binding<Option<DateRange>>,
+        options: CalendarOptions,
+        rules: DateRangeRules,
+    ) -> Self {
         let mut options = options.validated();
         options.presentation.cell_size = options.presentation.cell_size.max(26.0);
-        let initial = selection.get().map(|range| range.lower).unwrap_or(options.today);
+        let initial = selection
+            .get()
+            .map(|range| range.lower)
+            .unwrap_or(options.today);
         let session = RangeSession {
             month: CalendarGrid::month_start(initial, &options.calendar),
             focused_day: options.calendar.start_of_day(initial),
@@ -151,7 +167,12 @@ impl DateRangeCalendar {
         };
         let mut rules = rules;
         rules.validate();
-        Self { selection, options, rules, session: Rc::new(RefCell::new(session)) }
+        Self {
+            selection,
+            options,
+            rules,
+            session: Rc::new(RefCell::new(session)),
+        }
     }
 
     fn snapshot(&self) -> DateRangeCalendar {
@@ -173,14 +194,22 @@ impl DateRangeCalendar {
 
     fn browse(&self, months: i32) {
         let month = self.month();
-        if let Some(next) = self.options.calendar.date_by_adding(CalendarUnit::Month, months, month) {
+        if let Some(next) = self
+            .options
+            .calendar
+            .date_by_adding(CalendarUnit::Month, months, month)
+        {
             self.set_month(next);
         }
     }
 
     /// Whether a day may be pressed at all.
     fn is_enabled(&self, day: Date) -> bool {
-        self.options.presentation.is_enabled && self.options.availability.contains(day, &self.options.calendar)
+        self.options.presentation.is_enabled
+            && self
+                .options
+                .availability
+                .contains(day, &self.options.calendar)
     }
 
     /// Availability plus the maximum length measured from a pending start.
@@ -189,8 +218,14 @@ impl DateRangeCalendar {
             return false;
         }
         let session = self.session.borrow();
-        let Some(start) = session.pending_start else { return true };
-        self.rules.can_complete(start, self.options.calendar.start_of_day(day), &self.options.calendar)
+        let Some(start) = session.pending_start else {
+            return true;
+        };
+        self.rules.can_complete(
+            start,
+            self.options.calendar.start_of_day(day),
+            &self.options.calendar,
+        )
     }
 
     /// First press starts a range, second completes it.
@@ -203,7 +238,8 @@ impl DateRangeCalendar {
                 if !self.rules.can_complete(start, value, calendar) {
                     return;
                 }
-                let range = DateRange::new(calendar.start_of_day(start), calendar.start_of_day(value));
+                let range =
+                    DateRange::new(calendar.start_of_day(start), calendar.start_of_day(value));
                 session.pending_start = None;
                 session.focused_day = value;
                 drop(session);
@@ -222,7 +258,9 @@ impl DateRangeCalendar {
     fn apply_preset(&self, preset: &DateRangePreset) {
         let calendar = &self.options.calendar;
         let today = calendar.start_of_day(self.options.today);
-        let Some((lower, upper)) = preset.range(today, calendar) else { return };
+        let Some((lower, upper)) = preset.range(today, calendar) else {
+            return;
+        };
         {
             let mut session = self.session.borrow_mut();
             session.pending_start = None;
@@ -243,8 +281,15 @@ impl DateRangeCalendar {
             return false;
         }
         let cells = CalendarCells::new(CalendarPanel::Days, self.options.granularity);
-        let Some(navigation) = CalendarNavigation::new(scancode, cells.columns) else { return false };
-        let Some(next) = navigation.destination(date, cells, &self.options.calendar, &self.options.availability) else {
+        let Some(navigation) = CalendarNavigation::new(scancode, cells.columns) else {
+            return false;
+        };
+        let Some(next) = navigation.destination(
+            date,
+            cells,
+            &self.options.calendar,
+            &self.options.availability,
+        ) else {
             return true;
         };
         {
@@ -275,7 +320,11 @@ impl DateRangeCalendar {
             target
         } else {
             calendar
-                .date_by_adding(CalendarUnit::Month, 1 - self.options.presentation.number_of_months as i32, target)
+                .date_by_adding(
+                    CalendarUnit::Month,
+                    1 - self.options.presentation.number_of_months as i32,
+                    target,
+                )
                 .unwrap_or(target)
         };
         self.set_month(next);
@@ -304,7 +353,9 @@ impl DateRangeCalendar {
 
 impl View for DateRangeCalendar {
     fn body(&self) -> AnyView {
-        AnyView::new(DateRangeCalendarBody { view: self.snapshot() })
+        AnyView::new(DateRangeCalendarBody {
+            view: self.snapshot(),
+        })
     }
 }
 
@@ -336,7 +387,9 @@ impl PrimitiveView for DateRangeCalendarBody {
             label: "Date range".to_string(),
             ..Default::default()
         }));
-        let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() else { return };
+        let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() else {
+            return;
+        };
         let view = self.view.snapshot();
         registry.set_key(
             node,
@@ -345,8 +398,8 @@ impl PrimitiveView for DateRangeCalendarBody {
                 if phase != cove_core::scene::EventPhase::Bubble || !event.modifiers.is_empty() {
                     return cove_core::scene::EventResult::Ignored;
                 }
-                let Some(focused) = cove_core::scene::FocusChainHolder::current()
-                    .and_then(|chain| chain.focused())
+                let Some(focused) =
+                    cove_core::scene::FocusChainHolder::current().and_then(|chain| chain.focused())
                 else {
                     return cove_core::scene::EventResult::Ignored;
                 };
@@ -387,15 +440,21 @@ impl PrimitiveView for DateRangeCalendarBody {
                 })
             })
             .collect();
-        column.push(AnyView::new(
-            BoxView::new(
-                FlexDirection::Row, Align::FlexStart, Justify::FlexStart, Wrap::Wrap, MONTH_GAP,
-                AnyView::new(TupleView::new(cards)),
-            ),
-        ));
+        column.push(AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::FlexStart,
+            Justify::FlexStart,
+            Wrap::Wrap,
+            MONTH_GAP,
+            AnyView::new(TupleView::new(cards)),
+        )));
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::FlexStart, Justify::FlexStart, Wrap::NoWrap, 10.0,
+                FlexDirection::Column,
+                Align::FlexStart,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                10.0,
                 AnyView::new(TupleView::new(column)),
             )
             .frame_min_width(self.minimum_width(cell_size, months)),
@@ -408,7 +467,10 @@ impl DateRangeCalendarBody {
     /// Touch surfaces raise the cell to the minimum control extent.
     fn resolved_cell_size(&self, node: &Node) -> f32 {
         let environment = node.composition_value(&crate::adaptive::SurfaceEnvironment::key());
-        let floor = if environment.input.contains(cove_core::InputCapabilities::TOUCH) {
+        let floor = if environment
+            .input
+            .contains(cove_core::InputCapabilities::TOUCH)
+        {
             environment.minimum_control_extent()
         } else {
             0.0
@@ -465,7 +527,9 @@ impl PrimitiveView for PresetBar {
                 let preset = preset.clone();
                 AnyView::new(
                     Button::with_options(
-                        AnyView::new(Text::new(preset.title.clone()).semantic_font(SemanticFontRef::label())),
+                        AnyView::new(
+                            Text::new(preset.title.clone()).semantic_font(SemanticFontRef::label()),
+                        ),
                         move || target.apply_preset(&preset),
                         ButtonRole::Normal,
                         view.options.presentation.is_enabled && allowed,
@@ -522,7 +586,9 @@ impl PrimitiveView for MonthCard {
             AnyView::new(TupleView::new(vec![
                 AnyView::new(
                     Button::icon_with_options(
-                        ButtonIconSource::resource(crate::primitives::media::ui_icon_catalog::navigation::chevron_left()),
+                        ButtonIconSource::resource(
+                            crate::primitives::media::ui_icon_catalog::navigation::chevron_left(),
+                        ),
                         Some(12.0),
                         None,
                         ButtonRole::Normal,
@@ -545,7 +611,9 @@ impl PrimitiveView for MonthCard {
                 ),
                 AnyView::new(
                     Button::icon_with_options(
-                        ButtonIconSource::resource(crate::primitives::media::ui_icon_catalog::navigation::chevron_right()),
+                        ButtonIconSource::resource(
+                            crate::primitives::media::ui_icon_catalog::navigation::chevron_right(),
+                        ),
                         Some(12.0),
                         None,
                         ButtonRole::Normal,
@@ -566,19 +634,23 @@ impl PrimitiveView for MonthCard {
         let mut weekday_row: Vec<AnyView> = Vec::new();
         for weekday in 0..DAYS_PER_WEEK {
             weekday_row.push(AnyView::new(
-                Text::new(weekday_symbol((weekday as u32 + calendar.first_weekday() - 1) % 7))
-                    .semantic_font(SemanticFontRef::caption())
-                    .semantic_foreground(SemanticColorRef::on_surface_muted())
-                    .frame_size(self.cell_size, WEEKDAY_HEIGHT)
-                    .accessibility_hidden(true),
+                Text::new(weekday_symbol(
+                    (weekday as u32 + calendar.first_weekday() - 1) % 7,
+                ))
+                .semantic_font(SemanticFontRef::caption())
+                .semantic_foreground(SemanticColorRef::on_surface_muted())
+                .frame_size(self.cell_size, WEEKDAY_HEIGHT)
+                .accessibility_hidden(true),
             ));
         }
-        column.push(AnyView::new(
-            BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 2.0,
-                AnyView::new(TupleView::new(weekday_row)),
-            ),
-        ));
+        column.push(AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            2.0,
+            AnyView::new(TupleView::new(weekday_row)),
+        )));
 
         for week in 0..WEEKS_PER_MONTH {
             let cells: Vec<AnyView> = days
@@ -595,17 +667,23 @@ impl PrimitiveView for MonthCard {
                     })
                 })
                 .collect();
-            column.push(AnyView::new(
-                BoxView::new(
-                    FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 2.0,
-                    AnyView::new(TupleView::new(cells)),
-                ),
-            ));
+            column.push(AnyView::new(BoxView::new(
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                2.0,
+                AnyView::new(TupleView::new(cells)),
+            )));
         }
 
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 6.0,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                6.0,
                 AnyView::new(TupleView::new(column)),
             )
             .padding(MONTH_PADDING)
@@ -617,11 +695,24 @@ impl_primitive_view!(MonthCard);
 
 fn month_title(date: Date, calendar: &crate::foundation::Calendar) -> String {
     const NAMES: [&str; 12] = [
-        "January", "February", "March", "April", "May", "June", "July", "August", "September",
-        "October", "November", "December",
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
     ];
     let parts = calendar.parts(date);
-    let name = NAMES.get(parts.month.saturating_sub(1) as usize).copied().unwrap_or("January");
+    let name = NAMES
+        .get(parts.month.saturating_sub(1) as usize)
+        .copied()
+        .unwrap_or("January");
     format!("{name} {}", parts.year)
 }
 
@@ -648,26 +739,36 @@ struct DayCell {
 
 impl DayCell {
     fn is_start(&self) -> bool {
-        self.view
-            .selection
-            .get()
-            .is_some_and(|range| self.view.options.calendar.start_of_day(range.lower) == self.view.options.calendar.start_of_day(self.day))
+        self.view.selection.get().is_some_and(|range| {
+            self.view.options.calendar.start_of_day(range.lower)
+                == self.view.options.calendar.start_of_day(self.day)
+        })
     }
 
     fn is_end(&self) -> bool {
-        self.view
-            .selection
-            .get()
-            .is_some_and(|range| self.view.options.calendar.start_of_day(range.upper) == self.view.options.calendar.start_of_day(self.day))
+        self.view.selection.get().is_some_and(|range| {
+            self.view.options.calendar.start_of_day(range.upper)
+                == self.view.options.calendar.start_of_day(self.day)
+        })
     }
 
     fn in_range(&self) -> bool {
-        self.view.selection.get().is_some_and(|range| range.contains(self.day))
+        self.view
+            .selection
+            .get()
+            .is_some_and(|range| range.contains(self.day))
     }
 
     fn in_month(&self) -> bool {
-        self.view.options.calendar.date_interval_start(CalendarUnit::Month, self.day)
-            == self.view.options.calendar.date_interval_start(CalendarUnit::Month, self.month)
+        self.view
+            .options
+            .calendar
+            .date_interval_start(CalendarUnit::Month, self.day)
+            == self
+                .view
+                .options
+                .calendar
+                .date_interval_start(CalendarUnit::Month, self.month)
     }
 }
 
@@ -711,7 +812,11 @@ impl PrimitiveView for DayCell {
         let theme = theme_for_node(node);
         let in_month = self.in_month();
         let is_today = self.view.options.calendar.start_of_day(self.day)
-            == self.view.options.calendar.start_of_day(self.view.options.today);
+            == self
+                .view
+                .options
+                .calendar
+                .start_of_day(self.view.options.today);
         node.set_corner_radius(theme.radius.sm);
         node.set_opacity(if in_month { 1.0 } else { 0.35 });
         node.set_background_color(if self.in_range() {
@@ -719,10 +824,16 @@ impl PrimitiveView for DayCell {
         } else {
             None
         });
-        node.set_border_color(Some(if is_today { theme.colors.accent } else { Color::CLEAR }));
+        node.set_border_color(Some(if is_today {
+            theme.colors.accent
+        } else {
+            Color::CLEAR
+        }));
         node.set_border_width(if is_today { 1.0 } else { 0.0 });
 
-        let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() else { return };
+        let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() else {
+            return;
+        };
         if !self.in_month() || !self.view.is_selectable(self.day) {
             registry.remove(node);
             return;
@@ -756,7 +867,11 @@ impl PrimitiveView for DayCell {
         };
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::Center, Wrap::NoWrap, 0.0,
+                FlexDirection::Row,
+                Align::Center,
+                Justify::Center,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(
                     Text::new(self.view.options.calendar.parts(self.day).day.to_string())
                         .semantic_font(SemanticFontRef::label())
@@ -771,11 +886,24 @@ impl_primitive_view!(DayCell);
 
 fn full_date_label(day: Date, calendar: &crate::foundation::Calendar) -> String {
     const NAMES: [&str; 12] = [
-        "January", "February", "March", "April", "May", "June", "July", "August", "September",
-        "October", "November", "December",
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
     ];
     let parts = calendar.parts(day);
-    let month = NAMES.get(parts.month.saturating_sub(1) as usize).copied().unwrap_or("January");
+    let month = NAMES
+        .get(parts.month.saturating_sub(1) as usize)
+        .copied()
+        .unwrap_or("January");
     format!("{month} {}, {}", parts.day, parts.year)
 }
 
@@ -788,7 +916,11 @@ pub struct DateRangePicker {
 
 impl DateRangePicker {
     pub fn new(selection: Binding<Option<DateRange>>, options: DateRangePickerOptions) -> Self {
-        Self { selection, options: options.validated(), is_presented: Arc::new(Mutex::new(false)) }
+        Self {
+            selection,
+            options: options.validated(),
+            is_presented: Arc::new(Mutex::new(false)),
+        }
     }
 
     fn snapshot(&self) -> DateRangePicker {
@@ -814,7 +946,15 @@ impl DateRangePicker {
 
 fn medium_date(date: Date, options: &CalendarOptions) -> String {
     let parts = options.calendar.parts(date);
-    format!("{} {}, {}", month_title(date, &options.calendar).split(' ').next().unwrap_or("Jan"), parts.day, parts.year)
+    format!(
+        "{} {}, {}",
+        month_title(date, &options.calendar)
+            .split(' ')
+            .next()
+            .unwrap_or("Jan"),
+        parts.day,
+        parts.year
+    )
 }
 
 impl View for DateRangePicker {
@@ -833,7 +973,9 @@ impl View for DateRangePicker {
             let selection = self.selection.clone();
             row.push(AnyView::new(
                 Button::icon_with_options(
-                    ButtonIconSource::resource(crate::primitives::media::ui_icon_catalog::action::x()),
+                    ButtonIconSource::resource(
+                        crate::primitives::media::ui_icon_catalog::action::x(),
+                    ),
                     Some(12.0),
                     None,
                     ButtonRole::Normal,
@@ -846,29 +988,45 @@ impl View for DateRangePicker {
                 .button_style(GhostButtonStyle),
             ));
         }
-        row.push(AnyView::new(crate::primitives::controls::button::ButtonIcon::new(
-            ButtonIconSource::resource(crate::primitives::media::ui_icon_catalog::navigation::dropdown_chevron_down()),
-            Some(12.0),
-            None,
-        )));
+        row.push(AnyView::new(
+            crate::primitives::controls::button::ButtonIcon::new(
+                ButtonIconSource::resource(
+                    crate::primitives::media::ui_icon_catalog::navigation::dropdown_chevron_down(),
+                ),
+                Some(12.0),
+                None,
+            ),
+        ));
 
         let trigger = AnyView::new(
-            Row::new(VerticalAlignment::Center, 8.0, AnyView::new(TupleView::new(row)))
-                .padding_edges(TRIGGER_PADDING_HORIZONTAL, TRIGGER_PADDING_VERTICAL)
-                .frame_height(TRIGGER_MIN_HEIGHT)
-                .semantic_background(SemanticColorRef::surface())
-                .corner_radius_metric(crate::theme::ThemeMetric::input_radius())
-                .semantic_border(SemanticColorRef::border(), 1.0),
+            Row::new(
+                VerticalAlignment::Center,
+                8.0,
+                AnyView::new(TupleView::new(row)),
+            )
+            .padding_edges(TRIGGER_PADDING_HORIZONTAL, TRIGGER_PADDING_VERTICAL)
+            .frame_height(TRIGGER_MIN_HEIGHT)
+            .semantic_background(SemanticColorRef::surface())
+            .corner_radius_metric(crate::theme::ThemeMetric::input_radius())
+            .semantic_border(SemanticColorRef::border(), 1.0),
         );
 
         let presented = Binding::new(
             {
                 let state = self.is_presented.clone();
-                move || *state.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+                move || {
+                    *state
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner())
+                }
             },
             {
                 let state = self.is_presented.clone();
-                move |value: bool| *state.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = value
+                move |value: bool| {
+                    *state
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner()) = value
+                }
             },
         );
 
@@ -883,15 +1041,21 @@ impl View for DateRangePicker {
             .width(self.options.presentation.width)
             .surface(PopoverSurface::Content)
             .overflow(PopoverOverflow::Flip)
-            .trigger_description(crate::primitives::overlays::popover::PopoverTriggerDescription {
-                label: self.options.presentation.placeholder.clone(),
-                value: label,
-                help: None,
-            });
+            .trigger_description(
+                crate::primitives::overlays::popover::PopoverTriggerDescription {
+                    label: self.options.presentation.placeholder.clone(),
+                    value: label,
+                    help: None,
+                },
+            );
 
         AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(popover),
             )
             .frame_width(self.options.presentation.width),
@@ -908,7 +1072,10 @@ impl Clone for DateRangePicker {
 impl DateRangePicker {
     /// Whether the popover is open, for hosts mirroring the state.
     pub fn is_presented(&self) -> bool {
-        *self.is_presented.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+        *self
+            .is_presented
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
     /// Availability the calendar applies, exposed for hosts that pre-filter days.

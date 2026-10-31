@@ -14,4 +14,4 @@ pub use configuration::{
 pub use memory::{AppMemorySnapshot, AppWindowMemorySnapshot, AppWindowRendererState};
 pub use runtime::{Application, ApplicationCallbacks};
 pub use services::ApplicationServices;
-pub use typography::{ApplicationTypography, AdaptiveApplicationContent};
+pub use typography::{AdaptiveApplicationContent, ApplicationTypography};

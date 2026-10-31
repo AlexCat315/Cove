@@ -3,8 +3,8 @@
 //! Swift's `Box` collides with Rust's standard allocation type, so the
 //! container is exported as `BoxView`. The behaviour and alignment vocabulary
 //! are unchanged.
+use crate::{AnyView, PrimitiveView, impl_primitive_view};
 use cove_core::scene::{Align, FlexDirection, Gutter, Justify, LayoutNode, Node, Wrap};
-use crate::{impl_primitive_view, AnyView, PrimitiveView};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum HorizontalAlignment {
@@ -34,8 +34,12 @@ pub enum Alignment {
 impl HorizontalAlignment {
     pub fn yoga_justify(self, direction: FlexDirection) -> Justify {
         match (direction, self) {
-            (FlexDirection::Row, Self::Leading) | (FlexDirection::RowReverse, Self::Trailing) => Justify::FlexStart,
-            (FlexDirection::Row, Self::Trailing) | (FlexDirection::RowReverse, Self::Leading) => Justify::FlexEnd,
+            (FlexDirection::Row, Self::Leading) | (FlexDirection::RowReverse, Self::Trailing) => {
+                Justify::FlexStart
+            }
+            (FlexDirection::Row, Self::Trailing) | (FlexDirection::RowReverse, Self::Leading) => {
+                Justify::FlexEnd
+            }
             (FlexDirection::Row | FlexDirection::RowReverse, Self::Center) => Justify::Center,
             _ => panic!("HorizontalAlignment only maps to row directions"),
         }
@@ -51,8 +55,12 @@ impl HorizontalAlignment {
 impl VerticalAlignment {
     pub fn yoga_justify(self, direction: FlexDirection) -> Justify {
         match (direction, self) {
-            (FlexDirection::Column, Self::Top) | (FlexDirection::ColumnReverse, Self::Bottom) => Justify::FlexStart,
-            (FlexDirection::Column, Self::Bottom) | (FlexDirection::ColumnReverse, Self::Top) => Justify::FlexEnd,
+            (FlexDirection::Column, Self::Top) | (FlexDirection::ColumnReverse, Self::Bottom) => {
+                Justify::FlexStart
+            }
+            (FlexDirection::Column, Self::Bottom) | (FlexDirection::ColumnReverse, Self::Top) => {
+                Justify::FlexEnd
+            }
             (FlexDirection::Column | FlexDirection::ColumnReverse, Self::Center) => Justify::Center,
             _ => panic!("VerticalAlignment only maps to column directions"),
         }
@@ -82,8 +90,12 @@ impl Alignment {
     pub fn yoga_values(self, direction: FlexDirection) -> (Align, Justify) {
         let (horizontal, vertical) = self.components();
         match direction {
-            FlexDirection::Row | FlexDirection::RowReverse => (vertical.yoga_align(), horizontal.yoga_justify(direction)),
-            FlexDirection::Column | FlexDirection::ColumnReverse => (horizontal.yoga_align(), vertical.yoga_justify(direction)),
+            FlexDirection::Row | FlexDirection::RowReverse => {
+                (vertical.yoga_align(), horizontal.yoga_justify(direction))
+            }
+            FlexDirection::Column | FlexDirection::ColumnReverse => {
+                (horizontal.yoga_align(), vertical.yoga_justify(direction))
+            }
         }
     }
 }
@@ -100,12 +112,39 @@ pub struct BoxView {
     pub content: AnyView,
 }
 impl BoxView {
-    pub fn new(direction: FlexDirection, align_items: Align, justify_content: Justify, wrap: Wrap, spacing: f32, content: AnyView) -> Self {
-        Self { direction, align_items, justify_content, wrap, spacing, content }
+    pub fn new(
+        direction: FlexDirection,
+        align_items: Align,
+        justify_content: Justify,
+        wrap: Wrap,
+        spacing: f32,
+        content: AnyView,
+    ) -> Self {
+        Self {
+            direction,
+            align_items,
+            justify_content,
+            wrap,
+            spacing,
+            content,
+        }
     }
-    pub fn with_alignment(direction: FlexDirection, alignment: Alignment, wrap: Wrap, spacing: f32, content: AnyView) -> Self {
+    pub fn with_alignment(
+        direction: FlexDirection,
+        alignment: Alignment,
+        wrap: Wrap,
+        spacing: f32,
+        content: AnyView,
+    ) -> Self {
         let (align_items, justify_content) = alignment.yoga_values(direction);
-        Self::new(direction, align_items, justify_content, wrap, spacing, content)
+        Self::new(
+            direction,
+            align_items,
+            justify_content,
+            wrap,
+            spacing,
+            content,
+        )
     }
 }
 impl PrimitiveView for BoxView {
@@ -147,7 +186,11 @@ pub struct Row {
 }
 impl Row {
     pub fn new(alignment: VerticalAlignment, spacing: f32, content: AnyView) -> Self {
-        Self { alignment, spacing, content }
+        Self {
+            alignment,
+            spacing,
+            content,
+        }
     }
 }
 impl PrimitiveView for Row {
@@ -182,7 +225,11 @@ pub struct Column {
 }
 impl Column {
     pub fn new(alignment: HorizontalAlignment, spacing: f32, content: AnyView) -> Self {
-        Self { alignment, spacing, content }
+        Self {
+            alignment,
+            spacing,
+            content,
+        }
     }
 }
 impl PrimitiveView for Column {

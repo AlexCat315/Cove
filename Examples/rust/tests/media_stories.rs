@@ -20,7 +20,10 @@ fn toggling_the_skeleton_story_swaps_between_placeholder_and_content() {
     story.toggle_loading();
     assert!(!story.is_loading(), "the first toggle reveals content");
     story.toggle_loading();
-    assert!(story.is_loading(), "the second toggle restores the placeholder");
+    assert!(
+        story.is_loading(),
+        "the second toggle restores the placeholder"
+    );
 }
 
 #[test]

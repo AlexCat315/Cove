@@ -40,23 +40,52 @@ identifier!(
 
 impl WorkspaceSlotID {
     pub const CONTENT: Self = Self(String::new());
-    pub fn content() -> Self { Self("content".into()) }
-    pub fn leading() -> Self { Self("leading".into()) }
-    pub fn center() -> Self { Self("center".into()) }
-    pub fn trailing() -> Self { Self("trailing".into()) }
-    pub fn top() -> Self { Self("top".into()) }
-    pub fn bottom() -> Self { Self("bottom".into()) }
-    pub fn overlay() -> Self { Self("overlay".into()) }
-    pub fn floating() -> Self { Self("floating".into()) }
-
-    pub fn standard_editor_slots() -> Vec<Self> {
-        vec![Self::leading(), Self::center(), Self::trailing(), Self::bottom()]
+    pub fn content() -> Self {
+        Self("content".into())
+    }
+    pub fn leading() -> Self {
+        Self("leading".into())
+    }
+    pub fn center() -> Self {
+        Self("center".into())
+    }
+    pub fn trailing() -> Self {
+        Self("trailing".into())
+    }
+    pub fn top() -> Self {
+        Self("top".into())
+    }
+    pub fn bottom() -> Self {
+        Self("bottom".into())
+    }
+    pub fn overlay() -> Self {
+        Self("overlay".into())
+    }
+    pub fn floating() -> Self {
+        Self("floating".into())
     }
 
-    pub fn chrome_leading_rail() -> Self { Self("chrome.leading.rail".into()) }
-    pub fn chrome_trailing_rail() -> Self { Self("chrome.trailing.rail".into()) }
-    pub fn chrome_top_rail() -> Self { Self("chrome.top.rail".into()) }
-    pub fn chrome_bottom_rail() -> Self { Self("chrome.bottom.rail".into()) }
+    pub fn standard_editor_slots() -> Vec<Self> {
+        vec![
+            Self::leading(),
+            Self::center(),
+            Self::trailing(),
+            Self::bottom(),
+        ]
+    }
+
+    pub fn chrome_leading_rail() -> Self {
+        Self("chrome.leading.rail".into())
+    }
+    pub fn chrome_trailing_rail() -> Self {
+        Self("chrome.trailing.rail".into())
+    }
+    pub fn chrome_top_rail() -> Self {
+        Self("chrome.top.rail".into())
+    }
+    pub fn chrome_bottom_rail() -> Self {
+        Self("chrome.bottom.rail".into())
+    }
 
     pub fn chrome_rail(edge: WorkspaceEdge) -> Self {
         match edge {
@@ -69,7 +98,9 @@ impl WorkspaceSlotID {
 }
 
 impl Default for WorkspaceSlotID {
-    fn default() -> Self { Self::content() }
+    fn default() -> Self {
+        Self::content()
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]

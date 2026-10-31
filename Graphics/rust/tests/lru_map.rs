@@ -31,8 +31,14 @@ fn eviction_order_follows_insertion_without_reads() {
     let mut lru = LruMap::<i32, String>::new();
     lru.insert(1, "a".into());
     lru.insert(2, "b".into());
-    assert_eq!(lru.evict_least_recently_used().map(|entry| entry.0), Some(1));
-    assert_eq!(lru.evict_least_recently_used().map(|entry| entry.0), Some(2));
+    assert_eq!(
+        lru.evict_least_recently_used().map(|entry| entry.0),
+        Some(1)
+    );
+    assert_eq!(
+        lru.evict_least_recently_used().map(|entry| entry.0),
+        Some(2)
+    );
     assert_eq!(lru.evict_least_recently_used(), None);
 }
 
@@ -66,7 +72,11 @@ fn remove_all_resets_ordering() {
 
 #[test]
 fn hit_rate() {
-    let stats = CacheStats { hits: 3, misses: 1, evictions: 0 };
+    let stats = CacheStats {
+        hits: 3,
+        misses: 1,
+        evictions: 0,
+    };
     assert_eq!(stats.total_lookups(), 4);
     assert!((stats.hit_rate() - 0.75).abs() < 1e-9);
 }
@@ -78,8 +88,23 @@ fn hit_rate_with_no_lookups_is_zero() {
 
 #[test]
 fn delta_since_earlier_snapshot() {
-    let earlier = CacheStats { hits: 2, misses: 1, evictions: 0 };
-    let later = CacheStats { hits: 5, misses: 4, evictions: 2 };
+    let earlier = CacheStats {
+        hits: 2,
+        misses: 1,
+        evictions: 0,
+    };
+    let later = CacheStats {
+        hits: 5,
+        misses: 4,
+        evictions: 2,
+    };
     let delta = later.delta_since(&earlier);
-    assert_eq!(delta, CacheStats { hits: 3, misses: 3, evictions: 2 });
+    assert_eq!(
+        delta,
+        CacheStats {
+            hits: 3,
+            misses: 3,
+            evictions: 2
+        }
+    );
 }

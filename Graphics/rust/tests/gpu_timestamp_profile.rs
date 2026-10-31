@@ -16,11 +16,19 @@ fn markers_keep_completion_order_and_count() {
     profile.append(marker("backdrop-blur-v", 3_000));
     assert_eq!(profile.sample_count(), 3);
     assert_eq!(
-        profile.recorded_markers().iter().map(|m| m.label.clone()).collect::<Vec<_>>(),
+        profile
+            .recorded_markers()
+            .iter()
+            .map(|m| m.label.clone())
+            .collect::<Vec<_>>(),
         ["ui-segment", "backdrop-blit", "backdrop-blur-v"]
     );
     assert_eq!(
-        profile.recorded_markers().iter().map(|m| m.nanoseconds).collect::<Vec<_>>(),
+        profile
+            .recorded_markers()
+            .iter()
+            .map(|m| m.nanoseconds)
+            .collect::<Vec<_>>(),
         [1_000, 2_000, 3_000]
     );
 }
@@ -31,10 +39,22 @@ fn sampling_stops_at_the_marker_limit_but_still_counts() {
     for index in 0..5 {
         profile.append(marker("pass", index));
     }
-    assert_eq!(profile.sample_count(), 5, "every completion should still be counted");
-    assert_eq!(profile.recorded_markers().len(), 2, "only the limit worth of markers is retained");
     assert_eq!(
-        profile.recorded_markers().iter().map(|m| m.nanoseconds).collect::<Vec<_>>(),
+        profile.sample_count(),
+        5,
+        "every completion should still be counted"
+    );
+    assert_eq!(
+        profile.recorded_markers().len(),
+        2,
+        "only the limit worth of markers is retained"
+    );
+    assert_eq!(
+        profile
+            .recorded_markers()
+            .iter()
+            .map(|m| m.nanoseconds)
+            .collect::<Vec<_>>(),
         [0, 1]
     );
 }
@@ -66,7 +86,10 @@ fn concurrent_appends_are_serialised() {
         handle.join().unwrap();
     }
     assert_eq!(profile.sample_count(), (writers * per_writer) as usize);
-    assert_eq!(profile.recorded_markers().len(), (writers * per_writer) as usize);
+    assert_eq!(
+        profile.recorded_markers().len(),
+        (writers * per_writer) as usize
+    );
 }
 
 #[test]

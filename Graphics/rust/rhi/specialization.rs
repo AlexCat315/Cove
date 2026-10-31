@@ -1,5 +1,5 @@
 //! Translation of NativeRHI/Resources/ShaderSpecialization.swift.
-use super::{rhi_require, RhiError, RhiResult};
+use super::{RhiError, RhiResult, rhi_require};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -57,7 +57,11 @@ pub struct ReflectedShaderConstant {
 }
 impl ReflectedShaderConstant {
     pub fn new(id: u32, name: impl Into<String>, constant_type: ShaderConstantType) -> Self {
-        Self { id, name: name.into(), constant_type }
+        Self {
+            id,
+            name: name.into(),
+            constant_type,
+        }
     }
 }
 
@@ -74,7 +78,11 @@ impl ThreadgroupSize {
     }
     pub fn validate(self) -> RhiResult<()> {
         let overflow_xy = self.x.checked_mul(self.y).is_none();
-        let overflow_xyz = self.x.checked_mul(self.y).and_then(|xy| xy.checked_mul(self.z)).is_none();
+        let overflow_xyz = self
+            .x
+            .checked_mul(self.y)
+            .and_then(|xy| xy.checked_mul(self.z))
+            .is_none();
         rhi_require(
             self.x > 0 && self.y > 0 && self.z > 0 && !overflow_xy && !overflow_xyz,
             "threadgroup dimensions must be positive and representable",
@@ -96,14 +104,22 @@ pub struct ThreadgroupSpecialization {
     pub z: Option<u32>,
 }
 impl ThreadgroupSpecialization {
-    pub fn resolve(self, defaults: ThreadgroupSize, values: &[ShaderSpecializationConstant]) -> RhiResult<ThreadgroupSize> {
+    pub fn resolve(
+        self,
+        defaults: ThreadgroupSize,
+        values: &[ShaderSpecializationConstant],
+    ) -> RhiResult<ThreadgroupSize> {
         let dimension = |id: Option<u32>, fallback: i64| -> RhiResult<i64> {
             let Some(id) = id else { return Ok(fallback) };
-            let Some(entry) = values.iter().find(|entry| entry.id == id) else { return Ok(fallback) };
+            let Some(entry) = values.iter().find(|entry| entry.id == id) else {
+                return Ok(fallback);
+            };
             match entry.value {
                 ShaderConstantValue::Uint32(value) => Ok(i64::from(value)),
                 ShaderConstantValue::Int32(value) => Ok(i64::from(value)),
-                _ => Err(RhiError::invalid_argument("workgroup constant must be an integer")),
+                _ => Err(RhiError::invalid_argument(
+                    "workgroup constant must be an integer",
+                )),
             }
         };
         let result = ThreadgroupSize {
@@ -126,7 +142,10 @@ mod tests {
         assert_eq!(ShaderConstantValue::Int32(-1).bits(), u32::MAX);
         assert_eq!(ShaderConstantValue::Float32(1.0).bits(), 1.0f32.to_bits());
         assert_eq!(ShaderConstantValue::Bool(true).bits(), 1);
-        assert_eq!(ShaderConstantValue::Float32(0.5).constant_type(), ShaderConstantType::Float32);
+        assert_eq!(
+            ShaderConstantValue::Float32(0.5).constant_type(),
+            ShaderConstantType::Float32
+        );
     }
 
     #[test]
@@ -138,10 +157,17 @@ mod tests {
 
     #[test]
     fn specialization_overrides_only_the_named_dimensions() {
-        let values = [ShaderSpecializationConstant::new(4, ShaderConstantValue::Uint32(64))];
-        let resolved = ThreadgroupSpecialization { x: Some(4), y: None, z: None }
-            .resolve(ThreadgroupSize::new(8, 4, 1), &values)
-            .unwrap();
+        let values = [ShaderSpecializationConstant::new(
+            4,
+            ShaderConstantValue::Uint32(64),
+        )];
+        let resolved = ThreadgroupSpecialization {
+            x: Some(4),
+            y: None,
+            z: None,
+        }
+        .resolve(ThreadgroupSize::new(8, 4, 1), &values)
+        .unwrap();
         assert_eq!(resolved, ThreadgroupSize::new(64, 4, 1));
     }
 }

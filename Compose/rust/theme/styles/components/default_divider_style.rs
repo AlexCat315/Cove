@@ -1,12 +1,10 @@
 //! Translation of Theme/Styles/Components/DefaultDividerStyle.swift.
-use cove_core::scene::{LayoutNode, Node};
 use cove_core::Color;
+use cove_core::scene::{LayoutNode, Node};
 
-use crate::{impl_primitive_view, AnyView};
+use crate::{AnyView, impl_primitive_view};
 
-use super::divider_style::{
-    DividerOrientation, DividerStyle, DividerStyleConfiguration,
-};
+use super::divider_style::{DividerOrientation, DividerStyle, DividerStyleConfiguration};
 
 /// Divider default: 1-px line drawn with the `divider` color slot. Spans 100 %
 /// of the cross-axis.

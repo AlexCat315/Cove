@@ -8,11 +8,26 @@ use std::rc::Rc;
 
 fn points() -> LinearTimingCurve {
     LinearTimingCurve::new(vec![
-        TimingPoint { time: 0.0, progress: 0.0 },
-        TimingPoint { time: 0.25, progress: 0.5 },
-        TimingPoint { time: 0.5, progress: 0.5 },
-        TimingPoint { time: 0.75, progress: 1.25 },
-        TimingPoint { time: 1.0, progress: 1.0 },
+        TimingPoint {
+            time: 0.0,
+            progress: 0.0,
+        },
+        TimingPoint {
+            time: 0.25,
+            progress: 0.5,
+        },
+        TimingPoint {
+            time: 0.5,
+            progress: 0.5,
+        },
+        TimingPoint {
+            time: 0.75,
+            progress: 1.25,
+        },
+        TimingPoint {
+            time: 1.0,
+            progress: 1.0,
+        },
     ])
 }
 
@@ -50,7 +65,10 @@ fn steps_jump_on_the_specified_interval_edge_and_remain_monotone() {
         for index in 1..count {
             let boundary = index as f32 / count_f;
             assert_eq!(end.evaluate(boundary), index as f32 / count_f);
-            assert_eq!(end.evaluate(boundary.next_down()), (index - 1) as f32 / count_f);
+            assert_eq!(
+                end.evaluate(boundary.next_down()),
+                (index - 1) as f32 / count_f
+            );
             assert_eq!(start.evaluate(boundary), (index + 1) as f32 / count_f);
             assert_eq!(start.evaluate(boundary.next_down()), index as f32 / count_f);
         }
@@ -82,9 +100,11 @@ fn invalid_step_counts_resolve_to_one_step_and_large_counts_remain_finite() {
         );
     }
     for time in [0.0_f32, 0.1, 0.5, 0.9, 1.0] {
-        assert!(AnimationCurve::Steps(i64::MAX, AnimationStepPosition::End)
-            .evaluate(time)
-            .is_finite());
+        assert!(
+            AnimationCurve::Steps(i64::MAX, AnimationStepPosition::End)
+                .evaluate(time)
+                .is_finite()
+        );
         assert!(
             AnimationCurve::Steps(i64::MAX, AnimationStepPosition::Start).evaluate(time) <= 1.0
         );
@@ -108,8 +128,14 @@ fn linear_points_interpolate_each_segment_including_plateaus_reversal_and_oversh
         assert_eq!(curve.evaluate(time), expected);
     }
     let linear = AnimationCurve::PiecewiseLinear(LinearTimingCurve::new(vec![
-        TimingPoint { time: 0.0, progress: 0.0 },
-        TimingPoint { time: 1.0, progress: 1.0 },
+        TimingPoint {
+            time: 0.0,
+            progress: 0.0,
+        },
+        TimingPoint {
+            time: 1.0,
+            progress: 1.0,
+        },
     ]));
     for sample in 0..=1_000 {
         let time = sample as f32 / 1_000.0;
@@ -122,13 +148,19 @@ fn large_point_lists_retain_value_semantics_and_finite_interpolation() {
     let mut points: Vec<TimingPoint> = (0..=1_000)
         .map(|index| {
             let time = index as f32 / 1_000.0;
-            TimingPoint { time, progress: time * time }
+            TimingPoint {
+                time,
+                progress: time * time,
+            }
         })
         .collect();
     let value = LinearTimingCurve::new(points.clone());
     let curve = AnimationCurve::PiecewiseLinear(value.clone());
     assert_eq!(value, LinearTimingCurve::new(points.clone()));
-    points[500] = TimingPoint { time: 0.5, progress: 1.0 };
+    points[500] = TimingPoint {
+        time: 0.5,
+        progress: 1.0,
+    };
     assert_eq!(curve.evaluate(0.5), 0.25);
     assert_ne!(value, LinearTimingCurve::new(points));
     for sample in 0..=2_000 {
@@ -136,10 +168,22 @@ fn large_point_lists_retain_value_semantics_and_finite_interpolation() {
         assert!((curve.evaluate(time) - time * time).abs() < 0.000001);
     }
     let extremes = AnimationCurve::PiecewiseLinear(LinearTimingCurve::new(vec![
-        TimingPoint { time: 0.0, progress: 0.0 },
-        TimingPoint { time: 0.25, progress: f32::MAX },
-        TimingPoint { time: 0.5, progress: -f32::MAX },
-        TimingPoint { time: 1.0, progress: 1.0 },
+        TimingPoint {
+            time: 0.0,
+            progress: 0.0,
+        },
+        TimingPoint {
+            time: 0.25,
+            progress: f32::MAX,
+        },
+        TimingPoint {
+            time: 0.5,
+            progress: -f32::MAX,
+        },
+        TimingPoint {
+            time: 1.0,
+            progress: 1.0,
+        },
     ]));
     assert_eq!(extremes.evaluate(0.375), 0.0);
     assert_eq!(extremes.evaluate(0.3125), f32::MAX / 2.0);
@@ -151,8 +195,7 @@ fn bounce_is_continuous_at_impacts_and_has_diminishing_bounded_valleys() {
     for impact in [1.0_f32 / 2.75, 2.0 / 2.75, 2.5 / 2.75] {
         assert!((curve.evaluate(impact) - 1.0).abs() < 0.000001);
         assert!(
-            (curve.evaluate(impact - 0.000001) - curve.evaluate(impact + 0.000001)).abs()
-                < 0.00002
+            (curve.evaluate(impact - 0.000001) - curve.evaluate(impact + 0.000001)).abs() < 0.00002
         );
     }
     for (time, expected) in [
@@ -198,10 +241,11 @@ fn controllers_preserve_delay_overshoot_exact_finish_and_scheduler_cleanup() {
         let animation = Animation::new(1.0, curve.clone())
             .with_delay(0.1)
             .with_overshoot(true);
-        let controller = AnimationController::new(80.0_f32, 200.0_f32, animation, 0.0, move |next| {
-            written.set(next);
-            count.set(count.get() + 1);
-        });
+        let controller =
+            AnimationController::new(80.0_f32, 200.0_f32, animation, 0.0, move |next| {
+                written.set(next);
+                count.set(count.get() + 1);
+            });
         let scheduler = AnimatorScheduler::default();
         let erased: Rc<dyn AnyAnimationController> = controller.clone();
         scheduler.register(erased);

@@ -40,7 +40,8 @@ impl LogFormatter {
     /// them to its original stdout/stderr. Android and desktop routing stays in
     /// the native console sink.
     pub fn console(&self, record: &LogRecord, format: ConsoleFormat) {
-        if record.location.source == "process.stdout" || record.location.source == "process.stderr" {
+        if record.location.source == "process.stdout" || record.location.source == "process.stderr"
+        {
             return;
         }
         let text = match format {

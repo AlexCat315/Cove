@@ -109,7 +109,10 @@ mod tests {
 
     #[test]
     fn divider_extent_is_never_below_one_point() {
-        let theme = WorkspaceTheme { gutter: 0.0, ..WorkspaceTheme::default() };
+        let theme = WorkspaceTheme {
+            gutter: 0.0,
+            ..WorkspaceTheme::default()
+        };
         assert_eq!(WorkspaceRegionSizing::Divider.extent(&theme), 1.0);
         assert_eq!(WorkspaceRegionSizing::Points(-4.0).extent(&theme), 0.0);
     }

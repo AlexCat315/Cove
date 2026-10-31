@@ -4,8 +4,8 @@
 //! just as a container query publishes its final allocated size after layout. The
 //! main axis follows the toolbar: widths for a horizontal bar, heights for a
 //! vertical one.
-use cove_core::{Point, Rect, Size};
 use crate::{LayoutSubview, ProposedViewSize};
+use cove_core::{Point, Rect, Size};
 
 use super::{ToolbarAxis, ToolbarItemPlacement};
 
@@ -47,18 +47,29 @@ impl ToolbarOverflowLayout {
     }
 
     fn main(&self, size: Size) -> f32 {
-        if self.axis == ToolbarAxis::Vertical { size.height } else { size.width }
+        if self.axis == ToolbarAxis::Vertical {
+            size.height
+        } else {
+            size.width
+        }
     }
 
     fn cross(&self, size: Size) -> f32 {
-        if self.axis == ToolbarAxis::Vertical { size.width } else { size.height }
+        if self.axis == ToolbarAxis::Vertical {
+            size.width
+        } else {
+            size.height
+        }
     }
 
     /// Resolve which commands fit. Pure: placement publishes the result.
     pub fn arrangement(&self, sizes: &[Size]) -> ToolbarArrangement {
         // One extra subview is the overflow button.
         if sizes.len() != self.placements.len() + 1 {
-            return ToolbarArrangement { sizes: sizes.to_vec(), ..Default::default() };
+            return ToolbarArrangement {
+                sizes: sizes.to_vec(),
+                ..Default::default()
+            };
         }
         let more = self.placements.len();
         let mut hidden: Vec<usize> = self
@@ -78,7 +89,10 @@ impl ToolbarOverflowLayout {
             shown
         };
         let extent = |indices: &[usize]| -> f32 {
-            indices.iter().map(|index| self.main(sizes[*index])).sum::<f32>()
+            indices
+                .iter()
+                .map(|index| self.main(sizes[*index]))
+                .sum::<f32>()
                 + self.spacing * indices.len().saturating_sub(1) as f32
         };
         // Automatic commands are dropped lowest priority first; ties drop later
@@ -90,7 +104,8 @@ impl ToolbarOverflowLayout {
             .filter(|(_, placement)| {
                 matches!(
                     placement,
-                    ToolbarItemPlacement::Automatic | ToolbarItemPlacement::AutomaticWithPriority(_)
+                    ToolbarItemPlacement::Automatic
+                        | ToolbarItemPlacement::AutomaticWithPriority(_)
                 )
             })
             .map(|(index, _)| index)
@@ -117,11 +132,22 @@ impl ToolbarOverflowLayout {
             .map(|index| self.cross(sizes[*index]))
             .fold(0.0_f32, f32::max);
         let size = if self.axis == ToolbarAxis::Vertical {
-            Size { width: thickness, height: length }
+            Size {
+                width: thickness,
+                height: length,
+            }
         } else {
-            Size { width: length, height: thickness }
+            Size {
+                width: length,
+                height: thickness,
+            }
         };
-        ToolbarArrangement { sizes: sizes.to_vec(), visible: shown, hidden, size }
+        ToolbarArrangement {
+            sizes: sizes.to_vec(),
+            visible: shown,
+            hidden,
+            size,
+        }
     }
 
     pub fn size_that_fits(&self, _proposal: ProposedViewSize, subviews: &[LayoutSubview]) -> Size {
@@ -132,16 +158,21 @@ impl ToolbarOverflowLayout {
         self.arrangement(&sizes).size
     }
 
-    pub fn place_subviews(&self, bounds: Rect, _proposal: ProposedViewSize, subviews: &[LayoutSubview]) {
+    pub fn place_subviews(
+        &self,
+        bounds: Rect,
+        _proposal: ProposedViewSize,
+        subviews: &[LayoutSubview],
+    ) {
         let sizes: Vec<Size> = subviews
             .iter()
             .map(|subview| subview.size_that_fits(ProposedViewSize::UNSPECIFIED))
             .collect();
         let plan = self.arrangement(&sizes);
         let reversed = self.axis == ToolbarAxis::Horizontal
-            && subviews
-                .first()
-                .is_some_and(|subview| subview.layout_direction == cove_core::scene::Direction::Rtl);
+            && subviews.first().is_some_and(|subview| {
+                subview.layout_direction == cove_core::scene::Direction::Rtl
+            });
         let mut cursor = if self.axis == ToolbarAxis::Vertical {
             bounds.y
         } else if reversed {
@@ -154,7 +185,11 @@ impl ToolbarOverflowLayout {
             if !plan.visible.contains(&index) {
                 // A hidden command parks far off-screen rather than collapsing, so
                 // its measured size stays available.
-                subviews[index].place(Point::new(-1_000_000.0, 0.0), ProposedViewSize::UNSPECIFIED, false);
+                subviews[index].place(
+                    Point::new(-1_000_000.0, 0.0),
+                    ProposedViewSize::UNSPECIFIED,
+                    false,
+                );
                 continue;
             }
             if self.axis == ToolbarAxis::Vertical {
@@ -165,7 +200,11 @@ impl ToolbarOverflowLayout {
                 );
                 cursor += size.height + self.spacing;
             } else {
-                let x = if reversed { cursor - size.width } else { cursor };
+                let x = if reversed {
+                    cursor - size.width
+                } else {
+                    cursor
+                };
                 subviews[index].place(
                     Point::new(x, bounds.y + (plan.size.height - size.height) / 2.0),
                     ProposedViewSize::new(Some(size.width), Some(size.height)),
@@ -190,11 +229,20 @@ impl ToolbarOverflowLayout {
 }
 
 impl crate::Layout for ToolbarOverflowLayout {
-    fn size_that_fits(&self, proposal: ProposedViewSize, subviews: &[crate::LayoutSubview]) -> Size {
+    fn size_that_fits(
+        &self,
+        proposal: ProposedViewSize,
+        subviews: &[crate::LayoutSubview],
+    ) -> Size {
         ToolbarOverflowLayout::size_that_fits(self, proposal, subviews)
     }
 
-    fn place_subviews(&self, bounds: Rect, proposal: ProposedViewSize, subviews: &[crate::LayoutSubview]) {
+    fn place_subviews(
+        &self,
+        bounds: Rect,
+        proposal: ProposedViewSize,
+        subviews: &[crate::LayoutSubview],
+    ) {
         ToolbarOverflowLayout::place_subviews(self, bounds, proposal, subviews)
     }
 }
@@ -203,15 +251,32 @@ impl crate::Layout for ToolbarOverflowLayout {
 mod tests {
     #[test]
     fn toolbar_overflow_moves_low_priority_commands() {
+        use crate::primitives::controls::toolbar::{
+            ToolbarAxis, ToolbarItemPlacement, ToolbarOverflowLayout,
+        };
         use cove_core::Size;
-        use crate::primitives::controls::toolbar::{ToolbarAxis, ToolbarItemPlacement, ToolbarOverflowLayout};
         // four commands of 44pt + 4pt spacing = 188pt; budget 100 fits two.
         let sizes = vec![
-            Size { width: 44.0, height: 44.0 },
-            Size { width: 44.0, height: 44.0 },
-            Size { width: 44.0, height: 44.0 },
-            Size { width: 44.0, height: 44.0 },
-            Size { width: 44.0, height: 44.0 },
+            Size {
+                width: 44.0,
+                height: 44.0,
+            },
+            Size {
+                width: 44.0,
+                height: 44.0,
+            },
+            Size {
+                width: 44.0,
+                height: 44.0,
+            },
+            Size {
+                width: 44.0,
+                height: 44.0,
+            },
+            Size {
+                width: 44.0,
+                height: 44.0,
+            },
         ];
         let layout = ToolbarOverflowLayout::new(
             100.0,
@@ -226,6 +291,9 @@ mod tests {
         let plan = layout.arrangement(&sizes);
         // The Always item never moves; lowest priorities go first.
         assert!(!plan.hidden.contains(&3), "Always must stay in the bar");
-        assert!(plan.hidden.contains(&1), "priority 1 drops before priority 5");
+        assert!(
+            plan.hidden.contains(&1),
+            "priority 1 drops before priority 5"
+        );
     }
 }

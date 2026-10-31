@@ -79,10 +79,22 @@ mod tests {
 
     #[test]
     fn consume_policy_maps_to_event_results() {
-        assert_eq!(ScrollConsumePolicy::Always.result(false, false), EventResult::Handled);
-        assert_eq!(ScrollConsumePolicy::WhenScrollable.result(true, false), EventResult::Ignored);
-        assert_eq!(ScrollConsumePolicy::WhenOffsetChanged.result(true, true), EventResult::Handled);
-        assert_eq!(ScrollConsumePolicy::Never.result(true, true), EventResult::Ignored);
+        assert_eq!(
+            ScrollConsumePolicy::Always.result(false, false),
+            EventResult::Handled
+        );
+        assert_eq!(
+            ScrollConsumePolicy::WhenScrollable.result(true, false),
+            EventResult::Ignored
+        );
+        assert_eq!(
+            ScrollConsumePolicy::WhenOffsetChanged.result(true, true),
+            EventResult::Handled
+        );
+        assert_eq!(
+            ScrollConsumePolicy::Never.result(true, true),
+            EventResult::Ignored
+        );
     }
 
     #[test]
@@ -90,7 +102,10 @@ mod tests {
         let node = Node::new();
         assert_eq!(node.wheel_routing_priority(), None);
         node.set_wheel_routing_priority(Some(WheelRoutingPriority::PreferHit));
-        assert_eq!(node.wheel_routing_priority(), Some(WheelRoutingPriority::PreferHit));
+        assert_eq!(
+            node.wheel_routing_priority(),
+            Some(WheelRoutingPriority::PreferHit)
+        );
         node.set_wheel_routing_priority(None);
         assert_eq!(node.wheel_routing_priority(), None);
     }

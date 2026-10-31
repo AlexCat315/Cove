@@ -6,13 +6,13 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cove_core::{Point, Size};
 use crate::primitives::layout::ScrollViewport;
 use crate::{AnyView, View};
+use cove_core::{Point, Size};
 
 use super::row_index::VariableRowIndex;
 use super::row_metrics::VariableRowMetrics;
-use super::virtual_stack_body::{virtual_scroll, RowExtents};
+use super::virtual_stack_body::{RowExtents, virtual_scroll};
 use super::virtual_window::VirtualWindow;
 
 /// Authoritative window state for one variable stack.
@@ -65,7 +65,11 @@ impl<Id: Ord + Clone + 'static> VariableVirtualStack<Id> {
     }
 
     pub fn spacing(mut self, spacing: f32) -> Self {
-        self.spacing = if spacing.is_finite() { spacing.max(0.0) } else { 0.0 };
+        self.spacing = if spacing.is_finite() {
+            spacing.max(0.0)
+        } else {
+            0.0
+        };
         self
     }
 
@@ -119,10 +123,10 @@ impl<Id: Ord + Clone + 'static> View for VariableVirtualStack<Id> {
             && viewport.size.height > 0.0
             && !state.metrics.rows().is_empty()
         {
-            next_offset = state
-                .metrics
-                .rows()
-                .offset_for(&self.ids[target.min(self.ids.len() - 1)], viewport.size.height as f64);
+            next_offset = state.metrics.rows().offset_for(
+                &self.ids[target.min(self.ids.len() - 1)],
+                viewport.size.height as f64,
+            );
             state.previous_target = Some(target);
         }
         state.window.offset.y = next_offset as f32;
@@ -135,7 +139,10 @@ impl<Id: Ord + Clone + 'static> View for VariableVirtualStack<Id> {
             visible.clone(),
             visible,
             count,
-            Size { width: viewport.size.width, height: viewport.size.height },
+            Size {
+                width: viewport.size.width,
+                height: viewport.size.height,
+            },
         );
         let rows = state.metrics.rows().clone();
         drop(state);
@@ -153,7 +160,9 @@ impl<Id: Ord + Clone + 'static> View for VariableVirtualStack<Id> {
             1,
             &self.row_content,
             Some(Rc::new(move |next: Point| offset_state.set(next))),
-            Some(Rc::new(move |next: ScrollViewport| viewport_state.set(next))),
+            Some(Rc::new(move |next: ScrollViewport| {
+                viewport_state.set(next)
+            })),
         )
     }
 }

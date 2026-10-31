@@ -25,7 +25,11 @@ pub struct ChartResolutionCache {
 }
 impl Default for ChartResolutionCache {
     fn default() -> Self {
-        Self { slots: Vec::new(), samples: None, builds: 0 }
+        Self {
+            slots: Vec::new(),
+            samples: None,
+            builds: 0,
+        }
     }
 }
 impl ChartResolutionCache {
@@ -45,14 +49,21 @@ impl ChartResolutionCache {
         text: &TextStyleToken,
         build: impl FnOnce() -> ChartResolution,
     ) -> ChartResolution {
-        if let Some(hit) = self.slots.iter().find(|slot| {
-            slot.size == size && slot.origin == origin && &slot.text == text
-        }) {
+        if let Some(hit) = self
+            .slots
+            .iter()
+            .find(|slot| slot.size == size && slot.origin == origin && &slot.text == text)
+        {
             return hit.resolution.clone();
         }
         let value = build();
         self.builds += 1;
-        self.slots.push(Slot { size, origin, text: text.clone(), resolution: value.clone() });
+        self.slots.push(Slot {
+            size,
+            origin,
+            text: text.clone(),
+            resolution: value.clone(),
+        });
         // A resize drag walks through sizes one at a time; two slots keep both
         // spaces warm without growing.
         if self.slots.len() > 2 {

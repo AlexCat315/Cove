@@ -8,12 +8,12 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use cove_core::Binding;
 use cove_core::scene::{
     AccessibilityRole, AccessibilitySemantics, AccessibilityState, Align, EventPhase, EventResult,
     FlexDirection, FocusChainHolder, InputHandlerRoute, InteractionRegistryHolder, Justify,
     LayoutNode, Node, Wrap,
 };
-use cove_core::Binding;
 use cove_platform::{MouseButton, SystemCursor};
 
 use crate::modifiers::layout::PaddingExt;
@@ -23,8 +23,8 @@ use crate::primitives::controls::fields::time_input_model::{
     TimeInputHourCycle, TimeInputState, TimeSegment,
 };
 use crate::primitives::text::Text;
-use crate::theme::{theme_for_node, SemanticColorRef, SemanticFontRef};
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, TupleView, View};
+use crate::theme::{SemanticColorRef, SemanticFontRef, theme_for_node};
+use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_view};
 
 /// Segment padding.
 const SEGMENT_PADDING_HORIZONTAL: f32 = 6.0;
@@ -100,7 +100,11 @@ impl TimeInput {
 
 impl View for TimeInput {
     fn body(&self) -> AnyView {
-        let mut segments = vec![self.segment(TimeSegment::Hour), Self::separator(), self.segment(TimeSegment::Minute)];
+        let mut segments = vec![
+            self.segment(TimeSegment::Hour),
+            Self::separator(),
+            self.segment(TimeSegment::Minute),
+        ];
         if self.hour_cycle == TimeInputHourCycle::Twelve {
             segments.push(self.segment(TimeSegment::Period));
         }
@@ -109,7 +113,11 @@ impl View for TimeInput {
             accessibility_label: self.accessibility_label.clone(),
             content: AnyView::new(
                 BoxView::new(
-                    FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 2.0,
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    2.0,
                     AnyView::new(TupleView::new(segments)),
                 )
                 .padding_edges(FIELD_PADDING_HORIZONTAL, FIELD_PADDING_VERTICAL),
@@ -159,7 +167,10 @@ impl PrimitiveView for TimeInputFrame {
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Group,
             label: self.accessibility_label.clone().unwrap_or_default(),
-            state: AccessibilityState { is_enabled: self.is_enabled, ..Default::default() },
+            state: AccessibilityState {
+                is_enabled: self.is_enabled,
+                ..Default::default()
+            },
             ..Default::default()
         }));
     }
@@ -201,9 +212,13 @@ impl TimeSegmentLeaf {
 
     /// Moves focus to the neighbouring segment of the same field.
     fn focus_neighbor(&self, node: &Node, offset: isize) -> bool {
-        let Some(chain) = FocusChainHolder::current() else { return false };
+        let Some(chain) = FocusChainHolder::current() else {
+            return false;
+        };
         let segments = self.segments.borrow();
-        let Some(index) = segments.iter().position(|segment| segment == node) else { return false };
+        let Some(index) = segments.iter().position(|segment| segment == node) else {
+            return false;
+        };
         let next = index as isize + offset;
         if next < 0 || next as usize >= segments.len() {
             return false;
@@ -269,12 +284,17 @@ impl PrimitiveView for TimeSegmentLeaf {
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Button,
             label: self.label().to_string(),
-            state: AccessibilityState { is_enabled: self.is_enabled, ..Default::default() },
+            state: AccessibilityState {
+                is_enabled: self.is_enabled,
+                ..Default::default()
+            },
             combines_children: true,
             ..Default::default()
         }));
 
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         if !self.is_enabled {
             registry.remove(node);
             return;
@@ -291,7 +311,9 @@ impl PrimitiveView for TimeSegmentLeaf {
                 {
                     return EventResult::Ignored;
                 }
-                let Some(owner) = Node::upgrade(&pointer_node) else { return EventResult::Ignored };
+                let Some(owner) = Node::upgrade(&pointer_node) else {
+                    return EventResult::Ignored;
+                };
                 if let Some(chain) = FocusChainHolder::current() {
                     chain.focus(Some(&owner), true);
                 }
@@ -318,8 +340,14 @@ impl PrimitiveView for TimeSegmentLeaf {
                         EventResult::Handled
                     }
                     crate::Scancode::ARROW_LEFT | crate::Scancode::ARROW_RIGHT => {
-                        let Some(owner) = Node::upgrade(&key_node) else { return EventResult::Ignored };
-                        let offset = if event.scancode == crate::Scancode::ARROW_LEFT { -1 } else { 1 };
+                        let Some(owner) = Node::upgrade(&key_node) else {
+                            return EventResult::Ignored;
+                        };
+                        let offset = if event.scancode == crate::Scancode::ARROW_LEFT {
+                            -1
+                        } else {
+                            1
+                        };
                         if leaf.focus_neighbor(&owner, offset) {
                             EventResult::Handled
                         } else {
@@ -331,9 +359,7 @@ impl PrimitiveView for TimeSegmentLeaf {
                             && leaf.kind != TimeSegment::Period
                         {
                             let advanced = leaf.type_digit(digit);
-                            if advanced
-                                && let Some(owner) = Node::upgrade(&key_node)
-                            {
+                            if advanced && let Some(owner) = Node::upgrade(&key_node) {
                                 leaf.focus_neighbor(&owner, 1);
                             }
                             return EventResult::Handled;
@@ -443,7 +469,11 @@ impl PrimitiveView for SegmentLabel {
         };
         node.set_background_color(fill);
         node.set_corner_radius(SEGMENT_RADIUS);
-        node.set_foreground_color(Some(if self.is_enabled { ink } else { theme.colors.on_surface_muted }));
+        node.set_foreground_color(Some(if self.is_enabled {
+            ink
+        } else {
+            theme.colors.on_surface_muted
+        }));
         let _ = self.kind;
     }
 

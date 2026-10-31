@@ -3,8 +3,8 @@
 //! Swift source: `Examples/Mobile/Sources/AppContent/Today.swift`
 //! (`TodayScreen`, `ProjectCard`).
 
-use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::Binding;
+use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::layout::{FlexExt, PaddingExt};
 use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::primitives::data::avatar::Avatar;
@@ -154,8 +154,7 @@ impl View for ProjectCard {
                         8.0,
                         AnyView::new(TupleView::new(vec![
                             AnyView::new(
-                                Text::new(self.project.name.clone())
-                                    .flex_with(1.0, 1.0, None),
+                                Text::new(self.project.name.clone()).flex_with(1.0, 1.0, None),
                             ),
                             AnyView::new(Badge::new(self.project.kind.clone())),
                         ])),

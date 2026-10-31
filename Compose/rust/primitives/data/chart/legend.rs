@@ -6,15 +6,15 @@
 use std::collections::HashSet;
 use std::rc::Rc;
 
+use crate::{Layout, LayoutSubview, PrimitiveView, ProposedViewSize, View, impl_primitive_view};
+use cove_core::Binding;
 use cove_core::scene::{
     AccessibilityRole, AccessibilitySemantics, Direction, EventPhase, EventResult, LayoutNode,
     Node, Point, PointerPhase, Rect, Size,
 };
-use cove_core::Binding;
-use crate::{impl_primitive_view, Layout, LayoutSubview, PrimitiveView, ProposedViewSize, View};
 
-use crate::theme::tokens::SemanticColorRef;
 use crate::theme::theme_for_node;
+use crate::theme::tokens::SemanticColorRef;
 
 #[derive(Clone)]
 pub struct ChartLegendItem {
@@ -37,18 +37,35 @@ impl PrimitiveView for ChartLegend {
         Some(LayoutNode::new())
     }
     fn update_layout(&self, layout: &LayoutNode) {
-        let algorithm = ChartLegendLayout { horizontal_spacing: 4.0, vertical_spacing: 2.0 };
+        let algorithm = ChartLegendLayout {
+            horizontal_spacing: 4.0,
+            vertical_spacing: 2.0,
+        };
         let measure = algorithm.clone();
         let place = algorithm;
         layout.set_custom_layout(
             Rc::new(move |width, height, children| {
-                let subviews: Vec<LayoutSubview> = children.iter().map(LayoutSubview::from_layout_node).collect();
-                let result = measure.size_that_fits(ProposedViewSize::new(width, height), &subviews);
-                Size { width: result.width.max(0.0), height: result.height.max(0.0) }
+                let subviews: Vec<LayoutSubview> = children
+                    .iter()
+                    .map(LayoutSubview::from_layout_node)
+                    .collect();
+                let result =
+                    measure.size_that_fits(ProposedViewSize::new(width, height), &subviews);
+                Size {
+                    width: result.width.max(0.0),
+                    height: result.height.max(0.0),
+                }
             }),
             Rc::new(move |bounds, children| {
-                let subviews: Vec<LayoutSubview> = children.iter().map(LayoutSubview::from_layout_node).collect();
-                place.place_subviews(bounds, ProposedViewSize::new(Some(bounds.width), Some(bounds.height)), &subviews);
+                let subviews: Vec<LayoutSubview> = children
+                    .iter()
+                    .map(LayoutSubview::from_layout_node)
+                    .collect();
+                place.place_subviews(
+                    bounds,
+                    ProposedViewSize::new(Some(bounds.width), Some(bounds.height)),
+                    &subviews,
+                );
             }),
         );
         layout.set_min_width(Some(0.0));
@@ -92,15 +109,27 @@ impl PrimitiveView for ChartLegendToggle {
     fn update_node(&self, node: &Node) {
         let mut semantics = AccessibilitySemantics::new(AccessibilityRole::Toggle);
         semantics.label = self.item.title.clone();
-        semantics.value = if self.is_hidden { "Hidden".to_string() } else { "Shown".to_string() };
+        semantics.value = if self.is_hidden {
+            "Hidden".to_string()
+        } else {
+            "Shown".to_string()
+        };
         semantics.state.is_selected = !self.is_hidden;
         node.set_accessibility(Some(semantics));
         node.set_attachment("chart.legend.title", self.item.title.clone());
         node.set_attachment("chart.legend.hidden", self.is_hidden);
         node.set_attachment("chart.legend.index", self.index);
         let theme = theme_for_node(node);
-        let swatch = if self.is_hidden { theme.colors.background } else { self.item.color.resolve(&theme) };
-        let stroke = if self.is_hidden { theme.colors.on_surface_muted } else { self.item.color.resolve(&theme) };
+        let swatch = if self.is_hidden {
+            theme.colors.background
+        } else {
+            self.item.color.resolve(&theme)
+        };
+        let stroke = if self.is_hidden {
+            theme.colors.on_surface_muted
+        } else {
+            self.item.color.resolve(&theme)
+        };
         node.update_overlay_draw(
             (swatch.rgba8(), stroke.rgba8(), self.is_hidden),
             move |list, origin| {
@@ -142,7 +171,10 @@ pub struct ChartLegendLayout {
 impl Layout for ChartLegendLayout {
     fn size_that_fits(&self, proposal: ProposedViewSize, subviews: &[LayoutSubview]) -> Size {
         if subviews.is_empty() {
-            return Size { width: 0.0, height: 0.0 };
+            return Size {
+                width: 0.0,
+                height: 0.0,
+            };
         }
         let sizes: Vec<Size> = subviews
             .iter()
@@ -157,10 +189,18 @@ impl Layout for ChartLegendLayout {
             };
         };
         let (_, height) = self.rows(&sizes, width.max(0.0));
-        Size { width: width.max(0.0), height }
+        Size {
+            width: width.max(0.0),
+            height,
+        }
     }
 
-    fn place_subviews(&self, bounds: Rect, _proposal: ProposedViewSize, subviews: &[LayoutSubview]) {
+    fn place_subviews(
+        &self,
+        bounds: Rect,
+        _proposal: ProposedViewSize,
+        subviews: &[LayoutSubview],
+    ) {
         if subviews.is_empty() {
             return;
         }
@@ -169,7 +209,10 @@ impl Layout for ChartLegendLayout {
             .map(|subview| subview.size_that_fits(ProposedViewSize::new(Some(10_000.0), None)))
             .collect();
         let (positions, _) = self.rows(&sizes, bounds.width);
-        let rtl = subviews.first().map(|subview| subview.layout_direction == Direction::Rtl).unwrap_or(false);
+        let rtl = subviews
+            .first()
+            .map(|subview| subview.layout_direction == Direction::Rtl)
+            .unwrap_or(false);
         for (index, subview) in subviews.iter().enumerate() {
             let size = sizes[index];
             let x = if rtl {

@@ -88,7 +88,9 @@ impl ChartExplorationStory {
         (0..CHART_SAMPLE_COUNT)
             .map(|index| {
                 let x = index as f32;
-                let y = 25.0 + (x * 0.2 + self.revision.get() as f32).sin() * 14.0 + (x * 0.7).cos() * 3.0;
+                let y = 25.0
+                    + (x * 0.2 + self.revision.get() as f32).sin() * 14.0
+                    + (x * 0.7).cos() * 3.0;
                 ChartDatum::new(x, y)
             })
             .collect()
@@ -135,7 +137,10 @@ impl View for ChartExplorationStory {
                 ChartMark::Area,
                 "Signal",
                 ChartValueAxis::Left,
-                ChartSeriesStyle { line_width: Some(2.0), ..ChartSeriesStyle::default() },
+                ChartSeriesStyle {
+                    line_width: Some(2.0),
+                    ..ChartSeriesStyle::default()
+                },
             )],
             guides: ChartGuides::default(),
             x: ChartXDomain::Numeric,
@@ -212,7 +217,10 @@ pub fn adaptive_table_columns(is_enabled: bool) -> (Vec<TableColumn<usize>>, Tab
         .layout(sized(130.0))
         .visibility(ColumnVisibility::Optional),
     ];
-    let options = TableOptions { is_enabled, ..TableOptions::default() };
+    let options = TableOptions {
+        is_enabled,
+        ..TableOptions::default()
+    };
     (columns, options)
 }
 

@@ -26,7 +26,11 @@ fn a_disabled_starting_value_falls_back_to_the_first_enabled_row() {
     let wheel = volumes();
     let options = wheel.options.clone();
     let restart = WheelPicker::new(options, Some(10));
-    assert_eq!(restart.value(), Some(&0), "10 is disabled, so land on the first usable row");
+    assert_eq!(
+        restart.value(),
+        Some(&0),
+        "10 is disabled, so land on the first usable row"
+    );
 }
 
 #[test]
@@ -57,7 +61,11 @@ fn stepping_onto_a_disabled_row_skips_it() {
     wheel.step(1);
     assert_eq!(wheel.value(), Some(&9));
     assert!(!wheel.step(1), "there is nothing enabled above 9");
-    assert_eq!(wheel.value(), Some(&9), "the selection does not land on a disabled row");
+    assert_eq!(
+        wheel.value(),
+        Some(&9),
+        "the selection does not land on a disabled row"
+    );
 }
 
 #[test]
@@ -73,7 +81,11 @@ fn stepping_stops_at_the_bottom() {
 fn home_and_end_jump_to_the_edges() {
     let mut wheel = volumes();
     assert!(wheel.select_last());
-    assert_eq!(wheel.value(), Some(&9), "the last *enabled* row, not the last row");
+    assert_eq!(
+        wheel.value(),
+        Some(&9),
+        "the last *enabled* row, not the last row"
+    );
     assert!(wheel.select_first());
     assert_eq!(wheel.value(), Some(&0));
     // Re-selecting the current value reports no change.
@@ -108,7 +120,11 @@ fn the_visible_window_is_centred_and_slides_at_the_ends() {
 
     let mut at_top = volumes();
     at_top.select_first();
-    assert_eq!(at_top.visible_window(5), 0..5, "the window does not run before zero");
+    assert_eq!(
+        at_top.visible_window(5),
+        0..5,
+        "the window does not run before zero"
+    );
 
     let mut at_bottom = volumes();
     at_bottom.select_last();

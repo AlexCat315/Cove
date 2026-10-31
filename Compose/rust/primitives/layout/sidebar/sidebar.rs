@@ -5,22 +5,22 @@
 use std::collections::HashSet;
 use std::rc::Rc;
 
-use cove_core::scene::{
-    AccessibilityRole, Align, FlexDirection, FocusChainHolder, Justify, LayoutNode, Node, Wrap,
-};
-use cove_core::Binding;
-use cove_platform::KeyEvent;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{Button, ButtonIcon, ButtonIconSource, ButtonRole};
 use crate::primitives::overlays::roving_focus::{
-    roving_identity, RovingFocusHost, RovingItem, SelectionNavigation,
+    RovingFocusHost, RovingItem, SelectionNavigation, roving_identity,
 };
 use crate::primitives::text::Text;
 use crate::theme::SemanticFontRef;
 use crate::theme::styles::buttons::ButtonStyleViewExt;
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, TupleView, View};
+use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_view};
+use cove_core::Binding;
+use cove_core::scene::{
+    AccessibilityRole, Align, FlexDirection, FocusChainHolder, Justify, LayoutNode, Node, Wrap,
+};
+use cove_platform::KeyEvent;
 
 use super::hierarchy::{SidebarEntry, SidebarHierarchy};
 use super::items::{SidebarItem, SidebarSection};
@@ -44,17 +44,18 @@ pub struct Sidebar<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 
 impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Sidebar<Id> {
     pub fn new(selection: Binding<Option<Id>>, sections: Vec<SidebarSection<Id>>) -> Self {
         assert!(
-            sections
+            sections.iter().enumerate().all(|(index, section)| sections
                 .iter()
                 .enumerate()
-                .all(|(index, section)| sections
-                    .iter()
-                    .enumerate()
-                    .all(|(other, candidate)| other == index || candidate.id != section.id)),
+                .all(|(other, candidate)| other == index || candidate.id != section.id)),
             "Sidebar section IDs must be unique"
         );
         let hierarchy = SidebarHierarchy::new(&sections);
-        let ids: Vec<Id> = hierarchy.entries().into_iter().map(|entry| entry.item.id).collect();
+        let ids: Vec<Id> = hierarchy
+            .entries()
+            .into_iter()
+            .map(|entry| entry.item.id)
+            .collect();
         assert!(
             ids.iter().enumerate().all(|(index, id)| ids
                 .iter()
@@ -87,7 +88,11 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Sideb
     }
 
     pub fn minimum_row_height(mut self, height: f32) -> Self {
-        self.minimum_row_height = if height.is_finite() { height.max(0.0) } else { 38.0 };
+        self.minimum_row_height = if height.is_finite() {
+            height.max(0.0)
+        } else {
+            38.0
+        };
         self
     }
 
@@ -112,7 +117,6 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Sideb
             None => self.local_expanded.get(),
         }
     }
-
 
     /// One leading lane per section, even when some destinations omit an icon.
     /// Resolved against the live theme inside the row so a theme swap re-measures.
@@ -190,21 +194,19 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
                     disclosure_lane: section_has_branches,
                     context_label: hierarchy.context(entry),
                 };
-                rows.push(AnyView::new(
-                    AnyView::new(destination).with_modifier(RovingItem::new(
-                        entry.item.id.clone(),
-                        item_tab_stop,
-                        identity,
-                    )),
-                ));
+                rows.push(AnyView::new(AnyView::new(destination).with_modifier(
+                    RovingItem::new(entry.item.id.clone(), item_tab_stop, identity),
+                )));
             }
             let identity = section.id.clone();
-            let column = AnyView::new(
-                BoxView::new(
-                    FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 3.0,
-                    AnyView::new(TupleView::new(rows)),
-                ),
-            );
+            let column = AnyView::new(BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                3.0,
+                AnyView::new(TupleView::new(rows)),
+            ));
             section_views.push(AnyView::new(SectionIdentity {
                 id: identity,
                 content: column,
@@ -218,18 +220,19 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
         let expanded_binding = self.expanded.clone();
         let local_expanded = self.local_expanded.clone();
         let identity: Rc<dyn Fn(&Id) -> u64> = Rc::new(|id: &Id| roving_identity(id));
-        let command: Rc<dyn Fn(&KeyEvent) -> Option<SelectionNavigation>> = Rc::new(|event: &KeyEvent| {
-            if !event.modifiers.is_empty() {
-                return None;
-            }
-            match event.scancode {
-                crate::Scancode::ARROW_UP => Some(SelectionNavigation::Previous),
-                crate::Scancode::ARROW_DOWN => Some(SelectionNavigation::Next),
-                crate::Scancode::HOME => Some(SelectionNavigation::First),
-                crate::Scancode::END => Some(SelectionNavigation::Last),
-                _ => None,
-            }
-        });
+        let command: Rc<dyn Fn(&KeyEvent) -> Option<SelectionNavigation>> =
+            Rc::new(|event: &KeyEvent| {
+                if !event.modifiers.is_empty() {
+                    return None;
+                }
+                match event.scancode {
+                    crate::Scancode::ARROW_UP => Some(SelectionNavigation::Previous),
+                    crate::Scancode::ARROW_DOWN => Some(SelectionNavigation::Next),
+                    crate::Scancode::HOME => Some(SelectionNavigation::First),
+                    crate::Scancode::END => Some(SelectionNavigation::Last),
+                    _ => None,
+                }
+            });
         let selection_for_host = selection.clone();
         let host = RovingFocusHost::new(
             enabled,
@@ -262,28 +265,32 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
                 }
             },
             move |id: &Id| identity(id),
-            AnyView::new(
-                BoxView::new(
-                    FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 10.0,
-                    AnyView::new(TupleView::new(section_views)),
-                ),
-            ),
+            AnyView::new(BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                10.0,
+                AnyView::new(TupleView::new(section_views)),
+            )),
         )
         .command(move |event: &KeyEvent| command(event));
 
         // Overlay gutter: a reserved lane insets only the trailing edge, which
         // would make every selected destination sit further from one edge.
         let scroller = crate::primitives::layout::ScrollView::vertical(AnyView::new(host));
-        let body = AnyView::new(
-            BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 0.0,
-                AnyView::new(TupleView::new(vec![
-                    AnyView::new(self.header.clone().flex_with(0.0, 0.0, None)),
-                    AnyView::new(AnyView::new(scroller).flex_with(1.0, 1.0, Some(0.0))),
-                    AnyView::new(self.footer.clone().flex_with(0.0, 0.0, None)),
-                ])),
-            ),
-        );
+        let body = AnyView::new(BoxView::new(
+            FlexDirection::Column,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            0.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(self.header.clone().flex_with(0.0, 0.0, None)),
+                AnyView::new(AnyView::new(scroller).flex_with(1.0, 1.0, Some(0.0))),
+                AnyView::new(self.footer.clone().flex_with(0.0, 0.0, None)),
+            ])),
+        ));
         AnyView::new(body.accessibility(|semantics| {
             semantics.role = AccessibilityRole::List;
         }))
@@ -296,8 +303,6 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Sideb
         let theme = self.ambient_theme.clone();
         Self::icon_lane(entries, &theme)
     }
-
-
 }
 
 /// Gives a section column a stable identity across recompositions.
@@ -398,22 +403,21 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
             self.is_selected,
             None,
         )
-        .button_style(SidebarItemStyle { minimum_height: self.minimum_height });
-        let styled = button.button_style(SidebarItemStyle { minimum_height: self.minimum_height });
-        let roving = RovingItem::new(
-            self.row_id.clone(),
-            self.is_tab_stop,
-            self.identity.clone(),
-        );
-        vec![AnyView::new(
-            AnyView::new(styled).with_modifier(roving),
-        )]
+        .button_style(SidebarItemStyle {
+            minimum_height: self.minimum_height,
+        });
+        let styled = button.button_style(SidebarItemStyle {
+            minimum_height: self.minimum_height,
+        });
+        let roving = RovingItem::new(self.row_id.clone(), self.is_tab_stop, self.identity.clone());
+        vec![AnyView::new(AnyView::new(styled).with_modifier(roving))]
     }
 }
 
 impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
     for SidebarRowBody<Id>
-{}
+{
+}
 
 /// Row semantics: label, badge value and branch expanded state.
 struct SidebarRowSemantics {
@@ -458,7 +462,11 @@ impl PrimitiveView for SidebarChromeRow {
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         let row = BoxView::new(
-            FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 0.0,
+            FlexDirection::Row,
+            Align::Center,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            0.0,
             AnyView::new(self.label.clone().with_modifier(FlexGrowOne)),
         )
         .foreground_color(self.ink)
@@ -485,7 +493,10 @@ pub struct SidebarItemStyle {
 }
 
 impl crate::theme::styles::buttons::ButtonStyle for SidebarItemStyle {
-    fn make_body(&self, configuration: crate::theme::styles::buttons::ButtonStyleConfiguration) -> AnyView {
+    fn make_body(
+        &self,
+        configuration: crate::theme::styles::buttons::ButtonStyleConfiguration,
+    ) -> AnyView {
         let theme = configuration.theme.clone();
         let appearance =
             crate::theme::styles::components::selection_appearance::SelectionAppearance::resolve(

@@ -33,11 +33,7 @@ impl ImageGeometry {
     /// `source` is the source pixel extent; unknown, non-finite or empty
     /// sources fall back to the full container, exactly like the Swift
     /// initializer's early return.
-    pub fn new(
-        container: Rect,
-        source: Option<(f32, f32)>,
-        mode: ImageContentMode,
-    ) -> Self {
+    pub fn new(container: Rect, source: Option<(f32, f32)>, mode: ImageContentMode) -> Self {
         let mut geometry = Self {
             rect: container,
             uv_min: Point::new(0.0, 0.0),

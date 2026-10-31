@@ -90,7 +90,11 @@ pub fn status_text(state: &WebViewState) -> String {
         }
         WebViewPhase::Loaded => {
             let title = state.display_title();
-            if title.is_empty() { "Loaded".to_owned() } else { title }
+            if title.is_empty() {
+                "Loaded".to_owned()
+            } else {
+                title
+            }
         }
         WebViewPhase::Failed => "Failed to load".to_owned(),
     }

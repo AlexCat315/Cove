@@ -9,23 +9,21 @@
 
 use std::rc::Rc;
 
-use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
-use cove_core::Color;
-use cove_imaging::BundleImageResource;
 use crate::modifiers::interaction::AccessibilityExt;
-use crate::modifiers::layout::{
-    EdgeInsets, FlexExt, FrameDimension, LayoutFrameExt, PaddingExt,
-};
+use crate::modifiers::layout::{EdgeInsets, FlexExt, FrameDimension, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{Button, ButtonIcon, ButtonIconSource};
 use crate::primitives::feedback::StatusTone;
 use crate::primitives::layout::ActionGroupLayout;
 use crate::primitives::media::ui_icon_catalog;
 use crate::primitives::text::Text;
-use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
 use crate::theme::ControlSizeViewExt;
-use crate::theme::{node_text_scaler, theme_for_node, ControlSize, SemanticFontRef, Theme};
+use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
+use crate::theme::{ControlSize, SemanticFontRef, Theme, node_text_scaler, theme_for_node};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
+use cove_core::Color;
+use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
+use cove_imaging::BundleImageResource;
 
 /// How the block relates to the surface behind it.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -68,7 +66,10 @@ impl Alert {
     }
 
     /// Mirrors the Swift `actions:` `@ViewBuilder` overload.
-    pub fn with_actions<Actions: View + 'static>(title: impl Into<String>, actions: Actions) -> Self {
+    pub fn with_actions<Actions: View + 'static>(
+        title: impl Into<String>,
+        actions: Actions,
+    ) -> Self {
         let mut value = Self::new(title);
         value.actions = Some(AnyView::new(actions));
         value
@@ -108,7 +109,6 @@ impl Alert {
         configure(&mut self);
         self
     }
-
 }
 
 impl View for Alert {
@@ -123,7 +123,17 @@ impl View for Alert {
         let actions = self.actions.clone();
         let has_actions = self.actions.is_some();
         AnyView::new(AlertHost {
-            snapshot: AlertSnapshot { title, message, tone, variant, icon, shows_icon, on_dismiss, actions, has_actions },
+            snapshot: AlertSnapshot {
+                title,
+                message,
+                tone,
+                variant,
+                icon,
+                shows_icon,
+                on_dismiss,
+                actions,
+                has_actions,
+            },
         })
     }
 }
@@ -202,7 +212,8 @@ impl PrimitiveView for AlertHost {
         let style = self.snapshot.style(&theme);
         let label = self.snapshot.title.clone();
         let help = self.snapshot.message.clone();
-        let mut semantics = cove_core::scene::AccessibilitySemantics::new(AccessibilityRole::Status);
+        let mut semantics =
+            cove_core::scene::AccessibilitySemantics::new(AccessibilityRole::Status);
         semantics.label = label;
         semantics.help = help;
         let _ = style;
@@ -214,26 +225,38 @@ impl PrimitiveView for AlertHost {
         let scaler = node_text_scaler(node);
         let style = self.snapshot.style(&theme);
         let icon_extent = theme.icons.medium;
-        let text_inset = if self.snapshot.shows_icon { icon_extent + theme.spacing.sm } else { 0.0 };
+        let text_inset = if self.snapshot.shows_icon {
+            icon_extent + theme.spacing.sm
+        } else {
+            0.0
+        };
 
         let mut leading: Vec<AnyView> = Vec::new();
         if self.snapshot.shows_icon {
-            let resource = self.snapshot.icon.clone().unwrap_or_else(|| self.snapshot.tone.icon());
+            let resource = self
+                .snapshot
+                .icon
+                .clone()
+                .unwrap_or_else(|| self.snapshot.tone.icon());
             leading.push(AnyView::new(
-                ButtonIcon::new(ButtonIconSource::resource(resource), Some(icon_extent), Some(style.icon_ink))
-                    .frame(
-                        Some(FrameDimension::Points(icon_extent)),
-                        Some(FrameDimension::Points(
-                            icon_extent.max(scaler.scale(theme.typography.body_strong.line_height)),
-                        )),
-                        None,
-                        None,
-                        None,
-                        None,
-                    )
-                    .accessibility_hidden(true)
-                    .flex(0.0)
-                    .shrink(0.0),
+                ButtonIcon::new(
+                    ButtonIconSource::resource(resource),
+                    Some(icon_extent),
+                    Some(style.icon_ink),
+                )
+                .frame(
+                    Some(FrameDimension::Points(icon_extent)),
+                    Some(FrameDimension::Points(
+                        icon_extent.max(scaler.scale(theme.typography.body_strong.line_height)),
+                    )),
+                    None,
+                    None,
+                    None,
+                    None,
+                )
+                .accessibility_hidden(true)
+                .flex(0.0)
+                .shrink(0.0),
             ));
         }
         leading.push(AnyView::new(
@@ -300,10 +323,9 @@ impl PrimitiveView for AlertHost {
                 },
                 actions,
             );
-            column.push(AnyView::new(
-                AnyView::new(group)
-                    .padding_insets(EdgeInsets::new(theme.spacing.xs, text_inset, 0.0, 0.0)),
-            ));
+            column.push(AnyView::new(AnyView::new(group).padding_insets(
+                EdgeInsets::new(theme.spacing.xs, text_inset, 0.0, 0.0),
+            )));
         }
 
         vec![AnyView::new(

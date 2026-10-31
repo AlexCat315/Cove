@@ -5,18 +5,18 @@
 //! outside click, and exposes expanded state to accessibility.
 use std::sync::{Arc, Mutex};
 
-use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 use cove_core::Binding;
+use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 
+use crate::modifiers::layout::LayoutFrameExt;
 use crate::primitives::controls::button::{Button, ButtonRole};
 use crate::primitives::overlays::anchored::PopoverPlacement;
 use crate::primitives::overlays::menu::{Menu, MenuEntry};
 use crate::primitives::overlays::popover::Popover;
 use crate::primitives::text::Text;
-use crate::theme::styles::buttons::{ButtonStyleViewExt, SecondaryButtonStyle};
 use crate::theme::SemanticFontRef;
-use crate::modifiers::layout::LayoutFrameExt;
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, TupleView, View};
+use crate::theme::styles::buttons::{ButtonStyleViewExt, SecondaryButtonStyle};
+use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_view};
 
 /// A button that opens a menu.
 pub struct MenuButton<Label: View + Clone + 'static> {
@@ -78,7 +78,9 @@ impl<Label: View + Clone + 'static> MenuButton<Label> {
         };
         let presented = self.presented.clone();
         menu.on_item_activated(move || {
-            *presented.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = false;
+            *presented
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()) = false;
         })
     }
 }
@@ -88,12 +90,18 @@ impl<Label: View + Clone + 'static> View for MenuButton<Label> {
         let presented = Binding::new(
             {
                 let state = self.presented.clone();
-                move || *state.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+                move || {
+                    *state
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner())
+                }
             },
             {
                 let state = self.presented.clone();
                 move |value: bool| {
-                    *state.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = value;
+                    *state
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner()) = value;
                 }
             },
         );
@@ -117,11 +125,13 @@ impl<Label: View + Clone + 'static> View for MenuButton<Label> {
             popover = popover.width(width);
         }
         if let Some(label) = self.accessibility_label.as_ref() {
-            popover = popover.trigger_description(crate::primitives::overlays::popover::PopoverTriggerDescription {
-                label: label.clone(),
-                value: String::new(),
-                help: self.tooltip.clone(),
-            });
+            popover = popover.trigger_description(
+                crate::primitives::overlays::popover::PopoverTriggerDescription {
+                    label: label.clone(),
+                    value: String::new(),
+                    help: self.tooltip.clone(),
+                },
+            );
         }
         AnyView::new(popover)
     }
@@ -178,7 +188,9 @@ impl View for MenuButtonTitle {
         let title = self.title.clone();
         let label = MenuButton::new(
             self.entries.clone(),
-            AnyView::new(MenuButtonLabel { title: title.clone() }),
+            AnyView::new(MenuButtonLabel {
+                title: title.clone(),
+            }),
         )
         .enabled(self.is_enabled)
         .placement(self.placement)
@@ -244,14 +256,20 @@ impl MenuButtonTitle {
 impl<Label: View + Clone + 'static> MenuButton<Label> {
     /// Whether the menu is currently open.
     pub fn is_presented(&self) -> bool {
-        *self.presented.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+        *self
+            .presented
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 }
 
 impl MenuButtonTitle {
     /// Whether the menu is currently open.
     pub fn is_presented(&self) -> bool {
-        *self.presented.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+        *self
+            .presented
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 }
 

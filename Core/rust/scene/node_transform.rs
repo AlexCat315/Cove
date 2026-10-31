@@ -15,12 +15,24 @@ pub struct NodeTransform {
     pub scales_shadow: bool,
 }
 impl NodeTransform {
-    pub const IDENTITY: Self = Self { scale: 1.0, anchor: Point { x: 0.0, y: 0.0 }, scales_shadow: true };
+    pub const IDENTITY: Self = Self {
+        scale: 1.0,
+        anchor: Point { x: 0.0, y: 0.0 },
+        scales_shadow: true,
+    };
     pub const fn new(scale: f32, anchor: Point) -> Self {
-        Self { scale, anchor, scales_shadow: true }
+        Self {
+            scale,
+            anchor,
+            scales_shadow: true,
+        }
     }
     pub fn anchored(scale: f32, x: f32, y: f32) -> Self {
-        Self { scale, anchor: Point { x, y }, scales_shadow: true }
+        Self {
+            scale,
+            anchor: Point { x, y },
+            scales_shadow: true,
+        }
     }
     pub fn with_scales_shadow(mut self, scales_shadow: bool) -> Self {
         self.scales_shadow = scales_shadow;
@@ -57,9 +69,25 @@ pub struct Affine2D {
     pub shadow_scale: f32,
 }
 impl Affine2D {
-    pub const IDENTITY: Self = Self { a: 1.0, b: 0.0, c: 0.0, d: 1.0, e: 0.0, f: 0.0, shadow_scale: 1.0 };
+    pub const IDENTITY: Self = Self {
+        a: 1.0,
+        b: 0.0,
+        c: 0.0,
+        d: 1.0,
+        e: 0.0,
+        f: 0.0,
+        shadow_scale: 1.0,
+    };
     pub const fn new(a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> Self {
-        Self { a, b, c, d, e, f, shadow_scale: 1.0 }
+        Self {
+            a,
+            b,
+            c,
+            d,
+            e,
+            f,
+            shadow_scale: 1.0,
+        }
     }
     /// This transform applied to a point first, `next` second.
     pub fn followed(self, next: Self) -> Self {
@@ -74,7 +102,10 @@ impl Affine2D {
         }
     }
     pub fn applied(self, x: f32, y: f32) -> Point {
-        Point { x: self.a * x + self.c * y + self.e, y: self.b * x + self.d * y + self.f }
+        Point {
+            x: self.a * x + self.c * y + self.e,
+            y: self.b * x + self.d * y + self.f,
+        }
     }
     /// The point in this transform's source space that maps to `point`.
     pub fn source(self, point: Point) -> Point {
@@ -84,13 +115,19 @@ impl Affine2D {
             if self.a.abs() <= 1e-9 {
                 return Point { x: 0.0, y: 0.0 };
             }
-            return Point { x: (point.x - self.e) / self.a, y: (point.y - self.f) / self.a };
+            return Point {
+                x: (point.x - self.e) / self.a,
+                y: (point.y - self.f) / self.a,
+            };
         }
         self.inverted().applied(point.x, point.y)
     }
     /// Where this transform puts the local origin.
     pub fn origin(self) -> Point {
-        Point { x: self.e, y: self.f }
+        Point {
+            x: self.e,
+            y: self.f,
+        }
     }
     /// The inverse, or the identity when the transform collapses a dimension.
     pub fn inverted(self) -> Self {
@@ -106,7 +143,11 @@ impl Affine2D {
             d: self.a * inverse,
             e: (self.c * self.f - self.d * self.e) * inverse,
             f: (self.b * self.e - self.a * self.f) * inverse,
-            shadow_scale: if self.shadow_scale.abs() > 1e-9 { 1.0 / self.shadow_scale } else { 1.0 },
+            shadow_scale: if self.shadow_scale.abs() > 1e-9 {
+                1.0 / self.shadow_scale
+            } else {
+                1.0
+            },
         }
     }
 }
@@ -141,7 +182,11 @@ mod tests {
     use super::*;
     #[test]
     fn identity_transform_is_a_translation() {
-        let step = placement_step(Rect::new(10.0, 20.0, 100.0, 50.0), NodeTransform::IDENTITY, Point::default());
+        let step = placement_step(
+            Rect::new(10.0, 20.0, 100.0, 50.0),
+            NodeTransform::IDENTITY,
+            Point::default(),
+        );
         assert_eq!(step, Affine2D::new(1.0, 0.0, 0.0, 1.0, 10.0, 20.0));
         assert!(NodeTransform::IDENTITY.is_identity());
     }
@@ -164,12 +209,20 @@ mod tests {
     }
     #[test]
     fn inversion_round_trips_and_degenerate_collapses() {
-        let step = placement_step(Rect::new(5.0, 7.0, 40.0, 40.0), NodeTransform::anchored(1.5, 0.25, 0.75), Point::default());
+        let step = placement_step(
+            Rect::new(5.0, 7.0, 40.0, 40.0),
+            NodeTransform::anchored(1.5, 0.25, 0.75),
+            Point::default(),
+        );
         let point = Point { x: 13.0, y: 29.0 };
         let placed = step.applied(point.x, point.y);
         let restored = step.source(placed);
         assert!((restored.x - point.x).abs() < 1e-4 && (restored.y - point.y).abs() < 1e-4);
-        let collapsed = placement_step(Rect::new(0.0, 0.0, 10.0, 10.0), NodeTransform::new(0.0, Point::default()), Point::default());
+        let collapsed = placement_step(
+            Rect::new(0.0, 0.0, 10.0, 10.0),
+            NodeTransform::new(0.0, Point::default()),
+            Point::default(),
+        );
         assert_eq!(collapsed.inverted(), Affine2D::IDENTITY);
     }
 }

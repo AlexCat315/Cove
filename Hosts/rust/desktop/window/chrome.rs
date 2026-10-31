@@ -5,8 +5,8 @@
 //! half: the per-window ambient, the attachment keys and the incremental
 //! collector the host feeds to the platform shell.
 
-use cove_core::scene::Node;
 use cove_core::Rect;
+use cove_core::scene::Node;
 use cove_platform::WindowId;
 use cove_shell::{ChromeRect, WindowChromeHitTest};
 use std::cell::RefCell;
@@ -145,7 +145,8 @@ impl WindowChromeHitTestCollector {
             .find_map(|node| node.attachment::<WindowChromeHitTest>(CONFIGURATION_KEY))?;
 
         hit_test.draggable_rects = Self::rects(&self.drag_region_nodes, DRAG_REGION_KEY);
-        hit_test.non_draggable_rects = Self::rects(&self.interactive_region_nodes, INTERACTIVE_REGION_KEY);
+        hit_test.non_draggable_rects =
+            Self::rects(&self.interactive_region_nodes, INTERACTIVE_REGION_KEY);
         Some(hit_test)
     }
 
@@ -156,7 +157,10 @@ impl WindowChromeHitTestCollector {
 
     fn refresh_index_if_needed(&mut self, root: &Node) {
         let version = root.subtree_structure_version();
-        let unchanged = self.indexed_root.as_ref().is_some_and(|indexed| indexed == root)
+        let unchanged = self
+            .indexed_root
+            .as_ref()
+            .is_some_and(|indexed| indexed == root)
             && self.indexed_structure_version == Some(version);
         if unchanged {
             return;
@@ -168,7 +172,10 @@ impl WindowChromeHitTestCollector {
         self.interactive_region_nodes.clear();
         let mut stack = vec![root.clone()];
         while let Some(node) = stack.pop() {
-            if node.attachment::<WindowChromeHitTest>(CONFIGURATION_KEY).is_some() {
+            if node
+                .attachment::<WindowChromeHitTest>(CONFIGURATION_KEY)
+                .is_some()
+            {
                 self.configuration_nodes.push(node.clone());
             }
             if node.attachment::<bool>(DRAG_REGION_KEY) == Some(true) {

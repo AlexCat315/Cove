@@ -33,11 +33,19 @@ pub struct DataTableRowMetrics {
 
 impl DataTableRowMetrics {
     pub fn fixed(count: usize, fixed: f32) -> Self {
-        Self { count, fixed, index: None }
+        Self {
+            count,
+            fixed,
+            index: None,
+        }
     }
 
     pub fn variable(count: usize, fixed: f32, index: VariableRowIndex<usize>) -> Self {
-        Self { count, fixed, index: Some(Rc::new(index)) }
+        Self {
+            count,
+            fixed,
+            index: Some(Rc::new(index)),
+        }
     }
 
     pub fn top(&self, row: usize) -> f32 {
@@ -62,12 +70,21 @@ impl DataTableRowMetrics {
     }
 
     /// Rows intersecting the viewport, with `overscan` extra on each side.
-    pub fn visible_range(&self, offset: f32, viewport: f32, overscan: usize) -> std::ops::Range<usize> {
+    pub fn visible_range(
+        &self,
+        offset: f32,
+        viewport: f32,
+        overscan: usize,
+    ) -> std::ops::Range<usize> {
         match &self.index {
             Some(index) => {
                 // Clamp first so the offset cannot scroll past the content.
                 let clamped = offset.clamp(0.0, (self.total() - viewport).max(0.0));
-                expand(index.visible_range(f64::from(clamped), f64::from(viewport)), overscan, self.count)
+                expand(
+                    index.visible_range(f64::from(clamped), f64::from(viewport)),
+                    overscan,
+                    self.count,
+                )
             }
             None => {
                 let stride = self.fixed.max(1.0);
@@ -121,7 +138,9 @@ pub fn variable_row_heights(
     scale: f32,
     row_height: impl Fn(usize) -> f32,
 ) -> Vec<f32> {
-    (0..count).map(|row| minimum.max(row_height(row) * scale)).collect()
+    (0..count)
+        .map(|row| minimum.max(row_height(row) * scale))
+        .collect()
 }
 
 // MARK: - Sort projection

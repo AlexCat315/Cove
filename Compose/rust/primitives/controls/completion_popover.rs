@@ -13,26 +13,30 @@ pub use crate::primitives::text::text_completion_rebase::{
     TextCompletionEdit, TextCompletionItem, TextCompletionRequest, TextInsertFormat,
 };
 
+use crate::modifiers::layout::{FlexExt, PaddingExt};
+use crate::modifiers::style::{SemanticStyleViewExt, SurfaceStyleExt};
+use crate::primitives::text::Text;
+use crate::theme::{SemanticColorRef, SemanticFontRef};
+use crate::{
+    AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View, impl_primitive_view,
+};
 use cove_core::scene::{
     AccessibilityActions, AccessibilityRole, AccessibilitySemantics, AccessibilityState, Align,
     EventPhase, EventResult, FlexDirection, InputHandlerRoute, InteractionRegistryHolder, Justify,
     LayoutNode, Node, Wrap,
 };
-use crate::modifiers::layout::{FlexExt, PaddingExt};
-use crate::modifiers::style::{SemanticStyleViewExt, SurfaceStyleExt};
-use crate::primitives::text::Text;
-use crate::theme::{SemanticColorRef, SemanticFontRef};
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View};
 
 /// Answers with the item, its documentation filled in when there is any.
-pub type TextCompletionResolver = Arc<dyn Fn(TextCompletionItem, Box<dyn FnOnce(TextCompletionItem)>) + Send + Sync>;
+pub type TextCompletionResolver =
+    Arc<dyn Fn(TextCompletionItem, Box<dyn FnOnce(TextCompletionItem)>) + Send + Sync>;
 
 /// Asks the host for candidates for one request, then delivers them.
 ///
 /// The reply closure is invoked once; a caller that never answers simply leaves
 /// the list as it was.
-pub type TextCompletionProvider =
-    Arc<dyn Fn(TextCompletionRequest, Box<dyn FnOnce(Vec<TextCompletionItem>) + Send>) + Send + Sync>;
+pub type TextCompletionProvider = Arc<
+    dyn Fn(TextCompletionRequest, Box<dyn FnOnce(Vec<TextCompletionItem>) + Send>) + Send + Sync,
+>;
 
 /// Rows shown before the list scrolls.
 const VISIBLE_ROWS: usize = 10;
@@ -56,10 +60,17 @@ pub struct CompletionPopover {
 impl CompletionPopover {
     pub fn new(items: Vec<TextCompletionItem>, selected_index: usize) -> Self {
         let selected_index = clamp_index(selected_index, items.len());
-        Self { items, selected_index, on_accept: None }
+        Self {
+            items,
+            selected_index,
+            on_accept: None,
+        }
     }
 
-    pub fn on_accept(mut self, handler: impl Fn(TextCompletionItem) + Send + Sync + 'static) -> Self {
+    pub fn on_accept(
+        mut self,
+        handler: impl Fn(TextCompletionItem) + Send + Sync + 'static,
+    ) -> Self {
         self.on_accept = Some(Arc::new(handler));
         self
     }
@@ -83,7 +94,11 @@ impl CompletionPopover {
 /// highlighted.
 pub fn visible_range(count: usize, selected_index: usize) -> Range<usize> {
     let start = selected_index.saturating_sub(CONTEXT_ROWS);
-    let start = if count > VISIBLE_ROWS { start.min(count - VISIBLE_ROWS) } else { 0 };
+    let start = if count > VISIBLE_ROWS {
+        start.min(count - VISIBLE_ROWS)
+    } else {
+        0
+    };
     start..(start + VISIBLE_ROWS).min(count)
 }
 
@@ -99,7 +114,9 @@ impl Clone for CompletionPopover {
 
 impl View for CompletionPopover {
     fn body(&self) -> AnyView {
-        AnyView::new(CompletionPanel { view: self.snapshot() })
+        AnyView::new(CompletionPanel {
+            view: self.snapshot(),
+        })
     }
 }
 
@@ -133,7 +150,9 @@ impl PrimitiveView for CompletionPanel {
         let window = visible_range(count, view.selected_index);
         let mut column: Vec<AnyView> = Vec::new();
         for index in window {
-            let Some(item) = view.items.get(index).cloned() else { continue };
+            let Some(item) = view.items.get(index).cloned() else {
+                continue;
+            };
             let is_selected = index == view.selected_index;
             let on_accept = view.on_accept.clone();
             column.push(AnyView::new(CompletionRow {
@@ -166,7 +185,11 @@ impl PrimitiveView for CompletionPanel {
         }
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(TupleView::new(column)),
             )
             .padding(LIST_PADDING)
@@ -203,7 +226,10 @@ impl PrimitiveView for CompletionRow {
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::ListItem,
             label: self.item.label.clone(),
-            state: AccessibilityState { is_selected: self.is_selected, ..Default::default() },
+            state: AccessibilityState {
+                is_selected: self.is_selected,
+                ..Default::default()
+            },
             ..Default::default()
         }));
         let accept = self.on_accept.clone();
@@ -217,7 +243,9 @@ impl PrimitiveView for CompletionRow {
             ..Default::default()
         });
 
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         registry.set_pointer(
             node,
             InputHandlerRoute::control(),
@@ -257,14 +285,18 @@ impl PrimitiveView for CompletionRow {
         // Unselected rows stay transparent so the panel's material shows
         // through; an opaque row fill would tile the glass out of existence.
         vec![AnyView::new(
-            Row::new(VerticalAlignment::Center, 10.0, AnyView::new(TupleView::new(row)))
-                .padding_edges(ROW_PADDING_HORIZONTAL, ROW_PADDING_VERTICAL)
-                .semantic_background(if self.is_selected {
-                    SemanticColorRef::selection()
-                } else {
-                    SemanticColorRef::clear()
-                })
-                .corner_radius_metric(crate::theme::ThemeMetric::row_radius()),
+            Row::new(
+                VerticalAlignment::Center,
+                10.0,
+                AnyView::new(TupleView::new(row)),
+            )
+            .padding_edges(ROW_PADDING_HORIZONTAL, ROW_PADDING_VERTICAL)
+            .semantic_background(if self.is_selected {
+                SemanticColorRef::selection()
+            } else {
+                SemanticColorRef::clear()
+            })
+            .corner_radius_metric(crate::theme::ThemeMetric::row_radius()),
         )]
     }
 }

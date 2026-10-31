@@ -66,10 +66,15 @@ pub fn leaf_count(entries: &[MenuEntry]) -> usize {
 /// mark. Disabled entries stay visible so the menu can explain itself.
 pub fn workspace_entries(is_enabled: bool, checked: bool) -> Vec<MenuEntry> {
     vec![
-        MenuEntry::Label { id: 100, title: "Workspace".to_owned() },
+        MenuEntry::Label {
+            id: 100,
+            title: "Workspace".to_owned(),
+        },
         MenuEntry::Item(MenuItem::new(101, "Copy", || {}).enabled(is_enabled)),
         MenuEntry::Item(
-            MenuItem::new(102, "Pin item", || {}).enabled(is_enabled).selected(checked),
+            MenuItem::new(102, "Pin item", || {})
+                .enabled(is_enabled)
+                .selected(checked),
         ),
         MenuEntry::separator(103),
         MenuEntry::Submenu(MenuSubmenu {
@@ -123,11 +128,7 @@ pub fn many_entries() -> Vec<MenuEntry> {
                             "Inspect group",
                             || {},
                         )),
-                        MenuEntry::Item(MenuItem::new(
-                            3_000 + index as u64,
-                            "Export group",
-                            || {},
-                        )),
+                        MenuEntry::Item(MenuItem::new(3_000 + index as u64, "Export group", || {})),
                     ],
                     is_enabled: true,
                     width: SUBMENU_WIDTH,
@@ -401,7 +402,12 @@ impl TabsStory {
             options,
             selection: State::new("overview".to_owned()),
             segment: State::new("day".to_owned()),
-            documents: State::new(INITIAL_DOCUMENTS.iter().map(|name| (*name).to_owned()).collect()),
+            documents: State::new(
+                INITIAL_DOCUMENTS
+                    .iter()
+                    .map(|name| (*name).to_owned())
+                    .collect(),
+            ),
             document_selection: State::new("Scene.cove".to_owned()),
         }
     }
@@ -426,13 +432,29 @@ impl TabsStory {
     pub fn content_tabs(&self) -> Vec<TabItem<String>> {
         let enabled = self.options.is_enabled;
         vec![
-            TabItem::new("overview".to_owned(), "Overview", Text::new("Project overview")),
-            TabItem::new("disabled".to_owned(), "Unavailable", Text::new("Disabled content"))
-                .enabled(false),
-            TabItem::new("activity".to_owned(), "Activity", Text::new("Recent activity"))
-                .badge("3"),
-            TabItem::new("settings".to_owned(), "Settings", Text::new("Project settings"))
-                .enabled(enabled),
+            TabItem::new(
+                "overview".to_owned(),
+                "Overview",
+                Text::new("Project overview"),
+            ),
+            TabItem::new(
+                "disabled".to_owned(),
+                "Unavailable",
+                Text::new("Disabled content"),
+            )
+            .enabled(false),
+            TabItem::new(
+                "activity".to_owned(),
+                "Activity",
+                Text::new("Recent activity"),
+            )
+            .badge("3"),
+            TabItem::new(
+                "settings".to_owned(),
+                "Settings",
+                Text::new("Project settings"),
+            )
+            .enabled(enabled),
             TabItem::new(
                 "permissions".to_owned(),
                 "Workspace permissions and international collaboration 👩🏽‍💻",
@@ -465,8 +487,12 @@ impl TabsStory {
 
     /// Restores the initial documents.
     pub fn reset_documents(&self) {
-        self.documents
-            .set(INITIAL_DOCUMENTS.iter().map(|name| (*name).to_owned()).collect());
+        self.documents.set(
+            INITIAL_DOCUMENTS
+                .iter()
+                .map(|name| (*name).to_owned())
+                .collect(),
+        );
         self.document_selection.set(INITIAL_DOCUMENTS[0].to_owned());
     }
 

@@ -9,9 +9,9 @@ use crate::rhi::{
 };
 
 use super::device::Dx12DeviceHandle;
-use core::ffi::c_void;
 use super::resources::{Dx12Registries, Dx12ResourceRecord};
 use super::sys;
+use core::ffi::c_void;
 
 /// Creates one committed buffer and records it.
 pub fn create(
@@ -51,8 +51,8 @@ pub fn create_in_heap_for_transfer(
     heap_type: u32,
 ) -> RhiResult<Dx12ResourceRecord> {
     let mut record = create_in_heap_from_pointer(device, size.max(1), heap_type)?;
-    record.usage = crate::rhi::BufferUsage::TRANSFER_SOURCE
-        | crate::rhi::BufferUsage::TRANSFER_DESTINATION;
+    record.usage =
+        crate::rhi::BufferUsage::TRANSFER_SOURCE | crate::rhi::BufferUsage::TRANSFER_DESTINATION;
     Ok(record)
 }
 
@@ -73,11 +73,16 @@ fn create_in_heap_from_pointer(
     #[cfg(not(target_os = "windows"))]
     {
         let _ = (device, size, heap_type);
-        return Err(RhiError::unsupported_backend("DirectX 12 is only available on Windows"));
+        return Err(RhiError::unsupported_backend(
+            "DirectX 12 is only available on Windows",
+        ));
     }
     #[cfg(target_os = "windows")]
     {
-        let heap = sys::D3D12_HEAP_PROPERTIES { Type: heap_type, ..Default::default() };
+        let heap = sys::D3D12_HEAP_PROPERTIES {
+            Type: heap_type,
+            ..Default::default()
+        };
         let description = sys::D3D12_RESOURCE_DESC {
             Dimension: sys::D3D12_RESOURCE_DIMENSION_BUFFER,
             Alignment: 0,
@@ -256,7 +261,11 @@ pub fn read(
     // SAFETY: the mapping covers `record.size` bytes, the range was validated, and
     // `destination` is a distinct live slice.
     unsafe {
-        std::ptr::copy_nonoverlapping(record.mapped.add(offset), destination.as_mut_ptr(), destination.len());
+        std::ptr::copy_nonoverlapping(
+            record.mapped.add(offset),
+            destination.as_mut_ptr(),
+            destination.len(),
+        );
     }
     Ok(())
 }

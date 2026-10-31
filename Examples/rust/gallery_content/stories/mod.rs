@@ -5,13 +5,13 @@
 //! table the shell drives; a page whose story needs a primitive that has not
 //! been migrated yet is listed in `MIGRATION_PENDING` rather than stubbed.
 
+pub mod action_sheet_story;
+pub mod adaptive_examples;
 pub mod animation;
 pub mod animation_curves;
 pub mod animation_system;
-pub mod calendar;
-pub mod action_sheet_story;
-pub mod adaptive_examples;
 pub mod avatar_story;
+pub mod calendar;
 pub mod command_story;
 pub mod controls;
 pub mod data_stories;
@@ -23,8 +23,6 @@ pub mod intrinsic_fitting;
 pub mod layout;
 pub mod markdown_story;
 pub mod media_stories;
-pub mod sidebar_stories;
-pub mod sidebar_story;
 pub mod navigation_layout_stories;
 pub mod navigation_stories;
 pub mod navigation_stories_file;
@@ -34,22 +32,24 @@ pub mod overview;
 pub mod placement_example;
 pub mod product_stories;
 pub mod rich_text;
+pub mod sidebar_stories;
+pub mod sidebar_story;
 pub mod stepper;
 pub mod text_editor_story;
 pub mod theme;
 pub mod time_picker_story;
 pub mod toolbar_story;
-pub mod wheel_picker_story;
 pub mod viewport_traits;
 pub mod web_story;
+pub mod wheel_picker_story;
 
+pub use action_sheet_story::ActionSheetStory;
+pub use adaptive_examples::AdaptiveControlExamples;
 pub use animation::AnimationStory;
 pub use animation_curves::{AnimationCurveExamples, CurveChoice};
 pub use animation_system::{AnimationSystemExamples, DemoPhase};
-pub use calendar::CalendarStory;
-pub use action_sheet_story::ActionSheetStory;
-pub use adaptive_examples::AdaptiveControlExamples;
 pub use avatar_story::AvatarStory;
+pub use calendar::CalendarStory;
 pub use command_story::CommandStory;
 pub use controls::{ButtonStory, CheckboxStory, ToggleStory};
 pub use data_stories::{AdaptiveTableSample, ChartExplorationStory};
@@ -58,12 +58,12 @@ pub use data_stories_file::{
     VirtualStackStory,
 };
 pub use data_table_story::DataTableStory;
+pub use feedback::{AlertStory, BadgeStory, EmptyStory, ProgressStory, StorySection};
 pub use image_story::ImageStory;
-pub use intrinsic_fitting::{ViewThatFitsStory, FIT_CHIPS};
+pub use intrinsic_fitting::{FIT_CHIPS, ViewThatFitsStory};
+pub use layout::{LayoutGridStory, LazyGridStory, MasonrySample, MasonryStory};
 pub use markdown_story::MarkdownStory;
 pub use media_stories::{RatingSample, SkeletonStory};
-pub use sidebar_stories::{NestedSidebarExample, ResizableSidebarExample};
-pub use sidebar_story::SidebarStory;
 pub use navigation_layout_stories::{DrawerStory, RailStory};
 pub use navigation_stories::AppBarStory;
 pub use navigation_stories_file::{
@@ -71,22 +71,18 @@ pub use navigation_stories_file::{
     DialogStory, LabelStory, NavigationStackStory, PaginationStory, SheetStory, TagStory,
 };
 pub use overlay_stories::{HoverCardStory, PopconfirmStory};
-pub use overlay_stories_file::{
-    DisclosureStory, MenuStory, ModalStory, PopoverStory, TabsStory,
-};
-pub use layout::{LayoutGridStory, LazyGridStory, MasonrySample, MasonryStory};
-pub use feedback::{AlertStory, BadgeStory, EmptyStory, ProgressStory, StorySection};
+pub use overlay_stories_file::{DisclosureStory, MenuStory, ModalStory, PopoverStory, TabsStory};
+pub use overview::{DashboardCard, IntroductionStory, MetricCard};
 pub use placement_example::PlacementExample;
-pub use product_stories::{
-    ComboboxStory, FormStory, NotificationStory, RadioStory, TooltipStory,
-};
+pub use product_stories::{ComboboxStory, FormStory, NotificationStory, RadioStory, TooltipStory};
 pub use rich_text::RichTextStory;
+pub use sidebar_stories::{NestedSidebarExample, ResizableSidebarExample};
+pub use sidebar_story::SidebarStory;
 pub use stepper::StepperStory;
 pub use text_editor_story::TextEditorStory;
 pub use theme::ThemeStory;
 pub use time_picker_story::TimePickerStory;
 pub use toolbar_story::ToolbarStory;
-pub use wheel_picker_story::WheelPickerStory;
-pub use overview::{DashboardCard, IntroductionStory, MetricCard};
-pub use web_story::WebStory;
 pub use viewport_traits::{ViewportDebugName, ViewportTraits, ViewportTraitsStory};
+pub use web_story::WebStory;
+pub use wheel_picker_story::WheelPickerStory;

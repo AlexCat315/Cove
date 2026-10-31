@@ -22,8 +22,13 @@ static CONSTRUCTORS: Mutex<Vec<(GraphicsApi, BackendConstructor)>> = Mutex::new(
 /// previous constructor, which keeps repeated `install_backends` calls
 /// idempotent.
 pub fn register_backend(api: GraphicsApi, constructor: BackendConstructor) {
-    let mut constructors = CONSTRUCTORS.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-    match constructors.iter_mut().find(|(registered, _)| *registered == api) {
+    let mut constructors = CONSTRUCTORS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    match constructors
+        .iter_mut()
+        .find(|(registered, _)| *registered == api)
+    {
         Some(entry) => entry.1 = constructor,
         None => constructors.push((api, constructor)),
     }
@@ -32,8 +37,12 @@ pub fn register_backend(api: GraphicsApi, constructor: BackendConstructor) {
 /// Whether a constructor for `api` is part of this build.
 pub fn is_backend_registered(api: GraphicsApi) -> bool {
     install_backends();
-    let constructors = CONSTRUCTORS.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-    constructors.iter().any(|(registered, _)| *registered == api)
+    let constructors = CONSTRUCTORS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    constructors
+        .iter()
+        .any(|(registered, _)| *registered == api)
 }
 
 /// Installs every backend this build can construct. Each module is referenced
@@ -61,13 +70,12 @@ pub fn install_backends() {
 }
 
 /// Constructs the backend for `api`, installing the build's backends first.
-pub fn make_backend(
-    api: GraphicsApi,
-    config: &DeviceConfig,
-) -> RhiResult<Box<dyn RhiBackend>> {
+pub fn make_backend(api: GraphicsApi, config: &DeviceConfig) -> RhiResult<Box<dyn RhiBackend>> {
     install_backends();
     let constructor = {
-        let constructors = CONSTRUCTORS.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let constructors = CONSTRUCTORS
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         constructors
             .iter()
             .find(|(registered, _)| *registered == api)
@@ -82,9 +90,7 @@ pub fn make_backend(
 fn not_built_message(api: GraphicsApi) -> &'static str {
     match api {
         GraphicsApi::Metal => "Metal is only available on Apple platforms",
-        GraphicsApi::Vulkan => {
-            "Vulkan is built for Windows, Linux and Android; macOS uses Metal"
-        }
+        GraphicsApi::Vulkan => "Vulkan is built for Windows, Linux and Android; macOS uses Metal",
         GraphicsApi::Dx12 => "DirectX 12 is only available on Windows",
     }
 }

@@ -109,7 +109,10 @@ impl ResourcePreparationContext {
             compilations: Mutex::new(0),
             compilation: Mutex::new(None),
             sequence: Mutex::new(0),
-            owned: Mutex::new(OwnedState { owned: HashMap::new(), ownership_order: 0 }),
+            owned: Mutex::new(OwnedState {
+                owned: HashMap::new(),
+                ownership_order: 0,
+            }),
         }
     }
 
@@ -122,7 +125,11 @@ impl ResourcePreparationContext {
     }
 
     pub fn check_cancellation(&self) -> RhiResult<()> {
-        if self.is_cancelled() { Err(RhiError::Cancelled) } else { Ok(()) }
+        if self.is_cancelled() {
+            Err(RhiError::Cancelled)
+        } else {
+            Ok(())
+        }
     }
 
     pub fn label(&self) -> &str {
@@ -175,13 +182,22 @@ impl ResourcePreparationContext {
         }
         state.ownership_order += 1;
         let order = state.ownership_order;
-        state.owned.insert(key, Owned { count: 1, order, cleanup: Box::new(cleanup) });
+        state.owned.insert(
+            key,
+            Owned {
+                count: 1,
+                order,
+                cleanup: Box::new(cleanup),
+            },
+        );
     }
 
     pub fn released(&self, device: u64, id: u32) {
         let key = OwnedKey { device, id };
         let mut state = self.owned.lock().unwrap();
-        let Some(existing) = state.owned.get_mut(&key) else { return };
+        let Some(existing) = state.owned.get_mut(&key) else {
+            return;
+        };
         if existing.count == 1 {
             state.owned.remove(&key);
         } else {
@@ -193,7 +209,10 @@ impl ResourcePreparationContext {
         let mut values: Vec<(usize, Owned)> = {
             let mut state = self.owned.lock().unwrap();
             let owned = std::mem::take(&mut state.owned);
-            owned.into_iter().map(|(_, value)| (value.order, value)).collect()
+            owned
+                .into_iter()
+                .map(|(_, value)| (value.order, value))
+                .collect()
         };
         // Newest first, matching the Swift teardown order.
         values.sort_by(|left, right| right.0.cmp(&left.0));
@@ -225,7 +244,10 @@ impl ResourcePreparationContext {
 
     fn current_is(candidate: &ResourcePreparationContext) -> bool {
         CURRENT.with(|current| {
-            current.borrow().as_ref().is_some_and(|current| std::ptr::eq(&**current, candidate))
+            current
+                .borrow()
+                .as_ref()
+                .is_some_and(|current| std::ptr::eq(&**current, candidate))
         })
     }
 
@@ -235,8 +257,12 @@ impl ResourcePreparationContext {
     }
 
     /// Installs this context for the duration of `operation` and runs it.
-    pub fn run<T>(self: std::rc::Rc<Self>, operation: impl FnOnce() -> RhiResult<T>) -> RhiResult<T> {
-        let previous = CURRENT.with(|current| current.borrow_mut().replace(std::rc::Rc::clone(&self)));
+    pub fn run<T>(
+        self: std::rc::Rc<Self>,
+        operation: impl FnOnce() -> RhiResult<T>,
+    ) -> RhiResult<T> {
+        let previous =
+            CURRENT.with(|current| current.borrow_mut().replace(std::rc::Rc::clone(&self)));
         let result = (|| {
             self.check_cancellation()?;
             self.emit(PreparationPhase::Preparing, None);
@@ -260,8 +286,16 @@ impl ResourcePreparationContext {
             self.discard_owned();
             let cancelled = *error == RhiError::Cancelled;
             self.emit(
-                if cancelled { PreparationPhase::Cancelled } else { PreparationPhase::Failed },
-                if cancelled { None } else { Some(error.to_string()) },
+                if cancelled {
+                    PreparationPhase::Cancelled
+                } else {
+                    PreparationPhase::Failed
+                },
+                if cancelled {
+                    None
+                } else {
+                    Some(error.to_string())
+                },
             );
         }
         CURRENT.with(|current| *current.borrow_mut() = previous);
@@ -302,7 +336,11 @@ mod tests {
         let events = events.lock().unwrap();
         assert_eq!(events.last().unwrap().phase, PreparationPhase::Finished);
         assert_eq!(events.last().unwrap().fraction(), Some(1.0));
-        assert!(events.iter().any(|event| event.current_step.as_deref() == Some("compile")));
+        assert!(
+            events
+                .iter()
+                .any(|event| event.current_step.as_deref() == Some("compile"))
+        );
     }
 
     #[test]
@@ -328,7 +366,10 @@ mod tests {
         });
         assert_eq!(result, Err(RhiError::Cancelled));
         assert_eq!(*order.borrow(), vec![11, 10]);
-        assert_eq!(events.lock().unwrap().last().unwrap().phase, PreparationPhase::Cancelled);
+        assert_eq!(
+            events.lock().unwrap().last().unwrap().phase,
+            PreparationPhase::Cancelled
+        );
     }
 
     #[test]
@@ -336,7 +377,8 @@ mod tests {
         let (context, _events) = recording_context(None);
         assert!(context.step("orphan", || Ok(())).is_err());
         let other = ResourcePreparationContext::new("other", None, |_| {});
-        let result = ResourcePreparationContext::run(Rc::new(other), || context.step("cross", || Ok(())));
+        let result =
+            ResourcePreparationContext::run(Rc::new(other), || context.step("cross", || Ok(())));
         assert!(result.is_err());
     }
 

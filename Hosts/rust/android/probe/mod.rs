@@ -10,4 +10,4 @@ pub mod runner;
 pub mod transfer;
 pub mod ui;
 
-pub use runner::{require, ProbeContext, ProbeFailure, ProbeReport, ProbeResult};
+pub use runner::{ProbeContext, ProbeFailure, ProbeReport, ProbeResult, require};

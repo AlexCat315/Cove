@@ -21,15 +21,17 @@ use crate::view::{
     painter::TerminalPainter,
     surface_state::SurfaceState,
 };
-use cove_composition::{impl_primitive_view, PrimitiveView};
+use cove_composition::{PrimitiveView, impl_primitive_view};
 use cove_core::{
+    Color, Font, FontWeight, Rect,
     scene::{
         EventResult, FocusChainHolder, InteractionRegistryHolder, Node, PointerPhase,
-        TextInputAttachmentKey, TextInputAreaResolver,
+        TextInputAreaResolver, TextInputAttachmentKey,
     },
-    Color, Font, FontWeight, Rect,
 };
-use cove_platform::{KeyEvent, MouseButtonEvent, MouseMotionEvent, MouseWheelEvent, SystemCursor, TextEditingEvent};
+use cove_platform::{
+    KeyEvent, MouseButtonEvent, MouseMotionEvent, MouseWheelEvent, SystemCursor, TextEditingEvent,
+};
 use cove_text::TextEnvironmentHolder;
 use std::rc::Rc;
 
@@ -43,11 +45,19 @@ pub struct TerminalView {
 
 impl TerminalView {
     pub fn new(session: Rc<TerminalSession>) -> Self {
-        Self { session, font_size: 13.0, on_open_link: None }
+        Self {
+            session,
+            font_size: 13.0,
+            on_open_link: None,
+        }
     }
 
     pub fn font_size(mut self, size: f32) -> Self {
-        self.font_size = if size.is_finite() { size.clamp(6.0, 72.0) } else { 13.0 };
+        self.font_size = if size.is_finite() {
+            size.clamp(6.0, 72.0)
+        } else {
+            13.0
+        };
         self
     }
 
@@ -85,7 +95,9 @@ impl PrimitiveView for TerminalView {
     }
 
     fn update_node(&self, node: &Node) {
-        let Some(state) = node.first_resource::<SurfaceState>() else { return };
+        let Some(state) = node.first_resource::<SurfaceState>() else {
+            return;
+        };
         state.bind(self.session.clone());
         if let Some(open) = self.on_open_link.clone() {
             state.set_open_link(open);
@@ -106,18 +118,33 @@ impl PrimitiveView for TerminalView {
         let weak_node = node.downgrade();
         let draw_state = state.clone();
         node.update_draw(
-            (font.size().to_bits(), font.weight(), font.design(), font.is_italic()),
+            (
+                font.size().to_bits(),
+                font.weight(),
+                font.design(),
+                font.is_italic(),
+            ),
             move |list, origin| {
-                let Some(node) = Node::upgrade(&weak_node) else { return };
-                let Some(environment) = TextEnvironmentHolder::current() else { return };
+                let Some(node) = Node::upgrade(&weak_node) else {
+                    return;
+                };
+                let Some(environment) = TextEnvironmentHolder::current() else {
+                    return;
+                };
                 let metrics = CellMetrics::new(font.clone(), &environment);
                 draw_state.set_metrics(metrics.clone());
                 let frame_rect = node.frame();
                 let (columns, rows) = metrics.grid(frame_rect.width, frame_rect.height);
-                session.fit(columns, rows, metrics.width.round() as usize, metrics.height.round() as usize);
+                session.fit(
+                    columns,
+                    rows,
+                    metrics.width.round() as usize,
+                    metrics.height.round() as usize,
+                );
                 // Spawn only after the first fitted grid exists, so programs see
                 // the actual window size even when they query it immediately.
-                if !session.is_running() && session.status() == crate::session::SessionStatus::Idle {
+                if !session.is_running() && session.status() == crate::session::SessionStatus::Idle
+                {
                     let _ = session.start();
                 }
                 let frame = session.frame();
@@ -125,13 +152,15 @@ impl PrimitiveView for TerminalView {
                     .and_then(|chain| chain.focused())
                     .is_some_and(|focused| focused == node);
                 let reduced_motion = node.prefers_reduced_motion();
-                draw_state.blink.update(is_focused && frame.cursor.is_blinking && !reduced_motion);
+                draw_state
+                    .blink
+                    .update(is_focused && frame.cursor.is_blinking && !reduced_motion);
                 draw_state.text_blink.update(
                     !reduced_motion
-                        && frame
-                            .cells
-                            .iter()
-                            .any(|cell| cell.attributes.contains(crate::engine::TerminalCellAttributes::BLINK)),
+                        && frame.cells.iter().any(|cell| {
+                            cell.attributes
+                                .contains(crate::engine::TerminalCellAttributes::BLINK)
+                        }),
                 );
                 let images = draw_state
                     .textures
@@ -171,12 +200,15 @@ impl TerminalView {
         // area, read during layout. It must not wait for a paint to exist.
         let weak = Rc::downgrade(state);
         let font = self.font();
-        let resolver: TextInputAreaResolver = Rc::new(move |_node: &Node, origin: cove_core::Point| {
-            let state = weak.upgrade()?;
-            let environment = TextEnvironmentHolder::current()?;
-            let metrics = state.metrics().unwrap_or_else(|| CellMetrics::new(font.clone(), &environment));
-            state.text_input_area((origin.x, origin.y), &metrics)
-        });
+        let resolver: TextInputAreaResolver =
+            Rc::new(move |_node: &Node, origin: cove_core::Point| {
+                let state = weak.upgrade()?;
+                let environment = TextEnvironmentHolder::current()?;
+                let metrics = state
+                    .metrics()
+                    .unwrap_or_else(|| CellMetrics::new(font.clone(), &environment));
+                state.text_input_area((origin.x, origin.y), &metrics)
+            });
         node.set_attachment(TextInputAttachmentKey::AREA_RESOLVER, resolver);
         let weak = Rc::downgrade(state);
         node.set_attachment(
@@ -194,143 +226,204 @@ impl TerminalView {
     }
 
     fn install_input(&self, node: &Node, state: &Rc<SurfaceState>) {
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
 
         let weak_node = node.downgrade();
         let weak_state = Rc::downgrade(state);
         let down_session = self.session.clone();
-        registry.set_pointer(node, cove_core::scene::InputHandlerRoute::control(), Rc::new(
-            move |event: &MouseButtonEvent, phase: PointerPhase, _: cove_core::scene::EventPhase| -> EventResult {
-                let (Some(_node), Some(state)) = (Node::upgrade(&weak_node), weak_state.upgrade()) else {
-                    return EventResult::Ignored;
-                };
-                let Some(geometry) = state.geometry() else { return EventResult::Ignored };
-                let handled = match phase {
-                    PointerPhase::Down => state.pointer.down(event, &down_session, &geometry),
-                    PointerPhase::Up => state.pointer.up(event, &down_session, &geometry),
-                };
-                if handled {
-                    if phase == PointerPhase::Down && event.modifiers.has_gui() {
-                        if let Some(pointer) = state.pointer.pointer(&geometry, event.x, event.y, 0)
-                            && let Some(link) = state.pointer.link_at(&pointer, &down_session)
-                        {
-                            state.open_link(&link);
+        registry.set_pointer(
+            node,
+            cove_core::scene::InputHandlerRoute::control(),
+            Rc::new(
+                move |event: &MouseButtonEvent,
+                      phase: PointerPhase,
+                      _: cove_core::scene::EventPhase|
+                      -> EventResult {
+                    let (Some(_node), Some(state)) =
+                        (Node::upgrade(&weak_node), weak_state.upgrade())
+                    else {
+                        return EventResult::Ignored;
+                    };
+                    let Some(geometry) = state.geometry() else {
+                        return EventResult::Ignored;
+                    };
+                    let handled = match phase {
+                        PointerPhase::Down => state.pointer.down(event, &down_session, &geometry),
+                        PointerPhase::Up => state.pointer.up(event, &down_session, &geometry),
+                    };
+                    if handled {
+                        if phase == PointerPhase::Down && event.modifiers.has_gui() {
+                            if let Some(pointer) =
+                                state.pointer.pointer(&geometry, event.x, event.y, 0)
+                                && let Some(link) = state.pointer.link_at(&pointer, &down_session)
+                            {
+                                state.open_link(&link);
+                            }
                         }
+                        state.redraw();
+                        EventResult::Handled
+                    } else {
+                        EventResult::Ignored
                     }
-                    state.redraw();
-                    EventResult::Handled
-                } else {
-                    EventResult::Ignored
-                }
-            },
-        ));
+                },
+            ),
+        );
 
         let weak_node = node.downgrade();
         let weak_state = Rc::downgrade(state);
         let motion_session = self.session.clone();
-        registry.set_motion(node, cove_core::scene::InputHandlerRoute::control(), Rc::new(
-            move |event: &MouseMotionEvent, _: cove_core::scene::EventPhase| -> EventResult {
-                let (Some(node), Some(state)) = (Node::upgrade(&weak_node), weak_state.upgrade()) else {
-                    return EventResult::Ignored;
-                };
-                let Some(geometry) = state.geometry() else { return EventResult::Ignored };
-                let handled = state.pointer.motion(event, &motion_session, &geometry);
-                if let Some(pointer) = state.pointer.pointer(&geometry, event.x, event.y, 0) {
-                    let frame = motion_session.frame();
-                    let marked = frame
-                        .cell(pointer.row.min(frame.rows.saturating_sub(1)), pointer.column.min(frame.columns.saturating_sub(1)))
-                        .is_hyperlink;
-                    let hovered = state.pointer.hovered_link();
-                    let is_link = marked || hovered.is_some();
-                    state.set_hovered_link(hovered);
-                    node.set_cursor(Some(if is_link {
-                        SystemCursor::Pointer
-                    } else if motion_session.is_mouse_tracking() {
-                        SystemCursor::Arrow
+        registry.set_motion(
+            node,
+            cove_core::scene::InputHandlerRoute::control(),
+            Rc::new(
+                move |event: &MouseMotionEvent, _: cove_core::scene::EventPhase| -> EventResult {
+                    let (Some(node), Some(state)) =
+                        (Node::upgrade(&weak_node), weak_state.upgrade())
+                    else {
+                        return EventResult::Ignored;
+                    };
+                    let Some(geometry) = state.geometry() else {
+                        return EventResult::Ignored;
+                    };
+                    let handled = state.pointer.motion(event, &motion_session, &geometry);
+                    if let Some(pointer) = state.pointer.pointer(&geometry, event.x, event.y, 0) {
+                        let frame = motion_session.frame();
+                        let marked = frame
+                            .cell(
+                                pointer.row.min(frame.rows.saturating_sub(1)),
+                                pointer.column.min(frame.columns.saturating_sub(1)),
+                            )
+                            .is_hyperlink;
+                        let hovered = state.pointer.hovered_link();
+                        let is_link = marked || hovered.is_some();
+                        state.set_hovered_link(hovered);
+                        node.set_cursor(Some(if is_link {
+                            SystemCursor::Pointer
+                        } else if motion_session.is_mouse_tracking() {
+                            SystemCursor::Arrow
+                        } else {
+                            SystemCursor::Ibeam
+                        }));
+                    }
+                    if handled {
+                        EventResult::Handled
                     } else {
-                        SystemCursor::Ibeam
-                    }));
-                }
-                if handled { EventResult::Handled } else { EventResult::Ignored }
-            },
-        ));
+                        EventResult::Ignored
+                    }
+                },
+            ),
+        );
 
         let weak_state = Rc::downgrade(state);
         let wheel_session = self.session.clone();
-        registry.set_wheel(node, cove_core::scene::InputHandlerRoute::scroll(), Rc::new(
-            move |event: &MouseWheelEvent, _: cove_core::scene::EventPhase| -> EventResult {
-                let Some(state) = weak_state.upgrade() else { return EventResult::Ignored };
-                let Some(metrics) = state.metrics() else { return EventResult::Ignored };
-                if state.pointer.wheel(event, &wheel_session, metrics.height) {
-                    state.redraw();
-                    EventResult::Handled
-                } else {
-                    EventResult::Ignored
-                }
-            },
-        ));
+        registry.set_wheel(
+            node,
+            cove_core::scene::InputHandlerRoute::scroll(),
+            Rc::new(
+                move |event: &MouseWheelEvent, _: cove_core::scene::EventPhase| -> EventResult {
+                    let Some(state) = weak_state.upgrade() else {
+                        return EventResult::Ignored;
+                    };
+                    let Some(metrics) = state.metrics() else {
+                        return EventResult::Ignored;
+                    };
+                    if state.pointer.wheel(event, &wheel_session, metrics.height) {
+                        state.redraw();
+                        EventResult::Handled
+                    } else {
+                        EventResult::Ignored
+                    }
+                },
+            ),
+        );
 
         let weak_state = Rc::downgrade(state);
         let key_session = self.session.clone();
-        registry.set_key(node, cove_core::scene::InputHandlerRoute::text_input(), Rc::new(
-            move |event: &KeyEvent, phase: cove_core::scene::EventPhase| -> EventResult {
-                let _ = phase;
-                {
-                    // Key-up is not a separate route; the encoder only emits on down.
-                let Some(state) = weak_state.upgrade() else { return EventResult::Ignored };
-                // While an input method composes, Return, Backspace and arrows
-                // edit the composition; the program must not see them.
-                if !state.preedit().is_empty() {
-                    return EventResult::Handled;
-                }
-                state.blink.restart();
-                match key_routing::KeyRouting::new(event) {
-                    KeyRouting::Text => EventResult::Handled,
-                    KeyRouting::Host => EventResult::Ignored,
-                    KeyRouting::Paste => {
-                        if let Some(text) = cove_core::scene::ClipboardHolder::read()
-                            && !text.is_empty()
-                        {
-                            key_session.paste(&text);
-                        }
-                        EventResult::Handled
-                    }
-                    KeyRouting::Copy => {
-                        let Some(text) = key_session.selected_text() else { return EventResult::Ignored };
-                        if text.is_empty() {
+        registry.set_key(
+            node,
+            cove_core::scene::InputHandlerRoute::text_input(),
+            Rc::new(
+                move |event: &KeyEvent, phase: cove_core::scene::EventPhase| -> EventResult {
+                    let _ = phase;
+                    {
+                        // Key-up is not a separate route; the encoder only emits on down.
+                        let Some(state) = weak_state.upgrade() else {
                             return EventResult::Ignored;
+                        };
+                        // While an input method composes, Return, Backspace and arrows
+                        // edit the composition; the program must not see them.
+                        if !state.preedit().is_empty() {
+                            return EventResult::Handled;
                         }
-                        cove_core::scene::ClipboardHolder::write(&text);
-                        EventResult::Handled
+                        state.blink.restart();
+                        match key_routing::KeyRouting::new(event) {
+                            KeyRouting::Text => EventResult::Handled,
+                            KeyRouting::Host => EventResult::Ignored,
+                            KeyRouting::Paste => {
+                                if let Some(text) = cove_core::scene::ClipboardHolder::read()
+                                    && !text.is_empty()
+                                {
+                                    key_session.paste(&text);
+                                }
+                                EventResult::Handled
+                            }
+                            KeyRouting::Copy => {
+                                let Some(text) = key_session.selected_text() else {
+                                    return EventResult::Ignored;
+                                };
+                                if text.is_empty() {
+                                    return EventResult::Ignored;
+                                }
+                                cove_core::scene::ClipboardHolder::write(&text);
+                                EventResult::Handled
+                            }
+                            KeyRouting::Encode(key) => {
+                                if key_session.press(&key) {
+                                    EventResult::Handled
+                                } else {
+                                    EventResult::Ignored
+                                }
+                            }
+                        }
                     }
-                    KeyRouting::Encode(key) => {
-                        if key_session.press(&key) { EventResult::Handled } else { EventResult::Ignored }
-                    }
-                }
-                }
-            },
-        ));
+                },
+            ),
+        );
 
         let weak_state = Rc::downgrade(state);
         let text_session = self.session.clone();
-        registry.set_text(node, cove_core::scene::InputHandlerRoute::text_input(), Rc::new(
-            move |text: &str, _: cove_core::scene::EventPhase| -> EventResult {
-                let Some(state) = weak_state.upgrade() else { return EventResult::Ignored };
-                state.set_preedit("");
-                state.blink.restart();
-                text_session.send(text);
-                EventResult::Handled
-            },
-        ));
+        registry.set_text(
+            node,
+            cove_core::scene::InputHandlerRoute::text_input(),
+            Rc::new(
+                move |text: &str, _: cove_core::scene::EventPhase| -> EventResult {
+                    let Some(state) = weak_state.upgrade() else {
+                        return EventResult::Ignored;
+                    };
+                    state.set_preedit("");
+                    state.blink.restart();
+                    text_session.send(text);
+                    EventResult::Handled
+                },
+            ),
+        );
 
         let weak_state = Rc::downgrade(state);
-        registry.set_editing(node, cove_core::scene::InputHandlerRoute::text_input(), Rc::new(
-            move |event: &TextEditingEvent, _: cove_core::scene::EventPhase| -> EventResult {
-                let Some(state) = weak_state.upgrade() else { return EventResult::Ignored };
-                state.set_preedit(event.text.clone());
-                EventResult::Handled
-            },
-        ));
+        registry.set_editing(
+            node,
+            cove_core::scene::InputHandlerRoute::text_input(),
+            Rc::new(
+                move |event: &TextEditingEvent, _: cove_core::scene::EventPhase| -> EventResult {
+                    let Some(state) = weak_state.upgrade() else {
+                        return EventResult::Ignored;
+                    };
+                    state.set_preedit(event.text.clone());
+                    EventResult::Handled
+                },
+            ),
+        );
     }
 }
 

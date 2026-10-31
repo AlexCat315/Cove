@@ -22,10 +22,18 @@ pub enum PopoverPlacement {
 
 impl PopoverPlacement {
     pub const ALL: [Self; 12] = [
-        Self::TopLeading, Self::Top, Self::TopTrailing,
-        Self::LeadingTop, Self::Leading, Self::LeadingBottom,
-        Self::TrailingTop, Self::Trailing, Self::TrailingBottom,
-        Self::BottomLeading, Self::Bottom, Self::BottomTrailing,
+        Self::TopLeading,
+        Self::Top,
+        Self::TopTrailing,
+        Self::LeadingTop,
+        Self::Leading,
+        Self::LeadingBottom,
+        Self::TrailingTop,
+        Self::Trailing,
+        Self::TrailingBottom,
+        Self::BottomLeading,
+        Self::Bottom,
+        Self::BottomTrailing,
     ];
 
     pub fn edge(self) -> PopoverEdge {
@@ -40,7 +48,10 @@ impl PopoverPlacement {
     pub fn alignment(self) -> i32 {
         match self {
             Self::TopLeading | Self::BottomLeading | Self::LeadingTop | Self::TrailingTop => -1,
-            Self::TopTrailing | Self::BottomTrailing | Self::LeadingBottom | Self::TrailingBottom => 1,
+            Self::TopTrailing
+            | Self::BottomTrailing
+            | Self::LeadingBottom
+            | Self::TrailingBottom => 1,
             _ => 0,
         }
     }
@@ -148,7 +159,11 @@ impl PopoverGeometry {
                 PopoverEdge::Right => bounds.x + bounds.width - (anchor.x + anchor.width) - gap,
             }
         };
-        let required = if edge.is_vertical() { size.height } else { size.width };
+        let required = if edge.is_vertical() {
+            size.height
+        } else {
+            size.width
+        };
         if overflow == PopoverOverflow::Flip
             && space(edge) < required
             && space(edge.opposite()) >= required
@@ -207,6 +222,10 @@ impl PopoverGeometry {
             size.width,
             size.height,
         );
-        Self { frame, edge, maximum_size }
+        Self {
+            frame,
+            edge,
+            maximum_size,
+        }
     }
 }

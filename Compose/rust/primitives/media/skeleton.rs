@@ -1,11 +1,11 @@
 //! Translation of Primitives/Media/Skeleton.swift.
-use cove_core::scene::{
-    AccessibilityRole, AccessibilitySemantics, LayoutNode, MeasureMode, Node, NodeResource, Rect,
-};
 use crate::impl_primitive_view;
 use crate::primitives::media::LoadingAnimationClock;
 use crate::theme::SemanticColorRef;
 use crate::{PrimitiveView, View};
+use cove_core::scene::{
+    AccessibilityRole, AccessibilitySemantics, LayoutNode, MeasureMode, Node, NodeResource, Rect,
+};
 use std::rc::Rc;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -40,11 +40,19 @@ impl SkeletonAppearance {
     }
 
     fn validate(&mut self) {
-        self.height = if self.height.is_finite() { self.height.clamp(1.0, 1024.0) } else { 16.0 };
+        self.height = if self.height.is_finite() {
+            self.height.clamp(1.0, 1024.0)
+        } else {
+            16.0
+        };
         if let SkeletonShape::Rectangle(radius) = self.shape {
-            self.shape = SkeletonShape::Rectangle(
-                radius.and_then(|value| if value.is_finite() { Some(value.clamp(0.0, 512.0)) } else { None }),
-            );
+            self.shape = SkeletonShape::Rectangle(radius.and_then(|value| {
+                if value.is_finite() {
+                    Some(value.clamp(0.0, 512.0))
+                } else {
+                    None
+                }
+            }));
         }
     }
 }
@@ -58,7 +66,11 @@ pub struct SkeletonMotion {
 
 impl Default for SkeletonMotion {
     fn default() -> Self {
-        Self { is_animated: true, duration: 2.0, minimum_opacity: 0.5 }
+        Self {
+            is_animated: true,
+            duration: 2.0,
+            minimum_opacity: 0.5,
+        }
     }
 }
 
@@ -68,7 +80,11 @@ impl SkeletonMotion {
     }
 
     fn validate(&mut self) {
-        self.duration = if self.duration.is_finite() { self.duration.clamp(0.25, 60.0) } else { 2.0 };
+        self.duration = if self.duration.is_finite() {
+            self.duration.clamp(0.25, 60.0)
+        } else {
+            2.0
+        };
         self.minimum_opacity = if self.minimum_opacity.is_finite() {
             self.minimum_opacity.clamp(0.1, 1.0)
         } else {
@@ -79,7 +95,8 @@ impl SkeletonMotion {
     fn opacity(&self, phase: f64) -> f32 {
         // Smooth extrema, with identical first and last frames of each cycle.
         self.minimum_opacity
-            + (1.0 - self.minimum_opacity) * ((1.0 + (phase * 2.0 * std::f64::consts::PI).cos()) / 2.0) as f32
+            + (1.0 - self.minimum_opacity)
+                * ((1.0 + (phase * 2.0 * std::f64::consts::PI).cos()) / 2.0) as f32
     }
 }
 
@@ -102,7 +119,10 @@ struct PaintIdentity {
 
 impl Skeleton {
     pub fn new() -> Self {
-        Self { appearance: SkeletonAppearance::new(), motion: SkeletonMotion::new() }
+        Self {
+            appearance: SkeletonAppearance::new(),
+            motion: SkeletonMotion::new(),
+        }
     }
 
     pub fn configure(mut self, configure: impl FnOnce(&mut Self)) -> Self {
@@ -147,25 +167,33 @@ impl PrimitiveView for Skeleton {
         if let Some(layout) = node.layout_node() {
             layout.set_height(Some(height));
             layout.set_width(if circle { Some(height) } else { None });
-            layout.set_measure_func(Some(Rc::new(move |width, width_mode, measured_height, height_mode| {
-                if circle {
-                    let diameter = if width_mode == MeasureMode::Exactly {
-                        width
-                    } else if height_mode == MeasureMode::Exactly {
-                        measured_height
+            layout.set_measure_func(Some(Rc::new(
+                move |width, width_mode, measured_height, height_mode| {
+                    if circle {
+                        let diameter = if width_mode == MeasureMode::Exactly {
+                            width
+                        } else if height_mode == MeasureMode::Exactly {
+                            measured_height
+                        } else {
+                            height
+                        };
+                        return cove_core::Size {
+                            width: diameter,
+                            height: diameter,
+                        };
+                    }
+                    let width = if width_mode == MeasureMode::Undefined {
+                        120.0
                     } else {
-                        height
+                        width
                     };
-                    return cove_core::Size { width: diameter, height: diameter };
-                }
-                let width = if width_mode == MeasureMode::Undefined { 120.0 } else { width };
-                cove_core::Size { width, height }
-            })));
+                    cove_core::Size { width, height }
+                },
+            )));
         }
 
-        let animated = motion.is_animated
-            && !node.prefers_reduced_motion()
-            && motion.minimum_opacity < 1.0;
+        let animated =
+            motion.is_animated && !node.prefers_reduced_motion() && motion.minimum_opacity < 1.0;
         if let Some(clock) = node.first_resource::<LoadingAnimationClock>() {
             clock.configure(motion.duration, animated);
         }
@@ -184,22 +212,29 @@ impl PrimitiveView for Skeleton {
         let identity_secondary = appearance.is_secondary;
         let identity_color = appearance.color.clone();
         node.update_draw(identity, move |list, origin| {
-            let Some(owner) = Node::upgrade(&weak_node) else { return };
+            let Some(owner) = Node::upgrade(&weak_node) else {
+                return;
+            };
             let frame = owner.frame();
             let mut rect = Rect::new(origin.x, origin.y, frame.width, frame.height);
-            if !rect.x.is_finite() || !rect.y.is_finite() || !rect.width.is_finite()
-                || !rect.height.is_finite() || rect.width <= 0.0 || rect.height <= 0.0
+            if !rect.x.is_finite()
+                || !rect.y.is_finite()
+                || !rect.width.is_finite()
+                || !rect.height.is_finite()
+                || rect.width <= 0.0
+                || rect.height <= 0.0
             {
                 return;
             }
             let phase_opacity = if animated {
-                clock.as_ref().map_or(1.0, |clock| motion.opacity(clock.phase()))
+                clock
+                    .as_ref()
+                    .map_or(1.0, |clock| motion.opacity(clock.phase()))
             } else {
                 1.0
             };
-            let opacity = phase_opacity
-                * if identity_secondary { 0.5 } else { 1.0 }
-                * owner.opacity();
+            let opacity =
+                phase_opacity * if identity_secondary { 0.5 } else { 1.0 } * owner.opacity();
             let theme = crate::theme::theme_for_node(&owner);
             let color = identity_color.resolve(&theme).multiplied_alpha(opacity);
             let radius = match identity_shape {
@@ -211,9 +246,9 @@ impl PrimitiveView for Skeleton {
                     rect.height = diameter;
                     diameter / 2.0
                 }
-                SkeletonShape::Rectangle(corner_radius) => {
-                    corner_radius.unwrap_or(theme.radius.sm).min(rect.width.min(rect.height) / 2.0)
-                }
+                SkeletonShape::Rectangle(corner_radius) => corner_radius
+                    .unwrap_or(theme.radius.sm)
+                    .min(rect.width.min(rect.height) / 2.0),
             };
             let _ = list.add_rounded_rect(rect, radius, color);
         });

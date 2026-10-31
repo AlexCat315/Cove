@@ -12,7 +12,11 @@ pub struct DateAvailability {
 
 impl Default for DateAvailability {
     fn default() -> Self {
-        Self { minimum: None, maximum: None, is_enabled: Rc::new(|_| true) }
+        Self {
+            minimum: None,
+            maximum: None,
+            is_enabled: Rc::new(|_| true),
+        }
     }
 }
 
@@ -42,20 +46,35 @@ pub struct CalendarGrid;
 
 impl CalendarGrid {
     pub fn month_start(date: Date, calendar: &Calendar) -> Date {
-        calendar.date_interval_start(CalendarUnit::Month, date).unwrap_or_else(|| calendar.start_of_day(date))
+        calendar
+            .date_interval_start(CalendarUnit::Month, date)
+            .unwrap_or_else(|| calendar.start_of_day(date))
     }
 
     pub fn days_in_month(month: Date, calendar: &Calendar) -> Vec<Date> {
         let start = Self::month_start(month, calendar);
         let weekday = calendar.component(CalendarUnit::Weekday, start);
         let leading = (weekday - calendar.first_weekday() as i32).rem_euclid(7);
-        let Some(first) = calendar.date_by_adding(CalendarUnit::Day, -leading, start) else { return Vec::new() };
-        (0..42).filter_map(|offset| calendar.date_by_adding(CalendarUnit::Day, offset, first)).collect()
+        let Some(first) = calendar.date_by_adding(CalendarUnit::Day, -leading, start) else {
+            return Vec::new();
+        };
+        (0..42)
+            .filter_map(|offset| calendar.date_by_adding(CalendarUnit::Day, offset, first))
+            .collect()
     }
 
-    pub fn move_day(date: Date, days: i32, calendar: &Calendar, availability: &DateAvailability) -> Option<Date> {
+    pub fn move_day(
+        date: Date,
+        days: i32,
+        calendar: &Calendar,
+        availability: &DateAvailability,
+    ) -> Option<Date> {
         if days == 0 {
-            return if availability.contains(date, calendar) { Some(date) } else { None };
+            return if availability.contains(date, calendar) {
+                Some(date)
+            } else {
+                None
+            };
         }
         let mut candidate = date;
         for _ in 0..3660 {
@@ -90,7 +109,11 @@ pub struct TimeOfDay {
 
 impl TimeOfDay {
     pub fn new(hour: i32, minute: i32, second: i32) -> Self {
-        Self { hour: hour.clamp(0, 23), minute: minute.clamp(0, 59), second: second.clamp(0, 59) }
+        Self {
+            hour: hour.clamp(0, 23),
+            minute: minute.clamp(0, 59),
+            second: second.clamp(0, 59),
+        }
     }
 
     pub fn seconds(self) -> i32 {
@@ -111,7 +134,9 @@ impl TimeOfDay {
         if parts.len() != if show_seconds { 3 } else { 2 } {
             return None;
         }
-        if !parts.iter().all(|part| !part.is_empty() && part.chars().all(|character| character.is_ascii_digit())) {
+        if !parts.iter().all(|part| {
+            !part.is_empty() && part.chars().all(|character| character.is_ascii_digit())
+        }) {
             return None;
         }
         let hour: i32 = parts[0].parse().ok()?;
@@ -119,7 +144,11 @@ impl TimeOfDay {
         if !(0..=23).contains(&hour) || !(0..=59).contains(&minute) {
             return None;
         }
-        let second: i32 = if show_seconds { parts[2].parse().ok()? } else { 0 };
+        let second: i32 = if show_seconds {
+            parts[2].parse().ok()?
+        } else {
+            0
+        };
         if !(0..=59).contains(&second) {
             return None;
         }

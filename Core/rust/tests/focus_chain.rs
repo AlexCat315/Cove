@@ -45,7 +45,10 @@ fn scope_modality() {
         let focus = FocusChain::new();
         focus.focus(Some(&opener), visible);
         focus.push_scope(&modal, false);
-        assert!(same(focus.focused(), &modal), "pushing a scope focuses its root");
+        assert!(
+            same(focus.focused(), &modal),
+            "pushing a scope focuses its root"
+        );
         assert_eq!(focus.is_focus_visible(), visible);
 
         modal.add_child(&button);
@@ -66,7 +69,10 @@ fn scope_modality() {
 
         focus.push_scope(&nested, false);
         focus.settle_scope(&nested);
-        assert!(same(focus.focused(), &nested), "the nested scope takes over");
+        assert!(
+            same(focus.focused(), &nested),
+            "the nested scope takes over"
+        );
         assert_eq!(focus.is_focus_visible(), visible);
 
         focus.pop_scope(&nested);
@@ -77,7 +83,10 @@ fn scope_modality() {
         assert_eq!(focus.is_focus_visible(), visible);
 
         focus.focus_next(&tree);
-        assert!(focus.is_focus_visible(), "keyboard traversal is always visible");
+        assert!(
+            focus.is_focus_visible(),
+            "keyboard traversal is always visible"
+        );
 
         focus.pop_scope(&modal);
         assert!(
@@ -126,7 +135,9 @@ fn transient_columns() {
 
     focus.push_scope(&newer_dialog, false);
     assert!(
-        !focus.permits_input(&dialog) && !focus.permits_input(&parent_menu) && !focus.permits_input(&child_menu),
+        !focus.permits_input(&dialog)
+            && !focus.permits_input(&parent_menu)
+            && !focus.permits_input(&child_menu),
         "a newer modal blocks the whole older hierarchy"
     );
     assert!(focus.permits_input(&newer_dialog));
@@ -154,7 +165,10 @@ fn next_from_nil() {
     let (root, focusables) = make_tree();
     let focus = FocusChain::new();
     let next = focus.focus_next(&root);
-    assert!(same(next.clone(), &focusables[0]), "first focusable in tree order");
+    assert!(
+        same(next.clone(), &focusables[0]),
+        "first focusable in tree order"
+    );
     assert!(same(focus.focused(), &focusables[0]));
 }
 
@@ -165,7 +179,10 @@ fn next_wraps() {
     focus.focus(Some(&focusables[0]), false);
     assert!(same(focus.focus_next(&root), &focusables[1]));
     assert!(same(focus.focus_next(&root), &focusables[2]));
-    assert!(same(focus.focus_next(&root), &focusables[0]), "wraps to the start");
+    assert!(
+        same(focus.focus_next(&root), &focusables[0]),
+        "wraps to the start"
+    );
 }
 
 #[test]
@@ -173,7 +190,10 @@ fn previous_wraps() {
     let (root, focusables) = make_tree();
     let focus = FocusChain::new();
     focus.focus(Some(&focusables[0]), false);
-    assert!(same(focus.focus_previous(&root), &focusables[2]), "wraps to the end");
+    assert!(
+        same(focus.focus_previous(&root), &focusables[2]),
+        "wraps to the end"
+    );
     assert!(same(focus.focus_previous(&root), &focusables[1]));
     assert!(same(focus.focus_previous(&root), &focusables[0]));
 }
@@ -211,9 +231,8 @@ fn interaction_registry_starts_empty() {
 fn interaction_registry_set_and_remove_pointer_handler() {
     let registry = InteractionRegistry::new();
     let node = Node::new();
-    let handler = Rc::new(
-        |_: &MouseButtonEvent, _: PointerPhase, _: EventPhase| EventResult::Handled,
-    );
+    let handler =
+        Rc::new(|_: &MouseButtonEvent, _: PointerPhase, _: EventPhase| EventResult::Handled);
     registry.set_pointer(&node, InputHandlerRoute::control(), handler);
     assert!(
         registry.handlers(&node).pointer.is_some(),

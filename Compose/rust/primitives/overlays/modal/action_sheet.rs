@@ -11,11 +11,6 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use cove_core::scene::{
-    AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap,
-};
-use cove_core::{Binding, Color, Size};
-use cove_imaging::BundleImageResource;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{EdgeInsets, FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
@@ -28,16 +23,20 @@ use crate::primitives::overlays::modal::{
     Modal, ModalBackdrop, ModalOptions, ModalPlacement, SheetDragHandle,
 };
 use crate::primitives::overlays::roving_focus::{
-    roving_identity, RovingFocusHost, RovingItem, SelectionNavigation,
+    RovingFocusHost, RovingItem, SelectionNavigation, roving_identity,
 };
 use crate::primitives::text::{Divider, DividerAxis, Text};
 use crate::theme::styles::buttons::{
-    ButtonStyle, ButtonStyleConfiguration, ButtonStyleViewExt, GhostButtonStyle, SecondaryButtonStyle,
+    ButtonStyle, ButtonStyleConfiguration, ButtonStyleViewExt, GhostButtonStyle,
+    SecondaryButtonStyle,
 };
 use crate::theme::{
-    theme_for_node, ControlSize, ControlSizeViewExt, SemanticColorRef, SemanticFontRef,
+    ControlSize, ControlSizeViewExt, SemanticColorRef, SemanticFontRef, theme_for_node,
 };
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, ViewExt};
+use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
+use cove_core::{Binding, Color, Size};
+use cove_imaging::BundleImageResource;
 
 /// A stable, caller-owned command. Dismissal is supplied separately.
 #[derive(Clone)]
@@ -51,7 +50,11 @@ pub struct ActionSheetAction {
 }
 
 impl ActionSheetAction {
-    pub fn new(id: impl Into<String>, title: impl Into<String>, action: impl Fn() + 'static) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        title: impl Into<String>,
+        action: impl Fn() + 'static,
+    ) -> Self {
         Self {
             id: id.into(),
             title: title.into(),
@@ -104,7 +107,10 @@ impl ActionSheetQuestion {
     ) -> Self {
         let mut seen = std::collections::HashSet::new();
         for action in &actions {
-            assert!(seen.insert(action.id.clone()), "ActionSheet action IDs must be unique");
+            assert!(
+                seen.insert(action.id.clone()),
+                "ActionSheet action IDs must be unique"
+            );
         }
         Self {
             title: title.into(),
@@ -115,7 +121,11 @@ impl ActionSheetQuestion {
     }
 
     fn enabled_ids(&self) -> Vec<String> {
-        self.actions.iter().filter(|action| action.is_enabled).map(|action| action.id.clone()).collect()
+        self.actions
+            .iter()
+            .filter(|action| action.is_enabled)
+            .map(|action| action.id.clone())
+            .collect()
     }
 }
 
@@ -243,7 +253,11 @@ impl View for ActionSheet {
                 0.0,
                 AnyView::new(TupleView::new(vec![trigger, drawer])),
             ))
-            .z_index(if self.is_presented.get() { 10_000.0 } else { 0.0 }),
+            .z_index(if self.is_presented.get() {
+                10_000.0
+            } else {
+                0.0
+            }),
         )
     }
 }
@@ -267,7 +281,8 @@ impl PrimitiveView for ActionSheetDrawer {
     }
     fn children(&self, node: &Node) -> Vec<AnyView> {
         let theme = theme_for_node(node);
-        let surface: cove_core::Environment = node.composition_value(&crate::adaptive::SurfaceEnvironment::key());
+        let surface: cove_core::Environment =
+            node.composition_value(&crate::adaptive::SurfaceEnvironment::key());
         let window_height = surface.viewport.height;
         let is_compact = surface.viewport.width_class() == cove_core::SizeClass::Compact;
         let safe_bottom = surface.safe_area.bottom.max(0.0);
@@ -305,7 +320,9 @@ impl PrimitiveView for ActionSheetDrawer {
         })
         .padding_insets(EdgeInsets::new(0.0, 0.0, safe_bottom, 0.0));
 
-        vec![AnyView::new(Modal::new(self.is_presented.clone(), content).options(modal_options))]
+        vec![AnyView::new(
+            Modal::new(self.is_presented.clone(), content).options(modal_options),
+        )]
     }
 }
 
@@ -365,8 +382,7 @@ impl PrimitiveView for ActionSheetContent {
         }
 
         let mut header: Vec<AnyView> = vec![AnyView::new(
-            Text::new(self.question.title.clone())
-                .semantic_font(SemanticFontRef::body_strong()),
+            Text::new(self.question.title.clone()).semantic_font(SemanticFontRef::body_strong()),
         )];
         if !self.question.message.is_empty() {
             header.push(AnyView::new(
@@ -404,7 +420,11 @@ impl PrimitiveView for ActionSheetContent {
             .padding_insets(EdgeInsets::new(8.0, 12.0, 10.0, 12.0))
             .frame(None, None, None, Some(44.0), None, None),
         ));
-        column.push(AnyView::new(Divider::new(None, 1.0, DividerAxis::Horizontal)));
+        column.push(AnyView::new(Divider::new(
+            None,
+            1.0,
+            DividerAxis::Horizontal,
+        )));
 
         let rows = self.rows(&enabled, current.as_deref());
         let roving = RovingFocusHost::new(
@@ -429,9 +449,14 @@ impl PrimitiveView for ActionSheetContent {
         });
         let scroller = ScrollView::new(ScrollAxis::Vertical, AnyView::new(roving))
             .scrollbar_gutter(ScrollbarGutter::Overlay);
-        column.push(AnyView::new(
-            AnyView::new(scroller).frame(None, None, None, None, None, Some(self.maximum_height)),
-        ));
+        column.push(AnyView::new(AnyView::new(scroller).frame(
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(self.maximum_height),
+        )));
 
         let mut body = AnyView::new(
             AnyView::new(BoxView::new(
@@ -462,15 +487,17 @@ impl ActionSheetContent {
             let is_tab_stop = current == Some(action.id.as_str());
             let identity: Rc<dyn Fn(&String) -> u64> = Rc::new(|id: &String| roving_identity(id));
             let row = self.row(action);
-            items.push(AnyView::new(
-                AnyView::new(row.modifier(RovingItem::new(
-                    action.id.clone(),
-                    is_tab_stop,
-                    identity,
-                ))),
-            ));
+            items.push(AnyView::new(AnyView::new(row.modifier(RovingItem::new(
+                action.id.clone(),
+                is_tab_stop,
+                identity,
+            )))));
             if index < self.question.actions.len() - 1 {
-                items.push(AnyView::new(Divider::new(None, 1.0, DividerAxis::Horizontal)));
+                items.push(AnyView::new(Divider::new(
+                    None,
+                    1.0,
+                    DividerAxis::Horizontal,
+                )));
             }
         }
         AnyView::new(
@@ -563,9 +590,14 @@ impl ActionSheetContent {
             .button_style(GhostButtonStyle)
             .accessibility_label(close_label.clone())
             .control_size(ControlSize::Small)
-            .frame(Some(crate::modifiers::layout::FrameDimension::Points(44.0)),
-                   Some(crate::modifiers::layout::FrameDimension::Points(44.0)),
-                   None, None, None, None),
+            .frame(
+                Some(crate::modifiers::layout::FrameDimension::Points(44.0)),
+                Some(crate::modifiers::layout::FrameDimension::Points(44.0)),
+                None,
+                None,
+                None,
+                None,
+            ),
         )
     }
 }
@@ -629,5 +661,8 @@ pub fn action_sheet_close_icon() -> BundleImageResource {
 /// Sized payload helper for callers that construct the drawer directly.
 pub fn action_sheet_drawer_size(viewport: Size) -> (f32, f32) {
     let compact = viewport.width < 600.0;
-    (if compact { viewport.width } else { 560.0 }, viewport.height)
+    (
+        if compact { viewport.width } else { 560.0 },
+        viewport.height,
+    )
 }

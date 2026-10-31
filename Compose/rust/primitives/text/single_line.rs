@@ -6,11 +6,7 @@ use super::rope::rope_storage::is_newline;
 pub struct SingleLineText;
 
 impl SingleLineText {
-    pub fn fitting(
-        source: &str,
-        width: f32,
-        measure: impl Fn(&str) -> f32,
-    ) -> String {
+    pub fn fitting(source: &str, width: f32, measure: impl Fn(&str) -> f32) -> String {
         let text = normalized_single_line(source);
         if !width.is_finite() {
             return text;

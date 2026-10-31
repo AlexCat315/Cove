@@ -21,12 +21,18 @@ pub struct ThemeExtensions {
 }
 impl Default for ThemeExtensions {
     fn default() -> Self {
-        Self { values: HashMap::new(), identity: Rc::new(Cell::new(next_identity())) }
+        Self {
+            values: HashMap::new(),
+            identity: Rc::new(Cell::new(next_identity())),
+        }
     }
 }
 impl Clone for ThemeExtensions {
     fn clone(&self) -> Self {
-        Self { values: self.values.clone(), identity: Rc::new(Cell::new(self.identity.get())) }
+        Self {
+            values: self.values.clone(),
+            identity: Rc::new(Cell::new(self.identity.get())),
+        }
     }
 }
 impl PartialEq for ThemeExtensions {
@@ -37,7 +43,10 @@ impl PartialEq for ThemeExtensions {
 impl Eq for ThemeExtensions {}
 impl std::fmt::Debug for ThemeExtensions {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.debug_struct("ThemeExtensions").field("count", &self.values.len()).finish()
+        formatter
+            .debug_struct("ThemeExtensions")
+            .field("count", &self.values.len())
+            .finish()
     }
 }
 fn next_identity() -> u64 {

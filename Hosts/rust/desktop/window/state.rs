@@ -19,6 +19,9 @@ pub struct MainWindowState {
 
 impl MainWindowState {
     pub fn new(is_vsync_enabled: bool) -> Self {
-        Self { is_vsync_enabled, ..Self::default() }
+        Self {
+            is_vsync_enabled,
+            ..Self::default()
+        }
     }
 }

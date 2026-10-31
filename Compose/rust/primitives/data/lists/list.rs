@@ -9,23 +9,21 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::modifiers::interaction::CursorExt;
+use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
+use crate::modifiers::style::AppearanceExt;
+use crate::primitives::controls::adaptive::{apply_touch_control_extent, supports_control_hover};
+use crate::theme::styles::components::selection_appearance::{SelectionAppearance, SelectionRole};
+use crate::theme::styles::components::{ListRowStyleConfiguration, ListRowStyleEnvironment};
+use crate::theme::theme_for_node;
+use crate::{AnyView, BoxView, PrimitiveView, View, impl_primitive_view};
+use cove_core::Color;
 use cove_core::scene::{
     AccessibilityActions, AccessibilityRole, AccessibilitySemantics, AccessibilityState, Align,
     EventPhase, EventResult, FlexDirection, HoverPhase, InputHandlerRoute,
     InteractionRegistryHolder, Justify, LayoutNode, Node, PointerCaptureHolder, PointerPhase, Wrap,
 };
-use cove_core::Color;
 use cove_platform::{KeyEvent, MouseButton, SystemCursor};
-use crate::modifiers::interaction::CursorExt;
-use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
-use crate::modifiers::style::AppearanceExt;
-use crate::primitives::controls::adaptive::{apply_touch_control_extent, supports_control_hover};
-use crate::theme::styles::components::{
-    ListRowStyleConfiguration, ListRowStyleEnvironment,
-};
-use crate::theme::styles::components::selection_appearance::{SelectionAppearance, SelectionRole};
-use crate::theme::theme_for_node;
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, View};
 
 use super::refresh::RefreshOptions;
 use super::selection::CollectionSelection;
@@ -67,7 +65,10 @@ impl PrimitiveView for ListRowHost {
         node.set_attachment(ROW_ID, self.id);
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::ListItem,
-            state: AccessibilityState { is_selected: self.is_selected, ..Default::default() },
+            state: AccessibilityState {
+                is_selected: self.is_selected,
+                ..Default::default()
+            },
             combines_children: true,
             ..Default::default()
         }));
@@ -77,7 +78,9 @@ impl PrimitiveView for ListRowHost {
             activate: Some(Rc::new(move || {
                 if let Some(owner) = Node::upgrade(&activate_node) {
                     activate();
-                    owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("listRowActivate"));
+                    owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                        "listRowActivate",
+                    ));
                 }
             })),
             ..Default::default()
@@ -94,7 +97,9 @@ impl PrimitiveView for ListRowHost {
             }) as Rc<dyn Fn()>,
         );
 
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         node.set_cursor(Some(SystemCursor::Pointer));
         // Hover paints on the host so entering a row never recomposes it. The
         // radius comes from the shared selection appearance, so the hover band
@@ -106,7 +111,8 @@ impl PrimitiveView for ListRowHost {
         let radius = if touch {
             0.0
         } else {
-            SelectionAppearance::resolve(SelectionRole::Navigation, &theme_for_node(node)).corner_radius
+            SelectionAppearance::resolve(SelectionRole::Navigation, &theme_for_node(node))
+                .corner_radius
         };
         node.set_corner_radius(radius);
         let is_selected = self.is_selected;
@@ -115,7 +121,9 @@ impl PrimitiveView for ListRowHost {
         let hover_fn: Rc<dyn Fn(bool)> = Rc::new({
             let hover_node = node.downgrade();
             move |hovered: bool| {
-                let Some(owner) = Node::upgrade(&hover_node) else { return };
+                let Some(owner) = Node::upgrade(&hover_node) else {
+                    return;
+                };
                 let hovered = hovered && supports_control_hover(&owner);
                 owner.set_attachment(ROW_HOVERED, hovered);
                 let fill = if hovered && !is_selected {
@@ -128,64 +136,75 @@ impl PrimitiveView for ListRowHost {
         });
         hover_fn(node.attachment::<bool>(ROW_HOVERED) == Some(true));
         let hover_fn_for_hover = hover_fn.clone();
-        registry.set_hover(node, Rc::new(move |phase| {
-            hover_fn_for_hover(phase == HoverPhase::Enter);
-        }));
+        registry.set_hover(
+            node,
+            Rc::new(move |phase| {
+                hover_fn_for_hover(phase == HoverPhase::Enter);
+            }),
+        );
 
         let captured = self.on_activate.clone();
         let on_tap = self.on_tap.clone();
         let hover_fn_for_pointer = hover_fn.clone();
         let pointer_node = node.downgrade();
-        registry.set_pointer(node, InputHandlerRoute::control(), Rc::new(move |event, phase, event_phase| {
-            // Embedded controls get first refusal before row selection.
-            if event_phase == EventPhase::Capture || event.button != MouseButton::Left {
-                return EventResult::Ignored;
-            }
-            let Some(owner) = Node::upgrade(&pointer_node) else { return EventResult::Ignored };
-            match phase {
-                PointerPhase::Down => {
-                    owner.set_attachment(ROW_PRESSED, true);
-                    let touch = owner
-                        .composition_value(&crate::adaptive::SurfaceEnvironment::key())
-                        .input
-                        .contains(cove_core::InputCapabilities::TOUCH);
-                    if touch {
-                        owner.set_background_color(Some(theme_for_node(&owner).colors.state_layer_pressed));
-                    }
-                    if let Some(capture) = PointerCaptureHolder::current() {
-                        capture.acquire(&owner, true);
-                    }
-                    EventResult::Handled
+        registry.set_pointer(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, phase, event_phase| {
+                // Embedded controls get first refusal before row selection.
+                if event_phase == EventPhase::Capture || event.button != MouseButton::Left {
+                    return EventResult::Ignored;
                 }
-                PointerPhase::Up => {
-                    let was_pressed = owner.attachment::<bool>(ROW_PRESSED).unwrap_or(false);
-                    owner.set_attachment(ROW_PRESSED, false);
-                    hover_fn_for_pointer(false);
-                    if PointerCaptureHolder::current()
-                        .and_then(|capture| capture.target())
-                        .is_some_and(|target| target == owner)
-                        && let Some(capture) = PointerCaptureHolder::current()
-                    {
-                        capture.release();
-                    }
-                    if !was_pressed {
-                        return EventResult::Ignored;
-                    }
-                    let frame = owner.absolute_frame();
-                    if event.x >= frame.x
-                        && event.x <= frame.x + frame.width
-                        && event.y >= frame.y
-                        && event.y <= frame.y + frame.height
-                    {
-                        match on_tap.as_ref() {
-                            Some(on_tap) => on_tap(event.modifiers),
-                            None => captured(),
+                let Some(owner) = Node::upgrade(&pointer_node) else {
+                    return EventResult::Ignored;
+                };
+                match phase {
+                    PointerPhase::Down => {
+                        owner.set_attachment(ROW_PRESSED, true);
+                        let touch = owner
+                            .composition_value(&crate::adaptive::SurfaceEnvironment::key())
+                            .input
+                            .contains(cove_core::InputCapabilities::TOUCH);
+                        if touch {
+                            owner.set_background_color(Some(
+                                theme_for_node(&owner).colors.state_layer_pressed,
+                            ));
                         }
+                        if let Some(capture) = PointerCaptureHolder::current() {
+                            capture.acquire(&owner, true);
+                        }
+                        EventResult::Handled
                     }
-                    EventResult::Handled
+                    PointerPhase::Up => {
+                        let was_pressed = owner.attachment::<bool>(ROW_PRESSED).unwrap_or(false);
+                        owner.set_attachment(ROW_PRESSED, false);
+                        hover_fn_for_pointer(false);
+                        if PointerCaptureHolder::current()
+                            .and_then(|capture| capture.target())
+                            .is_some_and(|target| target == owner)
+                            && let Some(capture) = PointerCaptureHolder::current()
+                        {
+                            capture.release();
+                        }
+                        if !was_pressed {
+                            return EventResult::Ignored;
+                        }
+                        let frame = owner.absolute_frame();
+                        if event.x >= frame.x
+                            && event.x <= frame.x + frame.width
+                            && event.y >= frame.y
+                            && event.y <= frame.y + frame.height
+                        {
+                            match on_tap.as_ref() {
+                                Some(on_tap) => on_tap(event.modifiers),
+                                None => captured(),
+                            }
+                        }
+                        EventResult::Handled
+                    }
                 }
-            }
-        }));
+            }),
+        );
     }
 
     fn children(&self, node: &Node) -> Vec<AnyView> {
@@ -245,7 +264,11 @@ impl<Id: Ord + Clone + Send + Sync + 'static> List<Id> {
     }
 
     pub fn row_height(mut self, row_height: f32) -> Self {
-        self.row_height = Some(if row_height.is_finite() { row_height.max(1.0) } else { 30.0 });
+        self.row_height = Some(if row_height.is_finite() {
+            row_height.max(1.0)
+        } else {
+            30.0
+        });
         self
     }
 
@@ -329,8 +352,12 @@ impl<Id: Ord + Clone + Send + Sync + 'static> List<Id> {
             return true;
         }
         let next = match event.scancode {
-            crate::Scancode::ARROW_DOWN => (current.map_or(0, |index| index + 1)).min(self.ids.len() - 1),
-            crate::Scancode::ARROW_UP => current.map_or(self.ids.len() - 1, |index| index.saturating_sub(1)),
+            crate::Scancode::ARROW_DOWN => {
+                (current.map_or(0, |index| index + 1)).min(self.ids.len() - 1)
+            }
+            crate::Scancode::ARROW_UP => {
+                current.map_or(self.ids.len() - 1, |index| index.saturating_sub(1))
+            }
             crate::Scancode::HOME => 0,
             crate::Scancode::END => self.ids.len() - 1,
             crate::Scancode::RETURN | crate::Scancode::KEYPAD_ENTER => {
@@ -362,9 +389,7 @@ impl<Id: Ord + Clone + Send + Sync + 'static> List<Id> {
 
     fn rows_view(&self) -> AnyView {
         let touch = false;
-        let effective_height = self
-            .row_height
-            .unwrap_or(if touch { 56.0 } else { 30.0 });
+        let effective_height = self.row_height.unwrap_or(if touch { 56.0 } else { 30.0 });
         let mut rows: Vec<AnyView> = Vec::new();
         for id in &self.ids {
             let selected = self.selection.contains(id);
@@ -418,22 +443,33 @@ impl<Id: Ord + Clone + Send + Sync + 'static> List<Id> {
                 content,
             }));
         }
-        let scroll = crate::primitives::layout::ScrollView::vertical(AnyView::new(
-            BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap,
-                self.row_spacing,
-                AnyView::new(crate::TupleView::new(rows)),
-            ),
-        ));
-        AnyView::new(scroll.flex(1.0).frame(None, None, Some(0.0), Some(0.0), None, None))
+        let scroll = crate::primitives::layout::ScrollView::vertical(AnyView::new(BoxView::new(
+            FlexDirection::Column,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            self.row_spacing,
+            AnyView::new(crate::TupleView::new(rows)),
+        )));
+        AnyView::new(
+            scroll
+                .flex(1.0)
+                .frame(None, None, Some(0.0), Some(0.0), None, None),
+        )
     }
 }
 
 impl<Id: Ord + Clone + Send + Sync + 'static> View for List<Id> {
     fn body(&self) -> AnyView {
         let rows = self.rows_view();
-        let host = AnyView::new(ListKeyHost { list: self.snapshot(), content: rows });
-        AnyView::new(host.flex(1.0).frame(None, None, Some(0.0), Some(0.0), None, None))
+        let host = AnyView::new(ListKeyHost {
+            list: self.snapshot(),
+            content: rows,
+        });
+        AnyView::new(
+            host.flex(1.0)
+                .frame(None, None, Some(0.0), Some(0.0), None, None),
+        )
     }
 }
 
@@ -471,14 +507,24 @@ impl<Id: Ord + Clone + Send + Sync + 'static> PrimitiveView for ListKeyHost<Id> 
     }
 
     fn update_node(&self, node: &Node) {
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         let list = self.list.snapshot();
-        registry.set_key(node, InputHandlerRoute::control(), Rc::new(move |event, phase| {
-            if phase == EventPhase::Capture {
-                return EventResult::Ignored;
-            }
-            if list.handle_key(event) { EventResult::Handled } else { EventResult::Ignored }
-        }));
+        registry.set_key(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, phase| {
+                if phase == EventPhase::Capture {
+                    return EventResult::Ignored;
+                }
+                if list.handle_key(event) {
+                    EventResult::Handled
+                } else {
+                    EventResult::Ignored
+                }
+            }),
+        );
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {

@@ -1,6 +1,6 @@
 //! Composable insertion and removal effects from Animation/Transition.swift.
-use cove_core::scene::NodeTransform;
 use cove_core::Point;
+use cove_core::scene::NodeTransform;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TransitionEdge {
@@ -21,14 +21,22 @@ pub(crate) struct TransitionEffect {
 
 impl Default for TransitionEffect {
     fn default() -> Self {
-        Self { opacity: 1.0, x: 0.0, y: 0.0, scale: NodeTransform::IDENTITY, collapse: false }
+        Self {
+            opacity: 1.0,
+            x: 0.0,
+            y: 0.0,
+            scale: NodeTransform::IDENTITY,
+            collapse: false,
+        }
     }
 }
 
 impl TransitionEffect {
     fn combined(self, other: Self) -> Self {
         assert!(
-            self.scale.is_identity() || other.scale.is_identity() || self.scale.anchor == other.scale.anchor,
+            self.scale.is_identity()
+                || other.scale.is_identity()
+                || self.scale.anchor == other.scale.anchor,
             "combine scale transitions with the same anchor; nest visibility containers for different anchors",
         );
         let scale = if self.scale.is_identity() {
@@ -36,7 +44,8 @@ impl TransitionEffect {
         } else if other.scale.is_identity() {
             self.scale
         } else {
-            NodeTransform::new(self.scale.scale * other.scale.scale, self.scale.anchor).with_scales_shadow(false)
+            NodeTransform::new(self.scale.scale * other.scale.scale, self.scale.anchor)
+                .with_scales_shadow(false)
         };
         Self {
             opacity: self.opacity * other.opacity,
@@ -48,8 +57,12 @@ impl TransitionEffect {
     }
 
     pub(crate) fn interpolating(self, goal: Self, amount: f32) -> Self {
-        if amount == 0.0 { return self; }
-        if amount == 1.0 { return goal; }
+        if amount == 0.0 {
+            return self;
+        }
+        if amount == 1.0 {
+            return goal;
+        }
         let anchor = if goal.scale.is_identity() {
             self.scale.anchor
         } else if self.scale.is_identity() {
@@ -67,7 +80,8 @@ impl TransitionEffect {
             scale: NodeTransform::new(
                 self.scale.scale + (goal.scale.scale - self.scale.scale) * amount,
                 anchor,
-            ).with_scales_shadow(false),
+            )
+            .with_scales_shadow(false),
             collapse: goal.collapse,
         }
     }
@@ -81,51 +95,106 @@ pub struct Transition {
 }
 
 impl Default for Transition {
-    fn default() -> Self { Self::IDENTITY }
+    fn default() -> Self {
+        Self::IDENTITY
+    }
 }
 
 impl Transition {
-    pub const IDENTITY: Self = Self { insertion: TransitionEffect {
-        opacity: 1.0, x: 0.0, y: 0.0, scale: NodeTransform::IDENTITY, collapse: false,
-    }, removal: TransitionEffect {
-        opacity: 1.0, x: 0.0, y: 0.0, scale: NodeTransform::IDENTITY, collapse: false,
-    } };
+    pub const IDENTITY: Self = Self {
+        insertion: TransitionEffect {
+            opacity: 1.0,
+            x: 0.0,
+            y: 0.0,
+            scale: NodeTransform::IDENTITY,
+            collapse: false,
+        },
+        removal: TransitionEffect {
+            opacity: 1.0,
+            x: 0.0,
+            y: 0.0,
+            scale: NodeTransform::IDENTITY,
+            collapse: false,
+        },
+    };
 
-    pub const fn identity() -> Self { Self::IDENTITY }
+    pub const fn identity() -> Self {
+        Self::IDENTITY
+    }
 
     pub fn opacity() -> Self {
-        Self::from_effect(TransitionEffect { opacity: 0.0, ..TransitionEffect::default() })
+        Self::from_effect(TransitionEffect {
+            opacity: 0.0,
+            ..TransitionEffect::default()
+        })
     }
 
     pub fn collapse() -> Self {
-        Self::from_effect(TransitionEffect { collapse: true, ..TransitionEffect::default() })
+        Self::from_effect(TransitionEffect {
+            collapse: true,
+            ..TransitionEffect::default()
+        })
     }
 
     pub fn offset(x: f32, y: f32) -> Self {
-        Self::from_effect(TransitionEffect { x, y, ..TransitionEffect::default() })
+        Self::from_effect(TransitionEffect {
+            x,
+            y,
+            ..TransitionEffect::default()
+        })
     }
 
     pub fn move_edge(edge: TransitionEdge, distance: f32) -> Self {
         let distance = if distance.is_finite() { distance } else { 0.0 };
         Self::from_effect(match edge {
-            TransitionEdge::Top => TransitionEffect { y: -distance, ..TransitionEffect::default() },
-            TransitionEdge::Bottom => TransitionEffect { y: distance, ..TransitionEffect::default() },
-            TransitionEdge::Leading => TransitionEffect { x: -distance, ..TransitionEffect::default() },
-            TransitionEdge::Trailing => TransitionEffect { x: distance, ..TransitionEffect::default() },
+            TransitionEdge::Top => TransitionEffect {
+                y: -distance,
+                ..TransitionEffect::default()
+            },
+            TransitionEdge::Bottom => TransitionEffect {
+                y: distance,
+                ..TransitionEffect::default()
+            },
+            TransitionEdge::Leading => TransitionEffect {
+                x: -distance,
+                ..TransitionEffect::default()
+            },
+            TransitionEdge::Trailing => TransitionEffect {
+                x: distance,
+                ..TransitionEffect::default()
+            },
         })
     }
 
-    pub fn move_from_edge(edge: TransitionEdge) -> Self { Self::move_edge(edge, 16.0) }
+    pub fn move_from_edge(edge: TransitionEdge) -> Self {
+        Self::move_edge(edge, 16.0)
+    }
 
     pub fn navigation(distance: f32, forward: bool) -> Self {
-        let distance = if distance.is_finite() { distance.max(0.0) } else { 0.0 };
-        let insertion = TransitionEffect { opacity: 0.0, x: if forward { distance } else { -distance }, ..TransitionEffect::default() };
-        let removal = TransitionEffect { opacity: 0.0, x: if forward { -distance } else { distance }, ..TransitionEffect::default() };
+        let distance = if distance.is_finite() {
+            distance.max(0.0)
+        } else {
+            0.0
+        };
+        let insertion = TransitionEffect {
+            opacity: 0.0,
+            x: if forward { distance } else { -distance },
+            ..TransitionEffect::default()
+        };
+        let removal = TransitionEffect {
+            opacity: 0.0,
+            x: if forward { -distance } else { distance },
+            ..TransitionEffect::default()
+        };
         Self { insertion, removal }
     }
 
     pub fn scale(factor: f32, anchor: Point) -> Self {
-        let factor = if factor.is_finite() { factor.max(0.0) } else { 1.0 };
+        let factor = if factor.is_finite() {
+            factor.max(0.0)
+        } else {
+            1.0
+        };
         let anchor = Point::new(
             if anchor.x.is_finite() { anchor.x } else { 0.0 },
             if anchor.y.is_finite() { anchor.y } else { 0.0 },
@@ -144,10 +213,16 @@ impl Transition {
     }
 
     pub fn asymmetric(insertion: Self, removal: Self) -> Self {
-        Self { insertion: insertion.insertion, removal: removal.removal }
+        Self {
+            insertion: insertion.insertion,
+            removal: removal.removal,
+        }
     }
 
     fn from_effect(effect: TransitionEffect) -> Self {
-        Self { insertion: effect, removal: effect }
+        Self {
+            insertion: effect,
+            removal: effect,
+        }
     }
 }

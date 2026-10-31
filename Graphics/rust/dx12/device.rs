@@ -29,7 +29,13 @@ pub struct Dx12Queue {
 
 impl Dx12Queue {
     fn new(queue: sys::ComPtr, fence: sys::ComPtr, kind: u32) -> Self {
-        Self { queue, fence, fence_value: 0, fence_event: core::ptr::null_mut(), kind }
+        Self {
+            queue,
+            fence,
+            fence_value: 0,
+            fence_event: core::ptr::null_mut(),
+            kind,
+        }
     }
 }
 
@@ -95,7 +101,9 @@ impl Dx12DeviceHandle {
         #[cfg(not(target_os = "windows"))]
         {
             let _ = config;
-            Err(RhiError::unsupported_backend("DirectX 12 is only available on Windows"))
+            Err(RhiError::unsupported_backend(
+                "DirectX 12 is only available on Windows",
+            ))
         }
         #[cfg(target_os = "windows")]
         {
@@ -111,7 +119,9 @@ impl Dx12DeviceHandle {
         #[cfg(not(target_os = "windows"))]
         {
             let _ = queue_kind;
-            Err(RhiError::unsupported_backend("DirectX 12 is only available on Windows"))
+            Err(RhiError::unsupported_backend(
+                "DirectX 12 is only available on Windows",
+            ))
         }
         #[cfg(target_os = "windows")]
         {
@@ -160,7 +170,12 @@ impl Drop for Dx12DeviceHandle {
                 sys::IUnknownVtbl::release(queue.fence);
                 sys::IUnknownVtbl::release(queue.queue);
             }
-            for heap in [self.resource_heap, self.sampler_heap, self.rtv_heap, self.dsv_heap] {
+            for heap in [
+                self.resource_heap,
+                self.sampler_heap,
+                self.rtv_heap,
+                self.dsv_heap,
+            ] {
                 sys::IUnknownVtbl::release(heap);
             }
             sys::IUnknownVtbl::release(self.factory);
@@ -200,7 +215,9 @@ impl FenceWait {
     pub fn wait(self) -> RhiResult<()> {
         #[cfg(not(target_os = "windows"))]
         {
-            Err(RhiError::unsupported_backend("DirectX 12 is only available on Windows"))
+            Err(RhiError::unsupported_backend(
+                "DirectX 12 is only available on Windows",
+            ))
         }
         #[cfg(target_os = "windows")]
         {
@@ -218,7 +235,9 @@ fn wait_for_fence(queue: &Dx12Queue, value: u64) -> RhiResult<()> {
     #[cfg(not(target_os = "windows"))]
     {
         let _ = (queue, value);
-        Err(RhiError::unsupported_backend("DirectX 12 is only available on Windows"))
+        Err(RhiError::unsupported_backend(
+            "DirectX 12 is only available on Windows",
+        ))
     }
 }
 
@@ -284,11 +303,8 @@ mod windows_impl {
     ) -> sys::HRESULT;
 
     /// `CreateDXGIFactory2`'s signature.
-    type CreateFactory = unsafe extern "system" fn(
-        u32,
-        *const sys::GUID,
-        *mut *mut c_void,
-    ) -> sys::HRESULT;
+    type CreateFactory =
+        unsafe extern "system" fn(u32, *const sys::GUID, *mut *mut c_void) -> sys::HRESULT;
 
     pub fn make(config: DeviceConfig) -> RhiResult<Dx12DeviceHandle> {
         // SAFETY: the DLL names are NUL-terminated and the symbols are looked up
@@ -300,7 +316,9 @@ mod windows_impl {
         // SAFETY: the module handle is live.
         let create_device = unsafe { GetProcAddress(d3d12, c"D3D12CreateDevice".as_ptr()) };
         if create_device.is_null() {
-            return Err(RhiError::unsupported_backend("D3D12CreateDevice is unavailable"));
+            return Err(RhiError::unsupported_backend(
+                "D3D12CreateDevice is unavailable",
+            ));
         }
         // SAFETY: `D3D12CreateDevice` has the documented signature.
         let create_device: CreateDevice = unsafe { core::mem::transmute_copy(&create_device) };
@@ -313,7 +331,9 @@ mod windows_impl {
         // SAFETY: the module handle is live.
         let create_factory = unsafe { GetProcAddress(dxgi, c"CreateDXGIFactory2".as_ptr()) };
         if create_factory.is_null() {
-            return Err(RhiError::unsupported_backend("CreateDXGIFactory2 is unavailable"));
+            return Err(RhiError::unsupported_backend(
+                "CreateDXGIFactory2 is unavailable",
+            ));
         }
         // SAFETY: `CreateDXGIFactory2` has the documented signature.
         let create_factory: CreateFactory = unsafe { core::mem::transmute_copy(&create_factory) };
@@ -349,7 +369,12 @@ mod windows_impl {
 
         let (rtv_descriptor_size, resource_descriptor_size, sampler_descriptor_size) =
             descriptor_sizes(device);
-        let resource_heap = create_heap(device, sys::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1024, true)?;
+        let resource_heap = create_heap(
+            device,
+            sys::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+            1024,
+            true,
+        )?;
         let sampler_heap = create_heap(device, sys::D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 256, true)?;
         let rtv_heap = create_heap(device, sys::D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 64, false)?;
         let dsv_heap = create_heap(device, sys::D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 64, false)?;
@@ -390,10 +415,7 @@ mod windows_impl {
         })
     }
 
-    fn create_queue(
-        device: sys::ComPtr,
-        kind: u32,
-    ) -> RhiResult<Dx12Queue> {
+    fn create_queue(device: sys::ComPtr, kind: u32) -> RhiResult<Dx12Queue> {
         let description = sys::D3D12_COMMAND_QUEUE_DESC {
             Type: kind,
             Priority: 0,
@@ -437,7 +459,10 @@ mod windows_impl {
         unsafe {
             let vtbl = *(device as *mut *const sys::ID3D12DeviceVtbl);
             (
-                ((*vtbl).GetDescriptorHandleIncrementSize)(device, sys::D3D12_DESCRIPTOR_HEAP_TYPE_RTV),
+                ((*vtbl).GetDescriptorHandleIncrementSize)(
+                    device,
+                    sys::D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
+                ),
                 ((*vtbl).GetDescriptorHandleIncrementSize)(
                     device,
                     sys::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
@@ -459,7 +484,11 @@ mod windows_impl {
         let description = sys::D3D12_DESCRIPTOR_HEAP_DESC {
             Type: kind,
             NumDescriptors: count,
-            Flags: if shader_visible { sys::D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE } else { 0 },
+            Flags: if shader_visible {
+                sys::D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE
+            } else {
+                0
+            },
             NodeMask: 0,
         };
         let mut heap: sys::ComPtr = core::ptr::null_mut();
@@ -614,7 +643,9 @@ pub fn execute_and_signal(queue: &mut Dx12Queue, command_list: sys::ComPtr) -> R
     #[cfg(not(target_os = "windows"))]
     {
         let _ = (queue, command_list);
-        Err(RhiError::unsupported_backend("DirectX 12 is only available on Windows"))
+        Err(RhiError::unsupported_backend(
+            "DirectX 12 is only available on Windows",
+        ))
     }
 }
 
@@ -629,8 +660,7 @@ struct QueueVtbl {
     base: sys::IUnknownVtbl,
     UpdateTileMappings: usize,
     CopyTileMappings: usize,
-    ExecuteCommandLists:
-        unsafe extern "system" fn(sys::ComPtr, u32, *const sys::ComPtr),
+    ExecuteCommandLists: unsafe extern "system" fn(sys::ComPtr, u32, *const sys::ComPtr),
     SetMarker: usize,
     BeginEvent: usize,
     EndEvent: usize,
@@ -646,8 +676,7 @@ struct QueueVtbl {
 struct FenceVtblLocal {
     base: sys::IUnknownVtbl,
     GetCompletedValue: unsafe extern "system" fn(sys::ComPtr) -> u64,
-    SetEventOnCompletion:
-        unsafe extern "system" fn(sys::ComPtr, u64, sys::HANDLE) -> sys::HRESULT,
+    SetEventOnCompletion: unsafe extern "system" fn(sys::ComPtr, u64, sys::HANDLE) -> sys::HRESULT,
     Signal: unsafe extern "system" fn(sys::ComPtr, sys::ComPtr, u64) -> sys::HRESULT,
 }
 

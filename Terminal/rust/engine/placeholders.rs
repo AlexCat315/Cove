@@ -28,7 +28,13 @@ impl PlaceholderCell {
     /// Parses the diacritics of a placeholder grapheme; `None` for other text.
     ///
     /// Invalid diacritics count as missing, as in Kitty.
-    pub fn new(text: &str, column: usize, row: usize, foreground: u32, underline: u32) -> Option<Self> {
+    pub fn new(
+        text: &str,
+        column: usize,
+        row: usize,
+        foreground: u32,
+        underline: u32,
+    ) -> Option<Self> {
         let mut scalars = text.chars();
         if scalars.next().map(u32::from) != Some(PLACEHOLDER_CODEPOINT) || foreground == 0 {
             return None;
@@ -38,8 +44,12 @@ impl PlaceholderCell {
             row,
             image_id_low: foreground,
             placement_id: underline,
-            image_row: scalars.next().and_then(|scalar| Self::index(u32::from(scalar))),
-            image_column: scalars.next().and_then(|scalar| Self::index(u32::from(scalar))),
+            image_row: scalars
+                .next()
+                .and_then(|scalar| Self::index(u32::from(scalar))),
+            image_column: scalars
+                .next()
+                .and_then(|scalar| Self::index(u32::from(scalar))),
             image_id_high: scalars
                 .next()
                 .and_then(|scalar| Self::index(u32::from(scalar)))
@@ -83,8 +93,12 @@ impl PlaceholderRun {
                 && open.image_id & 0xFF_FFFF == cell.image_id_low
                 && open.placement_id == cell.placement_id
                 && cell.image_row.is_none_or(|row| row == open.image_row)
-                && cell.image_column.is_none_or(|column| column == open.image_column + open.width)
-                && cell.image_id_high.is_none_or(|high_byte| Some(high_byte) == *high)
+                && cell
+                    .image_column
+                    .is_none_or(|column| column == open.image_column + open.width)
+                && cell
+                    .image_id_high
+                    .is_none_or(|high_byte| Some(high_byte) == *high)
             {
                 open.width += 1;
                 continue;
@@ -210,14 +224,20 @@ impl PlaceholderRun {
             ),
             image_size: image,
             is_below_text: false,
-            offset: ((dest_x * scale).round() as usize, (dest_y * scale).round() as usize),
+            offset: (
+                (dest_x * scale).round() as usize,
+                (dest_y * scale).round() as usize,
+            ),
         })
     }
 }
 
 impl TerminalEngine {
     /// Image strips drawn by placeholder cells in the captured frame.
-    pub(crate) fn placeholder_placements(&self, cells: &[PlaceholderCell]) -> Vec<TerminalImagePlacement> {
+    pub(crate) fn placeholder_placements(
+        &self,
+        cells: &[PlaceholderCell],
+    ) -> Vec<TerminalImagePlacement> {
         if cells.is_empty() {
             return Vec::new();
         }
@@ -231,9 +251,10 @@ impl TerminalEngine {
             .filter_map(|run| {
                 // An explicit placement id must match; otherwise the image's
                 // first virtual placement.
-                let target = targets
-                    .iter()
-                    .find(|target| target.image_id == run.image_id && (run.placement_id == 0 || target.placement_id == run.placement_id))?;
+                let target = targets.iter().find(|target| {
+                    target.image_id == run.image_id
+                        && (run.placement_id == 0 || target.placement_id == run.placement_id)
+                })?;
                 let image = crate::engine::images::KittyImage::lookup(graphics, run.image_id)?;
                 // Unspecified rows or columns fit the image at its natural size.
                 let columns = if target.columns > 0 {
@@ -256,14 +277,19 @@ impl TerminalEngine {
             .collect()
     }
 
-    fn virtual_placements(&self, graphics: crate::engine::ffi::GhosttyKittyGraphics) -> Vec<VirtualPlacement> {
+    fn virtual_placements(
+        &self,
+        graphics: crate::engine::ffi::GhosttyKittyGraphics,
+    ) -> Vec<VirtualPlacement> {
         let mut per_image = Vec::new();
         // SAFETY: `graphics` is a live handle borrowed from the terminal; the
         // iterator is created, used and freed here before any other call.
         unsafe {
             let mut iterator = std::ptr::null_mut();
-            if crate::engine::ffi::ghostty_kitty_graphics_placement_iterator_new(std::ptr::null(), &mut iterator)
-                != crate::engine::ffi::GHOSTTY_SUCCESS
+            if crate::engine::ffi::ghostty_kitty_graphics_placement_iterator_new(
+                std::ptr::null(),
+                &mut iterator,
+            ) != crate::engine::ffi::GHOSTTY_SUCCESS
                 || iterator.is_null()
             {
                 return per_image;

@@ -6,7 +6,7 @@
 use super::rope::rope_difference;
 use super::rope::rope_editing;
 use super::rope::rope_lookup::lower_bound;
-use super::rope::rope_storage::{empty_node, RopeChunk, RopeHandle, RopeLeaf, RopeNode};
+use super::rope::rope_storage::{RopeChunk, RopeHandle, RopeLeaf, RopeNode, empty_node};
 use std::ops::Range;
 use std::sync::Arc;
 
@@ -183,12 +183,8 @@ impl TextBuffer {
         }
         let limit = previous.utf8_length().min(self.utf8_length());
         let common_start = rope_difference::common_bytes(&previous.root, &self.root, false, limit);
-        let common_end = rope_difference::common_bytes(
-            &previous.root,
-            &self.root,
-            true,
-            limit - common_start,
-        );
+        let common_end =
+            rope_difference::common_bytes(&previous.root, &self.root, true, limit - common_start);
         if common_start == self.utf8_length() && self.utf8_length() == previous.utf8_length() {
             return None;
         }
@@ -328,8 +324,7 @@ impl TextBuffer {
 
     /// Overlapping immutable leaves, including partially covered edge leaves.
     pub fn visible_chunks(&self, range: Range<usize>) -> Vec<Arc<RopeLeaf>> {
-        self.root
-            .leaves_in(self.bounded(range, self.utf8_length()))
+        self.root.leaves_in(self.bounded(range, self.utf8_length()))
     }
 
     pub fn utf8_bytes(&self, range: Range<usize>) -> Vec<u8> {

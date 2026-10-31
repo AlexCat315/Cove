@@ -19,13 +19,15 @@ use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{Button, ButtonIconSource, ButtonRole};
 use crate::primitives::overlays::selection_key_host::SelectionKeyHost;
 use crate::primitives::text::Text;
-use crate::theme::styles::buttons::{ghost, plain, ButtonStyleViewExt};
+use crate::theme::styles::buttons::{ButtonStyleViewExt, ghost, plain};
 use crate::theme::{
-    theme_for_node, ControlSize, ControlSizeViewExt, SemanticColorRef, SemanticFontRef, Theme,
+    ControlSize, ControlSizeViewExt, SemanticColorRef, SemanticFontRef, Theme, theme_for_node,
 };
 use crate::{AnyView, BoxView, Node, PrimitiveView, Row, TupleView, View};
 
-pub use autoplay::{CarouselAutoplay, CarouselAutoplayHost, CarouselAutoplaySession, ReducedMotionReader};
+pub use autoplay::{
+    CarouselAutoplay, CarouselAutoplayHost, CarouselAutoplaySession, ReducedMotionReader,
+};
 pub use indicator::{CarouselIndicator, CarouselProgressDot};
 
 /// One page of a [`Carousel`].
@@ -39,7 +41,11 @@ pub struct CarouselPage<Id: PartialEq + Clone> {
 
 impl<Id: PartialEq + Clone> CarouselPage<Id> {
     pub fn new(id: Id, content: AnyView) -> Self {
-        Self { id, caption: String::new(), content }
+        Self {
+            id,
+            caption: String::new(),
+            content,
+        }
     }
 
     pub fn caption(mut self, caption: impl Into<String>) -> Self {
@@ -71,14 +77,22 @@ impl<Id: PartialEq + Eq + Clone + Send + Sync + 'static> CarouselActions<Id> {
 
     fn current_index(&self) -> usize {
         match self.active_id() {
-            Some(id) => self.pages.iter().position(|page| page.id == id).unwrap_or(0),
+            Some(id) => self
+                .pages
+                .iter()
+                .position(|page| page.id == id)
+                .unwrap_or(0),
             None => 0,
         }
     }
 
     fn can_step(&self, delta: i32) -> bool {
         let index = self.current_index();
-        if delta < 0 { index > 0 } else { index < self.pages.len() - 1 }
+        if delta < 0 {
+            index > 0
+        } else {
+            index < self.pages.len() - 1
+        }
     }
 
     fn go_to(&self, index: usize) {
@@ -262,12 +276,23 @@ fn build_viewport<Id: PartialEq + Eq + Clone + Send + Sync + 'static>(
         theme.spacing.sm,
         AnyView::new(TupleView::new(row_items)),
     )
-    .frame(Some(FrameDimension::Percent(100.0)), None, None, None, None, None);
+    .frame(
+        Some(FrameDimension::Percent(100.0)),
+        None,
+        None,
+        None,
+        None,
+        None,
+    );
     let spanning = AnyView::new(row);
     match config.height {
         Some(height) => AnyView::new(spanning.frame(
             None,
-            Some(FrameDimension::Points(if height.is_finite() { height.max(1.0) } else { 180.0 })),
+            Some(FrameDimension::Points(if height.is_finite() {
+                height.max(1.0)
+            } else {
+                180.0
+            })),
             None,
             None,
             None,
@@ -315,10 +340,14 @@ fn build_controls<Id: PartialEq + Eq + Clone + Send + Sync + 'static>(
     match config.indicator.resolved(config.page_count) {
         CarouselIndicator::Dots => items.push(build_dots(theme, actions.clone(), rotation, config)),
         CarouselIndicator::Fraction => {
-            let text = Text::new(format!("{} / {}", actions.current_index() + 1, config.page_count))
-                .semantic_font(SemanticFontRef::caption())
-                .semantic_foreground(SemanticColorRef::on_surface_muted())
-                .accessibility_hidden(true);
+            let text = Text::new(format!(
+                "{} / {}",
+                actions.current_index() + 1,
+                config.page_count
+            ))
+            .semantic_font(SemanticFontRef::caption())
+            .semantic_foreground(SemanticColorRef::on_surface_muted())
+            .accessibility_hidden(true);
             items.push(AnyView::new(text));
         }
         CarouselIndicator::Automatic | CarouselIndicator::Hidden => {}

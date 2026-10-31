@@ -6,24 +6,22 @@
 use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
 
+use cove_composition::{AnyView, PrimitiveView, View};
 use cove_core::scene::{
     Align, AnimatorScheduler, EventResult, FlexDirection, HoverPhase, InputHandlerRoute,
     InteractionRegistryHolder, LayoutNode, Node, NodeResource, Wrap,
 };
 use cove_core::{Point, Size};
-use cove_composition::{AnyView, PrimitiveView, View};
 
+use crate::BoxView;
 use crate::modifiers::interaction::{AccessibilityExt, HoverExt};
-use crate::theme::styles::buttons::ButtonStyleViewExt;
 use crate::modifiers::layout::{FlexExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SurfaceStyleExt};
 use crate::primitives::controls::button::{Button, ButtonRole};
 use crate::primitives::overlays::modal::BottomSheet;
-use crate::primitives::overlays::portal::{
-    PortalPlacementMode, PortalResource, PortalStoreHolder,
-};
+use crate::primitives::overlays::portal::{PortalPlacementMode, PortalResource, PortalStoreHolder};
+use crate::theme::styles::buttons::ButtonStyleViewExt;
 use crate::theme::theme_for_node;
-use crate::BoxView;
 
 /// Delays, sizing and enablement for one hover card.
 #[derive(Clone, Copy)]
@@ -36,7 +34,12 @@ pub struct HoverCardTiming {
 
 impl Default for HoverCardTiming {
     fn default() -> Self {
-        Self { open_delay: 0.3, close_delay: 0.15, width: Some(300.0), is_enabled: true }
+        Self {
+            open_delay: 0.3,
+            close_delay: 0.15,
+            width: Some(300.0),
+            is_enabled: true,
+        }
     }
 }
 
@@ -53,7 +56,11 @@ impl HoverCardTiming {
             0.15
         };
         self.width = self.width.map(|value| {
-            if value.is_finite() { value.clamp(80.0, 4096.0) } else { 300.0 }
+            if value.is_finite() {
+                value.clamp(80.0, 4096.0)
+            } else {
+                300.0
+            }
         });
     }
 }
@@ -117,11 +124,7 @@ impl View for HoverCard {
             if crate::primitives::overlays::modal::uses_sheet(surface) {
                 AnyView::new(TouchHoverCard::new(label.clone(), content.clone(), enabled))
             } else {
-                AnyView::new(HoverCardHost::new(
-                    label.clone(),
-                    content.clone(),
-                    timing,
-                ))
+                AnyView::new(HoverCardHost::new(label.clone(), content.clone(), timing))
             }
         });
         AnyView::new(reader)
@@ -137,7 +140,11 @@ struct HoverCardHost {
 
 impl HoverCardHost {
     fn new(label: AnyView, content: AnyView, options: HoverCardTiming) -> Self {
-        Self { label, content, options }
+        Self {
+            label,
+            content,
+            options,
+        }
     }
 }
 
@@ -157,7 +164,9 @@ impl PrimitiveView for HoverCardHost {
     }
 
     fn update_node(&self, node: &Node) {
-        let session = node.first_resource::<HoverCardSession>().expect("session resource");
+        let session = node
+            .first_resource::<HoverCardSession>()
+            .expect("session resource");
         session.configure(self.content.clone(), self.options);
         if let Some(registry) = InteractionRegistryHolder::current() {
             let hover_session = Rc::downgrade(&session);
@@ -280,11 +289,19 @@ impl HoverCardSession {
             self.stop_waiting();
             self.pending.set(Some(wanted));
         }
-        let delay = if wanted { options.open_delay } else { options.close_delay };
+        let delay = if wanted {
+            options.open_delay
+        } else {
+            options.close_delay
+        };
         self.elapsed.set(0.0);
         if delay == 0.0 {
             self.stop_waiting();
-            if wanted { self.show() } else { self.hide() };
+            if wanted {
+                self.show()
+            } else {
+                self.hide()
+            };
             return;
         }
         if self.is_finished.get() {
@@ -300,13 +317,22 @@ impl HoverCardSession {
         if self.is_finished.get() {
             return false;
         }
-        self.elapsed.set(self.elapsed.get() + delta_time.clamp(0.0, 60.0));
+        self.elapsed
+            .set(self.elapsed.get() + delta_time.clamp(0.0, 60.0));
         let options = *self.options.borrow();
         let wanted = self.pending.get().unwrap_or(false);
-        let delay = if wanted { options.open_delay } else { options.close_delay };
+        let delay = if wanted {
+            options.open_delay
+        } else {
+            options.close_delay
+        };
         if self.elapsed.get() >= delay {
             self.stop_waiting();
-            if wanted { self.show() } else { self.hide() };
+            if wanted {
+                self.show()
+            } else {
+                self.hide()
+            };
             return false;
         }
         true
@@ -319,11 +345,15 @@ impl HoverCardSession {
     }
 
     fn show(&self) {
-        let Some(node) = self.node.borrow().clone() else { return };
+        let Some(node) = self.node.borrow().clone() else {
+            return;
+        };
         if !node.accepts_subtree_input() {
             return;
         }
-        let Some(content) = self.content.borrow().clone() else { return };
+        let Some(content) = self.content.borrow().clone() else {
+            return;
+        };
         let options = *self.options.borrow();
         if !options.is_enabled {
             return;
@@ -495,9 +525,7 @@ impl View for TouchHoverCard {
         .button_style(crate::theme::styles::buttons::plain());
         let sheet = BottomSheet::new(
             self.is_presented.binding(),
-            self.content
-                .clone()
-                .padding_edges(8.0, 0.0),
+            self.content.clone().padding_edges(8.0, 0.0),
         );
         let column = BoxView::new(
             FlexDirection::Column,
@@ -505,7 +533,10 @@ impl View for TouchHoverCard {
             cove_core::scene::Justify::FlexStart,
             Wrap::NoWrap,
             0.0,
-            AnyView::new(crate::TupleView::new(vec![AnyView::new(trigger), AnyView::new(sheet)])),
+            AnyView::new(crate::TupleView::new(vec![
+                AnyView::new(trigger),
+                AnyView::new(sheet),
+            ])),
         );
         AnyView::new(column)
     }

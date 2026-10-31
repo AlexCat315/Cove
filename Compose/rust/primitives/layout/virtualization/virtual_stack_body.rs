@@ -5,11 +5,11 @@
 //! row extents; this module owns the window arithmetic and the scroll wiring.
 use std::rc::Rc;
 
-use cove_core::scene::{Align, FlexDirection, Justify, LayoutNode, Node, Wrap};
-use cove_core::Point;
 use crate::modifiers::layout::LayoutFrameExt;
 use crate::primitives::layout::{ScrollAxis, ScrollView, ScrollViewport, ScrollbarGutter};
 use crate::{AnyView, BoxView, PrimitiveView, View};
+use cove_core::Point;
+use cove_core::scene::{Align, FlexDirection, Justify, LayoutNode, Node, Wrap};
 
 use super::virtual_window::{VirtualRowKey, VirtualWindow};
 
@@ -49,11 +49,18 @@ impl<Id: Ord + Clone> RowExtents for super::row_index::VariableRowIndex<Id> {
     }
 
     fn anchor_at(&self, offset: f64) -> Option<usize> {
-        if self.is_empty() { None } else { Some(self.row_at(offset)) }
+        if self.is_empty() {
+            None
+        } else {
+            Some(self.row_at(offset))
+        }
     }
 
     fn offset_for(&self, index: usize, viewport: f64) -> f64 {
-        self.clamp(super::row_index::VariableRowIndex::offset_of(self, index), viewport)
+        self.clamp(
+            super::row_index::VariableRowIndex::offset_of(self, index),
+            viewport,
+        )
     }
 
     fn clamp(&self, offset: f64, viewport: f64) -> f64 {
@@ -82,13 +89,20 @@ pub fn resolve_frame(
     let clamped = rows.clamp(offset, viewport);
     let (prepared_offset, prepared_height) = VirtualWindow::preparation(clamped, viewport, preload);
     let start = rows.anchor_at(prepared_offset).unwrap_or(0);
-    let end_row = rows.anchor_at(prepared_offset + prepared_height).unwrap_or(count.saturating_sub(1));
+    let end_row = rows
+        .anchor_at(prepared_offset + prepared_height)
+        .unwrap_or(count.saturating_sub(1));
     let start = start.saturating_sub(overscan).min(count);
     let end = (end_row + 1 + overscan).min(count).max(start);
     let before = rows.offset_of(start) as f32;
     let total = rows.total() as f32;
     let after = (total - rows.offset_of(end) as f32).max(0.0);
-    VirtualFrame { range: start..end, before, after, total }
+    VirtualFrame {
+        range: start..end,
+        before,
+        after,
+        total,
+    }
 }
 
 /// Builds the scroll view for a virtualized stack.
@@ -104,12 +118,22 @@ pub fn virtual_scroll<Id: Clone + 'static>(
     on_offset_change: Option<Rc<dyn Fn(Point)>>,
     on_viewport_change: Option<Rc<dyn Fn(ScrollViewport)>>,
 ) -> AnyView {
-    let frame = resolve_frame(rows, offset.y as f64, viewport.size.height as f64, overscan, preload);
+    let frame = resolve_frame(
+        rows,
+        offset.y as f64,
+        viewport.size.height as f64,
+        overscan,
+        preload,
+    );
     let mut children: Vec<AnyView> = Vec::new();
     if frame.before > 0.0 {
         children.push(AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(crate::EmptyView),
             )
             .frame_height(frame.before),
@@ -119,7 +143,11 @@ pub fn virtual_scroll<Id: Clone + 'static>(
         let Some(id) = ids.get(index) else { continue };
         let content = (row_content)(id);
         let extent = rows.extent(index);
-        let gap = if index + 1 < rows.count() { rows.spacing() } else { 0.0 };
+        let gap = if index + 1 < rows.count() {
+            rows.spacing()
+        } else {
+            0.0
+        };
         children.push(AnyView::new(
             AnyView::new(VirtualRowSlot {
                 key: VirtualRowKey::new(generation, index, extent),
@@ -131,7 +159,11 @@ pub fn virtual_scroll<Id: Clone + 'static>(
     if frame.after > 0.0 {
         children.push(AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(crate::EmptyView),
             )
             .frame_height(frame.after),
@@ -139,7 +171,11 @@ pub fn virtual_scroll<Id: Clone + 'static>(
     }
     let content = AnyView::new(
         BoxView::new(
-            FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 0.0,
+            FlexDirection::Column,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            0.0,
             AnyView::new(crate::TupleView::new(children)),
         )
         .frame(None, None, Some(0.0), None, None, Some(frame.total)),

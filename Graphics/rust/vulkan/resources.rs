@@ -9,9 +9,9 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 use crate::rhi::{
-    Buffer, BufferDescriptor, RhiCompiledObject, RhiCompilationWork, RhiError, RhiResult, Sampler,
+    Buffer, BufferDescriptor, RhiCompilationWork, RhiCompiledObject, RhiError, RhiResult, Sampler,
     SamplerDescriptor, ShaderFormat, ShaderModule, ShaderModuleDescriptor, Texture,
-    TextureDescriptor, TextureDimension, TextureAllocation, rhi_byte_range, rhi_require,
+    TextureAllocation, TextureDescriptor, TextureDimension, rhi_byte_range, rhi_require,
     rhi_validate_texture_samples,
 };
 
@@ -43,8 +43,12 @@ fn sharing_families(context: &VulkanContext) -> Vec<u32> {
 /// Locks the shared registry. A poisoned lock only means another thread panicked
 /// while holding it; every mutation is a single map operation, so the registry
 /// itself stays consistent.
-pub fn lock(registries: &Arc<Mutex<VulkanRegistries>>) -> std::sync::MutexGuard<'_, VulkanRegistries> {
-    registries.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+pub fn lock(
+    registries: &Arc<Mutex<VulkanRegistries>>,
+) -> std::sync::MutexGuard<'_, VulkanRegistries> {
+    registries
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
 // MARK: - Buffers
@@ -78,19 +82,18 @@ pub fn create_buffer(
             sys::VK_SHARING_MODE_EXCLUSIVE
         },
         queueFamilyIndexCount: if concurrent { families.len() as u32 } else { 0 },
-        pQueueFamilyIndices: if concurrent { families.as_ptr() } else { core::ptr::null() },
+        pQueueFamilyIndices: if concurrent {
+            families.as_ptr()
+        } else {
+            core::ptr::null()
+        },
     };
 
     let mut buffer: sys::VkBuffer = sys::VK_NULL_HANDLE;
     // SAFETY: `create_info` and the family list it may point at outlive the call,
     // and the out-parameter is a live local.
     let status = unsafe {
-        (context.core.create_buffer)(
-            context.device,
-            &create_info,
-            core::ptr::null(),
-            &mut buffer,
-        )
+        (context.core.create_buffer)(context.device, &create_info, core::ptr::null(), &mut buffer)
     };
     if status != sys::VK_SUCCESS || buffer == sys::VK_NULL_HANDLE {
         return Err(RhiError::OutOfMemory);
@@ -109,8 +112,12 @@ pub fn create_buffer(
             || descriptor.usage.contains(crate::rhi::BufferUsage::INDEX)
             || descriptor.usage.contains(crate::rhi::BufferUsage::INDIRECT)
             || descriptor.usage.contains(crate::rhi::BufferUsage::UNIFORM)
-            || descriptor.usage.contains(crate::rhi::BufferUsage::STORAGE_READ)
-            || descriptor.usage.contains(crate::rhi::BufferUsage::STORAGE_WRITE);
+            || descriptor
+                .usage
+                .contains(crate::rhi::BufferUsage::STORAGE_READ)
+            || descriptor
+                .usage
+                .contains(crate::rhi::BufferUsage::STORAGE_WRITE);
         let flags = if is_gpu_resource {
             sys::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
         } else {
@@ -170,7 +177,9 @@ pub fn destroy_buffer(
     allocator: &mut VulkanMemoryAllocator,
     handle: Buffer,
 ) {
-    let Some(record) = lock(registries).buffers.remove(&handle.id()) else { return };
+    let Some(record) = lock(registries).buffers.remove(&handle.id()) else {
+        return;
+    };
     // SAFETY: the frame ring waited for every submission that could use this
     // buffer before invoking deferred destruction.
     unsafe {
@@ -231,7 +240,11 @@ pub fn create_texture(
             sys::VK_SHARING_MODE_EXCLUSIVE
         },
         queueFamilyIndexCount: if concurrent { families.len() as u32 } else { 0 },
-        pQueueFamilyIndices: if concurrent { families.as_ptr() } else { core::ptr::null() },
+        pQueueFamilyIndices: if concurrent {
+            families.as_ptr()
+        } else {
+            core::ptr::null()
+        },
         initialLayout: sys::VK_IMAGE_LAYOUT_UNDEFINED,
     };
 
@@ -428,7 +441,9 @@ pub fn destroy_texture(
     allocator: &mut VulkanMemoryAllocator,
     handle: Texture,
 ) {
-    let Some(record) = lock(registries).textures.remove(&handle.id()) else { return };
+    let Some(record) = lock(registries).textures.remove(&handle.id()) else {
+        return;
+    };
     // Swapchain images own no memory or view of their own beyond what the
     // swapchain manages, so only their view is released by the swapchain path.
     if record.is_swapchain {
@@ -501,7 +516,9 @@ pub fn create_sampler(
     if status != sys::VK_SUCCESS || sampler == sys::VK_NULL_HANDLE {
         return Err(RhiError::OutOfMemory);
     }
-    lock(registries).samplers.insert(handle.id(), VulkanSamplerRecord { sampler });
+    lock(registries)
+        .samplers
+        .insert(handle.id(), VulkanSamplerRecord { sampler });
     Ok(())
 }
 
@@ -510,7 +527,9 @@ pub fn destroy_sampler(
     registries: &Arc<Mutex<VulkanRegistries>>,
     handle: Sampler,
 ) {
-    let Some(record) = lock(registries).samplers.remove(&handle.id()) else { return };
+    let Some(record) = lock(registries).samplers.remove(&handle.id()) else {
+        return;
+    };
     // SAFETY: the frame ring waited for every submission that could use it.
     unsafe {
         (context.resources.destroy_sampler)(context.device, record.sampler, core::ptr::null());
@@ -632,7 +651,9 @@ pub fn destroy_shader_module(
     registries: &Arc<Mutex<VulkanRegistries>>,
     handle: ShaderModule,
 ) {
-    let Some(record) = lock(registries).shader_modules.remove(&handle.id()) else { return };
+    let Some(record) = lock(registries).shader_modules.remove(&handle.id()) else {
+        return;
+    };
     // SAFETY: the frame ring waited for every submission that could use it.
     unsafe {
         (context.core.destroy_shader_module)(context.device, record.module, core::ptr::null());

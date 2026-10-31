@@ -5,9 +5,9 @@
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{State, TextAlignment};
 use cove_ui_compose::modifiers::layout::FlexExt;
+use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::rich::rich_text::RichText;
 use cove_ui_compose::primitives::text::rich::run::{RichTextRun, RichTextTraits};
-use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
 use cove_ui_compose::{AnyView, BoxView, DynamicField, LayoutDebugExt, TupleView, View};
 
@@ -21,7 +21,10 @@ pub fn inline_styles_sample() -> Vec<RichTextRun> {
         RichTextRun::new(", "),
         RichTextRun::with_traits("italic", RichTextTraits::ITALIC),
         RichTextRun::new(", "),
-        RichTextRun::with_traits("both at once", RichTextTraits::BOLD | RichTextTraits::ITALIC),
+        RichTextRun::with_traits(
+            "both at once",
+            RichTextTraits::BOLD | RichTextTraits::ITALIC,
+        ),
         RichTextRun::new(", "),
         RichTextRun::with_traits("inline code", RichTextTraits::CODE),
         RichTextRun::new(" and "),
@@ -120,27 +123,25 @@ impl View for RichTextStory {
             )
         };
 
-        let rtl = AnyView::new(BoxView::new(
-            FlexDirection::Column,
-            Align::Stretch,
-            Justify::FlexStart,
-            Wrap::NoWrap,
-            12.0,
-            AnyView::new(TupleView::new(
-                right_to_left_samples()
-                    .into_iter()
-                    .map(|runs| {
-                        let opened = self.last_opened.clone();
-                        AnyView::new(
-                            RichText::new(runs)
-                                .on_open_link(move |destination| {
-                                    opened.set(destination.to_string())
-                                }),
-                        )
-                    })
-                    .collect(),
-            )),
-        ));
+        let rtl =
+            AnyView::new(BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                12.0,
+                AnyView::new(TupleView::new(
+                    right_to_left_samples()
+                        .into_iter()
+                        .map(|runs| {
+                            let opened = self.last_opened.clone();
+                            AnyView::new(RichText::new(runs).on_open_link(move |destination| {
+                                opened.set(destination.to_string())
+                            }))
+                        })
+                        .collect(),
+                )),
+            ));
 
         // Type roles: the paragraph inherits the surrounding style and ink.
         let roles = AnyView::new(BoxView::new(

@@ -3,7 +3,7 @@
 //! Translation of `Examples/Mobile/Sources/AppContent/Settings.swift`.
 
 use cove_examples::mobile::model::MobileModel;
-use cove_examples::mobile::settings::{sections, SettingsRow, SettingsScreen, APPEARANCE_CHOICES};
+use cove_examples::mobile::settings::{APPEARANCE_CHOICES, SettingsRow, SettingsScreen, sections};
 
 fn screen() -> SettingsScreen {
     SettingsScreen::new(MobileModel::new())
@@ -68,14 +68,20 @@ fn choosing_an_appearance_records_it_and_closes_the_sheet() {
     screen.open_appearance_sheet();
     assert!(screen.choose_appearance("Dark"));
     assert_eq!(screen.model().appearance, "Dark");
-    assert!(!screen.is_choosing_appearance(), "choosing closes the sheet");
+    assert!(
+        !screen.is_choosing_appearance(),
+        "choosing closes the sheet"
+    );
 }
 
 #[test]
 fn every_offered_choice_is_accepted() {
     let screen = screen();
     for choice in APPEARANCE_CHOICES {
-        assert!(screen.choose_appearance(choice), "{choice} should be accepted");
+        assert!(
+            screen.choose_appearance(choice),
+            "{choice} should be accepted"
+        );
         assert_eq!(screen.model().appearance, choice);
     }
 }
@@ -84,7 +90,10 @@ fn every_offered_choice_is_accepted() {
 fn an_unoffered_appearance_is_rejected() {
     let screen = screen();
     let before = screen.model().appearance;
-    assert!(!screen.choose_appearance("Sepia"), "only the three choices exist");
+    assert!(
+        !screen.choose_appearance("Sepia"),
+        "only the three choices exist"
+    );
     assert_eq!(screen.model().appearance, before, "the model is untouched");
 }
 

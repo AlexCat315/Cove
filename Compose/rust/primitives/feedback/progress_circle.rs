@@ -1,16 +1,16 @@
 //! Translation of Primitives/Feedback/ProgressCircle.swift.
+use crate::impl_primitive_view;
+use crate::modifiers::interaction::AccessibilityExt;
+use crate::modifiers::style::AppearanceExt;
+use crate::primitives::feedback::{ProgressValue, StatusTone};
+use crate::primitives::media::LoadingAnimationClock;
+use crate::primitives::text::Text;
+use crate::theme::tokens::semantic_modifiers::SemanticStyleViewExt;
+use crate::{AnyView, PrimitiveView, View};
 use cove_core::scene::{
     AccessibilityRole, AccessibilitySemantics, AccessibilityState, Align, Justify, LayoutNode,
     Node, NodeResource, Point,
 };
-use crate::impl_primitive_view;
-use crate::modifiers::interaction::AccessibilityExt;
-use crate::modifiers::style::AppearanceExt;
-use crate::theme::tokens::semantic_modifiers::SemanticStyleViewExt;
-use crate::primitives::feedback::{ProgressValue, StatusTone};
-use crate::primitives::media::LoadingAnimationClock;
-use crate::primitives::text::Text;
-use crate::{AnyView, PrimitiveView, View};
 use std::f32::consts::{FRAC_PI_2, PI, TAU};
 use std::rc::Rc;
 
@@ -134,8 +134,15 @@ impl PrimitiveView for ProgressCircle {
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Progress,
             label: "Progress".to_string(),
-            value: if indeterminate { "In progress".to_string() } else { format!("{percent}%") },
-            state: AccessibilityState { is_enabled: self.is_enabled, ..Default::default() },
+            value: if indeterminate {
+                "In progress".to_string()
+            } else {
+                format!("{percent}%")
+            },
+            state: AccessibilityState {
+                is_enabled: self.is_enabled,
+                ..Default::default()
+            },
             ..Default::default()
         }));
 
@@ -160,8 +167,12 @@ impl PrimitiveView for ProgressCircle {
         }
 
         let identity = PaintIdentity {
-            value: Some(resolved), tone: self.tone, diameter, thickness,
-            is_enabled: self.is_enabled, indeterminate,
+            value: Some(resolved),
+            tone: self.tone,
+            diameter,
+            thickness,
+            is_enabled: self.is_enabled,
+            indeterminate,
         };
         let weak_node = node.downgrade();
         let clock = node.first_resource::<LoadingAnimationClock>();
@@ -170,7 +181,9 @@ impl PrimitiveView for ProgressCircle {
         let is_enabled = self.is_enabled;
         let fallback_thickness = self.thickness;
         node.update_draw(identity, move |list, origin| {
-            let Some(owner) = Node::upgrade(&weak_node) else { return };
+            let Some(owner) = Node::upgrade(&weak_node) else {
+                return;
+            };
             let frame = owner.frame();
             let size = frame.width.min(frame.height);
             if size <= 2.0 {
@@ -196,14 +209,32 @@ impl PrimitiveView for ProgressCircle {
                 // A fixed-length arc that rotates; the length is ~35% of the
                 // circle so the gap is obvious enough to read as motion.
                 let start = clock.phase() as f32 * TAU;
-                paint_ring(list, Point::new(cx, cy), inner, outer, start, PI * 0.7, base.multiplied_alpha(alpha));
+                paint_ring(
+                    list,
+                    Point::new(cx, cy),
+                    inner,
+                    outer,
+                    start,
+                    PI * 0.7,
+                    base.multiplied_alpha(alpha),
+                );
             } else {
-                let Some(presentation) = presentation.as_ref() else { return };
+                let Some(presentation) = presentation.as_ref() else {
+                    return;
+                };
                 let value = presentation.value() as f32;
                 if value <= 0.0 {
                     return;
                 }
-                paint_ring(list, Point::new(cx, cy), inner, outer, -FRAC_PI_2, TAU * value, base.multiplied_alpha(alpha));
+                paint_ring(
+                    list,
+                    Point::new(cx, cy),
+                    inner,
+                    outer,
+                    -FRAC_PI_2,
+                    TAU * value,
+                    base.multiplied_alpha(alpha),
+                );
             }
         });
     }
@@ -216,23 +247,48 @@ impl PrimitiveView for ProgressCircle {
         let indeterminate = self.is_indeterminate();
         let percent = (resolved * 100.0).round() as i64;
         let scale = self.resolved_diameter(node);
-        let size = if scale >= 56.0 { 13.0 } else if scale >= 40.0 { 11.0 } else { 9.0 };
+        let size = if scale >= 56.0 {
+            13.0
+        } else if scale >= 40.0 {
+            11.0
+        } else {
+            9.0
+        };
         let color = if self.is_enabled {
             self.tone.color()
         } else {
             crate::theme::SemanticColorRef::on_surface_disabled()
         };
         vec![AnyView::new(
-            Text::new(if indeterminate { String::new() } else { percent.to_string() })
-                .font(cove_core::Font::system(size, cove_core::FontWeight::Medium))
-                .semantic_foreground(color)
-                .accessibility_hidden(true),
+            Text::new(if indeterminate {
+                String::new()
+            } else {
+                percent.to_string()
+            })
+            .font(cove_core::Font::system(size, cove_core::FontWeight::Medium))
+            .semantic_foreground(color)
+            .accessibility_hidden(true),
         )]
     }
 }
 impl_primitive_view!(ProgressCircle);
 
 /// Paints an annulus sector as a triangle strip.
-fn paint_ring(list: &mut cove_core::DrawList, center: Point, inner: f32, outer: f32, from: f32, sweep: f32, color: cove_core::Color) {
-    let _ = list.add_arc_stroke(center, (inner + outer) / 2.0, from, sweep, outer - inner, color);
+fn paint_ring(
+    list: &mut cove_core::DrawList,
+    center: Point,
+    inner: f32,
+    outer: f32,
+    from: f32,
+    sweep: f32,
+    color: cove_core::Color,
+) {
+    let _ = list.add_arc_stroke(
+        center,
+        (inner + outer) / 2.0,
+        from,
+        sweep,
+        outer - inner,
+        color,
+    );
 }

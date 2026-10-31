@@ -21,7 +21,7 @@ use super::{
     AccelerationStructure, AccelerationStructureDescriptor, AdapterCapabilities, BindingLayout,
     BindingLayoutDescriptor, BindingLayoutEntry, BindingSet, BindingSetEntry, Buffer,
     BufferDescriptor, Capabilities, ComputePipeline, ComputePipelineDescriptor, FrameUploader,
-    GraphicsApi, GraphicsPipeline, GraphicsPipelineDescriptor, GpuTimestampProfile, MeshPipeline,
+    GpuTimestampProfile, GraphicsApi, GraphicsPipeline, GraphicsPipelineDescriptor, MeshPipeline,
     MeshPipelineDescriptor, PipelineLayout, PipelineLayoutDescriptor, PlannedSubmit,
     PresentationMode, RhiError, RhiResult, Sampler, SamplerDescriptor, ShaderModule,
     ShaderModuleDescriptor, SubmissionCpuProfile, SurfaceDescriptor, Swapchain, SwapchainImage,
@@ -105,7 +105,9 @@ pub trait RhiBackend: Send {
         _handle: MeshPipeline,
         _descriptor: MeshPipelineDescriptor,
     ) -> RhiResult<()> {
-        Err(RhiError::unsupported_feature("mesh pipelines are not implemented by this backend"))
+        Err(RhiError::unsupported_feature(
+            "mesh pipelines are not implemented by this backend",
+        ))
     }
     fn destroy_mesh_pipeline(&mut self, _handle: MeshPipeline) {}
     fn create_compute_pipeline(
@@ -144,12 +146,7 @@ pub trait RhiBackend: Send {
 
     // MARK: Immediate data transfer (host-visible / shared storage)
 
-    fn upload_buffer_data(
-        &mut self,
-        buffer: Buffer,
-        offset: usize,
-        data: &[u8],
-    ) -> RhiResult<()>;
+    fn upload_buffer_data(&mut self, buffer: Buffer, offset: usize, data: &[u8]) -> RhiResult<()>;
 
     /// Synchronous readback of previously submitted buffer contents.
     fn read_buffer_data(
@@ -273,7 +270,11 @@ mod tests {
             completion();
             Ok(())
         }
-        fn create_buffer(&mut self, _handle: Buffer, _descriptor: BufferDescriptor) -> RhiResult<()> {
+        fn create_buffer(
+            &mut self,
+            _handle: Buffer,
+            _descriptor: BufferDescriptor,
+        ) -> RhiResult<()> {
             Ok(())
         }
         fn create_texture(
@@ -376,7 +377,11 @@ mod tests {
     #[test]
     fn unsupported_operations_inherit_an_error_instead_of_silently_succeeding() {
         let mut backend = MinimalBackend;
-        assert!(backend.read_buffer_data(Buffer::new(1), 0, &mut []).is_err());
+        assert!(
+            backend
+                .read_buffer_data(Buffer::new(1), 0, &mut [])
+                .is_err()
+        );
         assert!(
             backend
                 .create_acceleration_structure(
@@ -387,9 +392,16 @@ mod tests {
         );
         assert!(backend.texture_allocation(Texture::new(1)).is_none());
         assert!(backend.gpu_timestamp_profile().is_none());
-        assert_eq!(backend.query_adapter_capabilities(), AdapterCapabilities::default());
+        assert_eq!(
+            backend.query_adapter_capabilities(),
+            AdapterCapabilities::default()
+        );
         // Binding-layout registration is a no-op that still reports success.
-        assert!(backend.register_binding_layout(BindingLayout::new(1), BindingLayoutDescriptor::default()).is_ok());
+        assert!(
+            backend
+                .register_binding_layout(BindingLayout::new(1), BindingLayoutDescriptor::default())
+                .is_ok()
+        );
         assert!(backend.wait_until_idle().is_ok());
         assert_eq!(
             TextureDescriptor::new(4, 4, TextureFormat::Rgba8Unorm, TextureUsage::SAMPLED).width,

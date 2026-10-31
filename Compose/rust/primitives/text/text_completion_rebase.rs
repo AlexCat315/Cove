@@ -83,7 +83,11 @@ pub struct TextCompletionItem {
 }
 
 impl TextCompletionItem {
-    pub fn new(id: impl Into<String>, label: impl Into<String>, insert_text: impl Into<String>) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        label: impl Into<String>,
+        insert_text: impl Into<String>,
+    ) -> Self {
         Self {
             id: id.into(),
             label: label.into(),
@@ -124,9 +128,7 @@ impl TextCompletionRebase {
                 if range.start > old.prefix_range.start || range.end < old.caret_index {
                     continue;
                 }
-                let Some(moved) =
-                    Self::move_range(&range, old, next, &delta, true)
-                else {
+                let Some(moved) = Self::move_range(&range, old, next, &delta, true) else {
                     continue;
                 };
                 item.replacement = Some(moved);
@@ -134,9 +136,7 @@ impl TextCompletionRebase {
             let mut edits = Vec::new();
             let mut failed = false;
             for edit in &item.additional_edits {
-                let Some(range) =
-                    Self::move_range(&edit.range, old, next, &delta, false)
-                else {
+                let Some(range) = Self::move_range(&edit.range, old, next, &delta, false) else {
                     failed = true;
                     break;
                 };

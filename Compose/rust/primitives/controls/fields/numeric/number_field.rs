@@ -9,17 +9,17 @@
 //! the chip restores it.
 use std::rc::Rc;
 
-use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
-use cove_core::{Binding, Color};
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::controls::button::{Button, ButtonIcon, ButtonIconSource, ButtonRole};
+use crate::primitives::text::Text;
 use crate::primitives::text::text_buffer::TextBuffer;
 use crate::primitives::text::text_field::{TextField, TextFieldEvents, TextFieldSize};
-use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonStyle, ButtonStyleConfiguration, ButtonStyleViewExt};
-use crate::theme::{theme_for_node, SemanticColorRef, SemanticFontRef};
+use crate::theme::{SemanticColorRef, SemanticFontRef, theme_for_node};
 use crate::{AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View};
+use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
+use cove_core::{Binding, Color};
 
 use super::prefix_style::NumericPrefixFieldStyle;
 use super::scrub::{NumericScrub, NumericScrubHandle};
@@ -41,7 +41,10 @@ impl PartialEq for NumberFieldPrefix {
 
 impl NumberFieldPrefix {
     pub fn new(title: impl Into<String>) -> Self {
-        Self { title: title.into(), tint: SemanticColorRef::on_surface_muted() }
+        Self {
+            title: title.into(),
+            tint: SemanticColorRef::on_surface_muted(),
+        }
     }
 
     pub fn tint(mut self, tint: SemanticColorRef) -> Self {
@@ -195,7 +198,13 @@ impl View for NumberField {
                 let is_editing = is_editing.clone();
                 let draft = draft.clone();
                 let committed = committed_for_get.clone();
-                move || if is_editing.get() { draft.get() } else { committed.clone() }
+                move || {
+                    if is_editing.get() {
+                        draft.get()
+                    } else {
+                        committed.clone()
+                    }
+                }
             },
             {
                 let draft = draft.clone();
@@ -207,70 +216,73 @@ impl View for NumberField {
             },
         );
 
-        let input = TextField::new(
-            self.mixed_value_label.clone().unwrap_or_default(),
-            text,
-        )
-        .decoration(crate::primitives::text::text_field::TextFieldDecoration {
-            size: self.size,
-            ..Default::default()
-        })
-        .behavior(crate::primitives::text::text_field::TextFieldBehavior {
-            disabled: !self.is_enabled,
-            ..Default::default()
-        })
-        .events(TextFieldEvents {
-            on_submit: Some({
-                let field = field.clone();
-                let draft = draft.clone();
-                let draft_changed = draft_changed.clone();
-                Rc::new(move || commit_draft(&field, &draft, &draft_changed))
-            }),
-            on_key_down: Some({
-                let field = field.clone();
-                let draft = draft.clone();
-                let draft_changed = draft_changed.clone();
-                Rc::new(move |event: &cove_platform::KeyEvent| {
-                    if event.scancode != crate::Scancode::ARROW_UP && event.scancode != crate::Scancode::ARROW_DOWN {
-                        return false;
-                    }
-                    let multiplier = if event.modifiers.has_shift() {
-                        10.0
-                    } else if event.modifiers.has_alt() {
-                        0.1
-                    } else {
-                        1.0
-                    };
-                    let by = if event.scancode == crate::Scancode::ARROW_UP { multiplier } else { -multiplier };
-                    adjust(&field, &draft, &draft_changed, by);
-                    true
-                })
-            }),
-            on_focus: Some({
-                let draft = draft.clone();
-                let is_editing = is_editing.clone();
-                let draft_changed = draft_changed.clone();
-                let committed = committed_buffer.clone();
-                Rc::new(move || {
-                    if !is_editing.get() {
-                        draft.set(committed.clone());
-                        draft_changed.set(false);
-                        is_editing.set(true);
-                    }
-                })
-            }),
-            on_blur: Some({
-                let field = field.clone();
-                let draft = draft.clone();
-                let is_editing = is_editing.clone();
-                let draft_changed = draft_changed.clone();
-                Rc::new(move || {
-                    commit_draft(&field, &draft, &draft_changed);
-                    is_editing.set(false);
-                })
-            }),
-            ..Default::default()
-        });
+        let input = TextField::new(self.mixed_value_label.clone().unwrap_or_default(), text)
+            .decoration(crate::primitives::text::text_field::TextFieldDecoration {
+                size: self.size,
+                ..Default::default()
+            })
+            .behavior(crate::primitives::text::text_field::TextFieldBehavior {
+                disabled: !self.is_enabled,
+                ..Default::default()
+            })
+            .events(TextFieldEvents {
+                on_submit: Some({
+                    let field = field.clone();
+                    let draft = draft.clone();
+                    let draft_changed = draft_changed.clone();
+                    Rc::new(move || commit_draft(&field, &draft, &draft_changed))
+                }),
+                on_key_down: Some({
+                    let field = field.clone();
+                    let draft = draft.clone();
+                    let draft_changed = draft_changed.clone();
+                    Rc::new(move |event: &cove_platform::KeyEvent| {
+                        if event.scancode != crate::Scancode::ARROW_UP
+                            && event.scancode != crate::Scancode::ARROW_DOWN
+                        {
+                            return false;
+                        }
+                        let multiplier = if event.modifiers.has_shift() {
+                            10.0
+                        } else if event.modifiers.has_alt() {
+                            0.1
+                        } else {
+                            1.0
+                        };
+                        let by = if event.scancode == crate::Scancode::ARROW_UP {
+                            multiplier
+                        } else {
+                            -multiplier
+                        };
+                        adjust(&field, &draft, &draft_changed, by);
+                        true
+                    })
+                }),
+                on_focus: Some({
+                    let draft = draft.clone();
+                    let is_editing = is_editing.clone();
+                    let draft_changed = draft_changed.clone();
+                    let committed = committed_buffer.clone();
+                    Rc::new(move || {
+                        if !is_editing.get() {
+                            draft.set(committed.clone());
+                            draft_changed.set(false);
+                            is_editing.set(true);
+                        }
+                    })
+                }),
+                on_blur: Some({
+                    let field = field.clone();
+                    let draft = draft.clone();
+                    let is_editing = is_editing.clone();
+                    let draft_changed = draft_changed.clone();
+                    Rc::new(move || {
+                        commit_draft(&field, &draft, &draft_changed);
+                        is_editing.set(false);
+                    })
+                }),
+                ..Default::default()
+            });
 
         let styled = match self.prefix.clone() {
             Some(prefix) => AnyView::new(NumberFieldPrefixed {
@@ -326,7 +338,11 @@ impl NumberField {
 
 /// The value an edit starts from: the parsed draft while editing, else the bound
 /// value.
-fn current_value(field: &NumberField, draft: &cove_core::State<TextBuffer>, is_editing: &cove_core::State<bool>) -> f32 {
+fn current_value(
+    field: &NumberField,
+    draft: &cove_core::State<TextBuffer>,
+    is_editing: &cove_core::State<bool>,
+) -> f32 {
     if is_editing.get() {
         field
             .parse_value(&draft.get().string_value())
@@ -429,14 +445,10 @@ impl PrimitiveView for NumberFieldPrefixed {
         let is_editing = self.is_editing.clone();
         let prefix = self.prefix.clone();
         let chip_value = current_value(&field, &draft, &is_editing);
-        let scrub = NumericScrub::new(
-            field.resolved_step() / 4.0,
-            field.reset_value,
-            {
-                let field = field.clone();
-                move |value: f32| field.clamped(value)
-            },
-        );
+        let scrub = NumericScrub::new(field.resolved_step() / 4.0, field.reset_value, {
+            let field = field.clone();
+            move |value: f32| field.clamped(value)
+        });
         let title = prefix.title.clone();
         let tint = prefix.tint.clone();
         let chip = NumericScrubHandle::new(
@@ -449,18 +461,24 @@ impl PrimitiveView for NumberFieldPrefixed {
             },
             scrub,
             field.is_enabled,
-            NumberFieldChip { title: title.clone(), tint: tint.clone(), is_enabled: field.is_enabled },
-        );
-        let input = AnyView::new(
-            NumericPrefixStyled {
-                input: self.input.clone(),
-                style: NumericPrefixFieldStyle::new(chip),
+            NumberFieldChip {
+                title: title.clone(),
+                tint: tint.clone(),
+                is_enabled: field.is_enabled,
             },
         );
+        let input = AnyView::new(NumericPrefixStyled {
+            input: self.input.clone(),
+            style: NumericPrefixFieldStyle::new(chip),
+        });
         let _ = node;
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(input.flex_with(1.0, 1.0, Some(0.0))),
             )
             .frame(None, None, None, Some(height), None, None),
@@ -499,8 +517,7 @@ impl PrimitiveView for NumericPrefixStyled {
 }
 crate::impl_primitive_view!(NumericPrefixStyled);
 
-impl NumberField {
-}
+impl NumberField {}
 
 /// The prefix chip's label.
 struct NumberFieldChip {
@@ -522,13 +539,21 @@ impl PrimitiveView for NumberFieldChip {
 
     fn update_node(&self, node: &Node) {
         let resolved = self.tint.resolve(&theme_for_node(node));
-        node.set_background_color(Some(resolved.multiplied_alpha(if self.is_enabled { 0.12 } else { 0.05 })));
+        node.set_background_color(Some(resolved.multiplied_alpha(if self.is_enabled {
+            0.12
+        } else {
+            0.05
+        })));
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::Center, Wrap::NoWrap, 0.0,
+                FlexDirection::Row,
+                Align::Center,
+                Justify::Center,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(
                     Text::new(self.title.clone())
                         .semantic_font(SemanticFontRef::label())
@@ -568,10 +593,10 @@ impl PrimitiveView for NumberFieldStepper {
         let current = current_value(&self.field, &self.draft, &self.is_editing);
         // Stepping past a bound is a no-op, so the button reports it instead of
         // swallowing the press.
-        let can_step_up = self.field.is_enabled
-            && self.field.max_value.is_none_or(|max| current < max);
-        let can_step_down = self.field.is_enabled
-            && self.field.min_value.is_none_or(|min| current > min);
+        let can_step_up =
+            self.field.is_enabled && self.field.max_value.is_none_or(|max| current < max);
+        let can_step_down =
+            self.field.is_enabled && self.field.min_value.is_none_or(|min| current > min);
         let up = step_button("Increment", can_step_up, {
             let field = self.field.snapshot();
             let draft = self.draft.clone();
@@ -584,22 +609,24 @@ impl PrimitiveView for NumberFieldStepper {
             let draft_changed = self.draft_changed.clone();
             move || adjust(&field, &draft, &draft_changed, -1.0)
         });
-        vec![AnyView::new(
-            Row::new(
-                VerticalAlignment::Center,
-                2.0,
-                AnyView::new(TupleView::new(vec![
-                    AnyView::new(self.input.clone().flex(1.0)),
-                    AnyView::new(
-                        BoxView::new(
-                            FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 1.0,
-                            AnyView::new(TupleView::new(vec![up, down])),
-                        )
-                        .frame_min_width(22.0),
-                    ),
-                ])),
-            ),
-        )]
+        vec![AnyView::new(Row::new(
+            VerticalAlignment::Center,
+            2.0,
+            AnyView::new(TupleView::new(vec![
+                AnyView::new(self.input.clone().flex(1.0)),
+                AnyView::new(
+                    BoxView::new(
+                        FlexDirection::Column,
+                        Align::Stretch,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        1.0,
+                        AnyView::new(TupleView::new(vec![up, down])),
+                    )
+                    .frame_min_width(22.0),
+                ),
+            ])),
+        ))]
     }
 }
 crate::impl_primitive_view!(NumberFieldStepper);
@@ -649,7 +676,11 @@ impl ButtonStyle for NumberStepButtonStyle {
         AnyView::new(NumberStepChrome {
             label: configuration.label.clone(),
             fill,
-            border: if configuration.is_focused { theme.colors.focus_ring } else { Color::CLEAR },
+            border: if configuration.is_focused {
+                theme.colors.focus_ring
+            } else {
+                Color::CLEAR
+            },
             border_width: if configuration.is_focused { 1.0 } else { 0.0 },
             radius: theme.radius.sm,
             alpha: if configuration.is_enabled { 1.0 } else { 0.45 },
@@ -689,7 +720,11 @@ impl PrimitiveView for NumberStepChrome {
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::Center, Wrap::NoWrap, 0.0,
+                FlexDirection::Row,
+                Align::Center,
+                Justify::Center,
+                Wrap::NoWrap,
+                0.0,
                 self.label.clone(),
             )
             .padding_edges(5.0, 1.0)

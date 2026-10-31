@@ -22,7 +22,7 @@ use crate::primitives::controls::fields::vec3_model::{
 };
 use crate::primitives::text::text_field::TextFieldSize;
 use crate::theme::SemanticColorRef;
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, TupleView, View};
+use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_view};
 
 /// Axis chip width used when the row has room for three side by side.
 pub const AXIS_BASIS: f32 = 96.0;
@@ -166,7 +166,9 @@ impl Vec3Field {
         if !self.is_enabled {
             return;
         }
-        let Some(read) = self.on_paste.as_ref() else { return };
+        let Some(read) = self.on_paste.as_ref() else {
+            return;
+        };
         if let Some(vector) = read() {
             self.write(vector);
         }
@@ -254,7 +256,11 @@ impl PrimitiveView for Vec3Row {
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::Wrap, 8.0,
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::Wrap,
+                8.0,
                 self.axes.clone(),
             )
             .frame_min_width(self.minimum_width),

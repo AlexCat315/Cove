@@ -88,8 +88,11 @@ impl BlinkTimer {
         self.is_visible.set(true);
         // Two half-periods make one full cycle, so a linear 1.2 s repeat gives a
         // 600 ms on / 600 ms off phase.
-        let animation = Animation::new(INTERVAL_SECONDS * 2.0, cove_core::scene::AnimationCurve::Linear)
-            .repeat_forever(false);
+        let animation = Animation::new(
+            INTERVAL_SECONDS * 2.0,
+            cove_core::scene::AnimationCurve::Linear,
+        )
+        .repeat_forever(false);
         let visible = self.is_visible.clone();
         let toggle = self.on_toggle.clone();
         let controller = AnimationController::new(0.0_f64, 1.0, animation, 0.0, move |progress| {

@@ -1,10 +1,10 @@
 //! Translation of Primitives/Controls/FieldLabel.swift.
-use cove_core::scene::{AccessibilitySemantics, FocusChainHolder, LayoutNode, Node};
-use crate::{AnyView, PrimitiveView, View, ViewKind};
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::modifiers::style::AppearanceExt;
 use crate::theme::styles::buttons::{ButtonStyle, ButtonStyleConfiguration, ButtonStyleViewExt};
+use crate::{AnyView, PrimitiveView, View, ViewKind};
+use cove_core::scene::{AccessibilitySemantics, FocusChainHolder, LayoutNode, Node};
 
 #[derive(Clone, Debug, Default)]
 pub struct FieldLabelOptions {
@@ -22,7 +22,10 @@ pub struct FieldLabel {
 
 impl FieldLabel {
     pub fn new(title: impl Into<String>) -> Self {
-        Self { title: title.into(), options: FieldLabelOptions::default() }
+        Self {
+            title: title.into(),
+            options: FieldLabelOptions::default(),
+        }
     }
     pub fn configure(mut self, configure: impl FnOnce(&mut FieldLabelOptions)) -> Self {
         configure(&mut self.options);
@@ -32,7 +35,10 @@ impl FieldLabel {
 
 impl View for FieldLabel {
     fn body(&self) -> AnyView {
-        AnyView::new(FieldLabelHost { title: self.title.clone(), options: self.options.clone() })
+        AnyView::new(FieldLabelHost {
+            title: self.title.clone(),
+            options: self.options.clone(),
+        })
     }
 }
 
@@ -64,17 +70,29 @@ impl PrimitiveView for FieldLabelHost {
         let label = self.title.clone();
         let help = self.options.help.clone();
         let button = crate::primitives::controls::button::Button::new(text, move || {
-            let Some(node) = Node::upgrade(&weak_node) else { return };
+            let Some(node) = Node::upgrade(&weak_node) else {
+                return;
+            };
             let mut root = node.clone();
-            while root.attachment::<bool>(crate::primitives::controls::form::label_scope::FORM_LABEL_SCOPE_KEY) != Some(true) {
+            while root.attachment::<bool>(
+                crate::primitives::controls::form::label_scope::FORM_LABEL_SCOPE_KEY,
+            ) != Some(true)
+            {
                 let Some(parent) = root.parent() else { break };
                 root = parent;
             }
             fn find(candidate: &Node, target_id: &str) -> Option<Node> {
-                if candidate.is_focusable() && candidate.accessibility().is_some_and(|semantics| semantics.identifier == target_id) {
+                if candidate.is_focusable()
+                    && candidate
+                        .accessibility()
+                        .is_some_and(|semantics| semantics.identifier == target_id)
+                {
                     return Some(candidate.clone());
                 }
-                candidate.children().iter().find_map(|child| find(child, target_id))
+                candidate
+                    .children()
+                    .iter()
+                    .find_map(|child| find(child, target_id))
             }
             if let Some(target) = find(&root, &target_id)
                 && let Some(chain) = FocusChainHolder::current()
@@ -105,8 +123,16 @@ struct FieldLabelStyle;
 
 impl ButtonStyle for FieldLabelStyle {
     fn make_body(&self, configuration: ButtonStyleConfiguration) -> AnyView {
-        let label = configuration.label.flex(0.0).shrink(1.0).frame_min_width(0.0);
-        let border = if configuration.is_focused { configuration.theme.colors.focus_ring } else { cove_core::Color::CLEAR };
+        let label = configuration
+            .label
+            .flex(0.0)
+            .shrink(1.0)
+            .frame_min_width(0.0);
+        let border = if configuration.is_focused {
+            configuration.theme.colors.focus_ring
+        } else {
+            cove_core::Color::CLEAR
+        };
         AnyView::new(
             crate::BoxView::new(
                 cove_core::scene::FlexDirection::Row,

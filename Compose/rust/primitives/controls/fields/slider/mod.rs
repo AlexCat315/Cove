@@ -6,5 +6,5 @@ pub mod slider;
 
 pub use geometry::{SliderAxis, SliderGeometry};
 pub use host::SliderHost;
-pub use paint::{ticks, SliderTick};
+pub use paint::{SliderTick, ticks};
 pub use slider::Slider;

@@ -1,12 +1,12 @@
 //! Translation of Theme/Styles/Buttons/TabButtonStyle.swift.
-use cove_core::scene::{with_animation, Align, Animation, Edge, FlexDirection, Justify, LayoutNode, Node};
 use cove_core::Color;
-
-use crate::theme::styles::components::selection_appearance::{
-    SelectionAppearance, SelectionRole,
+use cove_core::scene::{
+    Align, Animation, Edge, FlexDirection, Justify, LayoutNode, Node, with_animation,
 };
+
+use crate::theme::styles::components::selection_appearance::{SelectionAppearance, SelectionRole};
 use crate::theme::{SemanticColorRef, SemanticFontRef, SemanticStyleViewExt, Theme};
-use crate::{impl_primitive_view, AnyView};
+use crate::{AnyView, impl_primitive_view};
 
 use super::button_style::{ButtonInteractionKey, ButtonStyle, ButtonStyleConfiguration};
 
@@ -89,7 +89,11 @@ impl crate::PrimitiveView for TabChrome {
         let fill = self
             .appearance
             .fill(self.is_selected, self.is_hovered, self.is_pressed);
-        let border = if self.is_focused { self.theme.colors.focus_ring } else { Color::CLEAR };
+        let border = if self.is_focused {
+            self.theme.colors.focus_ring
+        } else {
+            Color::CLEAR
+        };
         let border_width = if self.is_focused { 1.0 } else { 0.0 };
         let animate = node
             .attachment::<ButtonInteractionKey>(TAB_KEY)
@@ -98,9 +102,14 @@ impl crate::PrimitiveView for TabChrome {
         let apply = || {
             let owner = node.clone();
             let current = node.background_color();
-            node.animatable_set_optional("tab.backgroundColor", current, Some(fill), move |value| {
-                owner.set_background_color(value);
-            });
+            node.animatable_set_optional(
+                "tab.backgroundColor",
+                current,
+                Some(fill),
+                move |value| {
+                    owner.set_background_color(value);
+                },
+            );
             let owner = node.clone();
             let current = node.border_color();
             node.animatable_set_optional("tab.borderColor", current, Some(border), move |value| {
@@ -159,7 +168,11 @@ impl crate::PrimitiveView for TabChrome {
                 min_height: (self.height - self.top - self.bottom).max(0.0),
             }),
             AnyView::new(TabIndicator {
-                color: if self.is_selected { self.theme.colors.accent } else { Color::CLEAR },
+                color: if self.is_selected {
+                    self.theme.colors.accent
+                } else {
+                    Color::CLEAR
+                },
             }),
         ]
     }

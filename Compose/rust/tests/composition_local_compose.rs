@@ -85,11 +85,11 @@ fn modifier_writes_onto_wrapper() {
         let local = std::rc::Rc::new(CompositionLocal::constant(0i32));
         let graph = support::graph();
         graph.install_view(
-            AnyView::new(AnyView::new(helpers::boxed(DebugNode::new("leaf")))
-                .with_modifier(cove_composition::ProvideCompositionLocalModifier::new(
-                    local.clone(),
-                    99,
-                ))),
+            AnyView::new(
+                AnyView::new(helpers::boxed(DebugNode::new("leaf"))).with_modifier(
+                    cove_composition::ProvideCompositionLocalModifier::new(local.clone(), 99),
+                ),
+            ),
             Default::default(),
         );
 
@@ -106,11 +106,14 @@ fn descendants_resolve_provider() {
         let local = std::rc::Rc::new(CompositionLocal::constant("default".to_string()));
         let graph = support::graph();
         graph.install_view(
-            AnyView::new(AnyView::new(helpers::boxed(DebugNode::new("x")))
-                .with_modifier(cove_composition::ProvideCompositionLocalModifier::new(
-                    local.clone(),
-                    "themed".to_string(),
-                ))),
+            AnyView::new(
+                AnyView::new(helpers::boxed(DebugNode::new("x"))).with_modifier(
+                    cove_composition::ProvideCompositionLocalModifier::new(
+                        local.clone(),
+                        "themed".to_string(),
+                    ),
+                ),
+            ),
             Default::default(),
         );
 

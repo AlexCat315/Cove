@@ -6,10 +6,10 @@ use super::surface::SurfaceState;
 use super::touch_input::TouchInput;
 use crate::desktop::diagnostics::integration::{DevToolsConfiguration, DiagnosticMemorySnapshot};
 use cove_composition::adaptive::SurfaceEnvironmentExt;
-use cove_core::scene::ComponentSourceLocation;
 use cove_composition::{
     AnyView, LayoutDebugAttachmentKey, PrimitiveView, View, ViewGraph, ViewKind,
 };
+use cove_core::scene::ComponentSourceLocation;
 use cove_core::scene::{
     AnimatorScheduler, EventDispatcher, NodeRenderer, NodeTree, PlatformInputContext, Recomposer,
     RenderTree, TextEditActions, TextEditCommand, TextInputAttachmentKey, TextInputClient,
@@ -46,7 +46,9 @@ impl PrimitiveView for AndroidAdaptiveSurface {
 
     fn children(&self, _node: &cove_core::scene::Node) -> Vec<AnyView> {
         let environment = self.environment.get();
-        vec![AnyView::new(cove_composition::AnyView::new(self.content.clone()).surface_environment(environment))]
+        vec![AnyView::new(
+            cove_composition::AnyView::new(self.content.clone()).surface_environment(environment),
+        )]
     }
 }
 
@@ -121,16 +123,23 @@ impl AndroidContentSession {
             surface,
         };
         session.with_current(|| {
-            let graph = session
-                .graph
-                .get_or_init(|| Rc::new(ViewGraph::new(session.tree.clone(), session.recomposer.clone())));
+            let graph = session.graph.get_or_init(|| {
+                Rc::new(ViewGraph::new(
+                    session.tree.clone(),
+                    session.recomposer.clone(),
+                ))
+            });
             let view = AnyView::new(AndroidAdaptiveSurface {
                 content,
                 environment: session.surface.value(),
             });
             graph.install_view(
                 view,
-                ComponentSourceLocation::new("android", "Hosts/rust/android/integration/scene.rs", 0),
+                ComponentSourceLocation::new(
+                    "android",
+                    "Hosts/rust/android/integration/scene.rs",
+                    0,
+                ),
             );
         });
         session
@@ -187,23 +196,48 @@ impl AndroidContentSession {
         if let Some(previous) = self.diagnostics.borrow_mut().as_mut() {
             previous.stop();
         }
-        let graph = self.graph.get().cloned().ok_or("scene graph is not installed")?;
+        let graph = self
+            .graph
+            .get()
+            .cloned()
+            .ok_or("scene graph is not installed")?;
         // The image registry is shared, so the closure can own it instead of
         // borrowing the scene environment for its whole lifetime.
         let images = self.environment.images().clone();
-        let shaping = self.environment.text().map(|text| text.shaping_cache_snapshot());
-        let layout = self.environment.text().map(|text| text.layout_cache_snapshot());
+        let shaping = self
+            .environment
+            .text()
+            .map(|text| text.shaping_cache_snapshot());
+        let layout = self
+            .environment
+            .text()
+            .map(|text| text.layout_cache_snapshot());
         let memory = {
             let graph = graph.clone();
             Rc::new(move || DiagnosticMemorySnapshot {
                 counters: [
-                    ("shapingEntries".to_owned(), shaping.map_or(0, |cache| cache.entries as u64)),
-                    ("shapingBytes".to_owned(), shaping.map_or(0, |cache| cache.estimated_bytes as u64)),
-                    ("layoutEntries".to_owned(), layout.map_or(0, |cache| cache.entries as u64)),
-                    ("layoutBytes".to_owned(), layout.map_or(0, |cache| cache.estimated_bytes as u64)),
+                    (
+                        "shapingEntries".to_owned(),
+                        shaping.map_or(0, |cache| cache.entries as u64),
+                    ),
+                    (
+                        "shapingBytes".to_owned(),
+                        shaping.map_or(0, |cache| cache.estimated_bytes as u64),
+                    ),
+                    (
+                        "layoutEntries".to_owned(),
+                        layout.map_or(0, |cache| cache.entries as u64),
+                    ),
+                    (
+                        "layoutBytes".to_owned(),
+                        layout.map_or(0, |cache| cache.estimated_bytes as u64),
+                    ),
                     ("imageEntries".to_owned(), images.cached_count() as u64),
                     ("imageBytes".to_owned(), images.cached_bytes() as u64),
-                    ("skippedParentUpdates".to_owned(), graph.skipped_parent_updates() as u64),
+                    (
+                        "skippedParentUpdates".to_owned(),
+                        graph.skipped_parent_updates() as u64,
+                    ),
                 ]
                 .into_iter()
                 .collect(),
@@ -297,9 +331,8 @@ impl AndroidContentSession {
     fn with_current<R>(&self, body: impl FnOnce() -> R) -> R {
         let animations = self.animations.clone();
         animations.with_current(|| {
-            self.environment.with_current(self.surface.scale(), || {
-                self.context.with_current(body)
-            })
+            self.environment
+                .with_current(self.surface.scale(), || self.context.with_current(body))
         })
     }
 
@@ -526,14 +559,9 @@ impl AndroidContentSession {
         let dispatcher = self.dispatcher();
         self.with_current(|| {
             if kind == 2 || kind == 3 {
-                if let Some(actions) = self
-                    .context
-                    .focus_chain
-                    .focused()
-                    .and_then(|node| {
-                        node.attachment::<TextEditActions>(TextInputAttachmentKey::EDIT_ACTIONS)
-                    })
-                {
+                if let Some(actions) = self.context.focus_chain.focused().and_then(|node| {
+                    node.attachment::<TextEditActions>(TextInputAttachmentKey::EDIT_ACTIONS)
+                }) {
                     (actions.perform)(if kind == 2 {
                         TextEditCommand::Undo
                     } else {
@@ -586,4 +614,3 @@ impl AndroidContentSession {
     // `inspect()` — the explicit diagnostic snapshot — lives in `inspection.rs`,
     // mirroring the Swift extension on `HostedScene`.
 }
-

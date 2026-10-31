@@ -11,18 +11,19 @@
 use std::rc::Rc;
 
 use cove_core::scene::{
-    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, AccessibilityState, EventPhase,
-    EventResult, FocusChainHolder, HoverPhase, InputHandlerRoute, InteractionRegistryHolder,
-    LayoutNode, Node, PointerCaptureHolder, PointerPhase, Rect,
+    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, AccessibilityState,
+    EventPhase, EventResult, FocusChainHolder, HoverPhase, InputHandlerRoute,
+    InteractionRegistryHolder, LayoutNode, Node, PointerCaptureHolder, PointerPhase, Rect,
 };
 use cove_core::{Binding, Point};
 use cove_platform::{MouseButton, SystemCursor};
 
 use crate::primitives::controls::adaptive::{apply_touch_control_extent, supports_control_hover};
-use crate::theme::styles::components::{AnySliderStyle, SliderStyleConfiguration, SliderStyleEnvironment};
+use crate::theme::styles::components::{
+    AnySliderStyle, SliderStyleConfiguration, SliderStyleEnvironment,
+};
 use crate::theme::theme_for_node;
-use crate::{impl_primitive_view, AnyView, PrimitiveView, View};
-
+use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
 
 const PRESSED: &str = "__range_slider_pressed";
 const HOVERED: &str = "__range_slider_hovered";
@@ -106,13 +107,21 @@ impl RangeSlider {
 
     /// A non-finite or non-positive step is dropped, as in the source.
     pub fn step(mut self, step: f64) -> Self {
-        self.step = if step.is_finite() && step > 0.0 { Some(step) } else { None };
+        self.step = if step.is_finite() && step > 0.0 {
+            Some(step)
+        } else {
+            None
+        };
         self
     }
 
     /// The gap the thumbs must keep; a non-finite value becomes zero.
     pub fn minimum_span(mut self, minimum_span: f64) -> Self {
-        self.minimum_span = if minimum_span.is_finite() { minimum_span.max(0.0) } else { 0.0 };
+        self.minimum_span = if minimum_span.is_finite() {
+            minimum_span.max(0.0)
+        } else {
+            0.0
+        };
         self
     }
 
@@ -166,7 +175,11 @@ impl RangeGeometry {
     fn normalized(self, raw: RangeValue) -> RangeValue {
         let lower = raw.lower.clamp(self.range.0, self.range.1);
         let upper = raw.upper.clamp(self.range.0, self.range.1);
-        if lower <= upper { RangeValue::new(lower, upper) } else { RangeValue::new(self.range.0, self.range.1) }
+        if lower <= upper {
+            RangeValue::new(lower, upper)
+        } else {
+            RangeValue::new(self.range.0, self.range.1)
+        }
     }
 
     fn snap(self, raw: f64) -> f64 {
@@ -232,7 +245,11 @@ fn active_thumb(node: &Node) -> RangeThumb {
 }
 
 fn format_value(value: f64) -> String {
-    if value == value.round() { format!("{}", value as i64) } else { format!("{value:.2}") }
+    if value == value.round() {
+        format!("{}", value as i64)
+    } else {
+        format!("{value:.2}")
+    }
 }
 
 /// The leaf range slider: one hit-testable node owning both thumbs.
@@ -247,7 +264,11 @@ pub struct RangeSliderHost {
 
 impl RangeSliderHost {
     fn geometry(&self) -> RangeGeometry {
-        RangeGeometry { range: self.range, step: self.step, minimum_span: self.minimum_span }
+        RangeGeometry {
+            range: self.range,
+            step: self.step,
+            minimum_span: self.minimum_span,
+        }
     }
 
     fn current(&self) -> RangeValue {
@@ -301,7 +322,10 @@ impl PrimitiveView for RangeSliderHost {
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Group,
             label: "Range".to_string(),
-            state: AccessibilityState { is_enabled: self.is_enabled, ..Default::default() },
+            state: AccessibilityState {
+                is_enabled: self.is_enabled,
+                ..Default::default()
+            },
             combines_children: false,
             ..Default::default()
         }));
@@ -351,23 +375,32 @@ impl PrimitiveView for RangeSliderHost {
                 active_thumb(node),
             ),
             move |list, origin| {
-                let Some(owner) = Node::upgrade(&weak) else { return };
+                let Some(owner) = Node::upgrade(&weak) else {
+                    return;
+                };
                 snapshot.render(&owner, list, origin);
             },
         );
 
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         if !self.is_enabled {
             registry.remove(node);
             return;
         }
 
         let hover_node = node.downgrade();
-        registry.set_hover(node, Rc::new(move |phase| {
-            let Some(owner) = Node::upgrade(&hover_node) else { return };
-            let next = phase == HoverPhase::Enter && supports_control_hover(&owner);
-            set_interaction(&owner, HOVERED, next);
-        }));
+        registry.set_hover(
+            node,
+            Rc::new(move |phase| {
+                let Some(owner) = Node::upgrade(&hover_node) else {
+                    return;
+                };
+                let next = phase == HoverPhase::Enter && supports_control_hover(&owner);
+                set_interaction(&owner, HOVERED, next);
+            }),
+        );
 
         let pointer = self.snapshot();
         let pointer_node = node.downgrade();
@@ -378,7 +411,9 @@ impl PrimitiveView for RangeSliderHost {
                 if event.button != MouseButton::Left {
                     return EventResult::Ignored;
                 }
-                let Some(owner) = Node::upgrade(&pointer_node) else { return EventResult::Ignored };
+                let Some(owner) = Node::upgrade(&pointer_node) else {
+                    return EventResult::Ignored;
+                };
                 match phase {
                     PointerPhase::Down => {
                         if let Some(capture) = PointerCaptureHolder::current() {
@@ -391,7 +426,9 @@ impl PrimitiveView for RangeSliderHost {
                         }
                         pointer.choose_thumb(&owner, event.x);
                         pointer.write_at(&owner, event.x);
-                        owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("rangeSliderValue"));
+                        owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                            "rangeSliderValue",
+                        ));
                         EventResult::Handled
                     }
                     PointerPhase::Up => {
@@ -419,12 +456,16 @@ impl PrimitiveView for RangeSliderHost {
             node,
             InputHandlerRoute::control(),
             Rc::new(move |event, _phase| {
-                let Some(owner) = Node::upgrade(&motion_node) else { return EventResult::Ignored };
+                let Some(owner) = Node::upgrade(&motion_node) else {
+                    return EventResult::Ignored;
+                };
                 if owner.attachment::<bool>(PRESSED) != Some(true) {
                     return EventResult::Ignored;
                 }
                 motion.write_at(&owner, event.x);
-                owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("rangeSliderValue"));
+                owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                    "rangeSliderValue",
+                ));
                 EventResult::Handled
             }),
         );
@@ -480,7 +521,10 @@ impl RangeSliderHost {
     fn refresh_accessibility(&self, node: &Node) {
         let current = self.current();
         for child in node.children() {
-            let Some(thumb) = child.attachment::<&'static str>("range.thumb").and_then(RangeThumb::from_key) else {
+            let Some(thumb) = child
+                .attachment::<&'static str>("range.thumb")
+                .and_then(RangeThumb::from_key)
+            else {
                 continue;
             };
             let mut semantics = child
@@ -512,7 +556,8 @@ impl RangeSliderHost {
                 is_pressed: node.attachment::<bool>(PRESSED) == Some(true),
                 is_hovered: node.attachment::<bool>(HOVERED) == Some(true),
                 is_focused: FocusChainHolder::current().is_some_and(|chain| {
-                    chain.focused().is_some_and(|focused| focused == *node) && chain.is_focus_visible()
+                    chain.focused().is_some_and(|focused| focused == *node)
+                        && chain.is_focus_visible()
                 }),
                 is_enabled: self.is_enabled,
             },
@@ -523,7 +568,11 @@ impl RangeSliderHost {
         if width <= 0.0 || height <= 0.0 {
             return;
         }
-        let geometry = RangeGeometry { range: self.range, step: self.step, minimum_span: self.minimum_span };
+        let geometry = RangeGeometry {
+            range: self.range,
+            step: self.step,
+            minimum_span: self.minimum_span,
+        };
         let track_y = origin.y + (height - appearance.track_height) * 0.5;
         let _ = list.add_rounded_rect(
             Rect::new(origin.x, track_y, width, appearance.track_height),
@@ -555,7 +604,12 @@ impl RangeSliderHost {
             {
                 let stroke = appearance.thumb_border_width;
                 let _ = list.add_rounded_rect(
-                    Rect::new(rect.x - stroke, rect.y - stroke, rect.width + 2.0 * stroke, rect.height + 2.0 * stroke),
+                    Rect::new(
+                        rect.x - stroke,
+                        rect.y - stroke,
+                        rect.width + 2.0 * stroke,
+                        rect.height + 2.0 * stroke,
+                    ),
                     corner + stroke,
                     border,
                 );
@@ -586,7 +640,11 @@ struct RangeThumbStop {
 
 impl RangeThumbStop {
     fn geometry(&self) -> RangeGeometry {
-        RangeGeometry { range: self.range, step: self.step, minimum_span: self.minimum_span }
+        RangeGeometry {
+            range: self.range,
+            step: self.step,
+            minimum_span: self.minimum_span,
+        }
     }
 
     fn move_to(&self, raw: f64) {
@@ -632,16 +690,25 @@ impl PrimitiveView for RangeThumbStop {
     fn update_node(&self, node: &Node) {
         node.set_is_focusable(self.is_enabled);
         node.set_is_tab_stop(self.is_enabled);
-        node.set_cursor(Some(if self.is_enabled { SystemCursor::Pointer } else { SystemCursor::NotAllowed }));
+        node.set_cursor(Some(if self.is_enabled {
+            SystemCursor::Pointer
+        } else {
+            SystemCursor::NotAllowed
+        }));
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::Slider,
             label: self.thumb.label().to_string(),
             value: format_value(self.value()),
-            state: AccessibilityState { is_enabled: self.is_enabled, ..Default::default() },
+            state: AccessibilityState {
+                is_enabled: self.is_enabled,
+                ..Default::default()
+            },
             ..Default::default()
         }));
 
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         if !self.is_enabled {
             registry.remove(node);
             node.set_accessibility_actions(AccessibilityActions::default());
@@ -666,8 +733,12 @@ impl PrimitiveView for RangeThumbStop {
                     return EventResult::Ignored;
                 }
                 match event.scancode {
-                    crate::Scancode::ARROW_LEFT | crate::Scancode::ARROW_DOWN => key.move_by(-increment),
-                    crate::Scancode::ARROW_RIGHT | crate::Scancode::ARROW_UP => key.move_by(increment),
+                    crate::Scancode::ARROW_LEFT | crate::Scancode::ARROW_DOWN => {
+                        key.move_by(-increment)
+                    }
+                    crate::Scancode::ARROW_RIGHT | crate::Scancode::ARROW_UP => {
+                        key.move_by(increment)
+                    }
                     crate::Scancode::HOME => key.move_to(key.range.0),
                     crate::Scancode::END => key.move_to(key.range.1),
                     _ => return EventResult::Ignored,
@@ -692,4 +763,3 @@ impl RangeThumbStop {
     }
 }
 impl_primitive_view!(RangeThumbStop);
-

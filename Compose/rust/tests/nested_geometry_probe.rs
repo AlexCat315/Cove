@@ -5,8 +5,8 @@ mod support;
 
 use cove_composition::{AnyView, TupleView};
 use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
-use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::BoxView;
+use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use support::GlobalTestLock;
 
 fn boxed(width: f32, height: f32) -> AnyView {

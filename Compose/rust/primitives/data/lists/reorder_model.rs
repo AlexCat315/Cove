@@ -69,7 +69,8 @@ impl ReorderDragSession {
     pub fn move_by(&self, travel: f32) {
         let row_height = self.row_height.get();
         let ceiling = (self.viewport_height.get() - row_height).max(0.0);
-        self.preview_top.set((self.start_top.get() + travel).clamp(0.0, ceiling));
+        self.preview_top
+            .set((self.start_top.get() + travel).clamp(0.0, ceiling));
     }
 
     pub fn end(&self) {
@@ -88,7 +89,13 @@ impl ReorderableListModel {
     ///
     /// `travel` is pointer movement and `scrolled` is automatic scrolling since
     /// the drag began; their sum is the displacement in content coordinates.
-    pub fn drop_boundary(source: usize, travel: f32, scrolled: f32, row_stride: f32, count: usize) -> usize {
+    pub fn drop_boundary(
+        source: usize,
+        travel: f32,
+        scrolled: f32,
+        row_stride: f32,
+        count: usize,
+    ) -> usize {
         let stride = row_stride.max(1.0);
         let offset = ((travel + scrolled) / stride).round() as i64;
         let boundary = source as i64 + offset;
@@ -101,7 +108,11 @@ impl ReorderableListModel {
     /// A boundary past the source shifts back by one because removing the row
     /// closes the gap it left.
     pub fn destination(source: usize, boundary: usize) -> Option<usize> {
-        let destination = if boundary > source { boundary - 1 } else { boundary };
+        let destination = if boundary > source {
+            boundary - 1
+        } else {
+            boundary
+        };
         (destination != source).then_some(destination)
     }
 
@@ -153,12 +164,21 @@ impl ReorderableListModel {
 /// control extent on a touch surface so the row is at least a finger target.
 pub fn reorder_row_height(scaled: f32, is_touch: bool, minimum_control_extent: f32) -> f32 {
     // `max(scaler.scale(rowHeight), isTouch ? minimumControlExtent : 0)`.
-    let floor = if is_touch { minimum_control_extent } else { 0.0 };
+    let floor = if is_touch {
+        minimum_control_extent
+    } else {
+        0.0
+    };
     scaled.max(floor)
 }
 
 /// The painted y of the drop indicator for `boundary`.
-pub fn drop_indicator_y(boundary: usize, count: usize, row_stride: f32, content_height: f32) -> f32 {
+pub fn drop_indicator_y(
+    boundary: usize,
+    count: usize,
+    row_stride: f32,
+    content_height: f32,
+) -> f32 {
     if boundary >= count {
         (content_height - 2.0).max(0.0)
     } else {
@@ -183,7 +203,10 @@ impl ReorderPreviewOffset {
     /// Applies `preview_top` through the node's content offset.
     pub fn apply(&self, preview_top: f32) {
         if let Some(node) = self.0.borrow().as_ref() {
-            node.set_content_offset(cove_core::Point { x: 0.0, y: -preview_top });
+            node.set_content_offset(cove_core::Point {
+                x: 0.0,
+                y: -preview_top,
+            });
         }
     }
 }

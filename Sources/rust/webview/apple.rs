@@ -13,7 +13,9 @@
 //! representable on a child `NSView` and are intentionally not faked.
 #![cfg(any(target_os = "macos", target_os = "ios"))]
 
-use super::{WebViewCommand, WebViewGeometry, WebViewHost, WebViewRequest, WebViewState, WebViewSurface};
+use super::{
+    WebViewCommand, WebViewGeometry, WebViewHost, WebViewRequest, WebViewState, WebViewSurface,
+};
 use crate::webview::WebViewPhase;
 use objc2::rc::Retained;
 use objc2::runtime::{NSObject, NSObjectProtocol};
@@ -57,7 +59,9 @@ impl AppleSurfaceState {
         // A link inside a local document leaves HTML mode. Keep reporting the
         // real URL from that point so Back/Forward and status text stay honest.
         let current_url = self.web_view.as_ref().and_then(|web_view| {
-            unsafe { web_view.URL() }.and_then(|url| url.absoluteString()).map(|value| value.to_string())
+            unsafe { web_view.URL() }
+                .and_then(|url| url.absoluteString())
+                .map(|value| value.to_string())
         });
         if self.loads_html
             && let Some(url) = &current_url
@@ -99,7 +103,9 @@ impl AppleSurfaceState {
         self.state.error_description = Some(description.to_string());
         if !self.loads_html && self.state.url.is_none() {
             self.state.url = self.web_view.as_ref().and_then(|web_view| {
-                unsafe { web_view.URL() }.and_then(|url| url.absoluteString()).map(|value| value.to_string())
+                unsafe { web_view.URL() }
+                    .and_then(|url| url.absoluteString())
+                    .map(|value| value.to_string())
             });
         }
         self.publish();
@@ -131,7 +137,11 @@ define_class!(
     // SAFETY: every selector below matches `WKNavigationDelegate`.
     unsafe impl WKNavigationDelegate for AppleNavigationDelegate {
         #[unsafe(method(webView:didStartProvisionalNavigation:))]
-        fn did_start_provisional_navigation(&self, _web_view: &WKWebView, _navigation: Option<&WKNavigation>) {
+        fn did_start_provisional_navigation(
+            &self,
+            _web_view: &WKWebView,
+            _navigation: Option<&WKNavigation>,
+        ) {
             if let Some(surface) = self.ivars().surface.upgrade() {
                 surface.borrow_mut().navigation_started();
             }
@@ -152,20 +162,34 @@ define_class!(
         }
 
         #[unsafe(method(webView:didFailNavigation:withError:))]
-        fn did_fail_navigation(&self, _web_view: &WKWebView, _navigation: Option<&WKNavigation>, error: &objc2_foundation::NSError) {
+        fn did_fail_navigation(
+            &self,
+            _web_view: &WKWebView,
+            _navigation: Option<&WKNavigation>,
+            error: &objc2_foundation::NSError,
+        ) {
             let cancelled = error.code() == NS_URL_ERROR_CANCELLED;
             let description = error.localizedDescription().to_string();
             if let Some(surface) = self.ivars().surface.upgrade() {
-                surface.borrow_mut().navigation_failed(cancelled, &description);
+                surface
+                    .borrow_mut()
+                    .navigation_failed(cancelled, &description);
             }
         }
 
         #[unsafe(method(webView:didFailProvisionalNavigation:withError:))]
-        fn did_fail_provisional_navigation(&self, _web_view: &WKWebView, _navigation: Option<&WKNavigation>, error: &objc2_foundation::NSError) {
+        fn did_fail_provisional_navigation(
+            &self,
+            _web_view: &WKWebView,
+            _navigation: Option<&WKNavigation>,
+            error: &objc2_foundation::NSError,
+        ) {
             let cancelled = error.code() == NS_URL_ERROR_CANCELLED;
             let description = error.localizedDescription().to_string();
             if let Some(surface) = self.ivars().surface.upgrade() {
-                surface.borrow_mut().navigation_failed(cancelled, &description);
+                surface
+                    .borrow_mut()
+                    .navigation_failed(cancelled, &description);
             }
         }
 
@@ -189,7 +213,12 @@ impl AppleNavigationDelegate {
 /// honouring whether that view is flipped.
 fn container_rect(rect: super::Rect, container: &NSView) -> CGRect {
     let bounds = container.bounds();
-    let (x, y, width, height) = (rect.x as f64, rect.y as f64, rect.width as f64, rect.height as f64);
+    let (x, y, width, height) = (
+        rect.x as f64,
+        rect.y as f64,
+        rect.width as f64,
+        rect.height as f64,
+    );
     let top = if container.isFlipped() {
         y - bounds.origin.y
     } else {
@@ -197,7 +226,10 @@ fn container_rect(rect: super::Rect, container: &NSView) -> CGRect {
         bounds.origin.y + bounds.size.height - (y + height)
     };
     CGRect {
-        origin: CGPoint { x: x - bounds.origin.x, y: top },
+        origin: CGPoint {
+            x: x - bounds.origin.x,
+            y: top,
+        },
         size: CGSize { width, height },
     }
 }
@@ -206,7 +238,12 @@ fn container_rect(rect: super::Rect, container: &NSView) -> CGRect {
 /// its full frame inside the smaller clipping container, so the part that is
 /// clipped away must be expressed as a negative origin.
 fn inner_rect(full: super::Rect, visible: super::Rect, container: &NSView) -> CGRect {
-    let (fx, fy, fw, fh) = (full.x as f64, full.y as f64, full.width as f64, full.height as f64);
+    let (fx, fy, fw, fh) = (
+        full.x as f64,
+        full.y as f64,
+        full.width as f64,
+        full.height as f64,
+    );
     let (vx, vy, vh) = (visible.x as f64, visible.y as f64, visible.height as f64);
     // The web view keeps the full frame inside a smaller clipping container.
     let y = if container.isFlipped() {
@@ -216,7 +253,10 @@ fn inner_rect(full: super::Rect, visible: super::Rect, container: &NSView) -> CG
     };
     CGRect {
         origin: CGPoint { x: fx - vx, y },
-        size: CGSize { width: fw, height: fh },
+        size: CGSize {
+            width: fw,
+            height: fh,
+        },
     }
 }
 
@@ -228,7 +268,9 @@ impl AppleWebKitHost {
     /// `window_provider` runs on every geometry update, so the surface can
     /// follow the window it belongs to even when that window changes.
     pub fn new(window_provider: impl Fn() -> Option<Retained<NSWindow>> + 'static) -> Self {
-        Self { window_provider: Rc::new(window_provider) }
+        Self {
+            window_provider: Rc::new(window_provider),
+        }
     }
 }
 
@@ -268,23 +310,38 @@ impl AppleWebKitSurface {
         let Some(mtm) = MainThreadMarker::new() else {
             let mut state = self.state.borrow_mut();
             state.state.phase = WebViewPhase::Failed;
-            state.state.error_description = Some("WebKit surface must be created on the main thread".into());
+            state.state.error_description =
+                Some("WebKit surface must be created on the main thread".into());
             state.publish();
             return;
         };
         let container = NSView::initWithFrame(
             NSView::alloc(mtm),
-            CGRect { origin: CGPoint { x: 0.0, y: 0.0 }, size: CGSize { width: 0.0, height: 0.0 } },
+            CGRect {
+                origin: CGPoint { x: 0.0, y: 0.0 },
+                size: CGSize {
+                    width: 0.0,
+                    height: 0.0,
+                },
+            },
         );
         container.setWantsLayer(true);
         container.setHidden(true);
 
         let configuration = unsafe { WKWebViewConfiguration::new(mtm) };
-        let web_view = unsafe { WKWebView::initWithFrame_configuration(
-            WKWebView::alloc(mtm),
-            CGRect { origin: CGPoint { x: 0.0, y: 0.0 }, size: CGSize { width: 0.0, height: 0.0 } },
-            &configuration,
-        ) };
+        let web_view = unsafe {
+            WKWebView::initWithFrame_configuration(
+                WKWebView::alloc(mtm),
+                CGRect {
+                    origin: CGPoint { x: 0.0, y: 0.0 },
+                    size: CGSize {
+                        width: 0.0,
+                        height: 0.0,
+                    },
+                },
+                &configuration,
+            )
+        };
         unsafe { web_view.setAllowsBackForwardNavigationGestures(true) };
         container.addSubview(&web_view);
 
@@ -313,7 +370,10 @@ impl WebViewSurface for AppleWebKitSurface {
         let Some(web_view) = web_view else { return };
         {
             let mut state = self.state.borrow_mut();
-            state.state = WebViewState { phase: WebViewPhase::Loading, ..WebViewState::default() };
+            state.state = WebViewState {
+                phase: WebViewPhase::Loading,
+                ..WebViewState::default()
+            };
             match request {
                 WebViewRequest::Url(url) => {
                     state.loads_html = false;
@@ -327,16 +387,18 @@ impl WebViewSurface for AppleWebKitSurface {
         }
         match request {
             WebViewRequest::Url(url) => {
-                if let Some(ns_url) = NSURL::URLWithString(&objc2_foundation::NSString::from_str(url)) {
+                if let Some(ns_url) =
+                    NSURL::URLWithString(&objc2_foundation::NSString::from_str(url))
+                {
                     let request = NSURLRequest::requestWithURL(&ns_url);
                     let _ = unsafe { web_view.loadRequest(&request) };
                 }
             }
             WebViewRequest::Html { html, base_url } => {
                 let body = objc2_foundation::NSString::from_str(html);
-                let base = base_url
-                    .as_ref()
-                    .and_then(|url| NSURL::URLWithString(&objc2_foundation::NSString::from_str(url)));
+                let base = base_url.as_ref().and_then(|url| {
+                    NSURL::URLWithString(&objc2_foundation::NSString::from_str(url))
+                });
                 let _ = unsafe { web_view.loadHTMLString_baseURL(&body, base.as_deref()) };
             }
         }
@@ -384,7 +446,9 @@ impl WebViewSurface for AppleWebKitSurface {
             }
             self.ensure_views();
         }
-        let (Some(container), Some(web_view)) = (self.container.clone(), self.state.borrow().web_view.clone()) else {
+        let (Some(container), Some(web_view)) =
+            (self.container.clone(), self.state.borrow().web_view.clone())
+        else {
             return;
         };
         let current_window = (self.window_provider)();
@@ -399,7 +463,10 @@ impl WebViewSurface for AppleWebKitSurface {
             hidden();
             return;
         }
-        let Some(content_view) = current_window.as_ref().and_then(|window| window.contentView()) else {
+        let Some(content_view) = current_window
+            .as_ref()
+            .and_then(|window| window.contentView())
+        else {
             hidden();
             return;
         };

@@ -19,9 +19,8 @@ use std::rc::Rc;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use cove_core::scene::{
-    EventPhase, EventResult, FocusChain, FocusChainHolder, InputHandlerRoute,
-    InteractionRegistry, InteractionRegistryHolder, Node, PointerCapture, PointerCaptureHolder,
-    PointerPhase,
+    EventPhase, EventResult, FocusChain, FocusChainHolder, InputHandlerRoute, InteractionRegistry,
+    InteractionRegistryHolder, Node, PointerCapture, PointerCaptureHolder, PointerPhase,
 };
 use cove_platform::{KeyEvent, MouseButtonEvent};
 
@@ -78,12 +77,18 @@ fn interaction_handler_released_on_removal() {
             registry.set_pointer(
                 &child,
                 InputHandlerRoute::control(),
-                Rc::new(|_: &MouseButtonEvent, _: PointerPhase, _: EventPhase| EventResult::Handled),
+                Rc::new(|_: &MouseButtonEvent, _: PointerPhase, _: EventPhase| {
+                    EventResult::Handled
+                }),
             );
             assert_eq!(registry.count(), 1);
 
             parent.remove_child(&child);
-            assert_eq!(registry.count(), 0, "the node lifecycle released the handler");
+            assert_eq!(
+                registry.count(),
+                0,
+                "the node lifecycle released the handler"
+            );
         });
     });
 }
@@ -106,7 +111,11 @@ fn interaction_released_for_subtree() {
             assert_eq!(registry.count(), 1);
 
             root.remove_child(&mid);
-            assert_eq!(registry.count(), 0, "the whole departing subtree released its handlers");
+            assert_eq!(
+                registry.count(),
+                0,
+                "the whole departing subtree released its handlers"
+            );
         });
     });
 }
@@ -147,7 +156,10 @@ fn focus_cleared_on_removal() {
             assert_eq!(focus.focused().map(|node| node.id()), Some(child.id()));
 
             parent.remove_child(&child);
-            assert!(focus.focused().is_none(), "teardown cleared the focused node");
+            assert!(
+                focus.focused().is_none(),
+                "teardown cleared the focused node"
+            );
         });
     });
 }

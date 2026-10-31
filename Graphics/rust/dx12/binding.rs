@@ -50,7 +50,10 @@ pub fn register_layout(
     }
     registries.binding_layouts.insert(
         handle.id(),
-        Dx12LayoutRecord { entries: descriptor.entries.clone(), root_signature: core::ptr::null_mut() },
+        Dx12LayoutRecord {
+            entries: descriptor.entries.clone(),
+            root_signature: core::ptr::null_mut(),
+        },
     );
     Ok(())
 }
@@ -66,9 +69,10 @@ pub fn register_pipeline_layout(
     // of them, so the declarations are gathered in set order.
     let mut declarations: Vec<BindingLayoutEntry> = Vec::new();
     for layout in &descriptor.set_layouts {
-        let record = registries.binding_layouts.get(&layout.id()).ok_or_else(|| {
-            RhiError::invalid_argument("unknown binding layout")
-        })?;
+        let record = registries
+            .binding_layouts
+            .get(&layout.id())
+            .ok_or_else(|| RhiError::invalid_argument("unknown binding layout"))?;
         declarations.extend(record.entries.iter().copied());
     }
     // D3D12 supports a single root signature per pipeline layout; 64 DWORDS is the
@@ -78,7 +82,9 @@ pub fn register_pipeline_layout(
         "pipeline layout declares too many root parameters",
     )?;
     let root_signature = create_root_signature(device, &declarations, &descriptor.push_constants)?;
-    registries.root_signatures.insert(handle.id(), root_signature);
+    registries
+        .root_signatures
+        .insert(handle.id(), root_signature);
     registries.pipeline_layouts.insert(
         handle.id(),
         super::resources::Dx12PipelineLayoutRecord {
@@ -126,7 +132,11 @@ pub fn register_set(
                     "binding references an unknown texture",
                 )?;
             }
-            crate::rhi::BindingResource::UniformBuffer { buffer, offset, size } => {
+            crate::rhi::BindingResource::UniformBuffer {
+                buffer,
+                offset,
+                size,
+            } => {
                 let record = registries.buffers.get(&buffer.id()).ok_or_else(|| {
                     RhiError::invalid_argument("binding references an unknown buffer")
                 })?;
@@ -159,7 +169,10 @@ pub fn register_set(
     registries.next_descriptor_index = next_index;
     registries.binding_sets.insert(
         handle.id(),
-        super::resources::Dx12SetRecordRecord { layout_id: layout.id(), entries: set_entries.to_vec() },
+        super::resources::Dx12SetRecordRecord {
+            layout_id: layout.id(),
+            entries: set_entries.to_vec(),
+        },
     );
     let _ = record;
     Ok(())
@@ -185,7 +198,9 @@ fn create_root_signature(
     #[cfg(not(target_os = "windows"))]
     {
         let _ = (device, declarations, push_constants);
-        Err(RhiError::unsupported_backend("DirectX 12 is only available on Windows"))
+        Err(RhiError::unsupported_backend(
+            "DirectX 12 is only available on Windows",
+        ))
     }
     #[cfg(target_os = "windows")]
     {
@@ -195,10 +210,10 @@ fn create_root_signature(
         let mut parameters: Vec<sys::D3D12_ROOT_PARAMETER> = Vec::new();
         for declaration in declarations {
             let parameter_type = match declaration.binding_type {
-                crate::rhi::BindingType::UniformBuffer => 0u32,   // CBV
-                crate::rhi::BindingType::StorageBuffer => 1u32,   // SRV
-                crate::rhi::BindingType::StorageTexture => 2u32,  // UAV
-                crate::rhi::BindingType::Texture => 1u32,         // SRV
+                crate::rhi::BindingType::UniformBuffer => 0u32, // CBV
+                crate::rhi::BindingType::StorageBuffer => 1u32, // SRV
+                crate::rhi::BindingType::StorageTexture => 2u32, // UAV
+                crate::rhi::BindingType::Texture => 1u32,       // SRV
                 // A sampler is a descriptor-table entry in D3D12, not a root
                 // descriptor, so it is left to the descriptor-table path.
                 crate::rhi::BindingType::Sampler => continue,
@@ -206,9 +221,10 @@ fn create_root_signature(
             };
             parameters.push(sys::D3D12_ROOT_PARAMETER {
                 ParameterType: parameter_type,
-                ShaderVisibility: if declaration.visibility.contains(
-                    crate::rhi::ShaderVisibility::FRAGMENT,
-                ) {
+                ShaderVisibility: if declaration
+                    .visibility
+                    .contains(crate::rhi::ShaderVisibility::FRAGMENT)
+                {
                     2
                 } else {
                     1
@@ -260,7 +276,10 @@ fn create_root_signature(
         // `GetBufferPointer`/`GetBufferSize` after `IUnknown`.
         let (pointer, length) = unsafe {
             let vtbl = *(blob as *mut *const BlobVtbl);
-            (((*vtbl).GetBufferPointer)(blob), ((*vtbl).GetBufferSize)(blob))
+            (
+                ((*vtbl).GetBufferPointer)(blob),
+                ((*vtbl).GetBufferSize)(blob),
+            )
         };
         // SAFETY: the device is live and the blob buffer stays valid until the blob
         // is released below.
@@ -343,7 +362,7 @@ unsafe extern "system" {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rhi::{BindingResource, ShaderVisibility, BindingType};
+    use crate::rhi::{BindingResource, BindingType, ShaderVisibility};
 
     #[test]
     fn duplicate_binding_slots_are_rejected() {

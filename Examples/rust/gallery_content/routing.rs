@@ -82,9 +82,7 @@ impl StoryDispatch {
             Self::Story(GalleryPage::Masonry) => {
                 Some(AnyView::new(stories::MasonryStory::new(options)))
             }
-            Self::Story(GalleryPage::RichText) => {
-                Some(AnyView::new(stories::RichTextStory::new()))
-            }
+            Self::Story(GalleryPage::RichText) => Some(AnyView::new(stories::RichTextStory::new())),
             Self::Story(GalleryPage::Calendar) => {
                 Some(AnyView::new(stories::CalendarStory::new(options)))
             }
@@ -160,12 +158,8 @@ impl StoryDispatch {
             Self::Story(GalleryPage::DataTable) => {
                 Some(AnyView::new(stories::DataTableStory::new(options)))
             }
-            Self::Story(GalleryPage::Web) => {
-                Some(AnyView::new(stories::WebStory::new(options)))
-            }
-            Self::Story(GalleryPage::Menu) => {
-                Some(AnyView::new(stories::MenuStory::new(options)))
-            }
+            Self::Story(GalleryPage::Web) => Some(AnyView::new(stories::WebStory::new(options))),
+            Self::Story(GalleryPage::Menu) => Some(AnyView::new(stories::MenuStory::new(options))),
             Self::Story(GalleryPage::ContextMenu) => {
                 Some(AnyView::new(stories::MenuStory::new(options)))
             }
@@ -178,9 +172,7 @@ impl StoryDispatch {
             Self::Story(GalleryPage::Disclosure) => {
                 Some(AnyView::new(stories::DisclosureStory::new(options)))
             }
-            Self::Story(GalleryPage::Tabs) => {
-                Some(AnyView::new(stories::TabsStory::new(options)))
-            }
+            Self::Story(GalleryPage::Tabs) => Some(AnyView::new(stories::TabsStory::new(options))),
             Self::Story(GalleryPage::TextEditor) => {
                 Some(AnyView::new(stories::TextEditorStory::new(options)))
             }
@@ -196,15 +188,9 @@ impl StoryDispatch {
             Self::Story(GalleryPage::ButtonGroup) => {
                 Some(AnyView::new(stories::ButtonGroupStory::new(options)))
             }
-            Self::Story(GalleryPage::Tag) => {
-                Some(AnyView::new(stories::TagStory::new(options)))
-            }
-            Self::Story(GalleryPage::Label) => {
-                Some(AnyView::new(stories::LabelStory::new()))
-            }
-            Self::Story(GalleryPage::Dialog) => {
-                Some(AnyView::new(stories::DialogStory::new()))
-            }
+            Self::Story(GalleryPage::Tag) => Some(AnyView::new(stories::TagStory::new(options))),
+            Self::Story(GalleryPage::Label) => Some(AnyView::new(stories::LabelStory::new())),
+            Self::Story(GalleryPage::Dialog) => Some(AnyView::new(stories::DialogStory::new())),
             Self::Story(GalleryPage::AlertDialog) => {
                 Some(AnyView::new(stories::AlertDialogStory::new()))
             }
@@ -217,9 +203,7 @@ impl StoryDispatch {
             Self::Story(GalleryPage::NavigationStack) => {
                 Some(AnyView::new(stories::NavigationStackStory::new()))
             }
-            Self::Story(GalleryPage::Tree) => {
-                Some(AnyView::new(stories::TreeStory::new(options)))
-            }
+            Self::Story(GalleryPage::Tree) => Some(AnyView::new(stories::TreeStory::new(options))),
             Self::Story(GalleryPage::VirtualStack) => {
                 Some(AnyView::new(stories::VirtualStackStory::new()))
             }
@@ -272,16 +256,44 @@ impl MigrationPending {
             (GalleryPage::Checkbox, "Controls/ControlStories.swift", &[]),
             (GalleryPage::Toggle, "Controls/ControlStories.swift", &[]),
             (GalleryPage::Slider, "Feedback/FeedbackStories.swift", &[]),
-            (GalleryPage::RangeSlider, "Controls/ControlStories.swift", &[]),
-            (GalleryPage::Rating, "Feedback/RatingStory.swift", &["Rating"]),
+            (
+                GalleryPage::RangeSlider,
+                "Controls/ControlStories.swift",
+                &[],
+            ),
+            (
+                GalleryPage::Rating,
+                "Feedback/RatingStory.swift",
+                &["Rating"],
+            ),
             (GalleryPage::TextField, "Controls/ControlStories.swift", &[]),
-            (GalleryPage::SearchField, "Controls/ControlStories.swift", &[]),
+            (
+                GalleryPage::SearchField,
+                "Controls/ControlStories.swift",
+                &[],
+            ),
             (GalleryPage::TextArea, "Controls/ControlStories.swift", &[]),
-            (GalleryPage::TextEditor, "Controls/TextEditorStory.swift", &["Tooltip"]),
-            (GalleryPage::WheelPicker, "Controls/WheelPickerStory.swift", &["WheelPickerOption"]),
-            (GalleryPage::NumberField, "Controls/ControlStories.swift", &[]),
+            (
+                GalleryPage::TextEditor,
+                "Controls/TextEditorStory.swift",
+                &["Tooltip"],
+            ),
+            (
+                GalleryPage::WheelPicker,
+                "Controls/WheelPickerStory.swift",
+                &["WheelPickerOption"],
+            ),
+            (
+                GalleryPage::NumberField,
+                "Controls/ControlStories.swift",
+                &[],
+            ),
             (GalleryPage::Vec3Field, "Controls/ControlStories.swift", &[]),
-            (GalleryPage::ColorField, "Controls/ControlStories.swift", &[]),
+            (
+                GalleryPage::ColorField,
+                "Controls/ControlStories.swift",
+                &[],
+            ),
             (GalleryPage::Select, "Controls/ControlStories.swift", &[]),
             (GalleryPage::JsonField, "Controls/ControlStories.swift", &[]),
             (GalleryPage::AssetRef, "Data/DataStories.swift", &[]),
@@ -291,8 +303,16 @@ impl MigrationPending {
             (GalleryPage::SwipeList, "Data/DataStories.swift", &[]),
             (GalleryPage::RefreshableList, "Data/DataStories.swift", &[]),
             (GalleryPage::Scrollbar, "Data/DataStories.swift", &[]),
-            (GalleryPage::ViewportTraits, "Foundation/SurfaceTraits.swift", &[]),
-            (GalleryPage::ViewThatFits, "Foundation/IntrinsicFitting.swift", &[]),
+            (
+                GalleryPage::ViewportTraits,
+                "Foundation/SurfaceTraits.swift",
+                &[],
+            ),
+            (
+                GalleryPage::ViewThatFits,
+                "Foundation/IntrinsicFitting.swift",
+                &[],
+            ),
             (GalleryPage::DragAndDrop, "Data/DataStories.swift", &[]),
             (GalleryPage::Tree, "Data/DataStories.swift", &["Tree"]),
             (GalleryPage::VirtualStack, "Data/DataStories.swift", &[]),
@@ -304,17 +324,33 @@ impl MigrationPending {
             (GalleryPage::RichText, "Data/RichTextStory.swift", &[]),
             (GalleryPage::Markdown, "Data/MarkdownStory.swift", &[]),
             (GalleryPage::Menu, "Layout/OverlayStories.swift", &[]),
-            (GalleryPage::MenuButton, "Controls/ControlStories.swift", &[]),
+            (
+                GalleryPage::MenuButton,
+                "Controls/ControlStories.swift",
+                &[],
+            ),
             (GalleryPage::ContextMenu, "Layout/OverlayStories.swift", &[]),
             (GalleryPage::Popover, "Layout/OverlayStories.swift", &[]),
             (GalleryPage::Modal, "Layout/OverlayStories.swift", &[]),
             (GalleryPage::Disclosure, "Layout/OverlayStories.swift", &[]),
-            (GalleryPage::Tabs, "Layout/OverlayStories.swift", &["TabItem"]),
+            (
+                GalleryPage::Tabs,
+                "Layout/OverlayStories.swift",
+                &["TabItem"],
+            ),
             (GalleryPage::Panel, "Layout/LayoutStories.swift", &[]),
             (GalleryPage::SplitView, "Layout/LayoutStories.swift", &[]),
             (GalleryPage::ScrollView, "Layout/LayoutStories.swift", &[]),
-            (GalleryPage::BoundedScroll, "Layout/LayoutStories.swift", &[]),
-            (GalleryPage::PropertyGrid, "Layout/LayoutStories.swift", &["PropertyGrid", "PropertyGridRow", "PropertyGridSection"]),
+            (
+                GalleryPage::BoundedScroll,
+                "Layout/LayoutStories.swift",
+                &[],
+            ),
+            (
+                GalleryPage::PropertyGrid,
+                "Layout/LayoutStories.swift",
+                &["PropertyGrid", "PropertyGridRow", "PropertyGridSection"],
+            ),
             (GalleryPage::Workspace, "Layout/LayoutStories.swift", &[]),
             (GalleryPage::Layout, "Layout/LayoutStories.swift", &[]),
             (GalleryPage::Masonry, "Layout/MasonryStory.swift", &[]),
@@ -328,41 +364,113 @@ impl MigrationPending {
             (GalleryPage::Radio, "Layout/ProductStories.swift", &[]),
             (GalleryPage::Form, "Layout/ProductStories.swift", &[]),
             (GalleryPage::Combobox, "Layout/ProductStories.swift", &[]),
-            (GalleryPage::Notification, "Layout/ProductStories.swift", &[]),
+            (
+                GalleryPage::Notification,
+                "Layout/ProductStories.swift",
+                &[],
+            ),
             (GalleryPage::Tooltip, "Layout/ProductStories.swift", &[]),
             (GalleryPage::Sidebar, "Layout/SidebarStory.swift", &[]),
-            (GalleryPage::NavigationDrawer, "Layout/DrawerStory.swift", &[]),
+            (
+                GalleryPage::NavigationDrawer,
+                "Layout/DrawerStory.swift",
+                &[],
+            ),
             (GalleryPage::NavigationRail, "Layout/RailStory.swift", &[]),
-            (GalleryPage::AppBar, "Navigation/AppBarStory.swift", &["AppBar"]),
+            (
+                GalleryPage::AppBar,
+                "Navigation/AppBarStory.swift",
+                &["AppBar"],
+            ),
             (GalleryPage::Table, "Data/DateTableStories.swift", &[]),
             (GalleryPage::DataTable, "Data/DataTableStory.swift", &[]),
             (GalleryPage::Calendar, "Data/DateTableStories.swift", &[]),
             (GalleryPage::DatePicker, "Data/DateTableStories.swift", &[]),
-            (GalleryPage::DateRangePicker, "Controls/ControlStories.swift", &["DateRangePicker"]),
+            (
+                GalleryPage::DateRangePicker,
+                "Controls/ControlStories.swift",
+                &["DateRangePicker"],
+            ),
             (GalleryPage::TimeField, "Data/DateTableStories.swift", &[]),
-            (GalleryPage::TimePicker, "Controls/TimePickerStory.swift", &["TimeInput", "TimePicker"]),
-            (GalleryPage::Popconfirm, "Overlays/PopconfirmStory.swift", &["Popconfirm"]),
-            (GalleryPage::ActionSheet, "Overlays/ActionSheetStory.swift", &[]),
-            (GalleryPage::Accordion, "Layout/NavigationStories.swift", &[]),
-            (GalleryPage::Breadcrumb, "Layout/NavigationStories.swift", &["Breadcrumb", "BreadcrumbItem"]),
-            (GalleryPage::Pagination, "Layout/NavigationStories.swift", &["Pagination"]),
-            (GalleryPage::ButtonGroup, "Layout/NavigationStories.swift", &[]),
-            (GalleryPage::SplitButton, "Controls/ControlStories.swift", &[]),
+            (
+                GalleryPage::TimePicker,
+                "Controls/TimePickerStory.swift",
+                &["TimeInput", "TimePicker"],
+            ),
+            (
+                GalleryPage::Popconfirm,
+                "Overlays/PopconfirmStory.swift",
+                &["Popconfirm"],
+            ),
+            (
+                GalleryPage::ActionSheet,
+                "Overlays/ActionSheetStory.swift",
+                &[],
+            ),
+            (
+                GalleryPage::Accordion,
+                "Layout/NavigationStories.swift",
+                &[],
+            ),
+            (
+                GalleryPage::Breadcrumb,
+                "Layout/NavigationStories.swift",
+                &["Breadcrumb", "BreadcrumbItem"],
+            ),
+            (
+                GalleryPage::Pagination,
+                "Layout/NavigationStories.swift",
+                &["Pagination"],
+            ),
+            (
+                GalleryPage::ButtonGroup,
+                "Layout/NavigationStories.swift",
+                &[],
+            ),
+            (
+                GalleryPage::SplitButton,
+                "Controls/ControlStories.swift",
+                &[],
+            ),
             (GalleryPage::Tag, "Layout/NavigationStories.swift", &[]),
             (GalleryPage::KeyCap, "Layout/NavigationStories.swift", &[]),
             (GalleryPage::Label, "Layout/NavigationStories.swift", &[]),
             (GalleryPage::Dialog, "Layout/NavigationStories.swift", &[]),
-            (GalleryPage::AlertDialog, "Layout/NavigationStories.swift", &[]),
+            (
+                GalleryPage::AlertDialog,
+                "Layout/NavigationStories.swift",
+                &[],
+            ),
             (GalleryPage::Sheet, "Layout/NavigationStories.swift", &[]),
-            (GalleryPage::BottomSheet, "Layout/NavigationStories.swift", &[]),
-            (GalleryPage::CommandPalette, "Overlays/CommandStory.swift", &["CommandItem", "CommandPalette"]),
-            (GalleryPage::NavigationStack, "Layout/NavigationStories.swift", &[]),
-            (GalleryPage::HoverCard, "Overlays/HoverStory.swift", &["HoverCard"]),
+            (
+                GalleryPage::BottomSheet,
+                "Layout/NavigationStories.swift",
+                &[],
+            ),
+            (
+                GalleryPage::CommandPalette,
+                "Overlays/CommandStory.swift",
+                &["CommandItem", "CommandPalette"],
+            ),
+            (
+                GalleryPage::NavigationStack,
+                "Layout/NavigationStories.swift",
+                &[],
+            ),
+            (
+                GalleryPage::HoverCard,
+                "Overlays/HoverStory.swift",
+                &["HoverCard"],
+            ),
             (GalleryPage::Timeline, "Data/DataStories.swift", &[]),
             (GalleryPage::Toolbar, "Controls/ToolbarStory.swift", &[]),
             (GalleryPage::Link, "Controls/ControlStories.swift", &[]),
             (GalleryPage::StatusBar, "Layout/LayoutStories.swift", &[]),
-            (GalleryPage::Carousel, "Layout/LayoutStories.swift", &["CarouselPage"]),
+            (
+                GalleryPage::Carousel,
+                "Layout/LayoutStories.swift",
+                &["CarouselPage"],
+            ),
             (GalleryPage::Skeleton, "Feedback/SkeletonStory.swift", &[]),
             (GalleryPage::Stepper, "Controls/StepperStory.swift", &[]),
         ]
@@ -469,7 +577,11 @@ mod checks {
             assert!(MigrationPending::entry(*page).1.is_empty());
         }
         for (page, _, missing) in &blocked {
-            assert!(!missing.is_empty(), "{} is listed as blocked", page.raw_value());
+            assert!(
+                !missing.is_empty(),
+                "{} is listed as blocked",
+                page.raw_value()
+            );
         }
     }
 

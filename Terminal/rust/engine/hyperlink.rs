@@ -15,7 +15,9 @@ impl TerminalEngine {
         // SAFETY: the terminal is live, `reference` is a GhosttyGridRef, and the
         // library writes at most `buffer.len()` bytes into `buffer`.
         unsafe {
-            if ffi::ghostty_terminal_grid_ref(self.terminal, point, &mut reference) != ffi::GHOSTTY_SUCCESS {
+            if ffi::ghostty_terminal_grid_ref(self.terminal, point, &mut reference)
+                != ffi::GHOSTTY_SUCCESS
+            {
                 return None;
             }
             let mut length = 0usize;
@@ -24,8 +26,12 @@ impl TerminalEngine {
                 return None;
             }
             let mut buffer = vec![0u8; length];
-            if ffi::ghostty_grid_ref_hyperlink_uri(&reference, buffer.as_mut_ptr(), buffer.len(), &mut length)
-                != ffi::GHOSTTY_SUCCESS
+            if ffi::ghostty_grid_ref_hyperlink_uri(
+                &reference,
+                buffer.as_mut_ptr(),
+                buffer.len(),
+                &mut length,
+            ) != ffi::GHOSTTY_SUCCESS
             {
                 return None;
             }

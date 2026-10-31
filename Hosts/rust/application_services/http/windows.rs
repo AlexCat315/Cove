@@ -6,9 +6,7 @@
 
 #![cfg(target_os = "windows")]
 
-use cove_ui_compose::primitives::media::{
-    AsyncImageError, ImageDownloadTransport,
-};
+use cove_ui_compose::primitives::media::{AsyncImageError, ImageDownloadTransport};
 use std::ffi::c_void;
 
 pub const SCHEME_HTTP: bool = true;
@@ -31,7 +29,9 @@ impl WindowsImageTransport {
         } else {
             15.0
         };
-        Self { timeout_ms: (seconds * 1000.0) as i32 }
+        Self {
+            timeout_ms: (seconds * 1000.0) as i32,
+        }
     }
 }
 
@@ -42,8 +42,8 @@ impl ImageDownloadTransport for WindowsImageTransport {
 }
 
 mod runtime {
-    use super::*;
     use super::super::core::{self, TransportIoError, Url};
+    use super::*;
 
     type Handle = *mut c_void;
 
@@ -86,8 +86,12 @@ mod runtime {
             index: *mut u32,
         ) -> i32;
         fn WinHttpQueryDataAvailable(request: Handle, available: *mut u32) -> i32;
-        fn WinHttpReadData(request: Handle, buffer: *mut c_void, to_read: u32, read: *mut u32)
-            -> i32;
+        fn WinHttpReadData(
+            request: Handle,
+            buffer: *mut c_void,
+            to_read: u32,
+            read: *mut u32,
+        ) -> i32;
         fn WinHttpSetTimeouts(
             handle: Handle,
             resolve: i32,
@@ -184,15 +188,7 @@ mod runtime {
 
         // SAFETY: the request handle is live and no optional body is supplied.
         let sent = unsafe {
-            WinHttpSendRequest(
-                request,
-                std::ptr::null(),
-                0,
-                std::ptr::null_mut(),
-                0,
-                0,
-                0,
-            )
+            WinHttpSendRequest(request, std::ptr::null(), 0, std::ptr::null_mut(), 0, 0, 0)
         };
         if sent == 0 {
             return Err(TransportIoError::network("WinHttpSendRequest failed"));
@@ -212,7 +208,9 @@ mod runtime {
             // SAFETY: the request handle is live and `available` is a valid
             // out-parameter.
             if unsafe { WinHttpQueryDataAvailable(request, &mut available) } == 0 {
-                return Err(TransportIoError::network("WinHttpQueryDataAvailable failed"));
+                return Err(TransportIoError::network(
+                    "WinHttpQueryDataAvailable failed",
+                ));
             }
             if available == 0 {
                 break;
@@ -224,9 +222,8 @@ mod runtime {
             let mut read = 0_u32;
             // SAFETY: `chunk` has `available` writable bytes and `read` is a valid
             // out-parameter.
-            if unsafe {
-                WinHttpReadData(request, chunk.as_mut_ptr().cast(), available, &mut read)
-            } == 0
+            if unsafe { WinHttpReadData(request, chunk.as_mut_ptr().cast(), available, &mut read) }
+                == 0
             {
                 return Err(TransportIoError::network("WinHttpReadData failed"));
             }

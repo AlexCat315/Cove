@@ -1,6 +1,6 @@
 //! Translation of CoveUIScene/Input/WheelGesture.swift.
 use crate::scene::{Node, NodeTree};
-use cove_platform::{ScrollPhase, ScrollInput};
+use cove_platform::{ScrollInput, ScrollPhase};
 
 /// A phased stream keeps its consuming viewport even when the pointer moves.
 /// A click catches OS momentum; only fresh input can start scrolling again.
@@ -26,7 +26,9 @@ impl WheelGesture {
             self.has_target = false;
             self.interrupted = false;
         }
-        if input.momentum_phase == ScrollPhase::None && (input.phase == ScrollPhase::Changed || input.phase == ScrollPhase::Stationary) {
+        if input.momentum_phase == ScrollPhase::None
+            && (input.phase == ScrollPhase::Changed || input.phase == ScrollPhase::Stationary)
+        {
             self.interrupted = false;
         }
         !self.interrupted
@@ -58,7 +60,10 @@ impl WheelGesture {
         self.has_target = true;
     }
     pub fn finish(&mut self, input: ScrollInput) {
-        if input.phase == ScrollPhase::Cancelled || input.momentum_phase == ScrollPhase::Ended || input.momentum_phase == ScrollPhase::Cancelled {
+        if input.phase == ScrollPhase::Cancelled
+            || input.momentum_phase == ScrollPhase::Ended
+            || input.momentum_phase == ScrollPhase::Cancelled
+        {
             self.target = None;
             self.has_target = false;
         }
@@ -75,7 +80,10 @@ mod tests {
     #[test]
     fn phase_stream_pins_the_consuming_viewport() {
         let mut gesture = WheelGesture::default();
-        let mut input = ScrollInput { phase: ScrollPhase::Began, ..ScrollInput::default() };
+        let mut input = ScrollInput {
+            phase: ScrollPhase::Began,
+            ..ScrollInput::default()
+        };
         assert!(gesture.prepare(input));
         let viewport = Node::new();
         gesture.consumed(&viewport, input);
@@ -95,10 +103,16 @@ mod tests {
             momentum_phase: ScrollPhase::Changed,
             ..ScrollInput::default()
         };
-        assert!(!gesture.prepare(momentum), "an interrupted momentum stream stays suppressed");
+        assert!(
+            !gesture.prepare(momentum),
+            "an interrupted momentum stream stays suppressed"
+        );
         input.phase = ScrollPhase::Began;
         assert!(gesture.prepare(input));
-        gesture.finish(ScrollInput { phase: ScrollPhase::Cancelled, ..ScrollInput::default() });
+        gesture.finish(ScrollInput {
+            phase: ScrollPhase::Cancelled,
+            ..ScrollInput::default()
+        });
         assert!(gesture.path(&NodeTree::new()).is_none());
     }
 }

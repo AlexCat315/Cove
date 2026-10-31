@@ -2,5 +2,5 @@
 pub mod safe_area;
 pub mod surface_root;
 
-pub use safe_area::{safe_area_insets, SafeArea, SafeAreaEdges, SafeAreaEnvironment};
+pub use safe_area::{SafeArea, SafeAreaEdges, SafeAreaEnvironment, safe_area_insets};
 pub use surface_root::SurfaceRoot;

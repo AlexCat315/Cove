@@ -5,11 +5,9 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use cove_core::scene::{
-    AnimatorScheduler, AnyAnimationController, Node, NodeResource,
-};
-use cove_core::Rect;
 use crate::primitives::overlays::menu::row_content::MenuItemContent;
+use cove_core::Rect;
+use cove_core::scene::{AnimatorScheduler, AnyAnimationController, Node, NodeResource};
 
 use super::menu::{MenuItemRole, MenuSubmenu};
 
@@ -206,9 +204,10 @@ impl MenuHoverIntent {
         if clear_action {
             *self.action.borrow_mut() = None;
         }
-        if let (Some(scheduler), Some(controller)) =
-            (self.scheduler.borrow().as_ref(), self.controller.borrow().as_ref())
-        {
+        if let (Some(scheduler), Some(controller)) = (
+            self.scheduler.borrow().as_ref(),
+            self.controller.borrow().as_ref(),
+        ) {
             scheduler.unregister(controller);
         }
         self.controller.borrow_mut().take();
@@ -299,8 +298,10 @@ pub struct MenuRowEvents {
 impl MenuRowEvents {
     pub fn is_inside(node: &Node, point: cove_core::Point) -> bool {
         let frame = node.absolute_frame();
-        point.x >= frame.x && point.x <= frame.x + frame.width
-            && point.y >= frame.y && point.y <= frame.y + frame.height
+        point.x >= frame.x
+            && point.x <= frame.x + frame.width
+            && point.y >= frame.y
+            && point.y <= frame.y + frame.height
     }
 
     pub fn frame(node: &Node) -> Rect {

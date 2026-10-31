@@ -137,7 +137,8 @@ impl Default for Redaction {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
-pub struct LoggingConfiguration {    pub filtering: Filtering,
+pub struct LoggingConfiguration {
+    pub filtering: Filtering,
     pub console: Console,
     pub storage: Storage,
     pub buffering: Buffering,

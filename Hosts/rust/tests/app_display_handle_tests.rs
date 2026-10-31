@@ -19,7 +19,10 @@ fn coalesces_display_wakes() {
 
     assert_eq!(wakes.get(), 1, "a burst of requests wakes the loop once");
     assert!(display.drain_display_request(), "a wake was owed");
-    assert!(!display.drain_display_request(), "draining clears the pending request");
+    assert!(
+        !display.drain_display_request(),
+        "draining clears the pending request"
+    );
 
     display.request_display();
     assert_eq!(wakes.get(), 2, "the next request after a drain wakes again");

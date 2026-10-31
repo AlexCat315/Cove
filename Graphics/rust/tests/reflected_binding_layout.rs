@@ -8,13 +8,12 @@
 //! and duplicating it here would add no coverage.
 
 use cove_graphics::{
-    reflected_binding_layout, BindingType, BufferBindingLayout, ReflectedShaderBinding,
-    ShaderArtifact, ShaderFormat, ShaderStage, ShaderVisibility,
+    BindingType, BufferBindingLayout, ReflectedShaderBinding, ShaderArtifact, ShaderFormat,
+    ShaderStage, ShaderVisibility, reflected_binding_layout,
 };
 
 fn artifact(stage: ShaderStage, bindings: Vec<ReflectedShaderBinding>) -> ShaderArtifact {
-    let mut artifact =
-        ShaderArtifact::new(stage, ShaderFormat::MslSource, "main", vec![1], "test");
+    let mut artifact = ShaderArtifact::new(stage, ShaderFormat::MslSource, "main", vec![1], "test");
     artifact.interface.bindings = bindings;
     artifact
 }
@@ -44,7 +43,10 @@ fn stage_merge_preserves_buffer_abi_and_sorts_slots() {
     // original ABI and widen its visibility to graphics.
     let layout = reflected_binding_layout(&[
         artifact(ShaderStage::Vertex, vec![uniform.clone()]),
-        artifact(ShaderStage::Fragment, vec![sampler, texture, uniform.clone()]),
+        artifact(
+            ShaderStage::Fragment,
+            vec![sampler, texture, uniform.clone()],
+        ),
     ])
     .expect("reflected layout");
 

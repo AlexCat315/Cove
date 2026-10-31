@@ -6,13 +6,34 @@
 
 use cove_core::Color;
 use cove_ui_compose::primitives::data::data_table::{
-    drop_indicator_x, editor_blur_outcome, CellHostUpdate, DataTableColumnGeometry,
-    EditorBlurOutcome, RowAccessibilityRole, RowHostUpdate,
+    CellHostUpdate, DataTableColumnGeometry, EditorBlurOutcome, RowAccessibilityRole,
+    RowHostUpdate, drop_indicator_x, editor_blur_outcome,
 };
 
-fn accent() -> Color { Color { r: 0.2, g: 0.4, b: 1.0, a: 1.0 } }
-fn surface() -> Color { Color { r: 0.5, g: 0.5, b: 0.5, a: 1.0 } }
-fn background() -> Color { Color { r: 1.0, g: 1.0, b: 1.0, a: 1.0 } }
+fn accent() -> Color {
+    Color {
+        r: 0.2,
+        g: 0.4,
+        b: 1.0,
+        a: 1.0,
+    }
+}
+fn surface() -> Color {
+    Color {
+        r: 0.5,
+        g: 0.5,
+        b: 0.5,
+        a: 1.0,
+    }
+}
+fn background() -> Color {
+    Color {
+        r: 1.0,
+        g: 1.0,
+        b: 1.0,
+        a: 1.0,
+    }
+}
 
 fn row(index: usize) -> RowHostUpdate {
     RowHostUpdate {
@@ -29,7 +50,10 @@ fn a_selected_row_is_accent_regardless_of_striping() {
     let mut update = row(1); // odd, so striped
     assert!(update.is_striped_row());
     update.is_selected = true;
-    assert_eq!(update.background(accent(), surface(), background()), accent());
+    assert_eq!(
+        update.background(accent(), surface(), background()),
+        accent()
+    );
 }
 
 #[test]
@@ -40,7 +64,10 @@ fn odd_rows_carry_the_stripe_and_even_rows_do_not() {
         row(1).background(accent(), surface(), background()),
         surface().multiplied_alpha(0.6)
     );
-    assert_eq!(row(2).background(accent(), surface(), background()), background());
+    assert_eq!(
+        row(2).background(accent(), surface(), background()),
+        background()
+    );
 }
 
 #[test]
@@ -48,14 +75,20 @@ fn striping_can_be_turned_off() {
     let mut update = row(1);
     update.is_striped = false;
     assert!(!update.is_striped_row());
-    assert_eq!(update.background(accent(), surface(), background()), background());
+    assert_eq!(
+        update.background(accent(), surface(), background()),
+        background()
+    );
 }
 
 #[test]
 fn an_unchanged_row_update_is_skipped() {
     let previous = row(3);
     let same = row(3);
-    assert!(!same.changed_from(Some(&previous)), "identical updates do not restyle");
+    assert!(
+        !same.changed_from(Some(&previous)),
+        "identical updates do not restyle"
+    );
     let mut changed = row(3);
     changed.is_selected = true;
     assert!(changed.changed_from(Some(&previous)));
@@ -79,26 +112,54 @@ fn the_row_label_is_one_based() {
 
 #[test]
 fn an_active_cell_draws_a_border() {
-    let active = CellHostUpdate { title: "Frame rate", is_active: true, is_enabled: true };
-    let idle = CellHostUpdate { title: "Frame rate", is_active: false, is_enabled: true };
+    let active = CellHostUpdate {
+        title: "Frame rate",
+        is_active: true,
+        is_enabled: true,
+    };
+    let idle = CellHostUpdate {
+        title: "Frame rate",
+        is_active: false,
+        is_enabled: true,
+    };
     assert_eq!(active.border_width(), 1.0);
     assert_eq!(idle.border_width(), 0.0);
 }
 
 #[test]
 fn only_an_enabled_cell_exposes_activate() {
-    let enabled = CellHostUpdate { title: "x", is_active: false, is_enabled: true };
-    let disabled = CellHostUpdate { title: "x", is_active: false, is_enabled: false };
+    let enabled = CellHostUpdate {
+        title: "x",
+        is_active: false,
+        is_enabled: true,
+    };
+    let disabled = CellHostUpdate {
+        title: "x",
+        is_active: false,
+        is_enabled: false,
+    };
     assert!(enabled.exposes_activate());
     assert!(!disabled.exposes_activate());
 }
 
 #[test]
 fn an_unchanged_cell_update_is_skipped() {
-    let previous = CellHostUpdate { title: "a", is_active: false, is_enabled: true };
-    let same = CellHostUpdate { title: "a", is_active: false, is_enabled: true };
+    let previous = CellHostUpdate {
+        title: "a",
+        is_active: false,
+        is_enabled: true,
+    };
+    let same = CellHostUpdate {
+        title: "a",
+        is_active: false,
+        is_enabled: true,
+    };
     assert!(!same.changed_from(Some(&previous)));
-    let different = CellHostUpdate { title: "b", is_active: false, is_enabled: true };
+    let different = CellHostUpdate {
+        title: "b",
+        is_active: false,
+        is_enabled: true,
+    };
     assert!(different.changed_from(Some(&previous)));
 }
 

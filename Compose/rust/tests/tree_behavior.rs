@@ -22,12 +22,12 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use cove_composition::AnyView;
+use cove_composition::Scancode;
 use cove_core::Binding;
 use cove_platform::{KeyEvent, KeyModifiers};
 use cove_ui_compose::primitives::data::lists::tree::{
-    flatten_tree, Tree, TreeOptions, TreeSearch, TreeSearchFilterPolicy, TreeSelection,
+    Tree, TreeOptions, TreeSearch, TreeSearchFilterPolicy, TreeSelection, flatten_tree,
 };
-use cove_composition::Scancode;
 
 /// Minimal primitive standing in for the Swift row's `Text`, which carries the
 /// row label. Keeps the projection tests free of the text environment.
@@ -56,7 +56,6 @@ impl cove_composition::View for TreeRowText {
     }
 }
 
-
 /// A shareable cell standing in for a Swift `@State` binding. `Binding` requires
 /// `Send + Sync`, so test state is mutex-guarded rather than `Rc<RefCell<_>>`.
 #[derive(Clone)]
@@ -67,7 +66,10 @@ impl<T: Clone + Send + 'static> Cell<T> {
         Self(Arc::new(Mutex::new(value)))
     }
     fn get(&self) -> T {
-        self.0.lock().unwrap_or_else(|error| error.into_inner()).clone()
+        self.0
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .clone()
     }
     fn set(&self, value: T) {
         *self.0.lock().unwrap_or_else(|error| error.into_inner()) = value;
@@ -220,7 +222,11 @@ fn arrow_keys_expand_collapse_and_step_into_the_focused_branch() {
     let tree = tree(reads.clone(), expanded_binding, primary, "", true);
 
     tree.handle_key(&key(Scancode::ARROW_RIGHT, KeyModifiers(0)));
-    assert_eq!(expanded.get(), HashSet::from([0]), "ArrowRight expands the row");
+    assert_eq!(
+        expanded.get(),
+        HashSet::from([0]),
+        "ArrowRight expands the row"
+    );
 
     // A second ArrowRight on an expanded branch steps into its first child
     // rather than expanding further.
@@ -230,8 +236,6 @@ fn arrow_keys_expand_collapse_and_step_into_the_focused_branch() {
         HashSet::from([0]),
         "ArrowRight on an open branch does not change the expansion"
     );
-
-
 }
 
 #[test]
@@ -270,7 +274,10 @@ fn alt_arrow_expands_and_collapses_the_whole_subtree() {
         "Alt+ArrowLeft collapses the whole subtree"
     );
     assert_eq!(
-        tree.entries().iter().map(|entry| entry.id).collect::<Vec<_>>(),
+        tree.entries()
+            .iter()
+            .map(|entry| entry.id)
+            .collect::<Vec<_>>(),
         vec![0],
         "only the root row survives a collapse-all"
     );
@@ -326,7 +333,9 @@ fn a_search_query_filters_and_auto_expands_while_keeping_paths() {
         "a non-matching sibling is hidden"
     );
     assert!(
-        entries.iter().all(|entry| entry.id != 0 || entry.is_expanded),
+        entries
+            .iter()
+            .all(|entry| entry.id != 0 || entry.is_expanded),
         "the ancestor of a match auto-expands"
     );
 }
@@ -377,7 +386,9 @@ fn a_highlight_only_policy_keeps_every_row_mounted() {
         "highlight-only marks the matching row without hiding the others"
     );
     assert!(
-        entries.iter().all(|entry| !entry.is_search_hit || entry.id == 3),
+        entries
+            .iter()
+            .all(|entry| !entry.is_search_hit || entry.id == 3),
         "only the matching row is marked"
     );
 }
@@ -403,12 +414,7 @@ fn flattening_preserves_depth_and_sibling_flags() {
         .collect();
     assert_eq!(
         shape,
-        vec![
-            (0, 0, false),
-            (1, 1, true),
-            (3, 2, false),
-            (2, 1, false),
-        ],
+        vec![(0, 0, false), (1, 1, true), (3, 2, false), (2, 1, false),],
         "depth grows with nesting and the last sibling is flagged"
     );
     assert_eq!(
@@ -463,7 +469,10 @@ fn expand_all_and_collapse_all_cover_the_whole_forest() {
 
     tree.expand_all();
     let open = expanded.get();
-    assert!(open.contains(&0) && open.contains(&1), "both branches opened (got {open:?})");
+    assert!(
+        open.contains(&0) && open.contains(&1),
+        "both branches opened (got {open:?})"
+    );
     assert_eq!(
         tree.entries().len(),
         4,
@@ -471,6 +480,9 @@ fn expand_all_and_collapse_all_cover_the_whole_forest() {
     );
 
     tree.collapse_all();
-    assert!(expanded.get().is_empty(), "collapse_all clears the expansion");
+    assert!(
+        expanded.get().is_empty(),
+        "collapse_all clears the expansion"
+    );
     assert_eq!(tree.entries().len(), 1, "only the root remains visible");
 }

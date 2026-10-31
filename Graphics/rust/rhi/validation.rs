@@ -145,8 +145,8 @@ pub fn rhi_validate_sample_count(count: usize) -> RhiResult<()> {
 pub fn rhi_validate_texture_samples(descriptor: &TextureDescriptor) -> RhiResult<()> {
     rhi_validate_sample_count(descriptor.sample_count)?;
     if descriptor.transient_attachment {
-        let attachment_only = descriptor.usage
-            & !(TextureUsage::COLOR_TARGET | TextureUsage::DEPTH_STENCIL_TARGET);
+        let attachment_only =
+            descriptor.usage & !(TextureUsage::COLOR_TARGET | TextureUsage::DEPTH_STENCIL_TARGET);
         rhi_require(
             descriptor.sample_count > 1 && attachment_only.is_empty(),
             "transient textures require multisample attachment-only usage",
@@ -171,7 +171,9 @@ pub fn rhi_validate_texture_samples(descriptor: &TextureDescriptor) -> RhiResult
     )?;
     rhi_require(
         descriptor.usage.contains(TextureUsage::COLOR_TARGET)
-            || descriptor.usage.contains(TextureUsage::DEPTH_STENCIL_TARGET),
+            || descriptor
+                .usage
+                .contains(TextureUsage::DEPTH_STENCIL_TARGET),
         "multisampled textures require attachment usage",
     )
 }
@@ -211,7 +213,12 @@ pub struct RenderPassSignature<Format> {
     pub depth: Option<Format>,
 }
 impl<Format: PartialEq> RenderPassSignature<Format> {
-    pub fn validate(&self, colors: &[Format], depth: Option<&Format>, samples: usize) -> RhiResult<()> {
+    pub fn validate(
+        &self,
+        colors: &[Format],
+        depth: Option<&Format>,
+        samples: usize,
+    ) -> RhiResult<()> {
         rhi_require(
             self.colors == colors && self.depth.as_ref() == depth,
             "pipeline formats do not match render attachments",
@@ -228,20 +235,30 @@ pub fn rhi_render_pass_signature<Format: PartialEq>(
     pass: &RenderPassDescriptor,
     describe: impl Fn(Texture) -> RhiResult<RenderTextureInfo<Format>>,
 ) -> RhiResult<RenderPassSignature<Format>> {
-    let mut sources: Vec<Texture> = pass.color_targets.iter().map(|target| target.texture).collect();
+    let mut sources: Vec<Texture> = pass
+        .color_targets
+        .iter()
+        .map(|target| target.texture)
+        .collect();
     if let Some(depth) = pass.depth_target {
         sources.push(depth.texture);
     }
-    let resolves: Vec<Texture> =
-        pass.color_targets.iter().filter_map(|target| target.resolve_texture).collect();
+    let resolves: Vec<Texture> = pass
+        .color_targets
+        .iter()
+        .filter_map(|target| target.resolve_texture)
+        .collect();
 
     rhi_require(
         !sources.is_empty() && pass.color_targets.len() <= 8,
         "render pass requires attachments and at most eight color targets",
     )?;
 
-    let mut attachment_ids: Vec<u32> =
-        sources.iter().chain(resolves.iter()).map(|texture| texture.id()).collect();
+    let mut attachment_ids: Vec<u32> = sources
+        .iter()
+        .chain(resolves.iter())
+        .map(|texture| texture.id())
+        .collect();
     let total = attachment_ids.len();
     attachment_ids.sort_unstable();
     attachment_ids.dedup();
@@ -257,7 +274,10 @@ pub fn rhi_render_pass_signature<Format: PartialEq>(
             info.extent == first.extent && info.sample_count == first.sample_count,
             "render attachments have different dimensions or sample counts",
         )?;
-        rhi_require(info.single_layer_2d, "render attachments require single-layer 2D textures")?;
+        rhi_require(
+            info.single_layer_2d,
+            "render attachments require single-layer 2D textures",
+        )?;
     }
 
     let mut colors = Vec::with_capacity(pass.color_targets.len());

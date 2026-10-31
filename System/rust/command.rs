@@ -99,9 +99,7 @@ impl ProcessOutput {
     }
 
     pub fn stdout_text(&self) -> String {
-        String::from_utf8_lossy(&self.stdout)
-            .trim()
-            .to_owned()
+        String::from_utf8_lossy(&self.stdout).trim().to_owned()
     }
 
     pub fn stderr_text(&self) -> String {

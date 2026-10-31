@@ -36,8 +36,18 @@ fn double_interp() {
 
 #[test]
 fn color_interp() {
-    let black = Color { r: 0.0, g: 0.0, b: 0.0, a: 0.0 };
-    let white = Color { r: 1.0, g: 1.0, b: 1.0, a: 1.0 };
+    let black = Color {
+        r: 0.0,
+        g: 0.0,
+        b: 0.0,
+        a: 0.0,
+    };
+    let white = Color {
+        r: 1.0,
+        g: 1.0,
+        b: 1.0,
+        a: 1.0,
+    };
     let mid = Color::interpolate(&black, &white, 0.5);
     assert_eq!(mid.r, 0.5);
     assert_eq!(mid.g, 0.5);
@@ -47,8 +57,18 @@ fn color_interp() {
 
 #[test]
 fn color_endpoints() {
-    let a = Color { r: 0.2, g: 0.3, b: 0.4, a: 0.5 };
-    let b = Color { r: 0.8, g: 0.7, b: 0.6, a: 1.0 };
+    let a = Color {
+        r: 0.2,
+        g: 0.3,
+        b: 0.4,
+        a: 0.5,
+    };
+    let b = Color {
+        r: 0.8,
+        g: 0.7,
+        b: 0.6,
+        a: 1.0,
+    };
     assert_eq!(Color::interpolate(&a, &b, 0.0), a);
     assert_eq!(Color::interpolate(&a, &b, 1.0), b);
 }
@@ -57,8 +77,18 @@ fn color_endpoints() {
 fn color_straight_alpha() {
     // Straight-alpha semantics: RGB lerps independently of alpha. Premultiplying
     // would pull the red toward zero here, which is what this pins down.
-    let opaque = Color { r: 1.0, g: 0.0, b: 0.0, a: 1.0 };
-    let transparent = Color { r: 0.0, g: 0.0, b: 1.0, a: 0.0 };
+    let opaque = Color {
+        r: 1.0,
+        g: 0.0,
+        b: 0.0,
+        a: 1.0,
+    };
+    let transparent = Color {
+        r: 0.0,
+        g: 0.0,
+        b: 1.0,
+        a: 0.0,
+    };
     let mid = Color::interpolate(&opaque, &transparent, 0.5);
     assert_eq!(mid.r, 0.5);
     assert_eq!(mid.b, 0.5);
@@ -83,8 +113,14 @@ fn point_and_size_interp() {
     close(point.y, 2.0, "point y");
 
     let size = Size::interpolate(
-        &Size { width: 10.0, height: 20.0 },
-        &Size { width: 20.0, height: 40.0 },
+        &Size {
+            width: 10.0,
+            height: 20.0,
+        },
+        &Size {
+            width: 20.0,
+            height: 40.0,
+        },
         0.5,
     );
     close(size.width, 15.0, "size width");

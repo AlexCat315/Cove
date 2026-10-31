@@ -5,8 +5,8 @@
 //! the kind of arithmetic that drifts silently.
 
 use cove_ui_compose::primitives::overlays::{
-    destination, display_entries, entries, normalize, ranked, record_recent, CommandEntry,
-    CommandItem,
+    CommandEntry, CommandItem, destination, display_entries, entries, normalize, ranked,
+    record_recent,
 };
 
 fn items() -> Vec<CommandItem> {
@@ -49,8 +49,8 @@ fn a_title_prefix_outranks_containment() {
 #[test]
 fn a_word_prefix_outranks_containment() {
     let list = vec![
-        CommandItem::new("a", "Close Open", "G"),   // containment
-        CommandItem::new("b", "Open Window", "G"),  // word prefix
+        CommandItem::new("a", "Close Open", "G"),  // containment
+        CommandItem::new("b", "Open Window", "G"), // word prefix
     ];
     assert_eq!(ids(&ranked(&list, "open")), vec!["b", "a"]);
 }
@@ -62,7 +62,11 @@ fn keywords_match_but_score_lower_than_the_title() {
         CommandItem::new("title", "Panel Layout", "G"),
     ];
     let ordered = ranked(&list, "panel");
-    assert_eq!(ids(&ordered), vec!["title", "kw"], "title hit outranks a keyword hit");
+    assert_eq!(
+        ids(&ordered),
+        vec!["title", "kw"],
+        "title hit outranks a keyword hit"
+    );
 }
 
 #[test]
@@ -88,7 +92,10 @@ fn a_term_that_matches_nothing_rejects_the_item() {
 fn every_term_must_match() {
     let list = vec![CommandItem::new("a", "Open File", "G")];
     assert_eq!(ids(&ranked(&list, "open file")), vec!["a"]);
-    assert!(ranked(&list, "open nothing").is_empty(), "all terms are required");
+    assert!(
+        ranked(&list, "open nothing").is_empty(),
+        "all terms are required"
+    );
 }
 
 #[test]
@@ -128,8 +135,15 @@ fn results_group_only_when_asked_and_only_with_multiple_groups() {
     assert_eq!(headers, vec!["File", "Window", "Application"]);
 
     // Grouping on but a single group: no header at all.
-    let single = vec![CommandItem::new("a", "A", "Only"), CommandItem::new("b", "B", "Only")];
-    assert!(entries(&single, true).iter().all(|row| matches!(row, CommandEntry::Item(_))));
+    let single = vec![
+        CommandItem::new("a", "A", "Only"),
+        CommandItem::new("b", "B", "Only"),
+    ];
+    assert!(
+        entries(&single, true)
+            .iter()
+            .all(|row| matches!(row, CommandEntry::Item(_)))
+    );
 }
 
 #[test]
@@ -190,15 +204,31 @@ fn arrow_navigation_wraps_at_both_ends() {
 
 #[test]
 fn page_jumps_clamp_instead_of_wrapping() {
-    assert_eq!(destination(10, Some(8), 5, false), Some(9), "clamps at the end");
-    assert_eq!(destination(10, Some(1), -5, false), Some(0), "clamps at the start");
+    assert_eq!(
+        destination(10, Some(8), 5, false),
+        Some(9),
+        "clamps at the end"
+    );
+    assert_eq!(
+        destination(10, Some(1), -5, false),
+        Some(0),
+        "clamps at the start"
+    );
     assert_eq!(destination(10, Some(2), 3, false), Some(5));
 }
 
 #[test]
 fn a_missing_highlight_starts_from_the_edge_the_move_came_from() {
-    assert_eq!(destination(4, None, 1, true), Some(0), "forward from nothing starts at the top");
-    assert_eq!(destination(4, None, -1, true), Some(3), "backward starts at the bottom");
+    assert_eq!(
+        destination(4, None, 1, true),
+        Some(0),
+        "forward from nothing starts at the top"
+    );
+    assert_eq!(
+        destination(4, None, -1, true),
+        Some(3),
+        "backward starts at the bottom"
+    );
     // An out-of-range current is treated the same way.
     assert_eq!(destination(4, Some(9), 1, true), Some(0));
 }

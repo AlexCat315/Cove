@@ -6,12 +6,12 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
 use cove_core::scene::{
     EventResult, InputHandlerRoute, InteractionRegistryHolder, LayoutNode, Node, NodeResource,
     PointerCapture, PointerCaptureHolder, PointerPhase,
 };
 use cove_platform::{KeyModifiers, MouseButton, SystemCursor};
-use crate::{impl_primitive_view, AnyView, PrimitiveView, View};
 
 /// Drag state attachment key.
 pub const SCRUB_SESSION: &str = "numeric.scrub";
@@ -28,7 +28,11 @@ pub struct NumericScrub {
 impl NumericScrub {
     pub fn new(per_point: f32, reset: Option<f32>, clamp: impl Fn(f32) -> f32 + 'static) -> Self {
         Self {
-            per_point: if per_point.is_finite() { per_point } else { 0.0 },
+            per_point: if per_point.is_finite() {
+                per_point
+            } else {
+                0.0
+            },
             clamp: Rc::new(clamp),
             reset,
         }
@@ -70,7 +74,11 @@ impl NumericScrubSession {
     }
 
     pub fn begin(&self, at: f32, value: f32, modifiers: KeyModifiers, node: &Node) {
-        *self.start.borrow_mut() = Some(ScrubStart { x: at, value, modifiers });
+        *self.start.borrow_mut() = Some(ScrubStart {
+            x: at,
+            value,
+            modifiers,
+        });
         if let Some(capture) = self.capture.borrow().as_ref() {
             capture.acquire(node, true);
         }
@@ -125,7 +133,13 @@ impl NumericScrubHandle {
         is_enabled: bool,
         label: impl View + 'static,
     ) -> Self {
-        Self { value, on_change: Rc::new(on_change), scrub, is_enabled, label: AnyView::new(label) }
+        Self {
+            value,
+            on_change: Rc::new(on_change),
+            scrub,
+            is_enabled,
+            label: AnyView::new(label),
+        }
     }
 }
 
@@ -134,7 +148,12 @@ impl PrimitiveView for NumericScrubHandle {
         let node = Node::new();
         let session: Rc<dyn NodeResource> = NumericScrubSession::new();
         node.add_resource(session.clone());
-        if let Some(session) = session.clone().as_any_rc().downcast::<NumericScrubSession>().ok() {
+        if let Some(session) = session
+            .clone()
+            .as_any_rc()
+            .downcast::<NumericScrubSession>()
+            .ok()
+        {
             node.set_attachment(SCRUB_SESSION, session);
         }
         node
@@ -159,7 +178,9 @@ impl PrimitiveView for NumericScrubHandle {
         } else {
             SystemCursor::Arrow
         }));
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         if !self.is_enabled {
             if let Some(session) = session.as_ref() {
                 session.cancel(node, None);
@@ -173,58 +194,76 @@ impl PrimitiveView for NumericScrubHandle {
         let scrub = self.scrub.clone();
         let pointer_node = node.downgrade();
         let pointer_session = session.clone();
-        registry.set_pointer(node, InputHandlerRoute::control(), Rc::new(move |event, phase, event_phase| {
-            if event.button != MouseButton::Left || event_phase != cove_core::scene::EventPhase::Target {
-                return EventResult::Ignored;
-            }
-            let Some(owner) = Node::upgrade(&pointer_node) else { return EventResult::Ignored };
-            match phase {
-                PointerPhase::Down => {
-                    // A double click resets; the click count arrives with the event.
-                    if event.clicks >= 2
-                        && let Some(reset) = scrub.reset
-                    {
+        registry.set_pointer(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, phase, event_phase| {
+                if event.button != MouseButton::Left
+                    || event_phase != cove_core::scene::EventPhase::Target
+                {
+                    return EventResult::Ignored;
+                }
+                let Some(owner) = Node::upgrade(&pointer_node) else {
+                    return EventResult::Ignored;
+                };
+                match phase {
+                    PointerPhase::Down => {
+                        // A double click resets; the click count arrives with the event.
+                        if event.clicks >= 2
+                            && let Some(reset) = scrub.reset
+                        {
+                            if let Some(session) = pointer_session.as_ref() {
+                                session.cancel(&owner, None);
+                            }
+                            if value != reset {
+                                on_change(reset);
+                            }
+                            return EventResult::Handled;
+                        }
+                        if let Some(session) = pointer_session.as_ref() {
+                            session.begin(event.x, value, event.modifiers, &owner);
+                        }
+                    }
+                    PointerPhase::Up => {
                         if let Some(session) = pointer_session.as_ref() {
                             session.cancel(&owner, None);
                         }
-                        if value != reset {
-                            on_change(reset);
-                        }
-                        return EventResult::Handled;
-                    }
-                    if let Some(session) = pointer_session.as_ref() {
-                        session.begin(event.x, value, event.modifiers, &owner);
                     }
                 }
-                PointerPhase::Up => {
-                    if let Some(session) = pointer_session.as_ref() {
-                        session.cancel(&owner, None);
-                    }
-                }
-            }
-            EventResult::Handled
-        }));
+                EventResult::Handled
+            }),
+        );
 
         let motion_on_change = self.on_change.clone();
         let motion_value = self.value;
         let motion_scrub = self.scrub.clone();
         let motion_session = session;
         let motion_node = node.downgrade();
-        registry.set_motion(node, InputHandlerRoute::control(), Rc::new(move |event, phase| {
-            if phase != cove_core::scene::EventPhase::Target {
-                return EventResult::Ignored;
-            }
-            let Some(owner) = Node::upgrade(&motion_node) else { return EventResult::Ignored };
-            let Some(session) = motion_session.as_ref() else { return EventResult::Ignored };
-            let start = *session.start.borrow();
-            let Some(start) = start else { return EventResult::Ignored };
-            let next = motion_scrub.value(start.value, event.x - start.x, start.modifiers);
-            if motion_value != next {
-                motion_on_change(next);
-            }
-            let _ = owner;
-            EventResult::Handled
-        }));
+        registry.set_motion(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, phase| {
+                if phase != cove_core::scene::EventPhase::Target {
+                    return EventResult::Ignored;
+                }
+                let Some(owner) = Node::upgrade(&motion_node) else {
+                    return EventResult::Ignored;
+                };
+                let Some(session) = motion_session.as_ref() else {
+                    return EventResult::Ignored;
+                };
+                let start = *session.start.borrow();
+                let Some(start) = start else {
+                    return EventResult::Ignored;
+                };
+                let next = motion_scrub.value(start.value, event.x - start.x, start.modifiers);
+                if motion_value != next {
+                    motion_on_change(next);
+                }
+                let _ = owner;
+                EventResult::Handled
+            }),
+        );
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {

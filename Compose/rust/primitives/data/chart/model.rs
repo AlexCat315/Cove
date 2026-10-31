@@ -156,23 +156,60 @@ impl ChartSeries {
         axis: ChartValueAxis,
         style: ChartSeriesStyle,
     ) -> Self {
-        Self { data: points, color, mark, title: title.into(), axis, style }
+        Self {
+            data: points,
+            color,
+            mark,
+            title: title.into(),
+            axis,
+            style,
+        }
     }
     pub fn line(values: Vec<f32>) -> Self {
-        Self::values(values, SemanticColorRef::accent(), ChartMark::Line, "", ChartValueAxis::Left, ChartSeriesStyle::default())
+        Self::values(
+            values,
+            SemanticColorRef::accent(),
+            ChartMark::Line,
+            "",
+            ChartValueAxis::Left,
+            ChartSeriesStyle::default(),
+        )
     }
     pub fn area(values: Vec<f32>) -> Self {
-        Self::values(values, SemanticColorRef::accent(), ChartMark::Area, "", ChartValueAxis::Left, ChartSeriesStyle::default())
+        Self::values(
+            values,
+            SemanticColorRef::accent(),
+            ChartMark::Area,
+            "",
+            ChartValueAxis::Left,
+            ChartSeriesStyle::default(),
+        )
     }
     pub fn bar(values: Vec<f32>) -> Self {
-        Self::values(values, SemanticColorRef::accent(), ChartMark::Bar, "", ChartValueAxis::Left, ChartSeriesStyle::default())
+        Self::values(
+            values,
+            SemanticColorRef::accent(),
+            ChartMark::Bar,
+            "",
+            ChartValueAxis::Left,
+            ChartSeriesStyle::default(),
+        )
     }
     /// Scatter series; `x` and `y` are paired by index and truncated to the
     /// shorter one.
     pub fn scatter(x: Vec<f32>, y: Vec<f32>) -> Self {
         let count = x.len().min(y.len());
-        let points = (0..count).map(|index| ChartDatum::new(x[index], y[index])).collect();
-        Self::points(points, SemanticColorRef::accent(), ChartMark::Point, "", ChartValueAxis::Left, ChartSeriesStyle::default())
+        let points = (0..count)
+            .map(|index| ChartDatum::new(x[index], y[index]))
+            .collect();
+        Self::points(
+            points,
+            SemanticColorRef::accent(),
+            ChartMark::Point,
+            "",
+            ChartValueAxis::Left,
+            ChartSeriesStyle::default(),
+        )
     }
 }
 
@@ -186,7 +223,11 @@ pub struct ChartSlice {
 }
 impl ChartSlice {
     pub fn new(title: impl Into<String>, value: f32, color: Option<SemanticColorRef>) -> Self {
-        Self { value, title: title.into(), color }
+        Self {
+            value,
+            title: title.into(),
+            color,
+        }
     }
     /// Distinct hues first; `info` is a second blue in the default themes, so
     /// it comes last.
@@ -218,7 +259,12 @@ pub struct ChartThreshold {
 }
 impl ChartThreshold {
     pub fn new(value: f32) -> Self {
-        Self { value, color: SemanticColorRef::warning(), label: String::new(), axis: ChartValueAxis::Left }
+        Self {
+            value,
+            color: SemanticColorRef::warning(),
+            label: String::new(),
+            axis: ChartValueAxis::Left,
+        }
     }
 }
 
@@ -253,7 +299,12 @@ pub struct ChartAnnotation {
 }
 impl ChartAnnotation {
     pub fn new(text: impl Into<String>, series: usize, index: usize) -> Self {
-        Self { text: text.into(), series, index, color: SemanticColorRef::accent() }
+        Self {
+            text: text.into(),
+            series,
+            index,
+            color: SemanticColorRef::accent(),
+        }
     }
 }
 
@@ -265,7 +316,11 @@ pub struct ChartMarker {
 }
 impl ChartMarker {
     pub fn new(index: usize) -> Self {
-        Self { index, color: SemanticColorRef::accent(), width: 1.0 }
+        Self {
+            index,
+            color: SemanticColorRef::accent(),
+            width: 1.0,
+        }
     }
     pub fn width(mut self, width: f32) -> Self {
         self.width = width.max(1.0);
@@ -304,7 +359,19 @@ pub struct ChartStyle {
 }
 impl Default for ChartStyle {
     fn default() -> Self {
-        Self::new(None, None, true, 2.0, 2.0, 4.0, None, SemanticColorRef::divider(), ChartStacking::None, 0.6, ChartOrientation::Vertical)
+        Self::new(
+            None,
+            None,
+            true,
+            2.0,
+            2.0,
+            4.0,
+            None,
+            SemanticColorRef::divider(),
+            ChartStacking::None,
+            0.6,
+            ChartOrientation::Vertical,
+        )
     }
 }
 impl ChartStyle {
@@ -343,7 +410,19 @@ impl ChartStyle {
     /// Compact trend line: no grid, thin stroke, small inset. Pair with
     /// unlabeled axes.
     pub fn sparkline() -> Self {
-        Self::new(None, None, false, 1.5, 2.0, 3.0, None, SemanticColorRef::divider(), ChartStacking::None, 0.6, ChartOrientation::Vertical)
+        Self::new(
+            None,
+            None,
+            false,
+            1.5,
+            2.0,
+            3.0,
+            None,
+            SemanticColorRef::divider(),
+            ChartStacking::None,
+            0.6,
+            ChartOrientation::Vertical,
+        )
     }
 }
 
@@ -367,7 +446,11 @@ pub struct ChartCalloutRow {
 }
 impl ChartCalloutRow {
     pub fn new(title: impl Into<String>, value: impl Into<String>) -> Self {
-        Self { title: title.into(), value: value.into(), color: None }
+        Self {
+            title: title.into(),
+            value: value.into(),
+            color: None,
+        }
     }
 }
 
@@ -379,7 +462,11 @@ pub struct ChartCallout {
 }
 impl ChartCallout {
     pub fn new(point: ChartPoint, title: impl Into<String>, rows: Vec<ChartCalloutRow>) -> Self {
-        Self { point, title: title.into(), rows }
+        Self {
+            point,
+            title: title.into(),
+            rows,
+        }
     }
 }
 
@@ -420,7 +507,11 @@ pub struct Selection {
 }
 impl Default for Selection {
     fn default() -> Self {
-        Self { point: None, range: None, value_text: std::sync::Arc::new(Self::default_text) }
+        Self {
+            point: None,
+            range: None,
+            value_text: std::sync::Arc::new(Self::default_text),
+        }
     }
 }
 impl Selection {
@@ -483,7 +574,10 @@ pub struct PieCenter {
 }
 impl PieCenter {
     pub fn new(value: impl Into<String>, label: impl Into<String>) -> Self {
-        Self { value: value.into(), label: label.into() }
+        Self {
+            value: value.into(),
+            label: label.into(),
+        }
     }
 }
 
@@ -504,7 +598,13 @@ pub struct XAxis {
 }
 impl Default for XAxis {
     fn default() -> Self {
-        Self { title: String::new(), tick_count: 5, is_labeled: true, kind: ChartScaleKind::Linear, format: None }
+        Self {
+            title: String::new(),
+            tick_count: 5,
+            is_labeled: true,
+            kind: ChartScaleKind::Linear,
+            format: None,
+        }
     }
 }
 
@@ -518,7 +618,13 @@ pub struct YAxis {
 }
 impl Default for YAxis {
     fn default() -> Self {
-        Self { title: String::new(), tick_count: 4, is_labeled: true, kind: ChartScaleKind::Linear, format: None }
+        Self {
+            title: String::new(),
+            tick_count: 4,
+            is_labeled: true,
+            kind: ChartScaleKind::Linear,
+            format: None,
+        }
     }
 }
 
@@ -528,7 +634,9 @@ pub struct Accessibility {
 }
 impl Default for Accessibility {
     fn default() -> Self {
-        Self { exposes_values: true }
+        Self {
+            exposes_values: true,
+        }
     }
 }
 
@@ -540,6 +648,9 @@ pub struct Viewport {
 }
 impl Viewport {
     pub fn new() -> Self {
-        Self { range: None, minimum_fraction: 0.01 }
+        Self {
+            range: None,
+            minimum_fraction: 0.01,
+        }
     }
 }

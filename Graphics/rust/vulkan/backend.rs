@@ -17,13 +17,13 @@ use crate::rhi::{
     AccelerationStructure, AccelerationStructureDescriptor, AdapterCapabilities, BindingLayout,
     BindingLayoutDescriptor, BindingLayoutEntry, BindingSet, BindingSetEntry, Buffer,
     BufferDescriptor, Capabilities, Completion, ComputePipeline, ComputePipelineDescriptor,
-    DeviceConfig, FrameUploader, GraphicsApi, GraphicsPipeline, GraphicsPipelineDescriptor,
-    GpuTimestampProfile, MeshPipeline, MeshPipelineDescriptor, PipelineLayout,
+    DeviceConfig, FrameUploader, GpuTimestampProfile, GraphicsApi, GraphicsPipeline,
+    GraphicsPipelineDescriptor, MeshPipeline, MeshPipelineDescriptor, PipelineLayout,
     PipelineLayoutDescriptor, PlannedSubmit, PresentationMode, QueueLimits, RhiBackend, RhiError,
-    RhiResult, Sampler, SamplerDescriptor, ShaderModule, ShaderModuleDescriptor, SubmissionCpuProfile,
-    SurfaceDescriptor, Swapchain, SwapchainImage, Texture, TextureAllocation, TextureDescriptor,
-    TextureSubresource, TextureUploadRegion, rhi_require, rhi_texture_subresource_extent,
-    rhi_texture_transfer_bytes, rhi_texture_upload_bytes,
+    RhiResult, Sampler, SamplerDescriptor, ShaderModule, ShaderModuleDescriptor,
+    SubmissionCpuProfile, SurfaceDescriptor, Swapchain, SwapchainImage, Texture, TextureAllocation,
+    TextureDescriptor, TextureSubresource, TextureUploadRegion, rhi_require,
+    rhi_texture_subresource_extent, rhi_texture_transfer_bytes, rhi_texture_upload_bytes,
 };
 
 use super::memory::{VulkanMemoryAllocation, VulkanMemoryAllocator};
@@ -34,9 +34,7 @@ use super::setup::{self, VulkanContext};
 use super::status::VulkanSubmissionStatus;
 use super::submission::{Submitter, VulkanFrame, VulkanFrameUploader, VulkanUploadChunk};
 use super::sys;
-use super::{
-    acceleration, pipelines, presentation, resources, submission,
-};
+use super::{acceleration, pipelines, presentation, resources, submission};
 
 /// The concrete Vulkan backend.
 pub struct VulkanBackend {
@@ -79,7 +77,9 @@ impl VulkanBackend {
         let mut memory_properties = sys::VkPhysicalDeviceMemoryProperties::default();
         // SAFETY: the physical device is live and the out-parameter is a live local.
         unsafe {
-            (context.instance_commands.get_physical_device_memory_properties)(
+            (context
+                .instance_commands
+                .get_physical_device_memory_properties)(
                 context.physical_device,
                 &mut memory_properties,
             )
@@ -117,9 +117,15 @@ impl VulkanBackend {
         // Extension presence is diagnostic only; enabled features and resolved
         // commands additionally determine the implemented capability set.
         AdapterCapabilities {
-            ray_tracing: self.context.extensions.contains("VK_KHR_acceleration_structure")
+            ray_tracing: self
+                .context
+                .extensions
+                .contains("VK_KHR_acceleration_structure")
                 && (self.context.extensions.contains("VK_KHR_ray_query")
-                    || self.context.extensions.contains("VK_KHR_ray_tracing_pipeline")),
+                    || self
+                        .context
+                        .extensions
+                        .contains("VK_KHR_ray_tracing_pipeline")),
             mesh_shading: self.context.extensions.contains("VK_EXT_mesh_shader"),
         }
     }
@@ -144,7 +150,8 @@ fn probe_capabilities(context: &VulkanContext) -> Capabilities {
         capabilities.ray_tracing.acceleration_structures = acceleration_structures;
         capabilities.ray_tracing.compute_ray_query =
             acceleration_structures && context.features.ray_query;
-        capabilities.mesh_shading.mesh = context.features.mesh && advanced.draw_mesh_tasks.is_some();
+        capabilities.mesh_shading.mesh =
+            context.features.mesh && advanced.draw_mesh_tasks.is_some();
         capabilities.mesh_shading.task = capabilities.mesh_shading.mesh && context.features.task;
     })
 }
@@ -225,7 +232,10 @@ fn make_upload_chunk(
         registries,
         allocator,
         handle,
-        BufferDescriptor::new(capacity.max(1), usage | crate::rhi::BufferUsage::TRANSFER_DESTINATION),
+        BufferDescriptor::new(
+            capacity.max(1),
+            usage | crate::rhi::BufferUsage::TRANSFER_DESTINATION,
+        ),
     )?;
     let (native, allocation) = {
         let registries = lock(registries);
@@ -235,7 +245,12 @@ fn make_upload_chunk(
             .ok_or(RhiError::OutOfMemory)?;
         (record.buffer, record.allocation)
     };
-    Ok(VulkanUploadChunk { buffer: native, allocation, buffer_handle: handle, capacity })
+    Ok(VulkanUploadChunk {
+        buffer: native,
+        allocation,
+        buffer_handle: handle,
+        capacity,
+    })
 }
 
 impl RhiBackend for VulkanBackend {
@@ -263,7 +278,11 @@ impl RhiBackend for VulkanBackend {
         descriptor: SurfaceDescriptor,
     ) -> RhiResult<()> {
         self.wait_until_idle()?;
-        let generation = self.swapchains.get(&handle.id()).map_or(0, |window| window.generation) + 1;
+        let generation = self
+            .swapchains
+            .get(&handle.id())
+            .map_or(0, |window| window.generation)
+            + 1;
         self.destroy_swapchain(handle);
         let surface = presentation::create_native_surface(&self.context, &descriptor)?;
 
@@ -314,7 +333,9 @@ impl RhiBackend for VulkanBackend {
     }
 
     fn destroy_swapchain(&mut self, handle: Swapchain) {
-        let Some(window) = self.swapchains.remove(&handle.id()) else { return };
+        let Some(window) = self.swapchains.remove(&handle.id()) else {
+            return;
+        };
         // Present's queue wait must also retire before binary semaphores die.
         // SAFETY: the device is live; waiting here guarantees no queued presentation
         // still references the semaphores being released.
@@ -345,7 +366,11 @@ impl RhiBackend for VulkanBackend {
                 "configure a swapchain and begin a frame first".into(),
             ));
         }
-        if self.swapchains.get(&handle.id()).is_some_and(|window| window.needs_recreate) {
+        if self
+            .swapchains
+            .get(&handle.id())
+            .is_some_and(|window| window.needs_recreate)
+        {
             self.recreate_window_swapchain(handle)?;
         }
         let slot = self.active_slot;
@@ -371,7 +396,9 @@ impl RhiBackend for VulkanBackend {
         if result.1 == sys::VK_ERROR_OUT_OF_DATE_KHR {
             self.recreate_window_swapchain(handle)?;
             let Some(window) = self.swapchains.get_mut(&handle.id()) else {
-                return Err(RhiError::SwapchainAcquireFailed("swapchain disappeared".into()));
+                return Err(RhiError::SwapchainAcquireFailed(
+                    "swapchain disappeared".into(),
+                ));
             };
             result = window.chain.acquire(&self.context, semaphore, u64::MAX);
         }
@@ -382,7 +409,9 @@ impl RhiBackend for VulkanBackend {
             )));
         }
         let Some(window) = self.swapchains.get_mut(&handle.id()) else {
-            return Err(RhiError::SwapchainAcquireFailed("swapchain disappeared".into()));
+            return Err(RhiError::SwapchainAcquireFailed(
+                "swapchain disappeared".into(),
+            ));
         };
         if result.1 == sys::VK_SUBOPTIMAL_KHR {
             window.needs_recreate = window.chain.surface_changed(&self.context);
@@ -395,18 +424,28 @@ impl RhiBackend for VulkanBackend {
         let height = window.chain.extent.height as usize;
         let generation = window.generation;
         mark_acquired(window, texture);
-        Ok(SwapchainImage::new(handle, generation, Texture::new(texture), width, height))
+        Ok(SwapchainImage::new(
+            handle,
+            generation,
+            Texture::new(texture),
+            width,
+            height,
+        ))
     }
 
     fn present(&mut self, image: SwapchainImage, completion: Completion) -> RhiResult<()> {
         let slot = self.active_slot;
         let Some(window) = self.swapchains.get_mut(&image.swapchain.id()) else {
-            return Err(RhiError::present_failed("image was not acquired from this swapchain"));
+            return Err(RhiError::present_failed(
+                "image was not acquired from this swapchain",
+            ));
         };
         if window.generation != image.generation
             || window.presentation.acquired_id != Some(image.texture.id())
         {
-            return Err(RhiError::present_failed("image was not acquired from this swapchain"));
+            return Err(RhiError::present_failed(
+                "image was not acquired from this swapchain",
+            ));
         }
         let index = presentation::image_index(window, image.swapchain, image.texture.id())?;
         let ready = match window.presentation.ready.get(&image.texture.id()) {
@@ -492,7 +531,8 @@ impl RhiBackend for VulkanBackend {
                 window.needs_recreate = window.needs_recreate || changed;
             }
         } else if status != sys::VK_SUCCESS {
-            self.submission_status.record(format!("vkQueuePresentKHR: {status}"));
+            self.submission_status
+                .record(format!("vkQueuePresentKHR: {status}"));
         }
         let _ = generation;
         // The transition's GPU work has been queued synchronously, so the frontend
@@ -639,12 +679,7 @@ impl RhiBackend for VulkanBackend {
 
     // MARK: Immediate data transfer
 
-    fn upload_buffer_data(
-        &mut self,
-        buffer: Buffer,
-        offset: usize,
-        data: &[u8],
-    ) -> RhiResult<()> {
+    fn upload_buffer_data(&mut self, buffer: Buffer, offset: usize, data: &[u8]) -> RhiResult<()> {
         submission::upload_buffer_data(&self.context, &self.registries, buffer, offset, data)
     }
 
@@ -730,7 +765,9 @@ impl RhiBackend for VulkanBackend {
                     .lock()
                     .unwrap_or_else(std::sync::PoisonError::into_inner),
             );
-            return Ok(Box::new(UploaderHandle { uploader: Arc::clone(&frame.uploader) }));
+            return Ok(Box::new(UploaderHandle {
+                uploader: Arc::clone(&frame.uploader),
+            }));
         }
 
         // First use of this slot: build its uploader now. `ChunkUploadAllocator`
@@ -775,11 +812,21 @@ impl RhiBackend for VulkanBackend {
     // MARK: Deferred destruction
 
     fn destroy_buffer(&mut self, handle: Buffer) {
-        resources::destroy_buffer(&self.context, &self.registries, &mut lock_allocator(&self.allocator), handle);
+        resources::destroy_buffer(
+            &self.context,
+            &self.registries,
+            &mut lock_allocator(&self.allocator),
+            handle,
+        );
     }
 
     fn destroy_texture(&mut self, handle: Texture) {
-        resources::destroy_texture(&self.context, &self.registries, &mut lock_allocator(&self.allocator), handle);
+        resources::destroy_texture(
+            &self.context,
+            &self.registries,
+            &mut lock_allocator(&self.allocator),
+            handle,
+        );
     }
 
     fn destroy_sampler(&mut self, handle: Sampler) {
@@ -802,9 +849,12 @@ impl RhiBackend for VulkanBackend {
 
     fn wait_until_idle(&mut self) -> RhiResult<()> {
         // SAFETY: the device is live; waiting here is the documented idle path.
-        let status = unsafe { (self.context.instance_commands.device_wait_idle)(self.context.device) };
+        let status =
+            unsafe { (self.context.instance_commands.device_wait_idle)(self.context.device) };
         if status != sys::VK_SUCCESS {
-            return Err(RhiError::submit_failed(format!("vkDeviceWaitIdle failed: {status}")));
+            return Err(RhiError::submit_failed(format!(
+                "vkDeviceWaitIdle failed: {status}"
+            )));
         }
         self.submission_status.check()
     }
@@ -1039,7 +1089,16 @@ pub fn upload_texture(
         // SAFETY: `cmd` is recording; the layout transition and the copy target the
         // same image consistently.
         unsafe {
-            transition_image(context, cmd, image, format, old_layout, sys::VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mip_levels, layers);
+            transition_image(
+                context,
+                cmd,
+                image,
+                format,
+                old_layout,
+                sys::VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                mip_levels,
+                layers,
+            );
             (context.draw.cmd_copy_buffer_to_image)(
                 cmd,
                 native,
@@ -1048,7 +1107,16 @@ pub fn upload_texture(
                 1,
                 &copy,
             );
-            transition_image(context, cmd, image, format, sys::VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, final_layout, mip_levels, layers);
+            transition_image(
+                context,
+                cmd,
+                image,
+                format,
+                sys::VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                final_layout,
+                mip_levels,
+                layers,
+            );
         }
         Ok(())
     });
@@ -1170,7 +1238,16 @@ pub fn read_texture(
     let outcome = submission::one_shot(context, |cmd| {
         // SAFETY: `cmd` is recording; the readback restores the original layout.
         unsafe {
-            transition_image(context, cmd, image, format, layout, sys::VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, mip_levels, layers);
+            transition_image(
+                context,
+                cmd,
+                image,
+                format,
+                layout,
+                sys::VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                mip_levels,
+                layers,
+            );
             (context.draw.cmd_copy_image_to_buffer)(
                 cmd,
                 image,
@@ -1179,7 +1256,16 @@ pub fn read_texture(
                 1,
                 &copy,
             );
-            transition_image(context, cmd, image, format, sys::VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, layout, mip_levels, layers);
+            transition_image(
+                context,
+                cmd,
+                image,
+                format,
+                sys::VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                layout,
+                mip_levels,
+                layers,
+            );
         }
         Ok(())
     });
@@ -1187,9 +1273,7 @@ pub fn read_texture(
         if let Some(pointer) = allocation.cpu_pointer(0) {
             // SAFETY: the copy completed and the staging mapping covers the range;
             // `destination` is a distinct live slice.
-            unsafe {
-                std::ptr::copy_nonoverlapping(pointer, destination.as_mut_ptr(), byte_count)
-            };
+            unsafe { std::ptr::copy_nonoverlapping(pointer, destination.as_mut_ptr(), byte_count) };
         }
     }
     // SAFETY: the readback completed (or failed before queueing), so the staging
@@ -1257,8 +1341,12 @@ unsafe fn transition_image(
 
 /// Locks the block allocator. A poisoned lock only means another thread panicked
 /// while holding it; every mutation is a self-contained block operation.
-fn lock_allocator(allocator: &Arc<Mutex<VulkanMemoryAllocator>>) -> std::sync::MutexGuard<'_, VulkanMemoryAllocator> {
-    allocator.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+fn lock_allocator(
+    allocator: &Arc<Mutex<VulkanMemoryAllocator>>,
+) -> std::sync::MutexGuard<'_, VulkanMemoryAllocator> {
+    allocator
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
 fn frames_aspect(format: crate::rhi::TextureFormat) -> u32 {
@@ -1324,7 +1412,9 @@ impl UploadChunkContext {
         let build = (|| -> RhiResult<VulkanMemoryAllocation> {
             let mut requirements = sys::VkMemoryRequirements::default();
             // SAFETY: the buffer was just created on this device.
-            unsafe { (self.core.get_buffer_memory_requirements)(self.device, native, &mut requirements) };
+            unsafe {
+                (self.core.get_buffer_memory_requirements)(self.device, native, &mut requirements)
+            };
             let mut allocator = lock_allocator(&self.allocator);
             let allocation = allocator.allocate(
                 requirements.size,
@@ -1386,17 +1476,19 @@ struct UploaderHandle {
 impl crate::rhi::FrameUploader for UploaderHandle {
     fn reset(&mut self) {
         crate::rhi::FrameUploader::reset(
-            &mut *self.uploader.lock().unwrap_or_else(std::sync::PoisonError::into_inner),
+            &mut *self
+                .uploader
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
         );
     }
 
-    fn write(
-        &mut self,
-        bytes: &[u8],
-        alignment: usize,
-    ) -> RhiResult<crate::rhi::UploadLocation> {
+    fn write(&mut self, bytes: &[u8], alignment: usize) -> RhiResult<crate::rhi::UploadLocation> {
         crate::rhi::FrameUploader::write(
-            &mut *self.uploader.lock().unwrap_or_else(std::sync::PoisonError::into_inner),
+            &mut *self
+                .uploader
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
             bytes,
             alignment,
         )
@@ -1427,7 +1519,10 @@ mod tests {
 
     #[test]
     fn aspect_masks_come_from_the_format() {
-        assert_eq!(frames_aspect(crate::rhi::TextureFormat::Rgba8Unorm), sys::VK_IMAGE_ASPECT_COLOR_BIT);
+        assert_eq!(
+            frames_aspect(crate::rhi::TextureFormat::Rgba8Unorm),
+            sys::VK_IMAGE_ASPECT_COLOR_BIT
+        );
         assert_eq!(
             frames_aspect(crate::rhi::TextureFormat::Depth32Float),
             sys::VK_IMAGE_ASPECT_DEPTH_BIT
@@ -1469,8 +1564,11 @@ impl VulkanBackend {
         }
 
         // Registries, in the Swift order.
-        let acceleration_ids =
-            lock(&self.registries).acceleration_structures.keys().copied().collect::<Vec<_>>();
+        let acceleration_ids = lock(&self.registries)
+            .acceleration_structures
+            .keys()
+            .copied()
+            .collect::<Vec<_>>();
         for id in acceleration_ids {
             acceleration::destroy_acceleration_structure(
                 context,
@@ -1479,28 +1577,53 @@ impl VulkanBackend {
                 AccelerationStructure::new(id),
             );
         }
-        let mesh_ids = lock(&self.registries).mesh_pipelines.keys().copied().collect::<Vec<_>>();
+        let mesh_ids = lock(&self.registries)
+            .mesh_pipelines
+            .keys()
+            .copied()
+            .collect::<Vec<_>>();
         for id in mesh_ids {
             pipelines::destroy_mesh_pipeline(context, &self.registries, MeshPipeline::new(id));
         }
-        let graphics_ids =
-            lock(&self.registries).graphics_pipelines.keys().copied().collect::<Vec<_>>();
+        let graphics_ids = lock(&self.registries)
+            .graphics_pipelines
+            .keys()
+            .copied()
+            .collect::<Vec<_>>();
         for id in graphics_ids {
-            pipelines::destroy_graphics_pipeline(context, &self.registries, GraphicsPipeline::new(id));
+            pipelines::destroy_graphics_pipeline(
+                context,
+                &self.registries,
+                GraphicsPipeline::new(id),
+            );
         }
-        let compute_ids =
-            lock(&self.registries).compute_pipelines.keys().copied().collect::<Vec<_>>();
+        let compute_ids = lock(&self.registries)
+            .compute_pipelines
+            .keys()
+            .copied()
+            .collect::<Vec<_>>();
         for id in compute_ids {
-            pipelines::destroy_compute_pipeline(context, &self.registries, ComputePipeline::new(id));
+            pipelines::destroy_compute_pipeline(
+                context,
+                &self.registries,
+                ComputePipeline::new(id),
+            );
         }
 
         // SAFETY: the device is idle, so the pool is unreferenced.
         unsafe {
-            (context.core.destroy_descriptor_pool)(context.device, self.descriptor_pool, core::ptr::null());
+            (context.core.destroy_descriptor_pool)(
+                context.device,
+                self.descriptor_pool,
+                core::ptr::null(),
+            );
         }
 
-        let layout_ids =
-            lock(&self.registries).pipeline_layouts.keys().copied().collect::<Vec<_>>();
+        let layout_ids = lock(&self.registries)
+            .pipeline_layouts
+            .keys()
+            .copied()
+            .collect::<Vec<_>>();
         for id in layout_ids {
             let native = lock(&self.registries)
                 .pipeline_layouts
@@ -1517,8 +1640,11 @@ impl VulkanBackend {
                 }
             }
         }
-        let binding_ids =
-            lock(&self.registries).binding_layouts.keys().copied().collect::<Vec<_>>();
+        let binding_ids = lock(&self.registries)
+            .binding_layouts
+            .keys()
+            .copied()
+            .collect::<Vec<_>>();
         for id in binding_ids {
             let layout = lock(&self.registries).binding_layouts.remove(&id);
             // SAFETY: as above.
@@ -1533,15 +1659,27 @@ impl VulkanBackend {
             }
         }
 
-        let module_ids = lock(&self.registries).shader_modules.keys().copied().collect::<Vec<_>>();
+        let module_ids = lock(&self.registries)
+            .shader_modules
+            .keys()
+            .copied()
+            .collect::<Vec<_>>();
         for id in module_ids {
             resources::destroy_shader_module(context, &self.registries, ShaderModule::new(id));
         }
-        let sampler_ids = lock(&self.registries).samplers.keys().copied().collect::<Vec<_>>();
+        let sampler_ids = lock(&self.registries)
+            .samplers
+            .keys()
+            .copied()
+            .collect::<Vec<_>>();
         for id in sampler_ids {
             resources::destroy_sampler(context, &self.registries, Sampler::new(id));
         }
-        let texture_ids = lock(&self.registries).textures.keys().copied().collect::<Vec<_>>();
+        let texture_ids = lock(&self.registries)
+            .textures
+            .keys()
+            .copied()
+            .collect::<Vec<_>>();
         for id in texture_ids {
             resources::destroy_texture(
                 context,
@@ -1550,7 +1688,11 @@ impl VulkanBackend {
                 Texture::new(id),
             );
         }
-        let buffer_ids = lock(&self.registries).buffers.keys().copied().collect::<Vec<_>>();
+        let buffer_ids = lock(&self.registries)
+            .buffers
+            .keys()
+            .copied()
+            .collect::<Vec<_>>();
         for id in buffer_ids {
             resources::destroy_buffer(
                 context,
@@ -1617,7 +1759,10 @@ impl VulkanBackend {
             }
         }
 
-        self.allocator.lock().expect("allocator poisoned").destroy_all();
+        self.allocator
+            .lock()
+            .expect("allocator poisoned")
+            .destroy_all();
         context
             .staging_allocator
             .lock()

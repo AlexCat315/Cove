@@ -1,9 +1,9 @@
 //! Translation of Theme/Tokens/TextScaler.swift.
+use super::semantic_modifiers::SemanticFontModifier;
+use crate::{AnyView, PrimitiveView, View, ViewExt, ViewKind, ViewModifier};
 use cove_core::scene::{CompositionLocal, LayoutNode, Node};
 use cove_core::{Font, TextScale};
 use std::rc::Rc;
-use crate::{AnyView, PrimitiveView, View, ViewKind, ViewModifier, ViewExt};
-use super::semantic_modifiers::SemanticFontModifier;
 
 /// Text scaling is independent of display density and the application's
 /// typography ramp. Hosts supply their accessibility setting once at the root;
@@ -21,7 +21,11 @@ impl Default for TextScaler {
 impl TextScaler {
     pub fn new(factor: f32) -> Self {
         Self {
-            authored_factor: if factor.is_finite() && factor > 0.0 { factor } else { 1.0 },
+            authored_factor: if factor.is_finite() && factor > 0.0 {
+                factor
+            } else {
+                1.0
+            },
             system_scale: TextScale::default(),
         }
     }
@@ -93,11 +97,16 @@ pub fn node_text_scaler(node: &Node) -> TextScaler {
 /// Copy composition defaults to the measured leaf. Explicit font/style
 /// attachments anywhere in its ancestry retain priority over this fallback.
 pub fn sync_text_style_environment(node: &Node) {
-    let Some(layout) = node.layout_node() else { return };
-    let body: Option<super::TextStyleToken> = node.composition_value(&crate::theme::ThemeEnvironment::body_style());
+    let Some(layout) = node.layout_node() else {
+        return;
+    };
+    let body: Option<super::TextStyleToken> =
+        node.composition_value(&crate::theme::ThemeEnvironment::body_style());
     let scaler = node_text_scaler(node);
     let changed = layout.attachment::<TextScaler>(TEXT_SCALER_ATTACHMENT) != Some(scaler.clone())
-        || layout.attachment::<super::TextStyleToken>(crate::theme::ThemeEnvironment::BODY_STYLE_ATTACHMENT) != body;
+        || layout.attachment::<super::TextStyleToken>(
+            crate::theme::ThemeEnvironment::BODY_STYLE_ATTACHMENT,
+        ) != body;
     layout.set_attachment(TEXT_SCALER_ATTACHMENT, scaler);
     layout.set_attachment(crate::theme::ThemeEnvironment::BODY_STYLE_ATTACHMENT, body);
     if changed {
@@ -111,7 +120,9 @@ pub struct TextScalerReader<Content: View> {
 }
 impl<Content: View> TextScalerReader<Content> {
     pub fn new(content: impl Fn(TextScaler) -> Content + 'static) -> Self {
-        Self { content: Rc::new(content) }
+        Self {
+            content: Rc::new(content),
+        }
     }
 }
 impl<Content: View + 'static> PrimitiveView for TextScalerReader<Content> {
@@ -142,7 +153,9 @@ pub trait TextScalerViewExt: View + Sized + 'static {
         self.modifier(TextScalerModifier { scaler })
     }
     fn text_style(self, token: super::TextStyleToken) -> crate::ModifiedContent {
-        self.modifier(SemanticFontModifier::new(super::SemanticFontRef::new(move |_| token.clone())))
+        self.modifier(SemanticFontModifier::new(super::SemanticFontRef::new(
+            move |_| token.clone(),
+        )))
     }
 }
 impl<T: View + Sized + 'static> TextScalerViewExt for T {}

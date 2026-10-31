@@ -4,9 +4,7 @@
 //! Every animation type the Swift story authors already exists in
 //! `cove_core::scene::animation`, so the state machines port exactly.
 
-use cove_core::scene::animation::{
-    Animation, AnimationCurve, AnimationKeyframe, KeyframeTimeline,
-};
+use cove_core::scene::animation::{Animation, AnimationCurve, AnimationKeyframe, KeyframeTimeline};
 use cove_core::{Point, State};
 
 /// The three keyframes the scale track plays, and its total duration.
@@ -94,7 +92,11 @@ impl AnimationSystemExamples {
 
     /// The loop control's label.
     pub fn loop_label(&self) -> &'static str {
-        if self.looping.get() { "Stop loop" } else { "Start loop" }
+        if self.looping.get() {
+            "Stop loop"
+        } else {
+            "Start loop"
+        }
     }
 
     /// Whether the repeating track is currently mounted.
@@ -108,7 +110,11 @@ impl AnimationSystemExamples {
 
     /// The moving surface's size, which changes with its destination.
     pub fn selection_size(&self) -> (f32, f32) {
-        if self.trailing.get() { (130.0, 44.0) } else { (90.0, 28.0) }
+        if self.trailing.get() {
+            (130.0, 44.0)
+        } else {
+            (90.0, 28.0)
+        }
     }
 
     /// Adds 10 to the interpolated numeric value.
@@ -147,14 +153,20 @@ mod checks {
         assert_eq!(track.value(-1.0), 1.0);
         assert_eq!(track.value(1.0), 1.0);
         // Mid-overshoot exceeds 1.
-        assert!(track.value(0.12) > 1.0, "the first keyframe overshoots above 1");
+        assert!(
+            track.value(0.12) > 1.0,
+            "the first keyframe overshoots above 1"
+        );
         // Between the overshoot and the dip the value falls below the start.
         assert!(track.value(0.30) < 1.0, "the second keyframe dips below 1");
     }
 
     #[test]
     fn phases_match_the_swift_enum() {
-        assert_eq!(DemoPhase::ALL.map(DemoPhase::raw_value), ["Idle", "Working", "Done"]);
+        assert_eq!(
+            DemoPhase::ALL.map(DemoPhase::raw_value),
+            ["Idle", "Working", "Done"]
+        );
         assert_eq!(DemoPhase::default(), DemoPhase::Idle);
         assert_eq!(DemoPhase::Working.scale(), 1.08);
         assert_eq!(DemoPhase::Idle.scale(), 1.0);
@@ -226,12 +238,12 @@ impl cove_ui_compose::View for AnimationSystemExamples {
     fn body(&self) -> cove_ui_compose::AnyView {
         use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
         use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
-        
+
         use cove_ui_compose::primitives::controls::Button;
         use cove_ui_compose::primitives::feedback::{Badge, StatusTone};
         use cove_ui_compose::primitives::text::Text;
-        use cove_ui_compose::theme::styles::buttons::button_style::ButtonStyleViewExt;
         use cove_ui_compose::theme::styles::buttons::SecondaryButtonStyle;
+        use cove_ui_compose::theme::styles::buttons::button_style::ButtonStyleViewExt;
         use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
         use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView};
 
@@ -251,39 +263,38 @@ impl cove_ui_compose::View for AnimationSystemExamples {
             )
         };
         let track_badge = AnyView::new(Badge::new("Keyframes").tone(StatusTone::Info));
-        let phase_badge = AnyView::new(
-            Badge::new(DemoPhase::Idle.raw_value()).tone(StatusTone::Info),
-        );
+        let phase_badge =
+            AnyView::new(Badge::new(DemoPhase::Idle.raw_value()).tone(StatusTone::Info));
         let badges = AnyView::new(
             BoxView::new(
-            FlexDirection::Row,
-            Align::Center,
-            Justify::FlexStart,
-            Wrap::NoWrap,
-            24.0,
-            AnyView::new(TupleView::new(vec![
-                AnyView::new(
-                    BoxView::new(
-                        FlexDirection::Column,
-                        Align::Center,
-                        Justify::FlexStart,
-                        Wrap::NoWrap,
-                        0.0,
-                        track_badge,
-                    )
-                    .debug_name("animation-keyframe"),
-                ),
-                AnyView::new(
-                    BoxView::new(
-                        FlexDirection::Column,
-                        Align::Center,
-                        Justify::FlexStart,
-                        Wrap::NoWrap,
-                        0.0,
-                        phase_badge,
-                    )
-                    .debug_name("animation-phase"),
-                ),
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                24.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(
+                        BoxView::new(
+                            FlexDirection::Column,
+                            Align::Center,
+                            Justify::FlexStart,
+                            Wrap::NoWrap,
+                            0.0,
+                            track_badge,
+                        )
+                        .debug_name("animation-keyframe"),
+                    ),
+                    AnyView::new(
+                        BoxView::new(
+                            FlexDirection::Column,
+                            Align::Center,
+                            Justify::FlexStart,
+                            Wrap::NoWrap,
+                            0.0,
+                            phase_badge,
+                        )
+                        .debug_name("animation-phase"),
+                    ),
                 ])),
             )
             .frame_height(58.0),
@@ -296,7 +307,11 @@ impl cove_ui_compose::View for AnimationSystemExamples {
             AnyView::new(
                 AnyView::new(
                     Button::title(
-                        if self.looping.get() { "Stop loop" } else { "Start loop" },
+                        if self.looping.get() {
+                            "Stop loop"
+                        } else {
+                            "Start loop"
+                        },
                         move || looping.update(|value| *value = !*value),
                     )
                     .enabled(enabled)
@@ -382,8 +397,7 @@ impl cove_ui_compose::View for AnimationSystemExamples {
                     complete,
                     bar,
                     AnyView::new(
-                        Text::new(self.completed_line())
-                            .debug_name("animation-completion-count"),
+                        Text::new(self.completed_line()).debug_name("animation-completion-count"),
                     ),
                 ])),
             )),

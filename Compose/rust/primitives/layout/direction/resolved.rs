@@ -1,9 +1,9 @@
 //! Translation of Compose/Sources/CoveUICompose/Primitives/Layout/Direction/Resolved.swift.
 use std::rc::Rc;
 
-use cove_core::scene::{Direction, LayoutNode, Node};
-use cove_core::State;
 use crate::{AnyView, PrimitiveView, View, ViewKind};
+use cove_core::State;
+use cove_core::scene::{Direction, LayoutNode, Node};
 
 /// Resolves the committed layout direction during layout write-back and
 /// rebuilds its content when the direction changes.
@@ -17,7 +17,10 @@ pub struct ResolvedLayoutDirection<Content: View + 'static> {
 }
 impl<Content: View + 'static> ResolvedLayoutDirection<Content> {
     pub fn new(content: impl Fn(Direction) -> Content + 'static) -> Self {
-        Self { content: Rc::new(content), direction: State::new(Direction::Ltr) }
+        Self {
+            content: Rc::new(content),
+            direction: State::new(Direction::Ltr),
+        }
     }
 }
 impl<Content: View + 'static> View for ResolvedLayoutDirection<Content> {

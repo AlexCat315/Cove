@@ -126,7 +126,8 @@ impl Node {
             return;
         }
         let apply = Rc::new(apply);
-        let controller = AnimationController::new(from, to, animation, 0.0, move |value| apply(Some(value)));
+        let controller =
+            AnimationController::new(from, to, animation, 0.0, move |value| apply(Some(value)));
         self.inherit_motion(key, &controller);
         let any: Rc<dyn AnyAnimationController> = controller.clone();
         self.replace_animation_controller(key, Some(any));
@@ -148,7 +149,9 @@ mod tests {
         let node = Node::new();
         let written = Rc::new(RefCell::new(Vec::new()));
         let log = written.clone();
-        node.animatable_set_with("opacity", 0.0_f32, 1.0, move |value| log.borrow_mut().push(value));
+        node.animatable_set_with("opacity", 0.0_f32, 1.0, move |value| {
+            log.borrow_mut().push(value)
+        });
         assert_eq!(*written.borrow(), vec![1.0]);
         assert!(!node.has_animation_controller("opacity"));
     }
@@ -160,12 +163,22 @@ mod tests {
         scheduler.reset();
         let written = Rc::new(RefCell::new(Vec::new()));
         let log = written.clone();
-        ActiveAnimationContext::with(Some(Animation::new(0.2, AnimationCurve::EaseOut)), None, None, || {
-            node.animatable_set_with("opacity", 0.0_f32, 1.0, move |value| log.borrow_mut().push(value));
-        });
+        ActiveAnimationContext::with(
+            Some(Animation::new(0.2, AnimationCurve::EaseOut)),
+            None,
+            None,
+            || {
+                node.animatable_set_with("opacity", 0.0_f32, 1.0, move |value| {
+                    log.borrow_mut().push(value)
+                });
+            },
+        );
         assert_eq!(scheduler.active_count(), 1);
         assert!(node.has_animation_controller("opacity"));
-        assert!(written.borrow().is_empty(), "the value is written by the tick");
+        assert!(
+            written.borrow().is_empty(),
+            "the value is written by the tick"
+        );
         scheduler.reset();
     }
 
@@ -174,9 +187,16 @@ mod tests {
         let node = Node::new();
         let written = Rc::new(RefCell::new(Vec::new()));
         let log = written.clone();
-        ActiveAnimationContext::with(Some(Animation::new(0.2, AnimationCurve::EaseOut)), None, None, || {
-            node.animatable_set_optional::<f32>("color", None, Some(1.0), move |value| log.borrow_mut().push(value));
-        });
+        ActiveAnimationContext::with(
+            Some(Animation::new(0.2, AnimationCurve::EaseOut)),
+            None,
+            None,
+            || {
+                node.animatable_set_optional::<f32>("color", None, Some(1.0), move |value| {
+                    log.borrow_mut().push(value)
+                });
+            },
+        );
         assert_eq!(*written.borrow(), vec![Some(1.0)]);
         assert!(!node.has_animation_controller("color"));
     }

@@ -239,7 +239,6 @@ fn normalize(path: &Path) -> PathBuf {
 
 /// Fails with a tool error when the directory cannot be read.
 pub fn files_or_error(root: &Path) -> Result<Vec<PathBuf>, ToolError> {
-    files_in(root, false).map_err(|error| {
-        ToolError::message(format!("Cannot read {}: {error}", root.display()))
-    })
+    files_in(root, false)
+        .map_err(|error| ToolError::message(format!("Cannot read {}: {error}", root.display())))
 }

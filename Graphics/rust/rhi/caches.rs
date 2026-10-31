@@ -9,9 +9,7 @@
 use std::collections::HashMap;
 use std::hash::Hash;
 
-use super::{
-    BindingLayoutEntry, BindingSetEntry, PipelineInterfaceKey,
-};
+use super::{BindingLayoutEntry, BindingSetEntry, PipelineInterfaceKey};
 
 // MARK: - O(1) LRU map
 
@@ -77,7 +75,12 @@ impl<K: Eq + Hash + Clone, V> LruMap<K, V> {
                 self.slots.len() - 1
             }
         };
-        self.slots[slot] = Some(LruSlot { key: key.clone(), value, prev: None, next: None });
+        self.slots[slot] = Some(LruSlot {
+            key: key.clone(),
+            value,
+            prev: None,
+            next: None,
+        });
         self.index.insert(key, slot);
         self.add_to_head(slot);
         self.count += 1;
@@ -128,7 +131,9 @@ impl<K: Eq + Hash + Clone, V> LruMap<K, V> {
     }
 
     fn detach(&mut self, slot: usize) {
-        let Some(entry) = self.slots[slot].as_ref() else { return };
+        let Some(entry) = self.slots[slot].as_ref() else {
+            return;
+        };
         let (prev, next) = (entry.prev, entry.next);
         match prev {
             Some(prev) => {
@@ -239,7 +244,10 @@ impl BindingSetCache {
     pub const CAPACITY: usize = 1024;
 
     pub fn new() -> Self {
-        Self { lru: LruMap::new(), stats: CacheStats::default() }
+        Self {
+            lru: LruMap::new(),
+            stats: CacheStats::default(),
+        }
     }
 
     pub fn count(&self) -> usize {
@@ -251,7 +259,10 @@ impl BindingSetCache {
     }
 
     pub fn existing(&mut self, layout_id: u32, entries: &[BindingSetEntry]) -> Option<u32> {
-        let key = BindingSetCacheKey { layout_id, entries: entries.to_vec() };
+        let key = BindingSetCacheKey {
+            layout_id,
+            entries: entries.to_vec(),
+        };
         if let Some(id) = self.lru.get(&key) {
             let id = *id;
             self.stats.hits += 1;
@@ -263,7 +274,10 @@ impl BindingSetCache {
 
     pub fn insert(&mut self, handle_id: u32, layout_id: u32, entries: &[BindingSetEntry]) {
         self.lru.insert(
-            BindingSetCacheKey { layout_id, entries: entries.to_vec() },
+            BindingSetCacheKey {
+                layout_id,
+                entries: entries.to_vec(),
+            },
             handle_id,
         );
     }
@@ -280,7 +294,10 @@ impl BindingSetCache {
     /// Removes a known set entry. Used when the caller explicitly destroys a
     /// binding set; it already holds the layout ID and entries.
     pub fn remove(&mut self, layout_id: u32, entries: &[BindingSetEntry]) -> Option<u32> {
-        self.lru.remove(&BindingSetCacheKey { layout_id, entries: entries.to_vec() })
+        self.lru.remove(&BindingSetCacheKey {
+            layout_id,
+            entries: entries.to_vec(),
+        })
     }
 
     pub fn reset_stats(&mut self) {
@@ -408,10 +425,25 @@ mod tests {
 
     #[test]
     fn cache_stats_delta_saturates() {
-        let previous = CacheStats { hits: 10, misses: 5, evictions: 1 };
-        let current = CacheStats { hits: 12, misses: 4, evictions: 3 };
+        let previous = CacheStats {
+            hits: 10,
+            misses: 5,
+            evictions: 1,
+        };
+        let current = CacheStats {
+            hits: 12,
+            misses: 4,
+            evictions: 3,
+        };
         let delta = current.delta_since(&previous);
-        assert_eq!(delta, CacheStats { hits: 2, misses: 0, evictions: 2 });
+        assert_eq!(
+            delta,
+            CacheStats {
+                hits: 2,
+                misses: 0,
+                evictions: 2
+            }
+        );
         assert_eq!(CacheStats::default().hit_rate(), 0.0);
     }
 
@@ -422,9 +454,18 @@ mod tests {
         let mut caches = DeviceCaches::new();
         caches.store_binding_layout(
             1,
-            vec![BindingLayoutEntry::new(0, BindingType::UniformBuffer, ShaderVisibility::VERTEX)],
+            vec![BindingLayoutEntry::new(
+                0,
+                BindingType::UniformBuffer,
+                ShaderVisibility::VERTEX,
+            )],
         );
-        assert_eq!(caches.binding_layout_entries(1).map(|entries| entries.len()), Some(1));
+        assert_eq!(
+            caches
+                .binding_layout_entries(1)
+                .map(|entries| entries.len()),
+            Some(1)
+        );
         caches.store_binding_set(50, 1);
         assert_eq!(caches.binding_set_layout_id(50), Some(1));
         assert_eq!(caches.remove_binding_set_owner(50), Some(1));

@@ -8,18 +8,18 @@ pub mod overflow_layout;
 
 use std::rc::Rc;
 
-use cove_core::scene::{
-    AccessibilityRole, AccessibilitySemantics, Align, CompositionLocal, EventResult,
-    FlexDirection, FocusChainHolder, InputHandlerRoute, InteractionRegistryHolder, Justify,
-    LayoutNode, Node, Wrap,
-};
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::AppearanceExt;
 use crate::primitives::controls::button::ButtonIconSource;
 use crate::primitives::overlays::roving_focus::SelectionNavigation;
-use crate::theme::{theme_for_node, ControlSize, ControlSizeEnvironment};
+use crate::theme::{ControlSize, ControlSizeEnvironment, theme_for_node};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
+use cove_core::scene::{
+    AccessibilityRole, AccessibilitySemantics, Align, CompositionLocal, EventResult, FlexDirection,
+    FocusChainHolder, InputHandlerRoute, InteractionRegistryHolder, Justify, LayoutNode, Node,
+    Wrap,
+};
 
 /// Which edge carries the toolbar's divider.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -138,7 +138,11 @@ pub struct ToolbarItem {
 
 impl ToolbarItem {
     pub fn new(command: crate::primitives::overlays::menu::MenuItem) -> Self {
-        Self { command, icon: None, placement: ToolbarItemPlacement::Automatic }
+        Self {
+            command,
+            icon: None,
+            placement: ToolbarItemPlacement::Automatic,
+        }
     }
 
     pub fn icon(mut self, icon: ButtonIconSource) -> Self {
@@ -228,12 +232,20 @@ impl PrimitiveView for Toolbar {
             },
             ..Default::default()
         }));
-        node.set_attachment("toolbar.axis", if self.options.axis == ToolbarAxis::Vertical { 1_u8 } else { 0_u8 });
+        node.set_attachment(
+            "toolbar.axis",
+            if self.options.axis == ToolbarAxis::Vertical {
+                1_u8
+            } else {
+                0_u8
+            },
+        );
         if !self.options.is_enabled {
             // Disabling must not leave capture or focus stranded inside the bar.
-            if let (Some(chain), Some(captured)) =
-                (FocusChainHolder::current(), cove_core::scene::PointerCaptureHolder::current_target())
-                && chain.contains(&captured, node)
+            if let (Some(chain), Some(captured)) = (
+                FocusChainHolder::current(),
+                cove_core::scene::PointerCaptureHolder::current_target(),
+            ) && chain.contains(&captured, node)
                 && let Some(capture) = cove_core::scene::PointerCaptureHolder::current()
             {
                 capture.release();
@@ -245,46 +257,56 @@ impl PrimitiveView for Toolbar {
                 chain.clear();
             }
         }
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         let enabled = self.options.is_enabled;
         let vertical = self.options.axis == ToolbarAxis::Vertical;
         let key_node = node.downgrade();
-        registry.set_key(node, InputHandlerRoute::control(), Rc::new(move |event, phase| {
-            if !enabled || phase != cove_core::scene::EventPhase::Bubble {
-                return EventResult::Ignored;
-            }
-            if !event.modifiers.is_empty() {
-                return EventResult::Ignored;
-            }
-            let Some(owner) = Node::upgrade(&key_node) else { return EventResult::Ignored };
-            let command = match event.scancode {
-                crate::Scancode::ARROW_LEFT if !vertical => SelectionNavigation::Previous,
-                crate::Scancode::ARROW_UP if vertical => SelectionNavigation::Previous,
-                crate::Scancode::ARROW_RIGHT if !vertical => SelectionNavigation::Next,
-                crate::Scancode::ARROW_DOWN if vertical => SelectionNavigation::Next,
-                crate::Scancode::HOME => SelectionNavigation::First,
-                crate::Scancode::END => SelectionNavigation::Last,
-                _ => return EventResult::Ignored,
-            };
-            let candidates = navigation_items(&owner);
-            if candidates.is_empty() {
-                return EventResult::Ignored;
-            }
-            let focused = FocusChainHolder::current().and_then(|chain| chain.focused());
-            let current = focused
-                .as_ref()
-                .and_then(|focused| candidates.iter().position(|candidate| candidate == focused));
-            let indices: Vec<usize> = (0..candidates.len()).collect();
-            let Some(index) = command.destination(&indices, current.as_ref(), true) else {
-                return EventResult::Ignored;
-            };
-            let Some(target) = candidates.get(index) else { return EventResult::Ignored };
-            if let Some(chain) = FocusChainHolder::current() {
-                chain.focus(Some(target), true);
-            }
-            crate::primitives::layout::ScrollReveal::reveal(target, false);
-            EventResult::Handled
-        }));
+        registry.set_key(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, phase| {
+                if !enabled || phase != cove_core::scene::EventPhase::Bubble {
+                    return EventResult::Ignored;
+                }
+                if !event.modifiers.is_empty() {
+                    return EventResult::Ignored;
+                }
+                let Some(owner) = Node::upgrade(&key_node) else {
+                    return EventResult::Ignored;
+                };
+                let command = match event.scancode {
+                    crate::Scancode::ARROW_LEFT if !vertical => SelectionNavigation::Previous,
+                    crate::Scancode::ARROW_UP if vertical => SelectionNavigation::Previous,
+                    crate::Scancode::ARROW_RIGHT if !vertical => SelectionNavigation::Next,
+                    crate::Scancode::ARROW_DOWN if vertical => SelectionNavigation::Next,
+                    crate::Scancode::HOME => SelectionNavigation::First,
+                    crate::Scancode::END => SelectionNavigation::Last,
+                    _ => return EventResult::Ignored,
+                };
+                let candidates = navigation_items(&owner);
+                if candidates.is_empty() {
+                    return EventResult::Ignored;
+                }
+                let focused = FocusChainHolder::current().and_then(|chain| chain.focused());
+                let current = focused.as_ref().and_then(|focused| {
+                    candidates.iter().position(|candidate| candidate == focused)
+                });
+                let indices: Vec<usize> = (0..candidates.len()).collect();
+                let Some(index) = command.destination(&indices, current.as_ref(), true) else {
+                    return EventResult::Ignored;
+                };
+                let Some(target) = candidates.get(index) else {
+                    return EventResult::Ignored;
+                };
+                if let Some(chain) = FocusChainHolder::current() {
+                    chain.focus(Some(target), true);
+                }
+                crate::primitives::layout::ScrollReveal::reveal(target, false);
+                EventResult::Handled
+            }),
+        );
     }
 
     fn children(&self, node: &Node) -> Vec<AnyView> {
@@ -299,18 +321,25 @@ impl PrimitiveView for Toolbar {
         let mut column: Vec<AnyView> = Vec::new();
         if self.options.divider == ToolbarDividerEdge::Top {
             column.push(AnyView::new(crate::primitives::text::Divider::new(
-                None, 1.0, crate::primitives::text::DividerAxis::Horizontal,
+                None,
+                1.0,
+                crate::primitives::text::DividerAxis::Horizontal,
             )));
         }
         if self.options.divider == ToolbarDividerEdge::Leading {
             column.push(AnyView::new(crate::primitives::text::Divider::new(
-                None, 1.0, crate::primitives::text::DividerAxis::Vertical,
+                None,
+                1.0,
+                crate::primitives::text::DividerAxis::Vertical,
             )));
         }
         column.push(if vertical {
             AnyView::new(
                 BoxView::new(
-                    FlexDirection::Column, Align::Center, Justify::FlexStart, Wrap::NoWrap,
+                    FlexDirection::Column,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
                     theme.spacing.xs,
                     self.content.clone(),
                 )
@@ -322,7 +351,10 @@ impl PrimitiveView for Toolbar {
         } else {
             AnyView::new(
                 BoxView::new(
-                    FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap,
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
                     theme.spacing.xs,
                     self.content.clone(),
                 )
@@ -332,28 +364,34 @@ impl PrimitiveView for Toolbar {
         });
         if self.options.divider == ToolbarDividerEdge::Trailing {
             column.push(AnyView::new(crate::primitives::text::Divider::new(
-                None, 1.0, crate::primitives::text::DividerAxis::Vertical,
+                None,
+                1.0,
+                crate::primitives::text::DividerAxis::Vertical,
             )));
         }
         if self.options.divider == ToolbarDividerEdge::Bottom {
             column.push(AnyView::new(crate::primitives::text::Divider::new(
-                None, 1.0, crate::primitives::text::DividerAxis::Horizontal,
+                None,
+                1.0,
+                crate::primitives::text::DividerAxis::Horizontal,
             )));
         }
         vec![AnyView::new(ToolbarChrome {
             axis: self.options.axis,
             is_enabled: self.options.is_enabled,
             side_divider,
-            content: AnyView::new(
-                BoxView::new(
-                    if side_divider { FlexDirection::Row } else { FlexDirection::Column },
-                    Align::Stretch,
-                    Justify::FlexStart,
-                    Wrap::NoWrap,
-                    0.0,
-                    AnyView::new(TupleView::new(column)),
-                ),
-            ),
+            content: AnyView::new(BoxView::new(
+                if side_divider {
+                    FlexDirection::Row
+                } else {
+                    FlexDirection::Column
+                },
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
+                AnyView::new(TupleView::new(column)),
+            )),
         })]
     }
 }
@@ -401,7 +439,11 @@ pub struct ToolbarGroup {
 
 impl ToolbarGroup {
     pub fn new(content: impl View + 'static) -> Self {
-        Self { is_bordered: false, label: String::new(), content: AnyView::new(content) }
+        Self {
+            is_bordered: false,
+            label: String::new(),
+            content: AnyView::new(content),
+        }
     }
 
     pub fn bordered(mut self, is_bordered: bool) -> Self {
@@ -437,10 +479,15 @@ impl PrimitiveView for ToolbarGroup {
     fn children(&self, node: &Node) -> Vec<AnyView> {
         let size = node.composition_value(&ControlSizeEnvironment::key());
         let theme = theme_for_node(node);
-        let vertical = node.composition_value(&ToolbarAxisEnvironment::axis()) == ToolbarAxis::Vertical;
+        let vertical =
+            node.composition_value(&ToolbarAxisEnvironment::axis()) == ToolbarAxis::Vertical;
         vec![AnyView::new(
             BoxView::new(
-                if vertical { FlexDirection::Column } else { FlexDirection::Row },
+                if vertical {
+                    FlexDirection::Column
+                } else {
+                    FlexDirection::Row
+                },
                 Align::Center,
                 Justify::FlexStart,
                 Wrap::NoWrap,
@@ -448,16 +495,40 @@ impl PrimitiveView for ToolbarGroup {
                 self.content.clone(),
             )
             .padding_edges(
-                if self.is_bordered && !vertical { 2.0 } else { 0.0 },
-                if self.is_bordered && vertical { 2.0 } else { 0.0 },
+                if self.is_bordered && !vertical {
+                    2.0
+                } else {
+                    0.0
+                },
+                if self.is_bordered && vertical {
+                    2.0
+                } else {
+                    0.0
+                },
             )
-            .background_color(if self.is_bordered { theme.colors.surface_variant } else { cove_core::Color::CLEAR })
-            .corner_radius(if self.is_bordered { theme.radius.sm } else { 0.0 })
+            .background_color(if self.is_bordered {
+                theme.colors.surface_variant
+            } else {
+                cove_core::Color::CLEAR
+            })
+            .corner_radius(if self.is_bordered {
+                theme.radius.sm
+            } else {
+                0.0
+            })
             .frame(
                 None,
                 None,
-                if vertical { Some(size.button_height()) } else { None },
-                if vertical { None } else { Some(size.button_height()) },
+                if vertical {
+                    Some(size.button_height())
+                } else {
+                    None
+                },
+                if vertical {
+                    None
+                } else {
+                    Some(size.button_height())
+                },
                 None,
                 None,
             ),
@@ -484,11 +555,14 @@ impl PrimitiveView for ToolbarSeparator {
 
     fn children(&self, node: &Node) -> Vec<AnyView> {
         let theme = theme_for_node(node);
-        let vertical = node.composition_value(&ToolbarAxisEnvironment::axis()) == ToolbarAxis::Vertical;
+        let vertical =
+            node.composition_value(&ToolbarAxisEnvironment::axis()) == ToolbarAxis::Vertical;
         let divider = if vertical {
             AnyView::new(
                 crate::primitives::text::Divider::new(
-                    None, 1.0, crate::primitives::text::DividerAxis::Horizontal,
+                    None,
+                    1.0,
+                    crate::primitives::text::DividerAxis::Horizontal,
                 )
                 .frame_size(18.0, 1.0)
                 .padding_edges(0.0, theme.spacing.xs),
@@ -496,17 +570,19 @@ impl PrimitiveView for ToolbarSeparator {
         } else {
             AnyView::new(
                 crate::primitives::text::Divider::new(
-                    None, 1.0, crate::primitives::text::DividerAxis::Vertical,
+                    None,
+                    1.0,
+                    crate::primitives::text::DividerAxis::Vertical,
                 )
                 .frame_size(1.0, 18.0)
                 .padding_edges(theme.spacing.xs, 0.0),
             )
         };
-        vec![AnyView::new(
-            divider.with_modifier(crate::modifiers::interaction::AccessibilityModifier::new(
-                |semantics| semantics.is_hidden = true,
-            )),
-        )]
+        vec![AnyView::new(divider.with_modifier(
+            crate::modifiers::interaction::AccessibilityModifier::new(|semantics| {
+                semantics.is_hidden = true
+            }),
+        ))]
     }
 }
 crate::impl_primitive_view!(ToolbarSeparator);

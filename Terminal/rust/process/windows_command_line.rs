@@ -10,7 +10,11 @@ pub fn command_line_string(arguments: &[String]) -> String {
         if index > 0 {
             line.push(' ');
         }
-        if argument.is_empty() || argument.chars().any(|c| matches!(c, ' ' | '\t' | '\n' | '\u{0B}' | '"')) {
+        if argument.is_empty()
+            || argument
+                .chars()
+                .any(|c| matches!(c, ' ' | '\t' | '\n' | '\u{0B}' | '"'))
+        {
             line.push('"');
             let mut backslashes = 0usize;
             for character in argument.chars() {
@@ -48,7 +52,9 @@ pub fn command_line_string(arguments: &[String]) -> String {
 }
 
 /// `NAME=value\0...\0\0`, sorted case-insensitively as Windows expects.
-pub fn environment_block_utf16(environment: &std::collections::BTreeMap<String, String>) -> Vec<u16> {
+pub fn environment_block_utf16(
+    environment: &std::collections::BTreeMap<String, String>,
+) -> Vec<u16> {
     let mut entries: Vec<(&String, &String)> = environment.iter().collect();
     entries.sort_by_key(|(key, _)| key.to_uppercase());
     let mut block = Vec::new();

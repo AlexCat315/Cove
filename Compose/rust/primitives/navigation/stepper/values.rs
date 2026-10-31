@@ -13,7 +13,12 @@ pub enum StepStatus {
 }
 
 impl StepStatus {
-    pub const ALL: [Self; 4] = [Self::Pending, Self::InProgress, Self::Completed, Self::Failed];
+    pub const ALL: [Self; 4] = [
+        Self::Pending,
+        Self::InProgress,
+        Self::Completed,
+        Self::Failed,
+    ];
 
     pub fn description(self) -> &'static str {
         match self {

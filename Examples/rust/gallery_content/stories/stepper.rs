@@ -129,11 +129,13 @@ impl View for StepperStory {
         let start = {
             let status = self.status.clone();
             let unlock = self.unlock_review.clone();
-            AnyView::new(Button::title("Start", move || {
-                status.set(StepStatus::InProgress);
-                unlock.set(false);
-            })
-            .enabled(enabled))
+            AnyView::new(
+                Button::title("Start", move || {
+                    status.set(StepStatus::InProgress);
+                    unlock.set(false);
+                })
+                .enabled(enabled),
+            )
         };
         let fail = {
             let status = self.status.clone();

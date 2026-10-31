@@ -6,12 +6,12 @@
 //! showing through the gutters, not from lines. The header has a 34 pt minimum
 //! and grows with its title and accessories. Active panels brighten the title
 //! rather than repainting the header.
-use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::text::Text;
 use crate::theme::{SemanticColorRef, SemanticFontRef};
 use crate::{AnyView, BoxView, Row, Spacer, TupleView, VerticalAlignment};
+use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 
 use super::panel_style::{PanelStyle, PanelStyleConfiguration};
 
@@ -50,7 +50,11 @@ impl PanelStyle for DefaultPanelStyle {
         );
         let body = AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(configuration.content.clone().flex(1.0)),
             )
             .flex(1.0)
@@ -63,7 +67,11 @@ impl PanelStyle for DefaultPanelStyle {
         );
         AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(TupleView::new(vec![header, body])),
             )
             .semantic_background(SemanticColorRef::surface_sunken())

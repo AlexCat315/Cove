@@ -3,10 +3,11 @@
 //! Multiline input with a draggable lower edge and internal text scrolling.
 use std::rc::Rc;
 
+use cove_composition::{AnyView, View, adaptive::SurfaceReader};
 use cove_core::scene::{Align, FlexDirection, Wrap};
 use cove_core::{Binding, State};
-use cove_composition::{adaptive::SurfaceReader, AnyView, View};
 
+use crate::BoxView;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::primitives::layout::resize::{EditorHeightHandle, EditorHeightLimits};
 use crate::primitives::text::text_buffer::TextBuffer;
@@ -14,7 +15,6 @@ use crate::primitives::text::text_field::{
     TextField, TextFieldAxis, TextFieldBehavior, TextFieldCodeEditing, TextFieldEvents,
     TextFieldLayout,
 };
-use crate::BoxView;
 
 /// Multiline input with a draggable lower edge and internal text scrolling.
 pub struct ResizableTextArea {

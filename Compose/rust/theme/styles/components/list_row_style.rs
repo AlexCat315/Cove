@@ -2,8 +2,8 @@
 use std::any::TypeId;
 use std::rc::Rc;
 
-use cove_core::scene::CompositionLocal;
 use cove_core::InputCapabilities;
+use cove_core::scene::CompositionLocal;
 
 use crate::theme::Theme;
 use crate::{AnyView, ModifiedContent, View, ViewExt};
@@ -65,7 +65,10 @@ impl AnyListRowStyle {
 }
 impl Clone for AnyListRowStyle {
     fn clone(&self) -> Self {
-        Self { make_body: self.make_body.clone(), style_id: self.style_id }
+        Self {
+            make_body: self.make_body.clone(),
+            style_id: self.style_id,
+        }
     }
 }
 impl PartialEq for AnyListRowStyle {

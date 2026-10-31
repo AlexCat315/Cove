@@ -16,8 +16,8 @@ use std::rc::Rc;
 use cove_core::State;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
+use cove_ui_compose::primitives::controls::Toggle;
 use cove_ui_compose::primitives::controls::button::ButtonRole;
-use cove_ui_compose::primitives::controls::{Toggle};
 use cove_ui_compose::primitives::data::lists::inset_group::ListGroup;
 use cove_ui_compose::primitives::data::lists::row::{ListRow, ListRowOptions};
 use cove_ui_compose::primitives::text::Text;
@@ -73,14 +73,22 @@ pub fn sections() -> Vec<SettingsSection> {
         SettingsSection {
             title: Some("General".to_owned()),
             rows: vec![
-                SettingsRow::Toggle { label: "Notifications" },
-                SettingsRow::Toggle { label: "Sync over cellular" },
-                SettingsRow::Disclosure { label: "Appearance" },
+                SettingsRow::Toggle {
+                    label: "Notifications",
+                },
+                SettingsRow::Toggle {
+                    label: "Sync over cellular",
+                },
+                SettingsRow::Disclosure {
+                    label: "Appearance",
+                },
             ],
         },
         SettingsSection {
             title: Some("Accessibility".to_owned()),
-            rows: vec![SettingsRow::Toggle { label: "Reduce motion" }],
+            rows: vec![SettingsRow::Toggle {
+                label: "Reduce motion",
+            }],
         },
         SettingsSection {
             // The sign-out group has no header, which is what makes it read as a
@@ -155,8 +163,8 @@ impl SettingsScreen {
 
 impl View for SettingsScreen {
     fn body(&self) -> AnyView {
-        let title = Text::new("Settings")
-            .semantic_font(cove_ui_compose::theme::SemanticFontRef::display());
+        let title =
+            Text::new("Settings").semantic_font(cove_ui_compose::theme::SemanticFontRef::display());
 
         let general = {
             let model = self.model.clone();
@@ -166,7 +174,10 @@ impl View for SettingsScreen {
             let sync = ListRow::new("Sync over cellular")
                 .trailing(AnyView::new(Toggle::new(self.sync_over_cellular.binding())));
             let appearance = ListRow::new("Appearance")
-                .options(ListRowOptions { shows_disclosure: true, ..ListRowOptions::new() })
+                .options(ListRowOptions {
+                    shows_disclosure: true,
+                    ..ListRowOptions::new()
+                })
                 .trailing(AnyView::new(
                     Text::new(model.borrow().appearance.clone())
                         .semantic_foreground(SemanticColorRef::on_surface_muted()),
@@ -187,8 +198,10 @@ impl View for SettingsScreen {
             AnyView::new(ListGroup::new(AnyView::new(reduce)).title("Accessibility"))
         };
 
-        let sign_out = ListRow::new("Sign out")
-            .options(ListRowOptions { role: ButtonRole::Destructive, ..ListRowOptions::new() });
+        let sign_out = ListRow::new("Sign out").options(ListRowOptions {
+            role: ButtonRole::Destructive,
+            ..ListRowOptions::new()
+        });
         let account = AnyView::new(ListGroup::new(AnyView::new(sign_out)));
 
         AnyView::new(

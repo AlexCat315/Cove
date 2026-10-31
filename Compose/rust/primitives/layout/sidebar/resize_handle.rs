@@ -5,16 +5,17 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cove_core::scene::{
-    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, Direction, Display,     EventPhase, EventResult, FocusChainHolder, HoverPhase, InputHandlerRoute,
-    InteractionRegistryHolder, LayoutNode, Node, NodeResource, PointerCaptureHolder, PointerPhase,
-    PointerCaptureAttachmentKey,
-};
-use cove_core::Binding;
-use cove_platform::{MouseButton, SystemCursor};
 use crate::modifiers::interaction::CursorExt;
 use crate::theme::theme_for_node;
-use crate::{impl_primitive_view, PrimitiveView, View};
+use crate::{PrimitiveView, View, impl_primitive_view};
+use cove_core::Binding;
+use cove_core::scene::{
+    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, Direction, Display,
+    EventPhase, EventResult, FocusChainHolder, HoverPhase, InputHandlerRoute,
+    InteractionRegistryHolder, LayoutNode, Node, NodeResource, PointerCaptureAttachmentKey,
+    PointerCaptureHolder, PointerPhase,
+};
+use cove_platform::{MouseButton, SystemCursor};
 
 const START: &str = "sidebar.resize.start";
 const BASIS: &str = "sidebar.resize.basis";
@@ -136,7 +137,11 @@ impl PrimitiveView for SidebarResizeHandle {
     }
 
     fn update_layout(&self, layout: &LayoutNode) {
-        layout.set_display(if self.is_active() { Display::Flex } else { Display::None });
+        layout.set_display(if self.is_active() {
+            Display::Flex
+        } else {
+            Display::None
+        });
         layout.set_width(Some(self.extent));
         layout.set_flex_shrink(0.0);
     }
@@ -150,16 +155,35 @@ impl PrimitiveView for SidebarResizeHandle {
             rtl: is_rtl(node),
         };
         if node.attachment::<(f32, f32, f32, f32, bool)>(BASIS)
-            != Some((basis.low, basis.high, basis.extent, basis.viewport, basis.rtl))
+            != Some((
+                basis.low,
+                basis.high,
+                basis.extent,
+                basis.viewport,
+                basis.rtl,
+            ))
         {
             release(node);
         }
-        node.set_attachment(BASIS, (basis.low, basis.high, basis.extent, basis.viewport, basis.rtl));
+        node.set_attachment(
+            BASIS,
+            (
+                basis.low,
+                basis.high,
+                basis.extent,
+                basis.viewport,
+                basis.rtl,
+            ),
+        );
 
         let active = self.is_active();
         node.set_is_hit_testable(active);
         node.set_is_focusable(active);
-        node.set_cursor(Some(if active { SystemCursor::ResizeHorizontal } else { SystemCursor::Arrow }));
+        node.set_cursor(Some(if active {
+            SystemCursor::ResizeHorizontal
+        } else {
+            SystemCursor::Arrow
+        }));
         node.set_accessibility_actions(AccessibilityActions::default());
         if !active {
             release(node);
@@ -180,7 +204,8 @@ impl PrimitiveView for SidebarResizeHandle {
             role: AccessibilityRole::Slider,
             label: self.label.clone(),
             value: format!("{} pt", current.round() as i64),
-            help: "Use Left/Right to resize, Shift for larger steps, Home/End for the limits".to_string(),
+            help: "Use Left/Right to resize, Shift for larger steps, Home/End for the limits"
+                .to_string(),
             ..Default::default()
         }));
 
@@ -195,14 +220,18 @@ impl PrimitiveView for SidebarResizeHandle {
         let set_node = node.downgrade();
         node.set_accessibility_actions(AccessibilityActions {
             increment: Some(Rc::new(move || {
-                if let (Some(owner), Some(binding)) = (Node::upgrade(&increment_node), increment_value.as_ref()) {
+                if let (Some(owner), Some(binding)) =
+                    (Node::upgrade(&increment_node), increment_value.as_ref())
+                {
                     let _ = owner;
                     let next = (binding.get() + 16.0).clamp(increment_range.0, increment_range.1);
                     binding.set(next);
                 }
             })),
             decrement: Some(Rc::new(move || {
-                if let (Some(owner), Some(binding)) = (Node::upgrade(&decrement_node), decrement_value.as_ref()) {
+                if let (Some(owner), Some(binding)) =
+                    (Node::upgrade(&decrement_node), decrement_value.as_ref())
+                {
                     let _ = owner;
                     let next = (binding.get() - 16.0).clamp(decrement_range.0, decrement_range.1);
                     binding.set(next);
@@ -211,11 +240,14 @@ impl PrimitiveView for SidebarResizeHandle {
             set_value: Some(Rc::new(move |text: &str| {
                 let cleaned = text.replace("pt", "");
                 let trimmed = cleaned.trim();
-                let Ok(next) = trimmed.parse::<f32>() else { return };
+                let Ok(next) = trimmed.parse::<f32>() else {
+                    return;
+                };
                 if !next.is_finite() {
                     return;
                 }
-                if let (Some(binding), Some(owner)) = (set_value.as_ref(), Node::upgrade(&set_node)) {
+                if let (Some(binding), Some(owner)) = (set_value.as_ref(), Node::upgrade(&set_node))
+                {
                     let _ = owner;
                     binding.set(next.clamp(set_range.0, set_range.1));
                 }
@@ -229,7 +261,9 @@ impl PrimitiveView for SidebarResizeHandle {
             Rc::new(move || {
                 if let Some(owner) = Node::upgrade(&clear_node) {
                     owner.remove_attachment(START);
-                    owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("sidebar.resize"));
+                    owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                        "sidebar.resize",
+                    ));
                 }
             }) as Rc<dyn Fn()>,
         );
@@ -237,9 +271,15 @@ impl PrimitiveView for SidebarResizeHandle {
         let weak = node.downgrade();
         let hover_node = node.downgrade();
         node.update_draw(
-            (basis.low.to_bits(), basis.high.to_bits(), basis.extent.to_bits()),
+            (
+                basis.low.to_bits(),
+                basis.high.to_bits(),
+                basis.extent.to_bits(),
+            ),
             move |list, origin| {
-                let Some(owner) = Node::upgrade(&weak) else { return };
+                let Some(owner) = Node::upgrade(&weak) else {
+                    return;
+                };
                 if !owner.is_layout_visible() {
                     return;
                 }
@@ -258,7 +298,11 @@ impl PrimitiveView for SidebarResizeHandle {
                 }
                 let theme = theme_for_node(&owner);
                 let frame = owner.frame();
-                let color = if focused { theme.colors.focus_ring } else { theme.colors.accent };
+                let color = if focused {
+                    theme.colors.focus_ring
+                } else {
+                    theme.colors.accent
+                };
                 let thickness = 2.0;
                 let _ = list.add_rect(
                     cove_core::Rect::new(
@@ -273,110 +317,157 @@ impl PrimitiveView for SidebarResizeHandle {
         );
         let _ = hover_node;
 
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         let hover_node = node.downgrade();
-        registry.set_hover(node, Rc::new(move |phase| {
-            let Some(owner) = Node::upgrade(&hover_node) else { return };
-            let hovered = phase == HoverPhase::Enter
-                && crate::primitives::controls::adaptive::supports_control_hover(&owner);
-            owner.set_attachment(HOVER, hovered);
-            owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("sidebar.resize"));
-        }));
+        registry.set_hover(
+            node,
+            Rc::new(move |phase| {
+                let Some(owner) = Node::upgrade(&hover_node) else {
+                    return;
+                };
+                let hovered = phase == HoverPhase::Enter
+                    && crate::primitives::controls::adaptive::supports_control_hover(&owner);
+                owner.set_attachment(HOVER, hovered);
+                owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                    "sidebar.resize",
+                ));
+            }),
+        );
 
         let current_width = self.current();
         let pointer_node = node.downgrade();
-        registry.set_pointer(node, InputHandlerRoute::control(), Rc::new(move |event, phase, event_phase| {
-            if event_phase != EventPhase::Target || event.button != MouseButton::Left {
-                return EventResult::Ignored;
-            }
-            let Some(owner) = Node::upgrade(&pointer_node) else { return EventResult::Ignored };
-            if !owner.accepts_subtree_input() {
-                return EventResult::Ignored;
-            }
-            match phase {
-                PointerPhase::Down => {
-                    if let Some(chain) = FocusChainHolder::current() {
-                        chain.focus(Some(&owner), false);
-                    }
-                    owner.set_attachment(START, ResizeStart { width: current_width, x: event.x });
-                    if let Some(capture) = PointerCaptureHolder::current() {
-                        capture.acquire(&owner, true);
-                    }
+        registry.set_pointer(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, phase, event_phase| {
+                if event_phase != EventPhase::Target || event.button != MouseButton::Left {
+                    return EventResult::Ignored;
                 }
-                PointerPhase::Up => release(&owner),
-            }
-            owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("sidebar.resize"));
-            EventResult::Handled
-        }));
+                let Some(owner) = Node::upgrade(&pointer_node) else {
+                    return EventResult::Ignored;
+                };
+                if !owner.accepts_subtree_input() {
+                    return EventResult::Ignored;
+                }
+                match phase {
+                    PointerPhase::Down => {
+                        if let Some(chain) = FocusChainHolder::current() {
+                            chain.focus(Some(&owner), false);
+                        }
+                        owner.set_attachment(
+                            START,
+                            ResizeStart {
+                                width: current_width,
+                                x: event.x,
+                            },
+                        );
+                        if let Some(capture) = PointerCaptureHolder::current() {
+                            capture.acquire(&owner, true);
+                        }
+                    }
+                    PointerPhase::Up => release(&owner),
+                }
+                owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                    "sidebar.resize",
+                ));
+                EventResult::Handled
+            }),
+        );
 
         let motion_value = self.value.clone();
         let motion_range = self.range;
         let motion_node = node.downgrade();
-        registry.set_motion(node, InputHandlerRoute::control(), Rc::new(move |event, phase| {
-            if phase != EventPhase::Target {
-                return EventResult::Ignored;
-            }
-            let Some(owner) = Node::upgrade(&motion_node) else { return EventResult::Ignored };
-            if !owner.accepts_subtree_input() {
-                return EventResult::Ignored;
-            }
-            if !PointerCaptureHolder::current()
-                .and_then(|capture| capture.target())
-                .is_some_and(|target| target == owner)
-            {
-                return EventResult::Ignored;
-            }
-            let Some(start) = owner.attachment::<ResizeStart>(START) else { return EventResult::Ignored };
-            let delta = (event.x - start.x) * if is_rtl(&owner) { -1.0 } else { 1.0 };
-            let next = (start.width + delta).clamp(motion_range.0, motion_range.1);
-            if let Some(binding) = motion_value.as_ref()
-                && binding.get() != next
-            {
-                binding.set(next);
-            }
-            EventResult::Handled
-        }));
+        registry.set_motion(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, phase| {
+                if phase != EventPhase::Target {
+                    return EventResult::Ignored;
+                }
+                let Some(owner) = Node::upgrade(&motion_node) else {
+                    return EventResult::Ignored;
+                };
+                if !owner.accepts_subtree_input() {
+                    return EventResult::Ignored;
+                }
+                if !PointerCaptureHolder::current()
+                    .and_then(|capture| capture.target())
+                    .is_some_and(|target| target == owner)
+                {
+                    return EventResult::Ignored;
+                }
+                let Some(start) = owner.attachment::<ResizeStart>(START) else {
+                    return EventResult::Ignored;
+                };
+                let delta = (event.x - start.x) * if is_rtl(&owner) { -1.0 } else { 1.0 };
+                let next = (start.width + delta).clamp(motion_range.0, motion_range.1);
+                if let Some(binding) = motion_value.as_ref()
+                    && binding.get() != next
+                {
+                    binding.set(next);
+                }
+                EventResult::Handled
+            }),
+        );
 
         let key_value = self.value.clone();
         let key_range = self.range;
         let key_node = node.downgrade();
-        registry.set_key(node, InputHandlerRoute::control(), Rc::new(move |event, phase| {
-            if phase != EventPhase::Target {
-                return EventResult::Ignored;
-            }
-            if event.modifiers.has_ctrl() || event.modifiers.has_gui() || event.modifiers.has_alt() {
-                return EventResult::Ignored;
-            }
-            let Some(owner) = Node::upgrade(&key_node) else { return EventResult::Ignored };
-            let step = if event.modifiers.has_shift() { 32.0 } else { 16.0 };
-            let current = key_value.as_ref().map(|binding| binding.get()).unwrap_or(key_range.0);
-            let rtl = is_rtl(&owner);
-            let next = match event.scancode {
-                crate::Scancode::ARROW_LEFT => current + if rtl { step } else { -step },
-                crate::Scancode::ARROW_RIGHT => current + if rtl { -step } else { step },
-                crate::Scancode::HOME => key_range.0,
-                crate::Scancode::END => key_range.1,
-                crate::Scancode::ESCAPE => {
-                    let Some(start) = owner.attachment::<ResizeStart>(START) else {
-                        return EventResult::Ignored;
-                    };
-                    let restored = start.width.clamp(key_range.0, key_range.1);
-                    if let Some(binding) = key_value.as_ref() {
-                        binding.set(restored);
-                    }
-                    release(&owner);
-                    return EventResult::Handled;
+        registry.set_key(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, phase| {
+                if phase != EventPhase::Target {
+                    return EventResult::Ignored;
                 }
-                _ => return EventResult::Ignored,
-            };
-            let next = next.clamp(key_range.0, key_range.1);
-            if let Some(binding) = key_value.as_ref()
-                && binding.get() != next
-            {
-                binding.set(next);
-            }
-            EventResult::Handled
-        }));
+                if event.modifiers.has_ctrl()
+                    || event.modifiers.has_gui()
+                    || event.modifiers.has_alt()
+                {
+                    return EventResult::Ignored;
+                }
+                let Some(owner) = Node::upgrade(&key_node) else {
+                    return EventResult::Ignored;
+                };
+                let step = if event.modifiers.has_shift() {
+                    32.0
+                } else {
+                    16.0
+                };
+                let current = key_value
+                    .as_ref()
+                    .map(|binding| binding.get())
+                    .unwrap_or(key_range.0);
+                let rtl = is_rtl(&owner);
+                let next = match event.scancode {
+                    crate::Scancode::ARROW_LEFT => current + if rtl { step } else { -step },
+                    crate::Scancode::ARROW_RIGHT => current + if rtl { -step } else { step },
+                    crate::Scancode::HOME => key_range.0,
+                    crate::Scancode::END => key_range.1,
+                    crate::Scancode::ESCAPE => {
+                        let Some(start) = owner.attachment::<ResizeStart>(START) else {
+                            return EventResult::Ignored;
+                        };
+                        let restored = start.width.clamp(key_range.0, key_range.1);
+                        if let Some(binding) = key_value.as_ref() {
+                            binding.set(restored);
+                        }
+                        release(&owner);
+                        return EventResult::Handled;
+                    }
+                    _ => return EventResult::Ignored,
+                };
+                let next = next.clamp(key_range.0, key_range.1);
+                if let Some(binding) = key_value.as_ref()
+                    && binding.get() != next
+                {
+                    binding.set(next);
+                }
+                EventResult::Handled
+            }),
+        );
     }
 }
 impl_primitive_view!(SidebarResizeHandle);
@@ -389,7 +480,10 @@ struct SidebarResizeLifetime {
 
 impl SidebarResizeLifetime {
     fn new() -> Self {
-        Self { capture: RefCell::new(None), chain: RefCell::new(None) }
+        Self {
+            capture: RefCell::new(None),
+            chain: RefCell::new(None),
+        }
     }
 }
 

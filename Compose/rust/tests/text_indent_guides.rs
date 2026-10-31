@@ -39,15 +39,11 @@ fn layout(source: &TextBuffer, rows: Option<std::ops::Range<usize>>) -> TextLayo
 
 #[test]
 fn continuous_scopes_join_across_blank_lines() {
-    let source = TextBuffer::from("func demo() {\n    first()\n\n    if ready {\n        next()\n    }\n}\n");
-    let guides = TextIndentGuides::segments(
-        &layout(&source, None),
-        &source,
-        4,
-        8.0,
-        20.0,
-        (0.0, 200.0),
+    let source = TextBuffer::from(
+        "func demo() {\n    first()\n\n    if ready {\n        next()\n    }\n}\n",
     );
+    let guides =
+        TextIndentGuides::segments(&layout(&source, None), &source, 4, 8.0, 20.0, (0.0, 200.0));
     assert_eq!(guides.len(), 2, "two scopes are open in this snippet");
     let first = guides.first().expect("outer scope guide");
     assert_eq!(first.x, 0.5);
@@ -76,21 +72,17 @@ fn visible_window_recovers_context_and_bounds_depth() {
     assert_eq!(guides.len(), 2, "both tabs in the window produce a guide");
     let first = guides.first().expect("depth-one guide");
     assert_eq!(first.top, 40.0);
-    assert_eq!(first.height, 40.0, "the blank line keeps the run continuous");
+    assert_eq!(
+        first.height, 40.0,
+        "the blank line keeps the run continuous"
+    );
     let last = guides.last().expect("depth-two guide");
     assert_eq!(last.x, 32.5, "tabs land on shared columns");
     assert_eq!(last.top, 60.0);
 
     assert!(
-        TextIndentGuides::segments(
-            &layout(&source, None),
-            &source,
-            4,
-            8.0,
-            20.0,
-            (64.0, 200.0),
-        )
-        .is_empty(),
+        TextIndentGuides::segments(&layout(&source, None), &source, 4, 8.0, 20.0, (64.0, 200.0),)
+            .is_empty(),
         "depths outside the visible x range are not drawn"
     );
 }

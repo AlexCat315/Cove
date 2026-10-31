@@ -8,6 +8,6 @@ pub mod split_view;
 pub use constraints::SplitConstraints;
 pub use handle::SplitHandle;
 pub use retention::{
-    SplitFocusHandoff, SplitFocusTransfer, SplitRetainedRegion, CONTAINER_MARKER, PANE_MARKER,
+    CONTAINER_MARKER, PANE_MARKER, SplitFocusHandoff, SplitFocusTransfer, SplitRetainedRegion,
 };
 pub use split_view::{SplitAxis, SplitView};

@@ -41,7 +41,10 @@ fn single_block_retains_source_coordinates() {
     // The located wrapper keeps the original content and records where it was
     // written, which is what makes a `@ViewBuilder` body traceable.
     assert_eq!(located.location.file_id, file!());
-    assert!(located.location.explicit == false, "expression() marks the source as inferred");
+    assert!(
+        located.location.explicit == false,
+        "expression() marks the source as inferred"
+    );
     match located.kind() {
         ViewKind::Source(source) => {
             assert_eq!(source.content.kind().is_primitive(), true);
@@ -88,7 +91,11 @@ fn conditional_picks_one_branch() {
 
     let truthy = make(true);
     let children = expanded(&truthy);
-    assert_eq!(children.len(), 1, "conditional content expands to one branch");
+    assert_eq!(
+        children.len(),
+        1,
+        "conditional content expands to one branch"
+    );
     let located = SourceLocatedView::expression(DebugNode::new("T"));
     assert_eq!(
         located.location.file_id,

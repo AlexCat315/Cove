@@ -15,9 +15,7 @@
 
 use cove_imaging::BundleImageResource;
 
-use super::ui_icon_catalog::{
-    all, asset, categories, search, UIIconEntry,
-};
+use super::ui_icon_catalog::{UIIconEntry, all, asset, categories, search};
 
 /// Name lookup across the whole catalog, independent of grouping.
 pub fn icon(named: &str) -> Option<BundleImageResource> {

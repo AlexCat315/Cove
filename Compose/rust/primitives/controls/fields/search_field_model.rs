@@ -88,7 +88,11 @@ impl SearchFieldState {
     /// row, or clear the highlight when nothing matches.
     pub fn on_change(&mut self, text: &str, suggestions: &[String]) {
         self.suppress_suggestions = false;
-        self.highlighted = if Self::matches(text, suggestions).is_empty() { None } else { Some(0) };
+        self.highlighted = if Self::matches(text, suggestions).is_empty() {
+            None
+        } else {
+            Some(0)
+        };
     }
 
     pub fn on_focus(&mut self, text: &str, suggestions: &[String]) {
@@ -146,7 +150,10 @@ impl SearchFieldState {
                 if visible.is_empty() {
                     return SearchAction::None;
                 }
-                self.move_highlight(if key == SearchKey::ArrowDown { 1 } else { -1 }, visible.len());
+                self.move_highlight(
+                    if key == SearchKey::ArrowDown { 1 } else { -1 },
+                    visible.len(),
+                );
                 SearchAction::MoveHighlight
             }
             SearchKey::Escape => {

@@ -3,8 +3,8 @@
 
 use super::run::{RichTextRun, RichTextTraits};
 use cove_core::{
-    line_break_opportunities, BidiParagraphs, Font, PositionedGlyph, TextAlignment, TextLayoutResult,
-    TextLine,
+    BidiParagraphs, Font, PositionedGlyph, TextAlignment, TextLayoutResult, TextLine,
+    line_break_opportunities,
 };
 use cove_text::TextEnvironment;
 use std::cell::RefCell;
@@ -243,12 +243,14 @@ impl RichTextFlow {
             if let Some(hit) = cache.borrow().get(&key) {
                 return hit.clone();
             }
-            let result = Rc::new(FlowBuilder {
-                paragraph: paragraph.clone(),
-                max_width: limit,
-                env: env.clone(),
-            }
-            .build());
+            let result = Rc::new(
+                FlowBuilder {
+                    paragraph: paragraph.clone(),
+                    max_width: limit,
+                    env: env.clone(),
+                }
+                .build(),
+            );
             let mut table = cache.borrow_mut();
             // Widths change continuously while a window resizes; a bounded
             // table keeps that from growing without limit.
@@ -284,11 +286,7 @@ impl Hash for FlowCacheKey {
     }
 }
 fn float_bits(value: f32) -> u32 {
-    if value == 0.0 {
-        0
-    } else {
-        value.to_bits()
-    }
+    if value == 0.0 { 0 } else { value.to_bits() }
 }
 
 thread_local! {
@@ -362,14 +360,7 @@ impl FlowBuilder {
         let mut glyph_lines: Vec<TextLine> = Vec::new();
         let mut top: f32 = 0.0;
         for range in self.wrap(&items) {
-            let placed = self.place(
-                &items,
-                range,
-                &text,
-                top,
-                lines.len(),
-                bidi.as_ref(),
-            );
+            let placed = self.place(&items, range, &text, top, lines.len(), bidi.as_ref());
             lines.push(placed.line.clone());
             fragments.extend(placed.fragments);
             glyph_lines.push(placed.glyphs);
@@ -408,12 +399,7 @@ impl FlowBuilder {
         }
     }
 
-    fn make_items(
-        &self,
-        text: &str,
-        starts: &[usize],
-        bidi: Option<&BidiParagraphs>,
-    ) -> Vec<Item> {
+    fn make_items(&self, text: &str, starts: &[usize], bidi: Option<&BidiParagraphs>) -> Vec<Item> {
         let breaks: HashSet<usize> = line_break_opportunities(text);
         let mut items: Vec<Item> = Vec::new();
         for (index, span) in self.paragraph.spans.iter().enumerate() {
@@ -431,11 +417,7 @@ impl FlowBuilder {
                 }
                 let utf8 = segment.as_bytes();
                 let mut shaped: Vec<Item> = Vec::new();
-                for glyph in self
-                    .env
-                    .shape(segment, Some(&span.font))
-                    .iter()
-                {
+                for glyph in self.env.shape(segment, Some(&span.font)).iter() {
                     let local = glyph.cluster as usize;
                     let byte = utf8.get(local).copied().unwrap_or(0);
                     let cluster = segment_start + local;
@@ -518,9 +500,7 @@ impl FlowBuilder {
             if width + item.extent() > self.max_width && breaks_here && !item.is_space {
                 let soft = (start + 1..=index)
                     .rev()
-                    .find(|position| {
-                        items[*position].break_before && !items[*position].is_space
-                    });
+                    .find(|position| items[*position].break_before && !items[*position].is_space);
                 if let Some(soft) = soft.filter(|soft| *soft > start) {
                     ranges.push(start..soft);
                     start = soft;
@@ -560,8 +540,8 @@ impl FlowBuilder {
             },
             |item| item.cluster,
         );
-        let right_to_left = bidi
-            .is_some_and(|bidi| bidi.paragraph_at_byte(line_start).is_right_to_left());
+        let right_to_left =
+            bidi.is_some_and(|bidi| bidi.paragraph_at_byte(line_start).is_right_to_left());
         let content: Vec<Item> = match bidi {
             Some(bidi) => self.visual_order(logical, bidi),
             None => logical.to_vec(),
@@ -593,8 +573,12 @@ impl FlowBuilder {
                     metrics_by_span.insert(
                         item.span,
                         (
-                            metrics.as_ref().map_or(span.font.size() * 0.8, |m| m.ascent),
-                            metrics.as_ref().map_or(span.font.size() * 0.2, |m| m.descent),
+                            metrics
+                                .as_ref()
+                                .map_or(span.font.size() * 0.8, |m| m.ascent),
+                            metrics
+                                .as_ref()
+                                .map_or(span.font.size() * 0.2, |m| m.descent),
                         ),
                     );
                 }

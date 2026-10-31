@@ -3,10 +3,10 @@
 //! Modifiers applied by the caller of a transparent component must run after
 //! that component rebuilds its own body. Otherwise internal primitive updates
 //! overwrite the caller's frame, flex, style and event configuration.
+use crate::ViewGraph;
 use cove_core::scene::Node;
 use std::cell::RefCell;
 use std::rc::Rc;
-use crate::ViewGraph;
 
 type Entries = Rc<RefCell<Vec<Rc<dyn Fn()>>>>;
 

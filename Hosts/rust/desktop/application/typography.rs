@@ -1,10 +1,10 @@
 //! Translation of Desktop/Sources/CoveUI/Application/Typography.swift and
 //! Application/AdaptiveContent.swift.
 
-use cove_core::scene::Node;
-use cove_core::{Environment, State};
 use cove_composition::adaptive::SurfaceEnvironmentExt;
 use cove_composition::{AnyView, PrimitiveView, View, ViewKind};
+use cove_core::scene::Node;
+use cove_core::{Environment, State};
 use cove_text::FontAtlas;
 use std::rc::Rc;
 
@@ -18,7 +18,11 @@ pub struct ApplicationTypography {
 
 impl Default for ApplicationTypography {
     fn default() -> Self {
-        Self { scale: 0.0, atlas: None, texture_id: 1 }
+        Self {
+            scale: 0.0,
+            atlas: None,
+            texture_id: 1,
+        }
     }
 }
 
@@ -35,7 +39,10 @@ pub struct AdaptiveApplicationContent {
 
 impl AdaptiveApplicationContent {
     pub fn new(content: AnyView, environment: State<Environment>) -> Self {
-        Self { content, environment }
+        Self {
+            content,
+            environment,
+        }
     }
 }
 
@@ -60,10 +67,12 @@ impl PrimitiveView for AdaptiveApplicationContent {
         // by the bare `surface_environment` modifier. Delegating here is what
         // makes host safe-area insets reach authored content.
         let _ = environment;
-        vec![AnyView::new(cove_ui_compose::primitives::layout::SurfaceRoot::new(
-            self.environment.get(),
-            self.content.clone(),
-        ))]
+        vec![AnyView::new(
+            cove_ui_compose::primitives::layout::SurfaceRoot::new(
+                self.environment.get(),
+                self.content.clone(),
+            ),
+        )]
     }
 }
 

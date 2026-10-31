@@ -117,13 +117,20 @@ impl AnySliderStyle {
             style_id: TypeId::of::<S>(),
         }
     }
-    pub fn resolve(&self, configuration: &SliderStyleConfiguration, theme: &Theme) -> SliderAppearance {
+    pub fn resolve(
+        &self,
+        configuration: &SliderStyleConfiguration,
+        theme: &Theme,
+    ) -> SliderAppearance {
         (self.resolve)(configuration, theme)
     }
 }
 impl Clone for AnySliderStyle {
     fn clone(&self) -> Self {
-        Self { resolve: self.resolve.clone(), style_id: self.style_id }
+        Self {
+            resolve: self.resolve.clone(),
+            style_id: self.style_id,
+        }
     }
 }
 impl PartialEq for AnySliderStyle {

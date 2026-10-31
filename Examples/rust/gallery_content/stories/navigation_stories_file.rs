@@ -101,7 +101,8 @@ impl AccordionStory {
     pub fn set_allows_multiple(&self, value: bool) {
         self.allows_multiple.set(value);
         if !value && self.expanded.get().len() > 1 {
-            self.expanded.set(BTreeSet::from([DEFAULT_SECTION.to_owned()]));
+            self.expanded
+                .set(BTreeSet::from([DEFAULT_SECTION.to_owned()]));
         }
     }
 
@@ -142,7 +143,8 @@ impl AccordionStory {
     /// The collapse-all control, which opens project when nothing is open.
     pub fn toggle_all(&self) {
         if self.expanded.get().is_empty() {
-            self.expanded.set(BTreeSet::from([DEFAULT_SECTION.to_owned()]));
+            self.expanded
+                .set(BTreeSet::from([DEFAULT_SECTION.to_owned()]));
         } else {
             self.expanded.set(BTreeSet::new());
         }
@@ -153,7 +155,11 @@ impl AccordionStory {
         format!(
             "{} sections open · {}",
             self.expanded.get().len(),
-            if self.autosave.get() { "Autosave on" } else { "Autosave off" }
+            if self.autosave.get() {
+                "Autosave on"
+            } else {
+                "Autosave off"
+            }
         )
     }
 }
@@ -182,7 +188,9 @@ pub struct BreadcrumbStory {
 
 impl BreadcrumbStory {
     pub fn new() -> Self {
-        Self { is_open: State::new("Project".to_owned()) }
+        Self {
+            is_open: State::new("Project".to_owned()),
+        }
     }
 
     pub fn opened(&self) -> String {
@@ -234,7 +242,10 @@ pub struct PaginationStory {
 
 impl PaginationStory {
     pub fn new(options: GalleryOptions) -> Self {
-        Self { options, page: State::new(DEFAULT_PAGE) }
+        Self {
+            options,
+            page: State::new(DEFAULT_PAGE),
+        }
     }
 
     pub fn page(&self) -> usize {
@@ -321,7 +332,11 @@ impl ButtonGroupStory {
 
     /// The first group's three segments, the third unavailable.
     pub fn mode_segments(&self) -> [(&'static str, &'static str, bool); 3] {
-        [("grid", "Grid", true), ("list", "List", true), ("map", "Map", false)]
+        [
+            ("grid", "Grid", true),
+            ("list", "List", true),
+            ("map", "Map", false),
+        ]
     }
 
     /// The second group's five segments.
@@ -365,8 +380,18 @@ impl TagStory {
     pub fn new(options: GalleryOptions) -> Self {
         Self {
             options,
-            tags: State::new(INITIAL_TAGS.iter().map(|value| (*value).to_owned()).collect()),
-            filters: State::new(INITIAL_FILTERS.iter().map(|value| (*value).to_owned()).collect()),
+            tags: State::new(
+                INITIAL_TAGS
+                    .iter()
+                    .map(|value| (*value).to_owned())
+                    .collect(),
+            ),
+            filters: State::new(
+                INITIAL_FILTERS
+                    .iter()
+                    .map(|value| (*value).to_owned())
+                    .collect(),
+            ),
         }
     }
 
@@ -387,16 +412,25 @@ impl TagStory {
 
     pub fn remove_filter(&self, title: &str) -> bool {
         let before = self.filters.get().len();
-        self.filters.update(|filters| filters.retain(|filter| filter != title));
+        self.filters
+            .update(|filters| filters.retain(|filter| filter != title));
         self.filters.get().len() != before
     }
 
     /// Restores both authored lists.
     pub fn reset(&self) {
-        self.tags
-            .set(INITIAL_TAGS.iter().map(|value| (*value).to_owned()).collect());
-        self.filters
-            .set(INITIAL_FILTERS.iter().map(|value| (*value).to_owned()).collect());
+        self.tags.set(
+            INITIAL_TAGS
+                .iter()
+                .map(|value| (*value).to_owned())
+                .collect(),
+        );
+        self.filters.set(
+            INITIAL_FILTERS
+                .iter()
+                .map(|value| (*value).to_owned())
+                .collect(),
+        );
     }
 
     /// The empty-state caption, shown only when nothing is left.
@@ -502,7 +536,10 @@ pub struct AlertDialogStory {
 
 impl AlertDialogStory {
     pub fn new() -> Self {
-        Self { is_open: State::new(false), is_deleted: State::new(false) }
+        Self {
+            is_open: State::new(false),
+            is_deleted: State::new(false),
+        }
     }
 
     pub fn is_open(&self) -> bool {
@@ -541,9 +578,13 @@ impl View for AlertDialogStory {
             "Confirm a destructive action",
             "The example only changes local state. Confirmation and cancellation have distinct visual roles.",
             AnyView::new(
-                Text::new(if self.is_deleted.get() { "Deleted" } else { "Intact" })
-                    .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-                    .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                Text::new(if self.is_deleted.get() {
+                    "Deleted"
+                } else {
+                    "Intact"
+                })
+                .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
+                .semantic_foreground(SemanticColorRef::on_surface_muted()),
             ),
         ))
     }
@@ -560,7 +601,9 @@ pub struct LabelStory {
 
 impl LabelStory {
     pub fn new() -> Self {
-        Self { shows_tag: State::new(true) }
+        Self {
+            shows_tag: State::new(true),
+        }
     }
 
     pub fn shows_tag(&self) -> bool {
@@ -589,9 +632,13 @@ impl View for LabelStory {
             "Content labels",
             "Status badges, removable tags and key caps keep their full text inside narrow cards. Field labels below name and focus an input.",
             AnyView::new(
-                Text::new(if self.shows_tag.get() { "Tag shown" } else { "Tag removed" })
-                    .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-                    .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                Text::new(if self.shows_tag.get() {
+                    "Tag shown"
+                } else {
+                    "Tag removed"
+                })
+                .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
+                .semantic_foreground(SemanticColorRef::on_surface_muted()),
             ),
         ))
     }

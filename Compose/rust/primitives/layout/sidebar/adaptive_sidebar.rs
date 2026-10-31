@@ -7,8 +7,6 @@
 use std::collections::HashSet;
 use std::rc::Rc;
 
-use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
-use cove_core::Binding;
 use crate::adaptive::ContainerSizeReader;
 use crate::animation::content::AnimatedVisibility;
 use crate::animation::transition::Transition;
@@ -16,6 +14,8 @@ use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use crate::primitives::overlays::modal::uses_sheet;
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
+use cove_core::Binding;
+use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
 
 use super::adaptive_hosts::{SidebarBackdrop, SidebarLayer, SidebarShellHost, SidebarTriggerHost};
 use super::adaptive_options::{AdaptiveSidebarOptions, SidebarGeometry, SidebarMode};
@@ -138,18 +138,24 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
         }
         let collapse = self.collapse.clone();
         let local = self.local_collapse.clone();
-        AnyView::new(SidebarToggle::new(self.options.expand_label.clone(), false, move || {
-            match collapse.as_ref() {
+        AnyView::new(SidebarToggle::new(
+            self.options.expand_label.clone(),
+            false,
+            move || match collapse.as_ref() {
                 Some(binding) => binding.set(false),
                 None => local.set(false),
-            }
-        }))
+            },
+        ))
     }
 
     fn navigation(&self, geometry: SidebarGeometry) -> AnyView {
         let is_modal = geometry.is_modal;
         let presentation = geometry.presentation(self.options.layout.shows_rail_labels);
-        let row_height = if geometry.mode == SidebarMode::Expanded { 38.0 } else { 44.0 };
+        let row_height = if geometry.mode == SidebarMode::Expanded {
+            38.0
+        } else {
+            44.0
+        };
         let mut header_children: Vec<AnyView> = Vec::new();
         // Rail trigger inside the header so the retained subtree owns the focus
         // return target.
@@ -169,7 +175,11 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
             let title = self.title.clone();
             header_children.push(AnyView::new(
                 BoxView::new(
-                    FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 8.0,
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    8.0,
                     AnyView::new(TupleView::new(vec![
                         AnyView::new(SidebarToggle::new("Collapse navigation", true, move || {
                             match presentation.as_ref() {
@@ -177,12 +187,10 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
                                 None => local.set(false),
                             }
                         })),
-                        AnyView::new(
-                            AnyView::new(
-                                AnyView::new(crate::primitives::text::Text::new(title).truncated())
-                                    .with_modifier(SemanticBodyStrong),
-                            ),
-                        ),
+                        AnyView::new(AnyView::new(
+                            AnyView::new(crate::primitives::text::Text::new(title).truncated())
+                                .with_modifier(SemanticBodyStrong),
+                        )),
                     ])),
                 )
                 .padding_edges(12.0, 4.0),
@@ -227,11 +235,19 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
         let title = self.title.clone();
         AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(TupleView::new(column)),
             )
             .accessibility(move |semantics| {
-                semantics.role = if is_modal { AccessibilityRole::Dialog } else { AccessibilityRole::Group };
+                semantics.role = if is_modal {
+                    AccessibilityRole::Dialog
+                } else {
+                    AccessibilityRole::Group
+                };
                 semantics.label = title.clone();
             }),
         )
@@ -243,7 +259,8 @@ struct SemanticBodyStrong;
 
 impl cove_composition::ViewModifier for SemanticBodyStrong {
     fn apply_node(&self, node: &Node) {
-        let token = crate::theme::SemanticFontRef::body_strong().resolve(&crate::theme::theme_for_node(node));
+        let token = crate::theme::SemanticFontRef::body_strong()
+            .resolve(&crate::theme::theme_for_node(node));
         node.set_attachment(crate::modifiers::style::FONT, token.font.clone());
         node.set_attachment(crate::modifiers::style::LINE_HEIGHT, token.line_height);
         if let Some(layout) = node.layout_node() {
@@ -265,13 +282,10 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
         sections: Vec<SidebarSection<Id>>,
     ) -> Self {
         assert!(
-            sections
+            sections.iter().enumerate().all(|(index, section)| sections
                 .iter()
                 .enumerate()
-                .all(|(index, section)| sections
-                    .iter()
-                    .enumerate()
-                    .all(|(other, candidate)| other == index || candidate.id != section.id)),
+                .all(|(other, candidate)| other == index || candidate.id != section.id)),
             "AdaptiveSidebar section IDs must be unique"
         );
         Self {
@@ -371,45 +385,48 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         let snapshot = self.snapshot.clone();
-        vec![AnyView::new(ContainerSizeReader::new(move |size: cove_core::Size| {
-            let width = if size.width > 0.0 { size.width } else { 0.0 };
-            let geometry = snapshot.geometry(width);
-            let navigation = snapshot.navigation(geometry);
-            let dismiss = {
-                let snapshot = snapshot.clone();
-                move || snapshot.set_presented(false)
-            };
-            let layer = SidebarLayer::new(
-                geometry,
-                snapshot.focus.clone(),
-                crate::primitives::overlays::modal::ModalDismissal::default(),
-                dismiss.clone(),
-                AnyView::new(TupleView::new(vec![
-                    AnyView::new(AnimatedVisibility::new(
-                        geometry.is_modal,
-                        Transition::opacity(),
-                        None,
-                        false,
-                        None,
-                        AnyView::new(SidebarBackdrop::new(
-                            crate::primitives::overlays::modal::ModalDismissal::default(),
-                            dismiss,
+        vec![AnyView::new(ContainerSizeReader::new(
+            move |size: cove_core::Size| {
+                let width = if size.width > 0.0 { size.width } else { 0.0 };
+                let geometry = snapshot.geometry(width);
+                let navigation = snapshot.navigation(geometry);
+                let dismiss = {
+                    let snapshot = snapshot.clone();
+                    move || snapshot.set_presented(false)
+                };
+                let layer = SidebarLayer::new(
+                    geometry,
+                    snapshot.focus.clone(),
+                    crate::primitives::overlays::modal::ModalDismissal::default(),
+                    dismiss.clone(),
+                    AnyView::new(TupleView::new(vec![
+                        AnyView::new(AnimatedVisibility::new(
+                            geometry.is_modal,
+                            Transition::opacity(),
+                            None,
+                            false,
+                            None,
+                            AnyView::new(SidebarBackdrop::new(
+                                crate::primitives::overlays::modal::ModalDismissal::default(),
+                                dismiss,
+                            )),
                         )),
-                    )),
-                    AnyView::new(navigation),
-                ])),
-            );
-            AnyView::new(SidebarShellHost::new(
-                geometry,
-                snapshot.focus.clone(),
-                AnyView::new(TupleView::new(vec![
-                    AnyView::new(snapshot.content.clone()),
-                    AnyView::new(layer),
-                ])),
-            ))
-        }))]
+                        AnyView::new(navigation),
+                    ])),
+                );
+                AnyView::new(SidebarShellHost::new(
+                    geometry,
+                    snapshot.focus.clone(),
+                    AnyView::new(TupleView::new(vec![
+                        AnyView::new(snapshot.content.clone()),
+                        AnyView::new(layer),
+                    ])),
+                ))
+            },
+        ))]
     }
 }
 impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
     for AdaptiveShell<Id>
-{}
+{
+}

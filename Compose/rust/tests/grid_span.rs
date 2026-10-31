@@ -81,17 +81,32 @@ fn lazy_grid_packs_spans_per_row() {
 #[test]
 fn uniform_lazy_grid_rows_need_no_span_table() {
     let uniform = LazyGridRows::new(7, 3, None);
-    assert_eq!(uniform.count, 3, "seven items in three columns make three rows");
+    assert_eq!(
+        uniform.count, 3,
+        "seven items in three columns make three rows"
+    );
     assert_eq!(uniform.items(2), 6..7, "the last row holds the remainder");
-    assert_eq!(uniform.span_of_item(0), 1, "unspanned items occupy one column");
-    assert_eq!(uniform.column_of_item(4), 1, "column is index modulo columns");
+    assert_eq!(
+        uniform.span_of_item(0),
+        1,
+        "unspanned items occupy one column"
+    );
+    assert_eq!(
+        uniform.column_of_item(4),
+        1,
+        "column is index modulo columns"
+    );
 }
 
 #[test]
 fn visible_columns_window_a_wide_grid() {
     let window = LazyGrid::<i32>::visible_columns(100, 50.0, 10.0, 600.0, 240.0, 1);
     // stride 60: first = floor(600/60) - 1 = 9, last = ceil(840/60) + 1 = 15.
-    assert_eq!(window, 9..15, "the window covers the viewport plus one of overscan");
+    assert_eq!(
+        window,
+        9..15,
+        "the window covers the viewport plus one of overscan"
+    );
 }
 
 #[test]
@@ -117,8 +132,16 @@ fn visible_columns_clamp_and_handle_degenerate_inputs() {
 fn row_heights_report_offsets_with_spacing() {
     let heights = GridRowHeights::variable(&[20.0, 40.0, 30.0]);
     heights.validate(3);
-    assert_eq!(heights.height(1), 40.0, "variable rows keep their authored height");
-    assert_eq!(heights.offset(2, 10.0), 20.0 + 40.0 + 20.0, "offsets include the gaps");
+    assert_eq!(
+        heights.height(1),
+        40.0,
+        "variable rows keep their authored height"
+    );
+    assert_eq!(
+        heights.offset(2, 10.0),
+        20.0 + 40.0 + 20.0,
+        "offsets include the gaps"
+    );
     let fixed = GridRowHeights::fixed(30.0);
     assert_eq!(fixed.height(5), 30.0, "fixed rows are uniform");
     assert_eq!(fixed.offset(3, 0.0), 90.0, "fixed offsets are arithmetic");
@@ -127,6 +150,14 @@ fn row_heights_report_offsets_with_spacing() {
 #[test]
 fn row_heights_scale_with_the_text_scaler() {
     let heights = GridRowHeights::fixed(20.0).scaled(2.0);
-    assert_eq!(heights.height(0), 40.0, "the scale factor applies to every row");
-    assert_eq!(heights.offset(2, 0.0), 80.0, "offsets scale with the heights");
+    assert_eq!(
+        heights.height(0),
+        40.0,
+        "the scale factor applies to every row"
+    );
+    assert_eq!(
+        heights.offset(2, 0.0),
+        80.0,
+        "offsets scale with the heights"
+    );
 }

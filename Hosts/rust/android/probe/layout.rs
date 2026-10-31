@@ -1,8 +1,8 @@
 //! Translation of Android/CoveAndroidProbe/Layout.swift.
 
-use super::runner::{require, ProbeContext, ProbeFailure};
-use cove_core::scene::{FlexDirection, InvalidationSource, LayoutNode, LayoutPass, Node, NodeTree};
+use super::runner::{ProbeContext, ProbeFailure, require};
 use cove_core::Rect;
+use cove_core::scene::{FlexDirection, InvalidationSource, LayoutNode, LayoutPass, Node, NodeTree};
 
 impl ProbeContext {
     /// Verifies the shared scene graph, Yoga layout and the invalidation/reset
@@ -35,10 +35,16 @@ impl ProbeContext {
         let mut nodes = NodeTree::new();
         nodes.set_root(Some(tree));
         nodes.flush();
-        require(!nodes.has_render_updates(), "scene invalidation did not reset")?;
+        require(
+            !nodes.has_render_updates(),
+            "scene invalidation did not reset",
+        )?;
 
         b.mark_render_dirty(InvalidationSource::Unknown);
-        require(nodes.has_render_updates(), "scene invalidation did not propagate")?;
+        require(
+            nodes.has_render_updates(),
+            "scene invalidation did not propagate",
+        )?;
         Ok("shared CoveUI scene graph, Yoga layout and invalidation/reset verified".to_owned())
     }
 }

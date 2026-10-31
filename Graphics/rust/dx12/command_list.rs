@@ -5,11 +5,11 @@
 //! encodes the recorded commands directly, which removes the opcode stream and the
 //! second decode while keeping the same command set.
 #![allow(non_snake_case)]
-use crate::rhi::{PlannedSubmit, RhiError, RhiResult};
 #[cfg(target_os = "windows")]
 use crate::rhi::PlannedCommand;
 #[cfg(target_os = "windows")]
 use crate::rhi::{ComputeCommand, CopyCommand, RenderCommand, rhi_count, rhi_require};
+use crate::rhi::{PlannedSubmit, RhiError, RhiResult};
 
 use super::device::Dx12DeviceHandle;
 #[cfg(any(target_os = "windows", test))]
@@ -29,7 +29,9 @@ pub fn record(
     #[cfg(not(target_os = "windows"))]
     {
         let _ = (device, registries, queue_kind, submit);
-        return Err(RhiError::unsupported_backend("DirectX 12 is only available on Windows"));
+        return Err(RhiError::unsupported_backend(
+            "DirectX 12 is only available on Windows",
+        ));
     }
     #[cfg(target_os = "windows")]
     {
@@ -88,12 +90,14 @@ fn encode(
         PlannedCommand::Barriers(barriers) => {
             for barrier in barriers {
                 let resource = match barrier.resource.kind {
-                    crate::rhi::ResourceKind::Buffer => {
-                        registries.buffers.get(&barrier.resource.id).map(|record| record.resource)
-                    }
-                    crate::rhi::ResourceKind::Texture => {
-                        registries.textures.get(&barrier.resource.id).map(|record| record.resource)
-                    }
+                    crate::rhi::ResourceKind::Buffer => registries
+                        .buffers
+                        .get(&barrier.resource.id)
+                        .map(|record| record.resource),
+                    crate::rhi::ResourceKind::Texture => registries
+                        .textures
+                        .get(&barrier.resource.id)
+                        .map(|record| record.resource),
                     _ => None,
                 };
                 let Some(resource) = resource else { continue };
@@ -141,9 +145,10 @@ fn encode_render_pass(
 ) -> RhiResult<()> {
     let mut color_views = Vec::with_capacity(record.descriptor.color_targets.len());
     for target in &record.descriptor.color_targets {
-        let texture = registries.textures.get(&target.texture.id()).ok_or_else(|| {
-            RhiError::invalid_argument("unknown render attachment")
-        })?;
+        let texture = registries
+            .textures
+            .get(&target.texture.id())
+            .ok_or_else(|| RhiError::invalid_argument("unknown render attachment"))?;
         let rtv = texture.rtv.ok_or_else(|| {
             RhiError::invalid_argument("render color target has no render-target view")
         })?;
@@ -152,9 +157,10 @@ fn encode_render_pass(
     }
     let depth_view = match record.descriptor.depth_target {
         Some(target) => {
-            let texture = registries.textures.get(&target.texture.id()).ok_or_else(|| {
-                RhiError::invalid_argument("unknown depth attachment")
-            })?;
+            let texture = registries
+                .textures
+                .get(&target.texture.id())
+                .ok_or_else(|| RhiError::invalid_argument("unknown depth attachment"))?;
             texture.dsv
         }
         None => None,
@@ -165,7 +171,11 @@ fn encode_render_pass(
         ((*vtbl).OMSetRenderTargets)(
             list,
             color_views.len() as u32,
-            if color_views.is_empty() { core::ptr::null() } else { color_views.as_ptr() },
+            if color_views.is_empty() {
+                core::ptr::null()
+            } else {
+                color_views.as_ptr()
+            },
             0,
             match &depth_view {
                 Some(view) => view,
@@ -230,7 +240,12 @@ fn encode_render(
                 ((*vtbl).RSSetScissorRects)(list, 1, &native);
                 Ok(())
             }
-            RenderCommand::Draw { vertex_count, instance_count, first_vertex, first_instance } => {
+            RenderCommand::Draw {
+                vertex_count,
+                instance_count,
+                first_vertex,
+                first_instance,
+            } => {
                 ((*vtbl).DrawInstanced)(
                     list,
                     rhi_count(*vertex_count)?,
@@ -284,7 +299,11 @@ fn encode_compute(
                     .ok_or_else(|| RhiError::invalid_argument("unknown compute pipeline"))?;
                 Ok(())
             }
-            ComputeCommand::Dispatch { groups_x, groups_y, groups_z } => {
+            ComputeCommand::Dispatch {
+                groups_x,
+                groups_y,
+                groups_z,
+            } => {
                 rhi_require(
                     *groups_x > 0 && *groups_y > 0 && *groups_z > 0,
                     "dispatch requires positive groups",
@@ -313,7 +332,13 @@ fn encode_copy(
     unsafe {
         let vtbl = *(list as *mut *const super::resources::CommandListVtbl);
         match command {
-            CopyCommand::CopyBuffer { src, src_offset, dst, dst_offset, size } => {
+            CopyCommand::CopyBuffer {
+                src,
+                src_offset,
+                dst,
+                dst_offset,
+                size,
+            } => {
                 let source = registries
                     .buffers
                     .get(&src.id())
@@ -387,6 +412,9 @@ mod tests {
 
     #[test]
     fn primitive_topologies_are_recorded_explicitly() {
-        assert_eq!(formats::primitive_topology(crate::rhi::PrimitiveType::TriangleList), 4);
+        assert_eq!(
+            formats::primitive_topology(crate::rhi::PrimitiveType::TriangleList),
+            4
+        );
     }
 }

@@ -23,7 +23,9 @@ use objc2_metal::{
 };
 use objc2_quartz_core::{CAMetalDrawable, CAMetalLayer};
 
-use crate::rhi::{AdapterCapabilities, Capabilities, DeviceConfig, QueueClass, QueueLimits, RhiError, RhiResult};
+use crate::rhi::{
+    AdapterCapabilities, Capabilities, DeviceConfig, QueueClass, QueueLimits, RhiError, RhiResult,
+};
 
 use super::library_cache::MetalLibraryCache;
 use super::registries::MetalRegistries;
@@ -90,13 +92,16 @@ impl MetalDeviceHandle {
         })?;
         let graphics_queue = device.newCommandQueue().ok_or(RhiError::OutOfMemory)?;
         // A missing second queue falls back to the graphics queue, matching Swift.
-        let compute_queue = device.newCommandQueue().unwrap_or_else(|| graphics_queue.clone());
+        let compute_queue = device
+            .newCommandQueue()
+            .unwrap_or_else(|| graphics_queue.clone());
 
-        let depth =  { MTLDepthStencilDescriptor::new() };
+        let depth = { MTLDepthStencilDescriptor::new() };
         depth.setDepthCompareFunction(objc2_metal::MTLCompareFunction::Always);
         depth.setDepthWriteEnabled(false);
-        let disabled_depth_state =
-            device.newDepthStencilStateWithDescriptor(&depth).ok_or(RhiError::OutOfMemory)?;
+        let disabled_depth_state = device
+            .newDepthStencilStateWithDescriptor(&depth)
+            .ok_or(RhiError::OutOfMemory)?;
 
         let capabilities = Self::query_capabilities(&device);
         let device_name = device.name().to_string();
@@ -151,10 +156,18 @@ impl MetalDeviceHandle {
             // state path yet, matching the Swift capability set.
             capabilities.mesh_shading.task = false;
             capabilities.indirect_draw = Self::probe_indirect_command_buffer(device);
-            capabilities.textures.texture_3d =
-                Self::probe_texture(device, MTLTextureType::Type3D, MTLPixelFormat::R8Unorm, true);
-            capabilities.textures.cube =
-                Self::probe_texture(device, MTLTextureType::TypeCube, MTLPixelFormat::RGBA8Unorm, false);
+            capabilities.textures.texture_3d = Self::probe_texture(
+                device,
+                MTLTextureType::Type3D,
+                MTLPixelFormat::R8Unorm,
+                true,
+            );
+            capabilities.textures.cube = Self::probe_texture(
+                device,
+                MTLTextureType::TypeCube,
+                MTLPixelFormat::RGBA8Unorm,
+                false,
+            );
             capabilities.max_queues = QueueLimits::default();
         })
     }
@@ -162,7 +175,7 @@ impl MetalDeviceHandle {
     /// Indirect draw is advertised only when the device can allocate an
     /// indirect command buffer with the shape the encoder needs.
     fn probe_indirect_command_buffer(device: &ProtocolObject<dyn MTLDevice>) -> bool {
-        let descriptor =  { MTLIndirectCommandBufferDescriptor::new() };
+        let descriptor = { MTLIndirectCommandBufferDescriptor::new() };
         descriptor.setCommandTypes(MTLIndirectCommandType::Draw);
         descriptor.setInheritBuffers(false);
         descriptor.setMaxVertexBufferBindCount(0);
@@ -187,7 +200,7 @@ impl MetalDeviceHandle {
         format: MTLPixelFormat,
         is_3d: bool,
     ) -> bool {
-        let descriptor =  { MTLTextureDescriptor::new() };
+        let descriptor = { MTLTextureDescriptor::new() };
         descriptor.setTextureType(texture_type);
         descriptor.setPixelFormat(format);
         // SAFETY: probe textures are single-texel, which every device supports;
@@ -218,7 +231,10 @@ impl MetalDeviceHandle {
     }
 
     /// Shared event for a timeline semaphore ID, created on first use.
-    pub fn shared_event(&mut self, id: u32) -> Option<Retained<ProtocolObject<dyn MTLSharedEvent>>> {
+    pub fn shared_event(
+        &mut self,
+        id: u32,
+    ) -> Option<Retained<ProtocolObject<dyn MTLSharedEvent>>> {
         {
             let registries = self
                 .registries
@@ -266,7 +282,10 @@ mod tests {
     #[test]
     fn labels_only_exist_when_the_descriptor_has_one() {
         assert!(label(None).is_none());
-        assert_eq!(label(Some("scene")).map(|value| value.to_string()), Some("scene".to_owned()));
+        assert_eq!(
+            label(Some("scene")).map(|value| value.to_string()),
+            Some("scene".to_owned())
+        );
     }
 
     #[test]

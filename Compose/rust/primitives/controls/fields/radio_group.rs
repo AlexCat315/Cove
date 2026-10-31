@@ -3,18 +3,22 @@
 //! Controlled selection with one Tab stop and wrapping arrow-key navigation.
 use std::rc::Rc;
 
-use cove_core::scene::{
-    AccessibilityRole, Align, FlexDirection, FocusChainHolder, Justify, LayoutNode, Node, Rect, Wrap,
-};
-use cove_core::{Binding, Color};
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{Button, ButtonRole};
-use crate::primitives::overlays::roving_focus::{roving_identity, RovingFocusHost, RovingItem};
+use crate::primitives::overlays::roving_focus::{RovingFocusHost, RovingItem, roving_identity};
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonStyle, ButtonStyleConfiguration, ButtonStyleViewExt};
-use crate::theme::{theme_for_node, SemanticFontRef};
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View, ViewExt};
+use crate::theme::{SemanticFontRef, theme_for_node};
+use crate::{
+    AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View, ViewExt,
+    impl_primitive_view,
+};
+use cove_core::scene::{
+    AccessibilityRole, Align, FlexDirection, FocusChainHolder, Justify, LayoutNode, Node, Rect,
+    Wrap,
+};
+use cove_core::{Binding, Color};
 
 /// Diameter of the radio mark.
 const MARK_EDGE: f32 = 16.0;
@@ -30,7 +34,12 @@ pub struct RadioOption<Value: PartialEq + Clone> {
 
 impl<Value: PartialEq + Clone> RadioOption<Value> {
     pub fn new(value: Value, title: impl Into<String>) -> Self {
-        Self { value, title: title.into(), detail: String::new(), is_enabled: true }
+        Self {
+            value,
+            title: title.into(),
+            detail: String::new(),
+            is_enabled: true,
+        }
     }
 
     pub fn detail(mut self, detail: impl Into<String>) -> Self {
@@ -61,7 +70,12 @@ impl<Value: PartialEq + Clone + std::hash::Hash + Send + Sync + 'static> RadioGr
                 .all(|(other, candidate)| other == index || candidate.value != option.value)),
             "Radio option values must be unique"
         );
-        Self { selection, options, is_enabled: true, is_horizontal: false }
+        Self {
+            selection,
+            options,
+            is_enabled: true,
+            is_horizontal: false,
+        }
     }
 
     pub fn enabled(mut self, is_enabled: bool) -> Self {
@@ -83,7 +97,9 @@ impl<Value: PartialEq + Clone + std::hash::Hash + Send + Sync + 'static> RadioGr
     }
 }
 
-impl<Value: PartialEq + Clone + std::hash::Hash + Send + Sync + 'static> View for RadioGroup<Value> {
+impl<Value: PartialEq + Clone + std::hash::Hash + Send + Sync + 'static> View
+    for RadioGroup<Value>
+{
     fn body(&self) -> AnyView {
         let enabled = self.enabled_values();
         let selection = self.selection.clone();
@@ -109,23 +125,24 @@ impl<Value: PartialEq + Clone + std::hash::Hash + Send + Sync + 'static> View fo
                         .semantic_foreground(crate::theme::SemanticColorRef::on_surface_muted()),
                 ));
             }
-            let content = AnyView::new(
-                Row::new(
-                    VerticalAlignment::Center,
-                    8.0,
-                    AnyView::new(TupleView::new(vec![
-                        AnyView::new(RadioMark { is_selected, is_enabled: is_option_enabled }),
-                        AnyView::new(BoxView::new(
-                            FlexDirection::Column,
-                            Align::FlexStart,
-                            Justify::FlexStart,
-                            Wrap::NoWrap,
-                            3.0,
-                            AnyView::new(TupleView::new(label)),
-                        )),
-                    ])),
-                ),
-            )
+            let content = AnyView::new(Row::new(
+                VerticalAlignment::Center,
+                8.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(RadioMark {
+                        is_selected,
+                        is_enabled: is_option_enabled,
+                    }),
+                    AnyView::new(BoxView::new(
+                        FlexDirection::Column,
+                        Align::FlexStart,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        3.0,
+                        AnyView::new(TupleView::new(label)),
+                    )),
+                ])),
+            ))
             .modifier(RadioSemantics { title, detail });
             let selection_for_button = selection.clone();
             let button = Button::with_options(
@@ -142,7 +159,8 @@ impl<Value: PartialEq + Clone + std::hash::Hash + Send + Sync + 'static> View fo
                 None,
             )
             .button_style(RadioItemStyle);
-            let identity: Rc<dyn Fn(&Value) -> u64> = Rc::new(|value: &Value| roving_identity(value));
+            let identity: Rc<dyn Fn(&Value) -> u64> =
+                Rc::new(|value: &Value| roving_identity(value));
             let is_tab_stop = tab_stop.as_ref() == Some(&option.value);
             let item = AnyView::new(button.modifier(RovingItem::new(
                 option.value.clone(),
@@ -166,8 +184,16 @@ impl<Value: PartialEq + Clone + std::hash::Hash + Send + Sync + 'static> View fo
             move |value: &Value| identity(value),
             AnyView::new(
                 BoxView::new(
-                    if self.is_horizontal { FlexDirection::Row } else { FlexDirection::Column },
-                    if self.is_horizontal { Align::Center } else { Align::Stretch },
+                    if self.is_horizontal {
+                        FlexDirection::Row
+                    } else {
+                        FlexDirection::Column
+                    },
+                    if self.is_horizontal {
+                        Align::Center
+                    } else {
+                        Align::Stretch
+                    },
                     Justify::FlexStart,
                     Wrap::NoWrap,
                     8.0,
@@ -203,10 +229,18 @@ struct RadioItemStyle;
 impl ButtonStyle for RadioItemStyle {
     fn make_body(&self, configuration: ButtonStyleConfiguration) -> AnyView {
         let theme = configuration.theme.clone();
-        let fill = if configuration.is_hovered { theme.colors.state_layer_hover } else { Color::CLEAR };
+        let fill = if configuration.is_hovered {
+            theme.colors.state_layer_hover
+        } else {
+            Color::CLEAR
+        };
         AnyView::new(
             BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(configuration.label.clone()),
             )
             .flex_with(1.0, 1.0, None)
@@ -219,7 +253,11 @@ impl ButtonStyle for RadioItemStyle {
             .background_color(fill)
             .corner_radius(theme.radius.sm)
             .border_color(
-                if configuration.is_focused { theme.colors.focus_ring } else { Color::CLEAR },
+                if configuration.is_focused {
+                    theme.colors.focus_ring
+                } else {
+                    Color::CLEAR
+                },
                 if configuration.is_focused { 2.0 } else { 0.0 },
             ),
         )
@@ -251,11 +289,17 @@ impl PrimitiveView for RadioMark {
         let is_selected = self.is_selected;
         let is_enabled = self.is_enabled;
         node.update_draw((is_selected, is_enabled), move |list, origin| {
-            let Some(owner) = Node::upgrade(&weak) else { return };
+            let Some(owner) = Node::upgrade(&weak) else {
+                return;
+            };
             let colors = theme_for_node(&owner).colors;
             let rect = Rect::new(origin.x, origin.y, MARK_EDGE, MARK_EDGE);
             // White face with a thin border, like the check box.
-            let fill = if is_enabled { colors.background } else { colors.surface };
+            let fill = if is_enabled {
+                colors.background
+            } else {
+                colors.surface
+            };
             let border = if !is_enabled {
                 colors.on_surface.multiplied_alpha(0.3)
             } else if is_selected {
@@ -273,7 +317,11 @@ impl PrimitiveView for RadioMark {
                 border.multiplied_alpha(opacity),
             );
             if is_selected {
-                let dot = if is_enabled { colors.accent } else { colors.on_surface_muted };
+                let dot = if is_enabled {
+                    colors.accent
+                } else {
+                    colors.on_surface_muted
+                };
                 let diameter = 6.0;
                 let _ = list.add_rounded_rect(
                     Rect::new(

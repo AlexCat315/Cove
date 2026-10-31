@@ -11,11 +11,11 @@
 use cove_core::scene::{
     ActiveAnimationContext, ComponentRecompositionMetrics, ComponentSourceLocation, Direction,
     DirtyReason, ElementId, InvalidationLog, InvalidationLogHolder, InvalidationPhase,
-    InvalidationSource, LayoutNode, Node, NodeKey, NodeTree, ObservableStateTracking,
-    RecompositionReason, RenderTree, StateRegistry, TextInputAttachmentKey, TextInputAreaResolver,
-    LocalInvalidationHandle,
+    InvalidationSource, LayoutNode, LocalInvalidationHandle, Node, NodeKey, NodeTree,
+    ObservableStateTracking, RecompositionReason, RenderTree, StateRegistry, TextInputAreaResolver,
+    TextInputAttachmentKey,
 };
-use cove_core::{with_deferred_evaluation, Point, Rect};
+use cove_core::{Point, Rect, with_deferred_evaluation};
 use cove_platform::TextInputArea;
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
@@ -23,8 +23,8 @@ use std::rc::{Rc, Weak};
 
 use crate::layout_debug_modifier::LayoutDebugAttachmentKey;
 use crate::{
-    AnyModifiedContent, AnyView, AsAny, DynamicField, EmptyView, IdentifiedView, LayoutTree, ModifierReplay,
-    PrimitiveView, SourceLocatedView, View, ViewKind, ViewModifier,
+    AnyModifiedContent, AnyView, AsAny, DynamicField, EmptyView, IdentifiedView, LayoutTree,
+    ModifierReplay, PrimitiveView, SourceLocatedView, View, ViewKind, ViewModifier,
 };
 
 pub struct LayoutSnapshotEntry {
@@ -96,8 +96,19 @@ impl ViewGraph {
     pub(crate) fn timeline_begin(&self) -> Option<f64> {
         self.tree.borrow().timeline.borrow().begin()
     }
-    pub(crate) fn timeline_end(&self, start: Option<f64>, phase: &str, name: &str, scope: Option<String>, reasons: &[RecompositionReason]) {
-        self.tree.borrow().timeline.borrow_mut().end(start, phase, name, scope, reasons);
+    pub(crate) fn timeline_end(
+        &self,
+        start: Option<f64>,
+        phase: &str,
+        name: &str,
+        scope: Option<String>,
+        reasons: &[RecompositionReason],
+    ) {
+        self.tree
+            .borrow()
+            .timeline
+            .borrow_mut()
+            .end(start, phase, name, scope, reasons);
     }
     /// Number of live user-view scopes, exposed for diagnostics.
     pub fn scope_count(&self) -> usize {
@@ -126,13 +137,25 @@ impl ViewGraph {
         }
         let root_node = Node::new();
         self.tree.borrow_mut().set_root(Some(root_node.clone()));
-        self.layout_of.borrow_mut().insert(root_node.id(), self.layout_root());
-        let nodes = if ViewScope::is_materialised_directly(view.storage.as_ref()) && !is_empty_view(view.storage.as_ref()) {
+        self.layout_of
+            .borrow_mut()
+            .insert(root_node.id(), self.layout_root());
+        let nodes = if ViewScope::is_materialised_directly(view.storage.as_ref())
+            && !is_empty_view(view.storage.as_ref())
+        {
             // Primitive/structural roots have no user-view anchor. Their reader
             // closures still need an owner, without adding a layout container.
             let layout_parent = self.layout_root();
-            let scope = Rc::new(RefCell::new(ViewScope::new(self, &root_node, view, Some(layout_parent), None)));
-            self.scopes.borrow_mut().insert(root_node.id(), scope.clone());
+            let scope = Rc::new(RefCell::new(ViewScope::new(
+                self,
+                &root_node,
+                view,
+                Some(layout_parent),
+                None,
+            )));
+            self.scopes
+                .borrow_mut()
+                .insert(root_node.id(), scope.clone());
             ViewScope::install(&scope, self);
             root_node.children()
         } else {
@@ -156,7 +179,9 @@ impl ViewGraph {
         let trace = self.timeline_begin();
         *self.last_layout_size.borrow_mut() = Some((width, height));
         with_deferred_evaluation(|| {
-            self.layout_tree.root.calculate_layout(Some(width), Some(height), Direction::Ltr);
+            self.layout_tree
+                .root
+                .calculate_layout(Some(width), Some(height), Direction::Ltr);
             if let Some(root) = self.tree.borrow().root() {
                 self.write_layout_back(&root, Point::new(0.0, 0.0), true);
             }
@@ -184,7 +209,12 @@ impl ViewGraph {
     }
 
     fn write_layout_back(&self, node: &Node, parent_origin: Point, parent_placement_visible: bool) {
-        self.write_layout_back_at(node, parent_origin, Point::default(), parent_placement_visible);
+        self.write_layout_back_at(
+            node,
+            parent_origin,
+            Point::default(),
+            parent_placement_visible,
+        );
     }
 
     /// `parent_layout` is the parent's absolute layout origin.
@@ -204,7 +234,10 @@ impl ViewGraph {
         parent_placement_visible: bool,
     ) {
         let layout = self.layout_of.borrow().get(&node.id()).cloned();
-        let placement_visible = parent_placement_visible && layout.as_ref().is_none_or(LayoutNode::custom_layout_is_visible);
+        let placement_visible = parent_placement_visible
+            && layout
+                .as_ref()
+                .is_none_or(LayoutNode::custom_layout_is_visible);
         let mut layout_origin = parent_layout;
         if let Some(layout) = &layout {
             node.set_layout_visibility(layout.custom_layout_is_visible());
@@ -213,16 +246,27 @@ impl ViewGraph {
             // Hidden retained slots are not measured. Publish suppressed
             // geometry rather than uninitialized probe frames until placed.
             node.set_frame(if placement_visible {
-                Rect::new(frame.x - parent_layout.x, frame.y - parent_layout.y, frame.width, frame.height)
+                Rect::new(
+                    frame.x - parent_layout.x,
+                    frame.y - parent_layout.y,
+                    frame.width,
+                    frame.height,
+                )
             } else {
                 Rect::default()
             });
         }
-        let absolute_origin = Point::new(parent_origin.x + node.frame().x, parent_origin.y + node.frame().y);
+        let absolute_origin = Point::new(
+            parent_origin.x + node.frame().x,
+            parent_origin.y + node.frame().y,
+        );
         self.sync_text_input_area(node, absolute_origin);
         // Children render translated by -content_offset; keep the IME anchor
         // geometry in the same space as what is actually on screen.
-        let child_origin = Point::new(absolute_origin.x - node.content_offset().x, absolute_origin.y - node.content_offset().y);
+        let child_origin = Point::new(
+            absolute_origin.x - node.content_offset().x,
+            absolute_origin.y - node.content_offset().y,
+        );
         for child in node.children() {
             self.write_layout_back_at(&child, child_origin, layout_origin, placement_visible);
         }
@@ -233,7 +277,8 @@ impl ViewGraph {
 
     fn sync_text_input_area(&self, node: &Node, absolute_origin: Point) {
         let previous: Option<TextInputArea> = node.attachment(TextInputAttachmentKey::AREA);
-        let resolver: Option<TextInputAreaResolver> = node.attachment(TextInputAttachmentKey::AREA_RESOLVER);
+        let resolver: Option<TextInputAreaResolver> =
+            node.attachment(TextInputAttachmentKey::AREA_RESOLVER);
         let next = resolver.and_then(|resolver| resolver(node, absolute_origin));
         if previous == next {
             return;
@@ -258,15 +303,38 @@ impl ViewGraph {
         result
     }
 
-    fn collect_layout_snapshot(&self, node: &Node, parent_origin: Point, result: &mut Vec<LayoutSnapshotEntry>) {
-        let absolute_origin = Point::new(parent_origin.x + node.frame().x, parent_origin.y + node.frame().y);
-        let absolute_frame = Rect::new(absolute_origin.x, absolute_origin.y, node.frame().width, node.frame().height);
-        let child_origin = Point::new(absolute_origin.x - node.content_offset().x, absolute_origin.y - node.content_offset().y);
+    fn collect_layout_snapshot(
+        &self,
+        node: &Node,
+        parent_origin: Point,
+        result: &mut Vec<LayoutSnapshotEntry>,
+    ) {
+        let absolute_origin = Point::new(
+            parent_origin.x + node.frame().x,
+            parent_origin.y + node.frame().y,
+        );
+        let absolute_frame = Rect::new(
+            absolute_origin.x,
+            absolute_origin.y,
+            node.frame().width,
+            node.frame().height,
+        );
+        let child_origin = Point::new(
+            absolute_origin.x - node.content_offset().x,
+            absolute_origin.y - node.content_offset().y,
+        );
         let debug_name: Option<String> = node.attachment(LayoutDebugAttachmentKey::DEBUG_NAME);
         let layout_role: Option<String> = node.attachment(LayoutDebugAttachmentKey::LAYOUT_ROLE);
-        let semantic_role: Option<String> = node.attachment(LayoutDebugAttachmentKey::SEMANTIC_ROLE);
+        let semantic_role: Option<String> =
+            node.attachment(LayoutDebugAttachmentKey::SEMANTIC_ROLE);
         if debug_name.is_some() || layout_role.is_some() || semantic_role.is_some() {
-            result.push(LayoutSnapshotEntry { debug_name, layout_role, semantic_role, frame: node.frame(), absolute_frame });
+            result.push(LayoutSnapshotEntry {
+                debug_name,
+                layout_role,
+                semantic_role,
+                frame: node.frame(),
+                absolute_frame,
+            });
         }
         for child in node.children() {
             self.collect_layout_snapshot(&child, child_origin, result);
@@ -276,7 +344,12 @@ impl ViewGraph {
     // MARK: - Reconcile entry points
 
     /// Reconcile `parent.children` against the slot list produced by `new_views`.
-    pub fn reconcile_children(self: &Rc<Self>, parent: &Node, layout_parent: Option<&LayoutNode>, new_views: &[AnyView]) {
+    pub fn reconcile_children(
+        self: &Rc<Self>,
+        parent: &Node,
+        layout_parent: Option<&LayoutNode>,
+        new_views: &[AnyView],
+    ) {
         let flat = flatten_slots(new_views);
         let old_children = parent.children();
         if let Some(entries) = self.stable_children_fast_path(&flat, &old_children) {
@@ -325,7 +398,9 @@ impl ViewGraph {
             if !matches!(actions[index], Action::Create) || entry.key.is_some() {
                 continue;
             }
-            let Some(queue) = unkeyed_queues.get_mut(&entry.tag) else { continue };
+            let Some(queue) = unkeyed_queues.get_mut(&entry.tag) else {
+                continue;
+            };
             if let Some(picked) = queue.pop_skipping(&matched) {
                 matched.insert(picked.id());
                 actions[index] = Action::Reuse(picked);
@@ -365,7 +440,10 @@ impl ViewGraph {
         // Reorder layout siblings to match. Anchor nodes carry no LayoutNode,
         // so collect the top-level layout nodes they produced under this parent.
         if let Some(layout_parent) = layout_parent {
-            let ordered_layouts: Vec<LayoutNode> = ordered.iter().flat_map(|node| self.top_level_layouts(node)).collect();
+            let ordered_layouts: Vec<LayoutNode> = ordered
+                .iter()
+                .flat_map(|node| self.top_level_layouts(node))
+                .collect();
             if ordered_layouts.len() == layout_parent.children().len() {
                 layout_parent.reorder_children(&ordered_layouts);
             }
@@ -382,7 +460,11 @@ impl ViewGraph {
         self.render_tree.reconcile_children(parent);
     }
 
-    fn stable_children_fast_path(&self, flat: &[AnyView], old_children: &[Node]) -> Option<Vec<SlotInfo>> {
+    fn stable_children_fast_path(
+        &self,
+        flat: &[AnyView],
+        old_children: &[Node],
+    ) -> Option<Vec<SlotInfo>> {
         if flat.len() != old_children.len() {
             return None;
         }
@@ -403,7 +485,12 @@ impl ViewGraph {
 
     /// Refresh the properties of an already-materialised node from `view`, then
     /// recurse into its children. The caller has verified the slot tag.
-    pub fn update_in_place(self: &Rc<Self>, node: &Node, view: &AnyView, layout_parent: Option<&LayoutNode>) {
+    pub fn update_in_place(
+        self: &Rc<Self>,
+        node: &Node,
+        view: &AnyView,
+        layout_parent: Option<&LayoutNode>,
+    ) {
         let inner = view.storage.as_ref();
         if let Some(any) = inner.as_any().downcast_ref::<AnyView>() {
             self.update_in_place(node, any, layout_parent);
@@ -419,7 +506,11 @@ impl ViewGraph {
         }
         if let Some(identified) = inner.as_any().downcast_ref::<IdentifiedView>() {
             if is_direct_structural_content(identified.content.storage.as_ref()) {
-                self.reconcile_children(node, layout_parent, std::slice::from_ref(&identified.content));
+                self.reconcile_children(
+                    node,
+                    layout_parent,
+                    std::slice::from_ref(&identified.content),
+                );
             } else {
                 self.update_in_place(node, &identified.content, layout_parent);
             }
@@ -454,10 +545,14 @@ impl ViewGraph {
                     ModifierReplay::reset(node);
                     let same_inputs = self.environment_reasons.borrow().is_empty() && {
                         let scope = scope.borrow();
-                        crate::view_input_comparison::ViewInputComparison::equal(scope.view.storage.as_ref(), inner)
+                        crate::view_input_comparison::ViewInputComparison::equal(
+                            scope.view.storage.as_ref(),
+                            inner,
+                        )
                     };
                     if same_inputs {
-                        self.skipped_parent_updates.set(self.skipped_parent_updates.get() + 1);
+                        self.skipped_parent_updates
+                            .set(self.skipped_parent_updates.get() + 1);
                         return;
                     }
                     let mut reasons = Vec::new();
@@ -503,7 +598,12 @@ impl ViewGraph {
     // MARK: - Materialise
 
     /// Materialise `view` into `parent` and return the top-level nodes added.
-    pub fn materialise(self: &Rc<Self>, view: &AnyView, parent: &Node, layout_parent: Option<&LayoutNode>) -> Vec<Node> {
+    pub fn materialise(
+        self: &Rc<Self>,
+        view: &AnyView,
+        parent: &Node,
+        layout_parent: Option<&LayoutNode>,
+    ) -> Vec<Node> {
         let inner = view.storage.as_ref();
         if let Some(any) = inner.as_any().downcast_ref::<AnyView>() {
             return self.materialise(any, parent, layout_parent);
@@ -542,7 +642,9 @@ impl ViewGraph {
 
         match inner.kind() {
             // 3. Primitive (text / box / row / ...)
-            ViewKind::Primitive(primitive) => self.materialise_primitive(primitive, inner.tag(), parent, layout_parent),
+            ViewKind::Primitive(primitive) => {
+                self.materialise_primitive(primitive, inner.tag(), parent, layout_parent)
+            }
             // 4. ModifiedContent — forward to the type-erased helper.
             ViewKind::Modified(modified) => modified.materialise_into(parent, layout_parent, self),
             // 5. Structural (tuple / conditional / optional / array)
@@ -555,7 +657,13 @@ impl ViewGraph {
         }
     }
 
-    fn materialise_primitive(self: &Rc<Self>, primitive: &dyn PrimitiveView, tag: &'static str, parent: &Node, layout_parent: Option<&LayoutNode>) -> Vec<Node> {
+    fn materialise_primitive(
+        self: &Rc<Self>,
+        primitive: &dyn PrimitiveView,
+        tag: &'static str,
+        parent: &Node,
+        layout_parent: Option<&LayoutNode>,
+    ) -> Vec<Node> {
         let node = primitive.make_node();
         node.set_view_tag(Some(tag.to_string()));
         // Build the layout node and wire both trees BEFORE `update_node` so
@@ -564,7 +672,9 @@ impl ViewGraph {
         let layout = primitive.make_layout_node();
         if let Some(layout) = &layout {
             node.set_layout_node(Some(layout));
-            self.layout_of.borrow_mut().insert(node.id(), layout.clone());
+            self.layout_of
+                .borrow_mut()
+                .insert(node.id(), layout.clone());
             if let Some(parent) = layout_parent {
                 parent.add_child(layout);
             }
@@ -585,13 +695,24 @@ impl ViewGraph {
         vec![node]
     }
 
-    fn materialise_user_view(self: &Rc<Self>, view: &AnyView, parent: &Node, layout_parent: Option<&LayoutNode>) -> Vec<Node> {
+    fn materialise_user_view(
+        self: &Rc<Self>,
+        view: &AnyView,
+        parent: &Node,
+        layout_parent: Option<&LayoutNode>,
+    ) -> Vec<Node> {
         let anchor = Node::new();
         // Anchors are pass-through: no hit testing and no LayoutNode.
         anchor.set_is_hit_testable(false);
         anchor.set_view_tag(Some(slot_tag(view)));
         parent.add_child(&anchor);
-        let scope = Rc::new(RefCell::new(ViewScope::new(self, &anchor, view.clone(), layout_parent.cloned(), InvalidationLogHolder::current())));
+        let scope = Rc::new(RefCell::new(ViewScope::new(
+            self,
+            &anchor,
+            view.clone(),
+            layout_parent.cloned(),
+            InvalidationLogHolder::current(),
+        )));
         self.scopes.borrow_mut().insert(anchor.id(), scope.clone());
         ViewScope::install(&scope, self);
         vec![anchor]
@@ -625,7 +746,10 @@ impl ViewGraph {
         if let Some(layout) = self.layout_of.borrow().get(&node.id()).cloned() {
             return vec![layout];
         }
-        node.children().iter().flat_map(|child| self.top_level_layouts(child)).collect()
+        node.children()
+            .iter()
+            .flat_map(|child| self.top_level_layouts(child))
+            .collect()
     }
 }
 
@@ -698,7 +822,11 @@ pub(crate) fn slot_key(view: &dyn View) -> Option<NodeKey> {
 }
 
 fn classify(view: &AnyView) -> SlotInfo {
-    SlotInfo { view: view.clone(), tag: slot_tag(view), key: slot_key(view) }
+    SlotInfo {
+        view: view.clone(),
+        tag: slot_tag(view),
+        key: slot_key(view),
+    }
 }
 
 /// An identified tuple/conditional needs one keyed anchor. Do not unwrap
@@ -727,10 +855,17 @@ fn flatten_slots(views: &[AnyView]) -> Vec<AnyView> {
         }
         if let Some(source) = inner.as_any().downcast_ref::<SourceLocatedView>() {
             for entry in flatten_slots(std::slice::from_ref(&source.content)) {
-                if entry.as_any().downcast_ref::<SourceLocatedView>().is_some_and(|nested| !nested.location.explicit) {
+                if entry
+                    .as_any()
+                    .downcast_ref::<SourceLocatedView>()
+                    .is_some_and(|nested| !nested.location.explicit)
+                {
                     out.push(entry);
                 } else {
-                    out.push(AnyView::new(SourceLocatedView { content: entry, location: source.location.clone() }));
+                    out.push(AnyView::new(SourceLocatedView {
+                        content: entry,
+                        location: source.location.clone(),
+                    }));
                 }
             }
             continue;
@@ -786,7 +921,13 @@ pub(crate) struct ViewScope {
 }
 
 impl ViewScope {
-    fn new(graph: &Rc<ViewGraph>, anchor: &Node, view: AnyView, layout_parent: Option<LayoutNode>, invalidation_log: Option<std::sync::Arc<InvalidationLog>>) -> Self {
+    fn new(
+        graph: &Rc<ViewGraph>,
+        anchor: &Node,
+        view: AnyView,
+        layout_parent: Option<LayoutNode>,
+        invalidation_log: Option<std::sync::Arc<InvalidationLog>>,
+    ) -> Self {
         Self {
             graph: Rc::downgrade(graph),
             anchor: anchor.clone(),
@@ -844,32 +985,45 @@ impl ViewScope {
         let precise = view.storage.precise_state_reads();
         let weak_scope = Rc::downgrade(scope);
         let weak_graph = Rc::downgrade(graph);
-        let read_invalidation = LocalInvalidationHandle::with_id(
-            cove_core::ReadScopeId(anchor_id.0),
-            move |reason| {
-                let (Some(scope), Some(graph)) = (weak_scope.upgrade(), weak_graph.upgrade()) else {
+        let read_invalidation =
+            LocalInvalidationHandle::with_id(cove_core::ReadScopeId(anchor_id.0), move |reason| {
+                let (Some(scope), Some(graph)) = (weak_scope.upgrade(), weak_graph.upgrade())
+                else {
                     return;
                 };
                 Self::schedule(&scope, &graph, reason);
-            },
-        );
+            });
         let read_scope = read_invalidation.read_scope();
         for field in &fields {
             let weak_scope = Rc::downgrade(scope);
             let weak_graph = Rc::downgrade(graph);
             let name = field.name().to_string();
             let kind = field.diagnostic_kind().to_string();
-            field.wire(Rc::new(move || {
-                let (Some(scope), Some(graph)) = (weak_scope.upgrade(), weak_graph.upgrade()) else {
-                    return;
-                };
-                Self::schedule(&scope, &graph, RecompositionReason::new(kind.clone()).with_detail(name.clone()));
-            }), precise);
+            field.wire(
+                Rc::new(move || {
+                    let (Some(scope), Some(graph)) = (weak_scope.upgrade(), weak_graph.upgrade())
+                    else {
+                        return;
+                    };
+                    Self::schedule(
+                        &scope,
+                        &graph,
+                        RecompositionReason::new(kind.clone()).with_detail(name.clone()),
+                    );
+                }),
+                precise,
+            );
             field.wire_read_tracking(read_scope.clone(), precise);
             if let Some(read) = field.dev_tools_read() {
                 let stable = format!("{}:{}", anchor_id.0, field.name());
                 let value_type = field.dev_tools_value_type();
-                if let Some(token) = graph.state_registry.borrow_mut().register(Some(stable), field.name(), &value_type, Some(anchor_id.0.to_string()), move || read()) {
+                if let Some(token) = graph.state_registry.borrow_mut().register(
+                    Some(stable),
+                    field.name(),
+                    &value_type,
+                    Some(anchor_id.0.to_string()),
+                    move || read(),
+                ) {
                     registrations.push(token);
                 }
             }
@@ -881,19 +1035,32 @@ impl ViewScope {
     }
 
     /// Re-evaluate body and reconcile against the existing anchor children.
-    fn recompose(scope: &Rc<RefCell<Self>>, graph: &Rc<ViewGraph>, reasons: Vec<RecompositionReason>) {
+    fn recompose(
+        scope: &Rc<RefCell<Self>>,
+        graph: &Rc<ViewGraph>,
+        reasons: Vec<RecompositionReason>,
+    ) {
         let Some((anchor, layout_parent, tag)) = ({
             let scope = scope.borrow();
             if !scope.installed {
                 None
             } else {
-                Some((scope.anchor.clone(), scope.layout_parent.clone(), scope.anchor.view_tag().unwrap_or_else(|| "Component".to_string())))
+                Some((
+                    scope.anchor.clone(),
+                    scope.layout_parent.clone(),
+                    scope
+                        .anchor
+                        .view_tag()
+                        .unwrap_or_else(|| "Component".to_string()),
+                ))
             }
         }) else {
             return;
         };
         let start = std::time::Instant::now();
-        let previous = graph.active_recomposition_scope.replace(Some(anchor.id().0));
+        let previous = graph
+            .active_recomposition_scope
+            .replace(Some(anchor.id().0));
         let trace = graph.timeline_begin();
         let body = Self::body(scope);
         ObservableStateTracking::observe_reads(|| {
@@ -902,7 +1069,13 @@ impl ViewScope {
         graph.active_recomposition_scope.set(previous);
         ModifierReplay::apply_from(&anchor, graph);
         Self::record_timing(scope, graph, start, false, &reasons);
-        graph.timeline_end(trace, "component", &tag, Some(anchor.id().0.to_string()), &reasons);
+        graph.timeline_end(
+            trace,
+            "component",
+            &tag,
+            Some(anchor.id().0.to_string()),
+            &reasons,
+        );
     }
 
     /// Swap in a new view value while keeping previously-wired state values
@@ -911,7 +1084,10 @@ impl ViewScope {
         let old_fields = scope.borrow().fields.clone();
         let new_fields = new_view.dynamic_properties();
         for field in &new_fields {
-            if let Some(previous) = old_fields.iter().find(|previous| previous.name() == field.name()) {
+            if let Some(previous) = old_fields
+                .iter()
+                .find(|previous| previous.name() == field.name())
+            {
                 field.copy_value_from(previous);
             }
         }
@@ -933,7 +1109,9 @@ impl ViewScope {
             (scope.anchor.clone(), scope.layout_parent.clone())
         };
         let start = std::time::Instant::now();
-        let previous = graph.active_recomposition_scope.replace(Some(anchor.id().0));
+        let previous = graph
+            .active_recomposition_scope
+            .replace(Some(anchor.id().0));
         let trace = graph.timeline_begin();
         let body = Self::body(scope);
         ObservableStateTracking::observe_reads(|| {
@@ -942,15 +1120,29 @@ impl ViewScope {
         graph.active_recomposition_scope.set(previous);
         Self::record_timing(scope, graph, start, true, &[]);
         let tag = anchor.view_tag().unwrap_or_else(|| "Component".to_string());
-        graph.timeline_end(trace, "component", &tag, Some(anchor.id().0.to_string()), &[]);
+        graph.timeline_end(
+            trace,
+            "component",
+            &tag,
+            Some(anchor.id().0.to_string()),
+            &[],
+        );
     }
 
-    fn record_timing(scope: &Rc<RefCell<Self>>, graph: &Rc<ViewGraph>, start: std::time::Instant, initial: bool, reasons: &[RecompositionReason]) {
+    fn record_timing(
+        scope: &Rc<RefCell<Self>>,
+        graph: &Rc<ViewGraph>,
+        start: std::time::Instant,
+        initial: bool,
+        reasons: &[RecompositionReason],
+    ) {
         if !graph.tracks_recomposition.get() {
             return;
         }
         let anchor = scope.borrow().anchor.clone();
-        let mut metrics = anchor.recomposition_metrics().unwrap_or_else(ComponentRecompositionMetrics::new);
+        let mut metrics = anchor
+            .recomposition_metrics()
+            .unwrap_or_else(ComponentRecompositionMetrics::new);
         let milliseconds = start.elapsed().as_secs_f64() * 1000.0;
         metrics.record(milliseconds, initial, reasons);
         anchor.set_recomposition_metrics(Some(metrics));
@@ -1016,7 +1208,8 @@ impl ViewScope {
             context.disables_animations,
             reason,
             move |reasons| {
-                let (Some(scope), Some(graph)) = (weak_scope.upgrade(), weak_graph.upgrade()) else {
+                let (Some(scope), Some(graph)) = (weak_scope.upgrade(), weak_graph.upgrade())
+                else {
                     return;
                 };
                 Self::recompose(&scope, &graph, reasons.to_vec());
@@ -1026,7 +1219,15 @@ impl ViewScope {
 
     fn record_state_write(scope: &Rc<RefCell<Self>>) {
         let scope = scope.borrow();
-        let Some(log) = &scope.invalidation_log else { return };
-        log.record(DirtyReason::new(scope.anchor.id(), InvalidationSource::StateWrite { scope: scope.anchor.id().0 }, InvalidationPhase::Layout));
+        let Some(log) = &scope.invalidation_log else {
+            return;
+        };
+        log.record(DirtyReason::new(
+            scope.anchor.id(),
+            InvalidationSource::StateWrite {
+                scope: scope.anchor.id().0,
+            },
+            InvalidationPhase::Layout,
+        ));
     }
 }

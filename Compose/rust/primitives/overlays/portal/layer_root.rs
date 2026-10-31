@@ -7,8 +7,10 @@
 //! may use, so an overlay can never be trapped behind window chrome regardless
 //! of authoring order.
 
-use cove_composition::{impl_primitive_view, AnyView, LayoutDebugAttachmentKey, PrimitiveView, View, ViewExt};
 use crate::modifiers::style::AppearanceExt;
+use cove_composition::{
+    AnyView, LayoutDebugAttachmentKey, PrimitiveView, View, ViewExt, impl_primitive_view,
+};
 use cove_core::scene::{Align, Display, Edge, FlexDirection, LayoutNode, Node, PositionType};
 
 use super::portal_host::PortalHost;
@@ -29,16 +31,23 @@ impl LayerRoot {
     }
 
     pub fn with_portals(content: impl View + 'static, portals: impl View + 'static) -> Self {
-        Self { content: AnyView::new(content), portals: AnyView::new(portals) }
+        Self {
+            content: AnyView::new(content),
+            portals: AnyView::new(portals),
+        }
     }
 }
 
 impl View for LayerRoot {
     fn body(&self) -> AnyView {
-        let content = AnyView::new(LayerRootContent { content: self.content.clone() });
+        let content = AnyView::new(LayerRootContent {
+            content: self.content.clone(),
+        });
         let portals = AnyView::new(
-            AnyView::new(PortalLayer { content: self.portals.clone() })
-                .z_index(PORTAL_LAYER_Z_INDEX),
+            AnyView::new(PortalLayer {
+                content: self.portals.clone(),
+            })
+            .z_index(PORTAL_LAYER_Z_INDEX),
         );
         AnyView::new(cove_composition::TupleView::new(vec![content, portals]))
     }
@@ -57,7 +66,10 @@ impl PrimitiveView for LayerRootContent {
     fn make_node(&self) -> Node {
         let node = Node::new();
         node.set_is_hit_testable(false);
-        node.set_attachment(LayoutDebugAttachmentKey::LAYOUT_ROLE, "layer-root".to_owned());
+        node.set_attachment(
+            LayoutDebugAttachmentKey::LAYOUT_ROLE,
+            "layer-root".to_owned(),
+        );
         node
     }
 
@@ -89,7 +101,10 @@ impl PrimitiveView for PortalLayer {
     fn make_node(&self) -> Node {
         let node = Node::new();
         node.set_is_hit_testable(false);
-        node.set_attachment(LayoutDebugAttachmentKey::LAYOUT_ROLE, "portal-layer".to_owned());
+        node.set_attachment(
+            LayoutDebugAttachmentKey::LAYOUT_ROLE,
+            "portal-layer".to_owned(),
+        );
         node
     }
 

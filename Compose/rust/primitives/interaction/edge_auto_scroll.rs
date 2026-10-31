@@ -7,10 +7,8 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use cove_core::scene::{
-    AnyAnimationController, AnimatorScheduler, Node, NodeResource, Rect,
-};
 use cove_core::Point;
+use cove_core::scene::{AnimatorScheduler, AnyAnimationController, Node, NodeResource, Rect};
 
 /// Points per second at the very edge.
 pub const MAXIMUM_SPEED: f32 = 1200.0;
@@ -94,8 +92,12 @@ impl EdgeAutoScroll {
 
     /// Starts tracking; `on_scroll` runs after every automatic scroll step.
     pub fn begin(self: &Rc<Self>, pointer_y: f32, on_scroll: Rc<dyn Fn()>) {
-        let Some(owner) = self.state.owner.borrow().clone() else { return };
-        let Some(scroll) = enclosing_scroll(&owner) else { return };
+        let Some(owner) = self.state.owner.borrow().clone() else {
+            return;
+        };
+        let Some(scroll) = enclosing_scroll(&owner) else {
+            return;
+        };
         self.state.start_offset.set(scroll.content_offset().y);
         self.state.pointer_y.set(pointer_y);
         *self.state.scroll.borrow_mut() = Some(scroll);
@@ -117,9 +119,10 @@ impl EdgeAutoScroll {
     pub fn end(&self) {
         *self.state.scroll.borrow_mut() = None;
         *self.state.on_scroll.borrow_mut() = None;
-        if let (Some(scheduler), Some(controller)) =
-            (self.scheduler.borrow().as_ref(), self.controller.borrow().as_ref())
-        {
+        if let (Some(scheduler), Some(controller)) = (
+            self.scheduler.borrow().as_ref(),
+            self.controller.borrow().as_ref(),
+        ) {
             scheduler.unregister(controller);
         }
         self.controller.borrow_mut().take();
@@ -131,7 +134,9 @@ fn tick(state: &EdgeAutoScrollState, delta_time: f64) {
     if state.is_finished.get() || !delta_time.is_finite() || delta_time < 0.0 {
         return;
     }
-    let Some(scroll) = state.scroll.borrow().clone() else { return };
+    let Some(scroll) = state.scroll.borrow().clone() else {
+        return;
+    };
     let viewport = crate::primitives::layout::scroll_view::visible_viewport_rect(&scroll);
     let speed = velocity(state.pointer_y.get(), viewport);
     if speed == 0.0 {

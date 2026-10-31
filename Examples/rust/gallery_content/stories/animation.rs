@@ -73,8 +73,8 @@ impl cove_ui_compose::View for AnimationStory {
         use cove_ui_compose::modifiers::layout::FlexExt;
         use cove_ui_compose::primitives::feedback::Alert;
         use cove_ui_compose::primitives::text::Text;
-        use cove_ui_compose::theme::styles::buttons::button_style::ButtonStyleViewExt;
         use cove_ui_compose::theme::styles::buttons::SecondaryButtonStyle;
+        use cove_ui_compose::theme::styles::buttons::button_style::ButtonStyleViewExt;
         use cove_ui_compose::{AnyView, BoxView, LayoutDebugExt, TupleView};
 
         use crate::gallery_content::stories::StorySection;
@@ -82,11 +82,12 @@ impl cove_ui_compose::View for AnimationStory {
         let enabled = self.options.is_enabled;
         let toggle_label = self.toggle_label();
         let visible = self.visible.clone();
-        let toggle = cove_ui_compose::primitives::controls::Button::title(toggle_label, move || {
-            visible.update(|value| *value = !*value);
-        })
-        .enabled(enabled)
-        .button_style(SecondaryButtonStyle);
+        let toggle =
+            cove_ui_compose::primitives::controls::Button::title(toggle_label, move || {
+                visible.update(|value| *value = !*value);
+            })
+            .enabled(enabled)
+            .button_style(SecondaryButtonStyle);
 
         // The retained subtree survives its exit animation.
         let animated = self.content();
@@ -107,7 +108,9 @@ impl cove_ui_compose::View for AnimationStory {
                             .message("Try toggling repeatedly during the transition.")
                             .tone(cove_ui_compose::primitives::feedback::StatusTone::Success),
                     ),
-                    AnyView::new(Text::new("Timing curves and the animation system are exercised by the sections below.")),
+                    AnyView::new(Text::new(
+                        "Timing curves and the animation system are exercised by the sections below.",
+                    )),
                 ])),
             )),
         );
@@ -121,8 +124,12 @@ impl cove_ui_compose::View for AnimationStory {
                 24.0,
                 AnyView::new(TupleView::new(vec![
                     AnyView::new(section),
-                    AnyView::new(crate::gallery_content::stories::AnimationCurveExamples::new(enabled)),
-                    AnyView::new(crate::gallery_content::stories::AnimationSystemExamples::new(enabled)),
+                    AnyView::new(
+                        crate::gallery_content::stories::AnimationCurveExamples::new(enabled),
+                    ),
+                    AnyView::new(
+                        crate::gallery_content::stories::AnimationSystemExamples::new(enabled),
+                    ),
                 ])),
             )
             .flex(0.0)

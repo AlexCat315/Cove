@@ -43,15 +43,30 @@ pub struct RadioChoice {
 
 /// The radio story's four options, in authored order.
 pub const RADIO_CHOICES: [RadioChoice; 4] = [
-    RadioChoice { id: "fast", title: "Fast", detail: Some("Prefer lower latency"), is_enabled: true },
+    RadioChoice {
+        id: "fast",
+        title: "Fast",
+        detail: Some("Prefer lower latency"),
+        is_enabled: true,
+    },
     RadioChoice {
         id: "balanced",
         title: "Balanced",
         detail: Some("Balance quality and speed"),
         is_enabled: true,
     },
-    RadioChoice { id: "offline", title: "Unavailable", detail: None, is_enabled: false },
-    RadioChoice { id: "quality", title: "High quality", detail: None, is_enabled: true },
+    RadioChoice {
+        id: "offline",
+        title: "Unavailable",
+        detail: None,
+        is_enabled: false,
+    },
+    RadioChoice {
+        id: "quality",
+        title: "High quality",
+        detail: None,
+        is_enabled: true,
+    },
 ];
 
 /// Whether `value` looks like an email address the form accepts.
@@ -80,18 +95,54 @@ pub struct Airport {
 
 /// The directory's twelve airports.
 pub const AIRPORTS: [Airport; 12] = [
-    Airport { code: "PEK", name: "Beijing Capital" },
-    Airport { code: "PVG", name: "Shanghai Pudong" },
-    Airport { code: "HKG", name: "Hong Kong" },
-    Airport { code: "LHR", name: "London Heathrow" },
-    Airport { code: "CDG", name: "Paris Charles de Gaulle" },
-    Airport { code: "FRA", name: "Frankfurt" },
-    Airport { code: "BER", name: "Berlin Brandenburg" },
-    Airport { code: "NRT", name: "Tokyo Narita" },
-    Airport { code: "HND", name: "Tokyo Haneda" },
-    Airport { code: "SFO", name: "San Francisco" },
-    Airport { code: "JFK", name: "New York JFK" },
-    Airport { code: "SIN", name: "Singapore Changi" },
+    Airport {
+        code: "PEK",
+        name: "Beijing Capital",
+    },
+    Airport {
+        code: "PVG",
+        name: "Shanghai Pudong",
+    },
+    Airport {
+        code: "HKG",
+        name: "Hong Kong",
+    },
+    Airport {
+        code: "LHR",
+        name: "London Heathrow",
+    },
+    Airport {
+        code: "CDG",
+        name: "Paris Charles de Gaulle",
+    },
+    Airport {
+        code: "FRA",
+        name: "Frankfurt",
+    },
+    Airport {
+        code: "BER",
+        name: "Berlin Brandenburg",
+    },
+    Airport {
+        code: "NRT",
+        name: "Tokyo Narita",
+    },
+    Airport {
+        code: "HND",
+        name: "Tokyo Haneda",
+    },
+    Airport {
+        code: "SFO",
+        name: "San Francisco",
+    },
+    Airport {
+        code: "JFK",
+        name: "New York JFK",
+    },
+    Airport {
+        code: "SIN",
+        name: "Singapore Changi",
+    },
 ];
 
 /// The label the combobox shows for an airport.
@@ -123,7 +174,11 @@ pub fn search_airports(query: &str) -> Result<Vec<Airport>, &'static str> {
 /// The cities the local combobox offers.
 pub const CITY_OPTIONS: [(&str, &str, bool); 5] = [
     ("beijing", "北京 · Beijing", true),
-    ("shanghai", "上海 · Shanghai · International collaboration workspace 👩🏽‍💻", true),
+    (
+        "shanghai",
+        "上海 · Shanghai · International collaboration workspace 👩🏽‍💻",
+        true,
+    ),
     ("hongkong", "香港 · Hong Kong", true),
     ("london", "London", true),
     ("unavailable", "Unavailable", false),
@@ -160,7 +215,10 @@ pub struct RadioStory {
 
 impl RadioStory {
     pub fn new(options: GalleryOptions) -> Self {
-        Self { options, selection: State::new(Some(DEFAULT_MODE.to_owned())) }
+        Self {
+            options,
+            selection: State::new(Some(DEFAULT_MODE.to_owned())),
+        }
     }
 
     pub fn selection(&self) -> Option<String> {

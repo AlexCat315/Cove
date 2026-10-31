@@ -10,7 +10,19 @@ pub struct ElevationScale {
     pub floating: LayeredShadow,
 }
 impl ElevationScale {
-    pub fn new(none: SurfaceShadow, low: SurfaceShadow, medium: SurfaceShadow, high: SurfaceShadow, floating: LayeredShadow) -> Self {
-        Self { none, low, medium, high, floating }
+    pub fn new(
+        none: SurfaceShadow,
+        low: SurfaceShadow,
+        medium: SurfaceShadow,
+        high: SurfaceShadow,
+        floating: LayeredShadow,
+    ) -> Self {
+        Self {
+            none,
+            low,
+            medium,
+            high,
+            floating,
+        }
     }
 }

@@ -1,5 +1,5 @@
 //! Translation of NativeRHI/Resources/PipelineInterface.swift.
-use super::{rhi_require, RhiResult, ShaderStage};
+use super::{RhiResult, ShaderStage, rhi_require};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -19,8 +19,11 @@ pub struct BufferBindingLayout {
 impl BufferBindingLayout {
     /// The Swift memberwise default, usable from `const fn` descriptor
     /// builders.
-    pub const DEFAULT: Self =
-        Self { read_only: false, has_dynamic_offset: false, element_stride: 0 };
+    pub const DEFAULT: Self = Self {
+        read_only: false,
+        has_dynamic_offset: false,
+        element_stride: 0,
+    };
 }
 
 /// A logical small-constant slot. Vulkan packs ranges into push-constant bytes;
@@ -34,7 +37,11 @@ pub struct PushConstantRange {
 }
 impl PushConstantRange {
     pub fn new(stage: ShaderStage, slot: u32, byte_count: i64) -> Self {
-        Self { stage, slot, byte_count }
+        Self {
+            stage,
+            slot,
+            byte_count,
+        }
     }
 }
 
@@ -91,8 +98,12 @@ mod tests {
 
     #[test]
     fn push_constant_validation_enforces_alignment_uniqueness_and_budget() {
-        assert!(validate_push_constants(&[PushConstantRange::new(ShaderStage::Vertex, 0, 64)]).is_ok());
-        assert!(validate_push_constants(&[PushConstantRange::new(ShaderStage::Vertex, 0, 3)]).is_err());
+        assert!(
+            validate_push_constants(&[PushConstantRange::new(ShaderStage::Vertex, 0, 64)]).is_ok()
+        );
+        assert!(
+            validate_push_constants(&[PushConstantRange::new(ShaderStage::Vertex, 0, 3)]).is_err()
+        );
         assert!(
             validate_push_constants(&[
                 PushConstantRange::new(ShaderStage::Vertex, 0, 64),

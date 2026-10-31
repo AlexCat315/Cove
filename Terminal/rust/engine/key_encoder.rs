@@ -9,7 +9,9 @@ use crate::engine::ffi::{self, GhosttyKeyEncoder, GhosttyKeyEvent};
 use std::ptr;
 
 /// Keyboard modifiers as the terminal cares about them.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 #[serde(transparent)]
 pub struct KeyModifiers(pub u8);
 
@@ -73,16 +75,61 @@ pub struct TerminalKey {
 
 impl TerminalKey {
     pub fn new(scancode: u32) -> Self {
-        Self { scancode, ..Self::default() }
+        Self {
+            scancode,
+            ..Self::default()
+        }
     }
 }
 
 /// USB HID usage id -> W3C key code, as Ghostty names them.
 fn ghostty_key(scancode: u32) -> Option<i32> {
     use ffi::key::*;
-    const LETTERS: [i32; 26] = [A, A + 1, A + 2, A + 3, A + 4, A + 5, A + 6, A + 7, A + 8, A + 9, A + 10, A + 11, A + 12, A + 13, A + 14, A + 15, A + 16, A + 17, A + 18, A + 19, A + 20, A + 21, A + 22, A + 23, A + 24, A + 25];
-    const DIGITS: [i32; 10] = [DIGIT_1, DIGIT_2, DIGIT_3, DIGIT_4, DIGIT_5, DIGIT_6, DIGIT_7, DIGIT_8, DIGIT_9, DIGIT_0];
-    const FUNCTIONS: [i32; 12] = [F1, F1 + 1, F1 + 2, F1 + 3, F1 + 4, F1 + 5, F1 + 6, F1 + 7, F1 + 8, F1 + 9, F1 + 10, F1 + 11];
+    const LETTERS: [i32; 26] = [
+        A,
+        A + 1,
+        A + 2,
+        A + 3,
+        A + 4,
+        A + 5,
+        A + 6,
+        A + 7,
+        A + 8,
+        A + 9,
+        A + 10,
+        A + 11,
+        A + 12,
+        A + 13,
+        A + 14,
+        A + 15,
+        A + 16,
+        A + 17,
+        A + 18,
+        A + 19,
+        A + 20,
+        A + 21,
+        A + 22,
+        A + 23,
+        A + 24,
+        A + 25,
+    ];
+    const DIGITS: [i32; 10] = [
+        DIGIT_1, DIGIT_2, DIGIT_3, DIGIT_4, DIGIT_5, DIGIT_6, DIGIT_7, DIGIT_8, DIGIT_9, DIGIT_0,
+    ];
+    const FUNCTIONS: [i32; 12] = [
+        F1,
+        F1 + 1,
+        F1 + 2,
+        F1 + 3,
+        F1 + 4,
+        F1 + 5,
+        F1 + 6,
+        F1 + 7,
+        F1 + 8,
+        F1 + 9,
+        F1 + 10,
+        F1 + 11,
+    ];
     const KEYPAD: [i32; 16] = [
         NUMPAD_DIVIDE,
         NUMPAD_MULTIPLY,
@@ -145,7 +192,10 @@ fn ghostty_key(scancode: u32) -> Option<i32> {
     if (84..=99).contains(&scancode) {
         return Some(KEYPAD[(scancode - 84) as usize]);
     }
-    NAMED.iter().find(|(code, _)| *code == scancode).map(|(_, key)| *key)
+    NAMED
+        .iter()
+        .find(|(code, _)| *code == scancode)
+        .map(|(_, key)| *key)
 }
 
 /// Wraps a Ghostty key encoder so the bytes follow the terminal's live modes.
@@ -160,9 +210,14 @@ impl KeyEncoder {
         unsafe {
             let mut encoder: GhosttyKeyEncoder = ptr::null_mut();
             let mut event: GhosttyKeyEvent = ptr::null_mut();
-            let encoder_ok = ffi::ghostty_key_encoder_new(ptr::null(), &mut encoder) == ffi::GHOSTTY_SUCCESS;
-            let event_ok = ffi::ghostty_key_event_new(ptr::null(), &mut event) == ffi::GHOSTTY_SUCCESS;
-            Self { encoder: if encoder_ok { encoder } else { ptr::null_mut() }, event: if event_ok { event } else { ptr::null_mut() } }
+            let encoder_ok =
+                ffi::ghostty_key_encoder_new(ptr::null(), &mut encoder) == ffi::GHOSTTY_SUCCESS;
+            let event_ok =
+                ffi::ghostty_key_event_new(ptr::null(), &mut event) == ffi::GHOSTTY_SUCCESS;
+            Self {
+                encoder: if encoder_ok { encoder } else { ptr::null_mut() },
+                event: if event_ok { event } else { ptr::null_mut() },
+            }
         }
     }
 
@@ -180,7 +235,11 @@ impl KeyEncoder {
             ffi::ghostty_key_encoder_setopt_from_terminal(self.encoder, terminal);
             ffi::ghostty_key_event_set_action(
                 self.event,
-                if key.is_repeat { ffi::KEY_ACTION_REPEAT } else { ffi::KEY_ACTION_PRESS },
+                if key.is_repeat {
+                    ffi::KEY_ACTION_REPEAT
+                } else {
+                    ffi::KEY_ACTION_PRESS
+                },
             );
             ffi::ghostty_key_event_set_key(self.event, code);
             ffi::ghostty_key_event_set_mods(self.event, key.modifiers.to_ghostty());

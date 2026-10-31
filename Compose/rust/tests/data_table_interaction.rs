@@ -46,7 +46,10 @@ struct GridRow {
 fn model(rows: usize) -> Rc<DataTableModel<GridRow, usize>> {
     DataTableModel::new(
         (0..rows)
-            .map(|index| GridRow { id: index, value: index })
+            .map(|index| GridRow {
+                id: index,
+                value: index,
+            })
             .collect::<Vec<_>>(),
         |row: &GridRow| row.id,
     )
@@ -244,7 +247,13 @@ fn pointer_modifiers_and_keyboard_chords_share_one_selection() {
         DataTableSelectionMode::Multiple,
         KeyModifiers::LEFT_SHIFT,
     );
-    let ids: Vec<usize> = selection.lock().unwrap().selected_ids.iter().copied().collect();
+    let ids: Vec<usize> = selection
+        .lock()
+        .unwrap()
+        .selected_ids
+        .iter()
+        .copied()
+        .collect();
     assert_eq!(ids, vec![1, 2, 3], "the shifted click extends the run");
 
     // A gui-click on row 2 removes it from the run.
@@ -254,7 +263,13 @@ fn pointer_modifiers_and_keyboard_chords_share_one_selection() {
         DataTableSelectionMode::Multiple,
         KeyModifiers::LEFT_GUI,
     );
-    let ids: Vec<usize> = selection.lock().unwrap().selected_ids.iter().copied().collect();
+    let ids: Vec<usize> = selection
+        .lock()
+        .unwrap()
+        .selected_ids
+        .iter()
+        .copied()
+        .collect();
     assert_eq!(ids, vec![1, 3], "the toggle removed row 2");
 
     // Shift+ArrowDown extends from the focused row, the keyboard half.
@@ -303,7 +318,13 @@ fn a_selection_binding_can_drive_a_controlled_table() {
     binding.set(next);
 
     assert_eq!(
-        selection.lock().unwrap().selected_ids.iter().copied().collect::<Vec<_>>(),
+        selection
+            .lock()
+            .unwrap()
+            .selected_ids
+            .iter()
+            .copied()
+            .collect::<Vec<_>>(),
         vec![4],
         "a write through the binding reaches the caller's state"
     );

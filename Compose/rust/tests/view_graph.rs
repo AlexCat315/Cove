@@ -17,11 +17,9 @@ mod support;
 use std::cell::Cell;
 use std::rc::Rc;
 
-use cove_composition::{
-    AnyView, LayoutDebugExt, TupleView, View, ViewExt, ViewModifier,
-};
-use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
+use cove_composition::{AnyView, LayoutDebugExt, TupleView, View, ViewExt, ViewModifier};
 use cove_core::State;
+use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::{BoxView, Row, VerticalAlignment};
 
@@ -140,7 +138,10 @@ fn children(graph: &Rc<cove_composition::ViewGraph>) -> Vec<Node> {
 }
 
 fn first_child(graph: &Rc<cove_composition::ViewGraph>) -> Node {
-    children(graph).into_iter().next().expect("a materialised child")
+    children(graph)
+        .into_iter()
+        .next()
+        .expect("a materialised child")
 }
 
 /// The view's own materialised node below the anchor a user view introduces.
@@ -150,11 +151,7 @@ fn first_child(graph: &Rc<cove_composition::ViewGraph>) -> Node {
 /// descend one level. Primitive/structural roots have no anchor.
 fn body_child(graph: &Rc<cove_composition::ViewGraph>) -> Node {
     let anchor = first_child(graph);
-    anchor
-        .children()
-        .into_iter()
-        .next()
-        .unwrap_or(anchor)
+    anchor.children().into_iter().next().unwrap_or(anchor)
 }
 
 fn root_node(graph: &Rc<cove_composition::ViewGraph>) -> Node {
@@ -280,7 +277,10 @@ fn a_reorder_across_a_transparent_anchor_repositions_the_stable_leaf() {
             .into_iter()
             .find(|entry| entry.debug_name.as_deref() == Some("stable"))
             .expect("the stable leaf");
-        assert_eq!(stable.absolute_frame.x, 0.0, "only child starts at the origin");
+        assert_eq!(
+            stable.absolute_frame.x, 0.0,
+            "only child starts at the origin"
+        );
 
         show_leading.set(true);
         graph.recomposer.commit_all();
@@ -297,7 +297,10 @@ fn a_reorder_across_a_transparent_anchor_repositions_the_stable_leaf() {
             .iter()
             .find(|entry| entry.debug_name.as_deref() == Some("stable"))
             .expect("the stable leaf survives");
-        assert_eq!(leading.absolute_frame.x, 0.0, "the new leaf takes the origin");
+        assert_eq!(
+            leading.absolute_frame.x, 0.0,
+            "the new leaf takes the origin"
+        );
         assert_eq!(
             stable.absolute_frame.x, 40.0,
             "the stable leaf shifts right by the leading leaf's width"
@@ -311,7 +314,9 @@ fn a_state_write_recomposes_on_the_next_commit() {
         let value = State::new(1usize);
         let graph = support::graph();
         graph.install(
-            StateHarness { state: value.clone() },
+            StateHarness {
+                state: value.clone(),
+            },
             Default::default(),
         );
         assert_eq!(body_child(&graph).frame().x, 1.0);
@@ -336,7 +341,9 @@ fn several_writes_before_one_commit_collapse() {
         let value = State::new(0usize);
         let graph = support::graph();
         graph.install(
-            StateHarness { state: value.clone() },
+            StateHarness {
+                state: value.clone(),
+            },
             Default::default(),
         );
 
@@ -433,7 +440,10 @@ fn a_same_shape_recompose_reuses_the_node_and_its_attachments() {
 
         let graph = support::graph();
         graph.install(
-            Harness { value: value.clone(), counting },
+            Harness {
+                value: value.clone(),
+                counting,
+            },
             Default::default(),
         );
 
@@ -511,9 +521,7 @@ fn a_modifier_reapplies_to_the_reused_node() {
         }
         impl View for Harness {
             fn body(&self) -> AnyView {
-                AnyView::new(
-                    AnyView::new(Labelled(0)).modifier(MarkerModifier(self.y.get())),
-                )
+                AnyView::new(AnyView::new(Labelled(0)).modifier(MarkerModifier(self.y.get())))
             }
             fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
                 vec![cove_composition::DynamicField::state("y", &self.y)]

@@ -91,8 +91,13 @@ impl DataTableEditingState {
     ///
     /// `answer` is the caller's validation + lookup: it decides whether the row
     /// and column still exist and whether the value is acceptable.
-    pub fn commit(&mut self, answer: impl FnOnce(&DataTableCellDraft) -> CommitAnswer) -> CommitOutcome {
-        let Some(draft) = self.draft.clone() else { return CommitOutcome::NoDraft };
+    pub fn commit(
+        &mut self,
+        answer: impl FnOnce(&DataTableCellDraft) -> CommitAnswer,
+    ) -> CommitOutcome {
+        let Some(draft) = self.draft.clone() else {
+            return CommitOutcome::NoDraft;
+        };
         match answer(&draft) {
             CommitAnswer::Orphaned => {
                 self.draft = None;
@@ -117,7 +122,9 @@ impl DataTableEditingState {
 
     /// Whether the draft currently carries a validation error.
     pub fn has_error(&self) -> bool {
-        self.draft.as_ref().is_some_and(|draft| draft.error.is_some())
+        self.draft
+            .as_ref()
+            .is_some_and(|draft| draft.error.is_some())
     }
 
     /// The next editable column id from `column_id`, in `direction`, skipping
@@ -178,7 +185,9 @@ impl<Id: Clone + Eq> CellEditing<Id> {
     }
 
     pub fn is_editing(&self, row_id: &Id, column_id: &str) -> bool {
-        self.draft.as_ref().is_some_and(|draft| draft.is_for(row_id, column_id))
+        self.draft
+            .as_ref()
+            .is_some_and(|draft| draft.is_for(row_id, column_id))
     }
 
     pub fn error(&self) -> Option<&str> {

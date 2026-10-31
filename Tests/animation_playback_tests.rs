@@ -10,7 +10,9 @@ use std::rc::{Rc, Weak};
 fn opacity_animation(node: &Node, target: f32) {
     let current = node.opacity();
     let written = node.clone();
-    node.animatable_set_with("opacity", current, target, move |value| written.set_opacity(value));
+    node.animatable_set_with("opacity", current, target, move |value| {
+        written.set_opacity(value)
+    });
 }
 
 fn offset_animation(node: &Node, target: Point) {
@@ -26,8 +28,7 @@ fn finite_repetitions_count_complete_forward_reverse_cycles() {
     for autoreverses in [false, true] {
         let value = Rc::new(Cell::new(-1.0_f32));
         let written = value.clone();
-        let animation =
-            Animation::new(1.0, AnimationCurve::Linear).repeat_count(2, autoreverses);
+        let animation = Animation::new(1.0, AnimationCurve::Linear).repeat_count(2, autoreverses);
         let controller = AnimationController::new(0.0_f32, 10.0_f32, animation, 0.0, move |next| {
             written.set(next);
         });
@@ -74,9 +75,10 @@ fn forever_playback_preserves_delay_handles_dropped_frames_and_only_stops_explic
 fn invalid_ticks_are_ignored_and_invalid_or_zero_durations_snap_once() {
     let writes = Rc::new(Cell::new(0_usize));
     let counter = writes.clone();
-    let controller = AnimationController::new(0.0_f32, 1.0_f32, Animation::linear(), 0.0, move |_| {
-        counter.set(counter.get() + 1);
-    });
+    let controller =
+        AnimationController::new(0.0_f32, 1.0_f32, Animation::linear(), 0.0, move |_| {
+            counter.set(counter.get() + 1);
+        });
     for delta in [-1.0, f64::NAN, f64::INFINITY] {
         AnyAnimationController::tick(&*controller, delta);
     }
@@ -137,7 +139,11 @@ fn physical_spring_velocity_matches_the_derivative_and_equilibrium_remains_the_t
                 < 0.002
         );
         assert_eq!(
-            AnimationCurve::Spring { response: 0.4, damping_fraction: damping }.evaluate(1.0),
+            AnimationCurve::Spring {
+                response: 0.4,
+                damping_fraction: damping
+            }
+            .evaluate(1.0),
             1.0
         );
     }
@@ -173,12 +179,8 @@ fn retargeted_point_motion_preserves_both_components_of_real_value_velocity() {
         assert_eq!(scheduler.active_count(), 1);
         scheduler.tick(0.0001);
         let expected = SpringSolution::new(0.4, 0.6).velocity(0.08, 0.0, 0.0, 1.0);
-        assert!(
-            ((node.content_offset().x - before.x) / 0.0001 - expected * 100.0).abs() < 2.0
-        );
-        assert!(
-            ((node.content_offset().y - before.y) / 0.0001 - expected * 50.0).abs() < 2.0
-        );
+        assert!(((node.content_offset().x - before.x) / 0.0001 - expected * 100.0).abs() < 2.0);
+        assert!(((node.content_offset().y - before.y) / 0.0001 - expected * 50.0).abs() < 2.0);
         scheduler.tick(5.0);
         assert_eq!(node.content_offset(), Point::new(-20.0, 140.0));
         assert_eq!(scheduler.active_count(), 0);
@@ -194,9 +196,10 @@ fn unmount_cancels_a_forever_property_animation_immediately_and_suppresses_compl
         root.add_child(&node);
         let completions = Rc::new(Cell::new(0_usize));
         let count = completions.clone();
-        let group = AnimationCompletionGroup::new(AnimationCompletionCriteria::Removed, move || {
-            count.set(count.get() + 1)
-        });
+        let group =
+            AnimationCompletionGroup::new(AnimationCompletionCriteria::Removed, move || {
+                count.set(count.get() + 1)
+            });
         scheduler.track(group.clone());
         ActiveAnimationContext::with(
             Some(Animation::linear().repeat_forever(false)),
@@ -224,9 +227,7 @@ fn logical_spring_completion_precedes_physical_removal() {
             let node = Node::new();
             let completions = Rc::new(Cell::new(0_usize));
             let count = completions.clone();
-            let group = AnimationCompletionGroup::new(criteria, move || {
-                count.set(count.get() + 1)
-            });
+            let group = AnimationCompletionGroup::new(criteria, move || count.set(count.get() + 1));
             scheduler.track(group.clone());
             ActiveAnimationContext::with(
                 Some(Animation::spring(0.4, 0.6)),
@@ -237,7 +238,11 @@ fn logical_spring_completion_precedes_physical_removal() {
             scheduler.tick(0.4);
             assert_eq!(
                 completions.get(),
-                if criteria == AnimationCompletionCriteria::LogicallyComplete { 1 } else { 0 }
+                if criteria == AnimationCompletionCriteria::LogicallyComplete {
+                    1
+                } else {
+                    0
+                }
             );
             assert_eq!(scheduler.active_count(), 1);
             scheduler.tick(5.0);
@@ -257,22 +262,28 @@ fn cancelled_completion_groups_release_without_needing_another_scheduler_tick() 
         let retained: Rc<RefCell<Option<Weak<AnimationCompletionGroup>>>> =
             Rc::new(RefCell::new(None));
         {
-            let group =
-                AnimationCompletionGroup::new(AnimationCompletionCriteria::Removed, || {
-                    panic!("cancelled scope completed")
-                });
+            let group = AnimationCompletionGroup::new(AnimationCompletionCriteria::Removed, || {
+                panic!("cancelled scope completed")
+            });
             *retained.borrow_mut() = Some(Rc::downgrade(&group));
             scheduler.track(group.clone());
-            ActiveAnimationContext::with(
-                Some(Animation::linear()),
-                Some(group),
-                None,
-                || opacity_animation(&node, 0.0),
-            );
+            ActiveAnimationContext::with(Some(Animation::linear()), Some(group), None, || {
+                opacity_animation(&node, 0.0)
+            });
         }
-        assert!(retained.borrow().as_ref().is_some_and(|weak| weak.upgrade().is_some()));
+        assert!(
+            retained
+                .borrow()
+                .as_ref()
+                .is_some_and(|weak| weak.upgrade().is_some())
+        );
         root.remove_child(&node);
-        assert!(retained.borrow().as_ref().is_some_and(|weak| weak.upgrade().is_none()));
+        assert!(
+            retained
+                .borrow()
+                .as_ref()
+                .is_some_and(|weak| weak.upgrade().is_none())
+        );
         assert_eq!(scheduler.active_count(), 0);
     });
 }

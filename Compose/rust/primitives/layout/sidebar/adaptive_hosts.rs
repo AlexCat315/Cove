@@ -6,17 +6,17 @@
 //! return target and the backdrop owns dismissal.
 use std::rc::Rc;
 
+use crate::modifiers::style::AppearanceExt;
+use crate::primitives::overlays::modal::ModalDismissal;
+use crate::theme::theme_for_node;
+use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
+use cove_core::scene::ModalFocusResource;
 use cove_core::scene::{
     AccessibilityRole, AccessibilitySemantics, Align, EventResult, FocusChainHolder,
     InputHandlerRole, InputHandlerRoute, InputRoutingPriority, InteractionRegistryHolder, Node,
     PointerPhase,
 };
 use cove_platform::MouseButton;
-use crate::modifiers::style::AppearanceExt;
-use crate::primitives::overlays::modal::ModalDismissal;
-use cove_core::scene::ModalFocusResource;
-use crate::theme::theme_for_node;
-use crate::{impl_primitive_view, AnyView, PrimitiveView, View};
 
 use super::adaptive_options::SidebarGeometry;
 use super::focus_handoff::SidebarFocusHandoff;
@@ -29,8 +29,16 @@ pub struct SidebarShellHost {
 }
 
 impl SidebarShellHost {
-    pub fn new(geometry: SidebarGeometry, focus: Rc<SidebarFocusHandoff>, content: impl View + 'static) -> Self {
-        Self { geometry, focus, content: AnyView::new(content) }
+    pub fn new(
+        geometry: SidebarGeometry,
+        focus: Rc<SidebarFocusHandoff>,
+        content: impl View + 'static,
+    ) -> Self {
+        Self {
+            geometry,
+            focus,
+            content: AnyView::new(content),
+        }
     }
 }
 
@@ -53,7 +61,8 @@ impl PrimitiveView for SidebarShellHost {
 
     fn update_node(&self, node: &Node) {
         let chain = FocusChainHolder::current();
-        self.focus.prepare(self.geometry.mode, self.geometry.is_modal, chain.clone());
+        self.focus
+            .prepare(self.geometry.mode, self.geometry.is_modal, chain.clone());
         let focus = self.focus.clone();
         node.set_layout_did_update(Some(Rc::new(move |_owner: &Node| {
             focus.complete(FocusChainHolder::current());
@@ -121,7 +130,9 @@ impl PrimitiveView for SidebarLayer {
         let weak = node.downgrade();
         let chain_for_layout = chain.clone();
         node.set_layout_did_update(Some(Rc::new(move |owner: &Node| {
-            let Some(inner) = Node::upgrade(&weak) else { return };
+            let Some(inner) = Node::upgrade(&weak) else {
+                return;
+            };
             if is_modal {
                 if let Some(chain) = chain_for_layout.as_ref() {
                     chain.settle_scope(&inner);
@@ -135,19 +146,25 @@ impl PrimitiveView for SidebarLayer {
             let _ = owner;
         }) as cove_core::scene::LayoutUpdateHook));
 
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         let is_modal = self.geometry.is_modal;
         let closes_on_escape = self.dismissal.closes_on_escape;
         let on_dismiss = self.on_dismiss.clone();
-        registry.set_key(node, InputHandlerRoute::overlay(), Rc::new(move |event, _phase| {
-            if !is_modal || event.scancode != crate::Scancode::ESCAPE {
-                return EventResult::Ignored;
-            }
-            if closes_on_escape {
-                on_dismiss();
-            }
-            EventResult::Handled
-        }));
+        registry.set_key(
+            node,
+            InputHandlerRoute::overlay(),
+            Rc::new(move |event, _phase| {
+                if !is_modal || event.scancode != crate::Scancode::ESCAPE {
+                    return EventResult::Ignored;
+                }
+                if closes_on_escape {
+                    on_dismiss();
+                }
+                EventResult::Handled
+            }),
+        );
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
@@ -164,7 +181,10 @@ pub struct SidebarTriggerHost {
 
 impl SidebarTriggerHost {
     pub fn new(focus: Rc<SidebarFocusHandoff>, content: impl View + 'static) -> Self {
-        Self { focus, content: AnyView::new(content) }
+        Self {
+            focus,
+            content: AnyView::new(content),
+        }
     }
 }
 
@@ -197,7 +217,10 @@ pub struct SidebarBackdrop {
 
 impl SidebarBackdrop {
     pub fn new(dismissal: ModalDismissal, on_dismiss: impl Fn() + 'static) -> Self {
-        Self { dismissal, on_dismiss: Rc::new(on_dismiss) }
+        Self {
+            dismissal,
+            on_dismiss: Rc::new(on_dismiss),
+        }
     }
 }
 
@@ -219,7 +242,9 @@ impl PrimitiveView for SidebarBackdrop {
             is_hidden: true,
             ..Default::default()
         }));
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         let closes_on_backdrop = self.dismissal.closes_on_backdrop;
         let on_dismiss = self.on_dismiss.clone();
         registry.set_pointer(
@@ -242,13 +267,17 @@ impl PrimitiveView for SidebarBackdrop {
                 EventResult::Handled
             }),
         );
-        registry.set_wheel(node, InputHandlerRoute::overlay(), Rc::new(move |_event, phase| {
-            if phase == cove_core::scene::EventPhase::Capture {
-                EventResult::Ignored
-            } else {
-                EventResult::Handled
-            }
-        }));
+        registry.set_wheel(
+            node,
+            InputHandlerRoute::overlay(),
+            Rc::new(move |_event, phase| {
+                if phase == cove_core::scene::EventPhase::Capture {
+                    EventResult::Ignored
+                } else {
+                    EventResult::Handled
+                }
+            }),
+        );
     }
 }
 crate::impl_primitive_view!(SidebarBackdrop);

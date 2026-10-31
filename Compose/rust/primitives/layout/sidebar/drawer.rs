@@ -6,11 +6,10 @@
 use std::collections::HashSet;
 use std::rc::Rc;
 
-use cove_core::Binding;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, PaddingExt};
-use crate::modifiers::style::SemanticStyleViewExt;
 use crate::modifiers::style::AppearanceExt;
+use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::interaction::horizontal_swipe::{HorizontalSwipe, HorizontalSwipeDirection};
 use crate::primitives::overlays::modal::{
     Modal, ModalDismissal, ModalGeometry, ModalOptions, ModalPlacement,
@@ -18,6 +17,7 @@ use crate::primitives::overlays::modal::{
 use crate::primitives::text::Text;
 use crate::theme::SemanticFontRef;
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
+use cove_core::Binding;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 
 use super::items::SidebarSection;
@@ -131,29 +131,35 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
                     is_presented.set(false);
                 }
             })
-            .header(AnyView::new(
-                BoxView::new(
-                    FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 0.0,
-                    AnyView::new(TupleView::new(vec![
-                        AnyView::new(
-                            BoxView::new(
-                                FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 8.0,
-                                AnyView::new(TupleView::new(vec![
-                                    AnyView::new(SidebarToggle::new(close_label, true, {
-                                        let binding = self.is_presented.clone();
-                                        move || binding.set(false)
-                                    })),
-                                    AnyView::new(DrawerTitle {
-                                        title: title.clone(),
-                                    }),
-                                ])),
-                            )
-                            .padding_edges(12.0, 8.0),
-                        ),
-                        header.clone(),
-                    ])),
-                ),
-            ))
+            .header(AnyView::new(BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
+                AnyView::new(TupleView::new(vec![
+                    AnyView::new(
+                        BoxView::new(
+                            FlexDirection::Row,
+                            Align::Center,
+                            Justify::FlexStart,
+                            Wrap::NoWrap,
+                            8.0,
+                            AnyView::new(TupleView::new(vec![
+                                AnyView::new(SidebarToggle::new(close_label, true, {
+                                    let binding = self.is_presented.clone();
+                                    move || binding.set(false)
+                                })),
+                                AnyView::new(DrawerTitle {
+                                    title: title.clone(),
+                                }),
+                            ])),
+                        )
+                        .padding_edges(12.0, 8.0),
+                    ),
+                    header.clone(),
+                ])),
+            )))
             .footer(footer);
         if let Some(expanded) = expanded {
             sidebar = sidebar.expanded(expanded);
@@ -179,7 +185,9 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
         });
 
         AnyView::new(SwipeToggleAccessibility {
-            content: AnyView::new(Modal::new(self.is_presented.clone(), titled).options(modal_options)),
+            content: AnyView::new(
+                Modal::new(self.is_presented.clone(), titled).options(modal_options),
+            ),
             label: self.title.clone(),
             is_enabled: true,
         })
@@ -216,7 +224,9 @@ impl PrimitiveView for DrawerTitle {
 
     fn children(&self, _node: &cove_core::scene::Node) -> Vec<AnyView> {
         vec![AnyView::new(
-            Text::new(self.title.clone()).truncated().semantic_font(SemanticFontRef::body_strong()),
+            Text::new(self.title.clone())
+                .truncated()
+                .semantic_font(SemanticFontRef::body_strong()),
         )]
     }
 }
@@ -242,7 +252,9 @@ impl PrimitiveView for SwipeToggleAccessibility {
 
     fn update_node(&self, node: &cove_core::scene::Node) {
         let mut semantics = node.accessibility().unwrap_or_else(|| {
-            cove_core::scene::AccessibilitySemantics::new(cove_core::scene::AccessibilityRole::Group)
+            cove_core::scene::AccessibilitySemantics::new(
+                cove_core::scene::AccessibilityRole::Group,
+            )
         });
         semantics.label = self.label.clone();
         node.set_accessibility(Some(semantics));

@@ -3,8 +3,8 @@
 //! Swift source: `GalleryContent/Stories/Data/DateTableStories.swift`
 //! (`CalendarStory`).
 
-use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::State;
+use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::foundation::{Date, weekday_of};
 use cove_ui_compose::modifiers::layout::FlexExt;
 use cove_ui_compose::primitives::controls::calendar::{
@@ -44,7 +44,11 @@ pub fn gallery_calendar(is_enabled: bool, granularity: CalendarGranularity) -> C
 }
 
 /// The caption shown under a granularity calendar.
-pub fn granularity_line(title: &str, granularity: CalendarGranularity, value: Option<Date>) -> String {
+pub fn granularity_line(
+    title: &str,
+    granularity: CalendarGranularity,
+    value: Option<Date>,
+) -> String {
     let label = match value {
         Some(date) => granularity_label(granularity, date),
         None => "None".to_string(),
@@ -56,10 +60,9 @@ pub fn granularity_line(title: &str, granularity: CalendarGranularity, value: Op
 pub fn granularity_label(granularity: CalendarGranularity, date: Date) -> String {
     let parts = cove_ui_compose::foundation::Calendar::new().parts(date);
     match granularity {
-        CalendarGranularity::Day => format!(
-            "{:04}-{:02}-{:02}",
-            parts.year, parts.month, parts.day
-        ),
+        CalendarGranularity::Day => {
+            format!("{:04}-{:02}-{:02}", parts.year, parts.month, parts.day)
+        }
         CalendarGranularity::Week => {
             let (year, week) = cove_ui_compose::foundation::iso_week_of(date.epoch_day());
             format!("{year:04}-W{week:02}")
@@ -101,8 +104,18 @@ impl CalendarStory {
 /// `date.formatted(date: .long, time: .omitted)` in a fixed, locale-free form.
 pub fn format_date_long(date: Date) -> String {
     const MONTHS: [&str; 12] = [
-        "January", "February", "March", "April", "May", "June", "July", "August", "September",
-        "October", "November", "December",
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
     ];
     let parts = cove_ui_compose::foundation::Calendar::new().parts(date);
     let month = MONTHS
@@ -112,7 +125,9 @@ pub fn format_date_long(date: Date) -> String {
     format!("{month} {}, {}", parts.day, parts.year)
 }
 
-fn selection_binding(state: &State<Option<Date>>) -> (Rc<dyn Fn() -> Option<Date>>, Rc<dyn Fn(Option<Date>)>) {
+fn selection_binding(
+    state: &State<Option<Date>>,
+) -> (Rc<dyn Fn() -> Option<Date>>, Rc<dyn Fn(Option<Date>)>) {
     let read = {
         let state = state.clone();
         move || state.get()
@@ -168,13 +183,11 @@ impl View for GranularityCalendar {
 impl View for CalendarStory {
     fn body(&self) -> AnyView {
         let (read, write) = selection_binding(&self.date);
-        let day_calendar = AnyView::new(
-            CalendarView::new(
-                read,
-                write,
-                gallery_calendar(self.options.is_enabled, CalendarGranularity::Day),
-            ),
-        );
+        let day_calendar = AnyView::new(CalendarView::new(
+            read,
+            write,
+            gallery_calendar(self.options.is_enabled, CalendarGranularity::Day),
+        ));
         let selected = {
             let date = self.date.clone();
             AnyView::new(
@@ -285,7 +298,11 @@ mod checks {
         assert_eq!(options.granularity, CalendarGranularity::Day);
         let monday = date(19_723);
         assert!(options.availability.contains(monday, &options.calendar));
-        assert!(!options.availability.contains(date(19_723 + 5), &options.calendar));
+        assert!(
+            !options
+                .availability
+                .contains(date(19_723 + 5), &options.calendar)
+        );
     }
 
     #[test]

@@ -70,7 +70,12 @@ fn covers(x: f32, y: f32, list: &DrawList, color: Option<Color>) -> bool {
 }
 
 fn red() -> Color {
-    Color { r: 1.0, g: 0.0, b: 0.0, a: 1.0 }
+    Color {
+        r: 1.0,
+        g: 0.0,
+        b: 0.0,
+        a: 1.0,
+    }
 }
 
 fn rect(x: f32, y: f32, width: f32, height: f32) -> Rect {
@@ -81,28 +86,41 @@ fn rect(x: f32, y: f32, width: f32, height: f32) -> Rect {
 fn mask_cuts_corners() {
     let mut list = DrawList::default();
     list.push_mask(RoundedRect::new(rect(0.0, 0.0, 100.0, 50.0), 12.0));
-    list.add_rect(rect(0.0, 0.0, 100.0, 50.0), red()).expect("the background rect");
-    list.add_rect(rect(20.0, 20.0, 10.0, 10.0), red()).expect("the interior rect");
+    list.add_rect(rect(0.0, 0.0, 100.0, 50.0), red())
+        .expect("the background rect");
+    list.add_rect(rect(20.0, 20.0, 10.0, 10.0), red())
+        .expect("the interior rect");
     list.pop_mask();
 
     for (x, y) in [(1.0, 1.0), (99.0, 49.0), (99.0, 1.0)] {
-        assert!(!covers(x, y, &list, None), "({x},{y}) is outside the rounded corner");
+        assert!(
+            !covers(x, y, &list, None),
+            "({x},{y}) is outside the rounded corner"
+        );
     }
     for (x, y) in [(50.0, 25.0), (50.0, 1.0), (1.0, 25.0)] {
         assert!(covers(x, y, &list, None), "({x},{y}) survives the mask");
     }
-    assert!(covers(6.0, 6.0, &list, None), "a point inside the arc of a 12pt corner is covered");
+    assert!(
+        covers(6.0, 6.0, &list, None),
+        "a point inside the arc of a 12pt corner is covered"
+    );
 
     // The small interior rect passes through as its original two triangles.
-    list.add_rect(rect(0.0, 0.0, 4.0, 4.0), red()).expect("the corner rect");
-    assert!(covers(1.0, 1.0, &list, None), "the unmasked corner rect paints over the cut");
+    list.add_rect(rect(0.0, 0.0, 4.0, 4.0), red())
+        .expect("the corner rect");
+    assert!(
+        covers(1.0, 1.0, &list, None),
+        "the unmasked corner rect paints over the cut"
+    );
 }
 
 #[test]
 fn interpolation() {
     let mut list = DrawList::default();
     list.push_mask(RoundedRect::new(rect(0.0, 0.0, 100.0, 100.0), 50.0));
-    list.add_rect(rect(0.0, 0.0, 100.0, 100.0), red()).expect("the circular fill");
+    list.add_rect(rect(0.0, 0.0, 100.0, 100.0), red())
+        .expect("the circular fill");
 
     for vertex in &list.vertices()[4..] {
         let dx = vertex.x - 50.0;
@@ -117,16 +135,25 @@ fn interpolation() {
 #[test]
 fn appended_geometry() {
     let mut cached = DrawList::default();
-    cached.add_rect(rect(0.0, 0.0, 80.0, 40.0), red()).expect("the cached rect");
+    cached
+        .add_rect(rect(0.0, 0.0, 80.0, 40.0), red())
+        .expect("the cached rect");
 
     let mut frame = DrawList::default();
     frame.push_mask(RoundedRect::new(rect(0.0, 0.0, 80.0, 40.0), 10.0));
     frame.append(&cached, Point::default()).expect("the append");
 
-    assert!(!covers(1.0, 1.0, &frame, None), "the destination mask cuts the cached corner");
+    assert!(
+        !covers(1.0, 1.0, &frame, None),
+        "the destination mask cuts the cached corner"
+    );
     assert!(covers(40.0, 20.0, &frame, None), "the interior survives");
     let batched: u32 = frame.batches().iter().map(|batch| batch.index_count).sum();
-    assert_eq!(batched, frame.indices().len() as u32, "batch index counts sum to the index buffer");
+    assert_eq!(
+        batched,
+        frame.indices().len() as u32,
+        "batch index counts sum to the index buffer"
+    );
 }
 
 #[test]
@@ -145,24 +172,37 @@ fn straight_edge_glyph() {
     let mut visible: Vec<cove_core::Vertex> = Vec::new();
     for index in list.indices() {
         let vertex = list.vertices()[*index as usize];
-        if !visible.iter().any(|seen| seen.x == vertex.x && seen.y == vertex.y && seen.u == vertex.u) {
+        if !visible
+            .iter()
+            .any(|seen| seen.x == vertex.x && seen.y == vertex.y && seen.u == vertex.u)
+        {
             visible.push(vertex);
         }
     }
-    assert!(!visible.is_empty(), "the clipped glyph still emits geometry");
     assert!(
-        visible.iter().all(|vertex| vertex.x <= 100.0 && vertex.x >= 95.0),
+        !visible.is_empty(),
+        "the clipped glyph still emits geometry"
+    );
+    assert!(
+        visible
+            .iter()
+            .all(|vertex| vertex.x <= 100.0 && vertex.x >= 95.0),
         "every visible vertex stays within the glyph's x span",
     );
-    let edge: Vec<&cove_core::Vertex> =
-        visible.iter().filter(|vertex| (vertex.x - 100.0).abs() < 0.001).collect();
+    let edge: Vec<&cove_core::Vertex> = visible
+        .iter()
+        .filter(|vertex| (vertex.x - 100.0).abs() < 0.001)
+        .collect();
     assert!(!edge.is_empty(), "the cut edge emits vertices");
     assert!(
         edge.iter().all(|vertex| (vertex.u - 0.5).abs() < 0.001),
         "the cut edge interpolates u exactly halfway",
     );
     assert!(covers(97.0, 45.0, &list, None));
-    assert!(!covers(103.0, 45.0, &list, None), "geometry past the mask edge is not covered");
+    assert!(
+        !covers(103.0, 45.0, &list, None),
+        "geometry past the mask edge is not covered"
+    );
 }
 
 #[test]
@@ -171,24 +211,43 @@ fn invisible_geometry() {
 
     let mut outside = DrawList::default();
     outside.push_mask(clip);
-    outside.add_rect(rect(150.0, 20.0, 10.0, 10.0), red()).expect("the far rect");
-    assert!(outside.indices().is_empty(), "fully clipped geometry drops its indices");
+    outside
+        .add_rect(rect(150.0, 20.0, 10.0, 10.0), red())
+        .expect("the far rect");
+    assert!(
+        outside.indices().is_empty(),
+        "fully clipped geometry drops its indices"
+    );
     assert!(outside.batches().is_empty(), "and its batches");
-    assert_eq!(outside.vertices().len(), 4, "the vertices are retained for cache bounds");
     assert_eq!(
-        outside.vertices().iter().map(|vertex| vertex.x).fold(f32::NEG_INFINITY, f32::max),
+        outside.vertices().len(),
+        4,
+        "the vertices are retained for cache bounds"
+    );
+    assert_eq!(
+        outside
+            .vertices()
+            .iter()
+            .map(|vertex| vertex.x)
+            .fold(f32::NEG_INFINITY, f32::max),
         160.0,
     );
 
     let mut cached = DrawList::default();
     for x in [-30.0_f32, 40.0, 130.0] {
-        cached.add_rect(rect(x, 40.0, 10.0, 10.0), red()).expect("a cached rect");
+        cached
+            .add_rect(rect(x, 40.0, 10.0, 10.0), red())
+            .expect("a cached rect");
     }
     let mut frame = DrawList::default();
     frame.push_mask(clip);
     frame.append(&cached, Point::default()).expect("the append");
 
-    assert_eq!(frame.indices().len(), 6, "only the visible cached rect keeps its indices");
+    assert_eq!(
+        frame.indices().len(),
+        6,
+        "only the visible cached rect keeps its indices"
+    );
     assert_eq!(frame.vertices().len(), cached.vertices().len());
     assert!(covers(45.0, 45.0, &frame, None));
     assert!(!covers(-25.0, 45.0, &frame, None));
@@ -211,14 +270,34 @@ fn preclipped_geometry() {
     frame.push_clip(clip);
     frame.append_preclipped(&cached, &[clip], Point::default());
 
-    assert_eq!(frame.vertices().len(), cached.vertices().len(), "no retriangulation");
     assert_eq!(
-        frame.vertices().iter().map(|vertex| vertex.x).collect::<Vec<_>>(),
-        cached.vertices().iter().map(|vertex| vertex.x).collect::<Vec<_>>(),
+        frame.vertices().len(),
+        cached.vertices().len(),
+        "no retriangulation"
     );
     assert_eq!(
-        frame.vertices().iter().map(|vertex| vertex.y).collect::<Vec<_>>(),
-        cached.vertices().iter().map(|vertex| vertex.y).collect::<Vec<_>>(),
+        frame
+            .vertices()
+            .iter()
+            .map(|vertex| vertex.x)
+            .collect::<Vec<_>>(),
+        cached
+            .vertices()
+            .iter()
+            .map(|vertex| vertex.x)
+            .collect::<Vec<_>>(),
+    );
+    assert_eq!(
+        frame
+            .vertices()
+            .iter()
+            .map(|vertex| vertex.y)
+            .collect::<Vec<_>>(),
+        cached
+            .vertices()
+            .iter()
+            .map(|vertex| vertex.y)
+            .collect::<Vec<_>>(),
     );
     assert_eq!(frame.indices(), cached.indices());
     assert!(!covers(1.0, 1.0, &frame, None));
@@ -233,7 +312,10 @@ fn preclipped_geometry() {
     constrained.push_clip(extra);
     constrained.append_preclipped(&cached, &[clip], Point::default());
 
-    assert!(covers(50.0, 50.0, &constrained, None), "the extra clip does not hide the shared interior");
+    assert!(
+        covers(50.0, 50.0, &constrained, None),
+        "the extra clip does not hide the shared interior"
+    );
     assert!(!covers(20.0, 20.0, &constrained, None));
     assert!(!covers(40.5, 40.5, &constrained, None));
 }
@@ -273,14 +355,29 @@ fn nested_cache_coverage() {
         for pass in 0..6 {
             let mut frame = DrawList::default();
             renderer.render(&render, &mut frame);
-            assert!(covers(60.0, 12.0, &frame, None), "pass {pass}: the inner top edge is covered");
-            assert!(covers(60.0, 60.0, &frame, None), "pass {pass}: the centre is covered");
-            assert!(!covers(11.0, 11.0, &frame, None), "pass {pass}: the outer corner is cut");
-            assert!(!covers(109.0, 109.0, &frame, None), "pass {pass}: the far corner is cut");
+            assert!(
+                covers(60.0, 12.0, &frame, None),
+                "pass {pass}: the inner top edge is covered"
+            );
+            assert!(
+                covers(60.0, 60.0, &frame, None),
+                "pass {pass}: the centre is covered"
+            );
+            assert!(
+                !covers(11.0, 11.0, &frame, None),
+                "pass {pass}: the outer corner is cut"
+            );
+            assert!(
+                !covers(109.0, 109.0, &frame, None),
+                "pass {pass}: the far corner is cut"
+            );
             counts.push(frame.indices().len());
         }
         assert_eq!(
-            counts.iter().collect::<std::collections::BTreeSet<_>>().len(),
+            counts
+                .iter()
+                .collect::<std::collections::BTreeSet<_>>()
+                .len(),
             1,
             "the cached composite is stable across passes",
         );
@@ -294,7 +391,12 @@ fn container_parity() {
         let card = rc(10.0, 10.0, 120.0, 40.0);
         card.set_corner_radius(8.0);
         card.set_clips_to_bounds(true);
-        card.set_border_color(Some(Color { r: 0.0, g: 0.0, b: 1.0, a: 1.0 }));
+        card.set_border_color(Some(Color {
+            r: 0.0,
+            g: 0.0,
+            b: 1.0,
+            a: 1.0,
+        }));
         card.set_border_width(1.0);
         let chip = rc(0.0, 0.0, 30.0, 40.0);
         chip.set_background_color(Some(red()));
@@ -320,8 +422,14 @@ fn container_parity() {
                 !covers(10.5, 30.0, list, Some(red())),
                 "{label}: the border itself is not painted by the child fill",
             );
-            assert!(covers(25.0, 30.0, list, Some(red())), "{label}: ordinary content paints");
-            assert!(covers(16.0, 16.0, list, Some(red())), "{label}: content inside the arc paints");
+            assert!(
+                covers(25.0, 30.0, list, Some(red())),
+                "{label}: ordinary content paints"
+            );
+            assert!(
+                covers(16.0, 16.0, list, Some(red())),
+                "{label}: content inside the arc paints"
+            );
         }
     });
 }

@@ -21,7 +21,11 @@ pub struct TextFieldHoverAnchor {
 
 impl TextFieldHoverAnchor {
     pub fn new(character_index: usize, window_x: f32, window_y: f32) -> Self {
-        Self { character_index, window_x, window_y }
+        Self {
+            character_index,
+            window_x,
+            window_y,
+        }
     }
 }
 
@@ -36,8 +40,14 @@ pub struct TextFieldCaretState {
 
 impl TextFieldCaretState {
     pub fn new(caret_index: usize, selected_range: Option<(usize, usize)>) -> Self {
-        Self { caret_index, selected_range }
+        Self {
+            caret_index,
+            selected_range,
+        }
     }
 
-    pub const INITIAL: Self = Self { caret_index: 0, selected_range: None };
+    pub const INITIAL: Self = Self {
+        caret_index: 0,
+        selected_range: None,
+    };
 }

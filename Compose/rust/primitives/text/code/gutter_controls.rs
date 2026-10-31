@@ -14,27 +14,29 @@
 //! - every control carries a label and, for breakpoints, its selected state
 use std::rc::Rc;
 
-use cove_composition::{LayoutDebugExt, ViewExt};
-use cove_core::scene::{
-    AccessibilityRole, AccessibilitySemantics, Align, EventPhase, EventResult, FlexDirection,
-    InputHandlerRoute, InteractionRegistryHolder, Justify, LayoutNode, Node, Wrap,
-};
-use cove_core::State;
-use cove_platform::KeyEvent;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{AbsolutePositionModifier, FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::Button;
-use crate::primitives::media::{ui_icon_catalog, Icon};
+use crate::primitives::media::{Icon, ui_icon_catalog};
 use crate::primitives::overlays::roving_focus::{RovingFocusHost, RovingItem};
+use crate::primitives::text::Text;
 use crate::primitives::text::code::folding_options::TextFoldingLabels;
 use crate::primitives::text::code::gutter_geometry::{TextGutterControl, TextGutterControlKind};
-use crate::primitives::text::code::gutter_options::{TextBreakpoint, TextBreakpointState, TextEditorGutter};
+use crate::primitives::text::code::gutter_options::{
+    TextBreakpoint, TextBreakpointState, TextEditorGutter,
+};
 use crate::primitives::text::code::gutter_session::TextGutterSession;
-use crate::primitives::text::Text;
 use crate::theme::styles::buttons::ButtonStyleViewExt;
 use crate::theme::{SemanticColorRef, SemanticFontRef};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
+use cove_composition::{LayoutDebugExt, ViewExt};
+use cove_core::State;
+use cove_core::scene::{
+    AccessibilityRole, AccessibilitySemantics, Align, EventPhase, EventResult, FlexDirection,
+    InputHandlerRoute, InteractionRegistryHolder, Justify, LayoutNode, Node, Wrap,
+};
+use cove_platform::KeyEvent;
 
 /// A stable roving identity for a control id.
 fn control_token(id: &String) -> u64 {
@@ -106,116 +108,122 @@ impl TextGutterControls {
         let line = control.line;
         let is_tab_stop = first == Some(control.id.as_str());
 
-        let (content, label, is_selected, selected_state): (AnyView, String, Option<bool>, Option<bool>) =
-            match control.kind {
-                TextGutterControlKind::Breakpoint => {
-                    let breakpoint = self.breakpoint(line);
-                    let label = match &breakpoint {
-                        Some(_) => (self.gutter.labels.remove_breakpoint)(line),
-                        None => (self.gutter.labels.add_breakpoint)(line),
-                    };
-                    let glyph = breakpoint_glyph(
-                        breakpoint.as_ref(),
-                        self.gutter.execution_line == Some(line),
-                    );
-                    let toggle_session = session.clone();
-                    (
-                        AnyView::new(Button::new(glyph, move || toggle_session.toggle_breakpoint(line))),
-                        label,
-                        Some(breakpoint.is_some()),
-                        None,
-                    )
-                }
-                TextGutterControlKind::Fold | TextGutterControlKind::Summary => {
-                    let collapsed = self.session.folds().is_collapsed(line);
-                    let label = if collapsed {
-                        (self.folding_labels.expand)(line)
-                    } else {
-                        (self.folding_labels.collapse)(line)
-                    };
-                    let glyph = if control.kind == TextGutterControlKind::Summary {
-                        AnyView::new(
-                            AnyView::new(BoxView::new(
-                                FlexDirection::Row,
-                                Align::Center,
-                                Justify::FlexStart,
-                                Wrap::NoWrap,
-                                4.0,
-                                AnyView::new(
-                                    Text::new(format!("⋯ {}", control.count))
-                                        .semantic_font(SemanticFontRef::caption())
-                                        .semantic_foreground(SemanticColorRef::on_surface_muted()),
-                                ),
-                            ))
-                            .padding_edges(6.0, 0.0)
-                            .semantic_background(SemanticColorRef::state_layer_hover())
-                            .corner_radius(4.0),
-                        )
-                    } else {
-                        AnyView::new(Icon::with_semantic(
-                            if collapsed {
-                                ui_icon_catalog::navigation::chevron_right()
-                            } else {
-                                ui_icon_catalog::navigation::chevron_down()
-                            },
-                            16.0,
-                            SemanticColorRef::on_surface_muted(),
+        let (content, label, is_selected, selected_state): (
+            AnyView,
+            String,
+            Option<bool>,
+            Option<bool>,
+        ) = match control.kind {
+            TextGutterControlKind::Breakpoint => {
+                let breakpoint = self.breakpoint(line);
+                let label = match &breakpoint {
+                    Some(_) => (self.gutter.labels.remove_breakpoint)(line),
+                    None => (self.gutter.labels.add_breakpoint)(line),
+                };
+                let glyph = breakpoint_glyph(
+                    breakpoint.as_ref(),
+                    self.gutter.execution_line == Some(line),
+                );
+                let toggle_session = session.clone();
+                (
+                    AnyView::new(Button::new(glyph, move || {
+                        toggle_session.toggle_breakpoint(line)
+                    })),
+                    label,
+                    Some(breakpoint.is_some()),
+                    None,
+                )
+            }
+            TextGutterControlKind::Fold | TextGutterControlKind::Summary => {
+                let collapsed = self.session.folds().is_collapsed(line);
+                let label = if collapsed {
+                    (self.folding_labels.expand)(line)
+                } else {
+                    (self.folding_labels.collapse)(line)
+                };
+                let glyph = if control.kind == TextGutterControlKind::Summary {
+                    AnyView::new(
+                        AnyView::new(BoxView::new(
+                            FlexDirection::Row,
+                            Align::Center,
+                            Justify::FlexStart,
+                            Wrap::NoWrap,
+                            4.0,
+                            AnyView::new(
+                                Text::new(format!("⋯ {}", control.count))
+                                    .semantic_font(SemanticFontRef::caption())
+                                    .semantic_foreground(SemanticColorRef::on_surface_muted()),
+                            ),
                         ))
-                    };
-                    let toggle_session = session.clone();
+                        .padding_edges(6.0, 0.0)
+                        .semantic_background(SemanticColorRef::state_layer_hover())
+                        .corner_radius(4.0),
+                    )
+                } else {
+                    AnyView::new(Icon::with_semantic(
+                        if collapsed {
+                            ui_icon_catalog::navigation::chevron_right()
+                        } else {
+                            ui_icon_catalog::navigation::chevron_down()
+                        },
+                        16.0,
+                        SemanticColorRef::on_surface_muted(),
+                    ))
+                };
+                let toggle_session = session.clone();
+                (
+                    AnyView::new(Button::new(glyph, move || {
+                        toggle_session.toggle_fold(line);
+                    })),
+                    label,
+                    None,
+                    Some(!collapsed),
+                )
+            }
+            TextGutterControlKind::Markers => {
+                let markers = self
+                    .session
+                    .markers_by_line()
+                    .get(&line)
+                    .cloned()
+                    .unwrap_or_default();
+                if let [marker] = markers.as_slice() {
+                    let activate_session = session.clone();
+                    let id = marker.id.clone();
+                    let glyph = AnyView::new(Icon::new(marker.icon.clone(), 20.0));
+                    let label = marker.label.clone();
                     (
                         AnyView::new(Button::new(glyph, move || {
-                            toggle_session.toggle_fold(line);
+                            activate_session.activate_marker(&id);
                         })),
                         label,
                         None,
-                        Some(!collapsed),
+                        None,
+                    )
+                } else {
+                    (
+                        AnyView::new(
+                            Text::new(markers.len().to_string())
+                                .semantic_font(SemanticFontRef::caption())
+                                .semantic_foreground(SemanticColorRef::accent()),
+                        ),
+                        (self.gutter.labels.line_actions)(line),
+                        None,
+                        None,
                     )
                 }
-                TextGutterControlKind::Markers => {
-                    let markers = self
-                        .session
-                        .markers_by_line()
-                        .get(&line)
-                        .cloned()
-                        .unwrap_or_default();
-                    if let [marker] = markers.as_slice() {
-                        let activate_session = session.clone();
-                        let id = marker.id.clone();
-                        let glyph = AnyView::new(Icon::new(marker.icon.clone(), 20.0));
-                        let label = marker.label.clone();
-                        (
-                            AnyView::new(Button::new(glyph, move || {
-                                activate_session.activate_marker(&id);
-                            })),
-                            label,
-                            None,
-                            None,
-                        )
-                    } else {
-                        (
-                            AnyView::new(
-                                Text::new(markers.len().to_string())
-                                    .semantic_font(SemanticFontRef::caption())
-                                    .semantic_foreground(SemanticColorRef::accent()),
-                            ),
-                            (self.gutter.labels.line_actions)(line),
-                            None,
-                            None,
-                        )
-                    }
-                }
-                TextGutterControlKind::Combined => (
-                    AnyView::new(Icon::with_semantic(
-                        ui_icon_catalog::action::more_horizontal(),
-                        16.0,
-                        SemanticColorRef::on_surface_muted(),
-                    )),
-                    (self.gutter.labels.line_actions)(line),
-                    None,
-                    None,
-                ),
-            };
+            }
+            TextGutterControlKind::Combined => (
+                AnyView::new(Icon::with_semantic(
+                    ui_icon_catalog::action::more_horizontal(),
+                    16.0,
+                    SemanticColorRef::on_surface_muted(),
+                )),
+                (self.gutter.labels.line_actions)(line),
+                None,
+                None,
+            ),
+        };
 
         let role = AccessibilityRole::Button;
         AnyView::new(
@@ -223,8 +231,12 @@ impl TextGutterControls {
                 AnyView::new(content)
                     .button_style(crate::theme::styles::buttons::plain())
                     .frame(
-                        Some(crate::modifiers::layout::FrameDimension::Points(control.frame.width)),
-                        Some(crate::modifiers::layout::FrameDimension::Points(control.frame.height)),
+                        Some(crate::modifiers::layout::FrameDimension::Points(
+                            control.frame.width,
+                        )),
+                        Some(crate::modifiers::layout::FrameDimension::Points(
+                            control.frame.height,
+                        )),
                         None,
                         None,
                         None,
@@ -241,7 +253,11 @@ impl TextGutterControls {
                     semantics.state.is_expanded = Some(expanded);
                 }
             })
-            .modifier(RovingItem::new(control.id.clone(), is_tab_stop, Rc::new(control_token)))
+            .modifier(RovingItem::new(
+                control.id.clone(),
+                is_tab_stop,
+                Rc::new(control_token),
+            ))
             .modifier(AbsolutePositionModifier::new(
                 Some(control.frame.x),
                 Some(control.frame.y),
@@ -325,9 +341,9 @@ fn breakpoint_glyph(breakpoint: Option<&TextBreakpoint>, is_execution_line: bool
         }
         // A disabled breakpoint keeps a hollow ring in the muted tone; the
         // semantic border helper resolves it against the node's own theme.
-        Some(_) => AnyView::new(
-            dot.border_color(cove_core::Color::from_rgba8(120, 128, 140, 255), 1.5),
-        ),
+        Some(_) => {
+            AnyView::new(dot.border_color(cove_core::Color::from_rgba8(120, 128, 140, 255), 1.5))
+        }
         None => dot,
     };
     AnyView::new(
@@ -365,7 +381,9 @@ impl PrimitiveView for GutterKeyBoundary {
     }
 
     fn update_node(&self, node: &Node) {
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         let session = self.session.clone();
         let cursor_line = self.cursor_line;
         let character_count = self.character_count;

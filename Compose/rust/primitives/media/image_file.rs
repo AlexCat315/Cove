@@ -13,8 +13,8 @@ use cove_imaging::{
 };
 
 use super::image::Image;
-use super::image_geometry::{ImageContentMode, ImageRenderingMode};
 use super::image::ImageSource;
+use super::image_geometry::{ImageContentMode, ImageRenderingMode};
 use super::vector_image_raster::VectorImageRaster;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -40,8 +40,16 @@ pub struct ImageLoadDiagnostic {
 }
 
 impl ImageLoadDiagnostic {
-    pub fn new(path: impl Into<String>, reason: ImageLoadFailureReason, details: impl Into<String>) -> Self {
-        Self { path: path.into(), reason, details: details.into() }
+    pub fn new(
+        path: impl Into<String>,
+        reason: ImageLoadFailureReason,
+        details: impl Into<String>,
+    ) -> Self {
+        Self {
+            path: path.into(),
+            reason,
+            details: details.into(),
+        }
     }
 }
 
@@ -56,7 +64,11 @@ impl ImageLoadDiagnostics {
         DIAGNOSTIC_HANDLER.with(|slot| *slot.borrow_mut() = handler);
     }
 
-    pub fn emit(path: impl Into<String>, reason: ImageLoadFailureReason, details: impl Into<String>) {
+    pub fn emit(
+        path: impl Into<String>,
+        reason: ImageLoadFailureReason,
+        details: impl Into<String>,
+    ) {
         let event = ImageLoadDiagnostic::new(path, reason, details);
         DIAGNOSTIC_HANDLER.with(|slot| {
             if let Some(handler) = slot.borrow().as_ref() {
@@ -79,7 +91,11 @@ impl Image {
             .to_ascii_lowercase();
         let target = if extension == "svg" || extension == "pdf" {
             let density = cove_core::content_scale();
-            let scale = if density.is_finite() { density.max(1.0) } else { 1.0 };
+            let scale = if density.is_finite() {
+                density.max(1.0)
+            } else {
+                1.0
+            };
             let width = ((width * scale).round().max(1.0) as u32).min(16_384);
             let height = ((height * scale).round().max(1.0) as u32).min(16_384);
             PixelSize::new(width, height).ok()
@@ -98,12 +114,19 @@ impl Image {
                     ImageLoadFailureReason::DecodeFailed,
                     format!("using TextureId::none; image decode failed: {error}"),
                 );
-                ImageSource::Texture { texture_id: 0, size: None }
+                ImageSource::Texture {
+                    texture_id: 0,
+                    size: None,
+                }
             }
         }
     }
 
-    pub fn resolve_resource(resource: &BundleImageResource, width: f32, height: f32) -> ImageSource {
+    pub fn resolve_resource(
+        resource: &BundleImageResource,
+        width: f32,
+        height: f32,
+    ) -> ImageSource {
         match resource.path() {
             Some(path) => Self::resolve_path(path, width, height),
             None => {
@@ -112,7 +135,10 @@ impl Image {
                     ImageLoadFailureReason::ResourceNotFound,
                     "bundle resource path is nil",
                 );
-                ImageSource::Texture { texture_id: 0, size: None }
+                ImageSource::Texture {
+                    texture_id: 0,
+                    size: None,
+                }
             }
         }
     }
@@ -129,7 +155,11 @@ impl Image {
         let source = Self::resolve_path(path, width, height);
         let mut image = Self::new(source, width, height, tint, content_mode, rendering_mode);
         if matches!(
-            path.extension().and_then(|value| value.to_str()).unwrap_or("").to_ascii_lowercase().as_str(),
+            path.extension()
+                .and_then(|value| value.to_str())
+                .unwrap_or("")
+                .to_ascii_lowercase()
+                .as_str(),
             "svg" | "pdf"
         ) {
             image.vector_source_url = Some(path.to_path_buf());
@@ -154,7 +184,10 @@ impl Image {
                     "bundle resource path is nil",
                 );
                 Self::new(
-                    ImageSource::Texture { texture_id: 0, size: None },
+                    ImageSource::Texture {
+                        texture_id: 0,
+                        size: None,
+                    },
                     width,
                     height,
                     tint,

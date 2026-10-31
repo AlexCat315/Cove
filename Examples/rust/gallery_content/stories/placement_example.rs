@@ -6,12 +6,12 @@
 //! the side the placement asks for. The mirror math is ordinary arithmetic with
 //! three branches that are easy to transpose, so it lives here as a function.
 
-use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::State;
+use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
-use cove_ui_compose::primitives::overlays::PopoverPlacement;
 use cove_ui_compose::primitives::controls::button::Button;
+use cove_ui_compose::primitives::overlays::PopoverPlacement;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::SemanticColorRef;
 use cove_ui_compose::{AnyView, BoxView, TupleView, View, ViewExt};
@@ -39,18 +39,54 @@ pub struct PlacementVariant {
 /// The order matters: the grid lays them out by index, and the compact mirror
 /// classifies them by index ranges.
 pub const VARIANTS: [PlacementVariant; 12] = [
-    PlacementVariant { label: "TL", placement: PopoverPlacement::TopLeading },
-    PlacementVariant { label: "Top", placement: PopoverPlacement::Top },
-    PlacementVariant { label: "TR", placement: PopoverPlacement::TopTrailing },
-    PlacementVariant { label: "LT", placement: PopoverPlacement::LeadingTop },
-    PlacementVariant { label: "Left", placement: PopoverPlacement::Leading },
-    PlacementVariant { label: "LB", placement: PopoverPlacement::LeadingBottom },
-    PlacementVariant { label: "RT", placement: PopoverPlacement::TrailingTop },
-    PlacementVariant { label: "Right", placement: PopoverPlacement::Trailing },
-    PlacementVariant { label: "RB", placement: PopoverPlacement::TrailingBottom },
-    PlacementVariant { label: "BL", placement: PopoverPlacement::BottomLeading },
-    PlacementVariant { label: "Bottom", placement: PopoverPlacement::Bottom },
-    PlacementVariant { label: "BR", placement: PopoverPlacement::BottomTrailing },
+    PlacementVariant {
+        label: "TL",
+        placement: PopoverPlacement::TopLeading,
+    },
+    PlacementVariant {
+        label: "Top",
+        placement: PopoverPlacement::Top,
+    },
+    PlacementVariant {
+        label: "TR",
+        placement: PopoverPlacement::TopTrailing,
+    },
+    PlacementVariant {
+        label: "LT",
+        placement: PopoverPlacement::LeadingTop,
+    },
+    PlacementVariant {
+        label: "Left",
+        placement: PopoverPlacement::Leading,
+    },
+    PlacementVariant {
+        label: "LB",
+        placement: PopoverPlacement::LeadingBottom,
+    },
+    PlacementVariant {
+        label: "RT",
+        placement: PopoverPlacement::TrailingTop,
+    },
+    PlacementVariant {
+        label: "Right",
+        placement: PopoverPlacement::Trailing,
+    },
+    PlacementVariant {
+        label: "RB",
+        placement: PopoverPlacement::TrailingBottom,
+    },
+    PlacementVariant {
+        label: "BL",
+        placement: PopoverPlacement::BottomLeading,
+    },
+    PlacementVariant {
+        label: "Bottom",
+        placement: PopoverPlacement::Bottom,
+    },
+    PlacementVariant {
+        label: "BR",
+        placement: PopoverPlacement::BottomTrailing,
+    },
 ];
 
 /// Where the compact preview puts its trigger.
@@ -67,7 +103,11 @@ pub struct CompactAnchor {
 /// on the left, a trailing placement parks it at the left edge, and a centred
 /// placement splits the difference. Top placements sit low, side placements
 /// vertically centre, bottom placements sit at the top.
-pub fn compact_anchor(placement: PopoverPlacement, width: f32, trigger_width: f32) -> CompactAnchor {
+pub fn compact_anchor(
+    placement: PopoverPlacement,
+    width: f32,
+    trigger_width: f32,
+) -> CompactAnchor {
     use PopoverPlacement::*;
     let (justify, x) = match placement {
         LeadingTop | Leading | LeadingBottom => {
@@ -93,7 +133,9 @@ pub fn shows_full_grid(width: f32) -> bool {
 ///
 /// Capped at the viewport so a narrow window still shows a usable trigger.
 pub fn compact_trigger_width(width: f32, scale: f32) -> f32 {
-    width.min(COMPACT_TRIGGER_BASIS.max(scale.max(0.0) * COMPACT_TRIGGER_BASIS)).max(COMPACT_TRIGGER_FLOOR.min(width))
+    width
+        .min(COMPACT_TRIGGER_BASIS.max(scale.max(0.0) * COMPACT_TRIGGER_BASIS))
+        .max(COMPACT_TRIGGER_FLOOR.min(width))
 }
 
 /// `PopoverPlacementExample`: every named side, with a compact fallback.
@@ -144,17 +186,19 @@ impl View for PlacementExample {
         let enabled = self.options.is_enabled;
         let title = Text::new("Placement playground")
             .semantic_font(cove_ui_compose::theme::SemanticFontRef::body_strong());
-        let detail = Text::new("Named sides stay on that side. The card and pointer are shared with Popover.")
-            .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
-            .semantic_foreground(SemanticColorRef::on_surface_muted());
+        let detail = Text::new(
+            "Named sides stay on that side. The card and pointer are shared with Popover.",
+        )
+        .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
+        .semantic_foreground(SemanticColorRef::on_surface_muted());
 
         // The grid is only shown when the container is wide enough; below that
         // the compact selector takes over.
         let selected = self.selected.get();
-        let trigger = Button::title(
-            VARIANTS[selected].label,
-            { let this = self.selected.clone(); move || this.set((selected + 1) % VARIANTS.len()) },
-        )
+        let trigger = Button::title(VARIANTS[selected].label, {
+            let this = self.selected.clone();
+            move || this.set((selected + 1) % VARIANTS.len())
+        })
         .enabled(enabled);
 
         AnyView::new(StorySection::new(

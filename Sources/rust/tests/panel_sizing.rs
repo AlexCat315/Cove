@@ -12,33 +12,49 @@ mod workspace_support;
 use std::collections::BTreeMap;
 
 use cove_ui_addons::workspace::{
-    SplitConstraints, WorkspaceAxisSizing, WorkspaceCommand, WorkspaceController, WorkspaceDocument,
-    WorkspaceLayoutMetrics, WorkspaceLayoutNode, WorkspacePanel, WorkspacePanelID,
-    WorkspacePanelSizing, WorkspaceRect, WorkspaceSlot, WorkspaceSlotID, WorkspaceSlotKind,
-    WorkspaceSizingResolver, WorkspaceSplitAxis, WorkspaceTabGroup, WorkspaceTabGroupID,
+    SplitConstraints, WorkspaceAxisSizing, WorkspaceCommand, WorkspaceController,
+    WorkspaceDocument, WorkspaceLayoutMetrics, WorkspaceLayoutNode, WorkspacePanel,
+    WorkspacePanelID, WorkspacePanelSizing, WorkspaceRect, WorkspaceSizingResolver, WorkspaceSlot,
+    WorkspaceSlotID, WorkspaceSlotKind, WorkspaceSplitAxis, WorkspaceTabGroup, WorkspaceTabGroupID,
     WorkspaceTheme,
 };
 use workspace_support::{group_node, panel};
 
 fn panel_with(id: &str, sizing: WorkspacePanelSizing) -> WorkspacePanel {
-    WorkspacePanel { sizing, ..panel(id, id) }
+    WorkspacePanel {
+        sizing,
+        ..panel(id, id)
+    }
 }
 
 #[test]
 fn sizing_defaults_normalisation_and_document_round_trip() {
     let invalid = WorkspaceAxisSizing::new(-10.0, Some(f32::INFINITY), Some(f32::NAN));
-    assert_eq!(invalid, WorkspaceAxisSizing::default(), "non-finite values fall back");
+    assert_eq!(
+        invalid,
+        WorkspaceAxisSizing::default(),
+        "non-finite values fall back"
+    );
 
     let clamped = WorkspaceAxisSizing::new(100.0, Some(10.0), Some(80.0));
-    assert_eq!(clamped, WorkspaceAxisSizing::new(100.0, Some(100.0), Some(100.0)));
+    assert_eq!(
+        clamped,
+        WorkspaceAxisSizing::new(100.0, Some(100.0), Some(100.0))
+    );
 
     let decoded: WorkspacePanelSizing =
         serde_json::from_str(r#"{"width":{"minimum":180,"preferred":500,"maximum":320}}"#)
             .expect("panel sizing decodes");
-    assert_eq!(decoded.width, WorkspaceAxisSizing::new(180.0, Some(320.0), Some(320.0)));
+    assert_eq!(
+        decoded.width,
+        WorkspaceAxisSizing::new(180.0, Some(320.0), Some(320.0))
+    );
     assert_eq!(decoded.height, WorkspaceAxisSizing::default());
 
-    let inspector = WorkspacePanel { sizing: decoded, ..panel("inspector", "Inspector") };
+    let inspector = WorkspacePanel {
+        sizing: decoded,
+        ..panel("inspector", "Inspector")
+    };
     let descriptor = cove_ui_addons::workspace::WorkspacePanelDescriptor::new(
         WorkspacePanelID::new("inspector"),
         "Inspector",
@@ -62,7 +78,8 @@ fn sizing_defaults_normalisation_and_document_round_trip() {
     let document = WorkspaceDocument::new(panels, groups, slots);
 
     let encoded = serde_json::to_string(&document).expect("document encodes");
-    let round_tripped: WorkspaceDocument = serde_json::from_str(&encoded).expect("document decodes");
+    let round_tripped: WorkspaceDocument =
+        serde_json::from_str(&encoded).expect("document decodes");
     assert_eq!(round_tripped, document);
     assert_eq!(document.split_fractions.leading, None);
     assert!(
@@ -89,24 +106,33 @@ fn inactive_tabs_nested_splits_and_collapsed_groups_own_their_bounds() {
     let panels = BTreeMap::from([
         (
             WorkspacePanelID::new("a"),
-            panel_with("a", WorkspacePanelSizing::new(
-                WorkspaceAxisSizing::new(100.0, None, Some(500.0)),
-                WorkspaceAxisSizing::default(),
-            )),
+            panel_with(
+                "a",
+                WorkspacePanelSizing::new(
+                    WorkspaceAxisSizing::new(100.0, None, Some(500.0)),
+                    WorkspaceAxisSizing::default(),
+                ),
+            ),
         ),
         (
             WorkspacePanelID::new("b"),
-            panel_with("b", WorkspacePanelSizing::new(
-                WorkspaceAxisSizing::new(220.0, None, Some(350.0)),
-                WorkspaceAxisSizing::default(),
-            )),
+            panel_with(
+                "b",
+                WorkspacePanelSizing::new(
+                    WorkspaceAxisSizing::new(220.0, None, Some(350.0)),
+                    WorkspaceAxisSizing::default(),
+                ),
+            ),
         ),
         (
             WorkspacePanelID::new("c"),
-            panel_with("c", WorkspacePanelSizing::new(
-                WorkspaceAxisSizing::new(80.0, None, Some(200.0)),
-                WorkspaceAxisSizing::default(),
-            )),
+            panel_with(
+                "c",
+                WorkspacePanelSizing::new(
+                    WorkspaceAxisSizing::new(80.0, None, Some(200.0)),
+                    WorkspaceAxisSizing::default(),
+                ),
+            ),
         ),
     ]);
     let groups = BTreeMap::from([
@@ -119,7 +145,10 @@ fn inactive_tabs_nested_splits_and_collapsed_groups_own_their_bounds() {
         ),
         (
             WorkspaceTabGroupID::new("c"),
-            WorkspaceTabGroup::new(WorkspaceTabGroupID::new("c"), vec![WorkspacePanelID::new("c")]),
+            WorkspaceTabGroup::new(
+                WorkspaceTabGroupID::new("c"),
+                vec![WorkspacePanelID::new("c")],
+            ),
         ),
     ]);
     let mut slots = WorkspaceSlot::standard_editor_slots();
@@ -140,7 +169,10 @@ fn inactive_tabs_nested_splits_and_collapsed_groups_own_their_bounds() {
 
     let sizing = WorkspaceSizingResolver::new(&document);
     assert_eq!(
-        sizing.group(&WorkspaceTabGroupID::new("ab"), WorkspaceSplitAxis::Horizontal),
+        sizing.group(
+            &WorkspaceTabGroupID::new("ab"),
+            WorkspaceSplitAxis::Horizontal
+        ),
         WorkspaceAxisSizing::new(220.0, None, Some(350.0)),
         "a group takes the largest bound of every panel it holds"
     );
@@ -155,7 +187,9 @@ fn inactive_tabs_nested_splits_and_collapsed_groups_own_their_bounds() {
         WorkspaceAxisSizing::new(220.0 + 80.0 + gutter, None, Some(350.0 + 200.0 + gutter))
     );
     assert_eq!(
-        sizing.slot(&WorkspaceSlotID::center(), WorkspaceSplitAxis::Vertical).minimum,
+        sizing
+            .slot(&WorkspaceSlotID::center(), WorkspaceSplitAxis::Vertical)
+            .minimum,
         34.0,
         "an empty group still reserves the tab bar height"
     );
@@ -208,17 +242,37 @@ fn floating_frames_use_the_panel_bounds_and_persist_the_clamped_size() {
         window_id: cove_ui_addons::workspace::WorkspaceFloatingWindowID::new("float"),
         frame: WorkspaceRect::new(0.0, 0.0, 900.0, 900.0),
     });
-    let window = controller.document().floating_windows.first().expect("floating window");
-    assert_eq!(window.frame.width, 320.0, "the width clamps to the panel maximum");
-    assert_eq!(window.frame.height, 304.0, "the height maximum plus the title bar");
+    let window = controller
+        .document()
+        .floating_windows
+        .first()
+        .expect("floating window");
+    assert_eq!(
+        window.frame.width, 320.0,
+        "the width clamps to the panel maximum"
+    );
+    assert_eq!(
+        window.frame.height, 304.0,
+        "the height maximum plus the title bar"
+    );
 
     controller.dispatch(WorkspaceCommand::MoveFloatingWindow {
         window_id: cove_ui_addons::workspace::WorkspaceFloatingWindowID::new("float"),
         frame: WorkspaceRect::new(0.0, 0.0, 160.0, 120.0),
     });
-    let window = controller.document().floating_windows.first().expect("floating window");
-    assert_eq!(window.frame.width, 200.0, "the width floors at the panel minimum");
-    assert_eq!(window.frame.height, 184.0, "the height minimum plus the title bar");
+    let window = controller
+        .document()
+        .floating_windows
+        .first()
+        .expect("floating window");
+    assert_eq!(
+        window.frame.width, 200.0,
+        "the width floors at the panel minimum"
+    );
+    assert_eq!(
+        window.frame.height, 184.0,
+        "the height minimum plus the title bar"
+    );
 }
 
 #[test]
@@ -232,8 +286,16 @@ fn split_maximums_and_impossible_bounds_are_deterministic() {
     };
 
     let feasible = constraints.range(500.0);
-    assert!((feasible.0 - 0.28).abs() < 0.00001, "100 / 500 is the lower bound, got {}", feasible.0);
-    assert!((feasible.1 - 0.52).abs() < 0.00001, "260 / 500 is the upper bound, got {}", feasible.1);
+    assert!(
+        (feasible.0 - 0.28).abs() < 0.00001,
+        "100 / 500 is the lower bound, got {}",
+        feasible.0
+    );
+    assert!(
+        (feasible.1 - 0.52).abs() < 0.00001,
+        "260 / 500 is the upper bound, got {}",
+        feasible.1
+    );
 
     // Impossible bounds collapse to a single legal point rather than inverting.
     let cramped = constraints.range(100.0);
@@ -242,7 +304,10 @@ fn split_maximums_and_impossible_bounds_are_deterministic() {
 
     let extra = constraints.range(1000.0);
     assert!((extra.0 - 260.0 / 620.0).abs() < 0.00001);
-    assert!((extra.0 - extra.1).abs() < 0.00001, "the two maxima pin one fraction");
+    assert!(
+        (extra.0 - extra.1).abs() < 0.00001,
+        "the two maxima pin one fraction"
+    );
 
     let mut empty = WorkspaceController::new(WorkspaceDocument::new(
         BTreeMap::new(),

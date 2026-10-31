@@ -4,8 +4,8 @@
 
 use cove_examples::gallery_content::catalog::GalleryOptions;
 use cove_examples::gallery_content::stories::data_stories::{
-    numeric_comparison, AdaptiveTableSample, ChartExplorationStory, CHART_FOCUS_RANGE,
-    CHART_SAMPLE_COUNT,
+    AdaptiveTableSample, CHART_FOCUS_RANGE, CHART_SAMPLE_COUNT, ChartExplorationStory,
+    numeric_comparison,
 };
 use cove_ui_compose::primitives::data::lists::table::ComparisonResult;
 
@@ -41,7 +41,10 @@ fn updating_the_data_bumps_the_revision_and_changes_the_curve() {
     story.update_data();
     assert_eq!(story.revision(), 1);
     let after = story.samples();
-    assert_ne!(before, after, "the phase shift must visibly change the signal");
+    assert_ne!(
+        before, after,
+        "the phase shift must visibly change the signal"
+    );
 }
 
 #[test]
@@ -55,7 +58,10 @@ fn the_brushed_caption_appears_only_with_a_selection() {
     let story = ChartExplorationStory::new();
     assert_eq!(story.brushed_caption(), None);
     story.set_selection(Some((20.0, 40.0)));
-    assert_eq!(story.brushed_caption().as_deref(), Some("Selected 20.0–40.0"));
+    assert_eq!(
+        story.brushed_caption().as_deref(),
+        Some("Selected 20.0–40.0")
+    );
 }
 
 #[test]

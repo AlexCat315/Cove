@@ -70,16 +70,21 @@ impl ShowcaseContent {
                 gallery.select_page(&page);
             }
         }
-        let has_typography = mode == SceneLaunchMode::Counter
-            && products.typography_mut().is_some();
-        let content = Self { mode, has_typography };
+        let has_typography =
+            mode == SceneLaunchMode::Counter && products.typography_mut().is_some();
+        let content = Self {
+            mode,
+            has_typography,
+        };
         if checkpoint.is_empty() {
             return Ok(content);
         }
         let values: BTreeMap<String, String> =
             serde_json::from_str(checkpoint).map_err(|_| CHECKPOINT_CORRUPT.to_owned())?;
         if mode == SceneLaunchMode::Counter {
-            let restored = products.counter().is_some_and(|counter| counter.restore(&values));
+            let restored = products
+                .counter()
+                .is_some_and(|counter| counter.restore(&values));
             if !restored {
                 return Err(CHECKPOINT_CORRUPT.to_owned());
             }
@@ -118,7 +123,10 @@ impl ShowcaseContent {
 
     pub fn checkpoint(&self, products: &mut dyn ShowcaseProducts) -> BTreeMap<String, String> {
         if self.mode == SceneLaunchMode::Counter {
-            return products.counter().map(|counter| counter.checkpoint()).unwrap_or_default();
+            return products
+                .counter()
+                .map(|counter| counter.checkpoint())
+                .unwrap_or_default();
         }
         let mut values = BTreeMap::new();
         if let Some(gallery) = products.gallery() {

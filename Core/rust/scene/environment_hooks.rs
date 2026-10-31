@@ -54,12 +54,24 @@ pub struct WindowReveal {
 }
 impl WindowReveal {
     pub fn new(center_x: f32, center_y: f32, radius: f32) -> Self {
-        Self { sequence: 0, center_x, center_y, radius, feather: 0.0 }
+        Self {
+            sequence: 0,
+            center_x,
+            center_y,
+            radius,
+            feather: 0.0,
+        }
     }
     /// Build the frame-level request the renderer reads while recording.
     pub fn request(&mut self) -> Reveal {
         self.sequence = self.sequence.wrapping_add(1);
-        Reveal::new(self.sequence, self.center_x, self.center_y, self.radius, self.feather)
+        Reveal::new(
+            self.sequence,
+            self.center_x,
+            self.center_y,
+            self.radius,
+            self.feather,
+        )
     }
     pub fn covers(&self, rect: Rect) -> bool {
         let dx = (rect.x + rect.width / 2.0 - self.center_x).abs();
@@ -105,9 +117,29 @@ mod tests {
 pub struct WindowRevealContext;
 impl WindowRevealContext {
     const KEY: &'static str = "CoveUI.control.activation-origin";
-    fn root(node: &Node) -> Node { let mut root=node.clone(); while let Some(parent)=root.parent(){root=parent;}root }
-    pub fn record_activation(node:&Node){let frame=node.absolute_frame();Self::root(node).set_attachment(Self::KEY,crate::Point::new(frame.x+frame.width/2.0,frame.y+frame.height/2.0));}
-    pub fn activation_origin(node:&Node)->Option<crate::Point>{Self::root(node).attachment(Self::KEY)}
-    pub fn clear_activation(node:Option<&Node>){if let Some(node)=node{node.remove_attachment(Self::KEY);}}
-    pub fn bounds(node:&Node)->Rect{Self::root(node).frame()}
+    fn root(node: &Node) -> Node {
+        let mut root = node.clone();
+        while let Some(parent) = root.parent() {
+            root = parent;
+        }
+        root
+    }
+    pub fn record_activation(node: &Node) {
+        let frame = node.absolute_frame();
+        Self::root(node).set_attachment(
+            Self::KEY,
+            crate::Point::new(frame.x + frame.width / 2.0, frame.y + frame.height / 2.0),
+        );
+    }
+    pub fn activation_origin(node: &Node) -> Option<crate::Point> {
+        Self::root(node).attachment(Self::KEY)
+    }
+    pub fn clear_activation(node: Option<&Node>) {
+        if let Some(node) = node {
+            node.remove_attachment(Self::KEY);
+        }
+    }
+    pub fn bounds(node: &Node) -> Rect {
+        Self::root(node).frame()
+    }
 }

@@ -69,7 +69,10 @@ pub struct BufferRange {
     pub size: usize,
 }
 impl BufferRange {
-    pub const WHOLE: Self = Self { offset: 0, size: usize::MAX };
+    pub const WHOLE: Self = Self {
+        offset: 0,
+        size: usize::MAX,
+    };
 
     pub const fn new(offset: usize, size: usize) -> Self {
         Self { offset, size }
@@ -86,9 +89,10 @@ impl BufferRange {
             (true, false) => other.offset >= self.offset,
             (false, true) => self.offset >= other.offset,
             (false, false) => {
-                let (Some(self_end), Some(other_end)) =
-                    (self.offset.checked_add(self.size), other.offset.checked_add(other.size))
-                else {
+                let (Some(self_end), Some(other_end)) = (
+                    self.offset.checked_add(self.size),
+                    other.offset.checked_add(other.size),
+                ) else {
                     // A range that overflows the address space covers everything
                     // above its offset, so treat it as overlapping.
                     return true;
@@ -119,7 +123,13 @@ pub struct ResourceAccess {
 }
 impl ResourceAccess {
     pub const fn new(resource: ResourceRef, kind: AccessKind, stage: AccessStage) -> Self {
-        Self { resource, kind, stage, range: None, is_attachment: false }
+        Self {
+            resource,
+            kind,
+            stage,
+            range: None,
+            is_attachment: false,
+        }
     }
     pub const fn read(resource: ResourceRef, stage: AccessStage) -> Self {
         Self::new(resource, AccessKind::Read, stage)
@@ -241,7 +251,11 @@ impl AccessTracker {
                         });
                     }
                 }
-                memory.reads.entry(read_key).or_default().insert(access.stage);
+                memory
+                    .reads
+                    .entry(read_key)
+                    .or_default()
+                    .insert(access.stage);
             }
             AccessKind::Write => {
                 if let Some(write) = memory.last_write {
@@ -270,7 +284,11 @@ impl AccessTracker {
                         });
                     }
                 }
-                memory.last_write = Some(Record { stage: access.stage, queue, range: access.range });
+                memory.last_write = Some(Record {
+                    stage: access.stage,
+                    queue,
+                    range: access.range,
+                });
                 memory.reads.clear();
             }
         }

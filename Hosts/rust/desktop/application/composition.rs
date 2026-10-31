@@ -1,6 +1,6 @@
 //! Translation of Desktop/Sources/CoveUI/Application/Composition.swift.
 
-use cove_composition::{ViewGraph, AnyView};
+use cove_composition::{AnyView, ViewGraph};
 use cove_core::scene::{LayerAwareNodeRenderer, NodeRenderer, NodeTree, Recomposer};
 use cove_core::{DrawList, Environment, State};
 use cove_imaging::ImageAssetRegistry;
@@ -106,12 +106,20 @@ impl MainComposition {
     }
 
     /// Installs the root view and gives it one layout pass.
-    pub fn install_root(&self, view: impl cove_composition::View + 'static, width: f32, height: f32) {
-        self.graph.install(view, cove_core::scene::ComponentSourceLocation::new(
-            "cove-ui",
-            "Hosts/rust/desktop/application/composition.rs",
-            0,
-        ));
+    pub fn install_root(
+        &self,
+        view: impl cove_composition::View + 'static,
+        width: f32,
+        height: f32,
+    ) {
+        self.graph.install(
+            view,
+            cove_core::scene::ComponentSourceLocation::new(
+                "cove-ui",
+                "Hosts/rust/desktop/application/composition.rs",
+                0,
+            ),
+        );
         self.graph.compute_layout(width, height);
     }
 

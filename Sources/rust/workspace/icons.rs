@@ -17,20 +17,33 @@ fn registry() -> &'static Mutex<BTreeMap<String, Vec<u8>>> {
 
 impl WorkspacePanelIconCatalog {
     pub fn register(key: impl Into<String>, resource: impl Into<Vec<u8>>) {
-        registry().lock().unwrap_or_else(|error| error.into_inner()).insert(key.into(), resource.into());
+        registry()
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .insert(key.into(), resource.into());
     }
 
     pub fn resolve(key: Option<&str>) -> Option<Vec<u8>> {
         let key = key?;
-        registry().lock().unwrap_or_else(|error| error.into_inner()).get(key).cloned()
+        registry()
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .get(key)
+            .cloned()
     }
 
     pub fn is_registered(key: &str) -> bool {
-        registry().lock().unwrap_or_else(|error| error.into_inner()).contains_key(key)
+        registry()
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .contains_key(key)
     }
 
     pub fn clear() {
-        registry().lock().unwrap_or_else(|error| error.into_inner()).clear();
+        registry()
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .clear();
     }
 }
 
@@ -47,7 +60,10 @@ mod tests {
         assert!(WorkspacePanelIconCatalog::resolve(None).is_none());
         assert!(WorkspacePanelIconCatalog::resolve(Some("missing")).is_none());
         WorkspacePanelIconCatalog::register("glyph", vec![1u8, 2, 3]);
-        assert_eq!(WorkspacePanelIconCatalog::resolve(Some("glyph")), Some(vec![1, 2, 3]));
+        assert_eq!(
+            WorkspacePanelIconCatalog::resolve(Some("glyph")),
+            Some(vec![1, 2, 3])
+        );
         WorkspacePanelIconCatalog::clear();
         assert!(!WorkspacePanelIconCatalog::is_registered("glyph"));
     }

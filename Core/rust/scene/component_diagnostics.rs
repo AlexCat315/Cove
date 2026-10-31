@@ -12,7 +12,13 @@ pub struct ComponentSourceLocation {
 }
 impl ComponentSourceLocation {
     pub fn new(file_id: impl Into<String>, file_path: impl Into<String>, line: u64) -> Self {
-        Self { file_id: file_id.into(), file_path: file_path.into(), line, column: 1, explicit: false }
+        Self {
+            file_id: file_id.into(),
+            file_path: file_path.into(),
+            line,
+            column: 1,
+            explicit: false,
+        }
     }
     pub fn with_column(mut self, column: u64) -> Self {
         self.column = column;
@@ -32,7 +38,11 @@ pub struct RecompositionReason {
 }
 impl RecompositionReason {
     pub fn new(kind: impl Into<String>) -> Self {
-        Self { kind: truncate_chars(kind.into(), 64), detail: None, origin_scope: None }
+        Self {
+            kind: truncate_chars(kind.into(), 64),
+            detail: None,
+            origin_scope: None,
+        }
     }
     pub fn with_detail(mut self, detail: impl Into<String>) -> Self {
         self.detail = Some(truncate_chars(detail.into(), 160));
@@ -44,7 +54,11 @@ impl RecompositionReason {
     }
 }
 fn truncate_chars(text: String, limit: usize) -> String {
-    if text.chars().count() <= limit { text } else { text.chars().take(limit).collect() }
+    if text.chars().count() <= limit {
+        text
+    } else {
+        text.chars().take(limit).collect()
+    }
 }
 
 /// Counts body evaluations, excluding the initial mount.
@@ -62,7 +76,11 @@ impl ComponentRecompositionMetrics {
         Self::default()
     }
     pub fn record(&mut self, milliseconds: f64, initial: bool, reasons: &[RecompositionReason]) {
-        let milliseconds = if milliseconds.is_finite() { milliseconds.max(0.0) } else { 0.0 };
+        let milliseconds = if milliseconds.is_finite() {
+            milliseconds.max(0.0)
+        } else {
+            0.0
+        };
         if initial {
             self.initial_ms = milliseconds;
             return;
@@ -75,7 +93,10 @@ impl ComponentRecompositionMetrics {
     }
     pub fn reset(&mut self) {
         let mount = self.initial_ms;
-        *self = Self { initial_ms: mount, ..Self::default() };
+        *self = Self {
+            initial_ms: mount,
+            ..Self::default()
+        };
     }
 }
 
@@ -88,7 +109,16 @@ mod tests {
         metrics.record(4.0, true, &[]);
         metrics.record(2.5, false, &[RecompositionReason::new("state")]);
         metrics.record(f64::NAN, false, &[]);
-        assert_eq!((metrics.count, metrics.initial_ms, metrics.last_ms, metrics.total_ms, metrics.max_ms), (2, 4.0, 0.0, 2.5, 2.5));
+        assert_eq!(
+            (
+                metrics.count,
+                metrics.initial_ms,
+                metrics.last_ms,
+                metrics.total_ms,
+                metrics.max_ms
+            ),
+            (2, 4.0, 0.0, 2.5, 2.5)
+        );
         metrics.reset();
         assert_eq!((metrics.count, metrics.initial_ms), (0, 4.0));
     }

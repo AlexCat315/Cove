@@ -14,20 +14,18 @@
 mod support;
 
 use std::rc::Rc;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use cove_composition::{AnyView, View};
+use cove_core::Binding;
 use cove_core::scene::{
     AccessibilityRole, Align, EventPhase, EventResult, FocusChain, FocusChainHolder,
     InteractionRegistry, InteractionRegistryHolder, Node, PointerCapture, PointerCaptureHolder,
     PointerPhase,
 };
-use cove_core::Binding;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
-use cove_ui_compose::primitives::controls::fields::slider::{
-    Slider, SliderAxis, SliderGeometry,
-};
+use cove_ui_compose::primitives::controls::fields::slider::{Slider, SliderAxis, SliderGeometry};
 use cove_ui_compose::{Row, VerticalAlignment};
 
 use support::GlobalTestLock;
@@ -149,7 +147,11 @@ fn pointer_down_writes_the_value_under_the_pointer() {
             PointerPhase::Down,
             EventPhase::Target,
         );
-        assert_eq!(value_of(&read), 1.0, "the right edge writes the upper bound");
+        assert_eq!(
+            value_of(&read),
+            1.0,
+            "the right edge writes the upper bound"
+        );
 
         InteractionRegistryHolder::set_current(None);
     });
@@ -178,14 +180,22 @@ fn pointer_outside_the_host_clamps_to_the_range() {
             PointerPhase::Down,
             EventPhase::Target,
         );
-        assert_eq!(value_of(&read), 0.0, "a left overflow clamps to the lower bound");
+        assert_eq!(
+            value_of(&read),
+            0.0,
+            "a left overflow clamps to the lower bound"
+        );
 
         pointer(
             &pointer_event(width + 50.0, 12.0),
             PointerPhase::Down,
             EventPhase::Target,
         );
-        assert_eq!(value_of(&read), 10.0, "a right overflow clamps to the upper bound");
+        assert_eq!(
+            value_of(&read),
+            10.0,
+            "a right overflow clamps to the upper bound"
+        );
 
         InteractionRegistryHolder::set_current(None);
     });
@@ -276,7 +286,11 @@ fn drag_motion_updates_the_value_while_pressed() {
             },
             EventPhase::Target,
         );
-        assert_eq!(value_of(&read), 100.0, "the far edge reaches the upper bound");
+        assert_eq!(
+            value_of(&read),
+            100.0,
+            "the far edge reaches the upper bound"
+        );
 
         InteractionRegistryHolder::set_current(None);
     });
@@ -311,7 +325,10 @@ fn interaction_updates_render_state_without_recomposing() {
             !graph.recomposer.has_pending(),
             "hover repaints without recomposing"
         );
-        assert!(graph.tree.borrow().has_render_updates(), "hover dirties render");
+        assert!(
+            graph.tree.borrow().has_render_updates(),
+            "hover dirties render"
+        );
         assert_eq!(
             host.attachment::<bool>("__slider_hovered"),
             Some(true),
@@ -464,7 +481,11 @@ fn page_keys_move_by_ten_steps_and_clamp() {
         for _ in 0..5 {
             dispatcher.dispatch(&key(cove_composition::Scancode::PAGE_UP));
         }
-        assert_eq!(value_of(&read), 100.0, "repeated PageUp clamps at the maximum");
+        assert_eq!(
+            value_of(&read),
+            100.0,
+            "repeated PageUp clamps at the maximum"
+        );
 
         FocusChainHolder::set_current(None);
         InteractionRegistryHolder::set_current(None);
@@ -566,8 +587,14 @@ fn key_handler_reports_handled_only_for_slider_keys() {
                 EventPhase::Target,
             )
         };
-        assert_eq!(press(cove_composition::Scancode::ARROW_UP), EventResult::Handled);
-        assert_eq!(press(cove_composition::Scancode::HOME), EventResult::Handled);
+        assert_eq!(
+            press(cove_composition::Scancode::ARROW_UP),
+            EventResult::Handled
+        );
+        assert_eq!(
+            press(cove_composition::Scancode::HOME),
+            EventResult::Handled
+        );
         assert_eq!(
             press(cove_composition::Scancode::A),
             EventResult::Ignored,

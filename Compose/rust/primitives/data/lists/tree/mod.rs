@@ -6,10 +6,10 @@
 pub mod options;
 pub mod view;
 
-pub use view::{flatten_tree, flatten_tree_matching, Tree, TreeEntry, TreeSearchMetadata};
 pub use options::{
     TreeDragOperations, TreeEvents, TreeLayout, TreeOptions, TreeSearch, TreeSelection, TreeSlots,
 };
+pub use view::{Tree, TreeEntry, TreeSearchMetadata, flatten_tree, flatten_tree_matching};
 
 /// How a search box affects the tree.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

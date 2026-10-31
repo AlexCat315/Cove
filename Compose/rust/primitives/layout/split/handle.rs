@@ -15,11 +15,11 @@ use cove_core::{Binding, Color};
 use cove_platform::MouseButton;
 
 use crate::theme::theme_for_node;
-use crate::{impl_primitive_view, AnyView, PrimitiveView};
+use crate::{AnyView, PrimitiveView, impl_primitive_view};
 
+use super::SplitAxis;
 use super::constraints::SplitConstraints;
 use super::retention::CONTAINER_MARKER;
-use super::SplitAxis;
 
 const START: &str = "splitview.dragStart";
 const HOVER: &str = "splitview.hover";
@@ -60,7 +60,8 @@ impl SplitHandle {
 
     fn current(&self, node: &Node) -> f32 {
         let proposed = self.fraction.get();
-        self.constraints.clamp(proposed, self.container_extent(node))
+        self.constraints
+            .clamp(proposed, self.container_extent(node))
     }
 
     fn write(&self, node: &Node, value: f32) {
@@ -168,7 +169,9 @@ impl PrimitiveView for SplitHandle {
         node.update_draw(
             (draw_color.map(|color| color.rgba8()), thickness.to_bits()),
             move |list, origin| {
-                let Some(owner) = Node::upgrade(&draw_node) else { return };
+                let Some(owner) = Node::upgrade(&draw_node) else {
+                    return;
+                };
                 let frame = owner.frame();
                 let theme = theme_for_node(&owner);
                 let resolved = draw_color.unwrap_or(theme.colors.divider);
@@ -195,14 +198,23 @@ impl PrimitiveView for SplitHandle {
             },
         );
 
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
 
         let hover_node = node.downgrade();
-        registry.set_hover(node, Rc::new(move |phase| {
-            let Some(owner) = Node::upgrade(&hover_node) else { return };
-            owner.set_attachment(HOVER, phase == HoverPhase::Enter);
-            owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("splitview"));
-        }));
+        registry.set_hover(
+            node,
+            Rc::new(move |phase| {
+                let Some(owner) = Node::upgrade(&hover_node) else {
+                    return;
+                };
+                owner.set_attachment(HOVER, phase == HoverPhase::Enter);
+                owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                    "splitview",
+                ));
+            }),
+        );
 
         let pointer_node = node.downgrade();
         let pointer_handle = SplitHandle::clone_for_actions(self);
@@ -220,10 +232,9 @@ impl PrimitiveView for SplitHandle {
                     PointerPhase::Down => {
                         let extent = pointer_handle.container_extent(&owner);
                         let start = DragStart {
-                            fraction: pointer_handle.constraints.clamp(
-                                pointer_handle.fraction.get(),
-                                extent,
-                            ),
+                            fraction: pointer_handle
+                                .constraints
+                                .clamp(pointer_handle.fraction.get(), extent),
                             position: if pointer_handle.axis == SplitAxis::Horizontal {
                                 event.x
                             } else {
@@ -268,7 +279,10 @@ impl PrimitiveView for SplitHandle {
                 } else {
                     event.y
                 };
-                motion_handle.write(&owner, start.fraction + (position - start.position) / start.extent);
+                motion_handle.write(
+                    &owner,
+                    start.fraction + (position - start.position) / start.extent,
+                );
                 EventResult::Handled
             }),
         );
@@ -282,7 +296,9 @@ impl PrimitiveView for SplitHandle {
                 if phase != EventPhase::Target {
                     return EventResult::Ignored;
                 }
-                if event.modifiers.has_ctrl() || event.modifiers.has_gui() || event.modifiers.has_alt()
+                if event.modifiers.has_ctrl()
+                    || event.modifiers.has_gui()
+                    || event.modifiers.has_alt()
                 {
                     return EventResult::Ignored;
                 }
@@ -338,7 +354,10 @@ struct SplitHandleLifetime {
 
 impl SplitHandleLifetime {
     fn new() -> Self {
-        Self { capture: RefCell::new(None), chain: RefCell::new(None) }
+        Self {
+            capture: RefCell::new(None),
+            chain: RefCell::new(None),
+        }
     }
 }
 

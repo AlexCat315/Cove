@@ -12,7 +12,13 @@ use cove_platform::{
 };
 
 fn wheel(x: f32, y: f32) -> MouseWheelEvent {
-    MouseWheelEvent { x, y, mouse_x: None, mouse_y: None, input: ScrollInput::default() }
+    MouseWheelEvent {
+        x,
+        y,
+        mouse_x: None,
+        mouse_y: None,
+        input: ScrollInput::default(),
+    }
 }
 
 #[test]
@@ -22,7 +28,10 @@ fn units() {
         y: -12.5,
         mouse_x: None,
         mouse_y: None,
-        input: ScrollInput { unit: ScrollUnit::Points, ..Default::default() },
+        input: ScrollInput {
+            unit: ScrollUnit::Points,
+            ..Default::default()
+        },
     };
     assert_eq!(points.displacement(30.0, 0.0, 0.0).0, 0.25);
     assert_eq!(points.displacement(60.0, 0.0, 0.0).1, -12.5);
@@ -36,7 +45,10 @@ fn units() {
         y: -1.0,
         mouse_x: None,
         mouse_y: None,
-        input: ScrollInput { unit: ScrollUnit::Pages, ..Default::default() },
+        input: ScrollInput {
+            unit: ScrollUnit::Pages,
+            ..Default::default()
+        },
     };
     assert_eq!(pages.displacement(30.0, 200.0, 150.0).0, 200.0);
     assert_eq!(pages.displacement(30.0, 200.0, 150.0).1, -150.0);
@@ -64,7 +76,14 @@ fn serialization() {
     let InputEvent::MouseWheel(wheel) = decoded else {
         panic!("decoded event is still a wheel event, got {decoded:?}")
     };
-    assert_eq!(wheel.input, metadata, "every phase field survives the round trip");
+    assert_eq!(
+        wheel.input, metadata,
+        "every phase field survives the round trip"
+    );
     assert_eq!((wheel.mouse_x, wheel.mouse_y), (Some(40.0), Some(60.0)));
-    assert_eq!((wheel.x, wheel.y), (0.0, 0.0), "a zero-delta end packet stays zero");
+    assert_eq!(
+        (wheel.x, wheel.y),
+        (0.0, 0.0),
+        "a zero-delta end packet stays zero"
+    );
 }

@@ -95,9 +95,14 @@ impl View for MobileRoot {
 
         let mut tabs_view = TabView::new(self.tab.binding(), tabs);
         tabs_view.mobile = true;
-        let view = tabs_view
-            .flex_with(1.0, 1.0, Some(0.0))
-            .frame(None, None, Some(0.0), Some(0.0), None, None);
+        let view = tabs_view.flex_with(1.0, 1.0, Some(0.0)).frame(
+            None,
+            None,
+            Some(0.0),
+            Some(0.0),
+            None,
+            None,
+        );
 
         let safe = SafeArea::new(
             SafeAreaEdges(SafeAreaEdges::TOP.0 | SafeAreaEdges::HORIZONTAL.0),

@@ -4,12 +4,12 @@
 //! content can adapt to the space actually available to it — a container query
 //! rather than a window query. Measurement runs after composition, so the first
 //! build receives zero and the next frame publishes the measured size.
-use cove_core::scene::{LayoutNode, Node};
+use crate::{AnyView, DynamicField, PrimitiveView, View, ViewKind};
 use cove_core::Size;
 use cove_core::State;
+use cove_core::scene::{LayoutNode, Node};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
-use crate::{AnyView, DynamicField, PrimitiveView, View, ViewKind};
 
 const MEASUREMENT_KEY: &str = "__coveui_container_size_measurement";
 
@@ -24,7 +24,10 @@ impl ContainerSizeMeasurement {
     const TOLERANCE: f32 = 0.5;
 
     fn new(state: State<Size>) -> Self {
-        Self { state: RefCell::new(state), last_reported: Cell::new(Size::default()) }
+        Self {
+            state: RefCell::new(state),
+            last_reported: Cell::new(Size::default()),
+        }
     }
 
     fn update(&self, node: &Node) {
@@ -34,14 +37,18 @@ impl ContainerSizeMeasurement {
         };
         let frame = node.frame();
         let measured = Size {
-            width: (frame.width - (padding.left + padding.right + border.left + border.right)).max(0.0),
-            height: (frame.height - (padding.top + padding.bottom + border.top + border.bottom)).max(0.0),
+            width: (frame.width - (padding.left + padding.right + border.left + border.right))
+                .max(0.0),
+            height: (frame.height - (padding.top + padding.bottom + border.top + border.bottom))
+                .max(0.0),
         };
         if !measured.width.is_finite() || !measured.height.is_finite() {
             return;
         }
         let last = self.last_reported.get();
-        if (measured.width - last.width).abs() < Self::TOLERANCE && (measured.height - last.height).abs() < Self::TOLERANCE {
+        if (measured.width - last.width).abs() < Self::TOLERANCE
+            && (measured.height - last.height).abs() < Self::TOLERANCE
+        {
             return;
         }
         self.last_reported.set(measured);
@@ -56,7 +63,10 @@ pub struct ContainerSizeReader<Content: View> {
 }
 impl<Content: View> ContainerSizeReader<Content> {
     pub fn new(content: impl Fn(Size) -> Content + 'static) -> Self {
-        Self { size: State::new(Size::default()), content: Rc::new(content) }
+        Self {
+            size: State::new(Size::default()),
+            content: Rc::new(content),
+        }
     }
 }
 impl<Content: View + 'static> View for ContainerSizeReader<Content> {
@@ -86,7 +96,8 @@ impl PrimitiveView for ContainerSizeProbe {
         node
     }
     fn update_node(&self, node: &Node) {
-        if let Some(measurement) = node.attachment::<Rc<ContainerSizeMeasurement>>(MEASUREMENT_KEY) {
+        if let Some(measurement) = node.attachment::<Rc<ContainerSizeMeasurement>>(MEASUREMENT_KEY)
+        {
             *measurement.state.borrow_mut() = self.size.clone();
             return;
         }

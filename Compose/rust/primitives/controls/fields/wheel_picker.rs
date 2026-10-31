@@ -20,7 +20,11 @@ pub struct WheelPickerOption<Value> {
 
 impl<Value: PartialEq + Clone> WheelPickerOption<Value> {
     pub fn new(value: Value, label: impl Into<String>) -> Self {
-        Self { value, label: label.into(), is_enabled: true }
+        Self {
+            value,
+            label: label.into(),
+            is_enabled: true,
+        }
     }
 
     pub fn enabled(mut self, is_enabled: bool) -> Self {
@@ -40,9 +44,16 @@ impl<Value: PartialEq + Clone> WheelPicker<Value> {
     /// A wheel starting on `value`, or on the first enabled row when `value` is
     /// not present or is disabled.
     pub fn new(options: Vec<WheelPickerOption<Value>>, value: Option<Value>) -> Self {
-        let mut picker = Self { options, value: None };
+        let mut picker = Self {
+            options,
+            value: None,
+        };
         let landing = value
-            .filter(|candidate| picker.index_of(candidate).is_some_and(|index| picker.options[index].is_enabled))
+            .filter(|candidate| {
+                picker
+                    .index_of(candidate)
+                    .is_some_and(|index| picker.options[index].is_enabled)
+            })
             .or_else(|| picker.first_enabled().cloned());
         picker.value = landing;
         picker
@@ -53,7 +64,9 @@ impl<Value: PartialEq + Clone> WheelPicker<Value> {
     }
 
     pub fn index_of(&self, value: &Value) -> Option<usize> {
-        self.options.iter().position(|option| &option.value == value)
+        self.options
+            .iter()
+            .position(|option| &option.value == value)
     }
 
     fn first_enabled(&self) -> Option<&Value> {
@@ -65,7 +78,9 @@ impl<Value: PartialEq + Clone> WheelPicker<Value> {
 
     /// Whether a row may be committed.
     pub fn is_selectable(&self, index: usize) -> bool {
-        self.options.get(index).is_some_and(|option| option.is_enabled)
+        self.options
+            .get(index)
+            .is_some_and(|option| option.is_enabled)
     }
 
     /// Moves the selection by `delta` rows, skipping disabled ones and stopping

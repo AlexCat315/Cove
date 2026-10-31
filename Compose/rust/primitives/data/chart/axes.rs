@@ -33,14 +33,29 @@ impl ChartValueAxes {
             visible.get(index).copied().unwrap_or(false) && item.axis == ChartValueAxis::Right
         });
         let secondary = if uses_secondary {
-            Some(ChartStack::new(series, visible, style, ChartValueAxis::Right))
+            Some(ChartStack::new(
+                series,
+                visible,
+                style,
+                ChartValueAxis::Right,
+            ))
         } else {
             None
         };
         let primary_scale = ChartScale::fit_stack(
             &primary,
-            &guides.thresholds.iter().filter(|item| item.axis == ChartValueAxis::Left).cloned().collect::<Vec<_>>(),
-            &guides.bands.iter().filter(|item| item.axis == ChartValueAxis::Left).cloned().collect::<Vec<_>>(),
+            &guides
+                .thresholds
+                .iter()
+                .filter(|item| item.axis == ChartValueAxis::Left)
+                .cloned()
+                .collect::<Vec<_>>(),
+            &guides
+                .bands
+                .iter()
+                .filter(|item| item.axis == ChartValueAxis::Left)
+                .cloned()
+                .collect::<Vec<_>>(),
             style,
             axis.y.tick_count,
             axis.y.kind,
@@ -48,16 +63,35 @@ impl ChartValueAxes {
         let secondary_scale = secondary.as_ref().map(|stack| {
             ChartScale::fit_stack(
                 stack,
-                &guides.thresholds.iter().filter(|item| item.axis == ChartValueAxis::Right).cloned().collect::<Vec<_>>(),
-                &guides.bands.iter().filter(|item| item.axis == ChartValueAxis::Right).cloned().collect::<Vec<_>>(),
+                &guides
+                    .thresholds
+                    .iter()
+                    .filter(|item| item.axis == ChartValueAxis::Right)
+                    .cloned()
+                    .collect::<Vec<_>>(),
+                &guides
+                    .bands
+                    .iter()
+                    .filter(|item| item.axis == ChartValueAxis::Right)
+                    .cloned()
+                    .collect::<Vec<_>>(),
                 style,
                 axis.secondary.tick_count,
                 axis.secondary.kind,
             )
         });
         Self {
-            sample_count: primary.sample_count.max(secondary.as_ref().map(|stack| stack.sample_count).unwrap_or(0)),
-            has_bars: primary.has_bars || secondary.as_ref().map(|stack| stack.has_bars).unwrap_or(false),
+            sample_count: primary.sample_count.max(
+                secondary
+                    .as_ref()
+                    .map(|stack| stack.sample_count)
+                    .unwrap_or(0),
+            ),
+            has_bars: primary.has_bars
+                || secondary
+                    .as_ref()
+                    .map(|stack| stack.has_bars)
+                    .unwrap_or(false),
             is_stacked: primary.is_stacked,
             primary,
             secondary,

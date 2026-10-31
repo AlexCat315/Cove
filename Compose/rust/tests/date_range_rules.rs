@@ -19,14 +19,18 @@ fn day(year: i32, month: u32, day: u32) -> Date {
 #[test]
 fn today_resolves_to_a_single_day() {
     let today = day(2024, 3, 15);
-    let range = DateRangePreset::today_range("Today").range(today, &calendar()).unwrap();
+    let range = DateRangePreset::today_range("Today")
+        .range(today, &calendar())
+        .unwrap();
     assert_eq!(range.0, range.1, "today is a one-day range");
 }
 
 #[test]
 fn yesterday_moves_back_one_day() {
     let today = day(2024, 3, 1);
-    let range = DateRangePreset::yesterday("Yesterday").range(today, &calendar()).unwrap();
+    let range = DateRangePreset::yesterday("Yesterday")
+        .range(today, &calendar())
+        .unwrap();
     // 1 March back one day is 29 February in a leap year.
     assert_eq!(range.0, day(2024, 2, 29));
     assert_eq!(range.0, range.1);
@@ -35,9 +39,15 @@ fn yesterday_moves_back_one_day() {
 #[test]
 fn last_days_includes_today() {
     let today = day(2024, 3, 10);
-    let range = DateRangePreset::last_days(7, None).range(today, &calendar()).unwrap();
+    let range = DateRangePreset::last_days(7, None)
+        .range(today, &calendar())
+        .unwrap();
     assert_eq!(range.1, today, "the range ends today");
-    assert_eq!(range.0, day(2024, 3, 4), "seven days inclusive starts on the 4th");
+    assert_eq!(
+        range.0,
+        day(2024, 3, 4),
+        "seven days inclusive starts on the 4th"
+    );
     assert_eq!(
         DateRangeRules::day_count(range, &calendar()),
         7,
@@ -48,7 +58,9 @@ fn last_days_includes_today() {
 #[test]
 fn last_days_clamps_to_one() {
     let today = day(2024, 3, 10);
-    let range = DateRangePreset::last_days(0, None).range(today, &calendar()).unwrap();
+    let range = DateRangePreset::last_days(0, None)
+        .range(today, &calendar())
+        .unwrap();
     assert_eq!(range.0, today);
     assert_eq!(range.1, today);
 }
@@ -107,8 +119,14 @@ fn an_unlimited_rule_allows_any_range() {
 fn a_maximum_rejects_a_longer_range() {
     let calendar = calendar();
     let rules = DateRangeRules::new().with_maximum_days(7);
-    assert!(rules.allows((day(2024, 5, 1), day(2024, 5, 7)), &calendar), "7 days fits");
-    assert!(!rules.allows((day(2024, 5, 1), day(2024, 5, 8)), &calendar), "8 days does not");
+    assert!(
+        rules.allows((day(2024, 5, 1), day(2024, 5, 7)), &calendar),
+        "7 days fits"
+    );
+    assert!(
+        !rules.allows((day(2024, 5, 1), day(2024, 5, 8)), &calendar),
+        "8 days does not"
+    );
 }
 
 #[test]

@@ -7,7 +7,9 @@ use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::visit_mut::{self, VisitMut};
-use syn::{parse_macro_input, Error, Expr, ExprMethodCall, Ident, ImplItem, ItemImpl, Member, Token};
+use syn::{
+    Error, Expr, ExprMethodCall, Ident, ImplItem, ItemImpl, Member, Token, parse_macro_input,
+};
 
 /// Marks a `View` implementation for field level `State` dependency tracking.
 ///
@@ -32,9 +34,12 @@ pub fn track_state_reads(attribute: TokenStream, item: TokenStream) -> TokenStre
         Err(error) => return error.into_compile_error().into(),
     };
     if fields.is_empty() {
-        return Error::new(Span::call_site(), "list the State fields that should be tracked")
-            .into_compile_error()
-            .into();
+        return Error::new(
+            Span::call_site(),
+            "list the State fields that should be tracked",
+        )
+        .into_compile_error()
+        .into();
     }
     let mut implementation = parse_macro_input!(item as ItemImpl);
     let field_names: HashSet<String> = fields.iter().map(ToString::to_string).collect();
@@ -44,25 +49,33 @@ pub fn track_state_reads(attribute: TokenStream, item: TokenStream) -> TokenStre
             .into();
     }
 
-    let is_view_impl = implementation
-        .trait_
-        .as_ref()
-        .is_some_and(|(_, path, _)| path.segments.last().is_some_and(|segment| segment.ident == "View"));
+    let is_view_impl = implementation.trait_.as_ref().is_some_and(|(_, path, _)| {
+        path.segments
+            .last()
+            .is_some_and(|segment| segment.ident == "View")
+    });
     if !is_view_impl {
-        return Error::new_spanned(&implementation, "track_state_reads must annotate an impl of View")
-            .into_compile_error()
-            .into();
+        return Error::new_spanned(
+            &implementation,
+            "track_state_reads must annotate an impl of View",
+        )
+        .into_compile_error()
+        .into();
     }
 
     let mut found_body = false;
     let mut dynamic_properties_index = None;
     let mut precise_state_reads_index = None;
     for (index, member) in implementation.items.iter_mut().enumerate() {
-        let ImplItem::Fn(function) = member else { continue };
+        let ImplItem::Fn(function) = member else {
+            continue;
+        };
         match function.sig.ident.to_string().as_str() {
             "body" => {
                 found_body = true;
-                let mut rewrite = StateFieldReads { fields: field_names.clone() };
+                let mut rewrite = StateFieldReads {
+                    fields: field_names.clone(),
+                };
                 rewrite.visit_block_mut(&mut function.block);
             }
             "dynamic_properties" => dynamic_properties_index = Some(index),
@@ -71,18 +84,26 @@ pub fn track_state_reads(attribute: TokenStream, item: TokenStream) -> TokenStre
         }
     }
     if !found_body {
-        return Error::new_spanned(&implementation, "View implementation must define body(&self)")
-            .into_compile_error()
-            .into();
+        return Error::new_spanned(
+            &implementation,
+            "View implementation must define body(&self)",
+        )
+        .into_compile_error()
+        .into();
     }
 
-    let property_fields: Vec<_> = fields.iter().map(|field| {
+    let property_fields: Vec<_> = fields
+        .iter()
+        .map(|field| {
             let name = field.to_string();
             quote! { ::cove_composition::DynamicField::state(#name, &self.#field) }
-        }).collect();
+        })
+        .collect();
     let mut generated = Vec::new();
     if let Some(index) = dynamic_properties_index {
-        let ImplItem::Fn(function) = &mut implementation.items[index] else { unreachable!() };
+        let ImplItem::Fn(function) = &mut implementation.items[index] else {
+            unreachable!()
+        };
         let previous = std::mem::replace(&mut function.block, syn::parse_quote!({}));
         function.block = syn::parse_quote!({
             let mut __cove_dynamic_fields = (|| #previous)();
@@ -97,14 +118,18 @@ pub fn track_state_reads(attribute: TokenStream, item: TokenStream) -> TokenStre
         });
     }
     if let Some(index) = precise_state_reads_index {
-        let ImplItem::Fn(function) = &mut implementation.items[index] else { unreachable!() };
+        let ImplItem::Fn(function) = &mut implementation.items[index] else {
+            unreachable!()
+        };
         function.block = syn::parse_quote!({ true });
     } else {
         generated.push(quote! { fn precise_state_reads(&self) -> bool { true } });
     }
-    implementation.items.extend(generated.into_iter().map(|tokens| {
-        ImplItem::Verbatim(tokens)
-    }));
+    implementation.items.extend(
+        generated
+            .into_iter()
+            .map(|tokens| ImplItem::Verbatim(tokens)),
+    );
 
     let self_ty = &implementation.self_ty;
     let (impl_generics, _, where_clause) = implementation.generics.split_for_impl();
@@ -119,9 +144,15 @@ struct StateFieldReads {
 }
 impl StateFieldReads {
     fn receiver_field(&self, expression: &Expr) -> Option<Ident> {
-        let Expr::Field(field) = expression else { return None };
-        let Member::Named(name) = &field.member else { return None };
-        let Expr::Path(base) = &*field.base else { return None };
+        let Expr::Field(field) = expression else {
+            return None;
+        };
+        let Member::Named(name) = &field.member else {
+            return None;
+        };
+        let Expr::Path(base) = &*field.base else {
+            return None;
+        };
         if base.qself.is_some()
             || base.path.segments.len() != 1
             || base.path.segments[0].ident != "self"
@@ -149,7 +180,12 @@ impl VisitMut for StateFieldReads {
             return;
         }
         if let Expr::Field(access) = expression {
-            if let Expr::MethodCall(ExprMethodCall { receiver, method, args, .. }) = &*access.base
+            if let Expr::MethodCall(ExprMethodCall {
+                receiver,
+                method,
+                args,
+                ..
+            }) = &*access.base
                 && method == "get"
                 && args.is_empty()
                 && let Some(state) = self.receiver_field(receiver)
@@ -170,12 +206,25 @@ impl VisitMut for StateFieldReads {
 
 impl StateFieldReads {
     fn array_field(&self, expression: &Expr) -> Option<(Ident, Ident)> {
-        let Expr::Field(field) = expression else { return None };
-        let Member::Named(name) = &field.member else { return None };
-        let Expr::MethodCall(ExprMethodCall { receiver, method, args, .. }) = &*field.base else { return None };
-        if method != "get" || !args.is_empty() { return None; }
+        let Expr::Field(field) = expression else {
+            return None;
+        };
+        let Member::Named(name) = &field.member else {
+            return None;
+        };
+        let Expr::MethodCall(ExprMethodCall {
+            receiver,
+            method,
+            args,
+            ..
+        }) = &*field.base
+        else {
+            return None;
+        };
+        if method != "get" || !args.is_empty() {
+            return None;
+        }
         let state = self.receiver_field(receiver)?;
         Some((state, name.clone()))
     }
 }
-

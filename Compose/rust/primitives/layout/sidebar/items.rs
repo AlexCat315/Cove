@@ -2,10 +2,10 @@
 //!
 //! Authored navigation content. Session state (expansion, focus, reveal) stays
 //! outside these values so they remain comparable inputs.
-use cove_imaging::BundleImageResource;
+use crate::AnyView;
 use crate::primitives::overlays::menu::MenuEntry;
 use crate::theme::SemanticIconSize;
-use crate::AnyView;
+use cove_imaging::BundleImageResource;
 
 /// Inline views for one sidebar row.
 ///
@@ -24,11 +24,20 @@ pub struct SidebarItemSlots {
 
 impl SidebarItemSlots {
     pub fn new() -> Self {
-        Self { leading: None, trailing: None, accessory: None, accessory_width: 44.0 }
+        Self {
+            leading: None,
+            trailing: None,
+            accessory: None,
+            accessory_width: 44.0,
+        }
     }
 
     pub fn accessory_width(mut self, width: f32) -> Self {
-        self.accessory_width = if width.is_finite() { width.clamp(0.0, 240.0) } else { 44.0 };
+        self.accessory_width = if width.is_finite() {
+            width.clamp(0.0, 240.0)
+        } else {
+            44.0
+        };
         self
     }
 
@@ -122,7 +131,11 @@ pub struct SidebarSection<Id: PartialEq + Clone> {
 
 impl<Id: PartialEq + Clone> SidebarSection<Id> {
     pub fn new(id: impl Into<String>, items: Vec<SidebarItem<Id>>) -> Self {
-        Self { id: id.into(), title: String::new(), items }
+        Self {
+            id: id.into(),
+            title: String::new(),
+            items,
+        }
     }
 
     pub fn title(mut self, title: impl Into<String>) -> Self {

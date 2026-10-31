@@ -13,7 +13,7 @@
 //! commit gate directly with the same inputs the handlers receive.
 
 use cove_ui_compose::primitives::controls::fields::{
-    normalized_commit_text, pretty_printed, validate, JsonFieldValidation,
+    JsonFieldValidation, normalized_commit_text, pretty_printed, validate,
 };
 
 /// The text a commit would write, or `None` when the commit must be rejected.
@@ -26,7 +26,11 @@ fn committed(text: &str) -> Option<String> {
 #[test]
 fn empty_input_saves_as_an_empty_json_object() {
     for blank in ["", "  ", "  \n ", "\n\t\n"] {
-        assert_eq!(normalized_commit_text(blank), "{}", "blank input becomes an object");
+        assert_eq!(
+            normalized_commit_text(blank),
+            "{}",
+            "blank input becomes an object"
+        );
         assert_eq!(
             validate(blank),
             JsonFieldValidation::Empty,

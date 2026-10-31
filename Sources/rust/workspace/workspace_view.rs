@@ -13,42 +13,46 @@
 //! hit slop and the reserve arithmetic.
 use super::controller::{WorkspaceCommand, WorkspaceController, WorkspaceTarget};
 use super::drag::{self, DRAG_OVERLAY_ROOT_KEY};
-use super::ids::{WorkspaceEdge, WorkspaceFloatingWindowID, WorkspacePanelID, WorkspaceSlotID, WorkspaceSplitAxis, WorkspaceTabGroupID};
+use super::ids::{
+    WorkspaceEdge, WorkspaceFloatingWindowID, WorkspacePanelID, WorkspaceSlotID,
+    WorkspaceSplitAxis, WorkspaceTabGroupID,
+};
 use super::model::{
-    WorkspaceDocument, WorkspaceFloatingWindow, WorkspaceLayoutNode, WorkspaceLayoutSplit, WorkspacePanelRegistry,
-    WorkspaceTabGroup,
+    WorkspaceDocument, WorkspaceFloatingWindow, WorkspaceLayoutNode, WorkspaceLayoutSplit,
+    WorkspacePanelRegistry, WorkspaceTabGroup,
 };
 use super::sizing::{WorkspaceLayoutMetrics, WorkspaceResolvedSplit, WorkspaceSizingResolver};
 use super::theme::{WorkspaceRegionSizing, WorkspaceTheme};
 use super::view::{
-    chrome_rail_slots, collapsed_groups_on, rail_groups, rail_plan, renderable_layout, visible_chrome_rail_slots,
-    visible_groups, WorkspaceBox, WorkspacePane, WorkspaceRegionTransition, WorkspaceResizeGeometry,
-    RESIZE_GEOMETRY_KEY,
+    RESIZE_GEOMETRY_KEY, WorkspaceBox, WorkspacePane, WorkspaceRegionTransition,
+    WorkspaceResizeGeometry, chrome_rail_slots, collapsed_groups_on, rail_groups, rail_plan,
+    renderable_layout, visible_chrome_rail_slots, visible_groups,
 };
 use cove_composition::{
-    impl_primitive_view, AnyView, EmptyView, LayoutDebugAttachmentKey, PrimitiveView, View, ViewExt,
+    AnyView, EmptyView, LayoutDebugAttachmentKey, PrimitiveView, View, ViewExt, impl_primitive_view,
 };
 
 /// Erase any view so modifier chains can be returned / stored as `AnyView`.
 fn erased(view: impl View + 'static) -> AnyView {
     AnyView::new(view)
 }
-use cove_core::scene::{
-    AccessibilityRole, AccessibilitySemantics, Align, Edge, FlexDirection, FocusChainHolder, InputHandlerRoute,
-    InputRoutingPriority, InteractionRegistryHolder, Justify, LayoutNode, Node, PointerCaptureHolder, PositionType,
-};
 use cove_core::Color;
+use cove_core::scene::{
+    AccessibilityRole, AccessibilitySemantics, Align, Edge, FlexDirection, FocusChainHolder,
+    InputHandlerRoute, InputRoutingPriority, InteractionRegistryHolder, Justify, LayoutNode, Node,
+    PointerCaptureHolder, PositionType,
+};
 use cove_platform::MouseButton;
-use cove_ui_compose::primitives::layout::scroll_view::ScrollView;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::modifiers::style::AppearanceExt;
 use cove_ui_compose::primitives::controls::Button;
-use cove_ui_compose::primitives::overlays::menu::{Menu, MenuEntry, MenuItem};
+use cove_ui_compose::primitives::layout::scroll_view::ScrollView;
 use cove_ui_compose::primitives::overlays::anchored::PopoverPlacement;
+use cove_ui_compose::primitives::overlays::menu::{Menu, MenuEntry, MenuItem};
 use cove_ui_compose::primitives::overlays::popover::Popover;
 use cove_ui_compose::primitives::text::{Divider, DividerAxis, Text};
-use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticFontRef, SemanticStyleViewExt};
 use cove_ui_compose::theme::theme_for_node;
+use cove_ui_compose::theme::tokens::{SemanticColorRef, SemanticFontRef, SemanticStyleViewExt};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -75,12 +79,19 @@ pub struct WorkspaceView {
 
 impl WorkspaceView {
     pub fn new(controller: Rc<RefCell<WorkspaceController>>, content: WorkspaceContent) -> Self {
-        Self { controller, content, compact: false }
+        Self {
+            controller,
+            content,
+            compact: false,
+        }
     }
 
     /// Build from a registry. The registry is snapshotted so the view does not
     /// hold a borrow across a panel factory.
-    pub fn with_registry(controller: Rc<RefCell<WorkspaceController>>, registry: &WorkspacePanelRegistry) -> Self {
+    pub fn with_registry(
+        controller: Rc<RefCell<WorkspaceController>>,
+        registry: &WorkspacePanelRegistry,
+    ) -> Self {
         Self::new(controller, registry.content())
     }
 
@@ -125,7 +136,9 @@ impl WorkspaceView {
             .unwrap_or_else(|| panel_id.raw_value().to_string());
         let controller = self.controller.clone();
         let restore = Button::title("Restore", move || {
-            controller.borrow_mut().dispatch(WorkspaceCommand::RestoreMaximized);
+            controller
+                .borrow_mut()
+                .dispatch(WorkspaceCommand::RestoreMaximized);
         });
         let header = AnyView::new(
             WorkspaceBox::row()
@@ -140,7 +153,11 @@ impl WorkspaceView {
             AnyView::new(
                 WorkspaceBox::column()
                     .child(header)
-                    .child((self.content_view(panel_id)).flex_with(1.0, 1.0, Some(0.0)).frame_min_width(0.0))
+                    .child(
+                        (self.content_view(panel_id))
+                            .flex_with(1.0, 1.0, Some(0.0))
+                            .frame_min_width(0.0),
+                    )
                     .boxed(),
             )
             .modifier(WorkspaceFillModifier)
@@ -154,40 +171,50 @@ impl WorkspaceView {
         let document = document.clone();
         let controller = self.controller.clone();
         let content = self.content.clone();
-        AnyView::new(WorkspaceSurfaceReader { build: Rc::new(move |width: f32| {
-            let expanded = width >= cove_core::Viewport::EXPANDED_MINIMUM_WIDTH;
-            if compact || !expanded {
-                return erased(
-                    AnyView::new(WorkspaceCompactView {
-                        document: document.clone(),
-                        controller: controller.clone(),
-                        content: content.clone(),
-                        presented: cove_core::State::new(false),
-                    })
+        AnyView::new(WorkspaceSurfaceReader {
+            build: Rc::new(move |width: f32| {
+                let expanded = width >= cove_core::Viewport::EXPANDED_MINIMUM_WIDTH;
+                if compact || !expanded {
+                    return erased(
+                        AnyView::new(WorkspaceCompactView {
+                            document: document.clone(),
+                            controller: controller.clone(),
+                            content: content.clone(),
+                            presented: cove_core::State::new(false),
+                        })
+                        .modifier(WorkspaceFillModifier)
+                        .modifier(WorkspaceRoleModifier::new(
+                            "workspace",
+                            "workspace",
+                            "workspace",
+                        )),
+                    );
+                }
+                erased(
+                    AnyView::new(
+                        WorkspaceBox::column()
+                            .child(WorkspaceShell {
+                                document: document.clone(),
+                                controller: controller.clone(),
+                                content: content.clone(),
+                                metrics: WorkspaceLayoutMetrics::default(),
+                            })
+                            .child(WorkspaceFloatingLayer {
+                                document: document.clone(),
+                                controller: controller.clone(),
+                                content: content.clone(),
+                            })
+                            .boxed(),
+                    )
                     .modifier(WorkspaceFillModifier)
-                    .modifier(WorkspaceRoleModifier::new("workspace", "workspace", "workspace")),
-                );
-            }
-            erased(
-                AnyView::new(
-                    WorkspaceBox::column()
-                        .child(WorkspaceShell {
-                            document: document.clone(),
-                            controller: controller.clone(),
-                            content: content.clone(),
-                            metrics: WorkspaceLayoutMetrics::default(),
-                        })
-                        .child(WorkspaceFloatingLayer {
-                            document: document.clone(),
-                            controller: controller.clone(),
-                            content: content.clone(),
-                        })
-                        .boxed(),
+                    .modifier(WorkspaceRoleModifier::new(
+                        "workspace",
+                        "workspace",
+                        "workspace",
+                    )),
                 )
-                .modifier(WorkspaceFillModifier)
-                .modifier(WorkspaceRoleModifier::new("workspace", "workspace", "workspace")),
-            )
-        }) })
+            }),
+        })
     }
 }
 
@@ -201,9 +228,9 @@ struct WorkspaceSurfaceReader {
 impl View for WorkspaceSurfaceReader {
     fn body(&self) -> AnyView {
         let build = self.build.clone();
-        AnyView::new(cove_composition::adaptive::ContainerSizeReader::new(move |size: cove_core::Size| {
-            build(size.width)
-        }))
+        AnyView::new(cove_composition::adaptive::ContainerSizeReader::new(
+            move |size: cove_core::Size| build(size.width),
+        ))
     }
 }
 
@@ -218,7 +245,11 @@ struct WorkspaceThemeProvider {
 
 impl View for WorkspaceThemeProvider {
     fn body(&self) -> AnyView {
-        erased(self.content.clone().composition_local(super::theme::WorkspaceThemeEnvironment::key(), self.theme))
+        erased(
+            self.content
+                .clone()
+                .composition_local(super::theme::WorkspaceThemeEnvironment::key(), self.theme),
+        )
     }
 }
 
@@ -251,9 +282,18 @@ impl WorkspaceRoleModifier {
 
 impl cove_composition::ViewModifier for WorkspaceRoleModifier {
     fn apply_node(&self, node: &Node) {
-        node.set_attachment(LayoutDebugAttachmentKey::LAYOUT_ROLE, self.layout_role.clone());
-        node.set_attachment(LayoutDebugAttachmentKey::SEMANTIC_ROLE, self.semantic_role.clone());
-        node.set_attachment(LayoutDebugAttachmentKey::DEBUG_NAME, self.debug_name.clone());
+        node.set_attachment(
+            LayoutDebugAttachmentKey::LAYOUT_ROLE,
+            self.layout_role.clone(),
+        );
+        node.set_attachment(
+            LayoutDebugAttachmentKey::SEMANTIC_ROLE,
+            self.semantic_role.clone(),
+        );
+        node.set_attachment(
+            LayoutDebugAttachmentKey::DEBUG_NAME,
+            self.debug_name.clone(),
+        );
     }
 }
 
@@ -274,9 +314,13 @@ struct WorkspacePaddingModifier {
 
 impl WorkspacePaddingModifier {
     fn all(value: f32) -> Self {
-        Self { top: value, leading: value, bottom: value, trailing: value }
+        Self {
+            top: value,
+            leading: value,
+            bottom: value,
+            trailing: value,
+        }
     }
-
 }
 
 impl cove_composition::ViewModifier for WorkspacePaddingModifier {
@@ -326,7 +370,10 @@ impl cove_composition::ViewModifier for WorkspaceLayoutAnimation {
     fn apply_node(&self, node: &Node) {
         let previous = node.attachment::<Vec<bool>>(LAYOUT_PHASE_KEY);
         let animates = super::theme::resolve_workspace_theme(node).animates_layout;
-        let animate = previous.as_ref().is_some_and(|previous| previous != &self.phase) && animates;
+        let animate = previous
+            .as_ref()
+            .is_some_and(|previous| previous != &self.phase)
+            && animates;
         node.set_attachment(LAYOUT_PHASE_KEY, self.phase.clone());
         if animate {
             node.set_attachment("cove.workspace.layout.animating", true);
@@ -354,12 +401,18 @@ struct WorkspaceExtent {
 
 impl WorkspaceExtent {
     fn new() -> Self {
-        Self { extent: cove_core::State::new(0.0) }
+        Self {
+            extent: cove_core::State::new(0.0),
+        }
     }
 
     fn measure(horizontal: bool, extent: &cove_core::State<f32>, node: &Node) {
         let frame = node.frame();
-        let value = if horizontal { frame.width } else { frame.height };
+        let value = if horizontal {
+            frame.width
+        } else {
+            frame.height
+        };
         if (extent.get() - value).abs() > 0.01 {
             extent.set(value);
         }
@@ -396,7 +449,11 @@ impl PrimitiveView for WorkspaceExtentBody {
 
     fn make_layout_node(&self) -> Option<LayoutNode> {
         let layout = LayoutNode::new();
-        layout.set_flex_direction(if self.horizontal { FlexDirection::Row } else { FlexDirection::Column });
+        layout.set_flex_direction(if self.horizontal {
+            FlexDirection::Row
+        } else {
+            FlexDirection::Column
+        });
         layout.set_align_items(Align::Stretch);
         layout.set_min_width(Some(0.0));
         layout.set_min_height(Some(0.0));
@@ -405,7 +462,11 @@ impl PrimitiveView for WorkspaceExtentBody {
     }
 
     fn update_layout(&self, layout: &LayoutNode) {
-        layout.set_flex_direction(if self.horizontal { FlexDirection::Row } else { FlexDirection::Column });
+        layout.set_flex_direction(if self.horizontal {
+            FlexDirection::Row
+        } else {
+            FlexDirection::Column
+        });
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
@@ -436,7 +497,13 @@ impl View for WorkspaceShell {
                 horizontal: false,
                 extent: extent.extent.clone(),
                 build: Rc::new(move |height| {
-                    build_shell(document.clone(), controller.clone(), content.clone(), metrics, height)
+                    build_shell(
+                        document.clone(),
+                        controller.clone(),
+                        content.clone(),
+                        metrics,
+                        height,
+                    )
                 }),
             })
             .modifier(WorkspaceFillModifier),
@@ -453,7 +520,8 @@ fn build_shell(
 ) -> AnyView {
     let top_visible = !visible_groups(&WorkspaceSlotID::top(), &document).is_empty();
     let top_collapsed = !collapsed_groups_on(WorkspaceEdge::Top, &document).is_empty();
-    let top_chrome = chrome_rail_slots(WorkspaceEdge::Top, &document, metrics.shows_collapsed_rails);
+    let top_chrome =
+        chrome_rail_slots(WorkspaceEdge::Top, &document, metrics.shows_collapsed_rails);
     let bottom_chrome = visible_chrome_rail_slots(WorkspaceEdge::Bottom, &document);
     let reserve: f32 = top_chrome.iter().map(|slot| slot.2).sum::<f32>()
         + bottom_chrome.iter().map(|slot| slot.2).sum::<f32>()
@@ -464,7 +532,11 @@ fn build_shell(
         resolver.slot(&WorkspaceSlotID::center(), WorkspaceSplitAxis::Vertical),
         resolver.slot(&WorkspaceSlotID::bottom(), WorkspaceSplitAxis::Vertical),
         true,
-        if visible_groups(&WorkspaceSlotID::bottom(), &document).is_empty() { 0.0 } else { metrics.divider },
+        if visible_groups(&WorkspaceSlotID::bottom(), &document).is_empty() {
+            0.0
+        } else {
+            metrics.divider
+        },
     );
     let main_size = resolver.combine(
         center_bottom,
@@ -509,13 +581,19 @@ fn build_shell(
                 content: content.clone(),
             })),
         ))
-        .modifier(WorkspaceLayoutAnimation { phase: phase.clone() }),
+        .modifier(WorkspaceLayoutAnimation {
+            phase: phase.clone(),
+        }),
     ));
     children.push(AnyView::new(WorkspaceRegionTransition::new(
         top_visible,
         false,
         WorkspaceRegionSizing::Divider,
-        Some(AnyView::new(WorkspaceSplitDivider::named("top", false, controller.clone()))),
+        Some(AnyView::new(WorkspaceSplitDivider::named(
+            "top",
+            false,
+            controller.clone(),
+        ))),
     )));
     if top_collapsed && metrics.shows_collapsed_rails {
         children.push(AnyView::new(WorkspaceRail {
@@ -534,8 +612,18 @@ fn build_shell(
             content: content.clone(),
             metrics,
         })
-        .flex_with(if top_visible { 1.0 - split.fraction } else { 1.0 }, 1.0, Some(0.0))
-        .modifier(WorkspaceLayoutAnimation { phase: phase.clone() }),
+        .flex_with(
+            if top_visible {
+                1.0 - split.fraction
+            } else {
+                1.0
+            },
+            1.0,
+            Some(0.0),
+        )
+        .modifier(WorkspaceLayoutAnimation {
+            phase: phase.clone(),
+        }),
     ));
     for (slot_id, edge, thickness) in &bottom_chrome {
         children.push(AnyView::new(WorkspaceChromeSlot {
@@ -586,7 +674,13 @@ impl View for WorkspaceMainRow {
                 horizontal: true,
                 extent: extent.extent.clone(),
                 build: Rc::new(move |width| {
-                    build_main_row(document.clone(), controller.clone(), content.clone(), metrics, width)
+                    build_main_row(
+                        document.clone(),
+                        controller.clone(),
+                        content.clone(),
+                        metrics,
+                        width,
+                    )
                 }),
             })
             .modifier(WorkspaceFillModifier),
@@ -602,9 +696,17 @@ fn build_main_row(
     width: f32,
 ) -> AnyView {
     let leading_visible = !visible_groups(&WorkspaceSlotID::leading(), &document).is_empty();
-    let leading_rail = rail_plan(WorkspaceEdge::Leading, &document, metrics.shows_collapsed_rails);
+    let leading_rail = rail_plan(
+        WorkspaceEdge::Leading,
+        &document,
+        metrics.shows_collapsed_rails,
+    );
     let trailing_visible = !visible_groups(&WorkspaceSlotID::trailing(), &document).is_empty();
-    let trailing_rail = rail_plan(WorkspaceEdge::Trailing, &document, metrics.shows_collapsed_rails);
+    let trailing_rail = rail_plan(
+        WorkspaceEdge::Trailing,
+        &document,
+        metrics.shows_collapsed_rails,
+    );
 
     let resolver = WorkspaceSizingResolver::with_metrics(&document, metrics);
     let center_size = resolver.combine(
@@ -615,7 +717,8 @@ fn build_main_row(
     );
     let leading_size = resolver.slot(&WorkspaceSlotID::leading(), WorkspaceSplitAxis::Horizontal);
     let trailing_size = resolver.slot(&WorkspaceSlotID::trailing(), WorkspaceSplitAxis::Horizontal);
-    let rail_width = leading_rail.as_ref().map_or(0.0, |plan| plan.2) + trailing_rail.as_ref().map_or(0.0, |plan| plan.2);
+    let rail_width = leading_rail.as_ref().map_or(0.0, |plan| plan.2)
+        + trailing_rail.as_ref().map_or(0.0, |plan| plan.2);
     let dividers = (leading_visible as u8 + trailing_visible as u8) as f32;
     let available = (width - rail_width - metrics.divider * dividers).max(0.0);
 
@@ -630,7 +733,11 @@ fn build_main_row(
             center_size
         },
     );
-    let leading_weight = if leading_visible { leading_split.fraction } else { 0.0 };
+    let leading_weight = if leading_visible {
+        leading_split.fraction
+    } else {
+        0.0
+    };
     let trailing_split = WorkspaceResolvedSplit::new(
         document.split_fractions.center_trailing,
         0.78,
@@ -638,7 +745,12 @@ fn build_main_row(
         center_size,
         trailing_size,
     );
-    let center_weight = (1.0 - leading_weight) * if trailing_visible { trailing_split.fraction } else { 1.0 };
+    let center_weight = (1.0 - leading_weight)
+        * if trailing_visible {
+            trailing_split.fraction
+        } else {
+            1.0
+        };
     let trailing_weight = (1.0 - leading_weight) - center_weight;
     let phase = vec![leading_visible, trailing_visible];
 
@@ -677,7 +789,11 @@ fn build_main_row(
         leading_visible,
         true,
         WorkspaceRegionSizing::Divider,
-        Some(AnyView::new(WorkspaceSplitDivider::named("leading", true, controller.clone()))),
+        Some(AnyView::new(WorkspaceSplitDivider::named(
+            "leading",
+            true,
+            controller.clone(),
+        ))),
     )));
     children.push(erased(
         AnyView::new(WorkspaceCenterColumn {
@@ -687,13 +803,19 @@ fn build_main_row(
             metrics,
         })
         .flex_with(center_weight, 1.0, Some(0.0))
-        .modifier(WorkspaceLayoutAnimation { phase: phase.clone() }),
+        .modifier(WorkspaceLayoutAnimation {
+            phase: phase.clone(),
+        }),
     ));
     children.push(AnyView::new(WorkspaceRegionTransition::new(
         trailing_visible,
         true,
         WorkspaceRegionSizing::Divider,
-        Some(AnyView::new(WorkspaceSplitDivider::named("centerTrailing", true, controller.clone()))),
+        Some(AnyView::new(WorkspaceSplitDivider::named(
+            "centerTrailing",
+            true,
+            controller.clone(),
+        ))),
     )));
     children.push(AnyView::new(WorkspaceRegionTransition::new(
         trailing_visible,
@@ -737,7 +859,11 @@ fn build_main_row(
             horizontal: true,
             offset: leading_rail_thickness
                 + leading_weight * available
-                + if leading_visible { metrics.divider } else { 0.0 }
+                + if leading_visible {
+                    metrics.divider
+                } else {
+                    0.0
+                }
                 + metrics.divider / 2.0,
             available: trailing_split.available,
             range: trailing_split.range,
@@ -774,7 +900,13 @@ impl View for WorkspaceCenterColumn {
                 horizontal: false,
                 extent: extent.extent.clone(),
                 build: Rc::new(move |height| {
-                    build_center_column(document.clone(), controller.clone(), content.clone(), metrics, height)
+                    build_center_column(
+                        document.clone(),
+                        controller.clone(),
+                        content.clone(),
+                        metrics,
+                        height,
+                    )
                 }),
             })
             .modifier(WorkspaceFillModifier)
@@ -798,7 +930,11 @@ fn build_center_column(
     let bottom_rail = if bottom_visible {
         None
     } else {
-        rail_plan(WorkspaceEdge::Bottom, &document, metrics.shows_collapsed_rails)
+        rail_plan(
+            WorkspaceEdge::Bottom,
+            &document,
+            metrics.shows_collapsed_rails,
+        )
     };
     let resolver = WorkspaceSizingResolver::with_metrics(&document, metrics);
     let split = WorkspaceResolvedSplit::new(
@@ -819,14 +955,24 @@ fn build_center_column(
             controller: controller.clone(),
             content: content.clone(),
         })
-        .flex_with(if bottom_visible { split.fraction } else { 1.0 }, 1.0, Some(0.0))
-        .modifier(WorkspaceLayoutAnimation { phase: phase.clone() }),
+        .flex_with(
+            if bottom_visible { split.fraction } else { 1.0 },
+            1.0,
+            Some(0.0),
+        )
+        .modifier(WorkspaceLayoutAnimation {
+            phase: phase.clone(),
+        }),
     ));
     children.push(AnyView::new(WorkspaceRegionTransition::new(
         bottom_visible,
         false,
         WorkspaceRegionSizing::Divider,
-        Some(AnyView::new(WorkspaceSplitDivider::named("topBottom", false, controller.clone()))),
+        Some(AnyView::new(WorkspaceSplitDivider::named(
+            "topBottom",
+            false,
+            controller.clone(),
+        ))),
     )));
     children.push(AnyView::new(WorkspaceRegionTransition::new(
         bottom_visible,
@@ -914,28 +1060,32 @@ struct WorkspaceBottomSlot {
 
 impl View for WorkspaceBottomSlot {
     fn body(&self) -> AnyView {
-        let inner: AnyView = if visible_groups(&WorkspaceSlotID::bottom(), &self.document).is_empty() {
-            AnyView::new(EmptyView)
-        } else {
-            erased(AnyView::new(WorkspaceSlotView {
-                slot_id: WorkspaceSlotID::bottom(),
-                document: self.document.clone(),
-                controller: self.controller.clone(),
-                content: self.content.clone(),
-            })
-            .modifier(WorkspaceRoleModifier::new(
-                "workspace-region",
-                "workspace.slot.bottom",
-                "workspace-region-bottom",
-            )))
-        };
+        let inner: AnyView =
+            if visible_groups(&WorkspaceSlotID::bottom(), &self.document).is_empty() {
+                AnyView::new(EmptyView)
+            } else {
+                erased(
+                    AnyView::new(WorkspaceSlotView {
+                        slot_id: WorkspaceSlotID::bottom(),
+                        document: self.document.clone(),
+                        controller: self.controller.clone(),
+                        content: self.content.clone(),
+                    })
+                    .modifier(WorkspaceRoleModifier::new(
+                        "workspace-region",
+                        "workspace.slot.bottom",
+                        "workspace-region-bottom",
+                    )),
+                )
+            };
         erased(
-            AnyView::new(WorkspaceBox::column().child((inner).flex(1.0)).boxed())
-                .modifier(WorkspaceRoleModifier::new(
+            AnyView::new(WorkspaceBox::column().child((inner).flex(1.0)).boxed()).modifier(
+                WorkspaceRoleModifier::new(
                     "workspace-bottom-slot",
                     "workspace.bottom",
                     "workspace-bottom-slot",
-                )),
+                ),
+            ),
         )
     }
 }
@@ -961,12 +1111,18 @@ impl View for WorkspaceChromeSlot {
             document: self.document.clone(),
             controller: self.controller.clone(),
         });
-        let container = if horizontal { WorkspaceBox::row() } else { WorkspaceBox::column() };
-        erased(AnyView::new(container.child(rail).boxed()).modifier(WorkspaceChromeSlotModifier {
-            horizontal,
-            thickness: self.thickness,
-            slot_id: self.slot_id.clone(),
-        }))
+        let container = if horizontal {
+            WorkspaceBox::row()
+        } else {
+            WorkspaceBox::column()
+        };
+        erased(
+            AnyView::new(container.child(rail).boxed()).modifier(WorkspaceChromeSlotModifier {
+                horizontal,
+                thickness: self.thickness,
+                slot_id: self.slot_id.clone(),
+            }),
+        )
     }
 }
 
@@ -980,7 +1136,10 @@ impl cove_composition::ViewModifier for WorkspaceChromeSlotModifier {
     fn apply_node(&self, node: &Node) {
         let colors = theme_for_node(node).colors;
         node.set_background_color(Some(colors.background));
-        node.set_attachment(LayoutDebugAttachmentKey::LAYOUT_ROLE, "workspace-chrome-slot".to_owned());
+        node.set_attachment(
+            LayoutDebugAttachmentKey::LAYOUT_ROLE,
+            "workspace-chrome-slot".to_owned(),
+        );
         node.set_attachment(
             LayoutDebugAttachmentKey::SEMANTIC_ROLE,
             format!("workspace.chrome.{}", self.slot_id.raw_value()),
@@ -1012,7 +1171,10 @@ impl View for WorkspaceRailReserve {
         let horizontal = matches!(self.edge, WorkspaceEdge::Top | WorkspaceEdge::Bottom);
         erased(
             AnyView::new(EmptyView)
-                .modifier(WorkspaceRailReserveModifier { horizontal, thickness: self.thickness })
+                .modifier(WorkspaceRailReserveModifier {
+                    horizontal,
+                    thickness: self.thickness,
+                })
                 .modifier(WorkspaceRoleModifier::new(
                     "workspace-rail-reserve",
                     &format!("workspace.rail.reserve.{}", self.edge.raw_value()),
@@ -1052,16 +1214,23 @@ pub struct WorkspaceLayoutNodeView {
 impl View for WorkspaceLayoutNodeView {
     fn body(&self) -> AnyView {
         match &self.node {
-            WorkspaceLayoutNode::Group(group_id) => match self.document.groups.get(group_id).cloned() {
-                Some(group) => AnyView::new(WorkspaceTabGroupView {
-                    group,
-                    document: self.document.clone(),
-                    controller: self.controller.clone(),
-                    content: self.content.clone(),
-                }),
-                None => AnyView::new(EmptyView),
-            },
-            WorkspaceLayoutNode::Split { axis, fraction, first, second } => {
+            WorkspaceLayoutNode::Group(group_id) => {
+                match self.document.groups.get(group_id).cloned() {
+                    Some(group) => AnyView::new(WorkspaceTabGroupView {
+                        group,
+                        document: self.document.clone(),
+                        controller: self.controller.clone(),
+                        content: self.content.clone(),
+                    }),
+                    None => AnyView::new(EmptyView),
+                }
+            }
+            WorkspaceLayoutNode::Split {
+                axis,
+                fraction,
+                first,
+                second,
+            } => {
                 let Some(first_leaf) = first.leaf_group_ids().into_iter().next() else {
                     return AnyView::new(EmptyView);
                 };
@@ -1091,27 +1260,31 @@ impl View for WorkspaceLayoutNodeView {
                     split_id: None,
                     hairline: metrics.divider,
                 });
-                erased(AnyView::new(
-                    order
-                        .child(WorkspaceLayoutNodeView {
-                            node: (**first).clone(),
-                            slot_id: self.slot_id.clone(),
-                            document: self.document.clone(),
-                            controller: self.controller.clone(),
-                            content: self.content.clone(),
-                        })
-                        .child(divider)
-                        .child(WorkspaceLayoutNodeView {
-                            node: (**second).clone(),
-                            slot_id: self.slot_id.clone(),
-                            document: self.document.clone(),
-                            controller: self.controller.clone(),
-                            content: self.content.clone(),
-                        })
-                        .boxed(),
+                erased(
+                    AnyView::new(
+                        order
+                            .child(WorkspaceLayoutNodeView {
+                                node: (**first).clone(),
+                                slot_id: self.slot_id.clone(),
+                                document: self.document.clone(),
+                                controller: self.controller.clone(),
+                                content: self.content.clone(),
+                            })
+                            .child(divider)
+                            .child(WorkspaceLayoutNodeView {
+                                node: (**second).clone(),
+                                slot_id: self.slot_id.clone(),
+                                document: self.document.clone(),
+                                controller: self.controller.clone(),
+                                content: self.content.clone(),
+                            })
+                            .boxed(),
+                    )
+                    .modifier(WorkspaceFillModifier)
+                    .modifier(WorkspaceLayoutSplitModifier {
+                        fraction: *fraction,
+                    }),
                 )
-                .modifier(WorkspaceFillModifier)
-                .modifier(WorkspaceLayoutSplitModifier { fraction: *fraction }))
             }
         }
     }
@@ -1158,8 +1331,11 @@ impl DividerTarget {
         let wanted = self.key()?;
         let mut cursor = from.parent();
         while let Some(current) = cursor {
-            if let Some(values) = current.attachment::<Vec<WorkspaceResizeGeometry>>(RESIZE_GEOMETRY_KEY)
-                && let Some(value) = values.into_iter().find(|candidate| candidate.split_id == wanted)
+            if let Some(values) =
+                current.attachment::<Vec<WorkspaceResizeGeometry>>(RESIZE_GEOMETRY_KEY)
+                && let Some(value) = values
+                    .into_iter()
+                    .find(|candidate| candidate.split_id == wanted)
             {
                 return Some(value);
             }
@@ -1178,7 +1354,10 @@ impl DividerTarget {
             Some("top") => document.document().split_fractions.top,
             _ => None,
         };
-        geometry.range.0.max(geometry.range.1.min(saved.unwrap_or(geometry.fraction)))
+        geometry
+            .range
+            .0
+            .max(geometry.range.1.min(saved.unwrap_or(geometry.fraction)))
     }
 
     fn write(&self, value: f32) {
@@ -1222,7 +1401,11 @@ pub struct WorkspaceSplitDivider {
 }
 
 impl WorkspaceSplitDivider {
-    fn named(split_id: &str, is_vertical_split: bool, controller: Rc<RefCell<WorkspaceController>>) -> Self {
+    fn named(
+        split_id: &str,
+        is_vertical_split: bool,
+        controller: Rc<RefCell<WorkspaceController>>,
+    ) -> Self {
         Self {
             debug_name: format!("workspace-split-{split_id}"),
             is_vertical_split,
@@ -1259,8 +1442,14 @@ impl PrimitiveView for WorkspaceSplitDivider {
         } else {
             cove_platform::SystemCursor::ResizeVertical
         }));
-        node.set_attachment(LayoutDebugAttachmentKey::DEBUG_NAME, self.debug_name.clone());
-        node.set_attachment(LayoutDebugAttachmentKey::LAYOUT_ROLE, "workspace-split-divider".to_owned());
+        node.set_attachment(
+            LayoutDebugAttachmentKey::DEBUG_NAME,
+            self.debug_name.clone(),
+        );
+        node.set_attachment(
+            LayoutDebugAttachmentKey::LAYOUT_ROLE,
+            "workspace-split-divider".to_owned(),
+        );
         node.set_attachment("cove.workspace.split.hitSize", hit_size);
 
         let target = self.target();
@@ -1272,13 +1461,20 @@ impl PrimitiveView for WorkspaceSplitDivider {
                 .map(|id| id.raw_value().to_string())
                 .or_else(|| {
                     self.address.as_ref().map(|address| {
-                        format!("{}-{}", address.first_group.raw_value(), address.second_group.raw_value())
+                        format!(
+                            "{}-{}",
+                            address.first_group.raw_value(),
+                            address.second_group.raw_value()
+                        )
                     })
                 })
                 .unwrap_or_else(|| "split".to_string())
         );
         if let Some(geometry) = target.geometry(node) {
-            semantics.value = format!("{}%", (target.current_fraction(&geometry) * 100.0).round() as i32);
+            semantics.value = format!(
+                "{}%",
+                (target.current_fraction(&geometry) * 100.0).round() as i32
+            );
         }
         node.set_accessibility(Some(semantics));
 
@@ -1309,84 +1505,111 @@ impl PrimitiveView for WorkspaceSplitDivider {
         );
 
         let pointer_node = node.clone();
-        registry.set_pointer(node, route.clone(), Rc::new(move |event, phase, _| {
-            if event.button != MouseButton::Left {
-                return cove_core::scene::EventResult::Ignored;
-            }
-            match phase {
-                cove_core::scene::PointerPhase::Down => {
-                    if let Some(chain) = FocusChainHolder::current() {
-                        chain.focus(Some(&pointer_node), false);
+        registry.set_pointer(
+            node,
+            route.clone(),
+            Rc::new(move |event, phase, _| {
+                if event.button != MouseButton::Left {
+                    return cove_core::scene::EventResult::Ignored;
+                }
+                match phase {
+                    cove_core::scene::PointerPhase::Down => {
+                        if let Some(chain) = FocusChainHolder::current() {
+                            chain.focus(Some(&pointer_node), false);
+                        }
+                        if let Some(capture) = PointerCaptureHolder::current() {
+                            capture.acquire(&pointer_node, false);
+                        }
                     }
-                    if let Some(capture) = PointerCaptureHolder::current() {
-                        capture.acquire(&pointer_node, false);
+                    cove_core::scene::PointerPhase::Up => {
+                        if let Some(capture) = PointerCaptureHolder::current()
+                            && capture.target().as_ref() == Some(&pointer_node)
+                        {
+                            capture.release();
+                        }
                     }
                 }
-                cove_core::scene::PointerPhase::Up => {
-                    if let Some(capture) = PointerCaptureHolder::current()
-                        && capture.target().as_ref() == Some(&pointer_node)
-                    {
-                        capture.release();
-                    }
-                }
-            }
-            cove_core::scene::EventResult::Handled
-        }));
+                cove_core::scene::EventResult::Handled
+            }),
+        );
 
         let motion_target = target.clone();
         let motion_node = node.clone();
-        registry.set_motion(node, route.clone(), Rc::new(move |event, _| {
-            if PointerCaptureHolder::current().and_then(|capture| capture.target()).as_ref() != Some(&motion_node) {
-                return cove_core::scene::EventResult::Ignored;
-            }
-            let Some(geometry) = motion_target.geometry(&motion_node) else {
-                return cove_core::scene::EventResult::Ignored;
-            };
-            if geometry.available <= 0.0 {
-                return cove_core::scene::EventResult::Ignored;
-            }
-            let position = if geometry.horizontal { event.x } else { event.y };
-            motion_target.write((position - geometry.offset) / geometry.available);
-            cove_core::scene::EventResult::Handled
-        }));
+        registry.set_motion(
+            node,
+            route.clone(),
+            Rc::new(move |event, _| {
+                if PointerCaptureHolder::current()
+                    .and_then(|capture| capture.target())
+                    .as_ref()
+                    != Some(&motion_node)
+                {
+                    return cove_core::scene::EventResult::Ignored;
+                }
+                let Some(geometry) = motion_target.geometry(&motion_node) else {
+                    return cove_core::scene::EventResult::Ignored;
+                };
+                if geometry.available <= 0.0 {
+                    return cove_core::scene::EventResult::Ignored;
+                }
+                let position = if geometry.horizontal {
+                    event.x
+                } else {
+                    event.y
+                };
+                motion_target.write((position - geometry.offset) / geometry.available);
+                cove_core::scene::EventResult::Handled
+            }),
+        );
 
         let key_target = target;
         let key_node = node.clone();
-        registry.set_key(node, InputHandlerRoute::new(
-            cove_core::scene::InputHandlerRole::Workspace,
-            InputRoutingPriority::NORMAL,
-            "workspace.split.key",
-        ), Rc::new(move |event, phase| {
-            if phase != cove_core::scene::EventPhase::Target {
-                return cove_core::scene::EventResult::Ignored;
-            }
-            if event.modifiers.has_ctrl() || event.modifiers.has_gui() || event.modifiers.has_alt() {
-                return cove_core::scene::EventResult::Ignored;
-            }
-            let Some(geometry) = key_target.geometry(&key_node) else {
-                return cove_core::scene::EventResult::Ignored;
-            };
-            let step = if event.modifiers.has_shift() { 0.1 } else { 0.02 };
-            let current = key_target.current_fraction(&geometry);
-            match event.scancode {
-                cove_composition::Scancode::HOME => key_target.write(geometry.range.0),
-                cove_composition::Scancode::END => key_target.write(geometry.range.1),
-                cove_composition::Scancode::ARROW_LEFT if key_target.is_vertical_split => {
-                    key_target.write(current - step)
+        registry.set_key(
+            node,
+            InputHandlerRoute::new(
+                cove_core::scene::InputHandlerRole::Workspace,
+                InputRoutingPriority::NORMAL,
+                "workspace.split.key",
+            ),
+            Rc::new(move |event, phase| {
+                if phase != cove_core::scene::EventPhase::Target {
+                    return cove_core::scene::EventResult::Ignored;
                 }
-                cove_composition::Scancode::ARROW_RIGHT if key_target.is_vertical_split => {
-                    key_target.write(current + step)
+                if event.modifiers.has_ctrl()
+                    || event.modifiers.has_gui()
+                    || event.modifiers.has_alt()
+                {
+                    return cove_core::scene::EventResult::Ignored;
                 }
-                cove_composition::Scancode::ARROW_UP if !key_target.is_vertical_split => {
-                    key_target.write(current - step)
+                let Some(geometry) = key_target.geometry(&key_node) else {
+                    return cove_core::scene::EventResult::Ignored;
+                };
+                let step = if event.modifiers.has_shift() {
+                    0.1
+                } else {
+                    0.02
+                };
+                let current = key_target.current_fraction(&geometry);
+                match event.scancode {
+                    cove_composition::Scancode::HOME => key_target.write(geometry.range.0),
+                    cove_composition::Scancode::END => key_target.write(geometry.range.1),
+                    cove_composition::Scancode::ARROW_LEFT if key_target.is_vertical_split => {
+                        key_target.write(current - step)
+                    }
+                    cove_composition::Scancode::ARROW_RIGHT if key_target.is_vertical_split => {
+                        key_target.write(current + step)
+                    }
+                    cove_composition::Scancode::ARROW_UP if !key_target.is_vertical_split => {
+                        key_target.write(current - step)
+                    }
+                    cove_composition::Scancode::ARROW_DOWN if !key_target.is_vertical_split => {
+                        key_target.write(current + step)
+                    }
+                    _ => return cove_core::scene::EventResult::Ignored,
                 }
-                cove_composition::Scancode::ARROW_DOWN if !key_target.is_vertical_split => {
-                    key_target.write(current + step)
-                }
-                _ => return cove_core::scene::EventResult::Ignored,
-            }
-            cove_core::scene::EventResult::Handled
-        }));
+                cove_core::scene::EventResult::Handled
+            }),
+        );
     }
 
     fn make_layout_node(&self) -> Option<LayoutNode> {
@@ -1418,7 +1641,9 @@ impl PrimitiveView for WorkspaceSplitDivider {
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         // The empty gutter between two panes: nothing is drawn, the canvas shows
         // through, and the parent keeps the invisible grab area around it.
-        vec![AnyView::new(WorkspaceSplitDividerLine { axis: self.is_vertical_split })]
+        vec![AnyView::new(WorkspaceSplitDividerLine {
+            axis: self.is_vertical_split,
+        })]
     }
 }
 impl_primitive_view!(WorkspaceSplitDivider);
@@ -1507,7 +1732,9 @@ impl View for WorkspaceTabGroupView {
             // out at the region height and only overflow scrolls.
             let panel = (self.content)(active_id.clone());
             let scrolled = AnyView::new(ScrollView::vertical(
-                AnyView::new(panel).flex_with(1.0, 1.0, Some(0.0)).frame_min_width(0.0),
+                AnyView::new(panel)
+                    .flex_with(1.0, 1.0, Some(0.0))
+                    .frame_min_width(0.0),
             ))
             .flex_with(1.0, 1.0, Some(0.0))
             .frame_min_width(0.0)
@@ -1579,8 +1806,13 @@ impl View for WorkspaceTabBar {
         let mut list = AccessibilitySemantics::new(AccessibilityRole::TabList);
         list.label = "Panel tabs".to_string();
         list.value = active_title;
-        let row = AnyView::new(WorkspaceBox::row().align(Align::Center).children(tabs).boxed())
-            .modifier(WorkspaceSemanticsModifier(list));
+        let row = AnyView::new(
+            WorkspaceBox::row()
+                .align(Align::Center)
+                .children(tabs)
+                .boxed(),
+        )
+        .modifier(WorkspaceSemanticsModifier(list));
         let scroller = AnyView::new(ScrollView::horizontal(row)).flex_with(1.0, 1.0, Some(0.0));
         erased(
             AnyView::new(
@@ -1595,7 +1827,9 @@ impl View for WorkspaceTabBar {
                     })
                     .boxed(),
             )
-            .modifier(WorkspaceTabBarModifier { metrics: WorkspaceLayoutMetrics::default() }),
+            .modifier(WorkspaceTabBarModifier {
+                metrics: WorkspaceLayoutMetrics::default(),
+            }),
         )
     }
 }
@@ -1606,8 +1840,14 @@ struct WorkspaceTabBarModifier {
 
 impl cove_composition::ViewModifier for WorkspaceTabBarModifier {
     fn apply_node(&self, node: &Node) {
-        node.set_attachment(LayoutDebugAttachmentKey::LAYOUT_ROLE, "workspace-tab-bar".to_owned());
-        node.set_attachment(LayoutDebugAttachmentKey::SEMANTIC_ROLE, "workspace.tab.bar".to_owned());
+        node.set_attachment(
+            LayoutDebugAttachmentKey::LAYOUT_ROLE,
+            "workspace-tab-bar".to_owned(),
+        );
+        node.set_attachment(
+            LayoutDebugAttachmentKey::SEMANTIC_ROLE,
+            "workspace.tab.bar".to_owned(),
+        );
         let mut semantics = AccessibilitySemantics::new(AccessibilityRole::Group);
         semantics.label = "Panel tab bar".to_string();
         node.set_accessibility(Some(semantics));
@@ -1641,10 +1881,12 @@ impl WorkspaceTabOverflow {
             let target = panel_id.clone();
             entries.push(MenuEntry::Item(
                 MenuItem::new(index as u64, panel.title.clone(), move || {
-                    controller.borrow_mut().dispatch(WorkspaceCommand::SetActivePanel {
-                        group_id: group_id.clone(),
-                        panel_id: target.clone(),
-                    });
+                    controller
+                        .borrow_mut()
+                        .dispatch(WorkspaceCommand::SetActivePanel {
+                            group_id: group_id.clone(),
+                            panel_id: target.clone(),
+                        });
                 })
                 .selected(self.group.active_panel_id.as_ref() == Some(panel_id)),
             ));
@@ -1652,16 +1894,28 @@ impl WorkspaceTabOverflow {
         entries.push(MenuEntry::separator(u64::MAX - 1));
         if let Some(active) = self.group.active_panel_id.clone() {
             let controller = self.controller.clone();
-            entries.push(MenuEntry::Item(MenuItem::new(u64::MAX - 2, "Maximize", move || {
-                controller.borrow_mut().dispatch(WorkspaceCommand::ToggleMaximize(active.clone()));
-            })));
+            entries.push(MenuEntry::Item(MenuItem::new(
+                u64::MAX - 2,
+                "Maximize",
+                move || {
+                    controller
+                        .borrow_mut()
+                        .dispatch(WorkspaceCommand::ToggleMaximize(active.clone()));
+                },
+            )));
         }
         if self.can_collapse() {
             let controller = self.controller.clone();
             let group_id = self.group.id.clone();
-            entries.push(MenuEntry::Item(MenuItem::new(u64::MAX - 3, "Collapse", move || {
-                controller.borrow_mut().dispatch(WorkspaceCommand::Collapse(group_id.clone()));
-            })));
+            entries.push(MenuEntry::Item(MenuItem::new(
+                u64::MAX - 3,
+                "Collapse",
+                move || {
+                    controller
+                        .borrow_mut()
+                        .dispatch(WorkspaceCommand::Collapse(group_id.clone()));
+                },
+            )));
         }
         entries
     }
@@ -1670,11 +1924,12 @@ impl WorkspaceTabOverflow {
         self.document
             .slot_containing(&self.group.id)
             .is_some_and(|slot| slot != WorkspaceSlotID::center())
-            && self
-                .group
-                .panels
-                .iter()
-                .any(|id| self.document.panels.get(id).is_some_and(|panel| panel.is_collapsible))
+            && self.group.panels.iter().any(|id| {
+                self.document
+                    .panels
+                    .get(id)
+                    .is_some_and(|panel| panel.is_collapsible)
+            })
     }
 }
 
@@ -1749,18 +2004,31 @@ impl PrimitiveView for WorkspaceTabButton {
             LayoutDebugAttachmentKey::DEBUG_NAME,
             format!("workspace-tab-{}", self.panel_id.raw_value()),
         );
-        node.set_attachment(LayoutDebugAttachmentKey::SEMANTIC_ROLE, "workspace.tab".to_owned());
+        node.set_attachment(
+            LayoutDebugAttachmentKey::SEMANTIC_ROLE,
+            "workspace.tab".to_owned(),
+        );
 
         let position = self
             .document
             .groups
             .get(&self.group_id)
             .and_then(|group| group.panels.iter().position(|id| id == &self.panel_id));
-        let count = self.document.groups.get(&self.group_id).map_or(1, |group| group.panels.len());
+        let count = self
+            .document
+            .groups
+            .get(&self.group_id)
+            .map_or(1, |group| group.panels.len());
         let mut semantics = AccessibilitySemantics::new(AccessibilityRole::Tab);
         semantics.label = self.title.clone();
-        semantics.value = if self.is_pinned { "Pinned".to_string() } else { String::new() };
-        semantics.help = position.map(|index| format!("Tab {} of {count}", index + 1)).unwrap_or_default();
+        semantics.value = if self.is_pinned {
+            "Pinned".to_string()
+        } else {
+            String::new()
+        };
+        semantics.help = position
+            .map(|index| format!("Tab {} of {count}", index + 1))
+            .unwrap_or_default();
         semantics.identifier = self.panel_id.raw_value().to_string();
         semantics.state.is_selected = self.is_active;
         semantics.combines_children = true;
@@ -1771,10 +2039,12 @@ impl PrimitiveView for WorkspaceTabButton {
         let activate_group = self.group_id.clone();
         let activate_panel = self.panel_id.clone();
         actions.activate = Some(Rc::new(move || {
-            activate_controller.borrow_mut().dispatch(WorkspaceCommand::SetActivePanel {
-                group_id: activate_group.clone(),
-                panel_id: activate_panel.clone(),
-            });
+            activate_controller
+                .borrow_mut()
+                .dispatch(WorkspaceCommand::SetActivePanel {
+                    group_id: activate_group.clone(),
+                    panel_id: activate_panel.clone(),
+                });
         }));
         node.set_accessibility_actions(actions);
 
@@ -1792,60 +2062,74 @@ impl PrimitiveView for WorkspaceTabButton {
         let press_document = self.document.clone();
         let press_group = self.group_id.clone();
         let press_panel = self.panel_id.clone();
-        registry.set_pointer(node, route.clone(), Rc::new(move |event, phase, _| {
-            if event.button != MouseButton::Left {
-                return cove_core::scene::EventResult::Ignored;
-            }
-            match phase {
-                cove_core::scene::PointerPhase::Down => {
-                    if let Some(chain) = FocusChainHolder::current() {
-                        chain.focus(Some(&press_node), false);
-                    }
-                    press_node.set_attachment(
-                        TAB_PRESS_KEY,
-                        TabPressState { down_x: event.x, down_y: event.y, did_drag: false },
-                    );
-                    if let Some(capture) = PointerCaptureHolder::current() {
-                        capture.acquire(&press_node, false);
-                    }
-                    cove_core::scene::EventResult::Handled
+        registry.set_pointer(
+            node,
+            route.clone(),
+            Rc::new(move |event, phase, _| {
+                if event.button != MouseButton::Left {
+                    return cove_core::scene::EventResult::Ignored;
                 }
-                cove_core::scene::PointerPhase::Up => {
-                    let state = press_node.attachment::<TabPressState>(TAB_PRESS_KEY);
-                    press_node.remove_attachment(TAB_PRESS_KEY);
-                    press_node.set_cursor(Some(cove_platform::SystemCursor::Pointer));
-                    press_node.set_opacity(1.0);
-                    if let Some(root) = drag::workspace_root(&press_node) {
-                        drag::set_drag_overlay(None, &root);
-                    }
-                    if let Some(capture) = PointerCaptureHolder::current()
-                        && capture.target().as_ref() == Some(&press_node)
-                    {
-                        capture.release();
-                    }
-                    let Some(state) = state else {
-                        return cove_core::scene::EventResult::Ignored;
-                    };
-                    if state.did_drag {
-                        let resolution = drag::resolve_drag(
-                            event.x,
-                            event.y,
-                            &press_group,
-                            &press_panel,
-                            &press_document,
-                            &press_node,
+                match phase {
+                    cove_core::scene::PointerPhase::Down => {
+                        if let Some(chain) = FocusChainHolder::current() {
+                            chain.focus(Some(&press_node), false);
+                        }
+                        press_node.set_attachment(
+                            TAB_PRESS_KEY,
+                            TabPressState {
+                                down_x: event.x,
+                                down_y: event.y,
+                                did_drag: false,
+                            },
                         );
-                        drag::apply_resolution(resolution, &press_panel, &mut press_controller.borrow_mut());
-                        return cove_core::scene::EventResult::Handled;
+                        if let Some(capture) = PointerCaptureHolder::current() {
+                            capture.acquire(&press_node, false);
+                        }
+                        cove_core::scene::EventResult::Handled
                     }
-                    press_controller.borrow_mut().dispatch(WorkspaceCommand::SetActivePanel {
-                        group_id: press_group.clone(),
-                        panel_id: press_panel.clone(),
-                    });
-                    cove_core::scene::EventResult::Handled
+                    cove_core::scene::PointerPhase::Up => {
+                        let state = press_node.attachment::<TabPressState>(TAB_PRESS_KEY);
+                        press_node.remove_attachment(TAB_PRESS_KEY);
+                        press_node.set_cursor(Some(cove_platform::SystemCursor::Pointer));
+                        press_node.set_opacity(1.0);
+                        if let Some(root) = drag::workspace_root(&press_node) {
+                            drag::set_drag_overlay(None, &root);
+                        }
+                        if let Some(capture) = PointerCaptureHolder::current()
+                            && capture.target().as_ref() == Some(&press_node)
+                        {
+                            capture.release();
+                        }
+                        let Some(state) = state else {
+                            return cove_core::scene::EventResult::Ignored;
+                        };
+                        if state.did_drag {
+                            let resolution = drag::resolve_drag(
+                                event.x,
+                                event.y,
+                                &press_group,
+                                &press_panel,
+                                &press_document,
+                                &press_node,
+                            );
+                            drag::apply_resolution(
+                                resolution,
+                                &press_panel,
+                                &mut press_controller.borrow_mut(),
+                            );
+                            return cove_core::scene::EventResult::Handled;
+                        }
+                        press_controller
+                            .borrow_mut()
+                            .dispatch(WorkspaceCommand::SetActivePanel {
+                                group_id: press_group.clone(),
+                                panel_id: press_panel.clone(),
+                            });
+                        cove_core::scene::EventResult::Handled
+                    }
                 }
-            }
-        }));
+            }),
+        );
 
         let motion_node = node.clone();
         let motion_controller = self.controller.clone();
@@ -1853,78 +2137,100 @@ impl PrimitiveView for WorkspaceTabButton {
         let motion_group = self.group_id.clone();
         let motion_panel = self.panel_id.clone();
         let motion_title = self.title.clone();
-        registry.set_motion(node, route, Rc::new(move |event, _| {
-            if PointerCaptureHolder::current().and_then(|capture| capture.target()).as_ref() != Some(&motion_node) {
-                return cove_core::scene::EventResult::Ignored;
-            }
-            let Some(state) = motion_node.attachment::<TabPressState>(TAB_PRESS_KEY) else {
-                return cove_core::scene::EventResult::Ignored;
-            };
-            let dx = event.x - state.down_x;
-            let dy = event.y - state.down_y;
-            let draggable = motion_document.panels.get(&motion_panel).is_none_or(|panel| panel.is_draggable);
-            let mut did_drag = state.did_drag;
-            if !did_drag && draggable && dx.abs().max(dy.abs()) >= DRAG_THRESHOLD {
-                did_drag = true;
-                motion_node.set_cursor(Some(cove_platform::SystemCursor::Move));
-                motion_node.set_opacity(0.42);
-            }
-            motion_node.set_attachment(
-                TAB_PRESS_KEY,
-                TabPressState { down_x: state.down_x, down_y: state.down_y, did_drag },
-            );
-            if did_drag
-                && let Some(root) = drag::workspace_root(&motion_node)
-            {
-                let resolution = drag::resolve_drag(
-                    event.x,
-                    event.y,
-                    &motion_group,
-                    &motion_panel,
-                    &motion_document,
-                    &motion_node,
-                );
-                let overlay = drag::WorkspaceTabDragOverlayState {
-                    cursor_x: event.x,
-                    cursor_y: event.y,
-                    title: motion_title.clone(),
-                    resolution,
+        registry.set_motion(
+            node,
+            route,
+            Rc::new(move |event, _| {
+                if PointerCaptureHolder::current()
+                    .and_then(|capture| capture.target())
+                    .as_ref()
+                    != Some(&motion_node)
+                {
+                    return cove_core::scene::EventResult::Ignored;
+                }
+                let Some(state) = motion_node.attachment::<TabPressState>(TAB_PRESS_KEY) else {
+                    return cove_core::scene::EventResult::Ignored;
                 };
-                drag::set_drag_overlay(Some(&overlay), &root);
-            }
-            if did_drag {
-                let _ = motion_controller;
-                cove_core::scene::EventResult::Handled
-            } else {
-                cove_core::scene::EventResult::Ignored
-            }
-        }));
+                let dx = event.x - state.down_x;
+                let dy = event.y - state.down_y;
+                let draggable = motion_document
+                    .panels
+                    .get(&motion_panel)
+                    .is_none_or(|panel| panel.is_draggable);
+                let mut did_drag = state.did_drag;
+                if !did_drag && draggable && dx.abs().max(dy.abs()) >= DRAG_THRESHOLD {
+                    did_drag = true;
+                    motion_node.set_cursor(Some(cove_platform::SystemCursor::Move));
+                    motion_node.set_opacity(0.42);
+                }
+                motion_node.set_attachment(
+                    TAB_PRESS_KEY,
+                    TabPressState {
+                        down_x: state.down_x,
+                        down_y: state.down_y,
+                        did_drag,
+                    },
+                );
+                if did_drag && let Some(root) = drag::workspace_root(&motion_node) {
+                    let resolution = drag::resolve_drag(
+                        event.x,
+                        event.y,
+                        &motion_group,
+                        &motion_panel,
+                        &motion_document,
+                        &motion_node,
+                    );
+                    let overlay = drag::WorkspaceTabDragOverlayState {
+                        cursor_x: event.x,
+                        cursor_y: event.y,
+                        title: motion_title.clone(),
+                        resolution,
+                    };
+                    drag::set_drag_overlay(Some(&overlay), &root);
+                }
+                if did_drag {
+                    let _ = motion_controller;
+                    cove_core::scene::EventResult::Handled
+                } else {
+                    cove_core::scene::EventResult::Ignored
+                }
+            }),
+        );
 
         let activate_controller = self.controller.clone();
         let activate_group = self.group_id.clone();
         let activate_panel = self.panel_id.clone();
-        registry.set_key(node, InputHandlerRoute::new(
-            cove_core::scene::InputHandlerRole::Workspace,
-            InputRoutingPriority::NORMAL,
-            "workspace.tab.key",
-        ), Rc::new(move |event, phase| {
-            if phase != cove_core::scene::EventPhase::Target {
-                return cove_core::scene::EventResult::Ignored;
-            }
-            if event.modifiers.has_ctrl() || event.modifiers.has_gui() || event.modifiers.has_alt() {
-                return cove_core::scene::EventResult::Ignored;
-            }
-            if event.scancode == cove_composition::Scancode::RETURN
-                || event.scancode == cove_composition::Scancode::SPACE
-            {
-                activate_controller.borrow_mut().dispatch(WorkspaceCommand::SetActivePanel {
-                    group_id: activate_group.clone(),
-                    panel_id: activate_panel.clone(),
-                });
-                return cove_core::scene::EventResult::Handled;
-            }
-            cove_core::scene::EventResult::Ignored
-        }));
+        registry.set_key(
+            node,
+            InputHandlerRoute::new(
+                cove_core::scene::InputHandlerRole::Workspace,
+                InputRoutingPriority::NORMAL,
+                "workspace.tab.key",
+            ),
+            Rc::new(move |event, phase| {
+                if phase != cove_core::scene::EventPhase::Target {
+                    return cove_core::scene::EventResult::Ignored;
+                }
+                if event.modifiers.has_ctrl()
+                    || event.modifiers.has_gui()
+                    || event.modifiers.has_alt()
+                {
+                    return cove_core::scene::EventResult::Ignored;
+                }
+                if event.scancode == cove_composition::Scancode::RETURN
+                    || event.scancode == cove_composition::Scancode::SPACE
+                {
+                    activate_controller
+                        .borrow_mut()
+                        .dispatch(WorkspaceCommand::SetActivePanel {
+                            group_id: activate_group.clone(),
+                            panel_id: activate_panel.clone(),
+                        });
+                    return cove_core::scene::EventResult::Handled;
+                }
+                cove_core::scene::EventResult::Ignored
+            }),
+        );
     }
 
     fn make_layout_node(&self) -> Option<LayoutNode> {
@@ -1946,20 +2252,27 @@ impl PrimitiveView for WorkspaceTabButton {
         // Selected tab: `surfaceVariant`; otherwise clear. 9 pt padding, 6 pt
         // radius, `height - 8` tall, no rules above or between tabs.
         let theme = theme_for_node(node);
-        let fill = if self.is_active { theme.colors.surface_variant } else { Color::CLEAR };
+        let fill = if self.is_active {
+            theme.colors.surface_variant
+        } else {
+            Color::CLEAR
+        };
         let mut row = WorkspaceBox::row().align(Align::Center).spacing(4.0);
         if self.is_pinned {
             row = row.child(
-                AnyView::new(EmptyView).modifier(WorkspaceDotModifier(SemanticColorRef::on_surface_muted())),
+                AnyView::new(EmptyView)
+                    .modifier(WorkspaceDotModifier(SemanticColorRef::on_surface_muted())),
             );
         }
         row = row.child(Text::new(self.title.clone()).semantic_font(SemanticFontRef::label()));
         vec![erased(
-            AnyView::new(WorkspaceBox::row().child(row.boxed()).boxed()).modifier(WorkspaceTabButtonModifier {
-                fill,
-                radius: 6.0,
-                padding: 9.0,
-            }),
+            AnyView::new(WorkspaceBox::row().child(row.boxed()).boxed()).modifier(
+                WorkspaceTabButtonModifier {
+                    fill,
+                    radius: 6.0,
+                    padding: 9.0,
+                },
+            ),
         )]
     }
 }
@@ -2023,7 +2336,9 @@ impl View for WorkspaceRailButton {
                     .semantic_foreground(SemanticColorRef::on_surface_muted()),
             )
         } else {
-            AnyView::new(RailTitleLabel { title: self.title.clone() })
+            AnyView::new(RailTitleLabel {
+                title: self.title.clone(),
+            })
         };
         let button = Button::new(label, move || {
             let mut controller = controller.borrow_mut();
@@ -2039,7 +2354,9 @@ impl View for WorkspaceRailButton {
         erased(
             AnyView::new(button)
                 .modifier(WorkspaceSemanticsModifier(semantics))
-                .modifier(WorkspaceRailButtonModifier { horizontal: self.horizontal }),
+                .modifier(WorkspaceRailButtonModifier {
+                    horizontal: self.horizontal,
+                }),
         )
     }
 }
@@ -2074,7 +2391,9 @@ struct RailTitleLabel {
 
 impl View for RailTitleLabel {
     fn body(&self) -> AnyView {
-        AnyView::new(RailTitleHost { title: self.title.clone() })
+        AnyView::new(RailTitleHost {
+            title: self.title.clone(),
+        })
     }
 }
 
@@ -2090,7 +2409,10 @@ impl PrimitiveView for RailTitleHost {
     }
     fn update_node(&self, node: &Node) {
         let color = theme_for_node(node).colors.on_surface_muted;
-        node.set_attachment("cove.workspace.label.text", self.title.replace('\n', " ").trim().to_string());
+        node.set_attachment(
+            "cove.workspace.label.text",
+            self.title.replace('\n', " ").trim().to_string(),
+        );
         node.set_attachment("cove.workspace.label.color", color);
         node.set_attachment("cove.workspace.label.size", 11.0f32);
         node.set_attachment("cove.workspace.label.vertical", self.is_vertical());
@@ -2123,7 +2445,11 @@ impl RailTitleHost {
     fn cleaned(&self) -> String {
         let clean = self.title.replace('\n', " ");
         let trimmed = clean.trim();
-        if trimmed.is_empty() { "Panel".to_string() } else { trimmed.to_string() }
+        if trimmed.is_empty() {
+            "Panel".to_string()
+        } else {
+            trimmed.to_string()
+        }
     }
 
     /// The Swift short-Latin exception: a 3-char ASCII title stays horizontal.
@@ -2146,7 +2472,8 @@ pub struct WorkspaceRail {
 
 impl WorkspaceRail {
     fn edge(&self) -> WorkspaceEdge {
-        self.edge_override.unwrap_or_else(|| super::view::rail_edge(&self.slot_id, &self.document))
+        self.edge_override
+            .unwrap_or_else(|| super::view::rail_edge(&self.slot_id, &self.document))
     }
 }
 
@@ -2173,7 +2500,11 @@ impl View for WorkspaceRail {
                 }));
             }
         }
-        let stack = if horizontal { WorkspaceBox::row() } else { WorkspaceBox::column() };
+        let stack = if horizontal {
+            WorkspaceBox::row()
+        } else {
+            WorkspaceBox::column()
+        };
         erased(
             AnyView::new(
                 stack
@@ -2201,7 +2532,10 @@ impl cove_composition::ViewModifier for WorkspaceRailModifier {
     fn apply_node(&self, node: &Node) {
         let colors = theme_for_node(node).colors;
         node.set_background_color(Some(colors.surface_sunken));
-        node.set_attachment(LayoutDebugAttachmentKey::LAYOUT_ROLE, "workspace-rail".to_owned());
+        node.set_attachment(
+            LayoutDebugAttachmentKey::LAYOUT_ROLE,
+            "workspace-rail".to_owned(),
+        );
         node.set_attachment(
             LayoutDebugAttachmentKey::DEBUG_NAME,
             format!("workspace-rail-{}", self.slot_id.raw_value()),
@@ -2234,7 +2568,9 @@ impl View for WorkspaceFloatingLayer {
     fn body(&self) -> AnyView {
         let mut windows: Vec<WorkspaceFloatingWindow> = self.document.floating_windows.clone();
         windows.sort_by(|left, right| {
-            left.z_index.cmp(&right.z_index).then_with(|| left.id.raw_value().cmp(right.id.raw_value()))
+            left.z_index
+                .cmp(&right.z_index)
+                .then_with(|| left.id.raw_value().cmp(right.id.raw_value()))
         });
         let mut children: Vec<AnyView> = Vec::new();
         for window in windows {
@@ -2249,7 +2585,10 @@ impl View for WorkspaceFloatingLayer {
                 content: self.content.clone(),
             }));
         }
-        erased(AnyView::new(WorkspaceBox::column().children(children).boxed()).modifier(WorkspaceFloatingLayerModifier))
+        erased(
+            AnyView::new(WorkspaceBox::column().children(children).boxed())
+                .modifier(WorkspaceFloatingLayerModifier),
+        )
     }
 }
 
@@ -2259,8 +2598,14 @@ impl cove_composition::ViewModifier for WorkspaceFloatingLayerModifier {
     fn apply_node(&self, node: &Node) {
         node.set_z_index(10_000.0);
         node.set_is_hit_testable(false);
-        node.set_attachment(LayoutDebugAttachmentKey::LAYOUT_ROLE, "workspace-floating-layer".to_owned());
-        node.set_attachment(LayoutDebugAttachmentKey::DEBUG_NAME, "workspace-floating-layer".to_owned());
+        node.set_attachment(
+            LayoutDebugAttachmentKey::LAYOUT_ROLE,
+            "workspace-floating-layer".to_owned(),
+        );
+        node.set_attachment(
+            LayoutDebugAttachmentKey::DEBUG_NAME,
+            "workspace-floating-layer".to_owned(),
+        );
     }
     fn apply_layout(&self, layout: &LayoutNode) {
         layout.set_position_type(PositionType::Absolute);
@@ -2293,14 +2638,16 @@ impl View for WorkspaceFloatingWindowView {
         let redock = Button::new(
             AnyView::new(Text::new("Attach").semantic_font(SemanticFontRef::caption())),
             move || {
-                controller.borrow_mut().dispatch(WorkspaceCommand::RedockFloatingWindow {
-                    window_id: window_id.clone(),
-                    target: WorkspaceTarget::tab_group(
-                        WorkspaceSlotID::center(),
-                        WorkspaceTabGroupID::new("center"),
-                        None,
-                    ),
-                });
+                controller
+                    .borrow_mut()
+                    .dispatch(WorkspaceCommand::RedockFloatingWindow {
+                        window_id: window_id.clone(),
+                        target: WorkspaceTarget::tab_group(
+                            WorkspaceSlotID::center(),
+                            WorkspaceTabGroupID::new("center"),
+                            None,
+                        ),
+                    });
             },
         )
         .tooltip("Attach");
@@ -2316,7 +2663,9 @@ impl View for WorkspaceFloatingWindowView {
                 .child(redock)
                 .boxed(),
         )
-        .modifier(WorkspaceFloatingTitleBarModifier { height: FLOATING_TITLE_HEIGHT })
+        .modifier(WorkspaceFloatingTitleBarModifier {
+            height: FLOATING_TITLE_HEIGHT,
+        })
         .modifier(WorkspaceRoleModifier::new(
             "workspace-floating-title-bar",
             "workspace.floating.titleBar",
@@ -2332,8 +2681,8 @@ impl View for WorkspaceFloatingWindowView {
         .flex_with(1.0, 1.0, Some(0.0));
 
         erased(
-            AnyView::new(WorkspaceBox::column().child(title_bar).child(body).boxed())
-                .modifier(WorkspaceFloatingWindowModifier {
+            AnyView::new(WorkspaceBox::column().child(title_bar).child(body).boxed()).modifier(
+                WorkspaceFloatingWindowModifier {
                     x: self.window.frame.x,
                     y: self.window.frame.y,
                     width: frame.width,
@@ -2342,7 +2691,8 @@ impl View for WorkspaceFloatingWindowView {
                     fill: SemanticColorRef::surface_floating(),
                     window: self.window.clone(),
                     controller: self.controller.clone(),
-                }),
+                },
+            ),
         )
     }
 }
@@ -2390,8 +2740,14 @@ impl cove_composition::ViewModifier for WorkspaceFloatingWindowModifier {
             blur: 32.0,
         });
         node.set_is_hit_testable(true);
-        node.set_attachment(LayoutDebugAttachmentKey::LAYOUT_ROLE, "workspace-floating-window".to_owned());
-        node.set_attachment(LayoutDebugAttachmentKey::SEMANTIC_ROLE, "workspace.floating.window".to_owned());
+        node.set_attachment(
+            LayoutDebugAttachmentKey::LAYOUT_ROLE,
+            "workspace-floating-window".to_owned(),
+        );
+        node.set_attachment(
+            LayoutDebugAttachmentKey::SEMANTIC_ROLE,
+            "workspace.floating.window".to_owned(),
+        );
         node.set_attachment(
             LayoutDebugAttachmentKey::DEBUG_NAME,
             format!("workspace-floating-window-{}", self.window.id.raw_value()),
@@ -2427,59 +2783,81 @@ fn install_floating_drag(
     let pointer_node = node.clone();
     let pointer_window = window.clone();
     let pointer_controller = controller.clone();
-    registry.set_pointer(node, route.clone(), Rc::new(move |event, phase, _| {
-        if event.button != MouseButton::Left {
-            return cove_core::scene::EventResult::Ignored;
-        }
-        match phase {
-            cove_core::scene::PointerPhase::Down => {
-                let local = pointer_node.convert_from_window(cove_core::Point { x: event.x, y: event.y });
-                if local.y > FLOATING_TITLE_HEIGHT {
-                    return cove_core::scene::EventResult::Ignored;
-                }
-                pointer_node.set_attachment(
-                    FLOATING_DRAG_KEY,
-                    TabPressState { down_x: event.x, down_y: event.y, did_drag: false },
-                );
-                if let Some(capture) = PointerCaptureHolder::current() {
-                    capture.acquire(&pointer_node, false);
-                }
-                cove_core::scene::EventResult::Handled
+    registry.set_pointer(
+        node,
+        route.clone(),
+        Rc::new(move |event, phase, _| {
+            if event.button != MouseButton::Left {
+                return cove_core::scene::EventResult::Ignored;
             }
-            cove_core::scene::PointerPhase::Up => {
-                pointer_node.remove_attachment(FLOATING_DRAG_KEY);
-                if let Some(capture) = PointerCaptureHolder::current()
-                    && capture.target().as_ref() == Some(&pointer_node)
-                {
-                    capture.release();
+            match phase {
+                cove_core::scene::PointerPhase::Down => {
+                    let local = pointer_node.convert_from_window(cove_core::Point {
+                        x: event.x,
+                        y: event.y,
+                    });
+                    if local.y > FLOATING_TITLE_HEIGHT {
+                        return cove_core::scene::EventResult::Ignored;
+                    }
+                    pointer_node.set_attachment(
+                        FLOATING_DRAG_KEY,
+                        TabPressState {
+                            down_x: event.x,
+                            down_y: event.y,
+                            did_drag: false,
+                        },
+                    );
+                    if let Some(capture) = PointerCaptureHolder::current() {
+                        capture.acquire(&pointer_node, false);
+                    }
+                    cove_core::scene::EventResult::Handled
                 }
-                let _ = (&pointer_window, &pointer_controller);
-                cove_core::scene::EventResult::Handled
+                cove_core::scene::PointerPhase::Up => {
+                    pointer_node.remove_attachment(FLOATING_DRAG_KEY);
+                    if let Some(capture) = PointerCaptureHolder::current()
+                        && capture.target().as_ref() == Some(&pointer_node)
+                    {
+                        capture.release();
+                    }
+                    let _ = (&pointer_window, &pointer_controller);
+                    cove_core::scene::EventResult::Handled
+                }
             }
-        }
-    }));
+        }),
+    );
 
     let motion_node = node.clone();
     let motion_window = window;
     let motion_controller = controller;
-    registry.set_motion(node, route, Rc::new(move |event, _| {
-        if PointerCaptureHolder::current().and_then(|capture| capture.target()).as_ref() != Some(&motion_node) {
-            return cove_core::scene::EventResult::Ignored;
-        }
-        let Some(state) = motion_node.attachment::<TabPressState>(FLOATING_DRAG_KEY) else {
-            return cove_core::scene::EventResult::Ignored;
-        };
-        let next = super::sizing::WorkspaceRect::new(
-            motion_window.frame.x + event.x - state.down_x,
-            motion_window.frame.y + event.y - state.down_y,
-            motion_window.frame.width,
-            motion_window.frame.height,
-        );
-        motion_controller
-            .borrow_mut()
-            .dispatch(WorkspaceCommand::MoveFloatingWindow { window_id: motion_window.id.clone(), frame: next });
-        cove_core::scene::EventResult::Handled
-    }));
+    registry.set_motion(
+        node,
+        route,
+        Rc::new(move |event, _| {
+            if PointerCaptureHolder::current()
+                .and_then(|capture| capture.target())
+                .as_ref()
+                != Some(&motion_node)
+            {
+                return cove_core::scene::EventResult::Ignored;
+            }
+            let Some(state) = motion_node.attachment::<TabPressState>(FLOATING_DRAG_KEY) else {
+                return cove_core::scene::EventResult::Ignored;
+            };
+            let next = super::sizing::WorkspaceRect::new(
+                motion_window.frame.x + event.x - state.down_x,
+                motion_window.frame.y + event.y - state.down_y,
+                motion_window.frame.width,
+                motion_window.frame.height,
+            );
+            motion_controller
+                .borrow_mut()
+                .dispatch(WorkspaceCommand::MoveFloatingWindow {
+                    window_id: motion_window.id.clone(),
+                    frame: next,
+                });
+            cove_core::scene::EventResult::Handled
+        }),
+    );
 }
 
 /// `_WorkspaceFloatingDragHandle`: the title label with a `move` cursor. The
@@ -2497,7 +2875,10 @@ impl PrimitiveView for WorkspaceFloatingDragHandle {
     }
     fn update_node(&self, node: &Node) {
         node.set_cursor(Some(cove_platform::SystemCursor::Move));
-        node.set_attachment(LayoutDebugAttachmentKey::SEMANTIC_ROLE, "workspace.floating.drag".to_owned());
+        node.set_attachment(
+            LayoutDebugAttachmentKey::SEMANTIC_ROLE,
+            "workspace.floating.drag".to_owned(),
+        );
         node.set_attachment(
             LayoutDebugAttachmentKey::DEBUG_NAME,
             format!("workspace-floating-drag-{}", self.window_id.raw_value()),
@@ -2552,7 +2933,11 @@ impl View for WorkspaceCompactView {
         let selected = focused
             .as_ref()
             .and_then(|id| panels.iter().find(|panel| &panel.id == id))
-            .or_else(|| panels.iter().find(|panel| panel.id.raw_value() == "viewport"))
+            .or_else(|| {
+                panels
+                    .iter()
+                    .find(|panel| panel.id.raw_value() == "viewport")
+            })
             .or_else(|| panels.first())
             .cloned();
         let Some(selected) = selected else {
@@ -2569,10 +2954,12 @@ impl View for WorkspaceCompactView {
             let panel_id = panel.id.clone();
             entries.push(MenuEntry::Item(
                 MenuItem::new(index as u64, panel.title.clone(), move || {
-                    controller.borrow_mut().dispatch(WorkspaceCommand::SetActivePanel {
-                        group_id: group_id.clone(),
-                        panel_id: panel_id.clone(),
-                    });
+                    controller
+                        .borrow_mut()
+                        .dispatch(WorkspaceCommand::SetActivePanel {
+                            group_id: group_id.clone(),
+                            panel_id: panel_id.clone(),
+                        });
                 })
                 .selected(panel.id == selected.id),
             ));
@@ -2580,7 +2967,10 @@ impl View for WorkspaceCompactView {
         let trigger = AnyView::new(
             WorkspaceBox::row()
                 .align(Align::Center)
-                .child(Text::new(format!("{} ▾", selected.title)).semantic_font(SemanticFontRef::label()))
+                .child(
+                    Text::new(format!("{} ▾", selected.title))
+                        .semantic_font(SemanticFontRef::label()),
+                )
                 .boxed(),
         )
         .modifier(WorkspacePaddingModifier::all(8.0));
@@ -2611,9 +3001,13 @@ mod tests {
 
     fn sample_document() -> WorkspaceDocument {
         let mut panels = BTreeMap::new();
-        let panel = super::super::model::WorkspacePanel::new(WorkspacePanelID::new("viewport"), "Viewport");
+        let panel =
+            super::super::model::WorkspacePanel::new(WorkspacePanelID::new("viewport"), "Viewport");
         panels.insert(panel.id.clone(), panel);
-        let group = WorkspaceTabGroup::new(WorkspaceTabGroupID::new("center"), vec![WorkspacePanelID::new("viewport")]);
+        let group = WorkspaceTabGroup::new(
+            WorkspaceTabGroupID::new("center"),
+            vec![WorkspacePanelID::new("viewport")],
+        );
         let mut groups = BTreeMap::new();
         groups.insert(group.id.clone(), group);
         let mut slots = BTreeMap::new();
@@ -2622,7 +3016,9 @@ mod tests {
             super::super::model::WorkspaceSlot::new(
                 WorkspaceSlotID::center(),
                 super::super::model::WorkspaceSlotKind::Content,
-                Some(WorkspaceLayoutNode::Group(WorkspaceTabGroupID::new("center"))),
+                Some(WorkspaceLayoutNode::Group(WorkspaceTabGroupID::new(
+                    "center",
+                ))),
             ),
         );
         WorkspaceDocument::new(panels, groups, slots)
@@ -2647,7 +3043,11 @@ mod tests {
     #[test]
     fn workspace_view_short_circuits_to_the_maximized_panel() {
         let controller = Rc::new(RefCell::new(WorkspaceController::new(sample_document())));
-        controller.borrow_mut().dispatch(WorkspaceCommand::ToggleMaximize(WorkspacePanelID::new("viewport")));
+        controller
+            .borrow_mut()
+            .dispatch(WorkspaceCommand::ToggleMaximize(WorkspacePanelID::new(
+                "viewport",
+            )));
         let view = WorkspaceView::new(controller, Rc::new(|_| AnyView::new(EmptyView)));
         let _ = view.body();
     }

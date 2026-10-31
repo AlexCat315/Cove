@@ -1,15 +1,13 @@
 //! Translation of Primitives/Feedback/EmptyState.swift.
-use cove_core::scene::{
-    AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap,
-};
-use cove_imaging::BundleImageResource;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{ButtonIcon, ButtonIconSource};
 use crate::primitives::text::Text;
-use crate::theme::{theme_for_node, SemanticColorRef, SemanticFontRef, Theme};
+use crate::theme::{SemanticColorRef, SemanticFontRef, Theme, theme_for_node};
 use crate::{AnyView, BoxView, TupleView, View};
+use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
+use cove_imaging::BundleImageResource;
 
 /// Vertical weight of an `EmptyState` block.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -93,11 +91,15 @@ impl View for EmptyState {
                     .clone()
                     .unwrap_or_else(crate::primitives::media::ui_icon_catalog::file::inbox);
                 column.push(AnyView::new(
-                    ButtonIcon::new(ButtonIconSource::resource(resource), Some(metrics.icon_size), None)
-                        .padding(metrics.chip_padding)
-                        .background_color(theme.colors.surface_variant)
-                        .corner_radius(theme.radius.pill)
-                        .accessibility_hidden(true),
+                    ButtonIcon::new(
+                        ButtonIconSource::resource(resource),
+                        Some(metrics.icon_size),
+                        None,
+                    )
+                    .padding(metrics.chip_padding)
+                    .background_color(theme.colors.surface_variant)
+                    .corner_radius(theme.radius.pill)
+                    .accessibility_hidden(true),
                 ));
             }
             column.push(AnyView::new(
@@ -113,21 +115,36 @@ impl View for EmptyState {
                 ));
             }
             if let Some(action) = action.clone() {
-                let insets = crate::modifiers::layout::EdgeInsets::new(metrics.action_gap, 0.0, 0.0, 0.0);
+                let insets =
+                    crate::modifiers::layout::EdgeInsets::new(metrics.action_gap, 0.0, 0.0, 0.0);
                 column.push(AnyView::new(action.padding_insets(insets)));
             }
             let label = title.clone();
             let help = message.clone();
             AnyView::new(
                 BoxView::new(
-                    FlexDirection::Column, Align::Center, Justify::Center, Wrap::NoWrap, 0.0,
+                    FlexDirection::Column,
+                    Align::Center,
+                    Justify::Center,
+                    Wrap::NoWrap,
+                    0.0,
                     AnyView::new(
                         BoxView::new(
-                            FlexDirection::Column, Align::Center, Justify::FlexStart, Wrap::NoWrap,
+                            FlexDirection::Column,
+                            Align::Center,
+                            Justify::FlexStart,
+                            Wrap::NoWrap,
                             metrics.gap,
                             AnyView::new(TupleView::new(column)),
                         )
-                        .frame(None, None, None, None, Some(metrics.max_width), None),
+                        .frame(
+                            None,
+                            None,
+                            None,
+                            None,
+                            Some(metrics.max_width),
+                            None,
+                        ),
                     ),
                 )
                 .padding(metrics.padding)
@@ -155,18 +172,30 @@ impl EmptyStateMetrics {
     fn new(prominence: EmptyStateProminence, theme: &Theme) -> Self {
         match prominence {
             EmptyStateProminence::Compact => Self {
-                icon_size: 18.0, chip_padding: 8.0, gap: 4.0, padding: theme.spacing.md,
-                action_gap: theme.spacing.xs, title_font: SemanticFontRef::body_strong(),
+                icon_size: 18.0,
+                chip_padding: 8.0,
+                gap: 4.0,
+                padding: theme.spacing.md,
+                action_gap: theme.spacing.xs,
+                title_font: SemanticFontRef::body_strong(),
                 max_width: 320.0,
             },
             EmptyStateProminence::Regular => Self {
-                icon_size: 24.0, chip_padding: 12.0, gap: 6.0, padding: theme.spacing.lg,
-                action_gap: theme.spacing.sm, title_font: SemanticFontRef::headline(),
+                icon_size: 24.0,
+                chip_padding: 12.0,
+                gap: 6.0,
+                padding: theme.spacing.lg,
+                action_gap: theme.spacing.sm,
+                title_font: SemanticFontRef::headline(),
                 max_width: 380.0,
             },
             EmptyStateProminence::Spacious => Self {
-                icon_size: 32.0, chip_padding: 16.0, gap: 8.0, padding: theme.spacing.xl,
-                action_gap: theme.spacing.md, title_font: SemanticFontRef::title(),
+                icon_size: 32.0,
+                chip_padding: 16.0,
+                gap: 8.0,
+                padding: theme.spacing.xl,
+                action_gap: theme.spacing.md,
+                title_font: SemanticFontRef::title(),
                 max_width: 440.0,
             },
         }

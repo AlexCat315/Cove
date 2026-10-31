@@ -1,15 +1,18 @@
 //! Translation of Compose/Sources/CoveUICompose/Primitives/Overlays/Portal/PortalRegistry.swift.
+use super::fit_constraints::PortalFitConstraints;
+use super::portal_placement::{PortalPlacement, PortalPlacementMode, portal_window_bounds};
+use crate::adaptive::{SurfaceEnvironment, SurfaceEnvironmentExt};
+use crate::animation::{AnimatedVisibility, Transition};
+use crate::theme::{
+    IconScalingViewExt, ReducedMotionViewExt, SemanticMotionRef, TextScalerViewExt, Theme,
+    ThemeViewExt,
+};
+use crate::{AnyView, ViewExt};
 use cove_core::scene::{CompositionLocal, Node, NodeResource, NodeWeak};
 use cove_core::{Environment, Point, Rect, Size};
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, HashMap};
 use std::rc::{Rc, Weak};
-use crate::animation::{AnimatedVisibility, Transition};
-use crate::theme::{Theme, ThemeViewExt, TextScalerViewExt, IconScalingViewExt, ReducedMotionViewExt, SemanticMotionRef};
-use crate::{AnyView, ViewExt};
-use super::portal_placement::{portal_window_bounds, PortalPlacementMode, PortalPlacement};
-use super::fit_constraints::PortalFitConstraints;
-use crate::adaptive::{SurfaceEnvironment, SurfaceEnvironmentExt};
 
 // MARK: - Entry
 
@@ -28,7 +31,12 @@ pub struct PortalEntry {
     pub position_for_size: Option<Rc<dyn Fn(Size) -> Point>>,
 }
 impl PortalEntry {
-    pub fn new(id: impl Into<String>, position: Point, width: Option<f32>, content: AnyView) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        position: Point,
+        width: Option<f32>,
+        content: AnyView,
+    ) -> Self {
         Self {
             id: id.into(),
             position,
@@ -77,26 +85,42 @@ impl PortalStore {
     }
 
     pub fn entries(&self) -> Vec<PortalEntry> {
-        self.rendered_entries().into_iter().filter(|entry| !entry.is_exiting).collect()
+        self.rendered_entries()
+            .into_iter()
+            .filter(|entry| !entry.is_exiting)
+            .collect()
     }
 
     pub fn rendered_entries(&self) -> Vec<PortalEntry> {
         let inner = self.inner.borrow();
-        inner.presentation_order.iter().filter_map(|id| inner.storage.get(id).cloned()).collect()
+        inner
+            .presentation_order
+            .iter()
+            .filter_map(|id| inner.storage.get(id).cloned())
+            .collect()
     }
 
     pub fn revision(&self) -> i64 {
         self.inner.borrow().current_revision
     }
 
-    pub fn register(&self, id: Option<String>, position: Point, width: Option<f32>, content: AnyView) -> String {
+    pub fn register(
+        &self,
+        id: Option<String>,
+        position: Point,
+        width: Option<f32>,
+        content: AnyView,
+    ) -> String {
         let id = id.unwrap_or_else(new_portal_id);
         {
             let mut inner = self.inner.borrow_mut();
             if !inner.storage.contains_key(&id) {
                 inner.presentation_order.push(id.clone());
             }
-            inner.storage.insert(id.clone(), PortalEntry::new(id.clone(), position, width, content));
+            inner.storage.insert(
+                id.clone(),
+                PortalEntry::new(id.clone(), position, width, content),
+            );
         }
         self.notify_changed();
         id
@@ -117,8 +141,15 @@ impl PortalStore {
         match slot {
             Some(slot_node) => {
                 if slot_node.frame().x != position.x || slot_node.frame().y != position.y {
-                    let size = Size { width: slot_node.frame().width, height: slot_node.frame().height };
-                    let fitted_position = entry.position_for_size.as_ref().map(|resolve| resolve(size)).unwrap_or(position);
+                    let size = Size {
+                        width: slot_node.frame().width,
+                        height: slot_node.frame().height,
+                    };
+                    let fitted_position = entry
+                        .position_for_size
+                        .as_ref()
+                        .map(|resolve| resolve(size))
+                        .unwrap_or(position);
                     let fitted = PortalPlacement::fit(
                         fitted_position,
                         size,
@@ -136,7 +167,9 @@ impl PortalStore {
         }
         {
             let mut inner = self.inner.borrow_mut();
-            let Some(entry) = inner.storage.get_mut(id) else { return };
+            let Some(entry) = inner.storage.get_mut(id) else {
+                return;
+            };
             if entry.position == position {
                 return;
             }
@@ -155,7 +188,9 @@ impl PortalStore {
     ) {
         let changed = {
             let mut inner = self.inner.borrow_mut();
-            let Some(entry) = inner.storage.get_mut(id) else { return };
+            let Some(entry) = inner.storage.get_mut(id) else {
+                return;
+            };
             let changed = entry.fills_window != fills_window
                 || entry.placement != placement
                 || entry.parent_id != parent_id;
@@ -173,7 +208,9 @@ impl PortalStore {
     pub fn configure_fit(&self, id: &str, fit: PortalFitConstraints) {
         let changed = {
             let mut inner = self.inner.borrow_mut();
-            let Some(entry) = inner.storage.get_mut(id) else { return };
+            let Some(entry) = inner.storage.get_mut(id) else {
+                return;
+            };
             if entry.fit == fit {
                 return;
             }
@@ -186,7 +223,11 @@ impl PortalStore {
     }
 
     pub fn anchor(&self, id: &str) -> Option<Rect> {
-        self.inner.borrow().dismissals.get(id).map(|dismissal| (dismissal.anchor)())
+        self.inner
+            .borrow()
+            .dismissals
+            .get(id)
+            .map(|dismissal| (dismissal.anchor)())
     }
 
     pub fn frame(&self, id: &str) -> Option<Rect> {
@@ -197,16 +238,26 @@ impl PortalStore {
     pub fn update_content(&self, id: &str, content: AnyView) {
         {
             let mut inner = self.inner.borrow_mut();
-            let Some(entry) = inner.storage.get_mut(id) else { return };
+            let Some(entry) = inner.storage.get_mut(id) else {
+                return;
+            };
             entry.content = content;
         }
         self.notify_changed();
     }
 
-    pub fn update_presentation(&self, id: &str, position: Point, width: Option<f32>, content: AnyView) {
+    pub fn update_presentation(
+        &self,
+        id: &str,
+        position: Point,
+        width: Option<f32>,
+        content: AnyView,
+    ) {
         {
             let mut inner = self.inner.borrow_mut();
-            let Some(entry) = inner.storage.get_mut(id) else { return };
+            let Some(entry) = inner.storage.get_mut(id) else {
+                return;
+            };
             entry.position = position;
             entry.width = width;
             entry.content = content;
@@ -222,7 +273,9 @@ impl PortalStore {
     pub fn begin_dismissal(&self, id: &str, content: AnyView) {
         {
             let mut inner = self.inner.borrow_mut();
-            let Some(entry) = inner.storage.get_mut(id) else { return };
+            let Some(entry) = inner.storage.get_mut(id) else {
+                return;
+            };
             if entry.is_exiting {
                 return;
             }
@@ -250,7 +303,12 @@ impl PortalStore {
     fn remove_descendants(&self, id: &str) {
         let children: Vec<String> = {
             let inner = self.inner.borrow();
-            inner.storage.values().filter(|entry| entry.parent_id.as_deref() == Some(id)).map(|entry| entry.id.clone()).collect()
+            inner
+                .storage
+                .values()
+                .filter(|entry| entry.parent_id.as_deref() == Some(id))
+                .map(|entry| entry.id.clone())
+                .collect()
         };
         for child in children {
             self.unregister(&child);
@@ -258,7 +316,11 @@ impl PortalStore {
     }
 
     pub fn permits_child(&self, id: &str) -> bool {
-        self.inner.borrow().storage.get(id).is_some_and(|entry| !entry.is_exiting)
+        self.inner
+            .borrow()
+            .storage
+            .get(id)
+            .is_some_and(|entry| !entry.is_exiting)
     }
 
     pub fn clear(&self) {
@@ -276,11 +338,19 @@ impl PortalStore {
     }
 
     pub fn set_dismissal(&self, id: &str, anchor: Rc<dyn Fn() -> Rect>, dismiss: Rc<dyn Fn()>) {
-        self.inner.borrow_mut().dismissals.insert(id.to_owned(), Dismissal { anchor, dismiss });
+        self.inner
+            .borrow_mut()
+            .dismissals
+            .insert(id.to_owned(), Dismissal { anchor, dismiss });
     }
 
     pub fn request_dismissal(&self, id: &str) {
-        let dismiss = self.inner.borrow().dismissals.get(id).map(|dismissal| dismissal.dismiss.clone());
+        let dismiss = self
+            .inner
+            .borrow()
+            .dismissals
+            .get(id)
+            .map(|dismissal| dismissal.dismiss.clone());
         if let Some(dismiss) = dismiss {
             dismiss();
         }
@@ -296,12 +366,18 @@ impl PortalStore {
                 .iter()
                 .filter(|id| {
                     inner.dismissals.contains_key(*id)
-                        && inner.storage.get(*id).is_some_and(|entry| !entry.is_exiting)
+                        && inner
+                            .storage
+                            .get(*id)
+                            .is_some_and(|entry| !entry.is_exiting)
                 })
                 .cloned()
                 .collect();
             let hit = open_ids.iter().any(|id| {
-                inner.dismissals.get(id).is_some_and(|dismissal| (dismissal.anchor)().contains(point))
+                inner
+                    .dismissals
+                    .get(id)
+                    .is_some_and(|dismissal| (dismissal.anchor)().contains(point))
                     || inner
                         .slot_nodes
                         .get(id)
@@ -314,7 +390,12 @@ impl PortalStore {
             open_ids
                 .iter()
                 .rev()
-                .filter_map(|id| inner.dismissals.get(id).map(|dismissal| dismissal.dismiss.clone()))
+                .filter_map(|id| {
+                    inner
+                        .dismissals
+                        .get(id)
+                        .map(|dismissal| dismissal.dismiss.clone())
+                })
                 .collect::<Vec<_>>()
         };
         for dismiss in callbacks {
@@ -333,14 +414,20 @@ impl PortalStore {
     }
 
     pub fn attach_slot_node(&self, id: &str, node: &Node) {
-        self.inner.borrow_mut().slot_nodes.insert(id.to_owned(), node.downgrade());
+        self.inner
+            .borrow_mut()
+            .slot_nodes
+            .insert(id.to_owned(), node.downgrade());
     }
 
     fn notify_changed(&self) {
         let (revision, observers) = {
             let mut inner = self.inner.borrow_mut();
             inner.current_revision = inner.current_revision.wrapping_add(1);
-            (inner.current_revision, inner.observers.values().cloned().collect::<Vec<_>>())
+            (
+                inner.current_revision,
+                inner.observers.values().cloned().collect::<Vec<_>>(),
+            )
         };
         for observer in observers {
             observer(revision);
@@ -380,7 +467,9 @@ impl PortalStoreHolder {
         SHARED_STORE.with(|store| store.clone())
     }
     pub fn current() -> Rc<PortalStore> {
-        CURRENT_STORE.with(|current| current.borrow().clone()).unwrap_or_else(Self::shared)
+        CURRENT_STORE
+            .with(|current| current.borrow().clone())
+            .unwrap_or_else(Self::shared)
     }
     pub fn set_current(store: Option<Rc<PortalStore>>) {
         CURRENT_STORE.with(|current| *current.borrow_mut() = store);
@@ -529,8 +618,14 @@ impl PortalResource {
         }
         *self.store.borrow_mut() = Some(Rc::downgrade(&current));
 
-        let theme = owner.as_ref().map(crate::theme::theme_for_node).unwrap_or_else(Theme::default_dark);
-        let scaler = owner.as_ref().map(crate::theme::node_text_scaler).unwrap_or_default();
+        let theme = owner
+            .as_ref()
+            .map(crate::theme::theme_for_node)
+            .unwrap_or_else(Theme::default_dark);
+        let scaler = owner
+            .as_ref()
+            .map(crate::theme::node_text_scaler)
+            .unwrap_or_default();
         let environment = owner
             .as_ref()
             .map(|node| node.composition_value(&SurfaceEnvironment::key()))
@@ -554,7 +649,8 @@ impl PortalResource {
         self.generation.set(self.generation.get().wrapping_add(1));
         let presented = match transition {
             Some(effect) => AnyView::new(
-                animated_visibility(true, effect, true, None, content).reduced_motion(reduced_motion),
+                animated_visibility(true, effect, true, None, content)
+                    .reduced_motion(reduced_motion),
             ),
             None => content,
         };
@@ -564,7 +660,8 @@ impl PortalResource {
                 current.update_presentation(&id, position, width, presented);
             }
             _ => {
-                *self.entry_id.borrow_mut() = Some(current.register(None, position, width, presented));
+                *self.entry_id.borrow_mut() =
+                    Some(current.register(None, position, width, presented));
             }
         }
         if let Some(id) = self.entry_id.borrow().clone() {
@@ -576,19 +673,28 @@ impl PortalResource {
     /// trigger corner; transition scale leaves elevation lengths unchanged.
     pub fn surface_reveal(anchor: Point, theme: &Theme) -> Transition {
         let scale = theme.motion.surface.reveal_scale;
-        let resolved = if scale.is_finite() { scale.clamp(0.0, 1.0) } else { crate::theme::SurfaceMotion::default().reveal_scale };
+        let resolved = if scale.is_finite() {
+            scale.clamp(0.0, 1.0)
+        } else {
+            crate::theme::SurfaceMotion::default().reveal_scale
+        };
         Transition::scale(resolved, anchor)
     }
 
     /// Logical dismissal is immediate. Only noninteractive paint survives the
     /// short exit; node teardown still unregisters synchronously.
     pub fn dismiss(&self, node: &Node) {
-        let Some(id) = self.entry_id.borrow().clone() else { return };
+        let Some(id) = self.entry_id.borrow().clone() else {
+            return;
+        };
         let Some(store) = self.store() else { return };
         if self.is_dismissing.get() {
             return;
         }
-        let (Some(content), Some(transition)) = (self.content.borrow().clone(), self.transition.borrow().clone()) else {
+        let (Some(content), Some(transition)) = (
+            self.content.borrow().clone(),
+            self.transition.borrow().clone(),
+        ) else {
             self.unmount(node);
             return;
         };
@@ -607,11 +713,15 @@ impl PortalResource {
             if visible {
                 return;
             }
-            let Some(resource) = weak_self.upgrade() else { return };
+            let Some(resource) = weak_self.upgrade() else {
+                return;
+            };
             if resource.generation.get() != expected {
                 return;
             }
-            let Some(node) = owner.as_ref().and_then(Node::upgrade) else { return };
+            let Some(node) = owner.as_ref().and_then(Node::upgrade) else {
+                return;
+            };
             resource.unmount(&node);
         });
         let hidden = AnyView::new(
@@ -629,7 +739,9 @@ impl PortalResource {
     }
 
     pub fn update_position(&self, position: Point) {
-        let Some(owner) = self.owner_node() else { return };
+        let Some(owner) = self.owner_node() else {
+            return;
+        };
         if !owner.accepts_subtree_input() {
             if let Some(id) = self.entry_id.borrow().clone() {
                 if let Some(store) = self.store() {

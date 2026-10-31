@@ -758,7 +758,10 @@ unsafe extern "C" {
     pub fn ghostty_mouse_event_set_button(event: GhosttyMouseEvent, button: i32);
     pub fn ghostty_mouse_event_clear_button(event: GhosttyMouseEvent);
     pub fn ghostty_mouse_event_set_mods(event: GhosttyMouseEvent, mods: GhosttyMods);
-    pub fn ghostty_mouse_event_set_position(event: GhosttyMouseEvent, position: GhosttyMousePosition);
+    pub fn ghostty_mouse_event_set_position(
+        event: GhosttyMouseEvent,
+        position: GhosttyMousePosition,
+    );
 
     pub fn ghostty_selection_gesture_new(
         allocator: *const GhosttyAllocator,
@@ -800,7 +803,7 @@ unsafe extern "C" {
     pub fn ghostty_free(allocator: *const GhosttyAllocator, ptr: *mut u8, len: usize);
 }
 
-use super::sized::{sized, SizedAbi};
+use super::sized::{SizedAbi, sized};
 
 macro_rules! impl_sized_abi {
     ($($ty:ty),* $(,)?) => {$(
@@ -830,9 +833,18 @@ impl_sized_abi!(
 pub fn sized_style() -> GhosttyStyle {
     let value = GhosttyStyle {
         size: 0,
-        fg_color: GhosttyStyleColor { tag: 0, value: GhosttyStyleColorValue { bits: 0 } },
-        bg_color: GhosttyStyleColor { tag: 0, value: GhosttyStyleColorValue { bits: 0 } },
-        underline_color: GhosttyStyleColor { tag: 0, value: GhosttyStyleColorValue { bits: 0 } },
+        fg_color: GhosttyStyleColor {
+            tag: 0,
+            value: GhosttyStyleColorValue { bits: 0 },
+        },
+        bg_color: GhosttyStyleColor {
+            tag: 0,
+            value: GhosttyStyleColorValue { bits: 0 },
+        },
+        underline_color: GhosttyStyleColor {
+            tag: 0,
+            value: GhosttyStyleColorValue { bits: 0 },
+        },
         bold: false,
         italic: false,
         faint: false,
@@ -876,12 +888,21 @@ pub fn sized_cursor() -> GhosttyRenderStateCursor {
 }
 
 pub fn sized_row_selection() -> GhosttyRenderStateRowSelection {
-    let value = GhosttyRenderStateRowSelection { size: 0, start_x: 0, end_x: 0 };
+    let value = GhosttyRenderStateRowSelection {
+        size: 0,
+        start_x: 0,
+        end_x: 0,
+    };
     sized(value)
 }
 
 pub fn sized_grid_ref() -> GhosttyGridRef {
-    let value = GhosttyGridRef { size: 0, node: ptr::null_mut(), x: 0, y: 0 };
+    let value = GhosttyGridRef {
+        size: 0,
+        node: ptr::null_mut(),
+        x: 0,
+        y: 0,
+    };
     sized(value)
 }
 

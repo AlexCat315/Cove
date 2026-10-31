@@ -5,9 +5,16 @@ use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ColumnPickerEntry {
-    Automatic { is_enabled: bool },
+    Automatic {
+        is_enabled: bool,
+    },
     Separator,
-    Column { id: String, title: String, is_enabled: bool, is_selected: bool },
+    Column {
+        id: String,
+        title: String,
+        is_enabled: bool,
+        is_selected: bool,
+    },
 }
 
 /// UI-independent state consumed by the Rust menu host once it is available.
@@ -27,12 +34,19 @@ impl ColumnVisibilityPickerModel {
         is_enabled: bool,
         is_expanded: bool,
     ) -> Self {
-        let visible: HashSet<&str> = plan.indices.iter().filter_map(|index| columns.get(*index).map(|column| column.id.as_str())).collect();
-        let mut entries = vec![ColumnPickerEntry::Automatic { is_enabled: !overrides.is_empty() }];
+        let visible: HashSet<&str> = plan
+            .indices
+            .iter()
+            .filter_map(|index| columns.get(*index).map(|column| column.id.as_str()))
+            .collect();
+        let mut entries = vec![ColumnPickerEntry::Automatic {
+            is_enabled: !overrides.is_empty(),
+        }];
         entries.push(ColumnPickerEntry::Separator);
         entries.extend(columns.iter().map(|column| {
             let selected = visible.contains(column.id.as_str());
-            let required = plan.required_ids.contains(&column.id) || (visible.len() == 1 && selected);
+            let required =
+                plan.required_ids.contains(&column.id) || (visible.len() == 1 && selected);
             ColumnPickerEntry::Column {
                 id: column.id.clone(),
                 title: column.title.clone(),
@@ -49,7 +63,9 @@ impl ColumnVisibilityPickerModel {
     }
 
     pub fn reset_to_automatic(overrides: &mut HashMap<String, bool>) -> bool {
-        if overrides.is_empty() { return false; }
+        if overrides.is_empty() {
+            return false;
+        }
         overrides.clear();
         true
     }

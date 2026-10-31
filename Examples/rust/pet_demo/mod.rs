@@ -67,7 +67,11 @@ fn child_bundles(root: &Path) -> Vec<PathBuf> {
     let mut bundles: Vec<PathBuf> = entries
         .filter_map(|entry| entry.ok())
         .map(|entry| entry.path())
-        .filter(|path| path.extension().map(|extension| extension == "bundle").unwrap_or(false))
+        .filter(|path| {
+            path.extension()
+                .map(|extension| extension == "bundle")
+                .unwrap_or(false)
+        })
         .collect();
     bundles.sort();
     bundles
@@ -82,14 +86,22 @@ fn search_recursively(directory: &Path, file_name: &str) -> Option<PathBuf> {
         .collect();
     children.sort();
     for path in &children {
-        if path.file_name().map(|name| name.to_string_lossy().starts_with('.')).unwrap_or(false) {
+        if path
+            .file_name()
+            .map(|name| name.to_string_lossy().starts_with('.'))
+            .unwrap_or(false)
+        {
             continue;
         }
         if path.is_dir() {
             if let Some(found) = search_recursively(path, file_name) {
                 return Some(found);
             }
-        } else if path.file_name().map(|name| name == file_name).unwrap_or(false) {
+        } else if path
+            .file_name()
+            .map(|name| name == file_name)
+            .unwrap_or(false)
+        {
             return Some(path.clone());
         }
     }
@@ -162,7 +174,10 @@ mod checks {
             "order must match PetPose::ALL so the sheet is deterministic"
         );
         assert_eq!(
-            names.iter().collect::<std::collections::BTreeSet<_>>().len(),
+            names
+                .iter()
+                .collect::<std::collections::BTreeSet<_>>()
+                .len(),
             7,
             "no two poses share a frame"
         );
@@ -174,9 +189,15 @@ mod checks {
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
         std::fs::write(root.join("idle.png"), b"x").unwrap();
-        assert_eq!(resolve_resource_path("idle", &[root.clone()]), root.join("idle.png"));
+        assert_eq!(
+            resolve_resource_path("idle", &[root.clone()]),
+            root.join("idle.png")
+        );
         // A missing frame resolves to an empty path rather than panicking.
-        assert_eq!(resolve_resource_path("sit", &[root.clone()]), PathBuf::new());
+        assert_eq!(
+            resolve_resource_path("sit", &[root.clone()]),
+            PathBuf::new()
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 

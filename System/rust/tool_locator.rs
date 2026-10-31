@@ -48,10 +48,7 @@ impl ProcessEnvironment {
 pub enum ToolLocator {}
 
 impl ToolLocator {
-    pub fn executable(
-        name: &str,
-        environment: &BTreeMap<String, String>,
-    ) -> Option<PathBuf> {
+    pub fn executable(name: &str, environment: &BTreeMap<String, String>) -> Option<PathBuf> {
         if name.is_empty() || name.contains('\0') {
             return None;
         }

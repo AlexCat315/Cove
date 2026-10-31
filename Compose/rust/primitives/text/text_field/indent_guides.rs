@@ -4,8 +4,8 @@
 //! visible rows and their bounded indentation prefixes are inspected.
 use std::collections::HashMap;
 
-use cove_core::TextLayoutResult;
 use crate::primitives::text::text_buffer::TextBuffer;
+use cove_core::TextLayoutResult;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct IndentGuideSegment {
@@ -69,13 +69,19 @@ impl TextIndentGuides {
                 source.character_index_for_utf8_offset(line.start_cluster as usize),
             );
             let start = source.utf8_offset_for_character_index(source.line_range(logical).start);
-            let value = *cache.entry(logical).or_insert_with(|| Self::indentation(source, logical, tab_width));
+            let value = *cache
+                .entry(logical)
+                .or_insert_with(|| Self::indentation(source, logical, tab_width));
             if !value.blank {
                 prior_depth = value.depth;
             }
             // Soft wraps restart at the text origin. A scope guide there would
             // cross the continued word, so only its authored row draws.
-            let depth = if line.start_cluster as usize == start { prior_depth } else { 0 };
+            let depth = if line.start_cluster as usize == start {
+                prior_depth
+            } else {
+                0
+            };
             let end_level = last_level.min(depth).max(first_level);
             let stale: Vec<usize> = runs
                 .keys()
@@ -91,28 +97,38 @@ impl TextIndentGuides {
                 let entry = runs.get(&level).copied();
                 match entry {
                     Some(run) if (run.top + run.height - line.top_y).abs() < 0.5 => {
-                        runs.insert(level, IndentGuideSegment {
-                            x: run.x,
-                            top: run.top,
-                            height: line.top_y + line_height - run.top,
-                        });
+                        runs.insert(
+                            level,
+                            IndentGuideSegment {
+                                x: run.x,
+                                top: run.top,
+                                height: line.top_y + line_height - run.top,
+                            },
+                        );
                     }
                     _ => {
                         if let Some(completed) = entry {
                             result.push(completed);
                         }
-                        runs.insert(level, IndentGuideSegment {
-                            x: level as f32 * step + 0.5,
-                            top: line.top_y,
-                            height: line_height,
-                        });
+                        runs.insert(
+                            level,
+                            IndentGuideSegment {
+                                x: level as f32 * step + 0.5,
+                                top: line.top_y,
+                                height: line_height,
+                            },
+                        );
                     }
                 }
             }
         }
         result.extend(runs.into_values());
         result.sort_by(|lhs, rhs| {
-            if lhs.x == rhs.x { lhs.top.total_cmp(&rhs.top) } else { lhs.x.total_cmp(&rhs.x) }
+            if lhs.x == rhs.x {
+                lhs.top.total_cmp(&rhs.top)
+            } else {
+                lhs.x.total_cmp(&rhs.x)
+            }
         });
         result
     }
@@ -132,12 +148,25 @@ impl TextIndentGuides {
                 match byte {
                     32 => columns += 1,
                     9 => columns += tab_width - columns % tab_width,
-                    10 | 13 => return Indent { depth: 0, blank: true },
-                    _ => return Indent { depth: columns / tab_width, blank: false },
+                    10 | 13 => {
+                        return Indent {
+                            depth: 0,
+                            blank: true,
+                        };
+                    }
+                    _ => {
+                        return Indent {
+                            depth: columns / tab_width,
+                            blank: false,
+                        };
+                    }
                 }
             }
             offset = chunk_end;
         }
-        Indent { depth: columns / tab_width, blank: offset == end }
+        Indent {
+            depth: columns / tab_width,
+            blank: offset == end,
+        }
     }
 }

@@ -18,10 +18,10 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use cove_core::scene::{
-    AnimatorScheduler, Animation, AnimationController, AnimationCurve, AnyAnimationController,
-};
 use cove_core::Color;
+use cove_core::scene::{
+    Animation, AnimationController, AnimationCurve, AnimatorScheduler, AnyAnimationController,
+};
 
 /// A `Float`-writing controller over a shared cell, the Swift `apply:` closure.
 fn float_controller(
@@ -42,7 +42,8 @@ fn as_any(controller: Rc<AnimationController<f32>>) -> Rc<dyn AnyAnimationContro
 
 #[test]
 fn endpoints() {
-    let (controller, written) = float_controller(0.0, 10.0, Animation::new(1.0, AnimationCurve::Linear));
+    let (controller, written) =
+        float_controller(0.0, 10.0, Animation::new(1.0, AnimationCurve::Linear));
 
     controller.tick(0.0);
     assert_eq!(written.get(), 0.0, "t=0 applies `from`");
@@ -55,7 +56,8 @@ fn endpoints() {
 
 #[test]
 fn midpoint() {
-    let (controller, written) = float_controller(0.0, 10.0, Animation::new(1.0, AnimationCurve::Linear));
+    let (controller, written) =
+        float_controller(0.0, 10.0, Animation::new(1.0, AnimationCurve::Linear));
     controller.tick(0.5);
     assert_eq!(written.get(), 5.0, "a linear curve hits the midpoint");
     assert!(!controller.is_finished());
@@ -63,29 +65,45 @@ fn midpoint() {
 
 #[test]
 fn delay_window() {
-    let (controller, written) =
-        float_controller(0.0, 10.0, Animation::new(1.0, AnimationCurve::Linear).with_delay(0.5));
+    let (controller, written) = float_controller(
+        0.0,
+        10.0,
+        Animation::new(1.0, AnimationCurve::Linear).with_delay(0.5),
+    );
 
     controller.tick(0.25);
-    assert_eq!(written.get(), 0.0, "inside the delay window the value stays at `from`");
+    assert_eq!(
+        written.get(),
+        0.0,
+        "inside the delay window the value stays at `from`"
+    );
     assert!(!controller.is_finished());
 
     // Now at elapsed 0.75 → active 0.25 of 1.0.
     controller.tick(0.5);
-    assert!((written.get() - 2.5).abs() < 1e-5, "the delay shifts the active window");
+    assert!(
+        (written.get() - 2.5).abs() < 1e-5,
+        "the delay shifts the active window"
+    );
 }
 
 #[test]
 fn tick_after_finished() {
     let calls = Rc::new(Cell::new(0));
     let counter = calls.clone();
-    let controller =
-        AnimationController::new(0.0_f32, 10.0, Animation::new(0.1, AnimationCurve::Linear), 0.0, move |_| {
-            counter.set(counter.get() + 1)
-        });
+    let controller = AnimationController::new(
+        0.0_f32,
+        10.0,
+        Animation::new(0.1, AnimationCurve::Linear),
+        0.0,
+        move |_| counter.set(counter.get() + 1),
+    );
 
     controller.tick(1.0);
-    assert!(controller.is_finished(), "the first tick finishes the short animation");
+    assert!(
+        controller.is_finished(),
+        "the first tick finishes the short animation"
+    );
 
     let before = calls.get();
     controller.tick(1.0);
@@ -94,14 +112,20 @@ fn tick_after_finished() {
 
 #[test]
 fn zero_duration() {
-    let (controller, written) = float_controller(0.0, 10.0, Animation::new(0.0, AnimationCurve::Linear));
-    assert_eq!(written.get(), 10.0, "a zero-duration animation snaps on construction");
+    let (controller, written) =
+        float_controller(0.0, 10.0, Animation::new(0.0, AnimationCurve::Linear));
+    assert_eq!(
+        written.get(),
+        10.0,
+        "a zero-duration animation snaps on construction"
+    );
     assert!(controller.is_finished());
 }
 
 #[test]
 fn finish_immediately_writes_target() {
-    let (controller, written) = float_controller(0.0, 10.0, Animation::new(1.0, AnimationCurve::Linear));
+    let (controller, written) =
+        float_controller(0.0, 10.0, Animation::new(1.0, AnimationCurve::Linear));
     controller.tick(0.25);
     assert_eq!(written.get(), 2.5);
 
@@ -121,11 +145,26 @@ fn easing_shape() {
 
 #[test]
 fn color_controller() {
-    let written = Rc::new(Cell::new(Color { r: 0.0, g: 0.0, b: 0.0, a: 0.0 }));
+    let written = Rc::new(Cell::new(Color {
+        r: 0.0,
+        g: 0.0,
+        b: 0.0,
+        a: 0.0,
+    }));
     let sink = written.clone();
     let controller = AnimationController::new(
-        Color { r: 0.0, g: 0.0, b: 0.0, a: 0.0 },
-        Color { r: 1.0, g: 1.0, b: 1.0, a: 1.0 },
+        Color {
+            r: 0.0,
+            g: 0.0,
+            b: 0.0,
+            a: 0.0,
+        },
+        Color {
+            r: 1.0,
+            g: 1.0,
+            b: 1.0,
+            a: 1.0,
+        },
         Animation::new(1.0, AnimationCurve::Linear),
         0.0,
         move |value| sink.set(value),
@@ -140,15 +179,21 @@ fn color_controller() {
 #[test]
 fn scheduler_ticks() {
     let scheduler = AnimatorScheduler::default();
-    let (first, first_written) = float_controller(0.0, 10.0, Animation::new(1.0, AnimationCurve::Linear));
-    let (second, second_written) = float_controller(100.0, 0.0, Animation::new(1.0, AnimationCurve::Linear));
+    let (first, first_written) =
+        float_controller(0.0, 10.0, Animation::new(1.0, AnimationCurve::Linear));
+    let (second, second_written) =
+        float_controller(100.0, 0.0, Animation::new(1.0, AnimationCurve::Linear));
     scheduler.register(as_any(first));
     scheduler.register(as_any(second));
     assert_eq!(scheduler.active_count(), 2);
 
     scheduler.tick(0.5);
     assert_eq!(first_written.get(), 5.0);
-    assert_eq!(second_written.get(), 50.0, "a descending animation interpolates downward");
+    assert_eq!(
+        second_written.get(),
+        50.0,
+        "a descending animation interpolates downward"
+    );
 }
 
 #[test]
@@ -192,29 +237,54 @@ fn scheduler_registration_during_tick() {
     scheduler.register(first.clone());
     scheduler.register(removed.clone());
     scheduler.register(first);
-    assert_eq!(scheduler.active_count(), 2, "duplicate registration is ignored");
+    assert_eq!(
+        scheduler.active_count(),
+        2,
+        "duplicate registration is ignored"
+    );
 
     scheduler.tick(0.25);
-    assert_eq!(removed_value.get(), 0.0, "a controller removed during the tick never applies");
-    assert_eq!(added_value.get(), 0.0, "a controller added during the tick waits for the next one");
+    assert_eq!(
+        removed_value.get(),
+        0.0,
+        "a controller removed during the tick never applies"
+    );
+    assert_eq!(
+        added_value.get(),
+        0.0,
+        "a controller added during the tick waits for the next one"
+    );
 
     scheduler.tick(0.25);
-    assert_eq!(added_value.get(), 0.25, "the newly added controller starts on the next tick");
+    assert_eq!(
+        added_value.get(),
+        0.25,
+        "the newly added controller starts on the next tick"
+    );
 
     scheduler.reset();
     scheduler.register(removed);
-    assert_eq!(scheduler.active_count(), 1, "reset clears the registry, allowing re-registration");
+    assert_eq!(
+        scheduler.active_count(),
+        1,
+        "reset clears the registry, allowing re-registration"
+    );
 }
 
 #[test]
 fn scheduler_evicts() {
     let scheduler = AnimatorScheduler::default();
-    let (controller, _written) = float_controller(0.0, 10.0, Animation::new(0.1, AnimationCurve::Linear));
+    let (controller, _written) =
+        float_controller(0.0, 10.0, Animation::new(0.1, AnimationCurve::Linear));
     scheduler.register(as_any(controller));
     assert_eq!(scheduler.active_count(), 1);
 
     scheduler.tick(1.0);
-    assert_eq!(scheduler.active_count(), 0, "eviction happens at the end of the same tick");
+    assert_eq!(
+        scheduler.active_count(),
+        0,
+        "eviction happens at the end of the same tick"
+    );
 }
 
 #[test]
@@ -227,11 +297,16 @@ fn empty_tick() {
 #[test]
 fn reset_drops_everything() {
     let scheduler = AnimatorScheduler::default();
-    let (controller, written) = float_controller(0.0, 1.0, Animation::new(1.0, AnimationCurve::Linear));
+    let (controller, written) =
+        float_controller(0.0, 1.0, Animation::new(1.0, AnimationCurve::Linear));
     scheduler.register(as_any(controller));
     assert_eq!(scheduler.active_count(), 1);
 
     scheduler.reset();
     assert_eq!(scheduler.active_count(), 0);
-    assert_eq!(written.get(), -1.0, "reset cancels without applying the target");
+    assert_eq!(
+        written.get(),
+        -1.0,
+        "reset cancels without applying the target"
+    );
 }

@@ -13,11 +13,7 @@ use crate::view::{
 };
 use cove_core::scene::{AnimatorScheduler, InvalidationSource, Node, NodeResource};
 use cove_platform::TextInputArea;
-use std::{
-    any::Any,
-    cell::RefCell,
-    rc::Rc,
-};
+use std::{any::Any, cell::RefCell, rc::Rc};
 
 pub struct SurfaceState {
     session: RefCell<Option<Rc<TerminalSession>>>,
@@ -171,13 +167,23 @@ impl SurfaceState {
     }
 
     /// The cursor cell in window coordinates, where the IME composes.
-    pub fn text_input_area(&self, origin: (f32, f32), metrics: &CellMetrics) -> Option<TextInputArea> {
+    pub fn text_input_area(
+        &self,
+        origin: (f32, f32),
+        metrics: &CellMetrics,
+    ) -> Option<TextInputArea> {
         let session = self.session.borrow().clone()?;
         let frame = session.frame();
         let cursor = frame.cursor;
         let x = origin.0 + cursor.column as f32 * metrics.width;
         let y = origin.1 + cursor.row as f32 * metrics.height;
-        Some(TextInputArea { x, y, width: metrics.width, height: metrics.height, cursor_x: x })
+        Some(TextInputArea {
+            x,
+            y,
+            width: metrics.width,
+            height: metrics.height,
+            cursor_x: x,
+        })
     }
 
     fn observe_now(&self) {

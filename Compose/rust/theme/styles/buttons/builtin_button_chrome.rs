@@ -5,13 +5,11 @@
 //! that node-driven repaint: it stores its kind/metrics on the node and reads
 //! the host button's live pressed/hovered/focus attachments every time it is
 //! applied.
-use cove_core::scene::{
-    Align, Edge, FlexDirection, FocusChainHolder, Justify, LayoutNode, Node,
-};
+use cove_core::scene::{Align, Edge, FlexDirection, FocusChainHolder, Justify, LayoutNode, Node};
 use cove_core::{Color, InputCapabilities};
 
 use crate::theme::{
-    theme_for_node, ControlSize, SemanticColorRef, SemanticFontRef, SemanticStyleViewExt, Theme,
+    ControlSize, SemanticColorRef, SemanticFontRef, SemanticStyleViewExt, Theme, theme_for_node,
 };
 use crate::{AnyView, PrimitiveView, View, ViewKind};
 
@@ -107,31 +105,52 @@ impl BuiltinButtonChromeKind {
         input: InputCapabilities,
     ) -> BuiltinButtonChromeMetrics {
         let touch = input.contains(InputCapabilities::TOUCH);
-        let height = if touch { size.touch_height() } else { size.button_height() };
+        let height = if touch {
+            size.touch_height()
+        } else {
+            size.button_height()
+        };
         let line_height = theme.typography.label.line_height;
         match self {
-            Self::Primary | Self::Secondary | Self::Ghost | Self::Destructive => BuiltinButtonChromeMetrics {
-                height,
-                min_width: if is_icon_only { Some(height) } else { None },
-                horizontal_padding: if is_icon_only {
-                    (height - line_height) / 2.0
-                } else if touch {
-                    size.touch_padding()
-                } else {
-                    size.horizontal_padding()
+            Self::Primary | Self::Secondary | Self::Ghost | Self::Destructive => {
+                BuiltinButtonChromeMetrics {
+                    height,
+                    min_width: if is_icon_only { Some(height) } else { None },
+                    horizontal_padding: if is_icon_only {
+                        (height - line_height) / 2.0
+                    } else if touch {
+                        size.touch_padding()
+                    } else {
+                        size.horizontal_padding()
+                    }
+                    .max(if is_icon_only { 2.0 } else { 0.0 }),
+                    radius: if touch {
+                        12.0f32.max(theme.radius.md)
+                    } else {
+                        theme.radius.md
+                    },
+                    vertical_padding: ((height - line_height) / if touch { 4.0 } else { 2.0 })
+                        .max(if touch { 4.0 } else { 2.0 }),
                 }
-                .max(if is_icon_only { 2.0 } else { 0.0 }),
-                radius: if touch { 12.0f32.max(theme.radius.md) } else { theme.radius.md },
-                vertical_padding: ((height - line_height) / if touch { 4.0 } else { 2.0 })
-                    .max(if touch { 4.0 } else { 2.0 }),
-            },
-            Self::Toggle { min_width, height: authored_height } => {
-                let height = if touch { height.max(authored_height) } else { authored_height };
+            }
+            Self::Toggle {
+                min_width,
+                height: authored_height,
+            } => {
+                let height = if touch {
+                    height.max(authored_height)
+                } else {
+                    authored_height
+                };
                 BuiltinButtonChromeMetrics {
                     height,
                     min_width: Some(min_width),
                     horizontal_padding: if touch { 12.0 } else { 7.0 },
-                    radius: if touch { 10.0f32.max(theme.radius.sm) } else { theme.radius.sm },
+                    radius: if touch {
+                        10.0f32.max(theme.radius.sm)
+                    } else {
+                        theme.radius.sm
+                    },
                     vertical_padding: ((height - line_height) / if touch { 4.0 } else { 2.0 })
                         .max(if touch { 4.0 } else { 2.0 }),
                 }
@@ -203,7 +222,9 @@ pub fn update_builtin_button_chrome_descendants(button_node: &Node) {
 }
 
 fn apply_builtin_button_chrome(chrome_node: &Node) {
-    let Some(state) = chrome_node.attachment::<BuiltinButtonChromeState>("__builtin_button_chrome_state") else {
+    let Some(state) =
+        chrome_node.attachment::<BuiltinButtonChromeState>("__builtin_button_chrome_state")
+    else {
         return;
     };
     let button_node = nearest_button_host_ancestor(chrome_node);
@@ -213,14 +234,24 @@ fn apply_builtin_button_chrome(chrome_node: &Node) {
     // that eases its fill reads as a delayed answer to the pointer.
     let owner = chrome_node.clone();
     let current = chrome_node.background_color();
-    chrome_node.animatable_set_optional("backgroundColor", current, Some(values.background), move |value| {
-        owner.set_background_color(value);
-    });
+    chrome_node.animatable_set_optional(
+        "backgroundColor",
+        current,
+        Some(values.background),
+        move |value| {
+            owner.set_background_color(value);
+        },
+    );
     let owner = chrome_node.clone();
     let current = chrome_node.border_color();
-    chrome_node.animatable_set_optional("borderColor", current, Some(values.border), move |value| {
-        owner.set_border_color(value);
-    });
+    chrome_node.animatable_set_optional(
+        "borderColor",
+        current,
+        Some(values.border),
+        move |value| {
+            owner.set_border_color(value);
+        },
+    );
     let owner = chrome_node.clone();
     let current = chrome_node.border_width();
     chrome_node.animatable_set_with("borderWidth", current, values.border_width, move |value| {
@@ -265,7 +296,9 @@ fn builtin_button_chrome_values(
             .unwrap_or(false);
     let focus_chain = FocusChainHolder::current();
     let focused = state.is_enabled
-        && focus_chain.as_ref().is_some_and(|chain| chain.is_focus_visible())
+        && focus_chain
+            .as_ref()
+            .is_some_and(|chain| chain.is_focus_visible())
         && button_node.is_some_and(|button| {
             focus_chain
                 .as_ref()
@@ -360,7 +393,11 @@ fn builtin_button_chrome_values(
 
     let press_scale = theme.motion.press_scale;
     let scale = if pressed && !chrome_node.prefers_reduced_motion() {
-        if press_scale.is_finite() { press_scale.clamp(0.8, 0.99) } else { 0.97 }
+        if press_scale.is_finite() {
+            press_scale.clamp(0.8, 0.99)
+        } else {
+            0.97
+        }
     } else {
         1.0
     };
@@ -384,7 +421,10 @@ fn builtin_button_chrome_values(
 fn nearest_button_host_ancestor(node: &Node) -> Option<Node> {
     let mut current = node.parent();
     while let Some(candidate) = current {
-        if candidate.attachment::<bool>(BUTTON_HOST_MARKER_KEY).unwrap_or(false) {
+        if candidate
+            .attachment::<bool>(BUTTON_HOST_MARKER_KEY)
+            .unwrap_or(false)
+        {
             return Some(candidate);
         }
         current = candidate.parent();

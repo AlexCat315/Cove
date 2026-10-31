@@ -18,9 +18,7 @@ use std::rc::Rc;
 use std::time::Instant;
 
 use cove_composition::ViewGraph;
-use cove_core::scene::{
-    EventDispatcher, NodeRenderer, NodeTree, PlatformInputContext, Recomposer,
-};
+use cove_core::scene::{EventDispatcher, NodeRenderer, NodeTree, PlatformInputContext, Recomposer};
 use cove_core::{DrawList, UI_SHADER_WGSL};
 use cove_devtools::client::DevToolsSession;
 use cove_devtools::inspection::SceneInspector;
@@ -35,7 +33,7 @@ use cove_platform::{
 use cove_text::FontCollection;
 
 use crate::export_buffer::ExportBuffer;
-use crate::prototype::frame::{viewport_size, Batch, Frame, Label};
+use crate::prototype::frame::{Batch, Frame, Label, viewport_size};
 
 /// Atlas edge in texels, matching the Swift prototype.
 const ATLAS_SIZE: usize = 2048;
@@ -176,7 +174,14 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
         let (context, tree, inspector) = (&self.context, &self.tree, &self.inspector);
         let (draw_list, fonts) = (&mut self.draw_list, &mut self.fonts);
         context.with_current(|| {
-            encode_frame(tree, inspector, draw_list, fonts, &mut labels, &mut note_width);
+            encode_frame(
+                tree,
+                inspector,
+                draw_list,
+                fonts,
+                &mut labels,
+                &mut note_width,
+            );
         });
 
         if fonts.atlas.is_full() {
@@ -186,7 +191,14 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
             labels.clear();
             note_width = 0.0;
             context.with_current(|| {
-                encode_frame(tree, inspector, draw_list, fonts, &mut labels, &mut note_width);
+                encode_frame(
+                    tree,
+                    inspector,
+                    draw_list,
+                    fonts,
+                    &mut labels,
+                    &mut note_width,
+                );
             });
         }
 
@@ -219,7 +231,11 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
             dark,
             note,
             note_width,
-            focused: self.context.focus_chain.focused().and_then(|node| crate::prototype::node_debug_name(&node)),
+            focused: self
+                .context
+                .focus_chain
+                .focused()
+                .and_then(|node| crate::prototype::node_debug_name(&node)),
             width,
             height,
             vertices,
@@ -241,17 +257,17 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
             atlas_full: self.fonts.atlas.is_full(),
         });
 
-        self.vertex_buffer.replace(vertex_bytes(self.draw_list.vertices()));
-        self.index_buffer.replace(index_bytes(self.draw_list.indices()));
+        self.vertex_buffer
+            .replace(vertex_bytes(self.draw_list.vertices()));
+        self.index_buffer
+            .replace(index_bytes(self.draw_list.indices()));
         if let Some(frame) = &self.frame {
             self.snapshot_buffer.encode(frame);
         }
         self.frame_number = self.frame_number.wrapping_add(1);
-        self.render_ms = (started.elapsed().as_secs_f64() * 1000.0)
-            - self.recomposition_ms
-            - self.layout_ms;
+        self.render_ms =
+            (started.elapsed().as_secs_f64() * 1000.0) - self.recomposition_ms - self.layout_ms;
     }
-
 
     pub fn pointer(&mut self, kind: i32, x: f32, y: f32) {
         if !x.is_finite() || !y.is_finite() {
@@ -353,14 +369,28 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
                 platform: "WebAssembly".into(),
             },
             [
-                "log", "tree", "select", "timing", "state", "recording", "inspect", "style",
-                "source", "recomposition", "state.observe", "timeline",
+                "log",
+                "tree",
+                "select",
+                "timing",
+                "state",
+                "recording",
+                "inspect",
+                "style",
+                "source",
+                "recomposition",
+                "state.observe",
+                "timeline",
             ]
             .iter()
             .map(|value| (*value).to_owned())
             .collect(),
         );
-        self.publish(&Envelope::new("hello", None, serde_json::to_value(payload).ok()));
+        self.publish(&Envelope::new(
+            "hello",
+            None,
+            serde_json::to_value(payload).ok(),
+        ));
     }
 
     /// Handles one DevTools request.
@@ -466,7 +496,8 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
                 if self.recorder.is_recording() {
                     fail(&mut response, "Already recording");
                 } else {
-                    self.recorder.start(self.content.checkpoint(), self.focused_name());
+                    self.recorder
+                        .start(self.content.checkpoint(), self.focused_name());
                 }
             }
             "input.record.stop" => match self.recorder.stop() {
@@ -547,18 +578,29 @@ impl<C: PrototypeContent> BrowserPrototype<C> {
                         .map_or(0, |inventory| inventory.node_count),
                     batch_count: frame.batches.len(),
                 };
-                messages.push(Envelope::new("timing.frame", None, serde_json::to_value(payload).ok()));
+                messages.push(Envelope::new(
+                    "timing.frame",
+                    None,
+                    serde_json::to_value(payload).ok(),
+                ));
             }
         }
         self.response_buffer.encode(&messages);
     }
 
     fn focused_name(&self) -> Option<String> {
-        self.context.focus_chain.focused().and_then(|node| crate::prototype::node_debug_name(&node))
+        self.context
+            .focus_chain
+            .focused()
+            .and_then(|node| crate::prototype::node_debug_name(&node))
     }
 
     fn set_timeline_enabled(&self, enabled: bool) {
-        self.tree.borrow().timeline.borrow_mut().set_enabled(enabled);
+        self.tree
+            .borrow()
+            .timeline
+            .borrow_mut()
+            .set_enabled(enabled);
     }
 
     fn tree_payload(&self) -> Option<serde_json::Value> {
@@ -633,7 +675,9 @@ fn encode_frame(
     labels: &mut Vec<Label>,
     note_width: &mut f32,
 ) {
-    let Some(root) = tree.borrow().root() else { return };
+    let Some(root) = tree.borrow().root() else {
+        return;
+    };
     draw_list.reset();
     collect_labels(fonts, &root, labels, note_width);
     NodeRenderer.render(&root, draw_list);

@@ -51,7 +51,15 @@ pub struct AccessibilityState {
 }
 impl Default for AccessibilityState {
     fn default() -> Self {
-        Self { is_enabled: true, is_selected: false, is_expanded: None, is_required: false, is_invalid: false, is_read_only: false, is_secure: false }
+        Self {
+            is_enabled: true,
+            is_selected: false,
+            is_expanded: None,
+            is_required: false,
+            is_invalid: false,
+            is_read_only: false,
+            is_secure: false,
+        }
     }
 }
 
@@ -72,14 +80,25 @@ pub struct AccessibilitySemantics {
 }
 impl Default for AccessibilitySemantics {
     fn default() -> Self {
-        Self { role: AccessibilityRole::Group, label: String::new(), value: String::new(), help: String::new(),
-            identifier: String::new(), described_by: None, state: AccessibilityState::default(),
-            combines_children: false, is_hidden: false }
+        Self {
+            role: AccessibilityRole::Group,
+            label: String::new(),
+            value: String::new(),
+            help: String::new(),
+            identifier: String::new(),
+            described_by: None,
+            state: AccessibilityState::default(),
+            combines_children: false,
+            is_hidden: false,
+        }
     }
 }
 impl AccessibilitySemantics {
     pub fn new(role: AccessibilityRole) -> Self {
-        Self { role, ..Self::default() }
+        Self {
+            role,
+            ..Self::default()
+        }
     }
     pub fn with_label(mut self, label: impl Into<String>) -> Self {
         self.label = label.into();
@@ -139,7 +158,10 @@ pub struct AccessibilityValueProvider {
 }
 impl AccessibilityValueProvider {
     pub fn new(revision: u64, read: impl Fn() -> String + 'static) -> Self {
-        Self { revision, read: std::rc::Rc::new(read) }
+        Self {
+            revision,
+            read: std::rc::Rc::new(read),
+        }
     }
 }
 
@@ -183,11 +205,25 @@ impl AccessibilityTree {
     pub fn snapshot(root: &Node) -> Vec<AccessibilityElement> {
         Self::snapshot_in(root, None, true)
     }
-    pub fn snapshot_in(root: &Node, viewport: Option<Rect>, resolve_values: bool) -> Vec<AccessibilityElement> {
+    pub fn snapshot_in(
+        root: &Node,
+        viewport: Option<Rect>,
+        resolve_values: bool,
+    ) -> Vec<AccessibilityElement> {
         let mut elements = Vec::new();
         let clip = viewport.unwrap_or_else(|| root.absolute_frame());
-        let parent_accepts = root.parent().is_none_or(|parent| parent.accepts_subtree_input());
-        collect(root, root.absolute_transform(), clip, false, parent_accepts, resolve_values, &mut elements);
+        let parent_accepts = root
+            .parent()
+            .is_none_or(|parent| parent.accepts_subtree_input());
+        collect(
+            root,
+            root.absolute_transform(),
+            clip,
+            false,
+            parent_accepts,
+            resolve_values,
+            &mut elements,
+        );
 
         let mut by_identifier: BTreeMap<String, AccessibilityElement> = BTreeMap::new();
         let mut has_descriptions = false;
@@ -198,23 +234,46 @@ impl AccessibilityTree {
         resolve(elements, &by_identifier)
     }
     /// Resolves `describedBy` links for clients that read semantics directly.
-    pub fn resolving_descriptions(mut meanings: BTreeMap<String, AccessibilitySemantics>) -> BTreeMap<String, AccessibilitySemantics> {
+    pub fn resolving_descriptions(
+        mut meanings: BTreeMap<String, AccessibilitySemantics>,
+    ) -> BTreeMap<String, AccessibilitySemantics> {
         let mut by_identifier: BTreeMap<String, AccessibilitySemantics> = BTreeMap::new();
-        for semantics in meanings.values().filter(|semantics| !semantics.identifier.is_empty()) {
-            by_identifier.entry(semantics.identifier.clone()).or_insert_with(|| semantics.clone());
+        for semantics in meanings
+            .values()
+            .filter(|semantics| !semantics.identifier.is_empty())
+        {
+            by_identifier
+                .entry(semantics.identifier.clone())
+                .or_insert_with(|| semantics.clone());
         }
         for semantics in meanings.values_mut() {
-            let Some(target) = semantics.described_by.as_ref().and_then(|identifier| by_identifier.get(identifier)) else { continue };
-            let description = if target.label.is_empty() { target.value.clone() } else { target.label.clone() };
+            let Some(target) = semantics
+                .described_by
+                .as_ref()
+                .and_then(|identifier| by_identifier.get(identifier))
+            else {
+                continue;
+            };
+            let description = if target.label.is_empty() {
+                target.value.clone()
+            } else {
+                target.label.clone()
+            };
             if !description.is_empty() && !semantics.help.contains(&description) {
-                semantics.help = if semantics.help.is_empty() { description } else { format!("{}. {}", semantics.help, description) };
+                semantics.help = if semantics.help.is_empty() {
+                    description
+                } else {
+                    format!("{}. {}", semantics.help, description)
+                };
             }
         }
         meanings
     }
     /// Shared by native accessibility and agent diagnostics.
     pub fn resolved_label(node: &Node) -> String {
-        let Some(semantic) = node.accessibility() else { return String::new() };
+        let Some(semantic) = node.accessibility() else {
+            return String::new();
+        };
         if !(semantic.label.is_empty() && semantic.combines_children) {
             return semantic.label;
         }
@@ -229,46 +288,95 @@ impl AccessibilityTree {
     }
 }
 
-fn index(elements: &[AccessibilityElement], by_identifier: &mut BTreeMap<String, AccessibilityElement>, has_descriptions: &mut bool) {
+fn index(
+    elements: &[AccessibilityElement],
+    by_identifier: &mut BTreeMap<String, AccessibilityElement>,
+    has_descriptions: &mut bool,
+) {
     for element in elements {
         *has_descriptions |= element.semantics.described_by.is_some();
         if !element.semantics.identifier.is_empty() {
-            by_identifier.entry(element.semantics.identifier.clone()).or_insert_with(|| element.clone());
+            by_identifier
+                .entry(element.semantics.identifier.clone())
+                .or_insert_with(|| element.clone());
         }
         index(&element.children, by_identifier, has_descriptions);
     }
 }
 
-fn resolve(elements: Vec<AccessibilityElement>, by_identifier: &BTreeMap<String, AccessibilityElement>) -> Vec<AccessibilityElement> {
+fn resolve(
+    elements: Vec<AccessibilityElement>,
+    by_identifier: &BTreeMap<String, AccessibilityElement>,
+) -> Vec<AccessibilityElement> {
     elements
         .into_iter()
         .map(|element| {
             let mut semantics = element.semantics;
-            if let Some(target) = semantics.described_by.as_ref().and_then(|identifier| by_identifier.get(identifier)) {
-                let description = if target.semantics.label.is_empty() { target.semantics.value.clone() } else { target.semantics.label.clone() };
+            if let Some(target) = semantics
+                .described_by
+                .as_ref()
+                .and_then(|identifier| by_identifier.get(identifier))
+            {
+                let description = if target.semantics.label.is_empty() {
+                    target.semantics.value.clone()
+                } else {
+                    target.semantics.label.clone()
+                };
                 if !description.is_empty() && !semantics.help.contains(&description) {
-                    semantics.help = if semantics.help.is_empty() { description } else { format!("{}. {}", semantics.help, description) };
+                    semantics.help = if semantics.help.is_empty() {
+                        description
+                    } else {
+                        format!("{}. {}", semantics.help, description)
+                    };
                 }
             }
-            AccessibilityElement { node: element.node, semantics, frame: element.frame, children: resolve(element.children, by_identifier), accepts_input: element.accepts_input }
+            AccessibilityElement {
+                node: element.node,
+                semantics,
+                frame: element.frame,
+                children: resolve(element.children, by_identifier),
+                accepts_input: element.accepts_input,
+            }
         })
         .collect()
 }
 
-fn collect(node: &Node, transform: Affine2D, clip: Rect, combines_text: bool, parent_accepts_input: bool, resolve_values: bool, output: &mut Vec<AccessibilityElement>) {
+fn collect(
+    node: &Node,
+    transform: Affine2D,
+    clip: Rect,
+    combines_text: bool,
+    parent_accepts_input: bool,
+    resolve_values: bool,
+    output: &mut Vec<AccessibilityElement>,
+) {
     let semantics = node.accessibility();
     if !node.is_layout_visible()
         || !node.is_interaction_enabled()
         || node.opacity() <= 0.0
         || node.subtree_opacity() <= 0.0
-        || semantics.as_ref().is_some_and(|semantics| semantics.is_hidden)
+        || semantics
+            .as_ref()
+            .is_some_and(|semantics| semantics.is_hidden)
     {
         return;
     }
-    let accepts_input = parent_accepts_input && node.is_layout_visible() && node.allows_hit_testing() && node.is_interaction_enabled();
+    let accepts_input = parent_accepts_input
+        && node.is_layout_visible()
+        && node.allows_hit_testing()
+        && node.is_interaction_enabled();
     let frame = node.frame();
-    let bounds = Rect::new(transform.e, transform.f, frame.width * transform.a.abs(), frame.height * transform.d.abs());
-    let child_clip = if node.clips_to_bounds() { clip.intersection(bounds) } else { Some(clip) };
+    let bounds = Rect::new(
+        transform.e,
+        transform.f,
+        frame.width * transform.a.abs(),
+        frame.height * transform.d.abs(),
+    );
+    let child_clip = if node.clips_to_bounds() {
+        clip.intersection(bounds)
+    } else {
+        Some(clip)
+    };
     let Some(child_clip) = child_clip else { return };
 
     let mut content = transform;
@@ -276,14 +384,29 @@ fn collect(node: &Node, transform: Affine2D, clip: Rect, combines_text: bool, pa
     content.e -= offset.x * transform.a;
     content.f -= offset.y * transform.d;
 
-    let child_combines = combines_text || semantics.as_ref().is_some_and(|semantics| semantics.combines_children);
+    let child_combines = combines_text
+        || semantics
+            .as_ref()
+            .is_some_and(|semantics| semantics.combines_children);
     let mut children = Vec::new();
     for child in node.children() {
-        let child_transform = super::placement_step(child.frame(), child.transform(), crate::Point::default()).followed(content);
-        collect(&child, child_transform, child_clip, child_combines, accepts_input, resolve_values, &mut children);
+        let child_transform =
+            super::placement_step(child.frame(), child.transform(), crate::Point::default())
+                .followed(content);
+        collect(
+            &child,
+            child_transform,
+            child_clip,
+            child_combines,
+            accepts_input,
+            resolve_values,
+            &mut children,
+        );
     }
 
-    let Some(frame) = bounds.intersection(clip) else { return };
+    let Some(frame) = bounds.intersection(clip) else {
+        return;
+    };
     let Some(mut semantic) = semantics else {
         output.extend(children);
         return;
@@ -315,13 +438,23 @@ fn collect(node: &Node, transform: Affine2D, clip: Rect, combines_text: bool, pa
     } else if semantic.state.is_secure {
         semantic.value = "•".repeat(semantic.value.chars().count());
     }
-    output.push(AccessibilityElement { node: node.clone(), semantics: semantic, frame, children, accepts_input });
+    output.push(AccessibilityElement {
+        node: node.clone(),
+        semantics: semantic,
+        frame,
+        children,
+        accepts_input,
+    });
 }
 
 fn label_text(node: &Node, includes_hidden_text: bool) -> Vec<String> {
     let mut out = Vec::new();
     for child in node.children() {
-        if !child.is_layout_visible() || !child.is_interaction_enabled() || child.opacity() <= 0.0 || child.subtree_opacity() <= 0.0 {
+        if !child.is_layout_visible()
+            || !child.is_interaction_enabled()
+            || child.opacity() <= 0.0
+            || child.subtree_opacity() <= 0.0
+        {
             continue;
         }
         if let Some(semantics) = child.accessibility() {
@@ -357,13 +490,27 @@ mod tests {
     #[test]
     fn descriptions_fall_back_from_label_to_value() {
         let mut meanings = BTreeMap::new();
-        meanings.insert("a".to_owned(), AccessibilitySemantics::new(AccessibilityRole::StaticText).with_identifier("label.a"));
-        meanings.insert("b".to_owned(), AccessibilitySemantics::new(AccessibilityRole::Button).described_by("label.a"));
+        meanings.insert(
+            "a".to_owned(),
+            AccessibilitySemantics::new(AccessibilityRole::StaticText).with_identifier("label.a"),
+        );
+        meanings.insert(
+            "b".to_owned(),
+            AccessibilitySemantics::new(AccessibilityRole::Button).described_by("label.a"),
+        );
         let resolved = AccessibilityTree::resolving_descriptions(meanings);
         assert_eq!(resolved["b"].help, "");
         let mut meanings = BTreeMap::new();
-        meanings.insert("a".to_owned(), AccessibilitySemantics::new(AccessibilityRole::StaticText).with_value("value").with_identifier("label.a"));
-        meanings.insert("b".to_owned(), AccessibilitySemantics::new(AccessibilityRole::Button).described_by("label.a"));
+        meanings.insert(
+            "a".to_owned(),
+            AccessibilitySemantics::new(AccessibilityRole::StaticText)
+                .with_value("value")
+                .with_identifier("label.a"),
+        );
+        meanings.insert(
+            "b".to_owned(),
+            AccessibilitySemantics::new(AccessibilityRole::Button).described_by("label.a"),
+        );
         let resolved = AccessibilityTree::resolving_descriptions(meanings);
         assert_eq!(resolved["b"].help, "value");
     }

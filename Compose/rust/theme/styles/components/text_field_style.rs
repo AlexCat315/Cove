@@ -67,7 +67,10 @@ impl AnyTextFieldStyle {
 }
 impl Clone for AnyTextFieldStyle {
     fn clone(&self) -> Self {
-        Self { make_body: self.make_body.clone(), style_id: self.style_id }
+        Self {
+            make_body: self.make_body.clone(),
+            style_id: self.style_id,
+        }
     }
 }
 impl PartialEq for AnyTextFieldStyle {
@@ -90,7 +93,10 @@ impl TextFieldStyleEnvironment {
 
 pub trait TextFieldStyleViewExt: View + Sized + 'static {
     fn text_field_style<S: TextFieldStyle + 'static>(self, style: S) -> ModifiedContent {
-        self.composition_local(TextFieldStyleEnvironment::key(), AnyTextFieldStyle::new(style))
+        self.composition_local(
+            TextFieldStyleEnvironment::key(),
+            AnyTextFieldStyle::new(style),
+        )
     }
 }
 impl<T: View + Sized + 'static> TextFieldStyleViewExt for T {}

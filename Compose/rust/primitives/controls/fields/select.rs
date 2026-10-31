@@ -11,10 +11,15 @@ pub enum KeyboardShortcutPlatform {
 
 impl KeyboardShortcutPlatform {
     pub const fn current() -> Self {
-        if cfg!(target_os = "macos") { Self::MacOS }
-        else if cfg!(target_os = "windows") { Self::Windows }
-        else if cfg!(target_os = "linux") { Self::Linux }
-        else { Self::Other }
+        if cfg!(target_os = "macos") {
+            Self::MacOS
+        } else if cfg!(target_os = "windows") {
+            Self::Windows
+        } else if cfg!(target_os = "linux") {
+            Self::Linux
+        } else {
+            Self::Other
+        }
     }
 }
 
@@ -34,8 +39,14 @@ pub struct KeyboardShortcut {
 }
 
 impl KeyboardShortcut {
-    pub fn new(key: impl Into<String>, modifiers: impl IntoIterator<Item = KeyboardShortcutModifier>) -> Self {
-        Self { modifiers: modifiers.into_iter().collect(), key: key.into() }
+    pub fn new(
+        key: impl Into<String>,
+        modifiers: impl IntoIterator<Item = KeyboardShortcutModifier>,
+    ) -> Self {
+        Self {
+            modifiers: modifiers.into_iter().collect(),
+            key: key.into(),
+        }
     }
 
     pub fn primary(key: impl Into<String>) -> Self {
@@ -43,7 +54,13 @@ impl KeyboardShortcut {
     }
 
     pub fn primary_shift(key: impl Into<String>) -> Self {
-        Self::new(key, [KeyboardShortcutModifier::Primary, KeyboardShortcutModifier::Shift])
+        Self::new(
+            key,
+            [
+                KeyboardShortcutModifier::Primary,
+                KeyboardShortcutModifier::Shift,
+            ],
+        )
     }
 
     pub fn display_string(&self) -> String {
@@ -54,7 +71,9 @@ impl KeyboardShortcut {
         let caps = self.caps(platform);
         match platform {
             KeyboardShortcutPlatform::MacOS => caps.concat(),
-            KeyboardShortcutPlatform::Windows | KeyboardShortcutPlatform::Linux | KeyboardShortcutPlatform::Other => caps.join("+"),
+            KeyboardShortcutPlatform::Windows
+            | KeyboardShortcutPlatform::Linux
+            | KeyboardShortcutPlatform::Other => caps.join("+"),
         }
     }
 
@@ -62,25 +81,43 @@ impl KeyboardShortcut {
         let mut resolved = Vec::new();
         for modifier in &self.modifiers {
             let modifier = if *modifier == KeyboardShortcutModifier::Primary {
-                if platform == KeyboardShortcutPlatform::MacOS { KeyboardShortcutModifier::Command }
-                else { KeyboardShortcutModifier::Control }
-            } else { *modifier };
-            if !resolved.contains(&modifier) { resolved.push(modifier); }
+                if platform == KeyboardShortcutPlatform::MacOS {
+                    KeyboardShortcutModifier::Command
+                } else {
+                    KeyboardShortcutModifier::Control
+                }
+            } else {
+                *modifier
+            };
+            if !resolved.contains(&modifier) {
+                resolved.push(modifier);
+            }
         }
-        let mut caps: Vec<String> = resolved.into_iter().map(|modifier| match platform {
-            KeyboardShortcutPlatform::MacOS => match modifier {
-                KeyboardShortcutModifier::Primary | KeyboardShortcutModifier::Command => "⌘",
-                KeyboardShortcutModifier::Control => "⌃",
-                KeyboardShortcutModifier::Option => "⌥",
-                KeyboardShortcutModifier::Shift => "⇧",
-            },
-            KeyboardShortcutPlatform::Windows | KeyboardShortcutPlatform::Linux | KeyboardShortcutPlatform::Other => match modifier {
-                KeyboardShortcutModifier::Primary | KeyboardShortcutModifier::Control => "Ctrl",
-                KeyboardShortcutModifier::Command => "Meta",
-                KeyboardShortcutModifier::Option => "Alt",
-                KeyboardShortcutModifier::Shift => "Shift",
-            },
-        }.to_string()).collect();
+        let mut caps: Vec<String> =
+            resolved
+                .into_iter()
+                .map(|modifier| {
+                    match platform {
+                        KeyboardShortcutPlatform::MacOS => match modifier {
+                            KeyboardShortcutModifier::Primary
+                            | KeyboardShortcutModifier::Command => "⌘",
+                            KeyboardShortcutModifier::Control => "⌃",
+                            KeyboardShortcutModifier::Option => "⌥",
+                            KeyboardShortcutModifier::Shift => "⇧",
+                        },
+                        KeyboardShortcutPlatform::Windows
+                        | KeyboardShortcutPlatform::Linux
+                        | KeyboardShortcutPlatform::Other => match modifier {
+                            KeyboardShortcutModifier::Primary
+                            | KeyboardShortcutModifier::Control => "Ctrl",
+                            KeyboardShortcutModifier::Command => "Meta",
+                            KeyboardShortcutModifier::Option => "Alt",
+                            KeyboardShortcutModifier::Shift => "Shift",
+                        },
+                    }
+                    .to_string()
+                })
+                .collect();
         caps.push(self.key.clone());
         caps
     }
@@ -95,10 +132,16 @@ pub struct SelectOption<Value> {
 
 impl<Value> SelectOption<Value> {
     pub fn new(value: Value, label: impl Into<String>, is_enabled: bool) -> Self {
-        Self { value, label: label.into(), is_enabled }
+        Self {
+            value,
+            label: label.into(),
+            is_enabled,
+        }
     }
 
-    pub fn id(&self) -> &Value { &self.value }
+    pub fn id(&self) -> &Value {
+        &self.value
+    }
 }
 
 // MARK: - Select view
@@ -106,22 +149,18 @@ impl<Value> SelectOption<Value> {
 use std::cell::Cell;
 use std::rc::Rc;
 
-use cove_core::scene::{Align, FlexDirection, HoverPhase, Justify, Node, Wrap};
-use cove_core::{Binding, Color};
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{ButtonIcon, ButtonIconSource};
 use crate::primitives::overlays::anchored::{PopoverOverflow, PopoverSurface};
-use crate::primitives::overlays::menu::{
-    Menu, MenuEntry, MenuItem, MenuItemRole,
-};
-use crate::primitives::overlays::popover::{
-    Popover, PopoverSizing, PopoverTriggerDescription,
-};
+use crate::primitives::overlays::menu::{Menu, MenuEntry, MenuItem, MenuItemRole};
+use crate::primitives::overlays::popover::{Popover, PopoverSizing, PopoverTriggerDescription};
 use crate::primitives::text::Text;
-use crate::theme::{theme_for_node, SemanticFontRef, Theme};
+use crate::theme::{SemanticFontRef, Theme, theme_for_node};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
+use cove_core::scene::{Align, FlexDirection, HoverPhase, Justify, Node, Wrap};
+use cove_core::{Binding, Color};
 
 /// Trigger height floor, matching the text fields beside it.
 const TRIGGER_MIN_HEIGHT: f32 = 32.0;
@@ -185,10 +224,12 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Select<Value> {
                 let selection = self.selection.clone();
                 let value = option.value.clone();
                 MenuEntry::Item(
-                    MenuItem::new(index as u64, option.label.clone(), move || selection.set(value.clone()))
-                        .enabled(option.is_enabled)
-                        .selected(option.value == current)
-                        .role(MenuItemRole::Normal),
+                    MenuItem::new(index as u64, option.label.clone(), move || {
+                        selection.set(value.clone())
+                    })
+                    .enabled(option.is_enabled)
+                    .selected(option.value == current)
+                    .role(MenuItemRole::Normal),
                 )
             })
             .collect()
@@ -204,7 +245,11 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Select<Value> {
         if is_presented {
             return theme.inputs.border_focused;
         }
-        if is_hovered { theme.inputs.border_hover } else { theme.inputs.border_color }
+        if is_hovered {
+            theme.inputs.border_hover
+        } else {
+            theme.inputs.border_color
+        }
     }
 }
 
@@ -247,15 +292,15 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> View for Select<Value> {
         };
         // The selected value is already the trigger's visible text, so it is the
         // control's name and value, not help.
-        AnyView::new(SelectComboBoxRole { content: AnyView::new(popover) })
+        AnyView::new(SelectComboBoxRole {
+            content: AnyView::new(popover),
+        })
     }
 }
 
 impl<Value: PartialEq + Clone + Send + Sync + 'static> Select<Value> {
     fn menu(&self) -> AnyView {
-        AnyView::new(
-            Menu::new(self.menu_entries()).max_visible_rows(self.max_visible_rows),
-        )
+        AnyView::new(Menu::new(self.menu_entries()).max_visible_rows(self.max_visible_rows))
     }
 }
 
@@ -335,14 +380,19 @@ impl PrimitiveView for SelectTriggerSurface {
     }
 
     fn update_node(&self, node: &Node) {
-        let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() else { return };
+        let Some(registry) = cove_core::scene::InteractionRegistryHolder::current() else {
+            return;
+        };
         let hovered = self.hovered.clone();
-        registry.set_hover(node, Rc::new(move |phase| {
-            let next = phase == HoverPhase::Enter;
-            if hovered.get() != next {
-                hovered.set(next);
-            }
-        }));
+        registry.set_hover(
+            node,
+            Rc::new(move |phase| {
+                let next = phase == HoverPhase::Enter;
+                if hovered.get() != next {
+                    hovered.set(next);
+                }
+            }),
+        );
     }
 
     fn children(&self, node: &Node) -> Vec<AnyView> {
@@ -363,7 +413,11 @@ impl PrimitiveView for SelectTriggerSurface {
         };
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 8.0,
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                8.0,
                 AnyView::new(TupleView::new(vec![
                     AnyView::new(
                         Text::new(self.label.clone())

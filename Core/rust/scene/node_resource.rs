@@ -46,7 +46,10 @@ mod tests {
         let parent = Node::new();
         let child = Node::new();
         parent.add_child(&child);
-        let recorder = Rc::new(Recorder { mounts: Cell::new(0), unmounts: Cell::new(0) });
+        let recorder = Rc::new(Recorder {
+            mounts: Cell::new(0),
+            unmounts: Cell::new(0),
+        });
         child.add_resource(recorder.clone());
         assert_eq!(recorder.mounts.get(), 1);
         assert!(child.first_resource::<Recorder>().is_some());

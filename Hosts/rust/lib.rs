@@ -4,7 +4,7 @@ pub mod android;
 pub mod application_services;
 pub mod desktop;
 
+pub use application_services::{http::TransportCapabilities, install_platform_services};
+pub use desktop::AppDisplayHandle;
 pub use desktop::application::configuration::ApplicationConfiguration;
 pub use desktop::application::runtime::{Application, ApplicationCallbacks};
-pub use desktop::AppDisplayHandle;
-pub use application_services::{install_platform_services, http::TransportCapabilities};

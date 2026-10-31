@@ -4,10 +4,10 @@
 //! [`CounterTextRun`] attachments and leaves painting to the host; this wrapper
 //! supplies the painter that shapes each run into the shared font atlas.
 
-use cove_core::scene::{Node, Point};
 use cove_core::DrawList;
+use cove_core::scene::{Node, Point};
 use cove_text::{DrawListText, TextEnvironmentHolder};
-use cove_ui_compose::{AnyView, PrimitiveView, View, ViewKind, ViewExt};
+use cove_ui_compose::{AnyView, PrimitiveView, View, ViewExt, ViewKind};
 
 use crate::counter::{CounterText, CounterTextRun, CounterView, ProvidedPainter};
 

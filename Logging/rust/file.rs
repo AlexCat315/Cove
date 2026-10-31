@@ -219,19 +219,13 @@ fn create_private_directory(path: &Path) -> io::Result<()> {
 
 fn create_private_file(path: &Path) -> io::Result<()> {
     if !path.exists() {
-        OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(path)?;
+        OpenOptions::new().write(true).create_new(true).open(path)?;
     }
     restrict(path, false)
 }
 
 fn write_private_file(path: &Path, contents: &[u8]) -> io::Result<()> {
-    let mut file = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(path)?;
+    let mut file = OpenOptions::new().write(true).create_new(true).open(path)?;
     restrict(path, false)?;
     file.write_all(contents)
 }
@@ -240,7 +234,10 @@ fn restrict(path: &Path, directory: bool) -> io::Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(path, fs::Permissions::from_mode(if directory { 0o700 } else { 0o600 }))?;
+        fs::set_permissions(
+            path,
+            fs::Permissions::from_mode(if directory { 0o700 } else { 0o600 }),
+        )?;
     }
     cove_system::files::restrict_path(path, directory)
 }

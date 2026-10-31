@@ -59,9 +59,15 @@ impl AppWindowMemorySnapshot {
         let mut counters = BTreeMap::from([
             ("samples".to_owned(), u64::from(self.samples)),
             ("hasSwapchain".to_owned(), u64::from(self.has_swapchain)),
-            ("suspended".to_owned(), u64::from(self.state == AppWindowRendererState::Suspended)),
+            (
+                "suspended".to_owned(),
+                u64::from(self.state == AppWindowRendererState::Suspended),
+            ),
             ("targetBytes".to_owned(), self.estimated_target_bytes as u64),
-            ("msaaLogicalBytes".to_owned(), self.msaa_logical_bytes as u64),
+            (
+                "msaaLogicalBytes".to_owned(),
+                self.msaa_logical_bytes as u64,
+            ),
             ("msaaMemoryless".to_owned(), u64::from(self.msaa_memoryless)),
         ]);
         if let Some(allocated) = self.msaa_allocated_bytes {
@@ -94,12 +100,18 @@ pub mod platform_pressure {
     mod linux {
         /// Host RAM still available, as a fraction of total.
         pub fn available_ratio() -> f64 {
-            let Ok(text) = std::fs::read_to_string("/proc/meminfo") else { return 1.0 };
+            let Ok(text) = std::fs::read_to_string("/proc/meminfo") else {
+                return 1.0;
+            };
             let (mut total, mut available) = (0.0_f64, 0.0_f64);
             for line in text.lines() {
                 let mut fields = line.split_whitespace();
-                let (Some(name), Some(value)) = (fields.next(), fields.next()) else { continue };
-                let Ok(value) = value.parse::<f64>() else { continue };
+                let (Some(name), Some(value)) = (fields.next(), fields.next()) else {
+                    continue;
+                };
+                let Ok(value) = value.parse::<f64>() else {
+                    continue;
+                };
                 match name {
                     "MemTotal:" => total = value,
                     "MemAvailable:" => available = value,
@@ -111,19 +123,25 @@ pub mod platform_pressure {
 
         /// Used fraction of the cgroup v2 limit, or `0` when no limit applies.
         pub fn container_ratio() -> f64 {
-            let Ok(membership) = std::fs::read_to_string("/proc/self/cgroup") else { return 0.0 };
+            let Ok(membership) = std::fs::read_to_string("/proc/self/cgroup") else {
+                return 0.0;
+            };
             let Some(entry) = membership.lines().find(|line| line.starts_with("0::")) else {
                 return 0.0;
             };
             let suffix = &entry[3..];
-            for path in [format!("/sys/fs/cgroup{suffix}"), "/sys/fs/cgroup".to_owned()] {
+            for path in [
+                format!("/sys/fs/cgroup{suffix}"),
+                "/sys/fs/cgroup".to_owned(),
+            ] {
                 let Ok(current) = std::fs::read_to_string(format!("{path}/memory.current")) else {
                     continue;
                 };
                 let Ok(maximum) = std::fs::read_to_string(format!("{path}/memory.max")) else {
                     continue;
                 };
-                let (Ok(used), Ok(limit)) = (current.trim().parse::<f64>(), maximum.trim().parse::<f64>())
+                let (Ok(used), Ok(limit)) =
+                    (current.trim().parse::<f64>(), maximum.trim().parse::<f64>())
                 else {
                     continue;
                 };
@@ -148,11 +166,16 @@ pub mod platform_pressure {
         static PRESSURE_LEVEL: Mutex<u32> = Mutex::new(1);
 
         pub fn set_level(level: u32) {
-            *PRESSURE_LEVEL.lock().unwrap_or_else(|error| error.into_inner()) = level;
+            *PRESSURE_LEVEL
+                .lock()
+                .unwrap_or_else(|error| error.into_inner()) = level;
         }
 
         pub fn is_low() -> bool {
-            *PRESSURE_LEVEL.lock().unwrap_or_else(|error| error.into_inner()) >= 2
+            *PRESSURE_LEVEL
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                >= 2
         }
     }
 
@@ -290,7 +313,11 @@ impl ApplicationMemoryPressure {
                 probe.close();
             })
             .ok();
-        Self { stop, pending, thread }
+        Self {
+            stop,
+            pending,
+            thread,
+        }
     }
 
     /// Consumes a raised pressure flag. The caller runs the trim on the UI thread.

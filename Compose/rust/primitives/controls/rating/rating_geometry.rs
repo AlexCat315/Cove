@@ -1,8 +1,8 @@
 //! Translation of Primitives/Controls/Rating/RatingGeometry.swift.
 //!
 //! Symbol extents and the pointer-to-value mapping for a rating row.
-use cove_core::{Point, Rect};
 use crate::theme::ControlSize;
+use cove_core::{Point, Rect};
 
 use super::rating::{RatingAppearance, RatingPrecision, RatingSelection};
 
@@ -16,7 +16,13 @@ pub struct RatingGeometry {
 }
 
 impl RatingGeometry {
-    pub fn new(appearance: &RatingAppearance, selection: &RatingSelection, density: ControlSize, touch: bool, minimum_extent: f32) -> Self {
+    pub fn new(
+        appearance: &RatingAppearance,
+        selection: &RatingSelection,
+        density: ControlSize,
+        touch: bool,
+        minimum_extent: f32,
+    ) -> Self {
         let size = appearance.size.unwrap_or(density);
         let star_size = appearance.star_size.unwrap_or(match size {
             ControlSize::Mini => 12.0,
@@ -42,8 +48,7 @@ impl RatingGeometry {
     }
 
     pub fn width(&self) -> f32 {
-        8.0
-            + self.maximum as f32 * self.cell_width
+        8.0 + self.maximum as f32 * self.cell_width
             + self.maximum.saturating_sub(1) as f32 * self.spacing
     }
 
@@ -60,7 +65,10 @@ impl RatingGeometry {
             index
         };
         Rect::new(
-            origin.x + 4.0 + (self.cell_width - self.star_size) / 2.0 + visual_index as f32 * self.stride(),
+            origin.x
+                + 4.0
+                + (self.cell_width - self.star_size) / 2.0
+                + visual_index as f32 * self.stride(),
             origin.y + (height - self.star_size) / 2.0,
             self.star_size,
             self.star_size,
@@ -68,22 +76,33 @@ impl RatingGeometry {
     }
 
     /// The value a pointer position selects.
-    pub fn candidate(&self, event_x: f32, origin_x: f32, right_to_left: bool, precision: RatingPrecision) -> f64 {
+    pub fn candidate(
+        &self,
+        event_x: f32,
+        origin_x: f32,
+        right_to_left: bool,
+        precision: RatingPrecision,
+    ) -> f64 {
         if !event_x.is_finite() || self.maximum == 0 {
             return 0.0;
         }
         let x = (event_x - origin_x - 4.0).clamp(0.0, self.width());
         let visual_index = ((x / self.stride()) as usize).min(self.maximum - 1);
-        let fraction = ((x - visual_index as f32 * self.stride()
-            - (self.cell_width - self.star_size) / 2.0)
-            / self.star_size)
-            .clamp(0.0, 1.0);
+        let fraction =
+            ((x - visual_index as f32 * self.stride() - (self.cell_width - self.star_size) / 2.0)
+                / self.star_size)
+                .clamp(0.0, 1.0);
         let index = if right_to_left {
             self.maximum - 1 - visual_index
         } else {
             visual_index
         };
-        index as f64 + precision.part(if right_to_left { 1.0 - fraction } else { fraction })
+        index as f64
+            + precision.part(if right_to_left {
+                1.0 - fraction
+            } else {
+                fraction
+            })
     }
 
     /// True when the point lies inside the row's painted extent.

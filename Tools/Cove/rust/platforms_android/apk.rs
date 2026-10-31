@@ -5,13 +5,13 @@
 //! `Platforms/Android/APK/Signing.swift`.
 
 use super::AndroidToolchain;
+use super::launch::{SceneLaunch, SceneLaunchMode};
 use crate::cli::{Arguments, OptionKey};
 use crate::project::{
     AppProject, ApplicationIdentity, ApplicationTemplates, ProjectConfiguration, Toolchain,
 };
 use crate::project_sdk::SDKRelease;
-use crate::support::{environment, Files, Shell, StdoutTarget, ToolError};
-use super::launch::{SceneLaunch, SceneLaunchMode};
+use crate::support::{Files, Shell, StdoutTarget, ToolError, environment};
 use cove_devtools_protocol::DevToolsLaunch;
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
@@ -28,9 +28,13 @@ pub struct APKSigning {
 impl APKSigning {
     pub fn parse(arguments: &Arguments) -> Result<Option<Self>, ToolError> {
         let Some(keystore) = arguments.url(OptionKey::Keystore) else {
-            if [OptionKey::KeyAlias, OptionKey::StorePassword, OptionKey::KeyPassword]
-                .iter()
-                .any(|option| arguments.value(*option).is_some())
+            if [
+                OptionKey::KeyAlias,
+                OptionKey::StorePassword,
+                OptionKey::KeyPassword,
+            ]
+            .iter()
+            .any(|option| arguments.value(*option).is_some())
             {
                 return Err(ToolError::invalid("Signing options require --keystore"));
             }
@@ -207,7 +211,11 @@ impl AndroidDevice {
         identity: &ApplicationIdentity,
         launch: Option<&DevToolsLaunch>,
     ) -> Result<String, ToolError> {
-        let adb = toolchain.sdk.join("platform-tools/adb").display().to_string();
+        let adb = toolchain
+            .sdk
+            .join("platform-tools/adb")
+            .display()
+            .to_string();
         let listing = Shell::run(
             &[adb.clone(), "devices".into()],
             None,
@@ -302,9 +310,10 @@ impl AndroidDevice {
         if let Some(launch) = launch {
             start.push("--es".into());
             start.push("cove_devtools".into());
-            start.push(base64(&serde_json::to_vec(launch).map_err(|error| {
-                ToolError::invalid(error.to_string())
-            })?));
+            start.push(base64(
+                &serde_json::to_vec(launch)
+                    .map_err(|error| ToolError::invalid(error.to_string()))?,
+            ));
         }
         Shell::run(
             &start,
@@ -360,8 +369,7 @@ fn logging_payload(identity: &ApplicationIdentity) -> Result<String, ToolError> 
 }
 
 fn base64(bytes: &[u8]) -> String {
-    const ALPHABET: &[u8; 64] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut result = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {
         let value = (u32::from(chunk[0]) << 16)
@@ -438,7 +446,10 @@ impl APKPackage {
             self.toolchain.sdk.display().to_string(),
         );
         if self.signing.is_none() {
-            build_environment.insert(credentials.store_password_variable.clone(), "android".into());
+            build_environment.insert(
+                credentials.store_password_variable.clone(),
+                "android".into(),
+            );
             build_environment.insert(credentials.key_password_variable.clone(), "android".into());
         }
         let task = format!("assemble{}", capitalize(self.mode.raw_value()));
@@ -462,10 +473,7 @@ impl APKPackage {
                 "-PcoveStorePasswordEnv={}",
                 credentials.store_password_variable
             ),
-            format!(
-                "-PcoveKeyPasswordEnv={}",
-                credentials.key_password_variable
-            ),
+            format!("-PcoveKeyPasswordEnv={}", credentials.key_password_variable),
             task,
         ];
         if cfg!(windows) {
@@ -512,7 +520,11 @@ impl APKPackage {
         Files::copy(&folder.join(&file_name), output)?;
         let verifier = self.toolchain.sdk.join("build-tools/36.1.0/apksigner");
         Shell::run(
-            &[verifier.display().to_string(), "verify".into(), output.display().to_string()],
+            &[
+                verifier.display().to_string(),
+                "verify".into(),
+                output.display().to_string(),
+            ],
             None,
             &environment(),
             false,
@@ -558,13 +570,7 @@ impl APKPackage {
             .join("android/generated")
             .join(self.mode.raw_value());
         Files::reset(&directory)?;
-        APKAssets::stage(
-            products,
-            &self.toolchain,
-            launch,
-            game_assets,
-            &directory,
-        )
+        APKAssets::stage(products, &self.toolchain, launch, game_assets, &directory)
     }
 
     /// Generated packaging workspaces are owned by the SDK, not by a user.
@@ -611,7 +617,11 @@ fn capitalize(value: &str) -> String {
 pub struct BuildAndroidApplication;
 
 impl BuildAndroidApplication {
-    pub fn prepare(arguments: &Arguments, root: &Path, project: &AppProject) -> Result<(), ToolError> {
+    pub fn prepare(
+        arguments: &Arguments,
+        root: &Path,
+        project: &AppProject,
+    ) -> Result<(), ToolError> {
         project.require(crate::cli::AppPlatform::Android)?;
         let toolchain = AndroidToolchain::new(root, arguments)?;
         let products = toolchain.compile(
@@ -712,7 +722,9 @@ impl BuildAndroidApplication {
         println!("Built Android application: {}", output.display());
         if options.install {
             match project {
-                Some(project) => crate::development::AndroidRun::run(&output, project, &toolchain, arguments)?,
+                Some(project) => {
+                    crate::development::AndroidRun::run(&output, project, &toolchain, arguments)?
+                }
                 None => {
                     AndroidDevice::install(
                         &output,

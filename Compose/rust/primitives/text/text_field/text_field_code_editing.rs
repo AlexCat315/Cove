@@ -13,8 +13,15 @@ pub enum TextEditKind {
 
 /// Returns the newline to insert at `caret`, carrying the current line's indent
 /// and one extra level after an open brace or bracket.
-pub fn indented_newline(buffer: &str, caret: usize, indentation_width: Option<usize>, vertical: bool) -> String {
-    let Some(width) = indentation_width else { return "\n".to_string() };
+pub fn indented_newline(
+    buffer: &str,
+    caret: usize,
+    indentation_width: Option<usize>,
+    vertical: bool,
+) -> String {
+    let Some(width) = indentation_width else {
+        return "\n".to_string();
+    };
     if !vertical {
         return "\n".to_string();
     }
@@ -25,8 +32,14 @@ pub fn indented_newline(buffer: &str, caret: usize, indentation_width: Option<us
         .rposition(|character| *character == '\n')
         .map_or(0, |index| index + 1);
     let line: String = characters[line_start..caret].iter().collect();
-    let indent: String = line.chars().take_while(|character| *character == ' ' || *character == '\t').collect();
-    let last = line.chars().rev().find(|character| !character.is_whitespace());
+    let indent: String = line
+        .chars()
+        .take_while(|character| *character == ' ' || *character == '\t')
+        .collect();
+    let last = line
+        .chars()
+        .rev()
+        .find(|character| !character.is_whitespace());
     let extra = if matches!(last, Some('{') | Some('[')) {
         " ".repeat(width)
     } else {
@@ -58,11 +71,15 @@ pub fn indent_lines(
     let mut characters: Vec<char> = buffer.chars().collect();
     let mut caret = caret.min(characters.len());
     let mut anchor = anchor.map(|value| value.min(characters.len()));
-    let selection = selection.map(|(low, high)| (low.min(characters.len()), high.min(characters.len())));
+    let selection =
+        selection.map(|(low, high)| (low.min(characters.len()), high.min(characters.len())));
     let lower = selection.map_or(caret, |(low, _)| low);
     let upper = selection.map_or(lower, |(low, high)| low.max(high.saturating_sub(1)));
     let line_index = |characters: &[char], index: usize| -> usize {
-        characters[..index.min(characters.len())].iter().filter(|character| **character == '\n').count()
+        characters[..index.min(characters.len())]
+            .iter()
+            .filter(|character| **character == '\n')
+            .count()
     };
     let line_start = |characters: &[char], line: usize| -> usize {
         if line == 0 {
@@ -99,7 +116,11 @@ pub fn indent_lines(
             };
             (0, " ".repeat(spaces))
         };
-        let offset = if !removing && selection.is_none() { caret } else { start };
+        let offset = if !removing && selection.is_none() {
+            caret
+        } else {
+            start
+        };
         let removed_end = (offset + removed).min(characters.len());
         characters.splice(offset..removed_end, insertion.chars());
         let shift = insertion.chars().count() as isize - removed as isize;
@@ -117,8 +138,18 @@ pub fn indent_lines(
     if let Some(max_length) = max_length
         && characters.len() > max_length
     {
-        return IndentResult { text: buffer.to_string(), caret, anchor, changed: false };
+        return IndentResult {
+            text: buffer.to_string(),
+            caret,
+            anchor,
+            changed: false,
+        };
     }
     let changed = text != buffer;
-    IndentResult { text, caret, anchor, changed }
+    IndentResult {
+        text,
+        caret,
+        anchor,
+        changed,
+    }
 }

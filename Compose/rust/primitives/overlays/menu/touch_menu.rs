@@ -16,24 +16,24 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cove_composition::Scancode;
-use cove_core::scene::{
-    AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, Justify, Wrap,
-};
-use cove_core::State;
-use cove_composition::{LayoutDebugExt, ViewExt};
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::media::ui_icon_catalog;
 use crate::primitives::overlays::menu::{
-    MenuEntry, MenuItemRole, MenuRowPresentation, MenuSubmenu, MenuItemContent,
+    MenuEntry, MenuItemContent, MenuItemRole, MenuRowPresentation, MenuSubmenu,
 };
 use crate::primitives::overlays::roving_focus::{RovingFocusHost, SelectionNavigation};
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonRole, ButtonStyleViewExt};
 use crate::theme::{SemanticColorRef, SemanticFontRef};
 use crate::{AnyView, BoxView, TupleView, View};
+use cove_composition::Scancode;
+use cove_composition::{LayoutDebugExt, ViewExt};
+use cove_core::State;
+use cove_core::scene::{
+    AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, Justify, Wrap,
+};
 
 /// One resolved sheet level: its entries and the title of the branch it shows.
 #[derive(Clone)]
@@ -45,7 +45,11 @@ pub struct TouchMenuLevel {
 
 impl TouchMenuLevel {
     pub fn root(entries: Vec<MenuEntry>) -> Self {
-        Self { entries, path: Vec::new(), title: None }
+        Self {
+            entries,
+            path: Vec::new(),
+            title: None,
+        }
     }
 
     /// Walks the path, stopping at the first entry that is not an enabled
@@ -53,7 +57,8 @@ impl TouchMenuLevel {
     pub fn resolve(entries: &[MenuEntry], path: &[u64]) -> Self {
         let mut level = Self::root(entries.to_vec());
         for id in path {
-            let Some(MenuEntry::Submenu(branch)) = level.entries.iter().find(|entry| entry.id() == *id)
+            let Some(MenuEntry::Submenu(branch)) =
+                level.entries.iter().find(|entry| entry.id() == *id)
             else {
                 break;
             };
@@ -196,7 +201,10 @@ impl TouchMenu {
 
     /// The path store, cloned so row closures do not borrow the view.
     fn session(&self) -> TouchMenuSession {
-        TouchMenuSession { path: self.path.clone(), highlighted: self.highlighted.clone() }
+        TouchMenuSession {
+            path: self.path.clone(),
+            highlighted: self.highlighted.clone(),
+        }
     }
 }
 
@@ -234,30 +242,28 @@ impl View for TouchMenu {
             children.push(AnyView::new(
                 AnyView::new(
                     crate::primitives::controls::Button::new(
-                        AnyView::new(
-                            BoxView::new(
-                                FlexDirection::Row,
-                                Align::Center,
-                                Justify::FlexStart,
-                                Wrap::NoWrap,
-                                8.0,
-                                AnyView::new(TupleView::new(vec![
-                                    AnyView::new(
-                                        crate::primitives::media::Icon::with_semantic(
-                                            ui_icon_catalog::navigation::arrow_left(),
-                                            16.0,
-                                            SemanticColorRef::on_surface(),
-                                        )
-                                        .accessibility_hidden(true),
-                                    ),
-                                    AnyView::new(
-                                        Text::new(title.clone())
-                                            .truncated()
-                                            .semantic_font(SemanticFontRef::body_strong()),
-                                    ),
-                                ])),
-                            ),
-                        ),
+                        AnyView::new(BoxView::new(
+                            FlexDirection::Row,
+                            Align::Center,
+                            Justify::FlexStart,
+                            Wrap::NoWrap,
+                            8.0,
+                            AnyView::new(TupleView::new(vec![
+                                AnyView::new(
+                                    crate::primitives::media::Icon::with_semantic(
+                                        ui_icon_catalog::navigation::arrow_left(),
+                                        16.0,
+                                        SemanticColorRef::on_surface(),
+                                    )
+                                    .accessibility_hidden(true),
+                                ),
+                                AnyView::new(
+                                    Text::new(title.clone())
+                                        .truncated()
+                                        .semantic_font(SemanticFontRef::body_strong()),
+                                ),
+                            ])),
+                        )),
                         move || back.pop(),
                     )
                     .role(ButtonRole::Normal),
@@ -293,24 +299,26 @@ impl View for TouchMenu {
         );
 
         let highlighted = self.highlighted.clone();
-        AnyView::new(RovingFocusHost::new(
-            enabled,
-            {
-                let highlighted = highlighted.clone();
-                move || highlighted.get()
-            },
-            move |id: u64| highlighted.set(Some(id)),
-            |id: &u64| *id,
-            body,
-        )
-        .command(|event| {
-            matches!(
-                event.scancode,
-                Scancode::ARROW_UP | Scancode::ARROW_DOWN | Scancode::HOME | Scancode::END
+        AnyView::new(
+            RovingFocusHost::new(
+                enabled,
+                {
+                    let highlighted = highlighted.clone();
+                    move || highlighted.get()
+                },
+                move |id: u64| highlighted.set(Some(id)),
+                |id: &u64| *id,
+                body,
             )
-            .then(|| SelectionNavigation::command_for(event.scancode))
-            .flatten()
-        }))
+            .command(|event| {
+                matches!(
+                    event.scancode,
+                    Scancode::ARROW_UP | Scancode::ARROW_DOWN | Scancode::HOME | Scancode::END
+                )
+                .then(|| SelectionNavigation::command_for(event.scancode))
+                .flatten()
+            }),
+        )
     }
 }
 
@@ -391,16 +399,14 @@ impl View for TouchMenuRow {
         AnyView::new(
             AnyView::new(
                 crate::primitives::controls::Button::new(
-                    AnyView::new(
-                        BoxView::new(
-                            FlexDirection::Row,
-                            Align::Center,
-                            Justify::FlexStart,
-                            Wrap::NoWrap,
-                            12.0,
-                            AnyView::new(TupleView::new(row_children)),
-                        ),
-                    ),
+                    AnyView::new(BoxView::new(
+                        FlexDirection::Row,
+                        Align::Center,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        12.0,
+                        AnyView::new(TupleView::new(row_children)),
+                    )),
                     move || activate(),
                 )
                 .enabled(row.is_enabled)

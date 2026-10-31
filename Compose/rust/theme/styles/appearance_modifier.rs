@@ -30,8 +30,17 @@ pub trait AppearanceViewExt: View + Sized + 'static {
     /// presets to the receiver subtree. Equivalent to `.theme(Theme::default_light)`
     /// for `Light`, etc. Composes naturally with `.theme(_)` — whichever
     /// modifier appears last (innermost) wins for descendants.
-    fn appearance(self, appearance: Appearance, transition: ThemeTransition) -> CircularThemeHost<Appearance> {
-        CircularThemeHost::new(appearance.theme(), appearance, transition, AnyView::new(self))
+    fn appearance(
+        self,
+        appearance: Appearance,
+        transition: ThemeTransition,
+    ) -> CircularThemeHost<Appearance> {
+        CircularThemeHost::new(
+            appearance.theme(),
+            appearance,
+            transition,
+            AnyView::new(self),
+        )
     }
 }
 impl<T: View + Sized + 'static> AppearanceViewExt for T {}

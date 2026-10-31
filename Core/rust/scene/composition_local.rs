@@ -17,7 +17,10 @@ pub struct CompositionLocal<Value> {
 impl<Value> CompositionLocal<Value> {
     pub fn new(default_value: impl Fn() -> Value + 'static) -> Self {
         static NEXT_KEY: AtomicU64 = AtomicU64::new(1);
-        Self { key: CompositionLocalKey(NEXT_KEY.fetch_add(1, Ordering::Relaxed)), default_value: Box::new(default_value) }
+        Self {
+            key: CompositionLocalKey(NEXT_KEY.fetch_add(1, Ordering::Relaxed)),
+            default_value: Box::new(default_value),
+        }
     }
     /// A declaration whose default is a cheaply cloned value.
     pub fn constant(value: Value) -> Self

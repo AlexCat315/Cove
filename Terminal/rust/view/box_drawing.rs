@@ -48,7 +48,12 @@ pub fn arms(scalar: u32) -> Option<Arms> {
         return None;
     }
     let digit = |index: usize| (entry[index] as char).to_digit(10).unwrap_or(0) as i32;
-    Some(Arms { up: digit(0), right: digit(1), down: digit(2), left: digit(3) })
+    Some(Arms {
+        up: digit(0),
+        right: digit(1),
+        down: digit(2),
+        left: digit(3),
+    })
 }
 
 pub fn draw(scalar: u32, cell: Rect, color: Color, list: &mut DrawList) {
@@ -102,7 +107,9 @@ impl<'a> Painter<'a> {
         if x1 <= x0 || y1 <= y0 {
             return;
         }
-        let _ = self.list.add_rect(Rect::new(x0, y0, x1 - x0, y1 - y0), self.color);
+        let _ = self
+            .list
+            .add_rect(Rect::new(x0, y0, x1 - x0, y1 - y0), self.color);
     }
 
     fn lines(&mut self, arms: Arms) {
@@ -130,43 +137,95 @@ impl<'a> Painter<'a> {
         let join = |turns: bool, near: f32, far: f32| if turns { near } else { far };
 
         if arms.up == 3 {
-            let end = join(arms.left != 0, self.center_y - self.gap, self.center_y + self.gap);
+            let end = join(
+                arms.left != 0,
+                self.center_y - self.gap,
+                self.center_y + self.gap,
+            );
             let x0 = self.center_x - self.gap;
             let x1 = self.center_x + self.gap;
             let (y0, y1) = (top, end);
             self.vertical(x0, y0, y1);
-            let end = join(arms.right != 0, self.center_y - self.gap, self.center_y + self.gap);
+            let end = join(
+                arms.right != 0,
+                self.center_y - self.gap,
+                self.center_y + self.gap,
+            );
             self.vertical(x1, top, end);
         } else if arms.up > 0 {
             let half = self.weight(arms.up) / 2.0;
-            self.rect(self.center_x - half, top, self.center_x + half, self.center_y + horizontal_reach);
+            self.rect(
+                self.center_x - half,
+                top,
+                self.center_x + half,
+                self.center_y + horizontal_reach,
+            );
         }
         if arms.down == 3 {
-            let start = join(arms.left != 0, self.center_y + self.gap, self.center_y - self.gap);
+            let start = join(
+                arms.left != 0,
+                self.center_y + self.gap,
+                self.center_y - self.gap,
+            );
             self.vertical(self.center_x - self.gap, start, bottom);
-            let start = join(arms.right != 0, self.center_y + self.gap, self.center_y - self.gap);
+            let start = join(
+                arms.right != 0,
+                self.center_y + self.gap,
+                self.center_y - self.gap,
+            );
             self.vertical(self.center_x + self.gap, start, bottom);
         } else if arms.down > 0 {
             let half = self.weight(arms.down) / 2.0;
-            self.rect(self.center_x - half, self.center_y - horizontal_reach, self.center_x + half, bottom);
+            self.rect(
+                self.center_x - half,
+                self.center_y - horizontal_reach,
+                self.center_x + half,
+                bottom,
+            );
         }
         if arms.left == 3 {
-            let end = join(arms.up != 0, self.center_x - self.gap, self.center_x + self.gap);
+            let end = join(
+                arms.up != 0,
+                self.center_x - self.gap,
+                self.center_x + self.gap,
+            );
             self.horizontal(self.center_y - self.gap, left, end);
-            let end = join(arms.down != 0, self.center_x - self.gap, self.center_x + self.gap);
+            let end = join(
+                arms.down != 0,
+                self.center_x - self.gap,
+                self.center_x + self.gap,
+            );
             self.horizontal(self.center_y + self.gap, left, end);
         } else if arms.left > 0 {
             let half = self.weight(arms.left) / 2.0;
-            self.rect(left, self.center_y - half, self.center_x + vertical_reach, self.center_y + half);
+            self.rect(
+                left,
+                self.center_y - half,
+                self.center_x + vertical_reach,
+                self.center_y + half,
+            );
         }
         if arms.right == 3 {
-            let start = join(arms.up != 0, self.center_x + self.gap, self.center_x - self.gap);
+            let start = join(
+                arms.up != 0,
+                self.center_x + self.gap,
+                self.center_x - self.gap,
+            );
             self.horizontal(self.center_y - self.gap, start, right);
-            let start = join(arms.down != 0, self.center_x + self.gap, self.center_x - self.gap);
+            let start = join(
+                arms.down != 0,
+                self.center_x + self.gap,
+                self.center_x - self.gap,
+            );
             self.horizontal(self.center_y + self.gap, start, right);
         } else if arms.right > 0 {
             let half = self.weight(arms.right) / 2.0;
-            self.rect(self.center_x - vertical_reach, self.center_y - half, right, self.center_y + half);
+            self.rect(
+                self.center_x - vertical_reach,
+                self.center_y - half,
+                right,
+                self.center_y + half,
+            );
         }
     }
 
@@ -198,17 +257,34 @@ impl<'a> Painter<'a> {
             _ => (2, true, true),
         };
         let width = if is_heavy { self.heavy } else { self.light };
-        let length = if is_vertical { self.cell.height } else { self.cell.width };
+        let length = if is_vertical {
+            self.cell.height
+        } else {
+            self.cell.width
+        };
         let step = length / count as f32;
         let dash = (step * 0.6).ceil();
         for index in 0..count {
-            let start = (if is_vertical { self.cell.y } else { self.cell.x })
-                + index as f32 * step
+            let start = (if is_vertical {
+                self.cell.y
+            } else {
+                self.cell.x
+            }) + index as f32 * step
                 + (step - dash) / 2.0;
             if is_vertical {
-                self.rect(self.center_x - width / 2.0, start, self.center_x + width / 2.0, start + dash);
+                self.rect(
+                    self.center_x - width / 2.0,
+                    start,
+                    self.center_x + width / 2.0,
+                    start + dash,
+                );
             } else {
-                self.rect(start, self.center_y - width / 2.0, start + dash, self.center_y + width / 2.0);
+                self.rect(
+                    start,
+                    self.center_y - width / 2.0,
+                    start + dash,
+                    self.center_y + width / 2.0,
+                );
             }
         }
     }
@@ -218,10 +294,10 @@ impl<'a> Painter<'a> {
         let radius = self.cell.width.min(self.cell.height) / 2.0;
         // Direction of the vertical (dy) and horizontal (dx) arms.
         let (dy, dx): (f32, f32) = match scalar {
-            0x256D => (1.0, 1.0),  // down and right
-            0x256E => (1.0, -1.0), // down and left
+            0x256D => (1.0, 1.0),   // down and right
+            0x256E => (1.0, -1.0),  // down and left
             0x256F => (-1.0, -1.0), // up and left
-            _ => (-1.0, 1.0),      // up and right
+            _ => (-1.0, 1.0),       // up and right
         };
         let arc_center_x = self.center_x + dx * radius;
         let arc_center_y = self.center_y + dy * radius;
@@ -238,14 +314,34 @@ impl<'a> Painter<'a> {
         }
         let half = self.light / 2.0;
         if dy > 0.0 {
-            self.rect(self.center_x - half, self.center_y + radius, self.center_x + half, self.cell.y + self.cell.height);
+            self.rect(
+                self.center_x - half,
+                self.center_y + radius,
+                self.center_x + half,
+                self.cell.y + self.cell.height,
+            );
         } else {
-            self.rect(self.center_x - half, self.cell.y, self.center_x + half, self.center_y - radius);
+            self.rect(
+                self.center_x - half,
+                self.cell.y,
+                self.center_x + half,
+                self.center_y - radius,
+            );
         }
         if dx > 0.0 {
-            self.rect(self.center_x + radius, self.center_y - half, self.cell.x + self.cell.width, self.center_y + half);
+            self.rect(
+                self.center_x + radius,
+                self.center_y - half,
+                self.cell.x + self.cell.width,
+                self.center_y + half,
+            );
         } else {
-            self.rect(self.cell.x, self.center_y - half, self.center_x - radius, self.center_y + half);
+            self.rect(
+                self.cell.x,
+                self.center_y - half,
+                self.center_x - radius,
+                self.center_y + half,
+            );
         }
     }
 
@@ -253,18 +349,34 @@ impl<'a> Painter<'a> {
         let (left, right) = (self.cell.x, self.cell.x + self.cell.width);
         let (top, bottom) = (self.cell.y, self.cell.y + self.cell.height);
         if scalar != 0x2572 {
-            let _ = self.list.add_line(Point::new(right, top), Point::new(left, bottom), self.light, self.color);
+            let _ = self.list.add_line(
+                Point::new(right, top),
+                Point::new(left, bottom),
+                self.light,
+                self.color,
+            );
         }
         if scalar != 0x2571 {
-            let _ = self.list.add_line(Point::new(left, top), Point::new(right, bottom), self.light, self.color);
+            let _ = self.list.add_line(
+                Point::new(left, top),
+                Point::new(right, bottom),
+                self.light,
+                self.color,
+            );
         }
     }
 
     fn block(&mut self, scalar: u32) {
         let (x, y, w, h) = (self.cell.x, self.cell.y, self.cell.width, self.cell.height);
         let mut fill = |fx: f32, fy: f32, fw: f32, fh: f32, alpha: f32| {
-            let color = if alpha >= 1.0 { self.color } else { self.color.multiplied_alpha(alpha) };
-            let _ = self.list.add_rect(Rect::new(x + fx * w, y + fy * h, fw * w, fh * h), color);
+            let color = if alpha >= 1.0 {
+                self.color
+            } else {
+                self.color.multiplied_alpha(alpha)
+            };
+            let _ = self
+                .list
+                .add_rect(Rect::new(x + fx * w, y + fy * h, fw * w, fh * h), color);
         };
         match scalar {
             0x2580 => fill(0.0, 0.0, 1.0, 0.5, 1.0),
@@ -319,18 +431,48 @@ impl<'a> Painter<'a> {
         let middle = self.cell.y + self.cell.height / 2.0;
         match scalar {
             0xE0B0 => {
-                let _ = self.list.add_triangle(Point::new(left, top), Point::new(right, middle), Point::new(left, bottom), self.color);
+                let _ = self.list.add_triangle(
+                    Point::new(left, top),
+                    Point::new(right, middle),
+                    Point::new(left, bottom),
+                    self.color,
+                );
             }
             0xE0B2 => {
-                let _ = self.list.add_triangle(Point::new(right, top), Point::new(left, middle), Point::new(right, bottom), self.color);
+                let _ = self.list.add_triangle(
+                    Point::new(right, top),
+                    Point::new(left, middle),
+                    Point::new(right, bottom),
+                    self.color,
+                );
             }
             0xE0B1 => {
-                let _ = self.list.add_line(Point::new(left, top), Point::new(right, middle), self.light, self.color);
-                let _ = self.list.add_line(Point::new(right, middle), Point::new(left, bottom), self.light, self.color);
+                let _ = self.list.add_line(
+                    Point::new(left, top),
+                    Point::new(right, middle),
+                    self.light,
+                    self.color,
+                );
+                let _ = self.list.add_line(
+                    Point::new(right, middle),
+                    Point::new(left, bottom),
+                    self.light,
+                    self.color,
+                );
             }
             _ => {
-                let _ = self.list.add_line(Point::new(right, top), Point::new(left, middle), self.light, self.color);
-                let _ = self.list.add_line(Point::new(left, middle), Point::new(right, bottom), self.light, self.color);
+                let _ = self.list.add_line(
+                    Point::new(right, top),
+                    Point::new(left, middle),
+                    self.light,
+                    self.color,
+                );
+                let _ = self.list.add_line(
+                    Point::new(left, middle),
+                    Point::new(right, bottom),
+                    self.light,
+                    self.color,
+                );
             }
         }
     }

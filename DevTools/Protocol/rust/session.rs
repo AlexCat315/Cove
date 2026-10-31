@@ -35,7 +35,9 @@ impl Subscription {
     }
 
     pub fn parse(name: &str) -> Option<Self> {
-        Subscription::ALL.into_iter().find(|value| value.name() == name)
+        Subscription::ALL
+            .into_iter()
+            .find(|value| value.name() == name)
     }
 }
 
@@ -190,7 +192,9 @@ impl InspectionValidation {
 
     /// A finite JSON number.
     pub fn number(value: Option<&JsonValue>) -> Option<f64> {
-        value.and_then(JsonValue::as_f64).filter(|number| number.is_finite())
+        value
+            .and_then(JsonValue::as_f64)
+            .filter(|number| number.is_finite())
     }
 
     /// The reason a request cannot run, or `None` when it is valid.

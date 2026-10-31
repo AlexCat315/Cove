@@ -5,15 +5,15 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use cove_core::scene::{
-    ActiveAnimationContext, AnimatorScheduler, AnyAnimationController, EventResult, InputHandlerRole,
-    InputHandlerRoute, InputRoutingPriority, InteractionRegistryHolder, LayoutNode, LayoutUpdateHook,
-    Node, NodeResource, PointerCaptureHolder,
-};
+use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
 use cove_core::scene::scrolling::ScrollVelocityTracker;
+use cove_core::scene::{
+    ActiveAnimationContext, AnimatorScheduler, AnyAnimationController, EventResult,
+    InputHandlerRole, InputHandlerRoute, InputRoutingPriority, InteractionRegistryHolder,
+    LayoutNode, LayoutUpdateHook, Node, NodeResource, PointerCaptureHolder,
+};
 use cove_core::{Binding, Point};
 use cove_platform::MouseButton;
-use crate::{impl_primitive_view, AnyView, PrimitiveView, View};
 
 /// Velocity samples older than this are ignored on release.
 const STALE_SAMPLE_WINDOW: f64 = 0.12;
@@ -129,7 +129,10 @@ impl SpringDragSession {
         let local = self.local(point);
         let start = self.start.get();
         let press = self.press.get();
-        self.current.set(Point::new(start.x + local.x - press.x, start.y + local.y - press.y));
+        self.current.set(Point::new(
+            start.x + local.x - press.x,
+            start.y + local.y - press.y,
+        ));
         self.sample();
         self.publish();
     }
@@ -150,8 +153,14 @@ impl SpringDragSession {
             capture.release();
         }
         let time = now();
-        let vx = self.tracker_x.borrow_mut().velocity(Some(time), Some(STALE_SAMPLE_WINDOW));
-        let vy = self.tracker_y.borrow_mut().velocity(Some(time), Some(STALE_SAMPLE_WINDOW));
+        let vx = self
+            .tracker_x
+            .borrow_mut()
+            .velocity(Some(time), Some(STALE_SAMPLE_WINDOW));
+        let vy = self
+            .tracker_y
+            .borrow_mut()
+            .velocity(Some(time), Some(STALE_SAMPLE_WINDOW));
         self.velocity.set(Point::new(vx, vy));
         self.release_point.set(self.current.get());
         self.elapsed.set(0.0);
@@ -159,8 +168,9 @@ impl SpringDragSession {
             self.finish_immediately();
         } else {
             self.is_finished.set(false);
-            let controller: Rc<dyn AnyAnimationController> =
-                Rc::new(SpringDragController { session: self.session_weak() });
+            let controller: Rc<dyn AnyAnimationController> = Rc::new(SpringDragController {
+                session: self.session_weak(),
+            });
             *self.controller.borrow_mut() = Some(controller.clone());
             if let Some(scheduler) = self.scheduler.borrow().as_ref() {
                 scheduler.register(controller);
@@ -192,7 +202,11 @@ impl SpringDragSession {
     pub fn finish_immediately(&self) {
         let target = self.target.get();
         let changed = self.current.get() != target
-            || self.binding.borrow().as_ref().is_some_and(|binding| binding.get() != target);
+            || self
+                .binding
+                .borrow()
+                .as_ref()
+                .is_some_and(|binding| binding.get() != target);
         self.current.set(target);
         self.cancel();
         if changed {
@@ -204,9 +218,10 @@ impl SpringDragSession {
 
     pub fn cancel(&self) {
         self.is_finished.set(true);
-        if let (Some(scheduler), Some(controller)) =
-            (self.scheduler.borrow().as_ref(), self.controller.borrow().as_ref())
-        {
+        if let (Some(scheduler), Some(controller)) = (
+            self.scheduler.borrow().as_ref(),
+            self.controller.borrow().as_ref(),
+        ) {
             scheduler.unregister(controller);
         }
         self.controller.borrow_mut().take();
@@ -226,7 +241,9 @@ impl SpringDragSession {
     }
 
     fn place(&self) {
-        let Some(node) = self.node.borrow().clone() else { return };
+        let Some(node) = self.node.borrow().clone() else {
+            return;
+        };
         let origin = self.origin.get();
         let current = self.current.get();
         node.set_frame(cove_core::Rect::new(
@@ -255,7 +272,9 @@ struct SpringDragController {
 
 impl AnyAnimationController for SpringDragController {
     fn is_finished(&self) -> bool {
-        self.session.upgrade().is_none_or(|session| session.is_finished())
+        self.session
+            .upgrade()
+            .is_none_or(|session| session.is_finished())
     }
 
     fn tick(&self, delta_time: f64) {
@@ -288,10 +307,13 @@ impl NodeResource for SpringDragSession {
         let weak_node = node.downgrade();
         let weak_session = self.session_weak();
         node.set_layout_did_update(Some(Rc::new(move |owner: &Node| {
-            let (Some(_owner), Some(session)) = (Node::upgrade(&weak_node), weak_session.upgrade()) else {
+            let (Some(_owner), Some(session)) = (Node::upgrade(&weak_node), weak_session.upgrade())
+            else {
                 return;
             };
-            session.origin.set(cove_core::Point::new(owner.frame().x, owner.frame().y));
+            session
+                .origin
+                .set(cove_core::Point::new(owner.frame().x, owner.frame().y));
             session.place();
         }) as LayoutUpdateHook));
     }
@@ -361,36 +383,54 @@ impl PrimitiveView for SpringDrag {
     }
 
     fn update_node(&self, node: &Node) {
-        let Some(session) = node.first_resource::<SpringDragSession>() else { return };
-        let options = SpringDragOptions { target: self.target, spring: self.spring, is_enabled: self.is_enabled };
+        let Some(session) = node.first_resource::<SpringDragSession>() else {
+            return;
+        };
+        let options = SpringDragOptions {
+            target: self.target,
+            spring: self.spring,
+            is_enabled: self.is_enabled,
+        };
         session.configure(self.offset.clone(), options, node.prefers_reduced_motion());
         let _ = ActiveAnimationContext::current();
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         let route = InputHandlerRoute::new(
-            InputHandlerRole::Drag, InputRoutingPriority::CHROME, "spring-drag",
+            InputHandlerRole::Drag,
+            InputRoutingPriority::CHROME,
+            "spring-drag",
         );
         let is_enabled = self.is_enabled;
         let pointer_session = session.clone();
-        registry.set_pointer(node, route.clone(), Rc::new(move |event, phase, _event_phase| {
-            if !is_enabled || event.button != MouseButton::Left {
-                return EventResult::Ignored;
-            }
-            match phase {
-                cove_core::scene::PointerPhase::Down => {
-                    pointer_session.begin(Point::new(event.x, event.y));
+        registry.set_pointer(
+            node,
+            route.clone(),
+            Rc::new(move |event, phase, _event_phase| {
+                if !is_enabled || event.button != MouseButton::Left {
+                    return EventResult::Ignored;
                 }
-                cove_core::scene::PointerPhase::Up => pointer_session.release(),
-            }
-            EventResult::Handled
-        }));
+                match phase {
+                    cove_core::scene::PointerPhase::Down => {
+                        pointer_session.begin(Point::new(event.x, event.y));
+                    }
+                    cove_core::scene::PointerPhase::Up => pointer_session.release(),
+                }
+                EventResult::Handled
+            }),
+        );
         let motion_session = session;
-        registry.set_motion(node, route, Rc::new(move |event, _phase| {
-            if !motion_session.is_dragging() {
-                return EventResult::Ignored;
-            }
-            motion_session.move_to(Point::new(event.x, event.y));
-            EventResult::Handled
-        }));
+        registry.set_motion(
+            node,
+            route,
+            Rc::new(move |event, _phase| {
+                if !motion_session.is_dragging() {
+                    return EventResult::Ignored;
+                }
+                motion_session.move_to(Point::new(event.x, event.y));
+                EventResult::Handled
+            }),
+        );
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {

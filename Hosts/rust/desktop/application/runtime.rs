@@ -16,21 +16,21 @@ use crate::desktop::diagnostics::frame_metrics::FrameMetrics;
 use crate::desktop::diagnostics::performance_hud::PerformanceHud;
 use crate::desktop::diagnostics::recording::{InputRecorder, RecordingControl};
 use crate::desktop::diagnostics::session::ApplicationDiagnostics;
-use crate::desktop::display::controls::{
-    MainWindowControls, PresentationControls, WindowControls,
-};
+use crate::desktop::display::controls::{MainWindowControls, PresentationControls, WindowControls};
 use crate::desktop::display::{AppAuxiliaryWindowRequest, AppDisplayHandle, DisplayBindings};
 use crate::desktop::rendering::context::AppRenderingContext;
 use crate::desktop::window::auxiliary::AuxiliaryAppWindow;
 use crate::desktop::window::chrome::{self, WindowChromeHitTestCollector};
-use crate::desktop::window::native_renderer::{AppWindowRenderer, AppWindowRenderSettings};
+use crate::desktop::window::native_renderer::{AppWindowRenderSettings, AppWindowRenderer};
 use crate::desktop::window::state::MainWindowState;
 use cove_composition::AnyView;
 use cove_core::scene::{
     ClipboardHolder, FocusChainHolder, InteractionRegistryHolder, PointerCaptureHolder,
     UIWorkSchedulerHolder,
 };
-use cove_core::{set_content_scale, Environment, Font, FontWeight, InputCapabilities, Insets, State};
+use cove_core::{
+    Environment, Font, FontWeight, InputCapabilities, Insets, State, set_content_scale,
+};
 use cove_graphics::rhi::Device;
 use cove_imaging::ImageAssetRegistryHolder;
 use cove_logging::{Level, LogEvent, LogSystem};
@@ -85,13 +85,15 @@ fn environment_flag(key: &str) -> Option<String> {
 }
 
 fn previews_phone() -> bool {
-    environment_flag("COVE_PREVIEW_DEVICE")
-        .is_some_and(|value| value.eq_ignore_ascii_case("phone"))
+    environment_flag("COVE_PREVIEW_DEVICE").is_some_and(|value| value.eq_ignore_ascii_case("phone"))
 }
 
 fn force_vsync_off() -> bool {
     environment_flag("COVE_VSYNC").is_some_and(|value| {
-        matches!(value.to_ascii_lowercase().as_str(), "off" | "0" | "false" | "no")
+        matches!(
+            value.to_ascii_lowercase().as_str(),
+            "off" | "0" | "false" | "no"
+        )
     })
 }
 
@@ -141,7 +143,10 @@ impl Application {
     /// `on_tick` runs before each frame's layout so an external subsystem (a
     /// game engine host, for example) can advance at the UI frame rate.
     /// `delta_time` is the seconds between the previous frame and this one.
-    #[allow(clippy::too_many_arguments, reason = "translated run entry point carries the same optional host hooks as the Swift declaration")]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "translated run entry point carries the same optional host hooks as the Swift declaration"
+    )]
     pub fn run(
         config: ApplicationConfiguration,
         backend: Option<Arc<Device>>,
@@ -153,7 +158,9 @@ impl Application {
         logging
             .apply_process_environment()
             .map_err(|error| format!("logging configuration failed: {error}"))?;
-        let application_name = std::env::args().next().unwrap_or_else(|| "CoveUI".to_owned());
+        let application_name = std::env::args()
+            .next()
+            .unwrap_or_else(|| "CoveUI".to_owned());
         let _ = LogSystem::bootstrap(Some(&application_name), logging, None);
         LogSystem::logger("com.cove.ui.application").log(&LogEvent::new(
             Level::Info,
@@ -182,12 +189,19 @@ impl Application {
         callbacks: ApplicationCallbacks,
         checkpoint: Option<ApplicationCheckpoint>,
     ) -> Result<Self, String> {
-        let rendering = Rc::new(
-            AppRenderingContext::new(backend, &config).map_err(|error| error.to_string())?,
-        );
+        let rendering =
+            Rc::new(AppRenderingContext::new(backend, &config).map_err(|error| error.to_string())?);
         let options = WindowOptions {
-            width: if previews_phone() { 390 } else { config.window.width.max(1) },
-            height: if previews_phone() { 844 } else { config.window.height.max(1) },
+            width: if previews_phone() {
+                390
+            } else {
+                config.window.width.max(1)
+            },
+            height: if previews_phone() {
+                844
+            } else {
+                config.window.height.max(1)
+            },
             title_bar_style: config.window.title_bar_style.platform_style(),
             shows_dock_icon: config.window.shows_dock_icon,
         };
@@ -316,7 +330,12 @@ impl Application {
             ready(&state.display_handle);
         }
         if let Some(ready) = state.callbacks.diagnostics_ready.clone() {
-            let capturing = state.diagnostics.borrow().queries.as_ref().is_some_and(|q| q.is_capturing());
+            let capturing = state
+                .diagnostics
+                .borrow()
+                .queries
+                .as_ref()
+                .is_some_and(|q| q.is_capturing());
             ready(capturing);
         }
 
@@ -356,7 +375,9 @@ impl Application {
                 move |mode: PlatformFrameRateMode| host.set_frame_rate_mode(mode)
             })),
             set_runtime_vsync_enabled: Some(Rc::new({
-                let application = Application { state: state.clone() };
+                let application = Application {
+                    state: state.clone(),
+                };
                 move |enabled: bool| application.set_vsync_enabled(enabled)
             })),
             current_runtime_display_refresh_rate: Some(Rc::new({
@@ -416,7 +437,10 @@ impl Application {
             })),
             main_window_maximized_query: Some(Rc::new({
                 let host = host.clone();
-                move || host.main_window().is_some_and(|id| host.is_window_maximized(id))
+                move || {
+                    host.main_window()
+                        .is_some_and(|id| host.is_window_maximized(id))
+                }
             })),
             set_main_window_chrome_hit_test_action: Some(Rc::new({
                 let host = host.clone();
@@ -464,15 +488,21 @@ impl Application {
             main_window,
             windows,
             open_auxiliary_window: Some(Rc::new({
-                let application = Application { state: state.clone() };
+                let application = Application {
+                    state: state.clone(),
+                };
                 move |request| application.open_auxiliary_window(request)
             })),
             close_auxiliary_window: Some(Rc::new({
-                let application = Application { state: state.clone() };
+                let application = Application {
+                    state: state.clone(),
+                };
                 move |id| application.close_auxiliary_window(id)
             })),
             auxiliary_window_is_open: Some(Rc::new({
-                let application = Application { state: state.clone() };
+                let application = Application {
+                    state: state.clone(),
+                };
                 move |id| application.is_auxiliary_window_open(id)
             })),
             install_native_menu_bar: Some(Rc::new(|menu_bar| {
@@ -520,11 +550,15 @@ impl Application {
                 }
             })),
             memory_query: Some(Rc::new({
-                let application = Application { state: state.clone() };
+                let application = Application {
+                    state: state.clone(),
+                };
                 move || Some(application.diagnostic_memory_snapshot().counters)
             })),
             trim_memory: Some(Rc::new({
-                let application = Application { state: state.clone() };
+                let application = Application {
+                    state: state.clone(),
+                };
                 move || application.trim_memory()
             })),
         };
@@ -540,10 +574,10 @@ impl Application {
             let state = state.clone();
             *callbacks.on_init.borrow_mut() = Some(Rc::new(
                 move |native: NativeRenderSurface, width: u32, height: u32| {
-                    let application = Application { state: state.clone() };
-                    if let Err(error) =
-                        application.handle_init(native, width, height)
-                    {
+                    let application = Application {
+                        state: state.clone(),
+                    };
+                    if let Err(error) = application.handle_init(native, width, height) {
                         application.fail_run_loop(&error, "main window initialization");
                     }
                 },
@@ -551,29 +585,30 @@ impl Application {
         }
         {
             let state = state.clone();
-            *callbacks.on_resize.borrow_mut() =
-                Some(Rc::new(move |width: u32, height: u32| {
-                    let application = Application { state: state.clone() };
-                    if let Err(error) = application.handle_resize(width, height) {
-                        application.fail_run_loop(&error, "main window resize");
-                    }
-                }));
-        }
-        {
-            let state = state.clone();
-            *callbacks.on_event.borrow_mut() = Some(Rc::new(move |event: &cove_platform::InputEvent| {
-                state.callbacks.events.publish(event);
+            *callbacks.on_resize.borrow_mut() = Some(Rc::new(move |width: u32, height: u32| {
+                let application = Application {
+                    state: state.clone(),
+                };
+                if let Err(error) = application.handle_resize(width, height) {
+                    application.fail_run_loop(&error, "main window resize");
+                }
             }));
         }
         {
             let state = state.clone();
-            let weak: Weak<ApplicationState> = Rc::downgrade(&state);
-            *callbacks.on_before_commit.borrow_mut() =
-                Some(Rc::new(move |delta_time: f64| {
-                    if let Some(state) = weak.upgrade() {
-                        Application { state }.handle_frame_preparation(delta_time);
-                    }
+            *callbacks.on_event.borrow_mut() =
+                Some(Rc::new(move |event: &cove_platform::InputEvent| {
+                    state.callbacks.events.publish(event);
                 }));
+        }
+        {
+            let state = state.clone();
+            let weak: Weak<ApplicationState> = Rc::downgrade(&state);
+            *callbacks.on_before_commit.borrow_mut() = Some(Rc::new(move |delta_time: f64| {
+                if let Some(state) = weak.upgrade() {
+                    Application { state }.handle_frame_preparation(delta_time);
+                }
+            }));
         }
         {
             let state = state.clone();
@@ -590,20 +625,28 @@ impl Application {
             let state = state.clone();
             *callbacks.on_window_teardown.borrow_mut() =
                 Some(Rc::new(move |window_id: WindowId| {
-                    Application { state: state.clone() }.release_gpu_surface(window_id);
+                    Application {
+                        state: state.clone(),
+                    }
+                    .release_gpu_surface(window_id);
                 }));
         }
         {
             let state = state.clone();
             *callbacks.on_window_presentation_changed.borrow_mut() =
                 Some(Rc::new(move |window_id: WindowId, active: bool| {
-                    Application { state: state.clone() }.handle_presentation_changed(window_id, active);
+                    Application {
+                        state: state.clone(),
+                    }
+                    .handle_presentation_changed(window_id, active);
                 }));
         }
         {
             let state = state.clone();
             *callbacks.on_teardown.borrow_mut() = Some(Rc::new(move || {
-                let application = Application { state: state.clone() };
+                let application = Application {
+                    state: state.clone(),
+                };
                 application.release_all_gpu_surfaces();
                 application.state.diagnostics.borrow_mut().stop();
             }));
@@ -630,8 +673,10 @@ impl Application {
             }
             *slot = Some(format!("{context} failed: {error}"));
         }
-        LogSystem::logger("com.cove.ui.app")
-            .log(&LogEvent::new(Level::Error, format!("{context} failed: {error}")));
+        LogSystem::logger("com.cove.ui.app").log(&LogEvent::new(
+            Level::Error,
+            format!("{context} failed: {error}"),
+        ));
         self.state.host.stop();
     }
 
@@ -646,8 +691,12 @@ impl Application {
         environment.viewport.height = logical.1 as f32;
         environment.viewport.scale = host.content_scale_factor();
         let insets = host.safe_area();
-        environment.safe_area =
-            Insets { top: insets.top, bottom: insets.bottom, leading: insets.leading, trailing: insets.trailing };
+        environment.safe_area = Insets {
+            top: insets.top,
+            bottom: insets.bottom,
+            leading: insets.leading,
+            trailing: insets.trailing,
+        };
         #[cfg(any(target_os = "ios", target_os = "android"))]
         {
             environment.input = InputCapabilities::TOUCH | InputCapabilities::KEYBOARD;
@@ -733,8 +782,10 @@ impl Application {
         }
         let settings =
             AppWindowRenderSettings::resolve(&state.config, state.config.window.rendering);
-        let mut renderer =
-            state.rendering.make_window(settings).map_err(|error| error.to_string())?;
+        let mut renderer = state
+            .rendering
+            .make_window(settings)
+            .map_err(|error| error.to_string())?;
         let vsync = state.main_window.borrow().is_vsync_enabled;
         renderer
             .configure(native, (width_px, height_px), vsync)
@@ -762,8 +813,8 @@ impl Application {
                     // ambient below, which is what `PortalStoreHolder::current()`
                     // actually reads; the composition-local copy would need
                     // `PortalStore: PartialEq`, which the registry does not provide.
-                    let content = AdaptiveApplicationContent::new(root_view, environment)
-                        .text_scaler(scaler);
+                    let content =
+                        AdaptiveApplicationContent::new(root_view, environment).text_scaler(scaler);
                     composition.install_view(AnyView::new(content), logical.0, logical.1);
                 });
                 // Scope this window's overlay store for every consumer that reads
@@ -837,7 +888,9 @@ impl Application {
 
     fn sync_main_window_chrome_hit_test(&self) {
         let state = &self.state;
-        let Some(window_id) = state.host.main_window() else { return };
+        let Some(window_id) = state.host.main_window() else {
+            return;
+        };
         let root = state.composition.tree.borrow().root();
         let next = root.and_then(|root| state.chrome_collector.borrow_mut().collect(&root));
         let mut last = state.last_chrome_hit_test.borrow_mut();
@@ -846,7 +899,9 @@ impl Application {
                 if last.as_ref() == Some(&next) {
                     return;
                 }
-                state.host.set_window_chrome_hit_test(window_id, Some(&next));
+                state
+                    .host
+                    .set_window_chrome_hit_test(window_id, Some(&next));
                 *last = Some(next);
             }
             None => {
@@ -888,12 +943,16 @@ impl Application {
         let state = &self.state;
         {
             let renderer = state.window_renderer.borrow();
-            let Some(renderer) = renderer.as_ref() else { return false };
+            let Some(renderer) = renderer.as_ref() else {
+                return false;
+            };
             if !renderer.is_configured() {
                 return false;
             }
         }
-        let Some(root) = state.composition.tree.borrow().root() else { return false };
+        let Some(root) = state.composition.tree.borrow().root() else {
+            return false;
+        };
 
         let frame_start = Instant::now();
         let timeline = state.composition.tree.borrow().timeline.clone();
@@ -914,18 +973,29 @@ impl Application {
             let main = state.main_window.borrow();
             (main.logical_w as f32, main.logical_h as f32)
         };
-        let _ = state.composition.graph.compute_layout_if_needed(logical_w, logical_h);
+        let _ = state
+            .composition
+            .graph
+            .compute_layout_if_needed(logical_w, logical_h);
 
         let chrome_trace = timeline.borrow().begin();
         self.sync_main_window_chrome_hit_test();
-        timeline.borrow_mut().end(chrome_trace, "frame", "Window chrome hit test", None, &[]);
+        timeline
+            .borrow_mut()
+            .end(chrome_trace, "frame", "Window chrome hit test", None, &[]);
 
         let session = state.host.main_session();
         let accessibility_trace = timeline.borrow().begin();
         if let Some(session) = &session {
             NativeAccessibility::synchronize(&state.host, session, &root, &timeline);
         }
-        timeline.borrow_mut().end(accessibility_trace, "frame", "Accessibility sync", None, &[]);
+        timeline.borrow_mut().end(
+            accessibility_trace,
+            "frame",
+            "Accessibility sync",
+            None,
+            &[],
+        );
         let layout_end = Instant::now();
 
         {
@@ -952,13 +1022,22 @@ impl Application {
             }
         }
         let draw_end = Instant::now();
-        timeline.borrow_mut().end(draw_trace, "draw", "Encode draw list", None, &[]);
+        timeline
+            .borrow_mut()
+            .end(draw_trace, "draw", "Encode draw list", None, &[]);
 
         let count_trace = timeline.borrow().begin();
         let frame_node_count = state.composition.tree.borrow_mut().node_count();
-        timeline.borrow_mut().end(count_trace, "frame", "Node count", None, &[]);
+        timeline
+            .borrow_mut()
+            .end(count_trace, "frame", "Node count", None, &[]);
 
-        if state.typography.borrow().atlas.as_ref().is_some_and(|atlas| atlas.is_dirty())
+        if state
+            .typography
+            .borrow()
+            .atlas
+            .as_ref()
+            .is_some_and(|atlas| atlas.is_dirty())
             && let Err(error) = self.upload_atlas_if_needed(true)
         {
             self.fail_run_loop(&error, "Font atlas upload");
@@ -971,7 +1050,9 @@ impl Application {
         };
         let presented = {
             let mut renderer = state.window_renderer.borrow_mut();
-            let Some(renderer) = renderer.as_mut() else { return false };
+            let Some(renderer) = renderer.as_mut() else {
+                return false;
+            };
             let list = state.composition.draw_list.borrow();
             renderer.draw(&list, (logical_w, logical_h))
         };
@@ -992,7 +1073,13 @@ impl Application {
                     0.0,
                 );
             }
-            let _ = (present_end, batches, frame_node_count, drawable_w, drawable_h);
+            let _ = (
+                present_end,
+                batches,
+                frame_node_count,
+                drawable_w,
+                drawable_h,
+            );
             state.host.request_display(None);
             return false;
         }
@@ -1073,15 +1160,44 @@ impl Application {
     }
 
     /// Snapshot in the counters/windows shape DevTools consumes.
-    pub fn diagnostic_memory_snapshot(&self) -> crate::desktop::diagnostics::DiagnosticMemorySnapshot {
+    pub fn diagnostic_memory_snapshot(
+        &self,
+    ) -> crate::desktop::diagnostics::DiagnosticMemorySnapshot {
         let value = self.memory_snapshot();
         let state = &self.state;
         let counters = BTreeMap::from([
-            ("shapingEntries".to_owned(), value.shaping.as_ref().map_or(0, |cache| cache.entries as u64)),
-            ("shapingBytes".to_owned(), value.shaping.as_ref().map_or(0, |cache| cache.estimated_bytes as u64)),
-            ("layoutEntries".to_owned(), value.text_layout.as_ref().map_or(0, |cache| cache.entries as u64)),
-            ("layoutBytes".to_owned(), value.text_layout.as_ref().map_or(0, |cache| cache.estimated_bytes as u64)),
-            ("imageEntries".to_owned(), state.composition.image_assets.cached_count() as u64),
+            (
+                "shapingEntries".to_owned(),
+                value
+                    .shaping
+                    .as_ref()
+                    .map_or(0, |cache| cache.entries as u64),
+            ),
+            (
+                "shapingBytes".to_owned(),
+                value
+                    .shaping
+                    .as_ref()
+                    .map_or(0, |cache| cache.estimated_bytes as u64),
+            ),
+            (
+                "layoutEntries".to_owned(),
+                value
+                    .text_layout
+                    .as_ref()
+                    .map_or(0, |cache| cache.entries as u64),
+            ),
+            (
+                "layoutBytes".to_owned(),
+                value
+                    .text_layout
+                    .as_ref()
+                    .map_or(0, |cache| cache.estimated_bytes as u64),
+            ),
+            (
+                "imageEntries".to_owned(),
+                state.composition.image_assets.cached_count() as u64,
+            ),
             ("imageBytes".to_owned(), value.cached_image_bytes as u64),
             (
                 "skippedParentUpdates".to_owned(),
@@ -1138,7 +1254,12 @@ impl Application {
     fn release_gpu_surface(&self, window_id: WindowId) {
         if self.state.host.main_window() == Some(window_id) {
             self.release_main_window_renderer();
-        } else if let Some(window) = self.state.auxiliary_windows.borrow_mut().get_mut(&window_id) {
+        } else if let Some(window) = self
+            .state
+            .auxiliary_windows
+            .borrow_mut()
+            .get_mut(&window_id)
+        {
             window.release_gpu_surface();
         }
     }
@@ -1189,7 +1310,10 @@ impl Application {
             state.composition.use_legacy_renderer,
             Rc::new(move |id, hit_test| host.set_window_chrome_hit_test(id, hit_test)),
         );
-        state.auxiliary_windows.borrow_mut().insert(window_id, window);
+        state
+            .auxiliary_windows
+            .borrow_mut()
+            .insert(window_id, window);
 
         // The Swift version installed per-window init/resize/frame hooks; the
         // runtime session owns the callback slots, so the host drives them from
@@ -1198,8 +1322,11 @@ impl Application {
             let state = state.clone();
             *session.callbacks.on_init.borrow_mut() = Some(Rc::new(
                 move |native: NativeRenderSurface, width: u32, height: u32| {
-                    let application = Application { state: state.clone() };
-                    if let Err(error) = application.auxiliary_init(window_id, native, width, height) {
+                    let application = Application {
+                        state: state.clone(),
+                    };
+                    if let Err(error) = application.auxiliary_init(window_id, native, width, height)
+                    {
                         application.fail_auxiliary_window(window_id, &error, "initialization");
                     }
                 },
@@ -1209,7 +1336,9 @@ impl Application {
             let state = state.clone();
             *session.callbacks.on_resize.borrow_mut() =
                 Some(Rc::new(move |width: u32, height: u32| {
-                    let application = Application { state: state.clone() };
+                    let application = Application {
+                        state: state.clone(),
+                    };
                     if let Err(error) = application.auxiliary_resize(window_id, width, height) {
                         application.fail_auxiliary_window(window_id, &error, "resize");
                     }
@@ -1219,7 +1348,10 @@ impl Application {
             let state = state.clone();
             *session.callbacks.on_frame.borrow_mut() =
                 Some(Rc::new(move |_native: NativeRenderSurface| -> bool {
-                    Application { state: state.clone() }.auxiliary_frame(window_id)
+                    Application {
+                        state: state.clone(),
+                    }
+                    .auxiliary_frame(window_id)
                 }));
         }
         session.request_display();
@@ -1253,12 +1385,7 @@ impl Application {
         )
     }
 
-    fn auxiliary_resize(
-        &self,
-        window_id: WindowId,
-        width: u32,
-        height: u32,
-    ) -> Result<(), String> {
+    fn auxiliary_resize(&self, window_id: WindowId, width: u32, height: u32) -> Result<(), String> {
         let mut windows = self.state.auxiliary_windows.borrow_mut();
         let Some(window) = windows.get_mut(&window_id) else {
             return Ok(());
@@ -1302,7 +1429,11 @@ impl Application {
 
     pub fn is_auxiliary_window_open(&self, window_id: WindowId) -> bool {
         self.sync_auxiliary_windows();
-        let known = self.state.auxiliary_windows.borrow().contains_key(&window_id);
+        let known = self
+            .state
+            .auxiliary_windows
+            .borrow()
+            .contains_key(&window_id);
         known && self.state.host.session(window_id).is_some()
     }
 

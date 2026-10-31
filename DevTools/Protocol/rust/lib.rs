@@ -306,7 +306,10 @@ mod tests {
             batch_count: 2,
         };
         let payload = Some(DevToolsCodec::json(&frame));
-        assert_eq!(DevToolsCodec::decode::<TimingFramePayload>(&payload), Some(frame));
+        assert_eq!(
+            DevToolsCodec::decode::<TimingFramePayload>(&payload),
+            Some(frame)
+        );
         let value = payload.unwrap();
         assert!(value.get("recompositionMs").is_some());
         assert!(value.get("presented").is_some());

@@ -1,6 +1,6 @@
 //! Translation of CoveUIComposeCore/Layout/Direction.swift.
-use cove_core::scene::{Direction, LayoutNode};
 use crate::{ModifiedContent, View, ViewExt, ViewModifier};
+use cove_core::scene::{Direction, LayoutNode};
 
 struct LayoutDirectionModifier {
     direction: Direction,

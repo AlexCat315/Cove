@@ -7,20 +7,22 @@
 //! the terminal, instead of every view file depending on the runtime layout.
 
 pub use cove_platform::{
-    KeyEvent, KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent, MouseWheelEvent, ScrollUnit,
-    SystemCursor, TextEditingEvent, TextInputArea,
+    KeyEvent, KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent, MouseWheelEvent,
+    ScrollUnit, SystemCursor, TextEditingEvent, TextInputArea,
 };
 
-/// How the host wants terminal work scheduled onto its UI thread.
-pub use cove_core::scene::UIWorkSchedulerHolder;
-/// Focus tracking, so the cursor blinks only while the surface is focused.
-pub use cove_core::scene::{FocusChain, FocusChainHolder};
 /// Pasteboard bridge used by Cmd-C and Cmd-V.
 pub use cove_core::scene::ClipboardHolder;
-/// Handler registration shared with the rest of the Compose input system.
-pub use cove_core::scene::{EventPhase, EventResult, InputHandlerRoute, InteractionRegistry, InteractionRegistryHolder};
 /// Pointer capture, so a drag that leaves the surface keeps selecting.
 pub use cove_core::scene::PointerCaptureHolder;
+/// How the host wants terminal work scheduled onto its UI thread.
+pub use cove_core::scene::UIWorkSchedulerHolder;
+/// Handler registration shared with the rest of the Compose input system.
+pub use cove_core::scene::{
+    EventPhase, EventResult, InputHandlerRoute, InteractionRegistry, InteractionRegistryHolder,
+};
+/// Focus tracking, so the cursor blinks only while the surface is focused.
+pub use cove_core::scene::{FocusChain, FocusChainHolder};
 
 /// The scene clock that drives cursor and text blinking.
 pub use cove_core::scene::AnimatorScheduler;

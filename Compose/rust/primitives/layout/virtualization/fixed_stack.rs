@@ -5,16 +5,22 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cove_core::scene::{Align, FlexDirection, Justify, LayoutNode, Node, Wrap};
-use cove_core::Point;
 use crate::modifiers::layout::LayoutFrameExt;
 use crate::primitives::layout::{ScrollAxis, ScrollView, ScrollViewport, ScrollbarGutter};
 use crate::{AnyView, BoxView, PrimitiveView, View};
+use cove_core::Point;
+use cove_core::scene::{Align, FlexDirection, Justify, LayoutNode, Node, Wrap};
 
 use super::virtual_window::{VirtualRowKey, VirtualWindow};
 
 /// Inclusive-exclusive row range covering `[offset, offset + height)`.
-pub fn visible_range(count: usize, row_stride: f32, offset: f32, height: f32, overscan: usize) -> std::ops::Range<usize> {
+pub fn visible_range(
+    count: usize,
+    row_stride: f32,
+    offset: f32,
+    height: f32,
+    overscan: usize,
+) -> std::ops::Range<usize> {
     if count == 0 || row_stride <= 0.0 || height <= 0.0 {
         return 0..0;
     }
@@ -50,7 +56,11 @@ pub struct FixedVirtualStack<Id: Clone> {
 }
 
 impl<Id: Clone + 'static> FixedVirtualStack<Id> {
-    pub fn new(ids: Vec<Id>, row_height: f32, row_content: impl Fn(&Id) -> AnyView + 'static) -> Self {
+    pub fn new(
+        ids: Vec<Id>,
+        row_height: f32,
+        row_content: impl Fn(&Id) -> AnyView + 'static,
+    ) -> Self {
         Self {
             ids,
             row_height: row_height.max(1.0),
@@ -129,9 +139,18 @@ impl<Id: Clone + 'static> View for FixedVirtualStack<Id> {
             .max(0.0)
             .min((total - viewport_size.size.height).max(0.0));
         let visible = visible_range(count, stride, clamped, viewport_size.size.height, 0);
-        let (prepared_offset, prepared_height) =
-            VirtualWindow::preparation(f64::from(clamped), f64::from(viewport_size.size.height), self.preload);
-        let range = visible_range(count, stride, prepared_offset as f32, prepared_height as f32, self.overscan);
+        let (prepared_offset, prepared_height) = VirtualWindow::preparation(
+            f64::from(clamped),
+            f64::from(viewport_size.size.height),
+            self.preload,
+        );
+        let range = visible_range(
+            count,
+            stride,
+            prepared_offset as f32,
+            prepared_height as f32,
+            self.overscan,
+        );
         window.record(range.clone(), visible, count, viewport_size.size);
         let window_offset = window.offset;
         drop(window);
@@ -139,7 +158,9 @@ impl<Id: Clone + 'static> View for FixedVirtualStack<Id> {
         let container_height = total;
         let mut rows: Vec<AnyView> = Vec::new();
         for index in range {
-            let Some(id) = self.ids.get(index) else { continue };
+            let Some(id) = self.ids.get(index) else {
+                continue;
+            };
             let content = (self.row_content)(id);
             rows.push(AnyView::new(
                 AnyView::new(RowSlot {
@@ -167,7 +188,11 @@ impl<Id: Clone + 'static> View for FixedVirtualStack<Id> {
         let on_change = self.on_scroll_offset_change.clone();
         let viewport = AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, self.spacing,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                self.spacing,
                 AnyView::new(crate::TupleView::new(rows)),
             )
             .frame(None, None, None, None, None, Some(container_height)),
@@ -179,9 +204,7 @@ impl<Id: Clone + 'static> View for FixedVirtualStack<Id> {
             Some(handler) => scroll.on_viewport_change(move |next| handler(next.offset)),
             None => scroll,
         };
-        AnyView::new(
-            AnyView::new(scroll).frame(None, None, Some(0.0), Some(0.0), None, None),
-        )
+        AnyView::new(AnyView::new(scroll).frame(None, None, Some(0.0), Some(0.0), None, None))
     }
 }
 

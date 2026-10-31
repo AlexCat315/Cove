@@ -2,12 +2,10 @@
 //!
 //! Shared sizing, stable optional IDs, first-person-on-top overlap and a
 //! count/ellipsis overflow slot. A zero limit can display only the overflow.
-use cove_core::scene::{
-    Align, Edge, LayoutNode, Node, Point, PositionType, Rect,
-};
-use crate::theme::tokens::ControlSize;
 use crate::theme::theme_environment::theme_for_node;
-use crate::{impl_primitive_view, AnyView, PrimitiveView};
+use crate::theme::tokens::ControlSize;
+use crate::{AnyView, PrimitiveView, impl_primitive_view};
+use cove_core::scene::{Align, Edge, LayoutNode, Node, Point, PositionType, Rect};
 
 use super::avatar::{Avatar, AvatarAppearance, AvatarColors};
 use super::member_list::{AvatarMemberList, AvatarMemberListTrigger};
@@ -66,7 +64,10 @@ pub struct AvatarGroup {
 }
 impl AvatarGroup {
     pub fn new(avatars: Vec<Avatar>) -> Self {
-        Self { avatars, options: AvatarGroupOptions::default() }
+        Self {
+            avatars,
+            options: AvatarGroupOptions::default(),
+        }
     }
     pub fn configure(mut self, configure: impl FnOnce(&mut AvatarGroupOptions)) -> Self {
         configure(&mut self.options);
@@ -186,11 +187,7 @@ impl PrimitiveView for AvatarGroup {
                 } else {
                     self.avatars.iter().skip(visible).cloned().collect()
                 };
-                AnyView::new(AvatarMemberListTrigger::new(
-                    marker,
-                    members,
-                    list.clone(),
-                ))
+                AnyView::new(AvatarMemberListTrigger::new(marker, members, list.clone()))
             } else {
                 AnyView::new(marker)
             };
@@ -286,7 +283,12 @@ impl PrimitiveView for AvatarGroupSlot {
         let diameter = self.diameter;
         node.update_overlay_draw(ring.rgba8(), move |list, origin: Point| {
             let _ = list.add_rounded_rect_stroke(
-                Rect::new(origin.x - 1.0, origin.y - 1.0, diameter + 2.0, diameter + 2.0),
+                Rect::new(
+                    origin.x - 1.0,
+                    origin.y - 1.0,
+                    diameter + 2.0,
+                    diameter + 2.0,
+                ),
                 diameter / 2.0 + 1.0,
                 2.0,
                 ring,

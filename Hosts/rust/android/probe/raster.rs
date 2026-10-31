@@ -1,6 +1,6 @@
 //! Translation of Android/CoveAndroidProbe/Raster.swift.
 
-use super::runner::{require, ProbeContext, ProbeFailure};
+use super::runner::{ProbeContext, ProbeFailure, require};
 use cove_graphics::rhi::{
     BindingResource, BindingSetDescriptor, BindingSetEntry, BufferDescriptor, BufferUsage,
     ColorAttachmentDescriptor, ColorLoadAction, CommandBuffer, DepthLoadAction, DepthStencilState,
@@ -34,7 +34,10 @@ impl ProbeContext {
             .device
             .make_shader_module(fragment.module_descriptor(&[]).map_err(fail)?)
             .map_err(fail)?;
-        let raster = RasterizationState { cull_mode: cove_graphics::rhi::CullMode::None, ..RasterizationState::default() };
+        let raster = RasterizationState {
+            cull_mode: cove_graphics::rhi::CullMode::None,
+            ..RasterizationState::default()
+        };
         let mut descriptor = GraphicsPipelineDescriptor::new(layout, vs);
         descriptor.fragment = Some(fs);
         descriptor.color_attachments =
@@ -43,7 +46,10 @@ impl ProbeContext {
         descriptor.rasterization = raster;
         descriptor.depth_stencil = Some(DepthStencilState::default());
         descriptor.sample_count = samples;
-        let pipeline = self.device.make_graphics_pipeline(descriptor).map_err(fail)?;
+        let pipeline = self
+            .device
+            .make_graphics_pipeline(descriptor)
+            .map_err(fail)?;
 
         let buffer = self
             .device
@@ -55,7 +61,9 @@ impl ProbeContext {
             // borrow ends before the buffer is destroyed.
             std::slice::from_raw_parts(green.as_ptr().cast(), std::mem::size_of_val(&green))
         };
-        self.device.upload_buffer_data(buffer, 0, green_bytes).map_err(fail)?;
+        self.device
+            .upload_buffer_data(buffer, 0, green_bytes)
+            .map_err(fail)?;
 
         let indirect = self
             .device
@@ -67,7 +75,9 @@ impl ProbeContext {
             // borrow ends before the buffer is destroyed.
             std::slice::from_raw_parts(args.as_ptr().cast(), std::mem::size_of_val(&args))
         };
-        self.device.upload_buffer_data(indirect, 0, args_bytes).map_err(fail)?;
+        self.device
+            .upload_buffer_data(indirect, 0, args_bytes)
+            .map_err(fail)?;
 
         let set = self
             .device
@@ -94,8 +104,13 @@ impl ProbeContext {
             let color = self
                 .device
                 .make_texture(
-                    TextureDescriptor::new(64, 64, TextureFormat::Rgba8Unorm, TextureUsage::COLOR_TARGET)
-                        .with_sample_count(samples),
+                    TextureDescriptor::new(
+                        64,
+                        64,
+                        TextureFormat::Rgba8Unorm,
+                        TextureUsage::COLOR_TARGET,
+                    )
+                    .with_sample_count(samples),
                 )
                 .map_err(fail)?;
             (color, Some(color))
@@ -116,8 +131,7 @@ impl ProbeContext {
         let mut outcome = Ok(());
         for index in 0..6 {
             let mut commands = CommandBuffer::new();
-            let mut attachment =
-                RenderColorTarget::clearing(color, [1.0, 0.0, 0.0, 1.0]);
+            let mut attachment = RenderColorTarget::clearing(color, [1.0, 0.0, 0.0, 1.0]);
             if samples != 1 {
                 attachment.resolve_texture = Some(target);
             }
@@ -150,7 +164,11 @@ impl ProbeContext {
             }
         }
 
-        let pixels = if outcome.is_ok() { self.read(target, 64, 64) } else { Err(ProbeFailure::new(String::new())) };
+        let pixels = if outcome.is_ok() {
+            self.read(target, 64, 64)
+        } else {
+            Err(ProbeFailure::new(String::new()))
+        };
 
         self.device.destroy_texture(depth);
         if let Some(color) = extra_color {
@@ -170,7 +188,10 @@ impl ProbeContext {
             pixels[center..center + 4] == [0, 255, 0, 255],
             "raster center mismatch",
         )?;
-        require(pixels[0..4] == [255, 0, 0, 255], "raster background/load mismatch")?;
+        require(
+            pixels[0..4] == [255, 0, 0, 255],
+            "raster background/load mismatch",
+        )?;
         if samples == 4 {
             require(
                 pixels

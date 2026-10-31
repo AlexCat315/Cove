@@ -1,8 +1,8 @@
 //! Translation of Theme/Tokens/SemanticMotion.swift.
-use cove_core::scene::{Animation, AnimationCurve};
-use std::sync::Arc;
 use super::Easing;
 use crate::theme::Theme;
+use cove_core::scene::{Animation, AnimationCurve};
+use std::sync::Arc;
 
 /// Late-bound animation reference resolved against the active `Theme`.
 #[derive(Clone)]
@@ -11,30 +11,55 @@ pub struct SemanticMotionRef {
 }
 impl SemanticMotionRef {
     pub fn new(resolve: impl Fn(&Theme) -> Animation + 'static) -> Self {
-        Self { resolve: Arc::new(resolve) }
+        Self {
+            resolve: Arc::new(resolve),
+        }
     }
     pub fn resolve(&self, theme: &Theme) -> Animation {
         (self.resolve)(theme)
     }
     pub fn entering() -> Self {
-        Self::new(|theme| Animation::new(theme.motion.surface.entrance, Easing::DECELERATE.as_animation_curve()))
+        Self::new(|theme| {
+            Animation::new(
+                theme.motion.surface.entrance,
+                Easing::DECELERATE.as_animation_curve(),
+            )
+        })
     }
     pub fn exiting() -> Self {
-        Self::new(|theme| Animation::new(theme.motion.surface.exit, Easing::DECELERATE.as_animation_curve()))
+        Self::new(|theme| {
+            Animation::new(
+                theme.motion.surface.exit,
+                Easing::DECELERATE.as_animation_curve(),
+            )
+        })
     }
     /// 80 ms in the default themes — micro-interactions, hover/press.
     pub fn fast() -> Self {
-        Self::new(|theme| Animation::new(theme.motion.fast, theme.motion.standard_easing.as_animation_curve()))
+        Self::new(|theme| {
+            Animation::new(
+                theme.motion.fast,
+                theme.motion.standard_easing.as_animation_curve(),
+            )
+        })
     }
     /// 180 ms in the default themes — surface state changes, default choice.
     pub fn medium() -> Self {
         Self::new(|theme| {
-            Animation::new(theme.motion.standard, theme.motion.standard_easing.as_animation_curve())
+            Animation::new(
+                theme.motion.standard,
+                theme.motion.standard_easing.as_animation_curve(),
+            )
         })
     }
     /// 320 ms in the default themes — emphasized motion.
     pub fn slow() -> Self {
-        Self::new(|theme| Animation::new(theme.motion.slow, theme.motion.emphasized.as_animation_curve()))
+        Self::new(|theme| {
+            Animation::new(
+                theme.motion.slow,
+                theme.motion.emphasized.as_animation_curve(),
+            )
+        })
     }
     pub fn snappy() -> Self {
         Self::new(|theme| Animation::spring(theme.motion.fast, 0.90))

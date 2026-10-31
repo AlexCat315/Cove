@@ -13,23 +13,41 @@ fn close(a: f32, b: f32) -> bool {
 
 #[test]
 fn a_colour_formats_as_uppercase_hex() {
-    let color = Color { r: 1.0, g: 0.0, b: 0.0, a: 1.0 };
+    let color = Color {
+        r: 1.0,
+        g: 0.0,
+        b: 0.0,
+        a: 1.0,
+    };
     assert_eq!(hex_string(color, false), "#FF0000");
 }
 
 #[test]
 fn alpha_is_appended_only_when_shown() {
-    let color = Color { r: 0.0, g: 0.0, b: 1.0, a: 0.5 };
+    let color = Color {
+        r: 0.0,
+        g: 0.0,
+        b: 1.0,
+        a: 0.5,
+    };
     assert_eq!(hex_string(color, false), "#0000FF");
     let with_alpha = hex_string(color, true);
     assert_eq!(with_alpha.len(), 9, "8 hex digits plus #, got {with_alpha}");
-    assert!(with_alpha.ends_with("80"), "0.5 rounds to 0x80, got {with_alpha}");
+    assert!(
+        with_alpha.ends_with("80"),
+        "0.5 rounds to 0x80, got {with_alpha}"
+    );
 }
 
 #[test]
 fn channels_clamp_and_round() {
     // Out-of-range values clamp rather than wrapping.
-    let bright = Color { r: 2.0, g: -1.0, b: 0.5, a: 1.0 };
+    let bright = Color {
+        r: 2.0,
+        g: -1.0,
+        b: 0.5,
+        a: 1.0,
+    };
     assert_eq!(hex_string(bright, false), "#FF0080");
 }
 
@@ -70,7 +88,12 @@ fn a_non_hex_character_is_rejected() {
 fn format_and_parse_round_trip_within_8_bit_quantisation() {
     // Hex carries 8 bits per channel, so a round trip is exact only to 1/510
     // (half a step) — 0.25 formats as 0x40 and reads back as 64/255.
-    let original = Color { r: 0.25, g: 0.5, b: 0.75, a: 1.0 };
+    let original = Color {
+        r: 0.25,
+        g: 0.5,
+        b: 0.75,
+        a: 1.0,
+    };
     let text = hex_string(original, false);
     assert_eq!(text, "#4080BF");
     let parsed = parse_hex(&text).expect("formatted output parses");

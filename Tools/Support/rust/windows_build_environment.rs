@@ -27,7 +27,8 @@ mod imp {
             .unwrap_or_else(|| "C:\\Program Files".into());
         let mut vcvars: Option<PathBuf> = None;
 
-        let vswhere = Path::new(&programs_x86).join("Microsoft Visual Studio/Installer/vswhere.exe");
+        let vswhere =
+            Path::new(&programs_x86).join("Microsoft Visual Studio/Installer/vswhere.exe");
         if vswhere.is_file() {
             // `vswhere` exits non-zero when no instance matches; that is not fatal.
             let output = shell::output(
@@ -106,7 +107,9 @@ pub use imp::activate;
 
 /// Other hosts have no MSVC environment to import; the call succeeds unchanged.
 #[cfg(not(windows))]
-pub fn activate(environment: &mut std::collections::BTreeMap<String, String>) -> Result<(), crate::terminal::ToolError> {
+pub fn activate(
+    environment: &mut std::collections::BTreeMap<String, String>,
+) -> Result<(), crate::terminal::ToolError> {
     let _ = environment;
     Ok(())
 }

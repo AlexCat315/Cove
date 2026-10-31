@@ -4,8 +4,8 @@
 //! interactive lane starts, and how much room the whole gutter takes. Virtualization
 //! and hit testing consume the same geometry so the painted controls and their
 //! targets cannot drift.
-use cove_core::{Font, Rect};
 use crate::theme::Theme;
+use cove_core::{Font, Rect};
 
 /// One resolved gutter geometry for a code field.
 #[derive(Clone, Copy, Debug, PartialEq)]

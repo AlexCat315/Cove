@@ -8,16 +8,14 @@
 //! checked-in `SDK.json` from `COVE_SDK_ROOT` or the nearest enclosing
 //! checkout.
 
-use crate::cli::{standardized, Arguments, Operation, OptionKey};
+use crate::cli::{Arguments, OptionKey, standardized};
 use crate::download;
-use crate::installation::{
-    CLIUpdate, Installation, InstallationReceipt, SDKPayload, TarArchive,
-};
+use crate::installation::{CLIUpdate, Installation, InstallationReceipt, SDKPayload, TarArchive};
 use crate::project::AppProject;
-use crate::support::{environment, Files, Shell, StdoutTarget, ToolError};
+use crate::support::{Files, ToolError};
 use cove_system::files::FileLock;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 /// Numeric ordering used by Swift's `compare(options: .numeric)`.
@@ -42,9 +40,7 @@ pub fn numeric_compare(lhs: &str, rhs: &str) -> std::cmp::Ordering {
     fn compare_numbers(lhs: &str, rhs: &str) -> std::cmp::Ordering {
         let lhs = lhs.trim_start_matches('0');
         let rhs = rhs.trim_start_matches('0');
-        lhs.len()
-            .cmp(&rhs.len())
-            .then_with(|| lhs.cmp(rhs))
+        lhs.len().cmp(&rhs.len()).then_with(|| lhs.cmp(rhs))
     }
     let left = tokens(lhs);
     let right = tokens(rhs);
@@ -189,17 +185,16 @@ impl NativeArtifacts {
     /// Packaged SDKs deliberately omit native sources. A checkout must
     /// bootstrap itself without downloading the release it is building.
     pub fn has_source_inputs(root: &Path) -> bool {
-        ["Native/third-party/CMakeLists.txt", "third-party/CMakeLists.txt"]
-            .iter()
-            .all(|path| root.join(path).is_file())
+        [
+            "Native/third-party/CMakeLists.txt",
+            "third-party/CMakeLists.txt",
+        ]
+        .iter()
+        .all(|path| root.join(path).is_file())
     }
 
     /// Returns whether the host bundles are now prepared.
-    pub fn install(
-        root: &Path,
-        target: &str,
-        cache_directory: &Path,
-    ) -> Result<bool, ToolError> {
+    pub fn install(root: &Path, target: &str, cache_directory: &Path) -> Result<bool, ToolError> {
         let lock = FileLock::acquire(&root.join(format!("Artifacts/locks/{target}.lock")))
             .map_err(|error| ToolError::invalid(error.to_string()))?;
         let result = Self::install_locked(root, target, cache_directory);
@@ -235,12 +230,10 @@ impl NativeArtifacts {
             _ => {
                 return Err(ToolError::invalid(format!(
                     "This SDK has no native libraries for {target}; install a complete SDK release"
-                )))
+                )));
             }
         };
-        let cache = cache_directory
-            .join("cache/native")
-            .join(&archive.sha256);
+        let cache = cache_directory.join("cache/native").join(&archive.sha256);
         let tar = cache.join("native.tar.gz");
         download::file(&archive.url, &tar, &archive.sha256)?;
         let staging = cache.join(unique_token());
@@ -305,9 +298,7 @@ pub struct SDKDownload;
 
 impl SDKDownload {
     pub fn fetch(version: &str, staging: &Path) -> Result<PathBuf, ToolError> {
-        let repository = SDKRelease::current()?
-            .repository
-            .replace(".git", "");
+        let repository = SDKRelease::current()?.repository.replace(".git", "");
         let base = format!("{repository}/releases/download/v{version}/");
         let name = format!("cove-{}.tar.gz", CLIUpdate::platform());
         Files::directory(staging)?;
@@ -348,9 +339,8 @@ impl CoveSDK {
             }
         };
         let store = SDKStore::new(None);
-        let local = project.and_then(|project| {
-            SDKStore::selection(&project.directory.join(".cove/sdk.json"))
-        });
+        let local = project
+            .and_then(|project| SDKStore::selection(&project.directory.join(".cove/sdk.json")));
         let required = project.map(|project| project.configuration.toolchain.sdk_version.clone());
         let selected = store.selected().filter(|root| {
             required.is_none()
@@ -359,7 +349,9 @@ impl CoveSDK {
                     .unwrap_or(false)
         });
         let override_path = arguments.url(OptionKey::SdkRoot).or_else(|| {
-            environment.get("COVE_SDK_ROOT").map(|value| standardized(value))
+            environment
+                .get("COVE_SDK_ROOT")
+                .map(|value| standardized(value))
         });
         let explicit = override_path.clone().or(local);
         let executable_directory = InstallationReceipt::executable_directory();
@@ -517,25 +509,6 @@ impl SDKStore {
         Ok(())
     }
 
-    pub fn list(&self) -> Result<(), ToolError> {
-        let installed = self.directory.join("versions");
-        if installed.exists() {
-            for sdk in Files::children(&installed)?
-                .into_iter()
-                .filter(|sdk| CoveSDK::is_sdk(sdk))
-            {
-                println!("{}", sdk.display());
-            }
-        }
-        match self.selected() {
-            Some(path) => println!("Selected: {}", path.display()),
-            None => println!("Selected: none"),
-        }
-        Ok(())
-    }
-
-    /// Installs the SDK; "latest" is resolved first. Returns the concrete
-    /// version that was installed.
     pub fn install(&self, requested: &str) -> Result<String, ToolError> {
         let repository = SDKRelease::current()?.repository;
         let version = if requested == SDKRelease::LATEST_TAG {
@@ -544,9 +517,7 @@ impl SDKStore {
             requested.to_string()
         };
         if !SDKRelease::is_version(&version) {
-            return Err(ToolError::invalid(
-                "Use cove sdk install VERSION or latest",
-            ));
+            return Err(ToolError::invalid("Use cove sdk install VERSION or latest"));
         }
         let lock = FileLock::acquire(
             &self
@@ -599,172 +570,4 @@ impl SDKStore {
 #[derive(Debug, Serialize, Deserialize)]
 struct Selection {
     path: String,
-}
-
-/// Dispatches commands to the project's selected SDK CLI.
-pub struct SDKCommand;
-
-impl SDKCommand {
-    /// Select the project's tool before interpreting flags introduced by a
-    /// newer SDK.
-    #[allow(dead_code)]
-    pub fn bootstrap(raw: &[String]) -> Result<(), ToolError> {
-        let Some(verb) = raw.first() else {
-            return Ok(());
-        };
-        if ["self", "sdk", "internal"].contains(&verb.as_str()) {
-            return Ok(());
-        }
-        let store = SDKStore::new(None);
-        if let Some(root) = Self::selected_sdk(raw, &store, &environment())? {
-            Self::invoke(&root, raw)?;
-        }
-        Ok(())
-    }
-
-    pub fn selected_sdk(
-        raw: &[String],
-        store: &SDKStore,
-        environment: &BTreeMap<String, String>,
-    ) -> Result<Option<PathBuf>, ToolError> {
-        if let Some(index) = raw.iter().position(|token| token == "--sdk-root") {
-            if let Some(value) = raw.get(index + 1) {
-                return Ok(Some(standardized(value)));
-            }
-        }
-        if let Some(path) = environment.get("COVE_SDK_ROOT") {
-            return Ok(Some(standardized(path)));
-        }
-        let values: BTreeSet<String> = OptionKey::ALL
-            .iter()
-            .map(|option| format!("--{}", option.raw_value()))
-            .collect();
-        let tokens: Vec<&String> = raw
-            .iter()
-            .take_while(|token| token.as_str() != "--")
-            .collect();
-        let mut paths = Vec::new();
-        for index in 1..tokens.len() {
-            if !tokens[index].starts_with("--") && !values.contains(tokens[index - 1].as_str()) {
-                paths.push(standardized(tokens[index]));
-            }
-        }
-        let cwd = standardized(".");
-        let project = paths
-            .iter()
-            .chain(std::iter::once(&cwd))
-            .find(|path| path.join("cove.json").is_file())
-            .cloned();
-        let required = project
-            .as_ref()
-            .and_then(|project| std::fs::read(project.join("cove.json")).ok())
-            .and_then(|data| serde_json::from_slice::<serde_json::Value>(&data).ok())
-            .and_then(|json| {
-                json.get("toolchain")
-                    .and_then(|toolchain| toolchain.get("sdkVersion"))
-                    .and_then(|version| version.as_str())
-                    .map(str::to_string)
-            });
-        if let Some(project) = &project {
-            if let Some(local) = SDKStore::selection(&project.join(".cove/sdk.json")) {
-                return Ok(Some(local));
-            }
-        }
-        let bundled = InstallationReceipt::executable_directory();
-        let mut candidates: Vec<PathBuf> = store.selected().into_iter().collect();
-        candidates.extend(store.installed_urls());
-        candidates.push(bundled);
-        candidates.retain(|candidate| CoveSDK::is_sdk(candidate));
-        let Some(required) = required else {
-            return Ok(candidates.into_iter().next());
-        };
-        if required == SDKRelease::LATEST_TAG {
-            return Ok(candidates.into_iter().max_by(|lhs, rhs| {
-                let left = SDKRelease::read(lhs)
-                    .map(|release| release.version)
-                    .unwrap_or_else(|_| "0.0.0".into());
-                let right = SDKRelease::read(rhs)
-                    .map(|release| release.version)
-                    .unwrap_or_else(|_| "0.0.0".into());
-                numeric_compare(&left, &right)
-            }));
-        }
-        if let Some(root) = candidates.into_iter().find(|root| {
-            SDKRelease::read(root)
-                .map(|release| release.version == required)
-                .unwrap_or(false)
-        }) {
-            return Ok(Some(root));
-        }
-        let version = store.install(&required)?;
-        Ok(Some(store.installed(&version)))
-    }
-
-    pub fn forward(arguments: &Arguments, raw: &[String]) -> Result<(), ToolError> {
-        match arguments.operation {
-            Operation::SelfUpdate
-            | Operation::InstallCli
-            | Operation::PackageCli
-            | Operation::PackageNative
-            | Operation::SdkInstall
-            | Operation::SdkUse
-            | Operation::SdkList
-            | Operation::Clean
-            | Operation::Devices => return Ok(()),
-            _ => {}
-        }
-        let root = CoveSDK::locate(arguments, None, &environment())?;
-        Self::invoke(&root, raw)
-    }
-
-    pub fn invoke(root: &Path, raw: &[String]) -> Result<(), ToolError> {
-        let release = SDKRelease::read(root)?;
-        #[cfg_attr(not(windows), allow(unused_mut))]
-        let mut binary = SDKPayload::executable(root);
-        #[cfg(windows)]
-        {
-            if !binary.is_file() {
-                binary = root.join("cove.cmd");
-            }
-        }
-        let current = InstallationReceipt::executable_directory();
-        let different_checkout = CoveSDK::is_sdk(&current)
-            && current
-                .canonicalize()
-                .unwrap_or_else(|_| current.clone())
-                != root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
-        let self_version = SDKRelease::current().ok().map(|release| release.version);
-        if self_version.as_deref() == Some(release.version.as_str()) && !different_checkout {
-            return Ok(());
-        }
-        if !binary.is_file() {
-            return Err(ToolError::invalid(format!(
-                "The selected SDK is missing its CLI: {}",
-                binary.display()
-            )));
-        }
-        let mut environment = environment();
-        let root_path = root.display().to_string();
-        if environment.get("COVE_DISPATCHED_SDK") == Some(&root_path) {
-            return Err(ToolError::invalid(format!(
-                "SDK CLI and manifest versions disagree at {}",
-                root.display()
-            )));
-        }
-        environment.insert("COVE_SDK_ROOT".into(), root_path.clone());
-        environment.insert("COVE_DISPATCHED_SDK".into(), root_path);
-        let mut command = vec![binary.display().to_string()];
-        command.extend(raw.iter().cloned());
-        let (_, _, status) = Shell::run_status(
-            &command,
-            None,
-            &environment,
-            false,
-            false,
-            StdoutTarget::StandardOutput,
-            None,
-            true,
-        )?;
-        std::process::exit(status);
-    }
 }

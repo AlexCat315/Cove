@@ -8,7 +8,7 @@
 
 use cove_examples::gallery_content::catalog::GalleryOptions;
 use cove_examples::gallery_content::stories::placement_example::{
-    compact_anchor, compact_trigger_width, shows_full_grid, PlacementExample, VARIANTS,
+    PlacementExample, VARIANTS, compact_anchor, compact_trigger_width, shows_full_grid,
 };
 use cove_ui_compose::primitives::overlays::PopoverPlacement;
 
@@ -18,7 +18,11 @@ fn the_twelve_variants_cover_every_placement_once() {
     let mut seen: Vec<PopoverPlacement> =
         VARIANTS.iter().map(|variant| variant.placement).collect();
     seen.sort_by_key(|placement| PopoverPlacement::ALL.iter().position(|p| p == placement));
-    assert_eq!(seen.len(), PopoverPlacement::ALL.len(), "one variant per placement");
+    assert_eq!(
+        seen.len(),
+        PopoverPlacement::ALL.len(),
+        "one variant per placement"
+    );
     for placement in PopoverPlacement::ALL {
         assert!(seen.contains(&placement), "{placement:?} is missing");
     }
@@ -64,11 +68,23 @@ fn the_anchor_never_goes_negative_when_the_trigger_is_wider_than_the_space() {
 #[test]
 fn top_placements_sit_low_and_side_placements_centre() {
     assert_eq!(compact_anchor(PopoverPlacement::Top, 200.0, 80.0).y, 130.0);
-    assert_eq!(compact_anchor(PopoverPlacement::TopLeading, 200.0, 80.0).y, 130.0);
-    assert_eq!(compact_anchor(PopoverPlacement::Leading, 200.0, 80.0).y, 55.0);
-    assert_eq!(compact_anchor(PopoverPlacement::TrailingBottom, 200.0, 80.0).y, 55.0);
+    assert_eq!(
+        compact_anchor(PopoverPlacement::TopLeading, 200.0, 80.0).y,
+        130.0
+    );
+    assert_eq!(
+        compact_anchor(PopoverPlacement::Leading, 200.0, 80.0).y,
+        55.0
+    );
+    assert_eq!(
+        compact_anchor(PopoverPlacement::TrailingBottom, 200.0, 80.0).y,
+        55.0
+    );
     assert_eq!(compact_anchor(PopoverPlacement::Bottom, 200.0, 80.0).y, 0.0);
-    assert_eq!(compact_anchor(PopoverPlacement::BottomTrailing, 200.0, 80.0).y, 0.0);
+    assert_eq!(
+        compact_anchor(PopoverPlacement::BottomTrailing, 200.0, 80.0).y,
+        0.0
+    );
 }
 
 #[test]

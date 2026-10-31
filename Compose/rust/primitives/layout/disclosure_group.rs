@@ -3,11 +3,11 @@
 //! A keyboard-focusable disclosure header with naturally sized content.
 //! Expansion belongs to the caller, so it survives panel reconstruction and can
 //! also be controlled by search or an Expand All command.
+use cove_core::Binding;
 use cove_core::scene::{
     AccessibilityRole, AccessibilityState, Align, Edge, FlexDirection, Justify, LayoutNode, Node,
     Wrap,
 };
-use cove_core::Binding;
 
 use crate::animation::content::AnimatedVisibility;
 use crate::modifiers::interaction::AccessibilityExt;
@@ -18,7 +18,9 @@ use crate::primitives::media::ui_icon_catalog::navigation;
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
 use crate::theme::{SemanticColorRef, SemanticFontRef};
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View};
+use crate::{
+    AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View, impl_primitive_view,
+};
 
 /// A disclosure header with content that only participates in layout when open.
 pub struct DisclosureGroup {
@@ -135,7 +137,9 @@ impl View for DisclosureGroup {
             is_expanded,
             true,
             None,
-            DisclosureContent { content: self.content.clone() },
+            DisclosureContent {
+                content: self.content.clone(),
+            },
         ));
 
         AnyView::new(

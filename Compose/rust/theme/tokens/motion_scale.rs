@@ -37,7 +37,11 @@ pub struct SurfaceMotion {
 }
 impl Default for SurfaceMotion {
     fn default() -> Self {
-        Self { entrance: 0.2, exit: 0.09, reveal_scale: 0.94 }
+        Self {
+            entrance: 0.2,
+            exit: 0.09,
+            reveal_scale: 0.94,
+        }
     }
 }
 
@@ -62,7 +66,13 @@ impl Default for MotionScale {
     }
 }
 impl MotionScale {
-    pub fn new(fast: f64, standard: f64, slow: f64, emphasized: Easing, standard_easing: Easing) -> Self {
+    pub fn new(
+        fast: f64,
+        standard: f64,
+        slow: f64,
+        emphasized: Easing,
+        standard_easing: Easing,
+    ) -> Self {
         Self {
             fast,
             standard,

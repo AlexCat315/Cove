@@ -24,7 +24,12 @@ fn transparent_steps_are_omitted() {
         list.add_shadow(
             LayeredShadow::single(SurfaceShadow {
                 // 0.001 alpha packs to byte 0, so every step is invisible.
-                color: Some(Color { r: 0.2, g: 0.1, b: 0.05, a: 0.001 }),
+                color: Some(Color {
+                    r: 0.2,
+                    g: 0.1,
+                    b: 0.05,
+                    a: 0.001,
+                }),
                 offset_x: 0.0,
                 offset_y: 2.0,
                 blur: 8.0,

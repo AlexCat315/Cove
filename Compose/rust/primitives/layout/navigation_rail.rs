@@ -6,8 +6,8 @@
 //! preserves selection and drafts.
 use std::collections::HashSet;
 
-use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::Binding;
+use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 
 use crate::modifiers::layout::FlexExt;
 use crate::modifiers::style::AppearanceExt;
@@ -74,7 +74,9 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
             self.selection.clone(),
             vec![SidebarSection::new("rail", self.items.clone())],
         )
-        .presentation(SidebarPresentation::Rail { shows_labels: self.shows_labels })
+        .presentation(SidebarPresentation::Rail {
+            shows_labels: self.shows_labels,
+        })
         .on_activate({
             let handler = self.on_activate.clone();
             move |id| handler(id)

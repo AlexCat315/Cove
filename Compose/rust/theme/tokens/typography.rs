@@ -11,7 +11,11 @@ pub struct TextStyleToken {
 }
 impl TextStyleToken {
     pub fn new(font: Font, line_height: f32, letter_spacing: f32) -> Self {
-        Self { font, line_height, letter_spacing }
+        Self {
+            font,
+            line_height,
+            letter_spacing,
+        }
     }
     pub fn resolving_family(&self, family: Option<&str>) -> Self {
         let mut result = self.clone();
@@ -21,13 +25,17 @@ impl TextStyleToken {
     /// Line height for this slot, rescaled to `font_override` when a modifier
     /// substituted a different font size.
     pub fn line_height_for(&self, font_override: Option<&Font>) -> f32 {
-        let size = font_override.map(Font::size).unwrap_or_else(|| self.font.size());
+        let size = font_override
+            .map(Font::size)
+            .unwrap_or_else(|| self.font.size());
         self.line_height * size / self.font.size()
     }
 }
 
 pub fn resolving_font_family(font: &Font, family: Option<&str>) -> Font {
-    let Some(family) = family else { return font.clone() };
+    let Some(family) = family else {
+        return font.clone();
+    };
     if font.family().is_some() || font.design() != FontDesign::Standard {
         return font.clone();
     }
@@ -62,7 +70,17 @@ impl Typography {
         label: TextStyleToken,
         mono: TextStyleToken,
     ) -> Self {
-        Self { family, display, title, headline, body, body_strong, caption, label, mono }
+        Self {
+            family,
+            display,
+            title,
+            headline,
+            body,
+            body_strong,
+            caption,
+            label,
+            mono,
+        }
     }
     pub fn resolved_body(&self) -> TextStyleToken {
         self.body.resolving_family(self.family.as_deref())

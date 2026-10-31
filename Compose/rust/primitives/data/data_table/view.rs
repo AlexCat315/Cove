@@ -28,35 +28,34 @@ use std::rc::Rc;
 use cove_core::scene::{
     AccessibilityActions, AccessibilityRole, AccessibilitySemantics, AccessibilityState, Align,
     EventPhase, EventResult, FlexDirection, FocusChainHolder, HoverPhase, InputHandlerRoute,
-    InteractionRegistryHolder, Justify, LayoutNode, Node, PointerCaptureHolder, PointerPhase,
-    Wrap,
+    InteractionRegistryHolder, Justify, LayoutNode, Node, PointerCaptureHolder, PointerPhase, Wrap,
 };
 use cove_core::{Binding, Point, Size, State};
 use cove_platform::{KeyEvent, KeyModifiers, MouseButton, SystemCursor};
 
+use super::super::lists::table::{
+    ColumnVisibility, ComparisonResult, TableColumn, TableColumnLayout, TableColumnPlan,
+    TableLayout, TableSort, TableSortDirection,
+};
 use super::column_order::DataTableColumnOrder;
 use super::data_table_geometry::DataTableColumnGeometry;
 use super::editing_model::{CellEditing, DataTableEditingState, EditableColumn};
 use super::model::DataTableModel;
 use super::row_metrics::{
-    row_height_key_matches, variable_row_heights, DataTableRowMetrics, RowHeightKey,
+    DataTableRowMetrics, RowHeightKey, row_height_key_matches, variable_row_heights,
 };
 use super::selection_model::{DataTableNavigation, DataTableSelection, DataTableSelectionMode};
-use super::super::lists::table::{
-    ColumnVisibility, ComparisonResult, TableColumn, TableColumnLayout, TableColumnPlan,
-    TableLayout, TableSort, TableSortDirection,
-};
 use crate::modifiers::layout::{EdgeInsets, FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::feedback::EmptyState;
 use crate::primitives::layout::{ScrollAxis, ScrollView, ScrollbarGutter};
+use crate::primitives::text::text_buffer::TextBuffer;
 use crate::primitives::text::text_field::{
     TextField, TextFieldBehavior, TextFieldEvents, TextFieldNavigationRequest,
 };
 use crate::primitives::text::{Divider, DividerAxis, Text};
-use crate::primitives::text::text_buffer::TextBuffer;
-use crate::theme::{node_text_scaler, theme_for_node, SemanticColorRef, SemanticFontRef};
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, TupleView, View, ViewExt};
+use crate::theme::{SemanticColorRef, SemanticFontRef, node_text_scaler, theme_for_node};
+use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, ViewExt, impl_primitive_view};
 
 const INPUT_MARKER: &str = "dataTable.input";
 const ROW_INDEX_MARKER: &str = "dataTable.rowIndex";
@@ -170,7 +169,10 @@ impl<Id: Ord + Clone> Default for DataTableSession<Id> {
 }
 
 /// A persistent row model, fixed header, frozen columns and two-axis window.
-pub struct DataTable<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> {
+pub struct DataTable<
+    Record: Clone + 'static,
+    Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
+> {
     pub model: Rc<DataTableModel<Record, Id>>,
     pub columns: Vec<TableColumn<Record>>,
     pub options: DataTableOptions<Id>,
@@ -190,7 +192,10 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
     pub fn new(model: Rc<DataTableModel<Record, Id>>, columns: Vec<TableColumn<Record>>) -> Self {
         let mut ids: HashSet<&str> = HashSet::new();
         for column in &columns {
-            assert!(ids.insert(&column.id), "DataTable column IDs must be unique");
+            assert!(
+                ids.insert(&column.id),
+                "DataTable column IDs must be unique"
+            );
         }
         let mut options = DataTableOptions::default();
         options.layout.validate();
@@ -250,9 +255,12 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
     fn body(&self) -> AnyView {
         let controller = self.controller();
         let probe = controller.clone();
-        AnyView::new(crate::adaptive::ContainerSizeReader::new(move |size: Size| {
-            DataTableSurface { controller: probe.clone(), size }
-        }))
+        AnyView::new(crate::adaptive::ContainerSizeReader::new(
+            move |size: Size| DataTableSurface {
+                controller: probe.clone(),
+                size,
+            },
+        ))
     }
 
     fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
@@ -286,10 +294,8 @@ pub struct DataTableController<
     pub navigation: DataTableNavigation<Id>,
 }
 
-impl<
-        Record: Clone + 'static,
-        Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
-    > Clone for DataTableController<Record, Id>
+impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> Clone
+    for DataTableController<Record, Id>
 {
     fn clone(&self) -> Self {
         Self {
@@ -313,10 +319,8 @@ impl<
     }
 }
 
-impl<
-        Record: Clone + 'static,
-        Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
-    > DataTableController<Record, Id>
+impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>
+    DataTableController<Record, Id>
 {
     fn selection(&self, session: &DataTableSession<Id>) -> DataTableSelection<Id> {
         match self.selection.as_ref() {
@@ -366,9 +370,12 @@ impl<
     }
 
     fn width_of(&self, column: &TableColumn<Record>, stored: &BTreeMap<String, f32>) -> f32 {
-        column
-            .layout
-            .constrained(stored.get(&column.id).copied().unwrap_or(column.layout.width))
+        column.layout.constrained(
+            stored
+                .get(&column.id)
+                .copied()
+                .unwrap_or(column.layout.width),
+        )
     }
 
     fn write_width(&self, column: &TableColumn<Record>, width: f32) {
@@ -388,7 +395,11 @@ impl<
     }
 
     fn display_order(&self, session: &DataTableSession<Id>) -> Vec<String> {
-        let authored: Vec<String> = self.columns.iter().map(|column| column.id.clone()).collect();
+        let authored: Vec<String> = self
+            .columns
+            .iter()
+            .map(|column| column.id.clone())
+            .collect();
         match self.column_order.as_ref() {
             Some(binding) => DataTableColumnOrder::apply(&binding.get(), &authored),
             None => DataTableColumnOrder::apply(&session.order, &authored),
@@ -455,7 +466,8 @@ impl<
             minimum,
             scale: node_text_scaler(node).factor(),
         };
-        if let Some(cached) = node.attachment::<Rc<RefCell<Option<(RowHeightKey, DataTableRowMetrics)>>>>(METRICS_CACHE)
+        if let Some(cached) = node
+            .attachment::<Rc<RefCell<Option<(RowHeightKey, DataTableRowMetrics)>>>>(METRICS_CACHE)
             && let Some((cached_key, metrics)) = cached.borrow().as_ref()
             && row_height_key_matches(Some(*cached_key), key)
         {
@@ -489,7 +501,14 @@ impl<
 
     /// Clamps an offset to the scrollable extent. Frozen columns do not scroll,
     /// so the horizontal maximum uses the moving span.
-    fn clamped_offset(&self, next: Point, plan: &DataTablePlan<Record>, metrics: &DataTableRowMetrics, moving_width: f32, viewport_height: f32) -> Point {
+    fn clamped_offset(
+        &self,
+        next: Point,
+        plan: &DataTablePlan<Record>,
+        metrics: &DataTableRowMetrics,
+        moving_width: f32,
+        viewport_height: f32,
+    ) -> Point {
         let maximum_x = (plan.geometry.moving_width() - moving_width).max(0.0);
         let maximum_y = (metrics.total() - viewport_height).max(0.0);
         Point::new(next.x.clamp(0.0, maximum_x), next.y.clamp(0.0, maximum_y))
@@ -526,28 +545,46 @@ impl<
                 offset.x = right - visible_width;
             }
         }
-        self.offset.set(self.clamped_offset(offset, plan, metrics, moving_width, viewport_height));
+        self.offset
+            .set(self.clamped_offset(offset, plan, metrics, moving_width, viewport_height));
     }
 
     fn begin_editing(&self, row: usize, column: usize, plan: &DataTablePlan<Record>) {
         if !self.is_enabled {
             return;
         }
-        let Some(target) = plan.columns.get(column) else { return };
-        let Some(editing) = target.text_editing.clone() else { return };
-        let Some(row_id) = self.model.row_id_at(row) else { return };
-        let Some(record) = self.model.record_at(row) else { return };
+        let Some(target) = plan.columns.get(column) else {
+            return;
+        };
+        let Some(editing) = target.text_editing.clone() else {
+            return;
+        };
+        let Some(row_id) = self.model.row_id_at(row) else {
+            return;
+        };
+        let Some(record) = self.model.record_at(row) else {
+            return;
+        };
         let mut session = self.session.get();
         if session.editing.is_editing(&row_id, &target.id) {
             return;
         }
-        session.editing.begin(row_id, target.id.clone(), editing.text_of(&record));
+        session
+            .editing
+            .begin(row_id, target.id.clone(), editing.text_of(&record));
         self.session.set(session);
     }
 
-    fn open_draft(&self, session: &DataTableSession<Id>, row_id: &Id, column_id: &str) -> Option<String> {
+    fn open_draft(
+        &self,
+        session: &DataTableSession<Id>,
+        row_id: &Id,
+        column_id: &str,
+    ) -> Option<String> {
         let draft = session.editing.draft.as_ref()?;
-        draft.is_for(row_id, column_id).then(|| draft.buffer.clone())
+        draft
+            .is_for(row_id, column_id)
+            .then(|| draft.buffer.clone())
     }
 
     fn set_draft_buffer(&self, value: String) {
@@ -566,7 +603,9 @@ impl<
     /// Validates and closes the open draft. Returns whether it closed.
     fn commit_editing(&self, input: &Rc<RefCell<Option<Node>>>) -> bool {
         let mut session = self.session.get();
-        let Some(draft) = session.editing.draft.clone() else { return true };
+        let Some(draft) = session.editing.draft.clone() else {
+            return true;
+        };
         let Some(column) = self
             .ordered_columns(&session)
             .into_iter()
@@ -597,20 +636,30 @@ impl<
         session.editing.cancel();
         self.session.set(session);
         if value != original {
-            self.model.update_row(&row_id, |record| editing.apply(record, &value));
+            self.model
+                .update_row(&row_id, |record| editing.apply(record, &value));
         }
         focus_node(input);
         true
     }
 
     /// Tab moves to the next editable column, skipping the rest.
-    fn move_editor(&self, direction: i32, plan: &DataTablePlan<Record>, input: &Rc<RefCell<Option<Node>>>) {
+    fn move_editor(
+        &self,
+        direction: i32,
+        plan: &DataTablePlan<Record>,
+        input: &Rc<RefCell<Option<Node>>>,
+    ) {
         if !self.commit_editing(input) {
             return;
         }
         let session = self.session.get();
-        let Some(draft) = session.editing.draft.as_ref() else { return };
-        let Some(row) = self.model.index_for(&draft.row_id) else { return };
+        let Some(draft) = session.editing.draft.as_ref() else {
+            return;
+        };
+        let Some(row) = self.model.index_for(&draft.row_id) else {
+            return;
+        };
         let editable: Vec<EditableColumn> = self
             .ordered_columns(&session)
             .iter()
@@ -639,7 +688,9 @@ impl<
         else {
             return;
         };
-        let Some(compare) = column.compare.clone() else { return };
+        let Some(compare) = column.compare.clone() else {
+            return;
+        };
         let next = match self.model.sort() {
             Some(sort)
                 if sort.column_id == column_id
@@ -719,7 +770,11 @@ impl<
             && (event.scancode == crate::Scancode::ARROW_LEFT
                 || event.scancode == crate::Scancode::ARROW_RIGHT)
         {
-            let step = if event.scancode == crate::Scancode::ARROW_LEFT { -1 } else { 1 };
+            let step = if event.scancode == crate::Scancode::ARROW_LEFT {
+                -1
+            } else {
+                1
+            };
             return self.move_column(plan, column, step);
         }
         if event.scancode == crate::Scancode::A
@@ -753,9 +808,10 @@ impl<
                 (target.max((from + 1).min(self.model.count() - 1)), column)
             }
             crate::Scancode::ARROW_LEFT => (current.unwrap_or(0), column.saturating_sub(1)),
-            crate::Scancode::ARROW_RIGHT => {
-                (current.unwrap_or(0), (column + 1).min(plan.columns.len() - 1))
-            }
+            crate::Scancode::ARROW_RIGHT => (
+                current.unwrap_or(0),
+                (column + 1).min(plan.columns.len() - 1),
+            ),
             crate::Scancode::F2 => {
                 let Some(current) = current else { return false };
                 self.begin_editing(current, column, plan);
@@ -783,7 +839,14 @@ impl<
         selection.select(row, &self.model, self.selection_mode, event.modifiers);
         selection.focused_column_id = Some(plan.columns[next_column].id.clone());
         self.write_selection(selection);
-        self.reveal(row, Some(next_column), plan, metrics, moving_width, viewport_height);
+        self.reveal(
+            row,
+            Some(next_column),
+            plan,
+            metrics,
+            moving_width,
+            viewport_height,
+        );
         true
     }
 
@@ -795,12 +858,18 @@ impl<
         moving_width: f32,
         viewport_height: f32,
     ) {
-        let Some(request_id) = self.navigation.request_id else { return };
+        let Some(request_id) = self.navigation.request_id else {
+            return;
+        };
         if self.session.get().last_navigation == Some(request_id) {
             return;
         }
-        let Some(row_id) = self.navigation.row_id.clone() else { return };
-        let Some(row) = self.model.index_for(&row_id) else { return };
+        let Some(row_id) = self.navigation.row_id.clone() else {
+            return;
+        };
+        let Some(row) = self.model.index_for(&row_id) else {
+            return;
+        };
         let session = self.session.get();
         let column = self
             .navigation
@@ -821,19 +890,33 @@ impl<
         let mut session = self.session.get();
         session.last_navigation = Some(request_id);
         self.session.set(session);
-        let plan = self.plan(&self.session.get(), plan_available_width(plan, moving_width));
+        let plan = self.plan(
+            &self.session.get(),
+            plan_available_width(plan, moving_width),
+        );
         self.reveal(row, column, &plan, metrics, moving_width, viewport_height);
     }
 
     fn select_row(&self, row: usize) {
         let session = self.session.get();
         let mut selection = self.selection(&session);
-        selection.select(row, &self.model, self.selection_mode, KeyModifiers::default());
+        selection.select(
+            row,
+            &self.model,
+            self.selection_mode,
+            KeyModifiers::default(),
+        );
         self.write_selection(selection);
         self.activate(row);
     }
 
-    fn select(&self, row: usize, column: usize, plan: &DataTablePlan<Record>, modifiers: KeyModifiers) {
+    fn select(
+        &self,
+        row: usize,
+        column: usize,
+        plan: &DataTablePlan<Record>,
+        modifiers: KeyModifiers,
+    ) {
         let session = self.session.get();
         let mut selection = self.selection(&session);
         selection.select(row, &self.model, self.selection_mode, modifiers);
@@ -872,15 +955,16 @@ pub struct DataTablePlan<Record> {
 
 impl<Record> Clone for DataTablePlan<Record> {
     fn clone(&self) -> Self {
-        Self { columns: self.columns.clone(), geometry: self.geometry.clone() }
+        Self {
+            columns: self.columns.clone(),
+            geometry: self.geometry.clone(),
+        }
     }
 }
 
 /// The measured surface: turns a size into a plan and a window.
-struct DataTableSurface<
-    Record: 'static,
-    Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
-> {
+struct DataTableSurface<Record: 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>
+{
     controller: DataTableController<Record, Id>,
     size: Size,
 }
@@ -897,8 +981,8 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
     }
 }
 
-impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> PrimitiveView
-    for DataTableSurface<Record, Id>
+impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>
+    PrimitiveView for DataTableSurface<Record, Id>
 {
     fn make_node(&self) -> Node {
         let node = Node::new();
@@ -921,7 +1005,14 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         let metrics = controller.metrics(node);
         controller.apply_navigation(&plan, &metrics, moving_width, viewport_height);
         let offset = controller.offset.get();
-        let window = DataTableWindows::resolve(&metrics, &plan.geometry, offset, moving_width, viewport_height, 3);
+        let window = DataTableWindows::resolve(
+            &metrics,
+            &plan.geometry,
+            offset,
+            moving_width,
+            viewport_height,
+            3,
+        );
         let session = controller.session.get();
 
         let input: Rc<RefCell<Option<Node>>> = Rc::new(RefCell::new(None));
@@ -981,7 +1072,10 @@ impl PrimitiveView for DataTableChrome {
             role: AccessibilityRole::Table,
             label: "Data table".to_string(),
             value: format!("{} rows, {} columns", self.model_rows, self.columns),
-            state: AccessibilityState { is_enabled: self.is_enabled, ..Default::default() },
+            state: AccessibilityState {
+                is_enabled: self.is_enabled,
+                ..Default::default()
+            },
             ..Default::default()
         }));
     }
@@ -994,10 +1088,7 @@ impl PrimitiveView for DataTableChrome {
 impl_primitive_view!(DataTableChrome);
 
 /// Header plus the two body lanes, wired to one keyboard host.
-struct DataTableLanes<
-    Record: 'static,
-    Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
-> {
+struct DataTableLanes<Record: 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> {
     controller: DataTableController<Record, Id>,
     plan: DataTablePlan<Record>,
     metrics: DataTableRowMetrics,
@@ -1014,7 +1105,14 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
     for DataTableLanes<Record, Id>
 {
     fn body(&self) -> AnyView {
-        let header = build_header(&self.controller, &self.plan, &self.metrics, self.offset, &self.layout, &self.session);
+        let header = build_header(
+            &self.controller,
+            &self.plan,
+            &self.metrics,
+            self.offset,
+            &self.layout,
+            &self.session,
+        );
         let frozen = build_frozen_lane(
             &self.controller,
             &self.plan,
@@ -1047,11 +1145,24 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                     offset: self.controller.offset.clone(),
                     content: frozen,
                 })
-                .frame(Some(crate::modifiers::layout::FrameDimension::Points(frozen_width)), None, None, Some(0.0), None, None)
+                .frame(
+                    Some(crate::modifiers::layout::FrameDimension::Points(
+                        frozen_width,
+                    )),
+                    None,
+                    None,
+                    Some(0.0),
+                    None,
+                    None,
+                )
                 .flex_with(0.0, 0.0, None),
             ));
         }
-        body_children.push(AnyView::new(AnyView::new(moving).flex_with(1.0, 1.0, Some(0.0))));
+        body_children.push(AnyView::new(AnyView::new(moving).flex_with(
+            1.0,
+            1.0,
+            Some(0.0),
+        )));
 
         let body = AnyView::new(
             BoxView::new(
@@ -1094,7 +1205,10 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
     }
 }
 
-fn header_cells<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>(
+fn header_cells<
+    Record: Clone + 'static,
+    Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
+>(
     controller: &DataTableController<Record, Id>,
     plan: &DataTablePlan<Record>,
     range: std::ops::Range<usize>,
@@ -1119,8 +1233,14 @@ fn header_cells<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Sen
         ));
     }
     for index in range {
-        let Some(column) = plan.columns.get(index) else { continue };
-        let width = geometry.widths.get(index).copied().unwrap_or(column.layout.width);
+        let Some(column) = plan.columns.get(index) else {
+            continue;
+        };
+        let width = geometry
+            .widths
+            .get(index)
+            .copied()
+            .unwrap_or(column.layout.width);
         cells.push(AnyView::new(HeaderCell {
             controller: controller.clone(),
             plan: plan.clone(),
@@ -1146,7 +1266,10 @@ fn header_cells<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Sen
     )
 }
 
-fn build_header<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>(
+fn build_header<
+    Record: Clone + 'static,
+    Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
+>(
     controller: &DataTableController<Record, Id>,
     plan: &DataTablePlan<Record>,
     _metrics: &DataTableRowMetrics,
@@ -1172,7 +1295,14 @@ fn build_header<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Sen
             content: header_cells(controller, plan, moving, geometry, offset, layout),
         })
         .flex_with(1.0, 1.0, Some(0.0))
-        .frame(None, None, Some(0.0), Some(layout.header_height), None, None),
+        .frame(
+            None,
+            None,
+            Some(0.0),
+            Some(layout.header_height),
+            None,
+            None,
+        ),
     ));
     parts.push(AnyView::new(
         BoxView::new(
@@ -1201,7 +1331,10 @@ fn build_header<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Sen
     })
 }
 
-fn build_frozen_lane<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>(
+fn build_frozen_lane<
+    Record: Clone + 'static,
+    Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
+>(
     controller: &DataTableController<Record, Id>,
     plan: &DataTablePlan<Record>,
     metrics: &DataTableRowMetrics,
@@ -1230,7 +1363,10 @@ fn build_frozen_lane<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone 
     })
 }
 
-fn build_moving_lane<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>(
+fn build_moving_lane<
+    Record: Clone + 'static,
+    Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
+>(
     controller: &DataTableController<Record, Id>,
     plan: &DataTablePlan<Record>,
     metrics: &DataTableRowMetrics,
@@ -1262,16 +1398,20 @@ fn build_moving_lane<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone 
         .scrollbar_gutter(ScrollbarGutter::Stable)
         .scroll_offset(controller.offset.binding());
     let _ = offset;
-    AnyView::new(
-        AnyView::new(scroll)
-            .flex_with(1.0, 1.0, Some(0.0))
-            .frame(None, None, Some(0.0), Some(0.0), None, None),
-    )
+    AnyView::new(AnyView::new(scroll).flex_with(1.0, 1.0, Some(0.0)).frame(
+        None,
+        None,
+        Some(0.0),
+        Some(0.0),
+        None,
+        None,
+    ))
 }
 
 /// A lane of absolutely stacked rows with a leading and trailing spacer, so the
 /// lane's own height is the table's full scroll extent.
-struct LaneRows<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> {
+struct LaneRows<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>
+{
     controller: DataTableController<Record, Id>,
     plan: DataTablePlan<Record>,
     metrics: DataTableRowMetrics,
@@ -1346,7 +1486,10 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
 }
 
 /// The frozen lane: same rows, leading columns, no scrolling of its own.
-struct FrozenLane<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> {
+struct FrozenLane<
+    Record: Clone + 'static,
+    Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
+> {
     controller: DataTableController<Record, Id>,
     plan: DataTablePlan<Record>,
     metrics: DataTableRowMetrics,
@@ -1377,7 +1520,10 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
 }
 
 /// The moving lane: scrolling columns inside the two-axis scroll view.
-struct MovingRows<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> {
+struct MovingRows<
+    Record: Clone + 'static,
+    Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
+> {
     controller: DataTableController<Record, Id>,
     plan: DataTablePlan<Record>,
     metrics: DataTableRowMetrics,
@@ -1411,7 +1557,10 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
 }
 
 /// One row: the cells for one range of columns.
-struct DataTableRow<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> {
+struct DataTableRow<
+    Record: Clone + 'static,
+    Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
+> {
     controller: DataTableController<Record, Id>,
     plan: DataTablePlan<Record>,
     row: usize,
@@ -1435,7 +1584,8 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         let is_selected = selection.contains(&row_id);
         let geometry = &self.plan.geometry;
         let frozen_count = geometry.frozen_count;
-        let is_frozen_lane = self.columns.end <= frozen_count && frozen_count < self.plan.columns.len();
+        let is_frozen_lane =
+            self.columns.end <= frozen_count && frozen_count < self.plan.columns.len();
         let mut cells: Vec<AnyView> = Vec::new();
         if self.columns.start >= frozen_count && self.columns.start < geometry.starts().len() {
             let gap = geometry.starts()[self.columns.start] - geometry.frozen_width();
@@ -1453,8 +1603,14 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             ));
         }
         for index in self.columns.clone() {
-            let Some(column) = self.plan.columns.get(index) else { continue };
-            let width = geometry.widths.get(index).copied().unwrap_or(column.layout.width);
+            let Some(column) = self.plan.columns.get(index) else {
+                continue;
+            };
+            let width = geometry
+                .widths
+                .get(index)
+                .copied()
+                .unwrap_or(column.layout.width);
             let is_active = selection.focused_id.as_ref() == Some(&row_id)
                 && selection.focused_column_id.as_ref() == Some(&column.id);
             cells.push(AnyView::new(DataTableCell {
@@ -1528,7 +1684,11 @@ impl PrimitiveView for DataTableRowHost {
             theme.colors.background
         }));
         node.set_accessibility(Some(AccessibilitySemantics {
-            role: if self.is_frozen_lane { AccessibilityRole::Group } else { AccessibilityRole::Row },
+            role: if self.is_frozen_lane {
+                AccessibilityRole::Group
+            } else {
+                AccessibilityRole::Row
+            },
             label: format!("Row {}", self.row + 1),
             state: AccessibilityState {
                 is_selected: self.is_selected,
@@ -1553,7 +1713,10 @@ impl PrimitiveView for DataTableRowHost {
 impl_primitive_view!(DataTableRowHost);
 
 /// One body cell. Owns the draft editor when this cell is being edited.
-struct DataTableCell<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> {
+struct DataTableCell<
+    Record: Clone + 'static,
+    Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
+> {
     controller: DataTableController<Record, Id>,
     plan: DataTablePlan<Record>,
     column: TableColumn<Record>,
@@ -1609,16 +1772,26 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             width: self.width,
             height: self.height,
             content: AnyView::new(
-                BoxView::new(FlexDirection::Row, Align::Center, justify, Wrap::NoWrap, 0.0, content)
-                    .padding_edges(10.0, 4.0)
-                    .clipped(),
+                BoxView::new(
+                    FlexDirection::Row,
+                    Align::Center,
+                    justify,
+                    Wrap::NoWrap,
+                    0.0,
+                    content,
+                )
+                .padding_edges(10.0, 4.0)
+                .clipped(),
             ),
         })
     }
 }
 
 /// Cell shell: focus ring, hover fill, activation and the accessibility cell.
-struct DataTableCellHost<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> {
+struct DataTableCellHost<
+    Record: Clone + 'static,
+    Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
+> {
     controller: DataTableController<Record, Id>,
     plan: DataTablePlan<Record>,
     title: String,
@@ -1631,8 +1804,8 @@ struct DataTableCellHost<Record: Clone + 'static, Id: Ord + std::hash::Hash + Cl
     content: AnyView,
 }
 
-impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> PrimitiveView
-    for DataTableCellHost<Record, Id>
+impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>
+    PrimitiveView for DataTableCellHost<Record, Id>
 {
     fn make_node(&self) -> Node {
         let node = Node::new();
@@ -1675,27 +1848,32 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         let column_index = self.column_index;
         let activate = self.is_enabled;
         node.set_accessibility_actions(AccessibilityActions {
-            activate: activate.then(|| {
-                Rc::new(move || controller.select_row(row)) as Rc<dyn Fn()>
-            }),
+            activate: activate.then(|| Rc::new(move || controller.select_row(row)) as Rc<dyn Fn()>),
             ..Default::default()
         });
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         if !self.is_enabled {
             registry.remove(node);
             return;
         }
         node.set_cursor(Some(SystemCursor::Pointer));
-        registry.set_hover(node, Rc::new(move |phase: HoverPhase| {
-            if let Some(owner) = None::<Node> {
-                let _ = owner;
-            }
-            let _ = phase;
-        }));
+        registry.set_hover(
+            node,
+            Rc::new(move |phase: HoverPhase| {
+                if let Some(owner) = None::<Node> {
+                    let _ = owner;
+                }
+                let _ = phase;
+            }),
+        );
         let controller = self.controller.clone();
         let plan = self.plan.clone();
-        registry.set_pointer(node, InputHandlerRoute::control(), Rc::new(
-            move |event, phase, event_phase| {
+        registry.set_pointer(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, phase, event_phase| {
                 if event_phase == EventPhase::Capture || event.button != MouseButton::Left {
                     return EventResult::Ignored;
                 }
@@ -1707,21 +1885,30 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                     return EventResult::Handled;
                 }
                 EventResult::Ignored
-            },
-        ));
+            }),
+        );
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         vec![self.content.clone()]
     }
 }
-impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View for DataTableCellHost<Record, Id> {
-    fn kind(&self) -> crate::ViewKind<'_> { crate::ViewKind::Primitive(self) }
-    fn tag(&self) -> &'static str { std::any::type_name::<Self>() }
+impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
+    for DataTableCellHost<Record, Id>
+{
+    fn kind(&self) -> crate::ViewKind<'_> {
+        crate::ViewKind::Primitive(self)
+    }
+    fn tag(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
 }
 
 /// The in-place editor for one cell.
-struct DraftEditor<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> {
+struct DraftEditor<
+    Record: Clone + 'static,
+    Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
+> {
     controller: DataTableController<Record, Id>,
     plan: DataTablePlan<Record>,
     column_id: String,
@@ -1764,7 +1951,10 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         let tab_plan = plan.clone();
         let tab_input = input.clone();
         let mut field = TextField::new("", text)
-            .behavior(TextFieldBehavior { disabled: !self.is_enabled, ..Default::default() })
+            .behavior(TextFieldBehavior {
+                disabled: !self.is_enabled,
+                ..Default::default()
+            })
             .events(TextFieldEvents {
                 on_submit: Some(Rc::new(move || {
                     submit_controller.commit_editing(&submit_input);
@@ -1831,7 +2021,10 @@ impl PrimitiveView for TextFieldShell {
 impl_primitive_view!(TextFieldShell);
 
 /// One header cell: title, sort indicator, the sort action and the resize grip.
-struct HeaderCell<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> {
+struct HeaderCell<
+    Record: Clone + 'static,
+    Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
+> {
     controller: DataTableController<Record, Id>,
     plan: DataTablePlan<Record>,
     column: TableColumn<Record>,
@@ -1848,8 +2041,15 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
     fn body(&self) -> AnyView {
         let column_id = self.column.id.clone();
         let sortable = self.column.compare.is_some();
-        let is_sorted = self.sorted.as_ref().is_some_and(|sort| sort.column_id == self.column.id);
-        let direction = self.sorted.as_ref().filter(|_| is_sorted).map(|sort| sort.direction);
+        let is_sorted = self
+            .sorted
+            .as_ref()
+            .is_some_and(|sort| sort.column_id == self.column.id);
+        let direction = self
+            .sorted
+            .as_ref()
+            .filter(|_| is_sorted)
+            .map(|sort| sort.direction);
         let controller = self.controller.clone();
         let mut row: Vec<AnyView> = Vec::new();
         row.push(AnyView::new(
@@ -1914,7 +2114,10 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
 }
 
 /// Header button: sort cycling plus header semantics.
-struct HeaderCellHost<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> {
+struct HeaderCellHost<
+    Record: Clone + 'static,
+    Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
+> {
     controller: DataTableController<Record, Id>,
     column_id: String,
     title: String,
@@ -1926,8 +2129,8 @@ struct HeaderCellHost<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone
     content: AnyView,
 }
 
-impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> PrimitiveView
-    for HeaderCellHost<Record, Id>
+impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>
+    PrimitiveView for HeaderCellHost<Record, Id>
 {
     fn make_node(&self) -> Node {
         let node = Node::new();
@@ -1969,7 +2172,9 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             },
             ..Default::default()
         }));
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         if !self.sortable {
             registry.remove(node);
             return;
@@ -1977,8 +2182,10 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         node.set_cursor(Some(SystemCursor::Pointer));
         let controller = self.controller.clone();
         let column_id = self.column_id.clone();
-        registry.set_pointer(node, InputHandlerRoute::control(), Rc::new(
-            move |event, phase, event_phase| {
+        registry.set_pointer(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, phase, event_phase| {
                 if event_phase == EventPhase::Capture || event.button != MouseButton::Left {
                     return EventResult::Ignored;
                 }
@@ -1987,21 +2194,30 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                     return EventResult::Handled;
                 }
                 EventResult::Ignored
-            },
-        ));
+            }),
+        );
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         vec![self.content.clone()]
     }
 }
-impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View for HeaderCellHost<Record, Id> {
-    fn kind(&self) -> crate::ViewKind<'_> { crate::ViewKind::Primitive(self) }
-    fn tag(&self) -> &'static str { std::any::type_name::<Self>() }
+impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
+    for HeaderCellHost<Record, Id>
+{
+    fn kind(&self) -> crate::ViewKind<'_> {
+        crate::ViewKind::Primitive(self)
+    }
+    fn tag(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
 }
 
 /// Column resize grip: drag, arrow keys and the accessibility set-value action.
-struct ResizeGrip<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> {
+struct ResizeGrip<
+    Record: Clone + 'static,
+    Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
+> {
     controller: DataTableController<Record, Id>,
     column: TableColumn<Record>,
     width: f32,
@@ -2009,8 +2225,8 @@ struct ResizeGrip<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + S
     is_enabled: bool,
 }
 
-impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> PrimitiveView
-    for ResizeGrip<Record, Id>
+impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>
+    PrimitiveView for ResizeGrip<Record, Id>
 {
     fn make_node(&self) -> Node {
         let node = Node::new();
@@ -2032,7 +2248,10 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
             role: AccessibilityRole::Slider,
             value: format!("{:.0}", self.width),
             label: format!("Resize {} column", self.column.title),
-            state: AccessibilityState { is_enabled: self.is_enabled, ..Default::default() },
+            state: AccessibilityState {
+                is_enabled: self.is_enabled,
+                ..Default::default()
+            },
             ..Default::default()
         }));
         let inc_controller = self.controller.clone();
@@ -2042,12 +2261,18 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         let layout = self.layout;
         let width = self.width;
         node.set_accessibility_actions(AccessibilityActions {
-            increment: Some(Rc::new(move || inc_controller.write_width(&inc_column, width + 10.0))),
-            decrement: Some(Rc::new(move || dec_controller.write_width(&dec_column, width - 10.0))),
+            increment: Some(Rc::new(move || {
+                inc_controller.write_width(&inc_column, width + 10.0)
+            })),
+            decrement: Some(Rc::new(move || {
+                dec_controller.write_width(&dec_column, width - 10.0)
+            })),
             ..Default::default()
         });
         let _ = (theme, layout);
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         if !self.is_enabled {
             registry.remove(node);
             return;
@@ -2058,8 +2283,10 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         let down_width = self.width;
         let down_start = start.clone();
         let down_node = node.downgrade();
-        registry.set_pointer(node, InputHandlerRoute::control(), Rc::new(
-            move |event, phase, event_phase| {
+        registry.set_pointer(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, phase, event_phase| {
                 if event_phase == EventPhase::Capture || event.button != MouseButton::Left {
                     return EventResult::Ignored;
                 }
@@ -2082,42 +2309,56 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
                     }
                 }
                 EventResult::Handled
-            },
-        ));
+            }),
+        );
         let motion_controller = self.controller.clone();
         let motion_column = self.column.clone();
         let motion_start = start.clone();
-        registry.set_motion(node, InputHandlerRoute::control(), Rc::new(move |event, _phase| {
-            let Some((started, initial)) = *motion_start.borrow() else {
-                return EventResult::Ignored;
-            };
-            motion_controller.write_width(&motion_column, initial + event.x - started);
-            EventResult::Handled
-        }));
+        registry.set_motion(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, _phase| {
+                let Some((started, initial)) = *motion_start.borrow() else {
+                    return EventResult::Ignored;
+                };
+                motion_controller.write_width(&motion_column, initial + event.x - started);
+                EventResult::Handled
+            }),
+        );
         let key_controller = self.controller.clone();
         let key_column = self.column.clone();
-        registry.set_key(node, InputHandlerRoute::control(), Rc::new(move |event, phase| {
-            if phase != EventPhase::Target {
-                return EventResult::Ignored;
-            }
-            let delta = match event.scancode {
-                crate::Scancode::ARROW_LEFT => -10.0,
-                crate::Scancode::ARROW_RIGHT => 10.0,
-                _ => return EventResult::Ignored,
-            };
-            let current = key_controller
-                .stored_widths()
-                .get(&key_column.id)
-                .copied()
-                .unwrap_or(key_column.layout.width);
-            key_controller.write_width(&key_column, current + delta);
-            EventResult::Handled
-        }));
+        registry.set_key(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, phase| {
+                if phase != EventPhase::Target {
+                    return EventResult::Ignored;
+                }
+                let delta = match event.scancode {
+                    crate::Scancode::ARROW_LEFT => -10.0,
+                    crate::Scancode::ARROW_RIGHT => 10.0,
+                    _ => return EventResult::Ignored,
+                };
+                let current = key_controller
+                    .stored_widths()
+                    .get(&key_column.id)
+                    .copied()
+                    .unwrap_or(key_column.layout.width);
+                key_controller.write_width(&key_column, current + delta);
+                EventResult::Handled
+            }),
+        );
     }
 }
-impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View for ResizeGrip<Record, Id> {
-    fn kind(&self) -> crate::ViewKind<'_> { crate::ViewKind::Primitive(self) }
-    fn tag(&self) -> &'static str { std::any::type_name::<Self>() }
+impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
+    for ResizeGrip<Record, Id>
+{
+    fn kind(&self) -> crate::ViewKind<'_> {
+        crate::ViewKind::Primitive(self)
+    }
+    fn tag(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
 }
 
 /// Header background, matching the canvas fill the reference table uses.
@@ -2185,7 +2426,10 @@ impl PrimitiveView for DataOffsetPane {
 impl_primitive_view!(DataOffsetPane);
 
 /// Owns the keyboard routing and the focus target for grid navigation.
-struct DataTableInputHost<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> {
+struct DataTableInputHost<
+    Record: Clone + 'static,
+    Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
+> {
     controller: DataTableController<Record, Id>,
     plan: DataTablePlan<Record>,
     metrics: DataTableRowMetrics,
@@ -2195,8 +2439,8 @@ struct DataTableInputHost<Record: Clone + 'static, Id: Ord + std::hash::Hash + C
     content: AnyView,
 }
 
-impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> PrimitiveView
-    for DataTableInputHost<Record, Id>
+impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static>
+    PrimitiveView for DataTableInputHost<Record, Id>
 {
     fn make_node(&self) -> Node {
         let node = Node::new();
@@ -2222,7 +2466,9 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         *self.input.borrow_mut() = Some(node.clone());
         node.set_attachment(INPUT_MARKER, true);
         node.set_is_focusable(self.controller.is_enabled);
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
         if !self.controller.is_enabled {
             registry.remove(node);
             return;
@@ -2233,23 +2479,40 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
         let moving_width = self.moving_width;
         let viewport_height = self.viewport_height;
         let input = self.input.clone();
-        registry.set_key(node, InputHandlerRoute::control(), Rc::new(move |event, phase| {
-            if phase == EventPhase::Capture {
-                return EventResult::Ignored;
-            }
-            if controller.handle_key(event, &plan, &metrics, moving_width, viewport_height, &input) {
-                EventResult::Handled
-            } else {
-                EventResult::Ignored
-            }
-        }));
+        registry.set_key(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event, phase| {
+                if phase == EventPhase::Capture {
+                    return EventResult::Ignored;
+                }
+                if controller.handle_key(
+                    event,
+                    &plan,
+                    &metrics,
+                    moving_width,
+                    viewport_height,
+                    &input,
+                ) {
+                    EventResult::Handled
+                } else {
+                    EventResult::Ignored
+                }
+            }),
+        );
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         vec![self.content.clone()]
     }
 }
-impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View for DataTableInputHost<Record, Id> {
-    fn kind(&self) -> crate::ViewKind<'_> { crate::ViewKind::Primitive(self) }
-    fn tag(&self) -> &'static str { std::any::type_name::<Self>() }
+impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
+    for DataTableInputHost<Record, Id>
+{
+    fn kind(&self) -> crate::ViewKind<'_> {
+        crate::ViewKind::Primitive(self)
+    }
+    fn tag(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
 }

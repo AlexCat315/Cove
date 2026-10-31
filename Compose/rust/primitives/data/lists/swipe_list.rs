@@ -18,27 +18,26 @@
 
 use std::rc::Rc;
 
-use cove_composition::Scancode;
-use cove_core::scene::{
-    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, Align, EventPhase,
-    EventResult, FlexDirection, HoverPhase, InputHandlerRoute, InteractionRegistryHolder,
-    Justify, LayoutNode, Node, PointerCaptureAttachmentKey, PointerCaptureHolder, PointerPhase,
-    Wrap,
-};
-use cove_core::{Binding, Environment, InputCapabilities, State};
-use cove_platform::{KeyEvent, MouseButton, SystemCursor};
 use crate::adaptive::SurfaceEnvironment;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{Button, ButtonIcon, ButtonIconSource};
-use crate::primitives::media::ui_icon_catalog;
 use crate::primitives::feedback::StatusTone;
-use crate::primitives::overlays::menu::{MenuEntry, MenuItem, MenuItemRole};
+use crate::primitives::media::ui_icon_catalog;
 use crate::primitives::overlays::ContextMenu;
+use crate::primitives::overlays::menu::{MenuEntry, MenuItem, MenuItemRole};
 use crate::primitives::text::Text;
-use crate::theme::styles::buttons::{AnyButtonStyle, ButtonStyleViewExt};
 use crate::theme::SemanticFontRef;
+use crate::theme::styles::buttons::{AnyButtonStyle, ButtonStyleViewExt};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
+use cove_composition::Scancode;
+use cove_core::scene::{
+    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, Align, EventPhase,
+    EventResult, FlexDirection, HoverPhase, InputHandlerRoute, InteractionRegistryHolder, Justify,
+    LayoutNode, Node, PointerCaptureAttachmentKey, PointerCaptureHolder, PointerPhase, Wrap,
+};
+use cove_core::{Binding, Environment, InputCapabilities, State};
+use cove_platform::{KeyEvent, MouseButton, SystemCursor};
 
 /// One trailing action on a `SwipeList` row.
 #[derive(Clone)]
@@ -97,7 +96,11 @@ pub fn swipe_action_extent(row_width: f32, count: usize) -> f32 {
 
 /// The snapped reveal for a live `reveal` value.
 pub fn swipe_snap_target(reveal: f32, max_reveal: f32) -> f32 {
-    if reveal < -max_reveal * SWIPE_SNAP_THRESHOLD { -max_reveal } else { 0.0 }
+    if reveal < -max_reveal * SWIPE_SNAP_THRESHOLD {
+        -max_reveal
+    } else {
+        0.0
+    }
 }
 
 /// Vertical list with trailing swipe actions.
@@ -244,7 +247,11 @@ where
                 let id = (self.id_of)(item);
                 let selected = self.selection.get().as_ref() == Some(&id);
                 let label = (self.row_label)(item);
-                let actions = if self.is_enabled { (self.actions)(item) } else { Vec::new() };
+                let actions = if self.is_enabled {
+                    (self.actions)(item)
+                } else {
+                    Vec::new()
+                };
                 let content = (self.row_content)(item, selected);
                 let item = item.clone();
                 let cursor = self.cursor.clone();
@@ -293,7 +300,9 @@ where
                     if event.scancode == Scancode::RETURN
                         || event.scancode == Scancode::KEYPAD_ENTER
                     {
-                        let Some(position) = current else { return false };
+                        let Some(position) = current else {
+                            return false;
+                        };
                         let item = data[position].clone();
                         let id = id_of(&item);
                         cursor.set(Some(id.clone()));
@@ -321,7 +330,11 @@ where
             };
             move |environment: &Environment| {
                 let touch = environment.input.contains(InputCapabilities::TOUCH);
-                let floor = if touch { environment.minimum_control_extent() } else { 0.0 };
+                let floor = if touch {
+                    environment.minimum_control_extent()
+                } else {
+                    0.0
+                };
                 let _ = floor;
                 let _ = &on_key;
                 let column = AnyView::new(BoxView::new(
@@ -386,11 +399,13 @@ impl View for SwipeRow {
                                 run();
                             })
                             .enabled(enabled)
-                            .role(if action_tone == StatusTone::Danger {
-                                MenuItemRole::Destructive
-                            } else {
-                                MenuItemRole::Normal
-                            }),
+                            .role(
+                                if action_tone == StatusTone::Danger {
+                                    MenuItemRole::Destructive
+                                } else {
+                                    MenuItemRole::Normal
+                                },
+                            ),
                         )
                     })
                     .collect()
@@ -497,7 +512,11 @@ impl View for SwipeRow {
             )
         };
 
-        AnyView::new(AnyView::new(with_actions).frame_height(row_height).clipped())
+        AnyView::new(
+            AnyView::new(with_actions)
+                .frame_height(row_height)
+                .clipped(),
+        )
     }
 }
 
@@ -565,7 +584,9 @@ impl PrimitiveView for SwipeRowHost {
 
         node.set_content_offset(cove_core::Point::new(-reveal.get(), 0.0));
 
-        let Some(registry) = InteractionRegistryHolder::current() else { return };
+        let Some(registry) = InteractionRegistryHolder::current() else {
+            return;
+        };
 
         let is_enabled = self.is_enabled;
         let is_selected = self.is_selected;
@@ -577,9 +598,17 @@ impl PrimitiveView for SwipeRowHost {
             let color = if active {
                 None
             } else if is_selected {
-                Some(crate::theme::theme_for_node(&paint_node).colors.state_layer_selected)
+                Some(
+                    crate::theme::theme_for_node(&paint_node)
+                        .colors
+                        .state_layer_selected,
+                )
             } else if hovered && is_enabled {
-                Some(crate::theme::theme_for_node(&paint_node).colors.state_layer_hover)
+                Some(
+                    crate::theme::theme_for_node(&paint_node)
+                        .colors
+                        .state_layer_hover,
+                )
             } else {
                 Some(cove_core::Color::CLEAR)
             };
@@ -589,12 +618,15 @@ impl PrimitiveView for SwipeRowHost {
 
         let hover_node = node.downgrade();
         let hover_paint = paint.clone();
-        registry.set_hover(node, Rc::new(move |phase: HoverPhase| {
-            if let Some(owner) = Node::upgrade(&hover_node) {
-                owner.set_attachment(SWIPE_HOVERED, phase == HoverPhase::Enter);
-                hover_paint();
-            }
-        }));
+        registry.set_hover(
+            node,
+            Rc::new(move |phase: HoverPhase| {
+                if let Some(owner) = Node::upgrade(&hover_node) {
+                    owner.set_attachment(SWIPE_HOVERED, phase == HoverPhase::Enter);
+                    hover_paint();
+                }
+            }),
+        );
 
         let pointer_node = node.clone();
         let pointer_reveal = reveal.clone();
@@ -606,52 +638,68 @@ impl PrimitiveView for SwipeRowHost {
         registry.set_pointer(
             node,
             InputHandlerRoute::control(),
-            Rc::new(move |event: &cove_platform::MouseButtonEvent, phase: PointerPhase, delivery: EventPhase| {
-                if delivery != EventPhase::Target || !is_enabled || event.button != MouseButton::Left {
-                    return EventResult::Ignored;
-                }
-                match phase {
-                    PointerPhase::Down => {
-                        pointer_node.set_attachment(SWIPE_START, cove_core::Point::new(event.x, event.y));
-                        pointer_node.set_attachment(SWIPE_BASE, pointer_reveal.get());
-                        pointer_node.set_attachment(SWIPE_ACTIVE, false);
-                        pointer_node.set_attachment(SWIPE_REJECTED, false);
-                        EventResult::Ignored
+            Rc::new(
+                move |event: &cove_platform::MouseButtonEvent,
+                      phase: PointerPhase,
+                      delivery: EventPhase| {
+                    if delivery != EventPhase::Target
+                        || !is_enabled
+                        || event.button != MouseButton::Left
+                    {
+                        return EventResult::Ignored;
                     }
-                    PointerPhase::Up => {
-                        let started = pointer_node.attachment::<cove_core::Point>(SWIPE_START).is_some();
-                        let active = pointer_node.attachment::<bool>(SWIPE_ACTIVE) == Some(true);
-                        let rejected = pointer_node.attachment::<bool>(SWIPE_REJECTED) == Some(true);
-                        pointer_node.remove_attachment(SWIPE_START);
-                        pointer_node.remove_attachment(SWIPE_BASE);
-                        pointer_node.set_attachment(SWIPE_ACTIVE, false);
-                        pointer_node.set_attachment(SWIPE_REJECTED, false);
-                        PointerCaptureHolder::release_current();
+                    match phase {
+                        PointerPhase::Down => {
+                            pointer_node.set_attachment(
+                                SWIPE_START,
+                                cove_core::Point::new(event.x, event.y),
+                            );
+                            pointer_node.set_attachment(SWIPE_BASE, pointer_reveal.get());
+                            pointer_node.set_attachment(SWIPE_ACTIVE, false);
+                            pointer_node.set_attachment(SWIPE_REJECTED, false);
+                            EventResult::Ignored
+                        }
+                        PointerPhase::Up => {
+                            let started = pointer_node
+                                .attachment::<cove_core::Point>(SWIPE_START)
+                                .is_some();
+                            let active =
+                                pointer_node.attachment::<bool>(SWIPE_ACTIVE) == Some(true);
+                            let rejected =
+                                pointer_node.attachment::<bool>(SWIPE_REJECTED) == Some(true);
+                            pointer_node.remove_attachment(SWIPE_START);
+                            pointer_node.remove_attachment(SWIPE_BASE);
+                            pointer_node.set_attachment(SWIPE_ACTIVE, false);
+                            pointer_node.set_attachment(SWIPE_REJECTED, false);
+                            PointerCaptureHolder::release_current();
 
-                        if active {
-                            pointer_reveal.set(swipe_snap_target(pointer_reveal.get(), max_reveal));
-                            pointer_paint();
-                            return EventResult::Handled;
+                            if active {
+                                pointer_reveal
+                                    .set(swipe_snap_target(pointer_reveal.get(), max_reveal));
+                                pointer_paint();
+                                return EventResult::Handled;
+                            }
+                            if started && !rejected && pointer_reveal.get() < -0.5 {
+                                pointer_reveal
+                                    .set(swipe_snap_target(pointer_reveal.get(), max_reveal));
+                                pointer_paint();
+                                return EventResult::Handled;
+                            }
+                            if started
+                                && !rejected
+                                && pointer_node
+                                    .absolute_frame()
+                                    .contains(cove_core::Point::new(event.x, event.y))
+                            {
+                                (pointer_select)();
+                                pointer_paint();
+                                return EventResult::Handled;
+                            }
+                            EventResult::Ignored
                         }
-                        if started && !rejected && pointer_reveal.get() < -0.5 {
-                            pointer_reveal.set(swipe_snap_target(pointer_reveal.get(), max_reveal));
-                            pointer_paint();
-                            return EventResult::Handled;
-                        }
-                        if started
-                            && !rejected
-                            && pointer_node
-                                .absolute_frame()
-                                .contains(cove_core::Point::new(event.x, event.y))
-                        {
-                            (pointer_select)();
-                            pointer_paint();
-                            return EventResult::Handled;
-                        }
-                        EventResult::Ignored
                     }
-                }
-            }),
+                },
+            ),
         );
 
         let motion_node = node.clone();
@@ -661,53 +709,64 @@ impl PrimitiveView for SwipeRowHost {
             .composition_value(&SurfaceEnvironment::key())
             .input
             .contains(InputCapabilities::TOUCH);
-        registry.set_motion(node, InputHandlerRoute::control(), Rc::new(move |event: &cove_platform::MouseMotionEvent, _phase: EventPhase| {
-            if !is_enabled || !touch {
-                return EventResult::Ignored;
-            }
-            let Some(start) = motion_node.attachment::<cove_core::Point>(SWIPE_START) else {
-                return EventResult::Ignored;
-            };
-            let Some(base) = motion_node.attachment::<f32>(SWIPE_BASE) else {
-                return EventResult::Ignored;
-            };
-            if motion_node.attachment::<bool>(SWIPE_REJECTED) == Some(true) {
-                return EventResult::Ignored;
-            }
-            let dx = event.x - start.x;
-            let dy = event.y - start.y;
-            if motion_node.attachment::<bool>(SWIPE_ACTIVE) != Some(true) {
-                if dx.abs() < SWIPE_ACTIVATION_DISTANCE || dx.abs() <= dy.abs() {
-                    if dy.abs() >= SWIPE_REJECTION_DISTANCE && dy.abs() > dx.abs() {
-                        motion_node.set_attachment(SWIPE_REJECTED, true);
+        registry.set_motion(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(
+                move |event: &cove_platform::MouseMotionEvent, _phase: EventPhase| {
+                    if !is_enabled || !touch {
+                        return EventResult::Ignored;
                     }
-                    return EventResult::Ignored;
-                }
-                motion_node.set_attachment(SWIPE_ACTIVE, true);
-                if let Some(capture) = PointerCaptureHolder::current() {
-                    capture.acquire(&motion_node, false);
-                }
-                motion_paint();
-            }
-            let next = (base + dx).min(0.0).max(-max_reveal);
-            if (next - motion_reveal.get()).abs() > f32::EPSILON {
-                motion_reveal.set(next);
-                motion_node.set_content_offset(cove_core::Point::new(-next, 0.0));
-            }
-            EventResult::Handled
-        }));
+                    let Some(start) = motion_node.attachment::<cove_core::Point>(SWIPE_START)
+                    else {
+                        return EventResult::Ignored;
+                    };
+                    let Some(base) = motion_node.attachment::<f32>(SWIPE_BASE) else {
+                        return EventResult::Ignored;
+                    };
+                    if motion_node.attachment::<bool>(SWIPE_REJECTED) == Some(true) {
+                        return EventResult::Ignored;
+                    }
+                    let dx = event.x - start.x;
+                    let dy = event.y - start.y;
+                    if motion_node.attachment::<bool>(SWIPE_ACTIVE) != Some(true) {
+                        if dx.abs() < SWIPE_ACTIVATION_DISTANCE || dx.abs() <= dy.abs() {
+                            if dy.abs() >= SWIPE_REJECTION_DISTANCE && dy.abs() > dx.abs() {
+                                motion_node.set_attachment(SWIPE_REJECTED, true);
+                            }
+                            return EventResult::Ignored;
+                        }
+                        motion_node.set_attachment(SWIPE_ACTIVE, true);
+                        if let Some(capture) = PointerCaptureHolder::current() {
+                            capture.acquire(&motion_node, false);
+                        }
+                        motion_paint();
+                    }
+                    let next = (base + dx).min(0.0).max(-max_reveal);
+                    if (next - motion_reveal.get()).abs() > f32::EPSILON {
+                        motion_reveal.set(next);
+                        motion_node.set_content_offset(cove_core::Point::new(-next, 0.0));
+                    }
+                    EventResult::Handled
+                },
+            ),
+        );
 
         let key_reveal = reveal.clone();
-        registry.set_key(node, InputHandlerRoute::control(), Rc::new(move |event: &KeyEvent, phase: EventPhase| {
-            if phase == EventPhase::Capture || event.scancode != Scancode::ESCAPE {
-                return EventResult::Ignored;
-            }
-            if key_reveal.get() >= -0.5 {
-                return EventResult::Ignored;
-            }
-            key_reveal.set(0.0);
-            EventResult::Handled
-        }));
+        registry.set_key(
+            node,
+            InputHandlerRoute::control(),
+            Rc::new(move |event: &KeyEvent, phase: EventPhase| {
+                if phase == EventPhase::Capture || event.scancode != Scancode::ESCAPE {
+                    return EventResult::Ignored;
+                }
+                if key_reveal.get() >= -0.5 {
+                    return EventResult::Ignored;
+                }
+                key_reveal.set(0.0);
+                EventResult::Handled
+            }),
+        );
 
         let clear_node = node.downgrade();
         node.set_attachment(

@@ -19,19 +19,19 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
-use cove_core::Binding;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{Button, ButtonRole};
-use cove_imaging::BundleImageResource;
 use crate::primitives::media::Icon;
-use crate::primitives::overlays::roving_focus::{roving_identity, RovingFocusHost, RovingItem};
+use crate::primitives::overlays::roving_focus::{RovingFocusHost, RovingItem, roving_identity};
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, TabButtonStyle};
-use crate::theme::{theme_for_node, SemanticColorRef, SemanticFontRef, ThemeMetric};
+use crate::theme::{SemanticColorRef, SemanticFontRef, ThemeMetric, theme_for_node};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
+use cove_core::Binding;
+use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
+use cove_imaging::BundleImageResource;
 
 /// Visual treatment of a tab strip.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -274,7 +274,9 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> TabView<Id> {
 
 impl<Id: PartialEq + Clone + std::hash::Hash + 'static> View for TabView<Id> {
     fn body(&self) -> AnyView {
-        AnyView::new(TabViewBody { tabs_view: self.snapshot() })
+        AnyView::new(TabViewBody {
+            tabs_view: self.snapshot(),
+        })
     }
 }
 
@@ -316,37 +318,47 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for TabVie
                 indicator,
                 is_selected: active.as_ref() == Some(&tab.id),
             };
-            strip_items.push(AnyView::new(
-                crate::ModifiedContent::new(AnyView::new(item), RovingItem::new(
-                    tab.id.clone(),
-                    is_tab_stop,
-                    identity.clone(),
-                )),
-            ));
+            strip_items.push(AnyView::new(crate::ModifiedContent::new(
+                AnyView::new(item),
+                RovingItem::new(tab.id.clone(), is_tab_stop, identity.clone()),
+            )));
         }
 
         let strip = AnyView::new(TabStrip {
             variant: view.variant,
             overflow: view.overflow,
-            content: AnyView::new(
-                BoxView::new(
-                    FlexDirection::Row,
-                    Align::Center,
-                    Justify::FlexStart,
-                    if view.overflow == TabOverflow::Wrap { Wrap::Wrap } else { Wrap::NoWrap },
-                    if view.variant == TabVariant::Segmented { 2.0 } else { 0.0 },
-                    AnyView::new(TupleView::new(strip_items)),
-                ),
-            ),
+            content: AnyView::new(BoxView::new(
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                if view.overflow == TabOverflow::Wrap {
+                    Wrap::Wrap
+                } else {
+                    Wrap::NoWrap
+                },
+                if view.variant == TabVariant::Segmented {
+                    2.0
+                } else {
+                    0.0
+                },
+                AnyView::new(TupleView::new(strip_items)),
+            )),
         });
 
         // Only the active tab's content is mounted; the rest were already built
         // by the caller and simply are not in this tree.
         let mut content: Vec<AnyView> = Vec::new();
         if let Some(active_id) = active.as_ref()
-            && let Some(tab) = view.tabs.iter().find(|tab| &tab.id == active_id && tab.is_enabled)
+            && let Some(tab) = view
+                .tabs
+                .iter()
+                .find(|tab| &tab.id == active_id && tab.is_enabled)
         {
-            content.push(AnyView::new(tab.content.clone().flex_with(1.0, 1.0, Some(0.0))));
+            content.push(AnyView::new(tab.content.clone().flex_with(
+                1.0,
+                1.0,
+                Some(0.0),
+            )));
         }
 
         let mut column: Vec<AnyView> = Vec::new();
@@ -374,12 +386,14 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for TabVie
                 }
             },
             move |id: &Id| roving_identity(id),
-            AnyView::new(
-                BoxView::new(
-                    FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 0.0,
-                    AnyView::new(TupleView::new(column)),
-                ),
-            ),
+            AnyView::new(BoxView::new(
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
+                AnyView::new(TupleView::new(column)),
+            )),
         );
         host.focus_request = Some(focus_request);
         let _ = tab_stop;
@@ -415,10 +429,13 @@ impl PrimitiveView for TabStrip {
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
-        let padding = if self.variant == TabVariant::Segmented { 3.0 } else { 0.0 };
-        let styled = AnyView::new(
-            AnyView::new(self.content.clone()).padding_edges(padding, padding),
-        );
+        let padding = if self.variant == TabVariant::Segmented {
+            3.0
+        } else {
+            0.0
+        };
+        let styled =
+            AnyView::new(AnyView::new(self.content.clone()).padding_edges(padding, padding));
         let _ = ThemeMetric::control_radius();
         if self.overflow == TabOverflow::Scroll {
             // A strip that must stay one line scrolls rather than wrapping.
@@ -455,7 +472,14 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> TabStripItem<Id> {
         indicator: IndicatorPlacement,
         is_selected: bool,
     ) -> Self {
-        Self { tab, selection, is_enabled, variant, indicator, is_selected }
+        Self {
+            tab,
+            selection,
+            is_enabled,
+            variant,
+            indicator,
+            is_selected,
+        }
     }
 }
 
@@ -494,7 +518,11 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for TabStr
         let button = Button::with_options(
             AnyView::new(
                 BoxView::new(
-                    FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 6.0,
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    6.0,
                     AnyView::new(TupleView::new(label_row)),
                 )
                 .padding_edges(self.variant.horizontal_padding(), 0.0),
@@ -512,13 +540,11 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for TabStr
         let mut row: Vec<AnyView> = vec![button];
         if let Some(on_close) = self.tab.on_close.clone() {
             let close = Button::with_options(
-                AnyView::new(
-                    crate::primitives::media::Icon::with_semantic(
-                        crate::primitives::media::ui_icon_catalog::action::x(),
-                        10.0,
-                        SemanticColorRef::on_surface_muted(),
-                    ),
-                ),
+                AnyView::new(crate::primitives::media::Icon::with_semantic(
+                    crate::primitives::media::ui_icon_catalog::action::x(),
+                    10.0,
+                    SemanticColorRef::on_surface_muted(),
+                )),
                 move || on_close(),
                 ButtonRole::Normal,
                 self.is_enabled,
@@ -530,12 +556,14 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for TabStr
         }
 
         vec![AnyView::new(TabItemChrome {
-            content: AnyView::new(
-                BoxView::new(
-                    FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 0.0,
-                    AnyView::new(TupleView::new(row)),
-                ),
-            ),
+            content: AnyView::new(BoxView::new(
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
+                AnyView::new(TupleView::new(row)),
+            )),
             indicator: self.indicator,
             is_selected: self.is_selected,
             variant: self.variant,

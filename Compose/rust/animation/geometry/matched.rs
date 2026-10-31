@@ -6,14 +6,14 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 
+use crate::theme::{SemanticMotionRef, theme_for_node};
+use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
+use cove_core::Rect;
 use cove_core::scene::{
     ActiveAnimationContext, Animation, AnimationCompletionGroup, AnimationController,
     AnimatorScheduler, AnyAnimationController, FlexDirection, LayoutNode, LayoutUpdateHook, Node,
     NodeResource,
 };
-use cove_core::Rect;
-use crate::theme::{theme_for_node, SemanticMotionRef};
-use crate::{impl_primitive_view, AnyView, PrimitiveView, View};
 
 const MATCHED_FRAME: &str = "motion.matchedFrame";
 
@@ -72,7 +72,9 @@ impl GeometrySession {
         self.generation.set(self.generation.get().wrapping_add(1));
         let generation = self.generation.get();
         let mut entries = self.entries.borrow_mut();
-        entries.retain(|_, entry| entry.node_id != 0 || generation.wrapping_sub(entry.generation) <= 1);
+        entries.retain(|_, entry| {
+            entry.node_id != 0 || generation.wrapping_sub(entry.generation) <= 1
+        });
     }
 }
 
@@ -147,7 +149,8 @@ impl MatchedSurface {
         *self.animation.borrow_mut() = Some(animation.clone());
         let context = ActiveAnimationContext::current();
         self.suppressed.set(context.disables_animations);
-        if let (Some(node), Some(surface)) = (self.node.borrow().clone(), self.surface.borrow().clone())
+        if let (Some(node), Some(surface)) =
+            (self.node.borrow().clone(), self.surface.borrow().clone())
             && (node.prefers_reduced_motion() || self.suppressed.get())
             && let Some(session) = self.session.borrow().clone()
             && let Some(entry) = session.entry(id)
@@ -156,14 +159,21 @@ impl MatchedSurface {
             let weak_surface = surface.downgrade();
             let drawn = entry_cell.clone();
             surface.animatable_set_with(MATCHED_FRAME, entry.frame, entry.target, move |rect| {
-                drawn.set(MatchedEntry { frame: rect, ..drawn.get() });
+                drawn.set(MatchedEntry {
+                    frame: rect,
+                    ..drawn.get()
+                });
                 if let Some(owner) = Node::upgrade(&weak_surface) {
                     place(&owner, rect);
                 }
             });
         }
         if let Some(group) = context.completion
-            && !self.completion.borrow().as_ref().is_some_and(|current| Rc::ptr_eq(current, &group))
+            && !self
+                .completion
+                .borrow()
+                .as_ref()
+                .is_some_and(|current| Rc::ptr_eq(current, &group))
         {
             if let Some(pending) = self.pending.borrow_mut().take()
                 && let Some(scheduler) = self.scheduler.borrow().as_ref()
@@ -203,7 +213,9 @@ impl MatchedSurface {
     fn layout(&self, owner: &Node) {
         let _guard = RegistrationGuard { surface: self };
         let Some(id) = self.id.get() else { return };
-        let Some(node) = find_surface(owner) else { return };
+        let Some(node) = find_surface(owner) else {
+            return;
+        };
         *self.surface.borrow_mut() = Some(node.clone());
         let root = {
             let mut root = node.clone();
@@ -225,12 +237,15 @@ impl MatchedSurface {
         let target = node.absolute_frame();
         let local = node.frame();
         let Some(mut entry) = session.entry(id) else {
-            session.insert(id, MatchedEntry {
-                node_id: owner.id().0,
-                frame: target,
-                target,
-                generation: session.generation(),
-            });
+            session.insert(
+                id,
+                MatchedEntry {
+                    node_id: owner.id().0,
+                    frame: target,
+                    target,
+                    generation: session.generation(),
+                },
+            );
             *self.layout_frame.borrow_mut() = Some(local);
             return;
         };
@@ -244,9 +259,11 @@ impl MatchedSurface {
         entry.node_id = owner.id().0;
         entry.generation = session.generation();
         *self.layout_frame.borrow_mut() = Some(local);
-        let animation = self.animation.borrow().clone().unwrap_or_else(|| {
-            SemanticMotionRef::smooth().resolve(&theme_for_node(&node))
-        });
+        let animation = self
+            .animation
+            .borrow()
+            .clone()
+            .unwrap_or_else(|| SemanticMotionRef::smooth().resolve(&theme_for_node(&node)));
         if node.prefers_reduced_motion() || self.suppressed.get() || animation.duration == 0.0 {
             node.cancel_animation(MATCHED_FRAME);
             entry.target = target;
@@ -263,7 +280,10 @@ impl MatchedSurface {
             let drawn_inner = drawn.clone();
             ActiveAnimationContext::with(Some(animation), completion, None, || {
                 node.animatable_set_with(MATCHED_FRAME, entry.frame, target, move |rect| {
-                    drawn_inner.set(MatchedEntry { frame: rect, ..drawn_inner.get() });
+                    drawn_inner.set(MatchedEntry {
+                        frame: rect,
+                        ..drawn_inner.get()
+                    });
                     if let Some(owner) = Node::upgrade(&weak_node) {
                         place(&owner, rect);
                     }
@@ -371,7 +391,11 @@ impl<Content: View + Clone> Matched<Content> {
         use std::hash::{Hash, Hasher};
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         id.hash(&mut hasher);
-        Self { id: hasher.finish(), animation: None, content }
+        Self {
+            id: hasher.finish(),
+            animation: None,
+            content,
+        }
     }
 
     pub fn animation(mut self, animation: Animation) -> Self {
@@ -399,7 +423,9 @@ impl<Content: View + Clone + 'static> PrimitiveView for Matched<Content> {
     }
 
     fn update_node(&self, node: &Node) {
-        let Some(surface) = node.first_resource::<MatchedSurface>() else { return };
+        let Some(surface) = node.first_resource::<MatchedSurface>() else {
+            return;
+        };
         let animation = self.animation.clone().unwrap_or_else(|| {
             ActiveAnimationContext::current()
                 .animation

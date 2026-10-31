@@ -127,12 +127,8 @@ impl View for ActionSheetStory {
         let enabled = self.options.is_enabled;
         let trigger = Text::new("Project actions");
 
-        let sheet = ActionSheet::new(
-            self.open.binding(),
-            self.project_question(),
-            trigger,
-        )
-        .is_enabled(enabled);
+        let sheet = ActionSheet::new(self.open.binding(), self.project_question(), trigger)
+            .is_enabled(enabled);
 
         let long_sheet = ActionSheet::new(
             self.many_open.binding(),
@@ -157,7 +153,10 @@ impl View for ActionSheetStory {
             cove_core::scene::Wrap::NoWrap,
             24.0,
             AnyView::new(cove_ui_compose::TupleView::new(vec![
-                AnyView::new(AnyView::new(Text::new("Action sheets")).debug_name("gallery-action-sheet-story")),
+                AnyView::new(
+                    AnyView::new(Text::new("Action sheets"))
+                        .debug_name("gallery-action-sheet-story"),
+                ),
                 AnyView::new(sheet),
                 AnyView::new(long_sheet),
                 AnyView::new(summary),

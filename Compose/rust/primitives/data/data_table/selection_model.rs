@@ -68,7 +68,9 @@ impl<Id: Ord + Clone> DataTableSelection<Id> {
         if index >= model.count() {
             return;
         }
-        let Some(id) = model.row_id_at(index) else { return };
+        let Some(id) = model.row_id_at(index) else {
+            return;
+        };
         if mode == DataTableSelectionMode::Multiple && modifiers.has_shift() {
             if let Some(anchor) = self.anchor_id.clone()
                 && let Some(anchor_index) = model.index_for(&anchor)
@@ -101,10 +103,18 @@ impl<Id: Ord + Clone> DataTableSelection<Id> {
         Id: Eq + std::hash::Hash,
     {
         self.selected_ids.retain(|id| model.index_for(id).is_some());
-        if self.focused_id.as_ref().is_some_and(|id| model.index_for(id).is_none()) {
+        if self
+            .focused_id
+            .as_ref()
+            .is_some_and(|id| model.index_for(id).is_none())
+        {
             self.focused_id = None;
         }
-        if self.anchor_id.as_ref().is_some_and(|id| model.index_for(id).is_none()) {
+        if self
+            .anchor_id
+            .as_ref()
+            .is_some_and(|id| model.index_for(id).is_none())
+        {
             self.anchor_id = None;
         }
     }
@@ -114,7 +124,9 @@ impl<Id: Ord + Clone> DataTableSelection<Id> {
     where
         Id: Eq + std::hash::Hash,
     {
-        self.selected_ids = (0..model.count()).filter_map(|row| model.row_id_at(row)).collect();
+        self.selected_ids = (0..model.count())
+            .filter_map(|row| model.row_id_at(row))
+            .collect();
     }
 
     pub fn clear(&mut self) {
@@ -139,7 +151,11 @@ pub struct DataTableNavigation<Id> {
 
 impl<Id> Default for DataTableNavigation<Id> {
     fn default() -> Self {
-        Self { request_id: None, row_id: None, column_id: None }
+        Self {
+            request_id: None,
+            row_id: None,
+            column_id: None,
+        }
     }
 }
 

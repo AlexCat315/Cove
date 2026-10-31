@@ -14,7 +14,7 @@ use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::BoxView;
 use cove_ui_compose::theme::styles::appearance_modifier::{Appearance, AppearanceViewExt};
 use cove_ui_compose::theme::styles::circular_appearance::ThemeTransition;
-use cove_ui_compose::theme::{theme_for_node, Theme};
+use cove_ui_compose::theme::{Theme, theme_for_node};
 
 use support::{DebugNode, GlobalTestLock};
 
@@ -91,7 +91,8 @@ fn inner_appearance_overrides_outer() {
                 Wrap::NoWrap,
                 0.0,
                 AnyView::new(cove_composition::TupleView::new(vec![AnyView::new(
-                    DebugNode::new("inner").appearance(Appearance::Light, ThemeTransition::default()),
+                    DebugNode::new("inner")
+                        .appearance(Appearance::Light, ThemeTransition::default()),
                 )])),
             ))
             .appearance(Appearance::Dark, ThemeTransition::default()),

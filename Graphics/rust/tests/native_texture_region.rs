@@ -8,7 +8,7 @@
 //! pixels across formats, mips and array layers), so only the validation half is
 //! ported here.
 
-use cove_graphics::{rhi_texture_upload_bytes, TextureFormat, TextureUploadRegion};
+use cove_graphics::{TextureFormat, TextureUploadRegion, rhi_texture_upload_bytes};
 
 #[test]
 fn upload_bounds_reject_overflow_and_invalid_rows() {
@@ -27,15 +27,8 @@ fn upload_bounds_reject_overflow_and_invalid_rows() {
     for (origin, (width, height), row_bytes, capacity) in rejected {
         let region = TextureUploadRegion::with_origin(width, height, origin[0], origin[1]);
         assert!(
-            rhi_texture_upload_bytes(
-                region,
-                row_bytes,
-                TextureFormat::Rgba8Unorm,
-                4,
-                3,
-                capacity,
-            )
-            .is_err(),
+            rhi_texture_upload_bytes(region, row_bytes, TextureFormat::Rgba8Unorm, 4, 3, capacity,)
+                .is_err(),
             "origin {origin:?} size ({width}, {height}) pitch {row_bytes} capacity {capacity} must be rejected"
         );
     }

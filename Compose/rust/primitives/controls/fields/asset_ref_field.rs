@@ -9,25 +9,27 @@
 use std::collections::BTreeSet;
 use std::rc::Rc;
 
-use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 use cove_core::Binding;
+use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 use cove_imaging::BundleImageResource;
 
-use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::interaction::AccessibilityExt;
+use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::controls::button::{Button, ButtonIcon, ButtonIconSource, ButtonRole};
 use crate::primitives::controls::fields::asset_ref_model::{
-    AssetIconKind, AssetRef, field_description, field_tooltip, has_preview, icon_for, picker_options,
-    placeholder_kind,
+    AssetIconKind, AssetRef, field_description, field_tooltip, has_preview, icon_for,
+    picker_options, placeholder_kind,
 };
 use crate::primitives::overlays::asset_drop_target::{AssetDropPayload, AssetDropTarget};
 use crate::primitives::overlays::menu::{Menu, MenuEntry, MenuItem};
 use crate::primitives::overlays::popover::Popover;
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
-use crate::theme::{theme_for_node, SemanticColorRef, SemanticFontRef};
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View};
+use crate::theme::{SemanticColorRef, SemanticFontRef, theme_for_node};
+use crate::{
+    AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View, impl_primitive_view,
+};
 
 /// Preview tile size.
 const TILE_WIDTH: f32 = 34.0;
@@ -105,7 +107,10 @@ impl AssetRefField {
 
     /// The picker options this slot accepts, in authored order.
     pub fn accepted_picker_options(&self) -> Vec<AssetRef> {
-        picker_options(&self.picker_options, &self.accepted_kinds).into_iter().cloned().collect()
+        picker_options(&self.picker_options, &self.accepted_kinds)
+            .into_iter()
+            .cloned()
+            .collect()
     }
 
     /// The description shown to assistive technology.
@@ -133,7 +138,11 @@ impl AssetRefField {
 }
 
 fn menu_title(option: &AssetRef) -> String {
-    match option.subtitle.as_deref().filter(|subtitle| !subtitle.is_empty()) {
+    match option
+        .subtitle
+        .as_deref()
+        .filter(|subtitle| !subtitle.is_empty())
+    {
         Some(subtitle) => format!("{}  {}", option.name, subtitle),
         None => option.name.clone(),
     }
@@ -160,7 +169,9 @@ impl View for AssetRefField {
     fn body(&self) -> AnyView {
         let field = self.snapshot();
         let value = self.value.clone();
-        let content = AnyView::new(AssetFieldContent { field: field.clone() });
+        let content = AnyView::new(AssetFieldContent {
+            field: field.clone(),
+        });
         let target = AssetDropTarget::new(
             self.active_payload.clone(),
             self.accepted_kinds.iter().cloned().collect(),
@@ -292,7 +303,11 @@ impl PrimitiveView for AssetFieldContent {
             ),
             AnyView::new(
                 BoxView::new(
-                    FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 1.0,
+                    FlexDirection::Column,
+                    Align::Stretch,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    1.0,
                     AnyView::new(TupleView::new(stack)),
                 )
                 .flex_with(1.0, 1.0, Some(0.0))
@@ -303,7 +318,9 @@ impl PrimitiveView for AssetFieldContent {
             let value = field.value.clone();
             row.push(AnyView::new(
                 Button::icon_with_options(
-                    ButtonIconSource::resource(crate::primitives::media::ui_icon_catalog::action::x()),
+                    ButtonIconSource::resource(
+                        crate::primitives::media::ui_icon_catalog::action::x(),
+                    ),
                     Some(12.0),
                     None,
                     ButtonRole::Normal,
@@ -319,16 +336,26 @@ impl PrimitiveView for AssetFieldContent {
             ));
         }
         if !field.picker_options.is_empty() {
-            row.push(AnyView::new(AnyView::new(AssetPicker { field: field.clone() }).flex(0.0).shrink(0.0)));
+            row.push(AnyView::new(
+                AnyView::new(AssetPicker {
+                    field: field.clone(),
+                })
+                .flex(0.0)
+                .shrink(0.0),
+            ));
         }
 
         vec![AnyView::new(
-            Row::new(VerticalAlignment::Center, 8.0, AnyView::new(TupleView::new(row)))
-                .padding_edges(FIELD_PADDING_HORIZONTAL, FIELD_PADDING_VERTICAL)
-                .frame(None, None, None, Some(FIELD_MIN_HEIGHT), None, None)
-                .semantic_background(SemanticColorRef::surface())
-                .corner_radius_metric(crate::theme::ThemeMetric::input_radius())
-                .semantic_border(SemanticColorRef::border(), 1.0),
+            Row::new(
+                VerticalAlignment::Center,
+                8.0,
+                AnyView::new(TupleView::new(row)),
+            )
+            .padding_edges(FIELD_PADDING_HORIZONTAL, FIELD_PADDING_VERTICAL)
+            .frame(None, None, None, Some(FIELD_MIN_HEIGHT), None, None)
+            .semantic_background(SemanticColorRef::surface())
+            .corner_radius_metric(crate::theme::ThemeMetric::input_radius())
+            .semantic_border(SemanticColorRef::border(), 1.0),
         )]
     }
 }
@@ -375,14 +402,21 @@ impl PrimitiveView for AssetTile {
             None => placeholder_kind(&self.accepted_kinds),
         };
         let icon = icon_resource(icon_for(kind));
-        let tint = if !self.is_enabled || self.reference.is_none() || !has_preview(self.reference.as_ref()) {
+        let tint = if !self.is_enabled
+            || self.reference.is_none()
+            || !has_preview(self.reference.as_ref())
+        {
             SemanticColorRef::on_surface_muted()
         } else {
             SemanticColorRef::on_surface_variant()
         };
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::Center, Wrap::NoWrap, 0.0,
+                FlexDirection::Row,
+                Align::Center,
+                Justify::Center,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(
                     ButtonIcon::new(ButtonIconSource::resource(icon), Some(14.0), None)
                         .semantic_foreground(tint),
@@ -441,17 +475,23 @@ impl PrimitiveView for AssetPicker {
         vec![AnyView::new(
             Popover::new(
                 trigger,
-                AnyView::new(Menu::new(entries).width(PICKER_WIDTH).max_visible_rows(PICKER_ROWS)),
+                AnyView::new(
+                    Menu::new(entries)
+                        .width(PICKER_WIDTH)
+                        .max_visible_rows(PICKER_ROWS),
+                ),
             )
             .enabled(is_enabled)
             .width(PICKER_WIDTH)
-            .trigger_description(crate::primitives::overlays::popover::PopoverTriggerDescription {
-                label: "Choose asset".to_string(),
-                value: current
-                    .map(|value| value.name)
-                    .unwrap_or_else(|| self.field.placeholder.clone()),
-                help: None,
-            }),
+            .trigger_description(
+                crate::primitives::overlays::popover::PopoverTriggerDescription {
+                    label: "Choose asset".to_string(),
+                    value: current
+                        .map(|value| value.name)
+                        .unwrap_or_else(|| self.field.placeholder.clone()),
+                    help: None,
+                },
+            ),
         )]
     }
 }
@@ -460,6 +500,10 @@ impl_primitive_view!(AssetPicker);
 impl AssetRefField {
     /// The touch-aware minimum height of the field.
     pub fn minimum_height(touch: bool) -> f32 {
-        if touch { TOUCH_MIN_HEIGHT } else { FIELD_MIN_HEIGHT }
+        if touch {
+            TOUCH_MIN_HEIGHT
+        } else {
+            FIELD_MIN_HEIGHT
+        }
     }
 }

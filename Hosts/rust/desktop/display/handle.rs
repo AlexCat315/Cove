@@ -57,15 +57,14 @@ pub struct DisplayBindings {
     pub open_auxiliary_window: Option<Rc<dyn Fn(AppAuxiliaryWindowRequest) -> Option<WindowId>>>,
     pub close_auxiliary_window: Option<Rc<dyn Fn(WindowId)>>,
     pub auxiliary_window_is_open: Option<Rc<dyn Fn(WindowId) -> bool>>,
-    pub install_native_menu_bar: Option<Rc<dyn Fn(&super::super::window::native_menu::NativeMenuBar)>>,
+    pub install_native_menu_bar:
+        Option<Rc<dyn Fn(&super::super::window::native_menu::NativeMenuBar)>>,
     pub set_close_interceptor: Option<Rc<dyn Fn(Option<Rc<dyn Fn(Option<WindowId>) -> bool>>)>>,
     pub quit: Option<Rc<dyn Fn()>>,
     pub main_window_id_query: Option<Rc<dyn Fn() -> Option<WindowId>>>,
-    pub open_folder_dialog:
-        Option<Rc<dyn Fn(Option<&str>, Box<dyn FnOnce(Option<String>)>)>>,
-    pub open_file_dialog: Option<
-        Rc<dyn Fn(Option<&str>, &[FileDialogFilter], bool, Box<dyn FnOnce(Vec<String>)>)>,
-    >,
+    pub open_folder_dialog: Option<Rc<dyn Fn(Option<&str>, Box<dyn FnOnce(Option<String>)>)>>,
+    pub open_file_dialog:
+        Option<Rc<dyn Fn(Option<&str>, &[FileDialogFilter], bool, Box<dyn FnOnce(Vec<String>)>)>>,
     pub memory_query: Option<Rc<dyn Fn() -> Option<BTreeMap<String, u64>>>>,
     pub trim_memory: Option<Rc<dyn Fn()>>,
 }
@@ -121,7 +120,11 @@ impl AppDisplayHandle {
     // MARK: - Memory
 
     pub fn memory_snapshot(&self) -> Option<BTreeMap<String, u64>> {
-        self.bindings.borrow().memory_query.as_ref().and_then(|query| query())
+        self.bindings
+            .borrow()
+            .memory_query
+            .as_ref()
+            .and_then(|query| query())
     }
 
     pub fn trim_memory(&self) {
@@ -133,21 +136,39 @@ impl AppDisplayHandle {
     // MARK: - Presentation
 
     pub fn set_target_frame_rate(&self, frames_per_second: Option<f64>) {
-        if let Some(set) = self.bindings.borrow().presentation.set_runtime_target_frame_rate.clone() {
+        if let Some(set) = self
+            .bindings
+            .borrow()
+            .presentation
+            .set_runtime_target_frame_rate
+            .clone()
+        {
             set(frames_per_second);
         }
         self.request_display();
     }
 
     pub fn set_frame_rate_mode(&self, mode: PlatformFrameRateMode) {
-        if let Some(set) = self.bindings.borrow().presentation.set_runtime_frame_rate_mode.clone() {
+        if let Some(set) = self
+            .bindings
+            .borrow()
+            .presentation
+            .set_runtime_frame_rate_mode
+            .clone()
+        {
             set(mode);
         }
         self.request_display();
     }
 
     pub fn set_vsync_enabled(&self, enabled: bool) {
-        if let Some(set) = self.bindings.borrow().presentation.set_runtime_vsync_enabled.clone() {
+        if let Some(set) = self
+            .bindings
+            .borrow()
+            .presentation
+            .set_runtime_vsync_enabled
+            .clone()
+        {
             set(enabled);
         }
         self.request_display();
@@ -165,7 +186,10 @@ impl AppDisplayHandle {
 
     // MARK: - Menus
 
-    pub fn install_native_menu_bar(&self, menu_bar: &super::super::window::native_menu::NativeMenuBar) {
+    pub fn install_native_menu_bar(
+        &self,
+        menu_bar: &super::super::window::native_menu::NativeMenuBar,
+    ) {
         if let Some(install) = self.bindings.borrow().install_native_menu_bar.clone() {
             install(menu_bar);
         }
@@ -174,21 +198,36 @@ impl AppDisplayHandle {
     // MARK: - Main window
 
     pub fn minimize_window(&self) {
-        let action = self.bindings.borrow().main_window.minimize_main_window_action.clone();
+        let action = self
+            .bindings
+            .borrow()
+            .main_window
+            .minimize_main_window_action
+            .clone();
         if let Some(action) = action {
             action();
         }
     }
 
     pub fn maximize_window(&self) {
-        let action = self.bindings.borrow().main_window.maximize_main_window_action.clone();
+        let action = self
+            .bindings
+            .borrow()
+            .main_window
+            .maximize_main_window_action
+            .clone();
         if let Some(action) = action {
             action();
         }
     }
 
     pub fn restore_window(&self) {
-        let action = self.bindings.borrow().main_window.restore_main_window_action.clone();
+        let action = self
+            .bindings
+            .borrow()
+            .main_window
+            .restore_main_window_action
+            .clone();
         if let Some(action) = action {
             action();
         }
@@ -200,7 +239,12 @@ impl AppDisplayHandle {
     /// driven from a status-bar/tray icon should use this when the window is
     /// closed, otherwise the window lingers in the Dock.
     pub fn hide_window(&self) {
-        let action = self.bindings.borrow().main_window.hide_main_window_action.clone();
+        let action = self
+            .bindings
+            .borrow()
+            .main_window
+            .hide_main_window_action
+            .clone();
         if let Some(action) = action {
             action();
         }
@@ -208,14 +252,23 @@ impl AppDisplayHandle {
 
     /// Re-shows a main window previously hidden by [`Self::hide_window`].
     pub fn show_window(&self) {
-        let action = self.bindings.borrow().main_window.show_main_window_action.clone();
+        let action = self
+            .bindings
+            .borrow()
+            .main_window
+            .show_main_window_action
+            .clone();
         if let Some(action) = action {
             action();
         }
     }
 
     pub fn toggle_maximize_window(&self) {
-        if self.is_window_maximized() { self.restore_window() } else { self.maximize_window() }
+        if self.is_window_maximized() {
+            self.restore_window()
+        } else {
+            self.maximize_window()
+        }
     }
 
     pub fn toggle_maximize_window_for(&self, window_id: WindowId) {
@@ -227,20 +280,34 @@ impl AppDisplayHandle {
     }
 
     pub fn close_main_window(&self) {
-        let action = self.bindings.borrow().main_window.close_main_window_action.clone();
+        let action = self
+            .bindings
+            .borrow()
+            .main_window
+            .close_main_window_action
+            .clone();
         if let Some(action) = action {
             action();
         }
     }
 
     pub fn is_window_maximized(&self) -> bool {
-        let query = self.bindings.borrow().main_window.main_window_maximized_query.clone();
+        let query = self
+            .bindings
+            .borrow()
+            .main_window
+            .main_window_maximized_query
+            .clone();
         query.is_some_and(|query| query())
     }
 
     pub fn set_window_chrome_hit_test(&self, hit_test: Option<&WindowChromeHitTest>) {
-        let action =
-            self.bindings.borrow().main_window.set_main_window_chrome_hit_test_action.clone();
+        let action = self
+            .bindings
+            .borrow()
+            .main_window
+            .set_main_window_chrome_hit_test_action
+            .clone();
         if let Some(action) = action {
             action(hit_test);
         }
@@ -249,33 +316,58 @@ impl AppDisplayHandle {
     // MARK: - Any window
 
     pub fn minimize_window_for(&self, window_id: WindowId) {
-        let action = self.bindings.borrow().windows.minimize_window_by_id_action.clone();
+        let action = self
+            .bindings
+            .borrow()
+            .windows
+            .minimize_window_by_id_action
+            .clone();
         if let Some(action) = action {
             action(window_id);
         }
     }
 
     pub fn maximize_window_for(&self, window_id: WindowId) {
-        let action = self.bindings.borrow().windows.maximize_window_by_id_action.clone();
+        let action = self
+            .bindings
+            .borrow()
+            .windows
+            .maximize_window_by_id_action
+            .clone();
         if let Some(action) = action {
             action(window_id);
         }
     }
 
     pub fn restore_window_for(&self, window_id: WindowId) {
-        let action = self.bindings.borrow().windows.restore_window_by_id_action.clone();
+        let action = self
+            .bindings
+            .borrow()
+            .windows
+            .restore_window_by_id_action
+            .clone();
         if let Some(action) = action {
             action(window_id);
         }
     }
 
     pub fn is_window_maximized_for(&self, window_id: WindowId) -> bool {
-        let query = self.bindings.borrow().windows.window_maximized_by_id_query.clone();
+        let query = self
+            .bindings
+            .borrow()
+            .windows
+            .window_maximized_by_id_query
+            .clone();
         query.is_some_and(|query| query(window_id))
     }
 
     pub fn show_window_system_menu(&self, window_id: WindowId, x: f32, y: f32) {
-        let action = self.bindings.borrow().windows.show_window_system_menu_action.clone();
+        let action = self
+            .bindings
+            .borrow()
+            .windows
+            .show_window_system_menu_action
+            .clone();
         if let Some(action) = action {
             action(window_id, x, y);
         }

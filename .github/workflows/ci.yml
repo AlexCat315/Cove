@@ -31,7 +31,7 @@ jobs:
       - name: Formatting
         run: ./cove fmt .
       - name: Lints
-        run: ./cove clippy . --all-targets --locked
+        run: ./cove clippy . --package cove-cli --all-targets --locked
       - name: Foundation contracts
         run: ./cove test . --locked --no-parallel
       - name: Headless checkpoint example

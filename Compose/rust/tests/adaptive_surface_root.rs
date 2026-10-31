@@ -9,15 +9,15 @@
 mod support;
 
 use cove_composition::{AnyView, LayoutDebugExt, PrimitiveView, View, ViewKind};
-use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 use cove_core::TextScaleSample;
+use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 use cove_core::{Environment, Insets, Keyboard, TextScale};
+use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::layout::FlexExt;
 use cove_ui_compose::primitives::layout::insets::safe_area::{SafeArea, SafeAreaEdges};
 use cove_ui_compose::primitives::layout::insets::surface_root::SurfaceRoot;
-use cove_ui_compose::theme::tokens::text_scaler::TextScalerViewExt;
 use cove_ui_compose::theme::TextScaler;
-use cove_ui_compose::BoxView;
+use cove_ui_compose::theme::tokens::text_scaler::TextScalerViewExt;
 
 use support::GlobalTestLock;
 
@@ -67,8 +67,14 @@ fn nested_surfaces_replace_the_host_ramp() {
         outer.text_scale = TextScale::linear(1.5);
         let mut inner = Environment::default();
         inner.text_scale = TextScale::from_samples([
-            TextScaleSample { size: 16.0, scaled_size: 32.0 },
-            TextScaleSample { size: 32.0, scaled_size: 48.0 },
+            TextScaleSample {
+                size: 16.0,
+                scaled_size: 32.0,
+            },
+            TextScaleSample {
+                size: 32.0,
+                scaled_size: 48.0,
+            },
         ]);
 
         let content = AnyView::new(SurfaceRoot::new(
@@ -106,7 +112,12 @@ fn nested_surfaces_replace_the_host_ramp() {
 fn safe_area_is_consumed_once_and_ime_replaces_the_bottom_floor() {
     GlobalTestLock::locked(|| {
         let mut surface = Environment::default();
-        surface.safe_area = Insets { top: 59.0, leading: 12.0, bottom: 34.0, trailing: 20.0 };
+        surface.safe_area = Insets {
+            top: 59.0,
+            leading: 12.0,
+            bottom: 34.0,
+            trailing: 20.0,
+        };
 
         for keyboard in [0.0_f32, 336.0, 12.0, 0.0, f32::NAN] {
             surface.keyboard = Keyboard::new(keyboard);
@@ -146,7 +157,11 @@ fn safe_area_is_consumed_once_and_ime_replaces_the_bottom_floor() {
             let root = graph.tree.borrow().root().expect("root node");
             let node = support::find_named(&root, "surface-fill").expect("the fill node exists");
             let frame = node.absolute_frame();
-            let bottom = if keyboard.is_finite() { 34.0_f32.max(keyboard) } else { 34.0 };
+            let bottom = if keyboard.is_finite() {
+                34.0_f32.max(keyboard)
+            } else {
+                34.0
+            };
 
             assert_eq!(
                 (frame.x, frame.y),
@@ -154,8 +169,7 @@ fn safe_area_is_consumed_once_and_ime_replaces_the_bottom_floor() {
                 "leading and top insets are consumed once (keyboard {keyboard})"
             );
             assert_eq!(
-                frame.width,
-                361.0,
+                frame.width, 361.0,
                 "width is the viewport minus both horizontal insets (keyboard {keyboard})"
             );
             assert_eq!(

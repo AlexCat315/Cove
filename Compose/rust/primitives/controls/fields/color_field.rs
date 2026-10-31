@@ -17,11 +17,13 @@ use crate::primitives::controls::fields::color_field_model::{hex_string, panel_w
 use crate::primitives::controls::fields::slider::Slider;
 use crate::primitives::overlays::anchored::{PopoverOverflow, PopoverSurface};
 use crate::primitives::overlays::popover::Popover;
+use crate::primitives::text::Text;
 use crate::primitives::text::text_buffer::TextBuffer;
 use crate::primitives::text::text_field::{TextField, TextFieldEvents};
-use crate::primitives::text::Text;
 use crate::theme::SemanticFontRef;
-use crate::{impl_primitive_view, AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View};
+use crate::{
+    AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View, impl_primitive_view,
+};
 
 /// Swatch size in the trigger.
 const SWATCH_WIDTH: f32 = 52.0;
@@ -122,7 +124,11 @@ impl ColorField {
 
     /// Commits the hex draft when it parses.
     fn commit_hex(&self) {
-        let draft = self.draft.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clone();
+        let draft = self
+            .draft
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone();
         if let Some(color) = parse_hex(&draft.string_value()) {
             self.color.set(color);
         }
@@ -135,12 +141,18 @@ impl View for ColorField {
         let presented = Binding::new(
             {
                 let state = self.is_presented.clone();
-                move || *state.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+                move || {
+                    *state
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner())
+                }
             },
             {
                 let state = self.is_presented.clone();
                 move |value: bool| {
-                    *state.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = value;
+                    *state
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner()) = value;
                 }
             },
         );
@@ -151,7 +163,9 @@ impl View for ColorField {
             shows_inline_values: self.shows_inline_values,
             shows_inline_channels: self.shows_inline_channels,
         });
-        let content = AnyView::new(ColorPickerPanel { field: field.clone() });
+        let content = AnyView::new(ColorPickerPanel {
+            field: field.clone(),
+        });
         AnyView::new(
             Popover::new(trigger, content)
                 .is_presented(presented)
@@ -215,26 +229,37 @@ impl PrimitiveView for ColorSwatch {
         let theme = crate::theme::styles::default_dark_theme::value();
         let swatch = AnyView::new(
             BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(crate::EmptyView),
             )
             .frame_size(SWATCH_WIDTH, SWATCH_HEIGHT)
-            .background_color(if self.is_enabled { self.color } else { self.color.multiplied_alpha(0.4) })
+            .background_color(if self.is_enabled {
+                self.color
+            } else {
+                self.color.multiplied_alpha(0.4)
+            })
             .corner_radius(theme.radius.sm)
             .border_color(theme.colors.border, 1.0),
         );
         if !self.shows_inline_values {
             return vec![swatch];
         }
-        let mut row: Vec<AnyView> = vec![swatch, AnyView::new(
-            Text::new(hex_string(self.color, self.show_alpha))
-                .semantic_font(SemanticFontRef::mono())
-                .semantic_foreground(if self.is_enabled {
-                    crate::theme::SemanticColorRef::on_surface_variant()
-                } else {
-                    crate::theme::SemanticColorRef::on_surface_muted()
-                }),
-        )];
+        let mut row: Vec<AnyView> = vec![
+            swatch,
+            AnyView::new(
+                Text::new(hex_string(self.color, self.show_alpha))
+                    .semantic_font(SemanticFontRef::mono())
+                    .semantic_foreground(if self.is_enabled {
+                        crate::theme::SemanticColorRef::on_surface_variant()
+                    } else {
+                        crate::theme::SemanticColorRef::on_surface_muted()
+                    }),
+            ),
+        ];
         if self.shows_inline_channels {
             row.push(AnyView::new(
                 Text::new(rgb_string(self.color, self.show_alpha))
@@ -243,7 +268,11 @@ impl PrimitiveView for ColorSwatch {
                     .flex(1.0),
             ));
         }
-        vec![AnyView::new(Row::new(VerticalAlignment::Center, 8.0, AnyView::new(TupleView::new(row))))]
+        vec![AnyView::new(Row::new(
+            VerticalAlignment::Center,
+            8.0,
+            AnyView::new(TupleView::new(row)),
+        ))]
     }
 }
 impl_primitive_view!(ColorSwatch);
@@ -251,9 +280,20 @@ impl_primitive_view!(ColorSwatch);
 fn rgb_string(color: Color, show_alpha: bool) -> String {
     let channel = |value: f32| (value * 255.0).round().clamp(0.0, 255.0) as i32;
     if show_alpha {
-        format!("{}, {}, {}, {}", channel(color.r), channel(color.g), channel(color.b), channel(color.a))
+        format!(
+            "{}, {}, {}, {}",
+            channel(color.r),
+            channel(color.g),
+            channel(color.b),
+            channel(color.a)
+        )
     } else {
-        format!("{}, {}, {}", channel(color.r), channel(color.g), channel(color.b))
+        format!(
+            "{}, {}, {}",
+            channel(color.r),
+            channel(color.g),
+            channel(color.b)
+        )
     }
 }
 
@@ -280,7 +320,11 @@ impl PrimitiveView for ColorPickerPanel {
         let theme = crate::theme::styles::default_dark_theme::value();
         let mut column: Vec<AnyView> = vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(crate::EmptyView),
             )
             .frame_height(PREVIEW_HEIGHT)
@@ -289,15 +333,27 @@ impl PrimitiveView for ColorPickerPanel {
             .border_color(Color::from_rgba8(58, 64, 78, 255), 1.0),
         )];
         for channel in [Channel::Red, Channel::Green, Channel::Blue] {
-            column.push(AnyView::new(ChannelRow { field: field.clone(), channel }));
+            column.push(AnyView::new(ChannelRow {
+                field: field.clone(),
+                channel,
+            }));
         }
         if field.show_alpha {
-            column.push(AnyView::new(ChannelRow { field: field.clone(), channel: Channel::Alpha }));
+            column.push(AnyView::new(ChannelRow {
+                field: field.clone(),
+                channel: Channel::Alpha,
+            }));
         }
-        column.push(AnyView::new(HexRow { field: field.clone() }));
+        column.push(AnyView::new(HexRow {
+            field: field.clone(),
+        }));
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 8.0,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                8.0,
                 AnyView::new(TupleView::new(column)),
             )
             .padding(10.0)
@@ -333,8 +389,11 @@ impl PrimitiveView for ChannelRow {
         let value = field.channel(channel);
         let slider = {
             let target = field.clone();
-            Slider::new(Binding::new(move || value, move |next: f64| target.set_channel(channel, next)))
-                .range((0.0, 1.0))
+            Slider::new(Binding::new(
+                move || value,
+                move |next: f64| target.set_channel(channel, next),
+            ))
+            .range((0.0, 1.0))
         };
         let readout = (value as f32 * 255.0).round().clamp(0.0, 255.0) as i32;
         vec![AnyView::new(Row::new(
@@ -389,8 +448,14 @@ impl PrimitiveView for HexRow {
                 let editing = editing.clone();
                 let committed = committed.clone();
                 move || {
-                    if *editing.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) {
-                        draft.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clone()
+                    if *editing
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    {
+                        draft
+                            .lock()
+                            .unwrap_or_else(|poisoned| poisoned.into_inner())
+                            .clone()
                     } else {
                         TextBuffer::new(&committed)
                     }
@@ -399,7 +464,9 @@ impl PrimitiveView for HexRow {
             {
                 let draft = draft.clone();
                 move |buffer: TextBuffer| {
-                    *draft.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = buffer;
+                    *draft
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner()) = buffer;
                 }
             },
         );
@@ -409,16 +476,25 @@ impl PrimitiveView for HexRow {
         let input = TextField::new("", text).events(TextFieldEvents {
             on_submit: Some(std::rc::Rc::new(move || commit.commit_hex())),
             on_focus: Some(std::rc::Rc::new(move || {
-                let mut editing = focus.is_editing.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                let mut editing = focus
+                    .is_editing
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
                 if !*editing {
-                    *focus.draft.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) =
+                    *focus
+                        .draft
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner()) =
                         TextBuffer::new(&hex_string(focus.color.get(), focus.show_alpha));
                     *editing = true;
                 }
             })),
             on_blur: Some(std::rc::Rc::new(move || {
                 blur.commit_hex();
-                *blur.is_editing.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = false;
+                *blur
+                    .is_editing
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner()) = false;
             })),
             ..Default::default()
         });

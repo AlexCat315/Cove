@@ -5,11 +5,13 @@ mod skills;
 mod tool;
 
 pub use mcp::{McpServer, PROTOCOL_VERSIONS};
-pub use schema::{JsonSchema, JsonSchemaScalar, JsonSchemaType, JsonSchemaValidator, JsonSchemaViolation};
+pub use schema::{
+    JsonSchema, JsonSchemaScalar, JsonSchemaType, JsonSchemaValidator, JsonSchemaViolation,
+};
 pub use skills::{AgentSkill, AgentSkillLibrary};
 pub use tool::{
-    AgentError, AgentMessage, AgentReply, AgentRole, AgentRun, AgentSession, AgentTool, AgentToolCall,
-    AgentToolResult, AgentToolbox, SessionApiFormat, ToolExecutor,
+    AgentError, AgentMessage, AgentReply, AgentRole, AgentRun, AgentSession, AgentTool,
+    AgentToolCall, AgentToolResult, AgentToolbox, SessionApiFormat, ToolExecutor,
 };
 
 // Convenience aliases so call sites can use either the `JSON`-prefixed spelling

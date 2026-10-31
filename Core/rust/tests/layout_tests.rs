@@ -15,8 +15,7 @@
 //! - RTL reverses row order
 
 use cove_core::scene::{
-    Align, Direction, Edge, FlexDirection, Gutter, LayoutNode, LayoutPass, Node, PositionType,
-    Wrap,
+    Align, Direction, Edge, FlexDirection, Gutter, LayoutNode, LayoutPass, Node, PositionType, Wrap,
 };
 
 fn sized(width: f32, height: f32) -> LayoutNode {
@@ -142,7 +141,10 @@ fn padding_offsets_children() {
     root.add_child(&child);
     root.calculate_layout(None, None, Direction::Ltr);
 
-    assert!(child.frame().x >= 10.0, "the child clears the leading padding");
+    assert!(
+        child.frame().x >= 10.0,
+        "the child clears the leading padding"
+    );
     assert!(child.frame().y >= 10.0, "the child clears the top padding");
 }
 
@@ -215,7 +217,10 @@ fn gap_spacing() {
     root.add_child(&b);
     root.calculate_layout(None, None, Direction::Ltr);
 
-    assert!(close(b.frame().x, 60.0), "b starts at a's trailing edge plus the gap");
+    assert!(
+        close(b.frame().x, 60.0),
+        "b starts at a's trailing edge plus the gap"
+    );
 }
 
 #[test]
@@ -248,7 +253,10 @@ fn margin_between_siblings() {
     root.add_child(&b);
     root.calculate_layout(None, None, Direction::Ltr);
 
-    assert!(close(b.frame().x, 70.0), "b starts at a's trailing edge plus the margin");
+    assert!(
+        close(b.frame().x, 70.0),
+        "b starts at a's trailing edge plus the margin"
+    );
 }
 
 #[test]
@@ -320,7 +328,10 @@ fn rtl_direction() {
     root.add_child(&b);
     root.calculate_layout(None, None, Direction::Rtl);
 
-    assert!(close(a.frame().x, 150.0), "in RTL the first child sits at the trailing edge");
+    assert!(
+        close(a.frame().x, 150.0),
+        "in RTL the first child sits at the trailing edge"
+    );
     assert!(close(b.frame().x, 100.0), "the second child precedes it");
 }
 
@@ -356,9 +367,10 @@ fn per_node_layout_direction_reverses_row_order() {
     // just be readable through `direction()`. This is the contract the whole
     // RTL story rests on: Sidebar, Toolbar, DataTable frozen columns and the
     // avatar status indicator all depend on it.
-    for (direction, first_x, second_x) in
-        [(Direction::Ltr, 0.0f32, 44.0f32), (Direction::Rtl, 44.0f32, 0.0f32)]
-    {
+    for (direction, first_x, second_x) in [
+        (Direction::Ltr, 0.0f32, 44.0f32),
+        (Direction::Rtl, 44.0f32, 0.0f32),
+    ] {
         let root = LayoutNode::new();
         root.set_flex_direction(FlexDirection::Row);
         root.set_direction(direction);

@@ -9,9 +9,9 @@
 //! implemented as explicit scanners because this crate does not depend on a
 //! regular-expression engine.
 
-use crate::cli::{standardized, AppPlatform, Arguments, Flag, OptionKey};
+use crate::cli::{AppPlatform, Arguments, Flag, OptionKey, standardized};
 use crate::development::{Inspector, ManagedSession};
-use crate::platforms_desktop::SwiftPackage;
+use crate::platforms_desktop::CargoPackage;
 use crate::project_sdk::{CoveSDK, SDKRelease};
 use crate::support::{Files, Shell, StdoutTarget, ToolError};
 use serde::{Deserialize, Serialize};
@@ -33,8 +33,7 @@ impl ApplicationIdentity {
                 "application.id must be a lowercase reverse-domain identifier, such as com.example.myapp",
             ));
         }
-        if self.name.trim().is_empty()
-            || self.name.chars().any(|character| character.is_control())
+        if self.name.trim().is_empty() || self.name.chars().any(|character| character.is_control())
         {
             return Err(ToolError::invalid(
                 "application.name must be a nonempty printable label",
@@ -67,9 +66,8 @@ pub fn is_product_name(value: &str) -> bool {
         Some(first) if first.is_ascii_alphabetic() => {}
         _ => return false,
     }
-    characters.all(|character| {
-        character.is_ascii_alphanumeric() || character == '_' || character == '-'
-    })
+    characters
+        .all(|character| character.is_ascii_alphanumeric() || character == '_' || character == '-')
 }
 
 /// `^[A-Za-z_][A-Za-z0-9_-]*$`
@@ -79,9 +77,8 @@ pub fn is_task_product(value: &str) -> bool {
         Some(first) if first.is_ascii_alphabetic() || first == '_' => {}
         _ => return false,
     }
-    characters.all(|character| {
-        character.is_ascii_alphanumeric() || character == '_' || character == '-'
-    })
+    characters
+        .all(|character| character.is_ascii_alphanumeric() || character == '_' || character == '-')
 }
 
 /// `^[A-Za-z_][A-Za-z0-9_]*$`
@@ -120,9 +117,9 @@ pub fn is_dotted_version(value: &str) -> bool {
         None => true,
         Some(suffix) => {
             !suffix.is_empty()
-                && suffix
-                    .chars()
-                    .all(|character| character.is_ascii_alphanumeric() || character == '.' || character == '-')
+                && suffix.chars().all(|character| {
+                    character.is_ascii_alphanumeric() || character == '.' || character == '-'
+                })
         }
     }
 }
@@ -276,7 +273,7 @@ impl ProjectConfiguration {
     }
 }
 
-/// An application directory: `cove.json` plus a Swift package.
+/// An application directory: `cove.json` plus a Cargo package.
 #[derive(Debug, Clone)]
 pub struct AppProject {
     pub directory: PathBuf,
@@ -287,9 +284,9 @@ impl AppProject {
     pub fn new(at: &Path) -> Result<Self, ToolError> {
         let directory = standardized(at);
         let manifest = directory.join("cove.json");
-        if !manifest.is_file() || !directory.join("Package.swift").is_file() {
+        if !manifest.is_file() || !directory.join("Cargo.toml").is_file() {
             return Err(ToolError::invalid(format!(
-                "{} must contain cove.json and Package.swift; use cove create app {}",
+                "{} must contain cove.json and Cargo.toml; use cove create app {}",
                 directory.display(),
                 directory.display()
             )));
@@ -328,43 +325,11 @@ impl AppProject {
         Ok(())
     }
 
-    /// Re-pins toolchain.sdkVersion in place, preserving the file's formatting.
-    pub fn pin(&self, version: &str) -> Result<(), ToolError> {
-        if !SDKRelease::is_version(version) {
-            return Err(ToolError::invalid(format!(
-                "Pin an exact SDK version, not {version}"
-            )));
-        }
-        let manifest = self.directory.join("cove.json");
-        let original = std::fs::read_to_string(&manifest)
-            .map_err(|error| ToolError::invalid(format!("{}: {error}", manifest.display())))?;
-        let (rewritten, matches) = replace_sdk_version(&original, version)?;
-        if matches != 1 {
-            return Err(ToolError::invalid(format!(
-                "Could not find toolchain.sdkVersion in {}",
-                manifest.display()
-            )));
-        }
-        Files::text(&rewritten, &manifest)?;
-        let updated: ProjectConfiguration = serde_json::from_str(&rewritten)
-            .map_err(|error| ToolError::invalid(format!("{}: {error}", manifest.display())))?;
-        if updated.toolchain.sdk_version != version {
-            return Err(ToolError::invalid(format!(
-                "Failed to pin SDK {version} in {}",
-                manifest.display()
-            )));
-        }
-        Ok(())
-    }
-
     pub fn clean(&self) -> Result<(), ToolError> {
         let mut builds = vec![self.build_directory()];
         let legacy = self.directory.join(".cove/build");
-        let legacy_is_link = is_symbolic_link(&legacy)
-            || legacy
-                .parent()
-                .map(is_symbolic_link)
-                .unwrap_or(false);
+        let legacy_is_link =
+            is_symbolic_link(&legacy) || legacy.parent().map(is_symbolic_link).unwrap_or(false);
         if !legacy_is_link {
             builds.push(legacy);
         }
@@ -404,50 +369,6 @@ fn is_symbolic_link(path: &Path) -> bool {
     std::fs::symlink_metadata(path)
         .map(|metadata| metadata.file_type().is_symlink())
         .unwrap_or(false)
-}
-
-/// Rewrites the single `"sdkVersion" : "..."` value, keeping all other bytes.
-fn replace_sdk_version(source: &str, version: &str) -> Result<(String, usize), ToolError> {
-    let bytes = source.as_bytes();
-    let mut result = String::with_capacity(source.len());
-    let mut matches = 0;
-    let mut cursor = 0;
-    while let Some(found) = source[cursor..].find("\"sdkVersion\"") {
-        let key_end = cursor + found + "\"sdkVersion\"".len();
-        let mut index = key_end;
-        let skip = |index: &mut usize| {
-            while *index < bytes.len() && (bytes[*index] as char).is_ascii_whitespace() {
-                *index += 1;
-            }
-        };
-        skip(&mut index);
-        if index >= bytes.len() || bytes[index] != b':' {
-            result.push_str(&source[cursor..key_end]);
-            cursor = key_end;
-            continue;
-        }
-        index += 1;
-        skip(&mut index);
-        if index >= bytes.len() || bytes[index] != b'"' {
-            result.push_str(&source[cursor..key_end]);
-            cursor = key_end;
-            continue;
-        }
-        let value_start = index + 1;
-        let Some(relative_end) = source[value_start..].find('"') else {
-            result.push_str(&source[cursor..key_end]);
-            cursor = key_end;
-            continue;
-        };
-        let value_end = value_start + relative_end;
-        result.push_str(&source[cursor..value_start]);
-        result.push_str(version);
-        result.push('"');
-        matches += 1;
-        cursor = value_end + 1;
-    }
-    result.push_str(&source[cursor..]);
-    Ok((result, matches))
 }
 
 /// `cove create app <directory>`.
@@ -528,19 +449,23 @@ impl CreateApplication {
             }
         }
         let templates = ApplicationTemplates::root(root);
-        // The Rust template is a Cargo project, so the Swift sources, the
-        // SwiftPM manifest and the Swift test target are not copied. The Rust
-        // files live under `src/` and `tests/` and are emitted verbatim.
-        let swift_only = ["Sources/AppContent/", "Tests/", "Package.swift"];
+        // The Rust template is a Cargo project. Swift sources, SwiftPM
+        // manifests and Swift tests are not copied; `.rs` sources and
+        // integration tests are emitted verbatim.
         for source in Files::files(&templates)? {
-            let relative_source = Files::relative(&source, &templates);
-            if swift_only
-                .iter()
-                .any(|prefix| relative_source == prefix.trim_end_matches('/') || relative_source.starts_with(prefix))
+            let mut relative = Files::relative(&source, &templates);
+            if relative.ends_with(".in") {
+                relative = relative.trim_end_matches(".in").to_string();
+            }
+            // SwiftPM manifests, Swift sources and Swift test targets belong to
+            // the pre-migration template and are never emitted.
+            if relative == "Package.swift"
+                || relative.ends_with(".swift")
+                || relative.starts_with("Sources/AppContent/")
+                || relative.starts_with("Tests/AppContentTests/")
             {
                 continue;
             }
-            let mut relative = Files::relative(&source, &templates);
             if let Some(rest) = relative.strip_prefix("Platforms/") {
                 let name = rest.split('/').next().unwrap_or_default();
                 if !configuration
@@ -552,22 +477,35 @@ impl CreateApplication {
                     continue;
                 }
             }
-            if let Some(stripped) = relative.strip_suffix(".in") {
-                relative = stripped.to_string();
+            if source
+                .extension()
+                .map(|extension| extension == "in")
+                .unwrap_or(false)
+            {
+                let text = std::fs::read_to_string(&source).map_err(|error| {
+                    ToolError::invalid(format!("{}: {error}", source.display()))
+                })?;
+                Files::text(
+                    &text.replace("{{COVE_UI_PATH}}", &toml_path(root)),
+                    &destination.join(&relative),
+                )?;
+            } else {
+                Files::copy(&source, &destination.join(&relative))?;
             }
-            Files::copy(&source, &destination.join(&relative))?;
         }
         Files::json(&configuration, &destination.join("cove.json"))?;
         println!(
             "Created cross-platform Cove application: {}",
             destination.display()
         );
-        println!(
-            "Edit Sources/AppContent/App.swift, then: cove run {}",
-            destination.display()
-        );
+        println!("Edit src/app.rs, then: cove run {}", destination.display());
         Ok(())
     }
+}
+
+/// A path as it must appear inside a TOML basic string.
+fn toml_path(path: &Path) -> String {
+    path.display().to_string().replace('\\', "\\\\")
 }
 
 /// The UI template bundled with the CLI.
@@ -591,15 +529,14 @@ impl ApplicationTemplates {
         let source = Self::root(root).join("Platforms/Android");
         Files::copy(&source, &at.join("Platforms/Android"))?;
         Files::json(configuration, &at.join("cove.json"))?;
-        Files::text("// Generated packaging workspace\n", &at.join("Package.swift"))?;
         Ok(())
     }
 }
 
-/// `cove test`: needs a package, not application identity or launch targets.
+/// `cove test`: needs a Cargo package, not application identity or launch targets.
 pub struct PackageTests {
     pub command: Vec<String>,
-    /// Desktop helper builds, so tests that launch a helper never run a stale one.
+    /// Helper binaries built first, so tests that launch one never run a stale build.
     pub helpers: Vec<Vec<String>>,
     pub environment: std::collections::BTreeMap<String, String>,
     pub timeout: Option<Duration>,
@@ -608,9 +545,9 @@ pub struct PackageTests {
 impl PackageTests {
     pub fn new(arguments: &Arguments) -> Result<Self, ToolError> {
         let directory = arguments.directory();
-        if !directory.join("Package.swift").is_file() {
+        if !directory.join("Cargo.toml").is_file() {
             return Err(ToolError::invalid(format!(
-                "{} must contain Package.swift to run cove test",
+                "{} must contain Cargo.toml to run cove test",
                 directory.display()
             )));
         }
@@ -619,11 +556,7 @@ impl PackageTests {
         } else {
             None
         };
-        let root = CoveSDK::locate(
-            arguments,
-            project.as_ref(),
-            &std::env::vars().collect(),
-        )?;
+        let root = CoveSDK::locate(arguments, project.as_ref(), &std::env::vars().collect())?;
         if arguments.flags.contains(&Flag::SkipBuild) && arguments.flags.contains(&Flag::BuildOnly)
         {
             return Err(ToolError::invalid(
@@ -631,40 +564,34 @@ impl PackageTests {
             ));
         }
         let scratch = arguments.url(OptionKey::ScratchPath);
-        let mut command = SwiftPackage::command(&directory, arguments.configuration, "test", scratch.as_deref());
+        let mut command = CargoPackage::command(
+            &directory,
+            arguments.configuration,
+            "test",
+            scratch.as_deref(),
+        );
+        // `cargo test` filters by substring; empty means every test.
         if let Some(filter) = arguments.value(OptionKey::Filter) {
-            command.push("--filter".into());
             command.push(filter.into());
         }
         if arguments.flags.contains(&Flag::NoParallel) {
-            command.push("--no-parallel".into());
+            command.push("--test-threads=1".into());
         }
-        let build = SwiftPackage::command(
+        let build = CargoPackage::command(
             &directory,
             arguments.configuration,
             "build",
             scratch.as_deref(),
         );
         if arguments.flags.contains(&Flag::SkipBuild) {
-            command.push("--skip-build".into());
+            command.push("--no-run".into());
         }
         if let Some(library) = arguments.value(OptionKey::TestingLibrary) {
-            match library {
-                "xctest" => command.push("--disable-swift-testing".into()),
-                "swift-testing" => command.push("--disable-xctest".into()),
-                _ => {
-                    return Err(ToolError::invalid(
-                        "--testing-library must be xctest or swift-testing",
-                    ))
-                }
+            if !["libtest", "cargo-test"].contains(&library) {
+                return Err(ToolError::invalid(
+                    "--testing-library must be libtest or cargo-test",
+                ));
             }
-        }
-        if let Some(events) = arguments.url(OptionKey::EventOutput) {
-            if let Some(parent) = events.parent() {
-                Files::directory(parent)?;
-            }
-            command.push("--experimental-event-stream-output".into());
-            command.push(events.display().to_string());
         }
         let timeout = match arguments.value(OptionKey::Timeout) {
             Some(value) => match value.parse::<f64>() {
@@ -674,7 +601,7 @@ impl PackageTests {
                 _ => {
                     return Err(ToolError::invalid(
                         "--timeout must be between 0 and 86400 seconds",
-                    ))
+                    ));
                 }
             },
             None => None,
@@ -689,7 +616,7 @@ impl PackageTests {
                 .into_iter()
                 .map(|helper| {
                     let mut helper_command = build.clone();
-                    helper_command.push("--product".into());
+                    helper_command.push("--bin".into());
                     helper_command.push(helper);
                     helper_command
                 })
@@ -697,9 +624,9 @@ impl PackageTests {
         };
         if arguments.flags.contains(&Flag::BuildOnly) {
             command = build;
-            command.push("--build-tests".into());
+            command.push("--tests".into());
         }
-        let root_environment = SwiftPackage::environment(&root)?;
+        let root_environment = CargoPackage::environment(&root)?;
         Ok(Self {
             command,
             helpers,
@@ -734,11 +661,10 @@ impl PackageTests {
                 self.command
                     .first()
                     .cloned()
-                    .unwrap_or_else(|| "swift".into()),
+                    .unwrap_or_else(|| "cargo".into()),
                 status,
             ));
         }
         Ok(())
     }
 }
-

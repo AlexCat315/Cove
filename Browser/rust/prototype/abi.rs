@@ -47,7 +47,9 @@ pub unsafe extern "C" fn cove_font_alloc(count: i32) -> *mut u8 {
 /// bytes.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cove_font_load(pointer: *const u8, count: i32) -> i32 {
-    let Ok(count) = usize::try_from(count) else { return 0 };
+    let Ok(count) = usize::try_from(count) else {
+        return 0;
+    };
     if pointer.is_null() || count == 0 || count > 32 * 1024 * 1024 {
         return 0;
     }
@@ -84,13 +86,17 @@ pub extern "C" fn cove_key(code: u32, modifiers: u32, down: i32, repeated: i32) 
 /// `pointer` must be readable for `count` bytes of UTF-8.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cove_text(pointer: *const c_char, count: i32, editing: i32) {
-    let Ok(count) = usize::try_from(count) else { return };
+    let Ok(count) = usize::try_from(count) else {
+        return;
+    };
     if pointer.is_null() || count == 0 || count > 32768 {
         return;
     }
     // SAFETY: the caller guarantees `count` readable UTF-8 bytes.
     let bytes = unsafe { std::slice::from_raw_parts(pointer.cast::<u8>(), count) };
-    let Ok(text) = std::str::from_utf8(bytes) else { return };
+    let Ok(text) = std::str::from_utf8(bytes) else {
+        return;
+    };
     with_app(|app| app.text(text, editing != 0));
 }
 
@@ -177,7 +183,9 @@ pub unsafe extern "C" fn cove_alloc(count: i32) -> *mut u8 {
 /// `pointer` and `count` must describe one live [`cove_alloc`] allocation.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cove_free(pointer: *mut u8, count: i32) {
-    let Ok(count) = usize::try_from(count) else { return };
+    let Ok(count) = usize::try_from(count) else {
+        return;
+    };
     unsafe { export_buffer::free_export_allocation(pointer, count) };
 }
 
@@ -187,7 +195,9 @@ pub unsafe extern "C" fn cove_free(pointer: *mut u8, count: i32) {
 /// `pointer` must be readable for `count` bytes.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cove_dispatch(pointer: *const u8, count: i32) {
-    let Ok(count) = usize::try_from(count) else { return };
+    let Ok(count) = usize::try_from(count) else {
+        return;
+    };
     if pointer.is_null() || count == 0 || count > 1024 * 1024 {
         return;
     }

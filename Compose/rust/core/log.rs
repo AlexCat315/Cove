@@ -9,7 +9,9 @@ pub struct Logger {
 
 impl Logger {
     pub fn new(label: impl Into<Arc<str>>) -> Self {
-        Self { label: label.into() }
+        Self {
+            label: label.into(),
+        }
     }
 
     pub fn compose() -> Self {
@@ -17,7 +19,13 @@ impl Logger {
     }
 
     pub fn log(&self, level: Level, message: impl AsRef<str>) {
-        let _ = runtime().log(level, &self.label, message.as_ref(), Default::default(), Location::default());
+        let _ = runtime().log(
+            level,
+            &self.label,
+            message.as_ref(),
+            Default::default(),
+            Location::default(),
+        );
     }
 
     pub fn warning(&self, message: impl AsRef<str>) {

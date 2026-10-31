@@ -18,7 +18,7 @@ pub mod linux;
 #[cfg(target_os = "windows")]
 pub mod windows;
 
-pub use view::{geometry_for, WebView, WebViewNodeResource};
+pub use view::{WebView, WebViewNodeResource, geometry_for};
 
 pub use cove_core::Rect;
 
@@ -37,7 +37,10 @@ pub use windows::{WindowsWebView2Host, WindowsWebView2Surface};
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum WebViewRequest {
     Url(String),
-    Html { html: String, base_url: Option<String> },
+    Html {
+        html: String,
+        base_url: Option<String>,
+    },
 }
 
 impl WebViewRequest {
@@ -45,10 +48,16 @@ impl WebViewRequest {
         Self::Url(url.into())
     }
     pub fn html(html: impl Into<String>) -> Self {
-        Self::Html { html: html.into(), base_url: None }
+        Self::Html {
+            html: html.into(),
+            base_url: None,
+        }
     }
     pub fn html_with_base(html: impl Into<String>, base_url: impl Into<String>) -> Self {
-        Self::Html { html: html.into(), base_url: Some(base_url.into()) }
+        Self::Html {
+            html: html.into(),
+            base_url: Some(base_url.into()),
+        }
     }
 }
 
@@ -120,7 +129,11 @@ impl WebViewGeometry {
     };
 
     pub fn new(frame: Rect, visible_frame: Rect, is_visible: bool) -> Self {
-        Self { frame, visible_frame, is_visible }
+        Self {
+            frame,
+            visible_frame,
+            is_visible,
+        }
     }
 }
 
@@ -198,14 +211,20 @@ impl WebViewHandle {
         }
     }
 
-    pub(crate) fn attach(&mut self, surface: std::rc::Rc<std::cell::RefCell<Box<dyn WebViewSurface>>>) {
+    pub(crate) fn attach(
+        &mut self,
+        surface: std::rc::Rc<std::cell::RefCell<Box<dyn WebViewSurface>>>,
+    ) {
         self.surface = Some(surface.clone());
         if let Some(pending) = self.pending.take() {
             surface.borrow_mut().perform(pending);
         }
     }
 
-    pub(crate) fn detach(&mut self, surface: &std::rc::Rc<std::cell::RefCell<Box<dyn WebViewSurface>>>) {
+    pub(crate) fn detach(
+        &mut self,
+        surface: &std::rc::Rc<std::cell::RefCell<Box<dyn WebViewSurface>>>,
+    ) {
         if self
             .surface
             .as_ref()
@@ -234,7 +253,10 @@ pub fn resolve_geometry(node: &cove_core::scene::Node) -> WebViewGeometry {
     let mut visible = frame;
     let mut ancestor = node.parent();
     while let Some(current) = ancestor {
-        if !current.is_layout_visible() || current.opacity() <= 0.0 || current.subtree_opacity() <= 0.0 {
+        if !current.is_layout_visible()
+            || current.opacity() <= 0.0
+            || current.subtree_opacity() <= 0.0
+        {
             return WebViewGeometry::HIDDEN;
         }
         if current.clips_to_bounds() {
@@ -256,9 +278,15 @@ mod tests {
     fn display_title_prefers_title_then_url() {
         let state = WebViewState::default();
         assert_eq!(state.display_title(), "");
-        let state = WebViewState { url: Some("https://example.com".into()), ..WebViewState::default() };
+        let state = WebViewState {
+            url: Some("https://example.com".into()),
+            ..WebViewState::default()
+        };
         assert_eq!(state.display_title(), "https://example.com");
-        let state = WebViewState { title: Some("Example".into()), ..state };
+        let state = WebViewState {
+            title: Some("Example".into()),
+            ..state
+        };
         assert_eq!(state.display_title(), "Example");
     }
 
@@ -280,7 +308,9 @@ mod tests {
             fn detach(&mut self) {}
         }
         let surface: Rc<std::cell::RefCell<Box<dyn WebViewSurface>>> =
-            Rc::new(std::cell::RefCell::new(Box::new(Recorder { performed: performed.clone() })));
+            Rc::new(std::cell::RefCell::new(Box::new(Recorder {
+                performed: performed.clone(),
+            })));
         let mut handle = WebViewHandle::new();
         handle.reload();
         assert!(!handle.is_attached());

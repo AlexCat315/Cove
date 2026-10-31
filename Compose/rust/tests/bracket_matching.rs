@@ -41,12 +41,18 @@ fn nested_pairs_skip_strings_and_comments() {
 
     assert_eq!(
         matcher.pair(&buffer, 2),
-        Some(BracketPair { open: opening, close: closing }),
+        Some(BracketPair {
+            open: opening,
+            close: closing
+        }),
         "the outer parenthesis matches across the skipped string and comment"
     );
     assert_eq!(
         matcher.pair(&buffer, buffer.character_count()),
-        Some(BracketPair { open: closing, close: opening }),
+        Some(BracketPair {
+            open: closing,
+            close: opening
+        }),
         "the closing caret finds the same pair reversed"
     );
     assert_eq!(

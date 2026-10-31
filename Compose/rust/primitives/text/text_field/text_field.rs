@@ -9,16 +9,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cove_core::scene::{
-    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, AccessibilityState,
-    EventPhase, EventResult, FocusChainHolder, HoverPhase, InputHandlerRoute,
-    InteractionRegistryHolder, LayoutNode, MeasureMode, Node, NodeResource, Overflow,
-    PointerCaptureHolder, PointerPhase, TextInputAttachmentKey, TextInputClient,
-    TextInputSnapshot,
-};
-use cove_core::{Binding, Color, InputCapabilities, Point, Rect, Size, TextAlignment};
-use cove_platform::{MouseButton, MouseWheelEvent, SystemCursor};
-use cove_text::{DrawListText, TextEnvironment, TextEnvironmentHolder};
 use crate::modifiers::interaction::CursorExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
@@ -27,15 +17,24 @@ use crate::primitives::text::text_document_layout::{TextDocumentLayout, TextLine
 use crate::theme::styles::components::{
     AnyTextFieldStyle, TextFieldStyleConfiguration, TextFieldStyleEnvironment,
 };
-use crate::theme::{theme_for_node, SemanticColorRef, SemanticFontRef, Theme, ThemeReader};
-use crate::{impl_primitive_view, AnyView, PrimitiveView, View};
+use crate::theme::{SemanticColorRef, SemanticFontRef, Theme, ThemeReader, theme_for_node};
+use crate::{AnyView, PrimitiveView, View, impl_primitive_view};
+use cove_core::scene::{
+    AccessibilityActions, AccessibilityRole, AccessibilitySemantics, AccessibilityState,
+    EventPhase, EventResult, FocusChainHolder, HoverPhase, InputHandlerRoute,
+    InteractionRegistryHolder, LayoutNode, MeasureMode, Node, NodeResource, Overflow,
+    PointerCaptureHolder, PointerPhase, TextInputAttachmentKey, TextInputClient, TextInputSnapshot,
+};
+use cove_core::{Binding, Color, InputCapabilities, Point, Rect, Size, TextAlignment};
+use cove_platform::{MouseButton, MouseWheelEvent, SystemCursor};
+use cove_text::{DrawListText, TextEnvironment, TextEnvironmentHolder};
 
 use super::indent_guides::TextIndentGuides;
 use super::text_field_code_editing::indented_newline;
 use super::text_field_layout_engine::{
-    document_geometry, make_render_state, selection_range, update_scroll, FieldCompositionState,
-    FieldLayoutInputs, FieldScrollState, FieldSelectionState, RenderDraftState, RenderState,
-    FIELD_STATE_KEY,
+    FIELD_STATE_KEY, FieldCompositionState, FieldLayoutInputs, FieldScrollState,
+    FieldSelectionState, RenderDraftState, RenderState, document_geometry, make_render_state,
+    selection_range, update_scroll,
 };
 use super::text_field_observation::{TextFieldCaretState, TextFieldHoverAnchor};
 use super::text_field_options::{
@@ -68,7 +67,10 @@ pub struct FieldState {
 impl FieldState {
     pub fn new(buffer: TextBuffer) -> Self {
         Self {
-            selection: FieldSelectionState { cursor_index: buffer.character_count(), ..Default::default() },
+            selection: FieldSelectionState {
+                cursor_index: buffer.character_count(),
+                ..Default::default()
+            },
             buffer,
             composition: FieldCompositionState::default(),
             scroll: FieldScrollState::default(),
@@ -98,7 +100,11 @@ impl FieldState {
         self.selection.cursor_index = self.selection.cursor_index.min(count);
         if let Some(anchor) = self.selection.anchor {
             let bounded = anchor.min(count);
-            self.selection.anchor = if bounded == self.selection.cursor_index { None } else { Some(bounded) };
+            self.selection.anchor = if bounded == self.selection.cursor_index {
+                None
+            } else {
+                Some(bounded)
+            };
         }
     }
 
@@ -261,7 +267,9 @@ impl TextField {
 
 impl View for TextField {
     fn body(&self) -> AnyView {
-        AnyView::new(TextFieldHost { field: self.snapshot() })
+        AnyView::new(TextFieldHost {
+            field: self.snapshot(),
+        })
     }
 }
 
@@ -321,15 +329,27 @@ impl PrimitiveView for TextFieldHost {
 
     fn update_node(&self, node: &Node) {
         let theme = theme_for_node(node);
-        node.set_cursor(Some(if self.field.behavior.disabled { SystemCursor::Arrow } else { SystemCursor::Ibeam }));
+        node.set_cursor(Some(if self.field.behavior.disabled {
+            SystemCursor::Arrow
+        } else {
+            SystemCursor::Ibeam
+        }));
         node.set_is_focusable(!self.field.behavior.disabled);
         node.set_is_hit_testable(!self.field.behavior.disabled);
 
         let current = self.field.text.get();
-        if node.attachment::<Rc<RefCell<FieldState>>>(FIELD_STATE_KEY).is_none() {
-            node.set_attachment(FIELD_STATE_KEY, Rc::new(RefCell::new(FieldState::new(current.clone()))));
+        if node
+            .attachment::<Rc<RefCell<FieldState>>>(FIELD_STATE_KEY)
+            .is_none()
+        {
+            node.set_attachment(
+                FIELD_STATE_KEY,
+                Rc::new(RefCell::new(FieldState::new(current.clone()))),
+            );
         }
-        let Some(state_handle) = node.attachment::<Rc<RefCell<FieldState>>>(FIELD_STATE_KEY) else { return };
+        let Some(state_handle) = node.attachment::<Rc<RefCell<FieldState>>>(FIELD_STATE_KEY) else {
+            return;
+        };
         {
             let mut state = state_handle.borrow_mut();
             state.normalize(&current);
@@ -341,7 +361,11 @@ impl PrimitiveView for TextFieldHost {
         state_handle.borrow_mut().is_focused = is_focused;
         let is_hovered = node.attachment::<bool>(SCROLLBAR_HOVERED).unwrap_or(false);
         let border = border_color_for(&self.field, &theme, is_focused, is_hovered);
-        let width = if is_focused { theme.inputs.focus_ring_width } else { theme.inputs.border_width };
+        let width = if is_focused {
+            theme.inputs.focus_ring_width
+        } else {
+            theme.inputs.border_width
+        };
         node.set_accessibility(Some(AccessibilitySemantics {
             role: AccessibilityRole::TextField,
             label: self.field.placeholder.clone(),
@@ -365,9 +389,10 @@ impl PrimitiveView for TextFieldHost {
                 chain.focus(Some(node), true);
             }
         }
-        if let (Some(request), Some(index)) =
-            (self.field.navigation.caret_request_id, self.field.navigation.caret_request_index)
-            && node.attachment::<u64>(CARET_REQUEST_ID) != Some(request)
+        if let (Some(request), Some(index)) = (
+            self.field.navigation.caret_request_id,
+            self.field.navigation.caret_request_index,
+        ) && node.attachment::<u64>(CARET_REQUEST_ID) != Some(request)
         {
             node.set_attachment(CARET_REQUEST_ID, request);
             let handle = state_handle.clone();
@@ -392,7 +417,9 @@ impl PrimitiveView for TextFieldHost {
                 width.to_bits(),
             ),
             move |list, origin| {
-                let Some(owner) = Node::upgrade(&draw_node) else { return };
+                let Some(owner) = Node::upgrade(&draw_node) else {
+                    return;
+                };
                 render(&owner, &field, &state_for_draw, list, origin, border, width);
             },
         );
@@ -417,28 +444,38 @@ fn install_text_input_client(node: &Node, field: &TextField, state: &Rc<RefCell<
 
 fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldState>>) {
     install_text_input_client(node, field, &state);
-    let Some(registry) = InteractionRegistryHolder::current() else { return };
+    let Some(registry) = InteractionRegistryHolder::current() else {
+        return;
+    };
     if field.behavior.disabled {
         registry.remove(node);
         return;
     }
     let hover_node = node.downgrade();
-    registry.set_hover(node, Rc::new(move |phase| {
-        let Some(owner) = Node::upgrade(&hover_node) else { return };
-        let hovered = phase == HoverPhase::Enter
-            && owner
-                .composition_value(&crate::adaptive::SurfaceEnvironment::key())
-                .supports_hover();
-        owner.set_attachment(SCROLLBAR_HOVERED, hovered);
-        if phase == HoverPhase::Leave
-            && let Some(handler) = owner.attachment::<Rc<dyn Fn(Option<TextFieldHoverAnchor>)>>("__textfield_hover")
-        {
-            handler(None);
-        }
-        // The owning style controls chrome; resetting fill here would restart
-        // an interpolation from transparent on every hover.
-        owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set("textFieldHover"));
-    }));
+    registry.set_hover(
+        node,
+        Rc::new(move |phase| {
+            let Some(owner) = Node::upgrade(&hover_node) else {
+                return;
+            };
+            let hovered = phase == HoverPhase::Enter
+                && owner
+                    .composition_value(&crate::adaptive::SurfaceEnvironment::key())
+                    .supports_hover();
+            owner.set_attachment(SCROLLBAR_HOVERED, hovered);
+            if phase == HoverPhase::Leave
+                && let Some(handler) = owner
+                    .attachment::<Rc<dyn Fn(Option<TextFieldHoverAnchor>)>>("__textfield_hover")
+            {
+                handler(None);
+            }
+            // The owning style controls chrome; resetting fill here would restart
+            // an interpolation from transparent on every hover.
+            owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                "textFieldHover",
+            ));
+        }),
+    );
 
     let pointer_node = node.downgrade();
     // Composition state must reach the host so it can show marked text and
@@ -458,16 +495,20 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
     node.set_attachment(
         TextInputAttachmentKey::FOCUS_CHANGE_HANDLER,
         Rc::new(move |focused: bool| {
-            let Some(owner) = Node::upgrade(&report_node) else { return };
+            let Some(owner) = Node::upgrade(&report_node) else {
+                return;
+            };
             if !focused && report_composing.get() {
                 if let Some(handle) = owner.attachment::<Rc<RefCell<FieldState>>>(FIELD_STATE_KEY) {
                     handle.borrow_mut().clear_composition();
                 }
                 report_composing.set(false);
             }
-            if let Some(handler) = owner.attachment::<Rc<dyn Fn()>>(
-                if focused { "__textfield_focus" } else { "__textfield_blur" },
-            ) {
+            if let Some(handler) = owner.attachment::<Rc<dyn Fn()>>(if focused {
+                "__textfield_focus"
+            } else {
+                "__textfield_blur"
+            }) {
                 handler();
             }
         }) as cove_core::scene::TextInputFocusChangeHandler,
@@ -475,147 +516,180 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
 
     let pointer_state = state.clone();
     let behavior = field.behavior.clone();
-    registry.set_pointer(node, InputHandlerRoute::text_input(), Rc::new(move |event, phase, _event_phase| {
-        if event.button != MouseButton::Left {
-            return EventResult::Ignored;
-        }
-        let Some(owner) = Node::upgrade(&pointer_node) else { return EventResult::Ignored };
-        match phase {
-            PointerPhase::Down => {
-                if behavior.clearable
-                    && owner.attachment::<f32>("__textfield_clear_hit").is_some_and(|hit| event.x >= hit)
-                {
-                    let mut state = pointer_state.borrow_mut();
-                    state.buffer = TextBuffer::empty();
-                    state.selection.cursor_index = 0;
-                    state.selection.anchor = None;
-                    state.clear_composition();
-                    state.record_activity();
-                    drop(state);
-                    if let Some(handler) = owner.attachment::<Rc<dyn Fn(&TextBuffer)>>("__textfield_change") {
-                        handler(&TextBuffer::empty());
+    registry.set_pointer(
+        node,
+        InputHandlerRoute::text_input(),
+        Rc::new(move |event, phase, _event_phase| {
+            if event.button != MouseButton::Left {
+                return EventResult::Ignored;
+            }
+            let Some(owner) = Node::upgrade(&pointer_node) else {
+                return EventResult::Ignored;
+            };
+            match phase {
+                PointerPhase::Down => {
+                    if behavior.clearable
+                        && owner
+                            .attachment::<f32>("__textfield_clear_hit")
+                            .is_some_and(|hit| event.x >= hit)
+                    {
+                        let mut state = pointer_state.borrow_mut();
+                        state.buffer = TextBuffer::empty();
+                        state.selection.cursor_index = 0;
+                        state.selection.anchor = None;
+                        state.clear_composition();
+                        state.record_activity();
+                        drop(state);
+                        if let Some(handler) =
+                            owner.attachment::<Rc<dyn Fn(&TextBuffer)>>("__textfield_change")
+                        {
+                            handler(&TextBuffer::empty());
+                        }
+                        return EventResult::Handled;
                     }
-                    return EventResult::Handled;
+                    if let Some(chain) = FocusChainHolder::current() {
+                        chain.focus(Some(&owner), true);
+                    }
+                    if let Some(capture) = PointerCaptureHolder::current() {
+                        capture.acquire(&owner, true);
+                    }
+                    let mut state = pointer_state.borrow_mut();
+                    state.is_dragging = true;
+                    state.is_focused = true;
+                    drop(state);
+                    if let Some(handler) = owner.attachment::<Rc<dyn Fn()>>("__textfield_focus") {
+                        handler();
+                    }
+                    EventResult::Handled
                 }
-                if let Some(chain) = FocusChainHolder::current() {
-                    chain.focus(Some(&owner), true);
+                PointerPhase::Up => {
+                    pointer_state.borrow_mut().is_dragging = false;
+                    if PointerCaptureHolder::current()
+                        .and_then(|capture| capture.target())
+                        .is_some_and(|target| target == owner)
+                        && let Some(capture) = PointerCaptureHolder::current()
+                    {
+                        capture.release();
+                    }
+                    EventResult::Handled
                 }
-                if let Some(capture) = PointerCaptureHolder::current() {
-                    capture.acquire(&owner, true);
-                }
-                let mut state = pointer_state.borrow_mut();
-                state.is_dragging = true;
-                state.is_focused = true;
-                drop(state);
-                if let Some(handler) = owner.attachment::<Rc<dyn Fn()>>("__textfield_focus") {
-                    handler();
-                }
-                EventResult::Handled
             }
-            PointerPhase::Up => {
-                pointer_state.borrow_mut().is_dragging = false;
-                if PointerCaptureHolder::current()
-                    .and_then(|capture| capture.target())
-                    .is_some_and(|target| target == owner)
-                    && let Some(capture) = PointerCaptureHolder::current()
-                {
-                    capture.release();
-                }
-                EventResult::Handled
-            }
-        }
-    }));
+        }),
+    );
 
     let key_node = node.downgrade();
     let key_state = state;
     let key_behavior = field.behavior.clone();
     let key_vertical = field.layout.axis == TextFieldAxis::Vertical;
     let indentation = field.code_editing.indentation_width;
-    registry.set_key(node, InputHandlerRoute::text_input(), Rc::new(move |event, _phase| {
-        let Some(owner) = Node::upgrade(&key_node) else { return EventResult::Ignored };
-        if let Some(custom) = owner.attachment::<Rc<dyn Fn(&cove_platform::KeyEvent) -> bool>>("__textfield_key") {
-            if custom(event) {
-                return EventResult::Handled;
-            }
-        }
-        let mut state = key_state.borrow_mut();
-        match event.scancode {
-            crate::Scancode::ARROW_LEFT => {
-                let target = state.selection.cursor_index.saturating_sub(1);
-                state.move_cursor(target, event.modifiers.has_shift(), None);
-                EventResult::Handled
-            }
-            crate::Scancode::ARROW_RIGHT => {
-                let target = (state.selection.cursor_index + 1).min(state.buffer.character_count());
-                state.move_cursor(target, event.modifiers.has_shift(), None);
-                EventResult::Handled
-            }
-            crate::Scancode::HOME => {
-                let line = state.buffer.line_index_for_character_index(state.selection.cursor_index);
-                let start = state.buffer.line_range(line).start;
-                state.move_cursor(start, event.modifiers.has_shift(), None);
-                EventResult::Handled
-            }
-            crate::Scancode::END => {
-                let line = state.buffer.line_index_for_character_index(state.selection.cursor_index);
-                let end = state.buffer.line_range(line).end;
-                state.move_cursor(end, event.modifiers.has_shift(), None);
-                EventResult::Handled
-            }
-            crate::Scancode::RETURN | crate::Scancode::KEYPAD_ENTER => {
-                if key_vertical {
-                    let newline = indented_newline(
-                        &state.buffer.string_value(),
-                        state.selection.cursor_index,
-                        indentation,
-                        true,
-                    );
-                    insert_replacing_selection(&mut state, &newline);
-                    EventResult::Handled
-                } else if let Some(submit) = owner.attachment::<Rc<dyn Fn()>>("__textfield_submit") {
-                    drop(state);
-                    submit();
-                    EventResult::Handled
-                } else {
-                    EventResult::Ignored
-                }
-            }
-            crate::Scancode::BACKSPACE | crate::Scancode::DELETE => {
-                if key_behavior.read_only {
+    registry.set_key(
+        node,
+        InputHandlerRoute::text_input(),
+        Rc::new(move |event, _phase| {
+            let Some(owner) = Node::upgrade(&key_node) else {
+                return EventResult::Ignored;
+            };
+            if let Some(custom) =
+                owner.attachment::<Rc<dyn Fn(&cove_platform::KeyEvent) -> bool>>("__textfield_key")
+            {
+                if custom(event) {
                     return EventResult::Handled;
                 }
-                if state.selection_range().is_none() {
-                    let cursor = state.selection.cursor_index;
-                    if cursor > 0 {
-                        let buffer = state.buffer.delete((cursor - 1)..cursor);
-                        state.buffer = buffer;
-                        state.selection.cursor_index = cursor - 1;
-                        state.record_activity();
-                    }
-                } else {
-                    delete_selection(&mut state);
-                }
-                EventResult::Handled
             }
-            _ => EventResult::Ignored,
-        }
-    }));
+            let mut state = key_state.borrow_mut();
+            match event.scancode {
+                crate::Scancode::ARROW_LEFT => {
+                    let target = state.selection.cursor_index.saturating_sub(1);
+                    state.move_cursor(target, event.modifiers.has_shift(), None);
+                    EventResult::Handled
+                }
+                crate::Scancode::ARROW_RIGHT => {
+                    let target =
+                        (state.selection.cursor_index + 1).min(state.buffer.character_count());
+                    state.move_cursor(target, event.modifiers.has_shift(), None);
+                    EventResult::Handled
+                }
+                crate::Scancode::HOME => {
+                    let line = state
+                        .buffer
+                        .line_index_for_character_index(state.selection.cursor_index);
+                    let start = state.buffer.line_range(line).start;
+                    state.move_cursor(start, event.modifiers.has_shift(), None);
+                    EventResult::Handled
+                }
+                crate::Scancode::END => {
+                    let line = state
+                        .buffer
+                        .line_index_for_character_index(state.selection.cursor_index);
+                    let end = state.buffer.line_range(line).end;
+                    state.move_cursor(end, event.modifiers.has_shift(), None);
+                    EventResult::Handled
+                }
+                crate::Scancode::RETURN | crate::Scancode::KEYPAD_ENTER => {
+                    if key_vertical {
+                        let newline = indented_newline(
+                            &state.buffer.string_value(),
+                            state.selection.cursor_index,
+                            indentation,
+                            true,
+                        );
+                        insert_replacing_selection(&mut state, &newline);
+                        EventResult::Handled
+                    } else if let Some(submit) =
+                        owner.attachment::<Rc<dyn Fn()>>("__textfield_submit")
+                    {
+                        drop(state);
+                        submit();
+                        EventResult::Handled
+                    } else {
+                        EventResult::Ignored
+                    }
+                }
+                crate::Scancode::BACKSPACE | crate::Scancode::DELETE => {
+                    if key_behavior.read_only {
+                        return EventResult::Handled;
+                    }
+                    if state.selection_range().is_none() {
+                        let cursor = state.selection.cursor_index;
+                        if cursor > 0 {
+                            let buffer = state.buffer.delete((cursor - 1)..cursor);
+                            state.buffer = buffer;
+                            state.selection.cursor_index = cursor - 1;
+                            state.record_activity();
+                        }
+                    } else {
+                        delete_selection(&mut state);
+                    }
+                    EventResult::Handled
+                }
+                _ => EventResult::Ignored,
+            }
+        }),
+    );
 
     let wheel_node = node.downgrade();
-    registry.set_wheel(node, InputHandlerRoute::text_input(), Rc::new(move |event: &MouseWheelEvent, _phase| {
-        let Some(_owner) = Node::upgrade(&wheel_node) else { return EventResult::Ignored };
-        if !event.input.is_continuation()
-            && let (Some(mouse_x), Some(mouse_y)) = (event.mouse_x, event.mouse_y)
-        {
-            let frame = _owner.absolute_frame();
-            if mouse_x < frame.x || mouse_x > frame.x + frame.width
-                || mouse_y < frame.y || mouse_y > frame.y + frame.height
-            {
+    registry.set_wheel(
+        node,
+        InputHandlerRoute::text_input(),
+        Rc::new(move |event: &MouseWheelEvent, _phase| {
+            let Some(_owner) = Node::upgrade(&wheel_node) else {
                 return EventResult::Ignored;
+            };
+            if !event.input.is_continuation()
+                && let (Some(mouse_x), Some(mouse_y)) = (event.mouse_x, event.mouse_y)
+            {
+                let frame = _owner.absolute_frame();
+                if mouse_x < frame.x
+                    || mouse_x > frame.x + frame.width
+                    || mouse_y < frame.y
+                    || mouse_y > frame.y + frame.height
+                {
+                    return EventResult::Ignored;
+                }
             }
-        }
-        EventResult::Ignored
-    }));
+            EventResult::Ignored
+        }),
+    );
 }
 
 fn insert_replacing_selection(state: &mut FieldState, incoming: &str) {
@@ -627,14 +701,17 @@ fn insert_replacing_selection(state: &mut FieldState, incoming: &str) {
     let removed = selection.map_or(0, |(low, high)| high - low);
     state.buffer = state.buffer.replace(cursor..(cursor + removed), incoming);
     state.clear_composition();
-    state.selection.cursor_index = (cursor + incoming.chars().count()).min(state.buffer.character_count());
+    state.selection.cursor_index =
+        (cursor + incoming.chars().count()).min(state.buffer.character_count());
     state.selection.anchor = None;
     state.selection.set_preferred_caret_x(None);
     state.record_activity();
 }
 
 fn delete_selection(state: &mut FieldState) -> bool {
-    let Some((low, high)) = state.selection_range() else { return false };
+    let Some((low, high)) = state.selection_range() else {
+        return false;
+    };
     state.buffer = state.buffer.delete(low..high);
     state.selection.cursor_index = low;
     state.selection.anchor = None;
@@ -645,7 +722,11 @@ fn delete_selection(state: &mut FieldState) -> bool {
 /// Advance width of one space in `font`, used to align indent guides.
 fn space_width_for(font: &cove_core::Font, environment: &TextEnvironment) -> f32 {
     let shaped = environment.shape(" ", Some(font));
-    shaped.iter().map(|glyph| glyph.x_advance).sum::<f32>().max(1.0)
+    shaped
+        .iter()
+        .map(|glyph| glyph.x_advance)
+        .sum::<f32>()
+        .max(1.0)
 }
 
 fn render(
@@ -668,7 +749,11 @@ fn render(
     } else {
         theme.inputs.background
     };
-    let _ = list.add_rounded_rect(Rect::new(origin.x, origin.y, frame.width, frame.height), radius, background);
+    let _ = list.add_rounded_rect(
+        Rect::new(origin.x, origin.y, frame.width, frame.height),
+        radius,
+        background,
+    );
     if border_width > 0.0 {
         let _ = list.add_rounded_rect_stroke(
             Rect::new(origin.x, origin.y, frame.width, frame.height),
@@ -678,7 +763,9 @@ fn render(
         );
     }
 
-    let Some(environment) = TextEnvironmentHolder::current() else { return };
+    let Some(environment) = TextEnvironmentHolder::current() else {
+        return;
+    };
     let token = SemanticFontRef::body().resolve(&theme);
     let line_height = token.line_height;
     let font = token.font.clone();
@@ -711,14 +798,19 @@ fn render(
         line_height,
         token.letter_spacing,
         environment.atlas_texture_id as u64,
-        if is_vertical { available_width } else { f32::INFINITY },
+        if is_vertical {
+            available_width
+        } else {
+            f32::INFINITY
+        },
         render_state.shows_placeholder,
     );
     let mut document = TextDocumentLayout::new(render_state.buffer.clone(), geometry);
     let vertical_inset = field.vertical_inset(line_height);
     state.scroll.visible_height = (frame.height - vertical_inset * 2.0).max(line_height);
     update_scroll(&mut state.scroll, &document, line_height);
-    let first_row = ((state.scroll.offset_y / line_height.max(1.0)).floor() as usize).saturating_sub(1);
+    let first_row =
+        ((state.scroll.offset_y / line_height.max(1.0)).floor() as usize).saturating_sub(1);
     let row_count = ((state.scroll.visible_height / line_height.max(1.0)).ceil() as usize) + 3;
     let layout = document.visible_layout(first_row, row_count, &environment);
 
@@ -744,7 +836,10 @@ fn render(
             field.code_editing.indentation_width.unwrap_or(4),
             space_width_for(&font, &environment),
             line_height,
-            (state.scroll.horizontal.offset, state.scroll.horizontal.offset + available_width),
+            (
+                state.scroll.horizontal.offset,
+                state.scroll.horizontal.offset + available_width,
+            ),
         );
         for segment in segments {
             let _ = list.add_rect(
@@ -760,15 +855,34 @@ fn render(
     }
 
     // Selection band under the glyphs.
-    if let Some((low, high)) = render_state.composition_range.or_else(|| state.selection_range()) {
-        let color = field.decoration.selection_color.unwrap_or(theme.colors.selection);
-        draw_range(list, &render_state.buffer, &layout, text_origin, line_height, low, high, color);
+    if let Some((low, high)) = render_state
+        .composition_range
+        .or_else(|| state.selection_range())
+    {
+        let color = field
+            .decoration
+            .selection_color
+            .unwrap_or(theme.colors.selection);
+        draw_range(
+            list,
+            &render_state.buffer,
+            &layout,
+            text_origin,
+            line_height,
+            low,
+            high,
+            color,
+        );
     }
 
     if let Ok(()) = list.add_text(
         &layout,
         text_origin,
-        if render_state.shows_placeholder { placeholder_color } else { text_color },
+        if render_state.shows_placeholder {
+            placeholder_color
+        } else {
+            text_color
+        },
         environment.atlas_texture_id,
         Some(&environment.atlas),
         None,
@@ -810,8 +924,14 @@ fn draw_range(
         if lower > line.end_cluster as usize || upper <= line.start_cluster as usize {
             continue;
         }
-        let x_low = super::text_field_layout_engine::row_x_at_byte(line, lower.max(line.start_cluster as usize));
-        let x_high = super::text_field_layout_engine::row_x_at_byte(line, upper.min(line.end_cluster as usize));
+        let x_low = super::text_field_layout_engine::row_x_at_byte(
+            line,
+            lower.max(line.start_cluster as usize),
+        );
+        let x_high = super::text_field_layout_engine::row_x_at_byte(
+            line,
+            upper.min(line.end_cluster as usize),
+        );
         let _ = list.add_rect(
             Rect::new(
                 text_origin.x + x_low,

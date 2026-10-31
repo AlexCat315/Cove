@@ -16,7 +16,9 @@ pub enum InvalidationSource {
 }
 impl InvalidationSource {
     pub fn style_set(field: impl Into<String>) -> Self {
-        Self::StyleSet { field: field.into() }
+        Self::StyleSet {
+            field: field.into(),
+        }
     }
 }
 
@@ -49,14 +51,31 @@ pub struct DirtyReason {
 }
 impl DirtyReason {
     pub fn new(target: ElementId, source: InvalidationSource, phase: InvalidationPhase) -> Self {
-        Self { target, source, phase, timestamp: unix_seconds() }
+        Self {
+            target,
+            source,
+            phase,
+            timestamp: unix_seconds(),
+        }
     }
-    pub fn at(target: ElementId, source: InvalidationSource, phase: InvalidationPhase, timestamp: f64) -> Self {
-        Self { target, source, phase, timestamp }
+    pub fn at(
+        target: ElementId,
+        source: InvalidationSource,
+        phase: InvalidationPhase,
+        timestamp: f64,
+    ) -> Self {
+        Self {
+            target,
+            source,
+            phase,
+            timestamp,
+        }
     }
 }
 fn unix_seconds() -> f64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map_or(0.0, |elapsed| elapsed.as_secs_f64())
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0.0, |elapsed| elapsed.as_secs_f64())
 }
 
 #[derive(Debug)]
@@ -82,7 +101,9 @@ impl Ring {
         if self.buffer.len() < self.capacity {
             return self.buffer.clone();
         }
-        (0..self.capacity).map(|offset| self.buffer[(self.head + offset) % self.capacity].clone()).collect()
+        (0..self.capacity)
+            .map(|offset| self.buffer[(self.head + offset) % self.capacity].clone())
+            .collect()
     }
 }
 
@@ -96,17 +117,31 @@ impl InvalidationLog {
     pub const DEFAULT_CAPACITY: usize = 256;
     pub fn new(capacity: usize) -> Self {
         let capacity = capacity.max(1);
-        Self { ring: Mutex::new(Ring { buffer: Vec::with_capacity(capacity), head: 0, capacity }), capacity }
+        Self {
+            ring: Mutex::new(Ring {
+                buffer: Vec::with_capacity(capacity),
+                head: 0,
+                capacity,
+            }),
+            capacity,
+        }
     }
     pub fn capacity(&self) -> usize {
         self.capacity
     }
     pub fn record(&self, reason: DirtyReason) {
-        self.ring.lock().unwrap_or_else(|error| error.into_inner()).record(reason);
+        self.ring
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .record(reason);
     }
     /// Recorded entries in oldest-to-newest order, optionally limited to the newest `limit`.
     pub fn snapshot(&self, limit: Option<usize>) -> Vec<DirtyReason> {
-        let entries = self.ring.lock().unwrap_or_else(|error| error.into_inner()).oldest_first();
+        let entries = self
+            .ring
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .oldest_first();
         match limit {
             Some(limit) if entries.len() > limit => entries[entries.len() - limit..].to_vec(),
             _ => entries,
@@ -156,9 +191,18 @@ mod tests {
     fn ring_reports_oldest_first_after_wrap() {
         let log = InvalidationLog::new(3);
         for index in 0..5 {
-            log.record(DirtyReason::at(ElementId(index), InvalidationSource::Unknown, InvalidationPhase::Render, index as f64));
+            log.record(DirtyReason::at(
+                ElementId(index),
+                InvalidationSource::Unknown,
+                InvalidationPhase::Render,
+                index as f64,
+            ));
         }
-        let timestamps: Vec<_> = log.snapshot(None).iter().map(|entry| entry.timestamp).collect();
+        let timestamps: Vec<_> = log
+            .snapshot(None)
+            .iter()
+            .map(|entry| entry.timestamp)
+            .collect();
         assert_eq!(timestamps, vec![2.0, 3.0, 4.0]);
         assert_eq!(log.snapshot(Some(2)).len(), 2);
         log.clear();
@@ -169,9 +213,17 @@ mod tests {
         let first = Arc::new(InvalidationLog::default());
         let second = Arc::new(InvalidationLog::default());
         InvalidationLogHolder::with(Some(first.clone()), || {
-            assert!(Arc::ptr_eq(&InvalidationLogHolder::current().unwrap(), &first));
-            InvalidationLogHolder::with(Some(second), || assert_eq!(InvalidationLogHolder::current().unwrap().capacity(), 256));
-            assert!(Arc::ptr_eq(&InvalidationLogHolder::current().unwrap(), &first));
+            assert!(Arc::ptr_eq(
+                &InvalidationLogHolder::current().unwrap(),
+                &first
+            ));
+            InvalidationLogHolder::with(Some(second), || {
+                assert_eq!(InvalidationLogHolder::current().unwrap().capacity(), 256)
+            });
+            assert!(Arc::ptr_eq(
+                &InvalidationLogHolder::current().unwrap(),
+                &first
+            ));
         });
         assert!(InvalidationLogHolder::current().is_none());
     }

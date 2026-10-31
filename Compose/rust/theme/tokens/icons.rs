@@ -1,12 +1,12 @@
 //! Translation of Theme/Tokens/Icons.swift.
+use super::TextScaler;
+use crate::theme::Theme;
+use crate::{AnyView, PrimitiveView, View, ViewKind};
 use cove_core::scene::{CompositionLocal, LayoutNode, Node};
 use cove_imaging::BundleImageResource;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
-use crate::{AnyView, PrimitiveView, View, ViewKind};
-use super::TextScaler;
-use crate::theme::Theme;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct IconTheme {
@@ -18,7 +18,13 @@ pub struct IconTheme {
 }
 impl Default for IconTheme {
     fn default() -> Self {
-        Self { small: 12.0, medium: 16.0, large: 24.0, scaling: IconScaling::Text, replacements: HashMap::new() }
+        Self {
+            small: 12.0,
+            medium: 16.0,
+            large: 24.0,
+            scaling: IconScaling::Text,
+            replacements: HashMap::new(),
+        }
     }
 }
 impl IconTheme {
@@ -31,7 +37,10 @@ impl IconTheme {
         self.replacements.insert(resource.to_string(), replacement);
     }
     pub fn resolve(&self, resource: &BundleImageResource) -> BundleImageResource {
-        self.replacements.get(&resource.to_string()).cloned().unwrap_or_else(|| resource.clone())
+        self.replacements
+            .get(&resource.to_string())
+            .cloned()
+            .unwrap_or_else(|| resource.clone())
     }
 }
 
@@ -64,7 +73,9 @@ pub struct IconMetrics {
 impl IconMetrics {
     pub fn new(node: &Node) -> Self {
         let theme = crate::theme::theme_for_node(node);
-        let scaling = node.composition_value(&IconScalingEnvironment::key()).unwrap_or(theme.icons.scaling);
+        let scaling = node
+            .composition_value(&IconScalingEnvironment::key())
+            .unwrap_or(theme.icons.scaling);
         let factor = match scaling {
             IconScaling::Text => crate::theme::node_text_scaler(node).factor(),
             IconScaling::Fixed => 1.0,
@@ -73,7 +84,11 @@ impl IconMetrics {
         Self { theme, factor }
     }
     pub fn size(&self, points: f32) -> f32 {
-        let points = if points.is_finite() { points.max(1.0) } else { 16.0 };
+        let points = if points.is_finite() {
+            points.max(1.0)
+        } else {
+            16.0
+        };
         points * self.factor
     }
     pub fn size_role(&self, role: &SemanticIconSize) -> f32 {
@@ -97,7 +112,9 @@ pub struct IconMetricsReader<Content: View> {
 }
 impl<Content: View> IconMetricsReader<Content> {
     pub fn new(content: impl Fn(&Node) -> Content + 'static) -> Self {
-        Self { content: Rc::new(content) }
+        Self {
+            content: Rc::new(content),
+        }
     }
 }
 impl<Content: View + 'static> PrimitiveView for IconMetricsReader<Content> {
@@ -130,14 +147,22 @@ pub struct SemanticIconSize {
 }
 impl SemanticIconSize {
     pub fn new(resolve: impl Fn(&Theme) -> f32 + 'static) -> Self {
-        Self { resolve: Arc::new(resolve) }
+        Self {
+            resolve: Arc::new(resolve),
+        }
     }
     pub fn resolve(&self, theme: &Theme) -> f32 {
         (self.resolve)(theme)
     }
-    pub fn small() -> Self { Self::new(|theme| theme.icons.small) }
-    pub fn medium() -> Self { Self::new(|theme| theme.icons.medium) }
-    pub fn large() -> Self { Self::new(|theme| theme.icons.large) }
+    pub fn small() -> Self {
+        Self::new(|theme| theme.icons.small)
+    }
+    pub fn medium() -> Self {
+        Self::new(|theme| theme.icons.medium)
+    }
+    pub fn large() -> Self {
+        Self::new(|theme| theme.icons.large)
+    }
 }
 
 pub trait IconScalingViewExt: View + Sized + 'static {
@@ -151,4 +176,6 @@ impl<T: View + Sized + 'static> IconScalingViewExt for T {}
 
 // `Node::iconMetrics` / `Node::iconScalingOverride` are free functions in Rust
 // because inherent impls cannot be added from this crate.
-pub use self::{icon_metrics as node_icon_metrics, icon_scaling_override as node_icon_scaling_override};
+pub use self::{
+    icon_metrics as node_icon_metrics, icon_scaling_override as node_icon_scaling_override,
+};

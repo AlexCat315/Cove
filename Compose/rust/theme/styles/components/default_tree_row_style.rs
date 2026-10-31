@@ -4,12 +4,12 @@
 //! enough selection contrast to read as an outline tree in an editor shell. The
 //! navigation highlight leaves the hierarchy gutter clear; subtle vertical guides
 //! carry depth without connecting horizontal strokes to the row chrome.
-use cove_core::scene::Node;
-use cove_core::Color;
 use crate::modifiers::layout::{FlexExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::theme::SemanticColorRef;
 use crate::{AnyView, Row, Spacer, TupleView, VerticalAlignment, View, ViewExt};
+use cove_core::Color;
+use cove_core::scene::Node;
 
 use super::tree_row_style::{TreeRowStyle, TreeRowStyleConfiguration};
 
@@ -23,7 +23,11 @@ impl TreeRowStyle for DefaultTreeRowStyle {
         // A selected row is a solid accent band with a light label, matching the
         // reference; an unselected hover is a neutral surface face.
         let background = if configuration.is_selected {
-            if configuration.is_hovered { colors.accent_hover } else { colors.accent }
+            if configuration.is_hovered {
+                colors.accent_hover
+            } else {
+                colors.accent
+            }
         } else if configuration.is_search_hit {
             colors.state_layer_selected
         } else if configuration.is_hovered {
@@ -75,10 +79,15 @@ impl cove_composition::ViewModifier for TreeRowFill {
     fn apply_node(&self, node: &Node) {
         let background = self.background;
         let weak = node.downgrade();
-        node.animatable_set_optional("treeRow.background", node.background_color(), Some(background), move |value| {
-            if let Some(owner) = Node::upgrade(&weak) {
-                owner.set_background_color(value);
-            }
-        });
+        node.animatable_set_optional(
+            "treeRow.background",
+            node.background_color(),
+            Some(background),
+            move |value| {
+                if let Some(owner) = Node::upgrade(&weak) {
+                    owner.set_background_color(value);
+                }
+            },
+        );
     }
 }

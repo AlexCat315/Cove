@@ -16,7 +16,7 @@ pub mod counter;
 pub mod frame;
 pub mod prototype;
 
-pub use frame::{viewport_size, Batch, Frame, Label};
+pub use frame::{Batch, Frame, Label, viewport_size};
 pub use prototype::BrowserPrototype;
 
 use std::cell::RefCell;

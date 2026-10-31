@@ -131,7 +131,11 @@ impl SidebarGeometry {
         resizing: &SidebarResizeOptions,
         handle_extent: f32,
     ) -> Self {
-        let viewport_width = if width.is_finite() { width.max(0.0) } else { 0.0 };
+        let viewport_width = if width.is_finite() {
+            width.max(0.0)
+        } else {
+            0.0
+        };
         let fitting = if viewport_width < policy.compact_maximum_width {
             SidebarMode::Compact
         } else if viewport_width < policy.expanded_minimum_width {
@@ -140,7 +144,11 @@ impl SidebarGeometry {
             SidebarMode::Expanded
         };
         let is_collapsed = fitting == SidebarMode::Expanded && is_collapsed;
-        let mode = if is_collapsed { SidebarMode::Rail } else { fitting };
+        let mode = if is_collapsed {
+            SidebarMode::Rail
+        } else {
+            fitting
+        };
         let initial_range = resizing.range(viewport_width, handle_extent);
         let resize_handle_width = if mode == SidebarMode::Expanded
             && requested_width.is_some()
@@ -160,7 +168,13 @@ impl SidebarGeometry {
         };
         let docked_width = match mode {
             SidebarMode::Expanded => resolved.min(viewport_width),
-            SidebarMode::Rail => if policy.shows_rail_labels { 72.0 } else { 56.0 },
+            SidebarMode::Rail => {
+                if policy.shows_rail_labels {
+                    72.0
+                } else {
+                    56.0
+                }
+            }
             SidebarMode::Compact => 0.0,
         };
         let is_modal = mode != SidebarMode::Expanded && is_presented;
@@ -186,11 +200,16 @@ impl SidebarGeometry {
     }
 
     /// Rail is the presentation used whenever the shell is not docked.
-    pub fn presentation(&self, shows_rail_labels: bool) -> super::presentation::SidebarPresentation {
+    pub fn presentation(
+        &self,
+        shows_rail_labels: bool,
+    ) -> super::presentation::SidebarPresentation {
         match self.mode {
             SidebarMode::Expanded => super::presentation::SidebarPresentation::Expanded,
             SidebarMode::Rail | SidebarMode::Compact => {
-                super::presentation::SidebarPresentation::Rail { shows_labels: shows_rail_labels }
+                super::presentation::SidebarPresentation::Rail {
+                    shows_labels: shows_rail_labels,
+                }
             }
         }
     }

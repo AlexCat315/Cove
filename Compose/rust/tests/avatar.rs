@@ -12,18 +12,14 @@
 mod support;
 
 use cove_composition::{AnyView, View};
-use cove_core::scene::{
-    AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap,
-};
-use cove_ui_compose::primitives::data::avatar::avatar::{
-    Avatar, AvatarIdentity, AvatarShape,
-};
+use cove_core::Color;
+use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
+use cove_ui_compose::BoxView;
+use cove_ui_compose::primitives::data::avatar::avatar::{Avatar, AvatarIdentity, AvatarShape};
 use cove_ui_compose::primitives::data::avatar::group::{
     AvatarGroup, AvatarGroupGeometry, AvatarOverflow,
 };
-use cove_core::Color;
 use cove_ui_compose::theme::tokens::ControlSize;
-use cove_ui_compose::BoxView;
 
 use support::GlobalTestLock;
 
@@ -45,7 +41,10 @@ fn all(graph: &std::rc::Rc<cove_composition::ViewGraph>) -> Vec<Node> {
 fn find_role(nodes: &[Node], role: AccessibilityRole) -> Option<Node> {
     nodes
         .iter()
-        .find(|node| node.accessibility().is_some_and(|semantics| semantics.role == role))
+        .find(|node| {
+            node.accessibility()
+                .is_some_and(|semantics| semantics.role == role)
+        })
         .cloned()
 }
 
@@ -97,7 +96,10 @@ fn identity_hue_is_deterministic_and_derived_from_the_initials() {
         AvatarIdentity::hue_index("ÉZ"),
         "the same spelling always resolves to the same hue"
     );
-    assert!(precomposed < 12, "the hue index stays inside the 12-slot ramp");
+    assert!(
+        precomposed < 12,
+        "the hue index stays inside the 12-slot ramp"
+    );
 
     assert_eq!(
         AvatarIdentity::hue_index(&Avatar::new("Jason Lee").initials()),
@@ -231,7 +233,11 @@ fn group_bounds_children_and_stacks_earlier_members_on_top() {
             (step - 33.6).abs() <= 0.5,
             "slots step by 33.6 (got {step})"
         );
-        assert_eq!(slots[0].frame().x, 0.0, "the first slot starts at the origin");
+        assert_eq!(
+            slots[0].frame().x,
+            0.0,
+            "the first slot starts at the origin"
+        );
         assert!(
             (slots[2].frame().x - 67.2).abs() <= 0.5,
             "the third slot sits two steps in (got {})",

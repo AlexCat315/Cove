@@ -4,11 +4,11 @@
 //! pie labels. Text placement is resolved at layout time when the plot rect is
 //! known; the label primitive carries its strings for the text host (the
 //! `Text` primitive has no Rust counterpart yet).
+use crate::{Layout, LayoutSubview, PrimitiveView, ProposedViewSize, impl_primitive_view};
 use cove_core::scene::{Align, FlexDirection, LayoutNode, Node, Point, Rect, Size};
-use crate::{impl_primitive_view, Layout, LayoutSubview, PrimitiveView, ProposedViewSize};
 
 use crate::theme::tokens::SemanticColorRef;
-use crate::theme::{theme_for_node, Theme};
+use crate::theme::{Theme, theme_for_node};
 
 use super::axis::ChartText;
 use super::cache::ChartResolutionCache;
@@ -74,7 +74,13 @@ pub struct ChartOverlayPlacement {
 }
 impl ChartOverlayPlacement {
     pub fn new(anchor: Point, horizontal: f32, vertical: f32) -> Self {
-        Self { anchor, horizontal, vertical, gap: 0.0, flips: false }
+        Self {
+            anchor,
+            horizontal,
+            vertical,
+            gap: 0.0,
+            flips: false,
+        }
     }
     pub fn gap(mut self, gap: f32) -> Self {
         self.gap = gap;
@@ -132,34 +138,61 @@ pub struct ChartOverlayLayout {
 }
 impl Layout for ChartOverlayLayout {
     fn size_that_fits(&self, proposal: ProposedViewSize, _subviews: &[LayoutSubview]) -> Size {
-        Size { width: proposal.width.unwrap_or(0.0), height: proposal.height.unwrap_or(0.0) }
+        Size {
+            width: proposal.width.unwrap_or(0.0),
+            height: proposal.height.unwrap_or(0.0),
+        }
     }
 
-    fn place_subviews(&self, bounds: Rect, _proposal: ProposedViewSize, subviews: &[LayoutSubview]) {
+    fn place_subviews(
+        &self,
+        bounds: Rect,
+        _proposal: ProposedViewSize,
+        subviews: &[LayoutSubview],
+    ) {
         let text = ChartText::new(&self.theme);
         let slots = self.plot.overlay_slots(
-            Some(Size { width: bounds.width, height: bounds.height }),
+            Some(Size {
+                width: bounds.width,
+                height: bounds.height,
+            }),
             &text,
             self.cache.clone(),
         );
         for (index, subview) in subviews.iter().enumerate() {
             let Some(slot) = slots.get(index) else {
-                subview.place(Point::new(bounds.x, bounds.y), ProposedViewSize::ZERO, false);
+                subview.place(
+                    Point::new(bounds.x, bounds.y),
+                    ProposedViewSize::ZERO,
+                    false,
+                );
                 continue;
             };
             let Some(placement) = slot.placement else {
-                subview.place(Point::new(bounds.x, bounds.y), ProposedViewSize::ZERO, false);
+                subview.place(
+                    Point::new(bounds.x, bounds.y),
+                    ProposedViewSize::ZERO,
+                    false,
+                );
                 continue;
             };
             let size = subview.size_that_fits(ProposedViewSize::UNSPECIFIED);
             let mut rect = placement.box_rect(size.width, size.height);
             rect.x += bounds.x;
             rect.y += bounds.y;
-            if placement.flips && (rect.y < bounds.y || rect.y + rect.height > bounds.y + bounds.height) {
+            if placement.flips
+                && (rect.y < bounds.y || rect.y + rect.height > bounds.y + bounds.height)
+            {
                 rect.y = bounds.y + placement.flipped_y(size.height);
             }
-            rect.x = rect.x.max(bounds.x).min(bounds.x + bounds.width - size.width);
-            rect.y = rect.y.max(bounds.y).min(bounds.y + bounds.height - size.height);
+            rect.x = rect
+                .x
+                .max(bounds.x)
+                .min(bounds.x + bounds.width - size.width);
+            rect.y = rect
+                .y
+                .max(bounds.y)
+                .min(bounds.y + bounds.height - size.height);
             subview.place(
                 Point::new(rect.x, rect.y),
                 ProposedViewSize::new(Some(size.width), Some(size.height)),
@@ -204,7 +237,11 @@ impl PrimitiveView for ChartOverlayLabel {
         node.set_attachment("chart.label.subtitle", self.item.subtitle.clone());
         node.set_attachment(
             "chart.label.rows",
-            self.item.rows.iter().map(|row| (row.title.clone(), row.value.clone())).collect::<Vec<_>>(),
+            self.item
+                .rows
+                .iter()
+                .map(|row| (row.title.clone(), row.value.clone()))
+                .collect::<Vec<_>>(),
         );
         let theme = theme_for_node(node);
         match self.item.kind {

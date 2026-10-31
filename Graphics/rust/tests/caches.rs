@@ -10,20 +10,32 @@ fn layout_keyed_by_full_id_list() {
     let mut cache = PipelineLayoutCache::new();
     cache.insert(
         10,
-        PipelineInterfaceKey { set_layouts: vec![1, 2], push_constants: vec![] },
+        PipelineInterfaceKey {
+            set_layouts: vec![1, 2],
+            push_constants: vec![],
+        },
     );
     cache.insert(
         11,
-        PipelineInterfaceKey { set_layouts: vec![2, 1], push_constants: vec![] },
+        PipelineInterfaceKey {
+            set_layouts: vec![2, 1],
+            push_constants: vec![],
+        },
     );
 
     // Order matters: [1,2] and [2,1] are distinct layouts.
     assert_eq!(
-        cache.layout(&PipelineInterfaceKey { set_layouts: vec![1, 2], push_constants: vec![] }),
+        cache.layout(&PipelineInterfaceKey {
+            set_layouts: vec![1, 2],
+            push_constants: vec![]
+        }),
         Some(10)
     );
     assert_eq!(
-        cache.layout(&PipelineInterfaceKey { set_layouts: vec![2, 1], push_constants: vec![] }),
+        cache.layout(&PipelineInterfaceKey {
+            set_layouts: vec![2, 1],
+            push_constants: vec![]
+        }),
         Some(11)
     );
 }
@@ -32,7 +44,10 @@ fn layout_keyed_by_full_id_list() {
 fn unknown_layout_returns_none() {
     let cache = PipelineLayoutCache::new();
     assert_eq!(
-        cache.layout(&PipelineInterfaceKey { set_layouts: vec![9], push_constants: vec![] }),
+        cache.layout(&PipelineInterfaceKey {
+            set_layouts: vec![9],
+            push_constants: vec![]
+        }),
         None
     );
 }
@@ -42,14 +57,23 @@ fn reinserting_same_layout_overwrites() {
     let mut cache = PipelineLayoutCache::new();
     cache.insert(
         10,
-        PipelineInterfaceKey { set_layouts: vec![1], push_constants: vec![] },
+        PipelineInterfaceKey {
+            set_layouts: vec![1],
+            push_constants: vec![],
+        },
     );
     cache.insert(
         12,
-        PipelineInterfaceKey { set_layouts: vec![1], push_constants: vec![] },
+        PipelineInterfaceKey {
+            set_layouts: vec![1],
+            push_constants: vec![],
+        },
     );
     assert_eq!(
-        cache.layout(&PipelineInterfaceKey { set_layouts: vec![1], push_constants: vec![] }),
+        cache.layout(&PipelineInterfaceKey {
+            set_layouts: vec![1],
+            push_constants: vec![]
+        }),
         Some(12)
     );
 }
@@ -59,11 +83,19 @@ fn uniform_ranges_do_not_alias() {
     let mut cache = BindingSetCache::new();
     let small = [BindingSetEntry::new(
         0,
-        BindingResource::UniformBuffer { buffer: Buffer::new(1), offset: 0, size: Some(16) },
+        BindingResource::UniformBuffer {
+            buffer: Buffer::new(1),
+            offset: 0,
+            size: Some(16),
+        },
     )];
     let large = [BindingSetEntry::new(
         0,
-        BindingResource::UniformBuffer { buffer: Buffer::new(1), offset: 0, size: Some(192) },
+        BindingResource::UniformBuffer {
+            buffer: Buffer::new(1),
+            offset: 0,
+            size: Some(192),
+        },
     )];
     cache.insert(100, 5, &small);
     assert_eq!(cache.existing(5, &small), Some(100));

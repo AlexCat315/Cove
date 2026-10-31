@@ -9,15 +9,15 @@ pub mod minimap;
 pub mod occurrences;
 
 pub use folding_options::{TextEditorFolding, TextFoldRegion, TextFoldingLabels, TextLineRebase};
-pub use gutter_options::{
-    TextBreakpoint, TextBreakpointState, TextEditorAnnotations, TextEditorGutter,
-    TextGutterLabels, TextGutterMarker,
-};
-pub use gutter_geometry::{TextGutterControl, TextGutterControlKind, TextGutterGeometry};
 pub use gutter_controls::TextGutterControls;
+pub use gutter_geometry::{TextGutterControl, TextGutterControlKind, TextGutterGeometry};
 pub use gutter_layout::{
-    GutterRow, distinct_lines, folded_breakpoint_is_active, folded_breakpoints, gutter_geometry,
-    update_gutter_controls, TextGutterInputs,
+    GutterRow, TextGutterInputs, distinct_lines, folded_breakpoint_is_active, folded_breakpoints,
+    gutter_geometry, update_gutter_controls,
+};
+pub use gutter_options::{
+    TextBreakpoint, TextBreakpointState, TextEditorAnnotations, TextEditorGutter, TextGutterLabels,
+    TextGutterMarker,
 };
 pub use gutter_session::{TextFoldSession, TextGutterSession};
 pub use minimap::{MinimapGeometry, MinimapRow};

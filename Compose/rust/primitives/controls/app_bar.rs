@@ -5,19 +5,21 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cove_core::scene::{AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, Justify, Node, Wrap};
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::controls::button::{Button, ButtonIconSource, ButtonRole};
 use crate::primitives::controls::toolbar::{
-    toolbar_height, Toolbar, ToolbarCommandPresentation, ToolbarCommands, ToolbarDividerEdge,
-    ToolbarItem, ToolbarOptions,
+    Toolbar, ToolbarCommandPresentation, ToolbarCommands, ToolbarDividerEdge, ToolbarItem,
+    ToolbarOptions, toolbar_height,
 };
 use crate::primitives::media::ui_icon_catalog;
 use crate::primitives::overlays::menu::MenuItem;
 use crate::primitives::text::Text;
-use crate::theme::{theme_for_node, SemanticColorRef, SemanticFontRef};
+use crate::theme::{SemanticColorRef, SemanticFontRef, theme_for_node};
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
+use cove_core::scene::{
+    AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, Justify, Node, Wrap,
+};
 
 /// Width below which the bar is compact.
 pub const DEFAULT_COMPACT_MAXIMUM_WIDTH: f32 = 600.0;
@@ -78,7 +80,10 @@ pub struct AppBar {
 impl AppBar {
     pub fn new(title: impl Into<String>) -> Self {
         let actions: Vec<ToolbarItem> = Vec::new();
-        assert!(has_unique_ids(None, &actions), "AppBar command IDs must be unique");
+        assert!(
+            has_unique_ids(None, &actions),
+            "AppBar command IDs must be unique"
+        );
         Self {
             title: title.into(),
             subtitle: None,
@@ -107,7 +112,10 @@ impl AppBar {
     }
 
     pub fn actions(mut self, actions: Vec<ToolbarItem>) -> Self {
-        assert!(has_unique_ids(self.primary.as_ref(), &actions), "AppBar command IDs must be unique");
+        assert!(
+            has_unique_ids(self.primary.as_ref(), &actions),
+            "AppBar command IDs must be unique"
+        );
         self.actions = actions;
         self
     }
@@ -122,7 +130,10 @@ impl AppBar {
     fn items(&self, compact: bool) -> Vec<ToolbarItem> {
         let capacity = (if compact { 1 } else { 3 }) - usize::from(self.primary.is_some());
         let mut candidates: Vec<usize> = (0..self.actions.len())
-            .filter(|index| self.actions[*index].placement != crate::primitives::controls::ToolbarItemPlacement::Overflow)
+            .filter(|index| {
+                self.actions[*index].placement
+                    != crate::primitives::controls::ToolbarItemPlacement::Overflow
+            })
             .collect();
         // Higher priority inlines first; ties keep source order.
         candidates.sort_by(|lhs, rhs| {
@@ -133,7 +144,11 @@ impl AppBar {
         let inline: Vec<usize> = candidates.into_iter().take(capacity).collect();
         let mut items: Vec<ToolbarItem> = Vec::new();
         if let Some(primary) = self.primary.as_ref() {
-            items.push(primary.clone().placement(crate::primitives::controls::ToolbarItemPlacement::Always));
+            items.push(
+                primary
+                    .clone()
+                    .placement(crate::primitives::controls::ToolbarItemPlacement::Always),
+            );
         }
         for (index, item) in self.actions.iter().enumerate() {
             items.push(item.clone().placement(if inline.contains(&index) {
@@ -173,11 +188,20 @@ impl View for AppBar {
         let bar = self.snapshot();
         // Container size decides compactness, so the whole bar rebuilds when the
         // allocation crosses the breakpoint.
-        AnyView::new(crate::adaptive::ContainerSizeReader::new(move |size: cove_core::Size| {
-            let width = if size.width > 0.0 { size.width } else { *bar.width.borrow() };
-            *bar.width.borrow_mut() = width;
-            AnyView::new(AppBarHost { bar: bar.snapshot(), width })
-        }))
+        AnyView::new(crate::adaptive::ContainerSizeReader::new(
+            move |size: cove_core::Size| {
+                let width = if size.width > 0.0 {
+                    size.width
+                } else {
+                    *bar.width.borrow()
+                };
+                *bar.width.borrow_mut() = width;
+                AnyView::new(AppBarHost {
+                    bar: bar.snapshot(),
+                    width,
+                })
+            },
+        ))
     }
 }
 
@@ -216,7 +240,11 @@ impl PrimitiveView for AppBarHost {
         // tooltip.
         let title = bar.title.clone();
         let subtitle = bar.subtitle.clone();
-        let combined_subtitle = if compact { subtitle.clone().unwrap_or_default() } else { String::new() };
+        let combined_subtitle = if compact {
+            subtitle.clone().unwrap_or_default()
+        } else {
+            String::new()
+        };
         children.push(AnyView::new(AppBarHeading {
             title: title.clone(),
             subtitle: if compact { None } else { subtitle },
@@ -225,49 +253,75 @@ impl PrimitiveView for AppBarHost {
 
         // Commands take at most half the row; the heading keeps the rest.
         let gap = 8.0;
-        let available = (self.width - 16.0 - if bar.back.is_some() { 44.0 } else { 0.0 } - gap).max(0.0);
+        let available =
+            (self.width - 16.0 - if bar.back.is_some() { 44.0 } else { 0.0 } - gap).max(0.0);
         let primary_width: f32 = match bar.primary.as_ref() {
             None => 0.0,
             Some(item) => {
-                if item.icon.is_some() { 44.0 } else { 80.0 }
+                if item.icon.is_some() {
+                    44.0
+                } else {
+                    80.0
+                }
             }
         };
         let visible_items = items.len() as f32;
         let required = primary_width
-            + if visible_items > if bar.primary.is_some() { 1.0 } else { 0.0 } { 44.0 } else { 0.0 }
-            + if bar.primary.is_some() && visible_items > 1.0 { gap } else { 0.0 };
+            + if visible_items > if bar.primary.is_some() { 1.0 } else { 0.0 } {
+                44.0
+            } else {
+                0.0
+            }
+            + if bar.primary.is_some() && visible_items > 1.0 {
+                gap
+            } else {
+                0.0
+            };
         let budget = (available - (96.0_f32.min((available - required).max(0.0)))).max(0.0);
         let measured = *bar.command_width.borrow();
         let commands_width = measured.unwrap_or(budget).min(budget);
         let item_count = items.len();
 
-        let commands = ToolbarCommands::new(items, bar.options.is_enabled, crate::primitives::controls::ToolbarAxis::Horizontal)
-            // The bar's own allocation is the budget: with it supplied the overflow
-            // layout measures and moves commands that do not fit.
-            .available_width(budget)
-            .presentation(ToolbarCommandPresentation {
-                minimum_extent: Some(44.0),
-                maximum_button_width: Some((120.0_f32.min((budget - if item_count > 1 { 44.0 + gap } else { 0.0 }).max(0.0))).max(0.0)),
-                uses_overflow_icon: true,
-            });
+        let commands = ToolbarCommands::new(
+            items,
+            bar.options.is_enabled,
+            crate::primitives::controls::ToolbarAxis::Horizontal,
+        )
+        // The bar's own allocation is the budget: with it supplied the overflow
+        // layout measures and moves commands that do not fit.
+        .available_width(budget)
+        .presentation(ToolbarCommandPresentation {
+            minimum_extent: Some(44.0),
+            maximum_button_width: Some(
+                (120.0_f32.min((budget - if item_count > 1 { 44.0 + gap } else { 0.0 }).max(0.0)))
+                    .max(0.0),
+            ),
+            uses_overflow_icon: true,
+        });
         children.push(AnyView::new(
             BoxView::new(
-                FlexDirection::Row, Align::Center, Justify::FlexStart, Wrap::NoWrap, 0.0,
+                FlexDirection::Row,
+                Align::Center,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
                 AnyView::new(commands),
             )
             .frame(None, None, None, None, Some(commands_width), None),
         ));
 
         let _ = toolbar_height(crate::theme::ControlSize::Regular);
-        vec![AnyView::new(Toolbar::new(AnyView::new(TupleView::new(children)))
-            .options(ToolbarOptions {
-                divider: bar.options.divider,
-                is_enabled: bar.options.is_enabled,
-                label: bar.options.label.clone(),
-                axis: crate::primitives::controls::ToolbarAxis::Horizontal,
-            })
-            .minimum_height(48.0)
-            .vertical_padding(2.0))]
+        vec![AnyView::new(
+            Toolbar::new(AnyView::new(TupleView::new(children)))
+                .options(ToolbarOptions {
+                    divider: bar.options.divider,
+                    is_enabled: bar.options.is_enabled,
+                    label: bar.options.label.clone(),
+                    axis: crate::primitives::controls::ToolbarAxis::Horizontal,
+                })
+                .minimum_height(48.0)
+                .vertical_padding(2.0),
+        )]
     }
 }
 crate::impl_primitive_view!(AppBarHost);
@@ -325,7 +379,11 @@ impl PrimitiveView for AppBarHeading {
         }
         vec![AnyView::new(
             BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 2.0,
+                FlexDirection::Column,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                2.0,
                 AnyView::new(TupleView::new(column)),
             )
             .flex_with(1.0, 1.0, Some(0.0))
@@ -376,12 +434,10 @@ impl PrimitiveView for AppBarBack {
             Some(label.clone()),
             move || (command.action)(),
         );
-        vec![AnyView::new(
-            ButtonChrome {
-                label: label.clone(),
-                content: AnyView::new(button),
-            },
-        )]
+        vec![AnyView::new(ButtonChrome {
+            label: label.clone(),
+            content: AnyView::new(button),
+        })]
     }
 }
 crate::impl_primitive_view!(AppBarBack);

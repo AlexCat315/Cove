@@ -4,17 +4,15 @@
 //! current back buffer. Swift's C++ bridge tracked this; the Rust port keeps the
 //! same state per window.
 #![allow(non_snake_case)]
-use crate::rhi::{
-    RhiError, RhiResult, SurfaceDescriptor, Swapchain, SwapchainImage, Texture,
-};
+use crate::rhi::{RhiError, RhiResult, SurfaceDescriptor, Swapchain, SwapchainImage, Texture};
 
 use super::device::{Dx12DeviceHandle, Dx12Swapchain};
 #[cfg(any(target_os = "windows", test))]
 use super::formats;
-#[cfg(test)]
-use crate::rhi::TextureFormat;
 use super::resources::Dx12Registries;
 use super::sys;
+#[cfg(test)]
+use crate::rhi::TextureFormat;
 
 /// Creates the swapchain, its back buffers and their render-target views.
 pub fn create(
@@ -27,7 +25,9 @@ pub fn create(
     #[cfg(not(target_os = "windows"))]
     {
         let _ = (device, handle, descriptor, generation);
-        Err(RhiError::unsupported_backend("DirectX 12 is only available on Windows"))
+        Err(RhiError::unsupported_backend(
+            "DirectX 12 is only available on Windows",
+        ))
     }
     #[cfg(target_os = "windows")]
     {
@@ -40,13 +40,20 @@ pub fn create(
             Height: height as u32,
             Format: format,
             Stereo: 0,
-            SampleDesc: sys::DXGI_SAMPLE_DESC { Count: 1, Quality: 0 },
+            SampleDesc: sys::DXGI_SAMPLE_DESC {
+                Count: 1,
+                Quality: 0,
+            },
             BufferUsage: sys::DXGI_USAGE_RENDER_TARGET_OUTPUT,
             BufferCount: buffer_count,
             Scaling: sys::DXGI_SCALING_STRETCH,
             SwapEffect: sys::DXGI_SWAP_EFFECT_FLIP_DISCARD,
             AlphaMode: 0,
-            Flags: if descriptor.vsync_enabled { 0 } else { sys::DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING },
+            Flags: if descriptor.vsync_enabled {
+                0
+            } else {
+                sys::DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING
+            },
         };
         let mut swapchain: sys::ComPtr = core::ptr::null_mut();
         // SAFETY: the factory and the HWND are live; the vtable entry matches
@@ -65,7 +72,9 @@ pub fn create(
             )
         };
         if status != sys::S_OK || swapchain.is_null() {
-            return Err(RhiError::make_swapchain_failed(sys::hresult_message(status)));
+            return Err(RhiError::make_swapchain_failed(sys::hresult_message(
+                status,
+            )));
         }
 
         // Wrap each back buffer as a render target.
@@ -77,12 +86,7 @@ pub fn create(
             // SAFETY: the swapchain is live and the index is inside its buffer count.
             let status = unsafe {
                 let vtbl = *(swapchain as *mut *const SwapChainVtbl);
-                ((*vtbl).GetBuffer)(
-                    swapchain,
-                    index,
-                    &sys::IID_ID3D12_RESOURCE,
-                    &mut resource,
-                )
+                ((*vtbl).GetBuffer)(swapchain, index, &sys::IID_ID3D12_RESOURCE, &mut resource)
             };
             if status != sys::S_OK || resource.is_null() {
                 // SAFETY: the buffers wrapped so far are released before the
@@ -93,7 +97,9 @@ pub fn create(
                     }
                     sys::IUnknownVtbl::release(swapchain);
                 }
-                return Err(RhiError::make_swapchain_failed(sys::hresult_message(status)));
+                return Err(RhiError::make_swapchain_failed(sys::hresult_message(
+                    status,
+                )));
             }
             let id = device.next_internal_id();
             buffers.push(resource);
@@ -147,9 +153,10 @@ pub fn acquire(device: &mut Dx12DeviceHandle, handle: Swapchain) -> RhiResult<Sw
         ));
     }
     let index = current_index(chain.swapchain).unwrap_or(chain.current_index);
-    let texture = *chain.texture_ids.get(index as usize).ok_or_else(|| {
-        RhiError::SwapchainAcquireFailed("back-buffer index out of range".into())
-    })?;
+    let texture = *chain
+        .texture_ids
+        .get(index as usize)
+        .ok_or_else(|| RhiError::SwapchainAcquireFailed("back-buffer index out of range".into()))?;
     chain.current_index = index;
     chain.acquired = Some(index);
     Ok(SwapchainImage::new(
@@ -164,10 +171,14 @@ pub fn acquire(device: &mut Dx12DeviceHandle, handle: Swapchain) -> RhiResult<Sw
 /// Queues one present for the acquired back buffer.
 pub fn present(device: &mut Dx12DeviceHandle, image: SwapchainImage) -> RhiResult<()> {
     let Some(chain) = device.swapchains.get_mut(&image.swapchain.id()) else {
-        return Err(RhiError::present_failed("image was not acquired from this swapchain"));
+        return Err(RhiError::present_failed(
+            "image was not acquired from this swapchain",
+        ));
     };
     if chain.acquired.is_none() {
-        return Err(RhiError::present_failed("image was not acquired from this swapchain"));
+        return Err(RhiError::present_failed(
+            "image was not acquired from this swapchain",
+        ));
     }
     chain.acquired = None;
     present_swapchain(chain)?;
@@ -197,7 +208,9 @@ fn present_swapchain(chain: &Dx12Swapchain) -> RhiResult<()> {
     #[cfg(not(target_os = "windows"))]
     {
         let _ = chain;
-        Err(RhiError::unsupported_backend("DirectX 12 is only available on Windows"))
+        Err(RhiError::unsupported_backend(
+            "DirectX 12 is only available on Windows",
+        ))
     }
     #[cfg(target_os = "windows")]
     {

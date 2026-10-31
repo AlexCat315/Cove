@@ -26,7 +26,8 @@ pub fn open(link: &str) {
     #[cfg(target_os = "macos")]
     let (program, arguments): (&str, Vec<&str>) = ("open", vec![&url]);
     #[cfg(target_os = "windows")]
-    let (program, arguments): (&str, Vec<&str>) = ("rundll32", vec!["url.dll,FileProtocolHandler", &url]);
+    let (program, arguments): (&str, Vec<&str>) =
+        ("rundll32", vec!["url.dll,FileProtocolHandler", &url]);
     #[cfg(all(unix, not(target_os = "macos")))]
     let (program, arguments): (&str, Vec<&str>) = ("xdg-open", vec![&url]);
 

@@ -23,7 +23,11 @@ pub struct MetalUploadChunk {
 impl MetalUploadChunk {
     pub fn new(buffer: Retained<ProtocolObject<dyn MTLBuffer>>, handle: Buffer) -> Self {
         let capacity = buffer.length();
-        Self { buffer, buffer_handle: handle, capacity }
+        Self {
+            buffer,
+            buffer_handle: handle,
+            capacity,
+        }
     }
     pub fn buffer(&self) -> &Retained<ProtocolObject<dyn MTLBuffer>> {
         &self.buffer
@@ -60,7 +64,9 @@ impl MetalFrameUploader {
         chunk_size: usize,
         make_chunk: impl FnMut(usize) -> RhiResult<MetalUploadChunk> + Send + 'static,
     ) -> Self {
-        Self { allocator: ChunkUploadAllocator::new(chunk_size, make_chunk) }
+        Self {
+            allocator: ChunkUploadAllocator::new(chunk_size, make_chunk),
+        }
     }
 }
 impl FrameUploader for MetalFrameUploader {
@@ -72,6 +78,9 @@ impl FrameUploader for MetalFrameUploader {
     /// storage without building an intermediate buffer.
     fn write(&mut self, bytes: &[u8], alignment: usize) -> RhiResult<UploadLocation> {
         let allocation = self.allocator.write(bytes, alignment)?;
-        Ok(UploadLocation::new(allocation.chunk().buffer_handle, allocation.offset()))
+        Ok(UploadLocation::new(
+            allocation.chunk().buffer_handle,
+            allocation.offset(),
+        ))
     }
 }

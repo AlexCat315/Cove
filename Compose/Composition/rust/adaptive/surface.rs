@@ -1,8 +1,8 @@
 //! Translation of CoveUIComposeCore/Adaptive/Surface.swift.
-use cove_core::{CompositionLocal, Environment};
-use cove_core::scene::{LayoutNode, Node};
-use std::rc::Rc;
 use crate::{AnyView, PrimitiveView, View, ViewKind};
+use cove_core::scene::{LayoutNode, Node};
+use cove_core::{CompositionLocal, Environment};
+use std::rc::Rc;
 
 pub struct SurfaceEnvironment;
 impl SurfaceEnvironment {
@@ -23,7 +23,9 @@ pub struct SurfaceReader<Content: View> {
 }
 impl<Content: View> SurfaceReader<Content> {
     pub fn new(content: impl Fn(&Environment) -> Content + 'static) -> Self {
-        Self { content: Rc::new(content) }
+        Self {
+            content: Rc::new(content),
+        }
     }
 }
 impl<Content: View + 'static> PrimitiveView for SurfaceReader<Content> {

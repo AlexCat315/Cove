@@ -5,20 +5,22 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cove_core::scene::{AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, Justify, Node, Wrap};
-use cove_core::Binding;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, PaddingExt};
 use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::controls::button::{Button, ButtonIconSource, ButtonRole};
 use crate::primitives::media::ui_icon_catalog;
+use crate::primitives::overlays::anchored::{PopoverOverflow, PopoverSurface};
 use crate::primitives::overlays::menu::{Menu, MenuEntry, MenuItem};
 use crate::primitives::overlays::popover::Popover;
-use crate::primitives::overlays::anchored::{PopoverOverflow, PopoverSurface};
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle, ToggleButtonStyle};
 use crate::theme::{SemanticColorRef, SemanticFontRef};
 use crate::{AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View};
+use cove_core::Binding;
+use cove_core::scene::{
+    AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, Justify, Node, Wrap,
+};
 
 /// Default visible items before a breadcrumb collapses its middle.
 pub const DEFAULT_MAX_VISIBLE_ITEMS: usize = 4;
@@ -35,7 +37,11 @@ pub struct BreadcrumbItem<Id: PartialEq + Clone> {
 
 impl<Id: PartialEq + Clone> BreadcrumbItem<Id> {
     pub fn new(id: Id, title: impl Into<String>) -> Self {
-        Self { id, title: title.into(), is_enabled: true }
+        Self {
+            id,
+            title: title.into(),
+            is_enabled: true,
+        }
     }
 
     pub fn enabled(mut self, is_enabled: bool) -> Self {
@@ -87,7 +93,9 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> Breadcrumb<Id> {
 
 impl<Id: PartialEq + Clone + std::hash::Hash + 'static> View for Breadcrumb<Id> {
     fn body(&self) -> AnyView {
-        AnyView::new(BreadcrumbBody { trail: self.snapshot() })
+        AnyView::new(BreadcrumbBody {
+            trail: self.snapshot(),
+        })
     }
 }
 
@@ -120,7 +128,11 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for Breadc
         let collapsed = count > trail.max_visible_items;
         // The trailing window keeps the last `maxVisibleItems - 1` items plus the
         // ellipsis slot, so the root and the current page always survive.
-        let trailing_start = if collapsed { count - trail.max_visible_items + 1 } else { count };
+        let trailing_start = if collapsed {
+            count - trail.max_visible_items + 1
+        } else {
+            count
+        };
 
         let chevron = AnyView::new(
             AnyView::new(crate::primitives::media::Icon::with_semantic(
@@ -148,14 +160,10 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for Breadc
                         let is_presented = trail.is_presented.clone();
                         let id = entry.id.clone();
                         MenuEntry::Item(
-                            MenuItem::new(
-                                menu_id(&entry.id),
-                                entry.title.clone(),
-                                move || {
-                                    on_select(id.clone());
-                                    *is_presented.borrow_mut() = false;
-                                },
-                            )
+                            MenuItem::new(menu_id(&entry.id), entry.title.clone(), move || {
+                                on_select(id.clone());
+                                *is_presented.borrow_mut() = false;
+                            })
                             .enabled(entry.is_enabled),
                         )
                     })
@@ -240,7 +248,9 @@ struct AccessibleLabel {
 
 impl AccessibleLabel {
     fn new(label: impl Into<String>) -> Self {
-        Self { label: label.into() }
+        Self {
+            label: label.into(),
+        }
     }
 }
 
@@ -267,7 +277,11 @@ pub struct PaginationModel;
 
 impl PaginationModel {
     pub fn normalized(current: usize, total: usize) -> usize {
-        if total == 0 { 0 } else { current.clamp(1, total) }
+        if total == 0 {
+            0
+        } else {
+            current.clamp(1, total)
+        }
     }
 
     /// The pages to show, with gaps where numbers were skipped.
@@ -312,7 +326,12 @@ pub struct Pagination {
 
 impl Pagination {
     pub fn new(page: Binding<usize>, total_pages: usize) -> Self {
-        Self { page, total_pages, siblings: 1, is_enabled: true }
+        Self {
+            page,
+            total_pages,
+            siblings: 1,
+            is_enabled: true,
+        }
     }
 
     pub fn siblings(mut self, siblings: usize) -> Self {
@@ -328,7 +347,9 @@ impl Pagination {
 
 impl View for Pagination {
     fn body(&self) -> AnyView {
-        AnyView::new(PaginationBody { pager: self.snapshot() })
+        AnyView::new(PaginationBody {
+            pager: self.snapshot(),
+        })
     }
 }
 
@@ -484,7 +505,10 @@ impl PrimitiveView for PaginationPageButton {
                 self.is_selected,
                 None,
             )
-            .button_style(ToggleButtonStyle { min_width: 32.0, height: 28.0 }),
+            .button_style(ToggleButtonStyle {
+                min_width: 32.0,
+                height: 28.0,
+            }),
         )]
     }
 }
@@ -492,8 +516,8 @@ crate::impl_primitive_view!(PaginationPageButton);
 
 #[cfg(test)]
 mod tests {
-    use super::PaginationModel;
     use super::PaginationItem;
+    use super::PaginationModel;
 
     #[test]
     fn short_pagers_show_every_page() {

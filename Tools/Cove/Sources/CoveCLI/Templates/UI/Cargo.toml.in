@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.90"
 publish = false
+autoexamples = false
+autotests = false
+autobenches = false
 
 [workspace]
 
@@ -12,7 +15,7 @@ publish = false
 cove-ui = { path = "{{COVE_UI_PATH}}" }
 
 [[bin]]
-name = "cove-application"
+name = "Application"
 path = "src/main.rs"
 
 [[test]]

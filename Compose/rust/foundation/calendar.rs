@@ -1,9 +1,7 @@
 //! Gregorian calendar arithmetic with an explicit first weekday and time zone
 //! offset. Every date operation the UI needs routes through here, so no widget
 //! does its own day arithmetic.
-use super::date::{
-    days_in_month, is_leap_year, iso_week_of, weekday_of, Date, DateParts,
-};
+use super::date::{Date, DateParts, days_in_month, is_leap_year, iso_week_of, weekday_of};
 
 /// The unit a date operation is expressed in.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -30,7 +28,10 @@ pub struct Calendar {
 
 impl Default for Calendar {
     fn default() -> Self {
-        Self { offset_seconds: 0, first_weekday: 2 }
+        Self {
+            offset_seconds: 0,
+            first_weekday: 2,
+        }
     }
 }
 
@@ -112,7 +113,8 @@ impl Calendar {
             CalendarUnit::Day => day + value as i64,
             CalendarUnit::WeekOfYear | CalendarUnit::Weekday => day + value as i64 * 7,
             CalendarUnit::Month | CalendarUnit::Year | CalendarUnit::YearForWeekOfYear => {
-                let months = if matches!(unit, CalendarUnit::Year | CalendarUnit::YearForWeekOfYear) {
+                let months = if matches!(unit, CalendarUnit::Year | CalendarUnit::YearForWeekOfYear)
+                {
                     value as i64 * 12
                 } else {
                     value as i64
@@ -123,8 +125,12 @@ impl Calendar {
                 let bound = days_in_month(year, month);
                 DateParts::new(year, month, parts.day.min(bound)).epoch_day()
             }
-            CalendarUnit::Hour => day + (within + value as i64 * 3600).div_euclid(Date::SECONDS_PER_DAY),
-            CalendarUnit::Minute => day + (within + value as i64 * 60).div_euclid(Date::SECONDS_PER_DAY),
+            CalendarUnit::Hour => {
+                day + (within + value as i64 * 3600).div_euclid(Date::SECONDS_PER_DAY)
+            }
+            CalendarUnit::Minute => {
+                day + (within + value as i64 * 60).div_euclid(Date::SECONDS_PER_DAY)
+            }
             CalendarUnit::Second => day + (within + value as i64).div_euclid(Date::SECONDS_PER_DAY),
         };
         let mut result = DateParts::from_epoch_day(result_day);
@@ -160,7 +166,9 @@ impl Calendar {
     pub fn date_interval_start(&self, unit: CalendarUnit, date: Date) -> Option<Date> {
         let parts = self.parts(date);
         match unit {
-            CalendarUnit::Day => Some(self.date(DateParts::new(parts.year, parts.month, parts.day))),
+            CalendarUnit::Day => {
+                Some(self.date(DateParts::new(parts.year, parts.month, parts.day)))
+            }
             CalendarUnit::Month => Some(self.date(DateParts::new(parts.year, parts.month, 1))),
             CalendarUnit::Year => Some(self.date(DateParts::new(parts.year, 1, 1))),
             CalendarUnit::WeekOfYear | CalendarUnit::Weekday => {

@@ -1,9 +1,9 @@
 //! Translation of Android/Integration/TouchInput.swift.
 
+use cove_core::Point;
 use cove_core::scene::{
     EventDispatcher, HitTester, InputHandlerRole, NodeTree, PlatformInputContext,
 };
-use cove_core::Point;
 use cove_platform::{
     InputEvent, MouseButton, MouseButtonEvent, MouseMotionEvent, MouseWheelEvent, ScrollDevice,
     ScrollInput, ScrollPhase, ScrollUnit,
@@ -27,7 +27,11 @@ pub struct TouchInput {
 
 impl TouchInput {
     pub fn new() -> Self {
-        Self { down: Point::default(), previous: Point::default(), scrolling: false }
+        Self {
+            down: Point::default(),
+            previous: Point::default(),
+            scrolling: false,
+        }
     }
 
     pub fn route(

@@ -6,16 +6,13 @@
 //! `Installation/SDKPayload.swift`, `Installation/TarArchive.swift`,
 //! `Installation/Update.swift`.
 
-use crate::cli::{standardized, AppPlatform, Arguments, OptionKey};
-use crate::platforms_android::{
-    AndroidToolchain, NativeDependencies,
-};
+use crate::cli::{AppPlatform, Arguments, OptionKey, standardized};
+use crate::platforms_android::{AndroidToolchain, NativeDependencies};
 use crate::project_sdk::{
-    numeric_compare, CoveSDK, NativeArchive as NativeArchiveMetadata, NativeArtifacts, SDKRelease,
-    SDKStore,
+    CoveSDK, NativeArchive as NativeArchiveMetadata, NativeArtifacts, SDKRelease, SDKStore,
 };
 use crate::sha256;
-use crate::support::{environment, Files, Shell, StdoutTarget, ToolError};
+use crate::support::{Files, Shell, StdoutTarget, ToolError, environment};
 use crate::toolchains::NativeSDK;
 use cove_system::files::FileLock;
 use serde::{Deserialize, Serialize};
@@ -138,59 +135,6 @@ impl CLIUpdate {
         format!("{system}-{}", PlatformTag::architecture())
     }
 
-    pub fn run(version: Option<&str>) -> Result<(), ToolError> {
-        let executable = InstallationReceipt::executable_directory();
-        let receipt = InstallationReceipt::read(&executable).map_err(|_| {
-            ToolError::invalid(
-                if executable.to_string_lossy().contains("/Cellar/") {
-                    "Update this installation with brew upgrade cove"
-                } else {
-                    "Use the package manager that installed cove, or install with the official standalone installer"
-                },
-            )
-        })?;
-        let repository = SDKRelease::current()?.repository.replace(".git", "");
-        let version = match version {
-            Some(requested) => {
-                if !SDKRelease::is_version(requested) {
-                    return Err(ToolError::invalid("Supply an exact CLI version"));
-                }
-                requested.to_string()
-            }
-            None => {
-                let latest = SDKRelease::latest_version(&repository)?;
-                if numeric_compare(&latest, &receipt.version) != std::cmp::Ordering::Greater {
-                    return Err(ToolError::invalid(
-                        "The release channel did not provide a newer supported version",
-                    ));
-                }
-                latest
-            }
-        };
-        if version == receipt.version {
-            println!("cove {version} is current");
-            return Ok(());
-        }
-        let store = SDKStore::new(Some(receipt.directory.clone()));
-        store.install(&version)?;
-        let payload = store.installed(&version);
-        let binary = payload.join(executable_name());
-        let actual = Shell::run(
-            &[binary.display().to_string(), "--version".into()],
-            None,
-            &environment(),
-            true,
-            true,
-            StdoutTarget::StandardOutput,
-        )?;
-        if actual != format!("cove {version}") {
-            return Err(ToolError::invalid(
-                "Downloaded CLI failed its startup check",
-            ));
-        }
-        CLIInstaller::install(&payload, &receipt.directory, &receipt.commands)
-    }
-
     pub fn checksum(name: &str, contents: &str) -> Result<String, ToolError> {
         let matches: Vec<&str> = contents
             .lines()
@@ -217,11 +161,7 @@ impl CLIUpdate {
 }
 
 pub fn executable_name() -> &'static str {
-    if cfg!(windows) {
-        "cove.exe"
-    } else {
-        "cove"
-    }
+    if cfg!(windows) { "cove.exe" } else { "cove" }
 }
 
 /// `cove internal package-cli`: builds and stages a complete SDK payload.
@@ -425,16 +365,13 @@ impl NativeArchive {
                 StdoutTarget::StandardOutput,
             )?;
             let repository = release.repository.replace(".git", "");
-            let checksum =
-                sha256::hex_file(&archive).map_err(|error| ToolError::invalid(error.to_string()))?;
+            let checksum = sha256::hex_file(&archive)
+                .map_err(|error| ToolError::invalid(error.to_string()))?;
             let mut platforms = std::collections::BTreeMap::new();
             platforms.insert(
                 target.clone(),
                 NativeArchiveMetadata {
-                    url: format!(
-                        "{repository}/releases/download/v{}/{name}",
-                        release.version
-                    ),
+                    url: format!("{repository}/releases/download/v{}/{name}", release.version),
                     sha256: checksum,
                 },
             );
@@ -463,15 +400,13 @@ impl CLIInstaller {
             .trim()
             .to_string();
         if !SDKRelease::is_version(&version) {
-            return Err(ToolError::invalid("Invalid CLI version in installation payload"));
+            return Err(ToolError::invalid(
+                "Invalid CLI version in installation payload",
+            ));
         }
         SDKPayload::validate(payload, &version)?;
-        let lock = FileLock::acquire(
-            &directory
-                .join("locks")
-                .join(format!("sdk-{version}.lock")),
-        )
-        .map_err(|error| ToolError::invalid(error.to_string()))?;
+        let lock = FileLock::acquire(&directory.join("locks").join(format!("sdk-{version}.lock")))
+            .map_err(|error| ToolError::invalid(error.to_string()))?;
         let result = Self::install_locked(payload, directory, commands, &version);
         drop(lock);
         result
@@ -518,10 +453,7 @@ impl CLIInstaller {
                 .map_err(|error| ToolError::invalid(error.to_string()))?;
         }
         Self::activate(&destination, commands, directory)?;
-        Files::json(
-            &receipt,
-            &directory.join(InstallationReceipt::FILENAME),
-        )?;
+        Files::json(&receipt, &directory.join(InstallationReceipt::FILENAME))?;
         SDKStore::new(Some(directory.to_path_buf())).select(&destination)?;
         println!("Installed Cove SDK {version}: {}", commands.display());
         Ok(())
@@ -573,9 +505,7 @@ impl CLIInstaller {
                 .map_err(|error| ToolError::invalid(error.to_string()))?;
             std::fs::rename(&temporary, &entry).map_err(|error| {
                 let _ = Files::remove(&temporary);
-                ToolError::invalid(format!(
-                    "Could not activate the new cove command: {error}"
-                ))
+                ToolError::invalid(format!("Could not activate the new cove command: {error}"))
             })?;
         }
         Ok(())
@@ -622,7 +552,15 @@ impl SDKPayload {
             "Native",
             "third-party",
         ];
-        const EXCLUDED: [&str; 7] = [".git", ".build", ".cove", "build", "vendor", "node_modules", "dist"];
+        const EXCLUDED: [&str; 7] = [
+            ".git",
+            ".build",
+            ".cove",
+            "build",
+            "vendor",
+            "node_modules",
+            "dist",
+        ];
         for path in PATHS {
             let source = root.join(path);
             if !source.exists() {
@@ -681,8 +619,8 @@ fn copy_tree(
     payload: &Path,
     excluded: &[&str],
 ) -> Result<(), ToolError> {
-    for entry in std::fs::read_dir(directory)
-        .map_err(|error| ToolError::invalid(error.to_string()))?
+    for entry in
+        std::fs::read_dir(directory).map_err(|error| ToolError::invalid(error.to_string()))?
     {
         let entry = entry.map_err(|error| ToolError::invalid(error.to_string()))?;
         let path = entry.path();
@@ -804,9 +742,9 @@ impl CLIRuntimeLibraries {
                         .unwrap_or_default();
                     let lower = name.to_ascii_lowercase();
                     let matches = lower.ends_with(".dll")
-                        && prefixes.iter().any(|prefix| {
-                            lower.starts_with(&prefix.to_ascii_lowercase())
-                        });
+                        && prefixes
+                            .iter()
+                            .any(|prefix| lower.starts_with(&prefix.to_ascii_lowercase()));
                     if matches && copied.insert(lower) {
                         Files::copy(&file, &payload.join(&name))?;
                     }
@@ -816,10 +754,7 @@ impl CLIRuntimeLibraries {
         }
         if cfg!(target_os = "linux") {
             let listing = Shell::run(
-                &[
-                    "ldd".into(),
-                    executable.display().to_string(),
-                ],
+                &["ldd".into(), executable.display().to_string()],
                 None,
                 &environment(),
                 true,
@@ -847,7 +782,11 @@ impl CLIRuntimeLibraries {
                     continue;
                 };
                 let file = PathBuf::from(component);
-                let name = file.file_name().unwrap_or_default().to_string_lossy().into_owned();
+                let name = file
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .into_owned();
                 if system.iter().any(|prefix| name.starts_with(prefix)) {
                     continue;
                 }

@@ -10,12 +10,12 @@
 //! behalf. Images render as their linked alternative text.
 use std::rc::Rc;
 
-use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
-use cove_core::TextAlignment;
 use crate::modifiers::layout::PaddingExt;
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::text::rich::run::RichTextRun;
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
+use cove_core::TextAlignment;
+use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 
 use super::code_block::MarkdownCodeBlock;
 use super::document::{MarkdownBlock, MarkdownList};
@@ -30,7 +30,10 @@ pub struct MarkdownView {
 
 impl MarkdownView {
     pub fn new(source: impl Into<String>) -> Self {
-        Self { source: source.into(), on_open_link: None }
+        Self {
+            source: source.into(),
+            on_open_link: None,
+        }
     }
 
     pub fn on_open_link(mut self, handler: impl Fn(&str) + 'static) -> Self {
@@ -84,12 +87,14 @@ impl PrimitiveView for MarkdownBlocks {
                 views.push(view);
             }
         }
-        vec![AnyView::new(
-            BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 12.0,
-                AnyView::new(TupleView::new(views)),
-            ),
-        )]
+        vec![AnyView::new(BoxView::new(
+            FlexDirection::Column,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            12.0,
+            AnyView::new(TupleView::new(views)),
+        ))]
     }
 }
 crate::impl_primitive_view!(MarkdownBlocks);
@@ -116,7 +121,9 @@ pub fn markdown_block(
             AnyView::new(MarkdownCodeBlock::new(language.clone(), text.clone()))
         }
         MarkdownBlock::Table(table) => AnyView::new(match on_open_link.clone() {
-            Some(handler) => MarkdownTableView::new(table.clone()).on_open_link(move |link| handler(link)),
+            Some(handler) => {
+                MarkdownTableView::new(table.clone()).on_open_link(move |link| handler(link))
+            }
             None => MarkdownTableView::new(table.clone()),
         }),
         MarkdownBlock::Rule => AnyView::new(
@@ -212,12 +219,14 @@ impl PrimitiveView for MarkdownHeading {
                 crate::primitives::text::DividerAxis::Horizontal,
             )));
         }
-        vec![AnyView::new(
-            BoxView::new(
-                FlexDirection::Column, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 8.0,
-                AnyView::new(TupleView::new(column)),
-            ),
-        )]
+        vec![AnyView::new(BoxView::new(
+            FlexDirection::Column,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            8.0,
+            AnyView::new(TupleView::new(column)),
+        ))]
     }
 }
 crate::impl_primitive_view!(MarkdownHeading);
@@ -228,9 +237,14 @@ pub fn heading_token(level: usize, theme: &crate::theme::Theme) -> crate::theme:
     match level {
         1 => typography.title.clone(),
         2 => {
-            let size = ((typography.title.font.size() + typography.headline.font.size()) / 2.0).round();
+            let size =
+                ((typography.title.font.size() + typography.headline.font.size()) / 2.0).round();
             crate::theme::TextStyleToken::new(
-                typography.headline.font.with_weight(cove_core::FontWeight::Bold).resized(size),
+                typography
+                    .headline
+                    .font
+                    .with_weight(cove_core::FontWeight::Bold)
+                    .resized(size),
                 (size * 1.3).round(),
                 typography.headline.letter_spacing,
             )
@@ -305,17 +319,19 @@ impl PrimitiveView for MarkdownQuote {
             depth: self.depth,
             on_open_link: self.on_open_link.clone(),
         });
-        vec![AnyView::new(
-            BoxView::new(
-                FlexDirection::Row, Align::Stretch, Justify::FlexStart, Wrap::NoWrap, 12.0,
-                AnyView::new(TupleView::new(vec![
-                    rule,
-                    AnyView::new(content.semantic_foreground(
-                        crate::theme::SemanticColorRef::on_surface_muted(),
-                    )),
-                ])),
-            ),
-        )]
+        vec![AnyView::new(BoxView::new(
+            FlexDirection::Row,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            12.0,
+            AnyView::new(TupleView::new(vec![
+                rule,
+                AnyView::new(
+                    content.semantic_foreground(crate::theme::SemanticColorRef::on_surface_muted()),
+                ),
+            ])),
+        ))]
     }
 }
 crate::impl_primitive_view!(MarkdownQuote);
@@ -341,7 +357,9 @@ impl PrimitiveView for QuoteRule {
     }
 
     fn update_node(&self, node: &Node) {
-        node.set_background_color(Some(crate::theme::theme_for_node(node).colors.border_strong));
+        node.set_background_color(Some(
+            crate::theme::theme_for_node(node).colors.border_strong,
+        ));
         node.set_corner_radius(1.5);
     }
 }
