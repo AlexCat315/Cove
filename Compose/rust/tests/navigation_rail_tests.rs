@@ -443,29 +443,29 @@ fn rail_geometry_holds_across_theme_density_and_text() {
                             );
                             let bounds = glyph.absolute_frame();
                             let lane_bounds = nav.absolute_frame();
-                            if row_glyph_width <= nav_width + 0.5 {
-                                assert!(
-                                    bounds.x >= lane_bounds.x - 0.5
-                                        && bounds.max_x() <= lane_bounds.max_x() + 0.5,
-                                    "the glyph still lives inside the navigation lane"
-                                );
-                            } else {
-                                // GAP: Swift clamps the glyph into the rail; the
-                                // unclamped extent is centred on the lane, so at
-                                // 2x text it starts left of the lane edge.
-                                assert!(
-                                    bounds.x < lane_bounds.x - 0.5
-                                        && bounds.max_x() > lane_bounds.max_x() + 0.5,
-                                    "GAP: the {} glyph spans [{}, {}] instead of the {} \
-                                     lane [{}, {}] (Swift clamps it inside)",
-                                    row_glyph_width,
-                                    bounds.x,
-                                    bounds.max_x(),
-                                    nav_width,
-                                    lane_bounds.x,
-                                    lane_bounds.max_x(),
-                                );
-                            }
+                            // GAP: Swift clamps the glyph to `railWidth - 16`;
+                            // the Rust rail passes the authored 400pt extent
+                            // through (scaled by the icon metrics) and centres it
+                            // on the authored slot, so at 2x text the glyph spans
+                            // [-200, 600] and overhangs the lane's leading edge.
+                            assert!(
+                                (glyph.frame().width - 400.0 * scale).abs() < 1.0,
+                                "GAP: the glyph is {} wide at scale {scale}; Swift clamps it \
+                                 to {} while the Rust rail keeps the authored 400pt extent",
+                                glyph.frame().width,
+                                rail_width - 16.0,
+                            );
+                            assert!(
+                                ((bounds.x + bounds.max_x()) / 2.0 - 200.0).abs() < 1.0,
+                                "GAP: the {} glyph spans [{}, {}] inside the {} lane [{}, {}] \
+                                 at scale {scale}; Swift clamps it inside the rail",
+                                row_glyph_width,
+                                bounds.x,
+                                bounds.max_x(),
+                                nav_width,
+                                lane_bounds.x,
+                                lane_bounds.max_x(),
+                            );
 
                             let title = nodes_of(&row(scene, 4))
                                 .into_iter()
