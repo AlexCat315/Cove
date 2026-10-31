@@ -16,7 +16,7 @@ import gettingStarted from '@/content/getting-started.md?raw'
 import architecture from '@/content/architecture.md?raw'
 import views from '@/content/views.md?raw'
 import nativeRhi from '@/content/native-rhi.md?raw'
-import cli from '@/content/cli.md?raw'
+import cargo from '@/content/cargo.md?raw'
 
 export const docGroups: DocGroup[] = [
   {
@@ -35,7 +35,7 @@ export const docGroups: DocGroup[] = [
   },
   {
     group: '工具链',
-    items: [{ slug: 'cli', title: 'cove CLI 手册', raw: cli }],
+    items: [{ slug: 'cargo', title: 'Cargo 工作流', raw: cargo }],
   },
 ]
 

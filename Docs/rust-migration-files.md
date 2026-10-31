@@ -13,11 +13,11 @@
 
 | 范围 | 文件数 | 已写入 | 进行中 | 未开始 |
 | --- | ---: | ---: | ---: | ---: |
-| 生产源码 | 984 | 983 | 0 | 1 |
-| 测试源码 | 424 | 118 | 0 | 306 |
-| SwiftPM 清单 | 25 | 25 | 0 | 0 |
-| 项目模板 | 5 | 5 | 0 | 0 |
-| 合计 | 1438 | — | — | — |
+| 生产源码 | 915 | 915 | 0 | 0 |
+| 测试源码 | 411 | 117 | 0 | 294 |
+| SwiftPM 清单 | 23 | 23 | 0 | 0 |
+| 项目模板 | 0 | 0 | 0 | 0 |
+| 合计 | 1349 | — | — | — |
 
 ## 生产源码逐文件映射
 
@@ -71,7 +71,7 @@
 | `Compose/Sources/CoveUICompose/Animation/TransitionView.swift` | 33 | 已写入（未验证） | `Compose/rust/animation/transition_view.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Animation/WithAnimation.swift` | 52 | 已写入（未验证） | `Compose/rust/lib.rs`<br>`Core/rust/scene/animation/context.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/AppStorage.swift` | 318 | 已写入（未验证） | `Compose/rust/app_storage.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Core/Log.swift` | 4 | 已写入（未验证） | `Tools/Cove/rust/support.rs` | 未编译、未行为对照 |
+| `Compose/Sources/CoveUICompose/Core/Log.swift` | 4 | 已写入（未验证） | `Compose/rust/core/log.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/CoreExports.swift` | 3 | 已写入（未验证） | `Compose/rust/core_exports.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/CoveUICompose.swift` | 7 | 已写入（未验证） | `Compose/rust/lib.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/CoveUIComposeResourceBundle.swift` | 6 | 已写入（未验证） | `Compose/rust/resource_bundle.rs`<br>`PlatformCore/rust/resources.rs` | 未编译、未行为对照 |
@@ -660,82 +660,6 @@
 | `Core/Sources/CoveUIScene/UIWorkScheduler.swift` | 11 | 已写入（未验证） | `Core/rust/scene/environment_hooks.rs` | 未编译、未行为对照 |
 | `Core/Sources/CoveUIScene/WindowReveal.swift` | 26 | 已写入（未验证） | `Core/rust/scene/environment_hooks.rs` | 未编译、未行为对照 |
 
-### Tools
-
-共 69 个文件：已写入 68，进行中 0，未开始 1。
-
-| 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
-| --- | ---: | --- | --- | --- |
-| `Tools/Cove/Sources/CoveCLI/CLI/Arguments.swift` | 286 | 已写入（未验证） | `Tools/Cove/rust/cli.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/CLI/Diagnostics.swift` | 21 | 已写入（未验证） | `DevTools/rust/inspection/diagnostics.rs`<br>`Tools/Cove/rust/cli.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/CLI/Platform.swift` | 51 | 已写入（未验证） | `Tools/Cove/rust/cli.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Development/AndroidRun.swift` | 41 | 已写入（未验证） | `Tools/Cove/rust/development.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Development/Cancellation.swift` | 40 | 已写入（未验证） | `Tools/Cove/rust/development.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Development/DesktopRun.swift` | 36 | 已写入（未验证） | `Tools/Cove/rust/development.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Development/Inspector.swift` | 92 | 已写入（未验证） | `Tools/Cove/rust/main.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Development/Session.swift` | 68 | 已写入（未验证） | `Tools/Cove/rust/main.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Entry.swift` | 159 | 已写入（未验证） | `Tools/Cove/rust/main.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Installation/Archive.swift` | 52 | 已写入（未验证） | `Tools/Cove/rust/installation.rs`<br>`Tools/Cove/rust/project_sdk.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Installation/Directories.swift` | 25 | 已写入（未验证） | `Tools/Cove/rust/installation.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Installation/Installer.swift` | 76 | 已写入（未验证） | `Tools/Cove/rust/installation.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Installation/NativeArchive.swift` | 47 | 已写入（未验证） | `Tools/Cove/rust/installation.rs`<br>`Tools/Cove/rust/project_sdk.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Installation/Receipt.swift` | 19 | 已写入（未验证） | `Tools/Cove/rust/installation.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Installation/RuntimeLibraries.swift` | 46 | 已写入（未验证） | `Tools/Cove/rust/installation.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Installation/SDKPayload.swift` | 49 | 已写入（未验证） | `Tools/Cove/rust/installation.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Installation/TarArchive.swift` | 23 | 已写入（未验证） | `Tools/Cove/rust/installation.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Installation/Update.swift` | 57 | 已写入（未验证） | `Tools/Cove/rust/installation.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Platforms/Android/APK/Assets.swift` | 38 | 已写入（未验证） | `Tools/Cove/rust/platforms_android/apk.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Platforms/Android/APK/Device.swift` | 39 | 已写入（未验证） | `Graphics/rust/metal/device.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Platforms/Android/APK/Package.swift` | 66 | 已写入（未验证） | `Tools/Cove/rust/platforms_android/apk.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Platforms/Android/APK/Signing.swift` | 38 | 已写入（未验证） | `Tools/Cove/rust/platforms_android/apk.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Platforms/Android/Compilation/Application.swift` | 41 | 已写入（未验证） | `Hosts/rust/android/sources/cove_android_app/application.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Platforms/Android/Compilation/Artifact.swift` | 17 | 已写入（未验证） | `Graphics/rust/rhi/shader_artifact.rs`<br>`Graphics/rust/rhi/shader_artifact_loading.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Platforms/Android/Compilation/NDK.swift` | 28 | 已写入（未验证） | `Tools/Cove/rust/platforms_android/mod.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Platforms/Android/Compilation/NativeDependencies.swift` | 37 | 已写入（未验证） | `Tools/Cove/rust/platforms_android/mod.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Platforms/Android/Compilation/Options.swift` | 32 | 已写入（未验证） | `Compose/rust/primitives/layout/sidebar/adaptive_options.rs`<br>`Compose/rust/primitives/layout/sidebar/resizing.rs`<br>`Compose/rust/primitives/overlays/modal/modal_options.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Platforms/Android/Compilation/SDKOverlay.swift` | 71 | 已写入（未验证） | `Tools/Cove/rust/platforms_android/mod.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Platforms/Android/Compilation/Toolchain.swift` | 102 | 已写入（未验证） | `Tools/Cove/rust/project.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Platforms/Desktop/Build.swift` | 57 | 已写入（未验证） | `Core/rust/build.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Platforms/Desktop/Bundle.swift` | 46 | 已写入（未验证） | `Compose/rust/primitives/media/ui_icon_catalog.rs`<br>`Compose/rust/resource_bundle.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Platforms/Desktop/Launcher.swift` | 27 | 已写入（未验证） | `Tools/Cove/rust/platforms_desktop/mod.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Platforms/Desktop/NativeResources.swift` | 78 | 已写入（未验证） | `Tools/Cove/rust/platforms_desktop/mod.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Platforms/iOS/ApplicationBuild.swift` | 66 | 已写入（未验证） | `Tools/Cove/rust/platforms_ios.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Project/Configuration.swift` | 131 | 已写入（未验证） | `Tools/Cove/rust/cli.rs`<br>`Tools/Cove/rust/project.rs`<br>`Tools/Cove/rust/project_tasks.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Project/Create.swift` | 39 | 已写入（未验证） | `Tools/Cove/rust/project.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Project/Identity.swift` | 16 | 已写入（未验证） | `Tools/Cove/rust/project.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Project/SDK/Artifacts.swift` | 82 | 已写入（未验证） | `Tools/Cove/rust/platforms_android/mod.rs`<br>`Tools/Cove/rust/project_sdk.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Project/SDK/Command.swift` | 68 | 已写入（未验证） | `Tools/Cove/rust/project_sdk.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Project/SDK/Download.swift` | 21 | 已写入（未验证） | `Tools/Cove/rust/project_sdk.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Project/SDK/Location.swift` | 74 | 已写入（未验证） | `Logging/rust/record.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Project/SDK/Release.swift` | 43 | 已写入（未验证） | `Tools/Cove/rust/project_sdk.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Project/SDK/Store.swift` | 70 | 已写入（未验证） | `Tools/Cove/rust/project_sdk.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Project/Tasks/Dependencies.swift` | 51 | 已写入（未验证） | `Tools/Cove/rust/platforms_android/mod.rs`<br>`Tools/Cove/rust/project_tasks.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Project/Tasks/Runner.swift` | 93 | 已写入（未验证） | `Tools/Cove/rust/project_tasks.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Project/Tasks/Workspace.swift` | 112 | 已写入（未验证） | `Tools/Cove/rust/project_tasks.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Project/Templates.swift` | 14 | 已写入（未验证） | `Tools/Cove/rust/project.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Project/Testing.swift` | 59 | 已写入（未验证） | `Tools/Cove/rust/project.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Project/Version.swift` | 20 | 已写入（未验证） | `Tools/Cove/rust/project.rs`<br>`Tools/Cove/rust/project_sdk.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Support/DeveloperTool.swift` | 30 | 已写入（未验证） | `Tools/Cove/rust/support.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Support/Files.swift` | 70 | 已写入（未验证） | `Tools/Support/rust/files.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Support/Process.swift` | 76 | 已写入（未验证） | `Logging/rust/record.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Support/ProcessStream.swift` | 42 | 已写入（未验证） | `Tools/Cove/rust/support.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Toolchains/Android.swift` | 29 | 已写入（未验证） | `Tools/Cove/rust/project.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Toolchains/Native.swift` | 45 | 已写入（未验证） | `Tools/Cove/rust/toolchains.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Toolchains/Requirements.swift` | 50 | 已写入（未验证） | `Tools/Cove/rust/toolchains.rs` | 未编译、未行为对照 |
-| `Tools/Cove/Sources/CoveCLI/Toolchains/Setup.swift` | 30 | 已写入（未验证） | `Tools/Cove/rust/toolchains.rs` | 未编译、未行为对照 |
-| `Tools/Support/Sources/ToolSupport/Archive.swift` | 24 | 已写入（未验证） | `Tools/Support/rust/archive.rs` | 未编译、未行为对照 |
-| `Tools/Support/Sources/ToolSupport/Concurrency.swift` | 20 | 已写入（未验证） | `Tools/Support/rust/concurrency.rs` | 未编译、未行为对照 |
-| `Tools/Support/Sources/ToolSupport/Download.swift` | 110 | 已写入（未验证） | `Tools/Support/rust/download.rs` | 未编译、未行为对照 |
-| `Tools/Support/Sources/ToolSupport/Files.swift` | 94 | 已写入（未验证） | `Tools/Support/rust/files.rs` | 未编译、未行为对照 |
-| `Tools/Support/Sources/ToolSupport/NSNumber+Boolean.swift` | 19 | 未开始 | — | 等待实现 |
-| `Tools/Support/Sources/ToolSupport/ProcessRunner.swift` | 45 | 已写入（未验证） | `Tools/Support/rust/process_runner.rs` | 未编译、未行为对照 |
-| `Tools/Support/Sources/ToolSupport/ProcessSignal.swift` | 20 | 已写入（未验证） | `Tools/Support/rust/process_signal.rs` | 未编译、未行为对照 |
-| `Tools/Support/Sources/ToolSupport/Repository.swift` | 31 | 已写入（未验证） | `Tools/Support/rust/repository.rs` | 未编译、未行为对照 |
-| `Tools/Support/Sources/ToolSupport/SHA256.swift` | 126 | 已写入（未验证） | `Tools/Support/rust/sha256.rs` | 未编译、未行为对照 |
-| `Tools/Support/Sources/ToolSupport/Shell.swift` | 70 | 已写入（未验证） | `Tools/Support/rust/shell.rs` | 未编译、未行为对照 |
-| `Tools/Support/Sources/ToolSupport/Terminal.swift` | 39 | 已写入（未验证） | `Tools/Support/rust/terminal.rs` | 未编译、未行为对照 |
-| `Tools/Support/Sources/ToolSupport/WindowsBuildEnvironment.swift` | 67 | 已写入（未验证） | `Tools/Support/rust/windows_build_environment.rs` | 未编译、未行为对照 |
-
 ### Examples
 
 共 61 个文件：已写入 61，进行中 0，未开始 0。
@@ -1062,7 +986,7 @@
 | `Shell/Sources/PlatformShell/DisplayRefresh/MacDisplayLink.swift` | 29 | 已写入（未验证） | `Shell/rust/display_refresh/mod.rs` | 未编译、未行为对照 |
 | `Shell/Sources/PlatformShell/DisplayRefresh/Signal.swift` | 50 | 已写入（未验证） | `Shell/rust/display_refresh/signal.rs` | 未编译、未行为对照 |
 | `Shell/Sources/PlatformShell/DisplayRefresh/WindowDisplayLink.swift` | 45 | 已写入（未验证） | `Shell/rust/display_refresh/mod.rs` | 未编译、未行为对照 |
-| `Shell/Sources/PlatformShell/Log.swift` | 5 | 已写入（未验证） | `Tools/Cove/rust/support.rs` | 未编译、未行为对照 |
+| `Shell/Sources/PlatformShell/Log.swift` | 5 | 已写入（未验证） | `Shell/rust/log.rs` | 未编译、未行为对照 |
 | `Shell/Sources/PlatformShell/NativeMenuPopover.swift` | 100 | 已写入（未验证） | `Shell/rust/native_menu_popover.rs` | 未编译、未行为对照 |
 | `Shell/Sources/PlatformShell/PlatformShell.swift` | 579 | 已写入（未验证） | `Shell/rust/platform_shell.rs`<br>`Shell/rust/sdl3_shell.rs` | 未编译、未行为对照 |
 | `Shell/Sources/PlatformShell/SDL3Clipboard.swift` | 22 | 已写入（未验证） | `Shell/rust/sdl3_clipboard.rs` | 未编译、未行为对照 |
@@ -1079,7 +1003,7 @@
 | `Runtime/Sources/CoveUIRuntime/Core/CoveUIRuntime.swift` | 17 | 已写入（未验证） | `Runtime/rust/lib.rs` | 未编译、未行为对照 |
 | `Runtime/Sources/CoveUIRuntime/Core/FrameDeadline.swift` | 28 | 已写入（未验证） | `Runtime/rust/frame_deadline.rs` | 未编译、未行为对照 |
 | `Runtime/Sources/CoveUIRuntime/Core/FrameDrive.swift` | 24 | 已写入（未验证） | `Runtime/rust/frame_drive.rs` | 未编译、未行为对照 |
-| `Runtime/Sources/CoveUIRuntime/Core/Log.swift` | 9 | 已写入（未验证） | `Tools/Cove/rust/support.rs` | 未编译、未行为对照 |
+| `Runtime/Sources/CoveUIRuntime/Core/Log.swift` | 9 | 已写入（未验证） | `Runtime/rust/log.rs` | 未编译、未行为对照 |
 | `Runtime/Sources/CoveUIRuntime/Core/NativeAccessibility.swift` | 303 | 已写入（未验证） | `Runtime/rust/native_accessibility.rs` | 未编译、未行为对照 |
 | `Runtime/Sources/CoveUIRuntime/Core/PlatformHost.swift` | 17 | 已写入（未验证） | `Runtime/rust/platform_host.rs` | 未编译、未行为对照 |
 | `Runtime/Sources/CoveUIRuntime/Core/SDL3PlatformHost.swift` | 993 | 已写入（未验证） | `Runtime/rust/sdl3_platform_host.rs` | 未编译、未行为对照 |

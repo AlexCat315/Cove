@@ -75,17 +75,15 @@ Core + Composition + Text + Inspection ← Browser
 
 `python3 Tools/Architecture/check.py` 检查每个 target 的唯一所有者、生产包依赖方向、源码 import 边界、跨能力原生桥接导入和内部 product 回流。CI 在构建前执行它。
 
-构建与测试统一通过 Cove CLI：
+构建与测试直接使用 Cargo：
 
 ```sh
-./cove test . --build-only
-./cove test . --skip-build --no-parallel
-./cove test Core --no-parallel
-./cove test Text --no-parallel
-./cove test Tests/Headless --no-parallel
-./cove test DevTools --no-parallel
-./cove test Graphics --no-parallel
-./cove test Tools/Cove --no-parallel
+cargo test --workspace --no-run
+cargo test --workspace -- --test-threads=1
+cargo test -p cove-core
+cargo test -p cove-text
+cargo test -p cove-devtools
+cargo test -p cove-graphics
 ```
 
 测试包不再由根 manifest 重复声明，因此根包测试和能力包测试均需在 CI 中执行。平台图形/窗口后端仍需各平台验收；本机通过不代表 Android、Wasm、Windows 与 Linux 全部通过。

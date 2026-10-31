@@ -1,6 +1,6 @@
 # CoveUI 浏览器 Wasm 原型
 
-此目录是浏览器宿主的独立验证工程，尚未成为 `cove build --web` 的完整应用目标。Swift/Wasm 模块通过 JavaScript 适配 Canvas、WebGPU 和 DOM 输入；它不依赖引擎的 Wasmtime 插件运行时。下述已验证工具链配对单独用于原型，不改变 Android 的 Swift 6.4.1 要求。
+此目录是浏览器宿主的独立验证工程，尚未成为完整的 Web 应用目标。Swift/Wasm 模块通过 JavaScript 适配 Canvas、WebGPU 和 DOM 输入；它不依赖引擎的 Wasmtime 插件运行时。下述已验证工具链配对单独用于原型，不改变 Android 的 Swift 6.4.1 要求。
 
 浏览器和桌面现在运行同一份 `CounterView` Compose 源码，以及真实的
 ViewGraph、节点树、Yoga 布局、输入分发、State/Binding 和 DrawList。
@@ -140,9 +140,9 @@ npm run dev
 ## 可重复验证
 
 ```bash
-./cove test Tests/Headless --no-parallel
-./cove test Text --no-parallel # 先构建原生字体依赖，见 ../Text/README.md
-./cove internal build-package Compose/Composition
+cargo test -p cove-browser -- --test-threads=1
+cargo test -p cove-text -- --test-threads=1
+cargo build -p cove-composition
 cd CoveUI/Browser
 npm run build
 npm run verify

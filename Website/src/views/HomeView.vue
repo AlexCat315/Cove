@@ -26,9 +26,9 @@ struct CounterView: View {
 }`
 
 const cliLines = [
-  { prompt: '$', text: 'cove setup', output: '✓ 工具链检查通过 · Swift 6.4.1' },
-  { prompt: '$', text: 'cove create app MyApp', output: '✓ 已生成桌面 / Android / iOS 共享工程' },
-  { prompt: '$', text: 'cove run MyApp', output: '▶ 正在构建并启动 NativeRHI 窗口…' },
+  { prompt: '$', text: 'cargo new my-app && cd my-app', output: '✓ Created binary package' },
+  { prompt: '$', text: 'cargo add cove-ui --git https://github.com/AlexCat315/Cove.git', output: '✓ Adding cove-ui' },
+  { prompt: '$', text: 'cargo run', output: '▶ 正在构建并启动 NativeRHI 窗口…' },
 ]
 
 const features = [
@@ -59,8 +59,8 @@ const features = [
   },
   {
     icon: 'M5 12h14M12 5l7 7-7 7',
-    title: 'cove 一体化 CLI',
-    desc: '创建、运行、测试、构建、SDK 版本管理，一条命令串起整个开发循环。',
+    title: '纯 Cargo 工作流',
+    desc: '构建、运行、测试、交叉编译都交给 Cargo，原生依赖由 build.rs 构建。',
   },
 ]
 
@@ -102,7 +102,7 @@ onMounted(() => {
           抵达<span class="gradient-text">每一块屏幕</span>
         </h1>
         <p class="hero-sub">
-          Cove 是跨平台声明式 UI 框架与 <code>cove</code> CLI。统一的视图、布局、文本与图像管线，
+          Cove 是 Rust 跨平台声明式 UI 框架。统一的视图、布局、文本与图像管线，
           通过 NativeRHI 驱动 Metal、DirectX 12 与 Vulkan。
         </p>
         <div class="hero-cta">
@@ -168,17 +168,16 @@ onMounted(() => {
     </div>
   </section>
 
-  <!-- ================= CLI ================= -->
+  <!-- ================= Cargo ================= -->
   <section class="section" id="cli">
     <div class="container cli-wrap">
       <div class="cli-copy reveal">
-        <span class="eyebrow">cove CLI</span>
+        <span class="eyebrow">Cargo</span>
         <h2 class="section-title">三条命令，从空目录到运行</h2>
         <p class="section-sub">
-          CLI 自带运行库，无需先安装 Swift 即可执行。SDK 版本由 <code>cove.json</code> 固定，
-          所有项目共享同一份工具链。
+          依赖与版本由 <code>Cargo.toml</code> 与 <code>Cargo.lock</code> 固定，工具链由 <code>rust-toolchain.toml</code> 固定。
         </p>
-        <RouterLink to="/docs/cli" class="btn btn-ghost">查看 CLI 手册</RouterLink>
+        <RouterLink to="/docs/cargo" class="btn btn-ghost">Cargo 工作流</RouterLink>
       </div>
       <div class="cli-terminal glass reveal">
         <div class="term-bar">

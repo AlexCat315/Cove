@@ -21,12 +21,13 @@ Status is derived, never guessed:
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import re
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 JSON_PATH = os.path.join(ROOT, "Docs", "rust-migration-files.json")
 
 EXCLUDED_DIRS = {
@@ -641,7 +642,7 @@ def is_reachable(path: str, declared: set[str]) -> bool:
     for candidate in (
         os.path.join(directory, "mod.rs"),
         os.path.join(directory, "lib.rs"),
-        # A binary crate's root is `main.rs`; `Tools/Cove` is one.
+        # A binary crate's root is `main.rs`.
         os.path.join(directory, "main.rs"),
         os.path.join(os.path.dirname(directory), os.path.basename(directory) + ".rs"),
     ):
@@ -661,9 +662,44 @@ def is_reachable(path: str, declared: set[str]) -> bool:
     return False
 
 
+def status(document: dict, as_json: bool, require_complete: bool) -> int:
+    production = [e for e in document["entries"] if e["kind"] == "production"]
+    tests = [e for e in document["entries"] if e["kind"] == "test"]
+    pending = sum(e["status"] == "pending" for e in production)
+    pending_tests = sum(e["status"] == "pending" for e in tests)
+    if as_json:
+        print(json.dumps({
+            "production": len(production), "written": len(production) - pending, "pending": pending,
+            "tests": len(tests), "tests_pending": pending_tests,
+        }))
+    else:
+        print(f"production entries: {len(production)}")
+        print(f"written: {len(production) - pending}")
+        print(f"pending: {pending}")
+        print(f"test entries: {len(tests)}")
+        print(f"tests pending: {pending_tests}")
+    if require_complete and pending:
+        print(f"{pending} production sources are not migrated", file=sys.stderr)
+        return 1
+    return 0
+
+
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--status", action="store_true", help="report counts without rewriting the inventory")
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("--require-complete", action="store_true")
+    args = parser.parse_args()
+
     with open(JSON_PATH, encoding="utf-8") as handle:
         document = json.load(handle)
+    if args.status:
+        return status(document, args.json, args.require_complete)
+
+    # Swift sources deleted from the tree (rather than migrated) leave the inventory.
+    document["entries"] = [
+        e for e in document["entries"] if os.path.isfile(os.path.join(ROOT, e["source"]))
+    ]
 
     rust = rust_files()
     derive(document["entries"], rust)

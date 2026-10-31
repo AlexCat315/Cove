@@ -17,127 +17,27 @@ concurrency:
   group: sdk-release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 jobs:
-  rust-migration:
+  metadata:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ inputs.tag || github.ref }}
-      - name: Require the completed Rust migration before publishing
-        shell: bash
-        run: |
-          rustup toolchain install 1.99.1 --profile minimal
-          ./cove migration status --require-complete
-  native:
-    needs: rust-migration
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: xcode-27
-            platform: macos-arm64
-            options: ''
-            desktop: true
-          - runner: windows-2025-vs2026
-            platform: windows-x86_64
-            options: ''
-            desktop: true
-          - runner: ubuntu-24.04
-            platform: linux-x86_64
-            options: ''
-            desktop: true
-          - runner: ubuntu-24.04
-            platform: android-arm64
-            options: '--android'
-          - runner: xcode-27
-            platform: ios-arm64
-            options: '--ios --sdk iphoneos --arch arm64'
-          - runner: xcode-27
-            platform: ios-arm64-simulator
-            options: '--ios --sdk iphonesimulator --arch arm64'
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          ref: ${{ inputs.tag || github.ref }}
-      - uses: ./.github/actions/fetch-submodules
-      - uses: ./.github/actions/setup-toolchains
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.13'
+      - name: Require the completed Rust migration
+        run: python3 Tools/Migration/inventory.py --status --require-complete
       - name: Check capability and resource ownership
         run: |
-          python Tools/Architecture/check.py
-          python Tools/Architecture/test_check.py
+          python3 Tools/Architecture/check.py
+          python3 Tools/Architecture/test_check.py
       - name: Verify release metadata
         run: node Tools/Release/check-version.mjs "$RELEASE_TAG" --release
-      - name: Identify native inputs
-        id: native-inputs
-        run: echo "digest=$(git ls-tree -r HEAD cmake third-party Native/third-party Tools/Cove/Sources/CoveCLI/Toolchains/Native.swift .github/actions/setup-toolchains/action.yml | git hash-object --stdin)" >> "$GITHUB_OUTPUT"
-      - uses: actions/setup-java@v4
-        if: matrix.platform == 'android-arm64'
-        with:
-          distribution: temurin
-          java-version: '21'
-      - uses: android-actions/setup-android@v3
-        if: matrix.platform == 'android-arm64'
-        with:
-          packages: 'platform-tools'
-      - name: Prepare Android platform tools
-        if: matrix.platform == 'android-arm64'
-        run: |
-          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.1.0" "ndk;30.0.16248370"
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/30.0.16248370" >> "$GITHUB_ENV"
-      - uses: actions/cache@v5
-        with:
-          key: sdk-native-v3-${{ matrix.platform }}-${{ steps.native-inputs.outputs.digest }}
-          path: |
-            vendor
-            Native/vendor
-            Artifacts/native
-            build/android-validation/native
-            build/android-validation/fonts-cmake
-      - name: Prepare host libraries
-        run: ./cove setup
-      - name: Package target libraries
-        run: ./cove internal package-native ${{ matrix.options }} --output "$PWD/dist"
-      - name: Verify desktop SDK
-        if: matrix.desktop
-        run: |
-          if [ "$RUNNER_OS" = Linux ]; then
-            xvfb-run -a ./cove test . --no-parallel
-          else
-            ./cove test . --no-parallel
-          fi
-      - name: Verify Android application packaging
-        if: matrix.platform == 'android-arm64'
-        run: ./cove build Examples/Mobile --android --output "$PWD/dist/mobile-smoke.apk"
-      - name: Verify iOS Simulator application
-        if: matrix.platform == 'ios-arm64-simulator'
-        run: ./cove build Examples/Mobile --ios
-      - uses: actions/upload-artifact@v4
-        with:
-          name: native-${{ matrix.platform }}
-          path: |
-            dist/cove-native-*.tar.gz
-            dist/native-*.json
-          if-no-files-found: error
-  sdk:
-    needs: native
+  desktop:
+    needs: metadata
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - runner: xcode-27
-            platform: macos-arm64
-          - runner: windows-2025-vs2026
-            platform: windows-x86_64
-          - runner: ubuntu-24.04
-            platform: linux-x86_64
+        runner: [xcode-27, windows-2025-vs2026, ubuntu-24.04]
     defaults:
       run:
         shell: bash
@@ -147,66 +47,62 @@ jobs:
           ref: ${{ inputs.tag || github.ref }}
       - uses: ./.github/actions/fetch-submodules
       - uses: ./.github/actions/setup-toolchains
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: native-*
-          path: native
-          merge-multiple: true
-      - name: Assemble shared SDK libraries and metadata
+      - name: Test workspace
         run: |
-          node Tools/Release/merge-native.mjs native
-          mkdir -p Artifacts
-          cp native/native.json Artifacts/native.json
-          tar -xf "native/cove-native-${{ matrix.platform }}.tar.gz"
-      - name: Test SDK management
-        run: ./cove test Tools/Cove --timeout 480
-      - name: Package complete SDK
-        run: ./cove internal package-cli --output "$PWD/dist"
-      - name: Verify independent startup
-        run: |
-          mkdir smoke
-          tar -xf "dist/cove-${{ matrix.platform }}.tar.gz" -C smoke
-          if [ "$RUNNER_OS" = Windows ]; then
-            env -i SystemRoot="$SYSTEMROOT" WINDIR="$WINDIR" PATH=/c/Windows/System32 smoke/cove/cove.exe --version
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a cargo test --workspace --locked --release -- --test-threads=1
           else
-            env -i PATH=/usr/bin:/bin smoke/cove/cove --version
+            cargo test --workspace --locked --release -- --test-threads=1
           fi
-          test -f smoke/cove/Package.swift
-          test -f smoke/cove/DevTools/Client/Performance/Performance.js
-          test -f smoke/cove/Tools/Cove/Sources/CoveCLI/SDK.json
-          test -f smoke/cove/Native/vendor/SDL3.artifactbundle/info.json
-      - uses: actions/upload-artifact@v4
+  mobile:
+    needs: metadata
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: aarch64-linux-android
+          - runner: xcode-27
+            target: aarch64-apple-ios
+          - runner: xcode-27
+            target: aarch64-apple-ios-sim
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7.0.1
         with:
-          name: sdk-${{ matrix.platform }}
-          path: dist/*
-          if-no-files-found: error
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: ./.github/actions/fetch-submodules
+      - uses: ./.github/actions/setup-toolchains
+      - uses: android-actions/setup-android@v3
+        if: matrix.target == 'aarch64-linux-android'
+        with:
+          packages: 'platform-tools ndk;30.0.16248370'
+      - name: Configure NDK
+        if: matrix.target == 'aarch64-linux-android'
+        run: |
+          ndk="$ANDROID_HOME/ndk/30.0.16248370"
+          ndk_bin="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          echo "ANDROID_NDK_HOME=$ndk" >> "$GITHUB_ENV"
+          echo "CC_aarch64_linux_android=$ndk_bin/aarch64-linux-android26-clang" >> "$GITHUB_ENV"
+          echo "AR_aarch64_linux_android=$ndk_bin/llvm-ar" >> "$GITHUB_ENV"
+          echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$ndk_bin/aarch64-linux-android26-clang" >> "$GITHUB_ENV"
+      - name: Build workspace for ${{ matrix.target }}
+        run: |
+          rustup target add ${{ matrix.target }}
+          cargo build --workspace --lib --locked --release --target ${{ matrix.target }}
   publish:
-    needs: sdk
+    needs: [desktop, mobile]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ inputs.tag || github.ref }}
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: sdk-*
-          path: sdk
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: native-*
-          path: native
-          merge-multiple: true
-      - name: Publish one SDK release
-        shell: bash
+      - name: Publish the SDK release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir release
-          find sdk -name '*.tar.gz' -exec cp {} release/ \;
-          cp native/cove-native-*.tar.gz release/
-          node Tools/Release/merge-native.mjs native
-          cp native/native.json release/
-          (cd release && sha256sum *.tar.gz | sort > SHA256SUMS)
-          cp Tools/Cove/install.sh Tools/Cove/install.ps1 release/
           node Tools/Release/release-notes.mjs > release-notes.md
-          gh release create "$RELEASE_TAG" release/* --verify-tag --title "Cove SDK $RELEASE_TAG" --notes-file release-notes.md
+          gh release create "$RELEASE_TAG" --verify-tag --title "Cove SDK $RELEASE_TAG" --notes-file release-notes.md

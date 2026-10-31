@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Publish the CoveUI SDK and CLI.
+# Publish the Cove SDK.
 #
 #   Tools/Release/release.sh                  patch bump, e.g. 0.1.5 -> 0.1.6
 #   Tools/Release/release.sh 0.2.0            explicit version
@@ -16,7 +16,7 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 cd "$ROOT"
 
-SDK_MANIFEST=Tools/Cove/Sources/CoveCLI/SDK.json
+SDK_MANIFEST=Cargo.toml
 WORKFLOW=release.yml
 
 BRANCH=main
@@ -70,8 +70,8 @@ retry() {
   return 1
 }
 
-json_version() {
-  node -p "JSON.parse(require('fs').readFileSync('$1','utf8')).version" 2>/dev/null
+workspace_version() {
+  node Tools/Release/version.mjs 2>/dev/null
 }
 
 is_version() {
@@ -108,6 +108,11 @@ bump_version() {
     patch) echo "$major.$minor.$((patch + 1))" ;;
     *) die "unknown bump component: $component" ;;
   esac
+}
+
+# Rewrites [workspace.package] version in the root Cargo.toml.
+set_workspace_version() {
+  VALUE=$1 perl -0pi -e 's/(^\[workspace\.package\]\n(?:(?!^\[).*\n)*?version\s*=\s*)"[^"]*"/$1"$ENV{VALUE}"/m' "$SDK_MANIFEST"
 }
 
 # Rewrites one JSON key in place, leaving the file's own formatting alone.
@@ -156,7 +161,8 @@ step "Preflight"
 
 command -v node >/dev/null || die "node is required"
 command -v git >/dev/null || die "git is required"
-[ -f "$SDK_MANIFEST" ] || die "not a CoveUI checkout: $SDK_MANIFEST is missing"
+command -v cargo >/dev/null || die "cargo is required"
+[ -f "$SDK_MANIFEST" ] || die "not a Cove checkout: $SDK_MANIFEST is missing"
 
 current_branch=$(git rev-parse --abbrev-ref HEAD)
 [ "$current_branch" = "$BRANCH" ] || die "on '$current_branch'; release from '$BRANCH' or pass --branch"
@@ -171,7 +177,7 @@ if [ -n "$(git status --porcelain)" ]; then
   fi
 fi
 
-current_version=$(json_version "$SDK_MANIFEST")
+current_version=$(workspace_version)
 is_version "$current_version" || die "unreadable SDK version: '$current_version'"
 info "current version $current_version"
 
@@ -208,7 +214,7 @@ else
   info "local only: nothing will be pushed"
 fi
 
-manifests=("$SDK_MANIFEST")
+manifests=("$SDK_MANIFEST" Cargo.lock)
 while IFS= read -r file; do
   manifests+=("$file")
 done < <(git ls-files | grep -E '(^|/)cove\.json$' || true)
@@ -224,7 +230,7 @@ changelog=$(printf '%s\n' "$changelog" | node Tools/Release/sanitize-commit-note
 step "Plan"
 info "version  $current_version -> $version"
 info "tag      $tag"
-info "commit   Release SDK and CLI $version"
+info "commit   Release SDK $version"
 info "manifest ${#manifests[@]} files:"
 for file in "${manifests[@]}"; do info "  $file"; done
 if [ "$CHANGELOG" -eq 1 ] && [ -f CHANGELOG.md ]; then
@@ -252,14 +258,13 @@ fi
 
 if [ "$version" != "$current_version" ]; then
   step "Bump manifests to $version"
-  set_json_version "$SDK_MANIFEST" version "$version"
+  set_workspace_version "$version"
+  cargo update --workspace --quiet || die "Cargo.lock did not accept $version"
   for file in "${manifests[@]}"; do
     case "$file" in
-      "$SDK_MANIFEST") continue ;;
+      "$SDK_MANIFEST"|Cargo.lock) continue ;;
     esac
     set_json_version "$file" sdkVersion "$version"
-  done
-  for file in "${manifests[@]}"; do
     node -e "JSON.parse(require('fs').readFileSync('$file','utf8'))" \
       || die "$file is not valid JSON after the bump"
   done
@@ -299,7 +304,7 @@ git add -- "${commit_paths[@]}"
 if git diff --cached --quiet; then
   info "manifests already committed at $version"
 else
-  message=(-m "Release SDK and CLI $version")
+  message=(-m "Release SDK $version")
   [ -n "$changelog" ] && message+=(-m "$changelog")
   git commit --quiet "${message[@]}" -- "${commit_paths[@]}"
   info "committed $(git rev-parse --short HEAD)"
@@ -307,9 +312,9 @@ fi
 
 step "Tag"
 if [ -n "$changelog" ]; then
-  git tag -a "$tag" -m "CoveUI SDK and CLI $version" -m "$changelog"
+  git tag -a "$tag" -m "Cove SDK $version" -m "$changelog"
 else
-  git tag -a "$tag" -m "CoveUI SDK and CLI $version"
+  git tag -a "$tag" -m "Cove SDK $version"
 fi
 info "tagged $tag"
 

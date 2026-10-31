@@ -18,8 +18,6 @@ members = [
     "DevTools",
     "DevTools/Protocol",
     "Sources",
-    "Tools/Cove",
-    "Tools/Support",
     "Browser",
     "Examples",
     "Examples/RustCounter",

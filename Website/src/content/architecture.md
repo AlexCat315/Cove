@@ -45,13 +45,8 @@ Cove 采用清晰的分层架构，把跨平台差异收敛到最底层，向上
 
 ## SDK 版本模型
 
-应用的 `cove.json` 使用 `toolchain.sdkVersion` 固定完整 SDK 版本。所有项目与 IDE 通过本地路径引用全局 `versions/VERSION` 中的同一份 SDK，不再单独下载 CoveUI 与原生库。
-
-```bash
-cove sdk install latest      # 安装最新 SDK
-cove sdk use 1.2.0           # 为当前项目选择版本
-```
+应用在 `Cargo.toml` 中以 git tag 或本地路径依赖 Cove crate，版本由 `Cargo.lock` 锁定。
 
 ## 与 Diffuse 的边界
 
-场景、三维渲染、物理、脚本 HUD 与编辑器集成由 [Diffuse](https://github.com/AlexCat315/Diffuse) 管理；Cove 只负责 UI、NativeRHI、平台服务与 CLI。两者组合，构成从底层 UI 到创作工作站的完整工具链。
+场景、三维渲染、物理、脚本 HUD 与编辑器集成由 [Diffuse](https://github.com/AlexCat315/Diffuse) 管理；Cove 只负责 UI、NativeRHI、平台服务。两者组合，构成从底层 UI 到创作工作站的完整工具链。

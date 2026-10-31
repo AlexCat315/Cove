@@ -19,7 +19,7 @@ const columns = [
       { label: '快速开始', to: '/docs/getting-started' },
       { label: '架构概览', to: '/docs/architecture' },
       { label: 'NativeRHI', to: '/docs/native-rhi' },
-      { label: 'CLI 手册', to: '/docs/cli' },
+      { label: 'Cargo 工作流', to: '/docs/cargo' },
     ],
   },
 ]

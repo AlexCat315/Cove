@@ -1,6 +1,7 @@
 import fs from 'node:fs';
-const sdk = JSON.parse(fs.readFileSync('Tools/Cove/Sources/CoveCLI/SDK.json'));
-if (process.argv[2] !== 'v' + sdk.version) throw new Error('Tag and SDK version must agree');
-if (process.argv.includes('--release') && !fs.readFileSync('CHANGELOG.md', 'utf8').includes('## ' + sdk.version + ' ')) {
+import {workspaceVersion} from './version.mjs';
+const version = workspaceVersion();
+if (process.argv[2] !== 'v' + version) throw new Error('Tag and workspace version must agree');
+if (process.argv.includes('--release') && !fs.readFileSync('CHANGELOG.md', 'utf8').includes('## ' + version + ' ')) {
   throw new Error('Every SDK release requires a versioned changelog entry');
 }

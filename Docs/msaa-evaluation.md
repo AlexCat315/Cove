@@ -122,8 +122,10 @@ Transient MSAA 4x (same pixels):
 ## Reproduce
 
 ```sh
-COVE_MSAA_EVALUATION=1 ./cove test . --filter MSAAEvaluationTests --no-parallel --testing-library swift-testing
+COVE_MSAA_EVALUATION=1 swift test --filter MSAAEvaluationTests --no-parallel
 ```
+
+`MSAAEvaluationTests` is still a Swift suite; its Rust port is pending.
 
 `COVE_MSAA_OUTPUT` overrides the output directory; the default is
 `/tmp/cove-msaa-evaluation`. This measurement is opt-in and is skipped by ordinary

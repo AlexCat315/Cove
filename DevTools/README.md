@@ -6,26 +6,17 @@ The server uses SwiftNIO on macOS, Linux and Windows. Protocol dispatch and
 socket transport live in the [Protocol](Protocol/Package.swift), [Inspection](Inspection/Package.swift) and [DevTools](Package.swift) capability packages.
 The previous Network.framework-only server and non-Apple no-op were removed.
 
-1. Start a CoveUI app with DevTools enabled:
+1. Start an app with DevTools enabled:
 
    ```bash
-   ./cove run CoveUI/Examples --devtools
-   # Application project:
-   ./cove run /path/to/MyApp --devtools
-   ./cove run /path/to/MyApp --android --devtools --device DEVICE_SERIAL
-   # Connect to an existing CLI-managed session:
-   ./cove devtools /path/to/MyApp
+   COVE_DEVTOOLS=1 cargo run
    ```
 
-The CLI opens this Inspector with the runtime's authenticated endpoint. Dynamic
-ports and per-session tokens allow multiple apps/devices without a shared fixed port.
-Use `--no-open` for headless runs and `--session ID` to select an existing session.
-Android uses a CLI-owned ADB forwarding lifetime; Ctrl+C removes the forwarding.
-
-The CLI opens a session-local `inspector.html` bootstrap rather than the client
-directly: the OS URL handlers (`open`, `xdg-open`, `rundll32`) drop the query
-string from `file://` URLs, so the endpoint would never reach the client. The
-bootstrap forwards in-browser, where the query is preserved.
+   The server listens on `COVE_DEVTOOLS_HOST:COVE_DEVTOOLS_PORT`
+   (default `127.0.0.1:9229`). Setting `COVE_DEVTOOLS_SESSION_ID`,
+   `COVE_DEVTOOLS_TOKEN` and `COVE_DEVTOOLS_SESSION_FILE` together enables an
+   authenticated session whose descriptor is written to that file. Android needs
+   `adb forward tcp:9229 tcp:9229`.
 
 For direct framework development, `COVE_DEVTOOLS=1 swift run --package-path
 CoveUI/Examples CoveUIDemo` still enables the loopback service at the default
@@ -97,9 +88,8 @@ Frame mirroring currently requires the macOS ImageIO encoder. Linux/Windows
 hosts advertise tree, selection, log, timing and configured state providers,
 and omit the unavailable mirror capability.
 
-For a headless connection test, run
-`./cove internal build-package DevTools --product CoveUIDevToolsProbe` from the repository
-root. It serves a real Node/Yoga diagnostic tree without GPU dependencies.
+For a headless connection test, use the `cove_devtools::probe` module
+(`cargo test -p cove-devtools`). It serves a real Node/Yoga diagnostic tree without GPU dependencies.
 
 ## Pick, inspect layout, edit styles
 
@@ -236,7 +226,7 @@ reallocates its MSAA target when the drawable dimensions change.
 Run the native Inspector acceptance suite without a Wasm SDK or GPU:
 
 ```bash
-./cove internal build-package DevTools --product CoveUIDevToolsProbe
+cargo test -p cove-devtools
 swift run --package-path Tools/Developer cove-dev browser verify --native-only
 ```
 
@@ -246,11 +236,9 @@ breakpoint URLs and disconnect/reconnect cleanup.
 
 ## Profile and platform adapters
 
-`cove run --profile` uses Swift Release optimization with COVE_PROFILE and
-keeps an opt-in diagnostics service. Streams are still subscription-driven;
+Streams are still subscription-driven;
 CPU instrumentation and picture mirroring have measurement overhead and should
-be enabled only for the investigation. CLI --release rejects --devtools, and
-fromEnvironment does not enable a production Release runtime.
+be enabled only for the investigation. `fromEnvironment` does not enable a production Release runtime.
 
 Android now connects the same scene protocol to its UI-thread Handler, including
 while the surface is paused. It advertises tree/selection/styles/source/component
@@ -259,35 +247,17 @@ mirroring or arbitrary checkpoint/recording providers that its host has not
 installed. Its timing presentMs covers host work after draw-list preparation,
 including GPU command submission/waiting; it is not GPU execution duration.
 
-Run against an existing CLI-managed session:
-
-```sh
-cove-dev devtools session /path/to/MyApp mac
-cove-dev devtools session /path/to/MyApp android
-```
 
 ## AI-driven component acceptance
 
-No OS automation is needed. Start the Gallery through the Cove CLI, query its
+No OS automation is needed. Start the app with `COVE_DEVTOOLS=1`, query its
 live AI diagnostics, inject input through DevTools and inspect the renderer mirror.
-Arguments after `--` go to the Gallery, so a page, width and input mode are
-selected at launch. `cove devtools` actions resolve the project's single live
-session (add `--session ID` when several run):
-
-```sh
-./cove run CoveUI/Examples --mac --devtools --no-open -- --component list --width 390 --input touch
-./cove devtools CoveUI/Examples list                     # available AI tools
-./cove devtools CoveUI/Examples query '{"text":"Document 5","visible_only":true,"compact":true}'
-./cove devtools CoveUI/Examples click NODE_ID
-./cove devtools CoveUI/Examples activate NODE_ID              # accessibility action, no geometry needed
-./cove devtools CoveUI/Examples input @events.json --capture /tmp/after.jpg
-./cove devtools CoveUI/Examples capture /tmp/gallery.jpg --settle-ms 400
-```
+The actions below are DevTools protocol requests sent over the session endpoint.
 
 A bare JSON object runs `query_ui_nodes`; `query TOOL JSON` runs any other tool.
 `click` and `input` accept `--capture OUT.jpg`, which mirrors the window as soon
 as delivery completes. Use it for transient states (a scroll indicator that fades,
-a transition in flight); a separate `capture` call starts a new CLI process first.
+a transition in flight); a separate `capture` call opens a new connection first.
 `compact: true` returns one short record per node (id, role, label, value,
 non-default state, clipped frame, `File.swift:line`) instead of the full
 layout/style/view-type payload. The same actions are available as
@@ -296,7 +266,7 @@ accept a port or an `@session.json` / `@runtime.json` file. Managed sessions ret
 token and device-forwarded port inside the connection; copying a token into shell
 commands is unnecessary. Select a component through the Gallery search, then
 inspect the narrow/wide/touch previews and change scale or appearance in the UI.
-Build/test changes with `./cove test CoveUI --no-parallel --filter TEST`.
+Build/test changes with `cargo test --workspace TEST -- --test-threads=1`.
 
 Gallery flags: `--input touch|mixed|pointer`, `--dark`, `--text-scale 2`,
 `--rtl`, `--reduce-motion`. Width and height still follow the real window after
@@ -316,7 +286,7 @@ always query the resulting value and inspect a fresh mirror image to verify it.
 Input fields keep their values lazy. Ordinary node discovery does not read them.
 Keyboard events use browser `KeyboardEvent.code`, for example
 `{"kind":"keyDown","key":"KeyA","modifiers":["cmd"]}`. Numeric USB-HID
-`scancode` is also accepted by the CLI, including letters and digits. Unsupported
+`scancode` is also accepted, including letters and digits. Unsupported
 or missing key codes fail before delivery instead of reporting a successful
 sequence whose shortcut was ignored.
 
@@ -367,4 +337,4 @@ it; the mirror remains useful without foregrounding or OS automation.
 - `Protocol` documents the shared protocol. Swift message models remain canonical in Protocol, separate from HTML rendering.
 - DevTools server `Session`, `Transport`, `Tree` and `Requests` separate lifecycle, sockets, tree encoding and request domains. Typed host adapters group scene, checkpoints, recordings, observations and mirror callbacks.
 
-CLI discovery files, connection tokens, ADB forwarding and temporary edits are session data, never application manifest or authored checkpoint fields.
+Session descriptor files, connection tokens, ADB forwarding and temporary edits are session data, never application manifest or authored checkpoint fields.

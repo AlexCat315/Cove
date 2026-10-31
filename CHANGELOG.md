@@ -1,9 +1,17 @@
 # Changelog
 
-每个 Cove SDK 版本对应一个 `vX.Y.Z` 标签，统一包含 CLI、框架源码、模板与各目标平台的原生预编译库。
+每个 Cove SDK 版本对应一个 `vX.Y.Z` 标签，以 Cargo git 依赖形式提供。
 
 ## Unreleased
 
+- **移除 Cove CLI（破坏性）**：删除 `Tools/Cove`（`cove-cli` 及其 Swift 原版、项目模板、
+  安装脚本）、仅被它使用的 `Tools/Support`（`cove-tool-support`），以及根目录 `cove` /
+  `cove.cmd`。构建、运行、测试、交叉编译直接使用 Cargo；原生依赖由各 crate 的 `build.rs`
+  构建。迁移盘点改为 `python3 Tools/Migration/inventory.py [--status [--json]
+  [--require-complete]]`。CI 与发布流程改为 Cargo；SDK 版本唯一来源改为根 `Cargo.toml`
+  的 `[workspace.package] version`，发布只产出 tag 与 Release 说明，不再打包原生预编译库。
+  随之删除仅服务 Swift CI 的 `Tools/Testing/Windows.ps1` 与 `.github/actions/build-cache`。
+  清单删除 75 个已不存在的 Swift 行：生产源码 915/915 已写入，测试待迁移 294/411。
 - **测试迁移启动（2026-10-31）**：新写 5 个集成测试并在 `Compose/Cargo.toml` 注册
   `[[test]]`——`select_enumeration`、`offscreen_reuse`、`scratch_geometry`、
   `recomposition_paint`、`chrome_component`，经 `cargo check -p cove-ui-compose --tests`

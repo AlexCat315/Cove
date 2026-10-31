@@ -29,15 +29,15 @@ jobs:
             target
           key: rust-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
       - name: Formatting
-        run: ./cove fmt .
+        run: cargo fmt --all --check
       - name: Lints
-        run: ./cove clippy . --package cove-cli --all-targets --locked
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Foundation contracts
-        run: ./cove test . --locked --no-parallel
+        run: cargo test --workspace --locked -- --test-threads=1
       - name: Headless checkpoint example
-        run: ./cove run Examples/RustCounter --locked
+        run: cargo run --locked --manifest-path Examples/RustCounter/Cargo.toml
       - name: Record migration inventory
-        run: ./cove migration status --json
+        run: python3 Tools/Migration/inventory.py --status --json
   ios-foundation:
     runs-on: macos-15
     strategy:
@@ -49,7 +49,7 @@ jobs:
       - name: Rust toolchain
         run: rustup toolchain install 1.99.1 --profile minimal --target ${{ matrix.target }}
       - name: Shared Rust foundation
-        run: ./cove check . --package cove-ui --target ${{ matrix.target }} --locked
+        run: cargo check --package cove-ui --target ${{ matrix.target }} --locked
   android-foundation:
     runs-on: ubuntu-24.04
     steps:
@@ -66,4 +66,4 @@ jobs:
           echo "AR_aarch64_linux_android=$ANDROID_HOME/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar" >> "$GITHUB_ENV"
           echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$ndk_cc" >> "$GITHUB_ENV"
       - name: Shared Rust foundation
-        run: ./cove check . --package cove-ui --target aarch64-linux-android --locked
+        run: cargo check --package cove-ui --target aarch64-linux-android --locked
