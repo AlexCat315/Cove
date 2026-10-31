@@ -8,10 +8,12 @@ use super::model::{WorkspaceDocument, WorkspaceLayoutNode};
 use serde::{Deserialize, Deserializer, Serialize};
 
 /// Logical content points, excluding workspace chrome.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct WorkspaceAxisSizing {
     pub minimum: f32,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub preferred: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub maximum: Option<f32>,
 }
 
@@ -73,7 +75,9 @@ fn optional_sum(first: Option<f32>, second: Option<f32>, gap: f32) -> Option<f32
 /// moved, grouped or floated.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct WorkspacePanelSizing {
+    #[serde(default)]
     pub width: WorkspaceAxisSizing,
+    #[serde(default)]
     pub height: WorkspaceAxisSizing,
 }
 
@@ -94,11 +98,7 @@ pub struct WorkspaceLayoutMetrics {
 
 impl Default for WorkspaceLayoutMetrics {
     fn default() -> Self {
-        Self {
-            tab_height: 34.0,
-            divider: 1.0,
-            shows_collapsed_rails: true,
-        }
+        Self::new(&super::theme::WorkspaceTheme::default(), 1.0)
     }
 }
 
@@ -281,57 +281,7 @@ impl<'a> WorkspaceSizingResolver<'a> {
     }
 }
 
-/// Split constraints, clamped into the range the two sides actually allow.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct SplitConstraints {
-    pub fraction: (f32, f32),
-    pub minimum_first: f32,
-    pub minimum_second: f32,
-    pub maximum_first: Option<f32>,
-    pub maximum_second: Option<f32>,
-}
-
-impl Default for SplitConstraints {
-    fn default() -> Self {
-        Self {
-            fraction: (0.0, 1.0),
-            minimum_first: 0.0,
-            minimum_second: 0.0,
-            maximum_first: None,
-            maximum_second: None,
-        }
-    }
-}
-
-impl SplitConstraints {
-    pub fn range(&self, available: f32) -> (f32, f32) {
-        let (low, high) = self.fraction;
-        if available <= 0.0 {
-            return (low, high);
-        }
-        let mut lower = low;
-        let mut upper = high;
-        if self.minimum_first > 0.0 {
-            lower = lower.max(self.minimum_first / available);
-        }
-        if let Some(maximum) = self.maximum_first {
-            upper = upper.min(maximum / available);
-        }
-        if self.minimum_second > 0.0 {
-            upper = upper.min(1.0 - self.minimum_second / available);
-        }
-        if let Some(maximum) = self.maximum_second {
-            lower = lower.max(1.0 - maximum / available);
-        }
-        if !lower.is_finite() {
-            lower = low;
-        }
-        if !upper.is_finite() {
-            upper = high;
-        }
-        (lower.min(upper), upper.max(lower))
-    }
-}
+pub use cove_ui_compose::primitives::layout::split::SplitConstraints;
 
 /// A resolved split: the fraction to use and the range it may travel.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -350,13 +300,9 @@ impl WorkspaceResolvedSplit {
         second: WorkspaceAxisSizing,
     ) -> Self {
         let available = available.max(0.0);
-        let constraints = SplitConstraints {
-            fraction: (0.0, 1.0),
-            minimum_first: first.minimum,
-            minimum_second: second.minimum,
-            maximum_first: first.maximum,
-            maximum_second: second.maximum,
-        };
+        let constraints = SplitConstraints::new(0.0, 1.0)
+            .minimums(first.minimum, second.minimum)
+            .maximums(first.maximum, second.maximum);
         let range = constraints.range(available);
         let initial = match fraction {
             Some(value) => value,
@@ -411,10 +357,15 @@ impl WorkspaceRect {
 /// resize writes an explicit fraction that survives window changes and
 /// document round trips.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkspaceSplitFractions {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub leading: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub center_trailing: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub top_bottom: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub top: Option<f32>,
 }
 
@@ -441,24 +392,24 @@ impl WorkspaceSplitFractions {
     }
 }
 
-/// Deserialising a normalized sizing value must not bypass the constructor,
-/// so the derived `Deserialize` is replaced by one that re-normalizes.
-pub(crate) fn deserialize_axis_sizing<'de, D: Deserializer<'de>>(
-    deserializer: D,
-) -> Result<WorkspaceAxisSizing, D::Error> {
-    #[derive(Deserialize)]
-    struct Raw {
-        #[serde(default)]
-        minimum: f32,
-        #[serde(default)]
-        preferred: Option<f32>,
-        #[serde(default)]
-        maximum: Option<f32>,
+/// Decoding must not bypass the constructor, so an invalid document is
+/// normalised before it reaches the layout engine.
+impl<'de> Deserialize<'de> for WorkspaceAxisSizing {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        struct Raw {
+            #[serde(default)]
+            minimum: f32,
+            #[serde(default)]
+            preferred: Option<f32>,
+            #[serde(default)]
+            maximum: Option<f32>,
+        }
+        let raw = Raw::deserialize(deserializer)?;
+        Ok(WorkspaceAxisSizing::new(
+            raw.minimum,
+            raw.preferred,
+            raw.maximum,
+        ))
     }
-    let raw = Raw::deserialize(deserializer)?;
-    Ok(WorkspaceAxisSizing::new(
-        raw.minimum,
-        raw.preferred,
-        raw.maximum,
-    ))
 }

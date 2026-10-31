@@ -1727,18 +1727,18 @@ fn panel_sizing_applies_to_outer_pointer_keyboard_and_accessibility_and_restores
         "a pointer drag cannot resize a split while `available` is 0"
     );
 
-    // GAP: `WorkspaceDocument` cannot be encoded (see `workspace_controller_tests`),
-    // so the Swift round trip is replaced by a `replace` of the authored
-    // document, which is the state a round trip would have restored.
-    rig.dispatch(WorkspaceCommand::ReplaceDocument(Box::new(authored.clone())));
+    let before_restore = rig.frame("workspace-region-leading").width;
+    let saved = serde_json::to_string(&rig.document()).expect("document encodes");
+    let restored: WorkspaceDocument = serde_json::from_str(&saved).expect("document decodes");
+    rig.dispatch(WorkspaceCommand::ReplaceDocument(Box::new(restored)));
     for _ in 0..3 {
         rig.pump();
     }
     assert_close(
         rig.frame("workspace-region-leading").width,
-        217.36,
+        before_restore,
         1.0,
-        "replacing with the authored document restores the fallback split width",
+        "the encoded and restored document keeps the resized split",
     );
     assert_eq!(
         rig.document()

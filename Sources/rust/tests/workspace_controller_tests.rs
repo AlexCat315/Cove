@@ -25,16 +25,6 @@
 //! - moving the last panel out of a floating window closes the window record
 //! - a floating move and focus update the frame and the z-order
 //!
-//! GAP (production defect, reported not fixed): `WorkspaceLayoutNode` derives
-//! `serde::Serialize` with `#[serde(tag = "kind")]` on an enum whose `Group`
-//! variant is a newtype, so `serde_json` rejects every encode with
-//! "cannot serialize tagged newtype variant `WorkspaceLayoutNode::Group`
-//! containing a string". `Deserialize` is fine; only encoding is broken, so
-//! `WorkspaceDocument` cannot be persisted at all. Swift's suite round-tripped
-//! the document through `JSONEncoder`/`JSONDecoder`; that assertion cannot be
-//! ported until the production derive is fixed, so
-//! `document_encoding_is_unimplemented` asserts the current, documented
-//! behaviour instead. Everything else in the Swift case is ported as written.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -204,10 +194,13 @@ fn nested_split_resize_persists_and_rejects_stale_addresses() {
     };
     assert_eq!(inner, 0.7);
 
-    // The Swift case also round-tripped the document here. See the module-level
-    // GAP note: encoding a document with any layout node currently fails, so the
-    // `layoutTree`-free persisted shape and the round trip are asserted in
-    // `document_encoding_is_unimplemented` instead.
+    let encoded = serde_json::to_string(&controller.document()).expect("document encodes");
+    assert!(
+        !encoded.contains("layoutTree"),
+        "the persisted shape has no derived layout tree"
+    );
+    let decoded: WorkspaceDocument = serde_json::from_str(&encoded).expect("document decodes");
+    assert_eq!(&decoded, &*controller.document(), "the document round trips");
 
     assert!(
         !controller
@@ -1193,49 +1186,3 @@ fn floating_window_move_and_focus_update_frame_and_z_order() {
     );
 }
 
-/// GAP: see the module-level note. Swift asserted that the persisted shape
-/// carries no derived `layoutTree` and that the document round trips. The Rust
-/// `WorkspaceLayoutNode` cannot be encoded at all, so this asserts exactly what
-/// the production code does today: decoding works, encoding does not.
-#[test]
-fn document_encoding_is_unimplemented() {
-    let document = make_document();
-    let result = serde_json::to_string(&document);
-    let Err(error) = result else {
-        panic!(
-            "a document still encodes; the serde tag/Group incompatibility was fixed, so the \
-             round-trip assertion in `nested_split_resize_persists_and_rejects_stale_addresses` \
-             must be restored"
-        );
-    };
-    assert!(
-        error.to_string().contains("tagged newtype variant"),
-        "the current failure is the tagged-newtype `Group` variant, not something else (got {error})"
-    );
-
-    // Decoding is unaffected: a document with no layout node decodes, which
-    // proves only `Serialize` is broken.
-    let mut groups = BTreeMap::new();
-    groups.insert(
-        WorkspaceTabGroupID::new("center"),
-        group("center", &["viewport"]),
-    );
-    let mut panels = BTreeMap::new();
-    panels.insert(
-        WorkspacePanelID::new("viewport"),
-        panel("viewport", "Viewport"),
-    );
-    let mut slots = BTreeMap::new();
-    slots.insert(
-        WorkspaceSlotID::center(),
-        WorkspaceSlot::new(WorkspaceSlotID::center(), WorkspaceSlotKind::Content, None),
-    );
-    let plain = WorkspaceDocument::new(panels, groups, slots);
-    let encoded = serde_json::to_string(&plain).expect("a layout-free document encodes");
-    assert!(
-        !encoded.contains("layoutTree"),
-        "the persisted shape has no derived layout tree"
-    );
-    let decoded: WorkspaceDocument = serde_json::from_str(&encoded).expect("document decodes");
-    assert_eq!(decoded, plain, "a layout-free document round trips");
-}

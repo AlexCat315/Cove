@@ -277,13 +277,9 @@ fn floating_frames_use_the_panel_bounds_and_persist_the_clamped_size() {
 
 #[test]
 fn split_maximums_and_impossible_bounds_are_deterministic() {
-    let constraints = SplitConstraints {
-        fraction: (0.0, 1.0),
-        minimum_first: 100.0,
-        minimum_second: 150.0,
-        maximum_first: Some(260.0),
-        maximum_second: Some(360.0),
-    };
+    let constraints = SplitConstraints::new(0.0, 1.0)
+        .minimums(100.0, 150.0)
+        .maximums(Some(260.0), Some(360.0));
 
     let feasible = constraints.range(500.0);
     assert!(

@@ -17,6 +17,7 @@ use cove_graphics::{
     TextureUploadRegion, TextureUsage, rhi_texture_subresource_extent,
 };
 
+use cove_graphics::{DeviceConfig, GraphicsApi};
 use support::{RecordingBackend, make_device};
 
 fn texture_descriptor(format: TextureFormat) -> TextureDescriptor {
@@ -59,13 +60,48 @@ fn out_of_range_subresources_are_rejected() {
     }
 }
 
+fn native_device(api: GraphicsApi) -> Option<Device> {
+    Device::make(DeviceConfig {
+        preferred_backends: vec![api],
+        enable_validation: false,
+        ..DeviceConfig::default()
+    })
+    .ok()
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn metal_failed_uploads_do_not_poison_the_frame() {
+    match native_device(GraphicsApi::Metal) {
+        Some(device) => failed_uploads_do_not_poison_the_frame(&device),
+        None => eprintln!("no Metal device available; skipping"),
+    }
+}
+
+#[cfg(any(target_os = "linux", target_os = "windows", target_os = "android"))]
+#[test]
+fn vulkan_failed_uploads_do_not_poison_the_frame() {
+    match native_device(GraphicsApi::Vulkan) {
+        Some(device) => failed_uploads_do_not_poison_the_frame(&device),
+        None => eprintln!("no Vulkan device available; skipping"),
+    }
+}
+
+#[cfg(target_os = "windows")]
+#[test]
+fn dx12_failed_uploads_do_not_poison_the_frame() {
+    match native_device(GraphicsApi::Dx12) {
+        Some(device) => failed_uploads_do_not_poison_the_frame(&device),
+        None => eprintln!("no DX12 device available; skipping"),
+    }
+}
+
 /// A recorded upload whose buffer range is not addressable fails the submission
 /// without poisoning the planner: a valid command list still submits afterwards.
-#[test]
-fn failed_uploads_do_not_poison_the_frame() {
-    let backend = RecordingBackend::standard();
-    let device = make_device(&backend, 1);
-
+/// Uploads are validated by the backend encoder, so this runs on a native
+/// device per backend, as the Swift suite did.
+#[allow(dead_code)]
+fn failed_uploads_do_not_poison_the_frame(device: &Device) {
     let texture = device
         .make_texture(texture_descriptor(TextureFormat::Rgba8Unorm))
         .expect("texture");
@@ -111,16 +147,22 @@ fn failed_uploads_do_not_poison_the_frame() {
             candidate
         },
     ];
-    for candidate in invalid {
-        let mut commands = CommandBuffer::new();
-        commands.copy_pass(|encoder| encoder.upload_buffer_to_texture(candidate));
-        assert!(
+    let accepted: Vec<usize> = invalid
+        .into_iter()
+        .enumerate()
+        .filter(|(_, candidate)| {
+            let mut commands = CommandBuffer::new();
+            commands.copy_pass(|encoder| encoder.upload_buffer_to_texture(*candidate));
             device
                 .submit(&commands, QueueClass::Graphics, &[], &[], None)
-                .is_err(),
-            "an invalid recorded upload must be rejected"
-        );
-    }
+                .is_ok()
+        })
+        .map(|(index, _)| index)
+        .collect();
+    assert!(
+        accepted.is_empty(),
+        "invalid recorded uploads {accepted:?} must be rejected"
+    );
 
     // An offset that would overflow the address space is rejected too.
     upload.offset = i64::MAX as usize;

@@ -64,15 +64,6 @@
 //!   is correct — `select` returns `true` and `selected_text()` carries the
 //!   expected text — so the events are ported, and
 //!   `selection_does_not_refresh_the_cached_frame` pins the current behaviour.
-//! - `GAP: blink-timer-clones-the-visibility-cell`.
-//!   `Terminal/rust/view/blink_timer.rs:96` does `self.is_visible.clone()`,
-//!   which clones the `bool` *value* out of the `Cell` into a fresh `Cell`
-//!   rather than sharing the timer's own. The animation therefore toggles a
-//!   private copy and `BlinkTimer::is_visible()` never leaves `true`, so the
-//!   cursor does not visibly blink in production even though the toggle handler
-//!   fires and the surface repaints. Swift's `BlinkTimer` was a class and
-//!   mutated its own `isVisible`. `cursor_blink_phase_never_leaves_visible`
-//!   pins that behaviour and asserts the toggle/repaint half that does work.
 
 #![cfg(unix)]
 
@@ -699,11 +690,9 @@ fn the_cursor_blinks_only_while_focused() {
         harness.layout(WIDTH, HEIGHT);
         // The phase is a half-period of 600 ms off then 600 ms on.
         harness.tick(0.6);
+        assert!(!blink.is_visible(), "a focused cursor blinks off");
         harness.tick(0.6);
-        assert!(
-            blink.is_visible(),
-            "GAP: blink-timer-clones-the-visibility-cell — the timer's public phase never leaves the visible state"
-        );
+        assert!(blink.is_visible(), "and back on after another half period");
 
         harness.context.focus_chain.clear();
         harness.layout(WIDTH, HEIGHT);
@@ -715,7 +704,7 @@ fn the_cursor_blinks_only_while_focused() {
 }
 
 #[test]
-fn cursor_blink_phase_never_leaves_visible() {
+fn cursor_blink_phase_alternates_while_focused() {
     with_harness(sleep_command(), |harness| {
         harness.mount(TerminalView::new(harness.session.clone()), WIDTH, HEIGHT);
         let blink = harness
@@ -744,8 +733,8 @@ fn cursor_blink_phase_never_leaves_visible() {
             toggles.get()
         );
         assert!(
-            phases.iter().all(|visible| *visible),
-            "GAP: blink-timer-clones-the-visibility-cell — the animation toggles a private copy, so the exposed phase stays true; observed {phases:?}"
+            phases.contains(&true) && phases.contains(&false),
+            "the exposed cursor phase alternates while focused; observed {phases:?}"
         );
 
         harness.context.focus_chain.clear();

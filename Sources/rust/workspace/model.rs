@@ -17,8 +17,11 @@ use std::rc::Rc;
 
 /// Recursive layout of a slot. A split is located by its two children; the
 /// common ancestor stays stable when hidden branches are compacted.
+///
+/// Encoded as Swift's synthesized `Codable`: `{"group":{"_0":id}}` and
+/// `{"split":{"axis":…,"fraction":…,"first":…,"second":…}}`.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "kind", rename_all = "camelCase")]
+#[serde(from = "LayoutNodeCoding", into = "LayoutNodeCoding")]
 pub enum WorkspaceLayoutNode {
     Group(WorkspaceTabGroupID),
     Split {
@@ -27,6 +30,59 @@ pub enum WorkspaceLayoutNode {
         first: Box<WorkspaceLayoutNode>,
         second: Box<WorkspaceLayoutNode>,
     },
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum LayoutNodeCoding {
+    Group {
+        #[serde(rename = "_0")]
+        id: WorkspaceTabGroupID,
+    },
+    Split {
+        axis: WorkspaceSplitAxis,
+        fraction: f32,
+        first: Box<WorkspaceLayoutNode>,
+        second: Box<WorkspaceLayoutNode>,
+    },
+}
+
+impl From<LayoutNodeCoding> for WorkspaceLayoutNode {
+    fn from(coding: LayoutNodeCoding) -> Self {
+        match coding {
+            LayoutNodeCoding::Group { id } => Self::Group(id),
+            LayoutNodeCoding::Split {
+                axis,
+                fraction,
+                first,
+                second,
+            } => Self::Split {
+                axis,
+                fraction,
+                first,
+                second,
+            },
+        }
+    }
+}
+
+impl From<WorkspaceLayoutNode> for LayoutNodeCoding {
+    fn from(node: WorkspaceLayoutNode) -> Self {
+        match node {
+            WorkspaceLayoutNode::Group(id) => Self::Group { id },
+            WorkspaceLayoutNode::Split {
+                axis,
+                fraction,
+                first,
+                second,
+            } => Self::Split {
+                axis,
+                fraction,
+                first,
+                second,
+            },
+        }
+    }
 }
 
 impl WorkspaceLayoutNode {
@@ -130,6 +186,7 @@ impl WorkspaceLayoutNode {
 
 /// A split is located by the groups on opposite sides of it.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkspaceLayoutSplit {
     pub slot: WorkspaceSlotID,
     pub first_group: WorkspaceTabGroupID,
@@ -151,12 +208,17 @@ impl WorkspaceLayoutSplit {
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkspacePanel {
     pub id: WorkspacePanelID,
     pub title: String,
+    #[serde(default = "super::coding::yes")]
     pub is_closable: bool,
+    #[serde(default = "super::coding::yes")]
     pub is_draggable: bool,
+    #[serde(default = "super::coding::yes")]
     pub is_collapsible: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon_asset_key: Option<String>,
     /// A panel that draws its own tabs, such as a code editor with file tabs,
     /// hides the group tab bar while it is the only panel in its group.
@@ -182,11 +244,18 @@ impl WorkspacePanel {
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkspaceTabGroup {
     pub id: WorkspaceTabGroupID,
     pub panels: Vec<WorkspacePanelID>,
+    #[serde(
+        rename = "activePanelID",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub active_panel_id: Option<WorkspacePanelID>,
     pub is_collapsed: bool,
+    #[serde(rename = "pinnedPanelIDs")]
     pub pinned_panel_ids: Vec<WorkspacePanelID>,
 }
 
@@ -208,10 +277,10 @@ impl WorkspaceTabGroup {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "kind", content = "value", rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub enum WorkspaceSlotSize {
-    Fixed(f32),
-    Fraction(f32),
+    Fixed(#[serde(with = "unlabelled")] f32),
+    Fraction(#[serde(with = "unlabelled")] f32),
 }
 
 impl WorkspaceSlotSize {
@@ -224,7 +293,7 @@ impl WorkspaceSlotSize {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "kind", rename_all = "camelCase")]
+#[serde(from = "SlotKindCoding", into = "SlotKindCoding")]
 pub enum WorkspaceSlotKind {
     Content,
     Chrome {
@@ -235,10 +304,46 @@ pub enum WorkspaceSlotKind {
     Floating,
 }
 
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum SlotKindCoding {
+    Content {},
+    Chrome {
+        edge: WorkspaceEdge,
+        size: WorkspaceSlotSize,
+    },
+    Overlay {},
+    Floating {},
+}
+
+impl From<SlotKindCoding> for WorkspaceSlotKind {
+    fn from(coding: SlotKindCoding) -> Self {
+        match coding {
+            SlotKindCoding::Content {} => Self::Content,
+            SlotKindCoding::Chrome { edge, size } => Self::Chrome { edge, size },
+            SlotKindCoding::Overlay {} => Self::Overlay,
+            SlotKindCoding::Floating {} => Self::Floating,
+        }
+    }
+}
+
+impl From<WorkspaceSlotKind> for SlotKindCoding {
+    fn from(kind: WorkspaceSlotKind) -> Self {
+        match kind {
+            WorkspaceSlotKind::Content => Self::Content {},
+            WorkspaceSlotKind::Chrome { edge, size } => Self::Chrome { edge, size },
+            WorkspaceSlotKind::Overlay => Self::Overlay {},
+            WorkspaceSlotKind::Floating => Self::Floating {},
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkspaceSlot {
     pub id: WorkspaceSlotID,
     pub kind: WorkspaceSlotKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub layout: Option<WorkspaceLayoutNode>,
 }
 
@@ -334,8 +439,10 @@ impl WorkspaceSlot {
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkspaceFloatingWindow {
     pub id: WorkspaceFloatingWindowID,
+    #[serde(rename = "groupID")]
     pub group_id: WorkspaceTabGroupID,
     pub title: String,
     pub frame: WorkspaceRect,
@@ -361,10 +468,19 @@ impl WorkspaceFloatingWindow {
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkspaceClosedPanel {
+    #[serde(rename = "panelID")]
     pub panel_id: WorkspacePanelID,
+    #[serde(rename = "groupID")]
     pub group_id: WorkspaceTabGroupID,
+    #[serde(rename = "slotID", default, skip_serializing_if = "Option::is_none")]
     pub slot_id: Option<WorkspaceSlotID>,
+    #[serde(
+        rename = "floatingWindowID",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     pub floating_window_id: Option<WorkspaceFloatingWindowID>,
     pub index: usize,
 }
@@ -388,16 +504,23 @@ impl WorkspaceClosedPanel {
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkspaceCollapsedItem {
+    #[serde(rename = "groupID")]
     pub group_id: WorkspaceTabGroupID,
+    #[serde(rename = "slotID")]
     pub slot_id: WorkspaceSlotID,
     pub edge: WorkspaceEdge,
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkspaceDocument {
+    #[serde(with = "map")]
     pub panels: BTreeMap<WorkspacePanelID, WorkspacePanel>,
+    #[serde(with = "map")]
     pub groups: BTreeMap<WorkspaceTabGroupID, WorkspaceTabGroup>,
+    #[serde(with = "map")]
     pub slots: BTreeMap<WorkspaceSlotID, WorkspaceSlot>,
     #[serde(default)]
     pub collapsed: Vec<WorkspaceCollapsedItem>,
@@ -720,5 +843,72 @@ mod tests {
         let next = tree.resizing(&address, 0.25).unwrap();
         assert!(matches!(next, WorkspaceLayoutNode::Split { fraction, .. } if fraction == 0.25));
         assert!(tree.resizing(&address, 0.5).is_none());
+    }
+}
+
+mod map {
+    pub use super::super::coding::{deserialize_map as deserialize, serialize_map as serialize};
+}
+
+mod unlabelled {
+    use super::super::coding::Unlabelled;
+
+    pub fn serialize<S: serde::Serializer>(value: &f32, serializer: S) -> Result<S::Ok, S::Error> {
+        serde::Serialize::serialize(&Unlabelled { value: *value }, serializer)
+    }
+
+    pub fn deserialize<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<f32, D::Error> {
+        <Unlabelled<f32> as serde::Deserialize>::deserialize(deserializer).map(|coded| coded.value)
+    }
+}
+
+#[cfg(test)]
+mod coding_tests {
+    use super::*;
+
+    #[test]
+    fn documents_use_the_swift_codable_shape() {
+        let id = WorkspaceTabGroupID::new("center");
+        let panel = WorkspacePanelID::new("viewport");
+        let document = WorkspaceDocument::new(
+            BTreeMap::from([(panel.clone(), WorkspacePanel::new(panel.clone(), "Viewport"))]),
+            BTreeMap::from([(id.clone(), WorkspaceTabGroup::new(id.clone(), vec![panel]))]),
+            BTreeMap::from([(
+                WorkspaceSlotID::center(),
+                WorkspaceSlot::new(
+                    WorkspaceSlotID::center(),
+                    WorkspaceSlotKind::Chrome {
+                        edge: WorkspaceEdge::Leading,
+                        size: WorkspaceSlotSize::Fixed(40.0),
+                    },
+                    Some(WorkspaceLayoutNode::split(
+                        WorkspaceSplitAxis::Horizontal,
+                        0.5,
+                        WorkspaceLayoutNode::group(id.clone()),
+                        WorkspaceLayoutNode::group(id),
+                    )),
+                ),
+            )]),
+        );
+        let value = serde_json::to_value(&document).expect("encodes");
+        assert_eq!(value["panels"][0], "viewport", "ID-keyed dictionaries are flat pairs");
+        assert_eq!(value["panels"][1]["isClosable"], true);
+        assert_eq!(value["groups"][1]["activePanelID"], "viewport");
+        assert_eq!(
+            value["slots"][1]["kind"],
+            serde_json::json!({ "chrome": { "edge": "leading", "size": { "fixed": { "_0": 40.0 } } } })
+        );
+        assert_eq!(
+            value["slots"][1]["layout"]["split"]["first"],
+            serde_json::json!({ "group": { "_0": "center" } })
+        );
+        assert_eq!(value["splitFractions"], serde_json::json!({}));
+        let decoded: WorkspaceDocument = serde_json::from_value(value).expect("decodes");
+        assert_eq!(decoded, document);
+
+        let minimal: WorkspacePanel =
+            serde_json::from_str(r#"{"id":"a","title":"A"}"#).expect("Swift defaults apply");
+        assert!(minimal.is_closable && minimal.is_draggable && minimal.is_collapsible);
+        assert!(!minimal.hides_tab_bar_when_alone);
     }
 }

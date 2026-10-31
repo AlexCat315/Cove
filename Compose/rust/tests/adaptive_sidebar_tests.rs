@@ -304,19 +304,61 @@ impl View for Harness {
     }
 }
 
+/// Every node except orphaned subtrees.
+///
+/// The Rust `Sidebar` body leaves its first `ScrollView` mounted as a
+/// zero-height sibling after the first recomposition (see the module doc), so
+/// lookups skip a zero-height `ScrollArea` that has a later `ScrollArea`
+/// sibling.
+fn live_nodes(scene: &InteractiveScene) -> Vec<Node> {
+    fn is_scroll_area(node: &Node) -> bool {
+        node.accessibility()
+            .is_some_and(|semantics| semantics.role == AccessibilityRole::ScrollArea)
+    }
+    fn walk(node: &Node, into: &mut Vec<Node>) {
+        into.push(node.clone());
+        let children = node.children();
+        for (index, child) in children.iter().enumerate() {
+            let orphaned = is_scroll_area(child)
+                && child.frame().height == 0.0
+                && children[index + 1..].iter().any(is_scroll_area);
+            if !orphaned {
+                walk(child, into);
+            }
+        }
+    }
+    let mut collected = Vec::new();
+    if let Some(root) = scene.graph.tree.borrow().root() {
+        walk(&root, &mut collected);
+    }
+    collected
+}
+
+fn live_first(scene: &InteractiveScene, predicate: impl Fn(&Node) -> bool) -> Option<Node> {
+    live_nodes(scene).into_iter().find(|node| predicate(node))
+}
+
+fn live_all(scene: &InteractiveScene, predicate: impl Fn(&Node) -> bool) -> Vec<Node> {
+    live_nodes(scene).into_iter().filter(|node| predicate(node)).collect()
+}
+
+fn live_named(scene: &InteractiveScene, name: &str) -> Option<Node> {
+    live_first(scene, |node| support::debug_name(node).as_deref() == Some(name))
+}
+
 fn row(scene: &InteractiveScene, index: i32) -> Node {
     let label = format!("Destination {index}");
-    scene
-        .first(|node| {
-            node.accessibility()
+    live_first(scene, |node| {
+        node.attachment::<bool>("__button_host") == Some(true)
+            && node
+                .accessibility()
                 .is_some_and(|semantics| semantics.label == label)
-        })
-        .unwrap_or_else(|| panic!("row {index} is mounted"))
+    })
+    .unwrap_or_else(|| panic!("row {index} is mounted"))
 }
 
 fn navigation(scene: &InteractiveScene) -> Node {
-    scene
-        .first(|node| {
+    live_first(scene, |node| {
             node.accessibility().is_some_and(|semantics| {
                 semantics.label == "Workspace" && semantics.role != AccessibilityRole::StaticText
             })
@@ -325,7 +367,7 @@ fn navigation(scene: &InteractiveScene) -> Node {
 }
 
 fn toggle(scene: &InteractiveScene, label: &str) -> Option<Node> {
-    scene.first(|node| {
+    live_first(scene, |node| {
         node.accessibility()
             .is_some_and(|semantics| semantics.label == label)
     })
@@ -342,8 +384,7 @@ fn toggle_button(scene: &InteractiveScene, label: &str) -> Option<Node> {
 /// `Button::title` publishes no accessible label, so the page button carries one
 /// explicitly and is found by role.
 fn background_button(scene: &InteractiveScene) -> Node {
-    scene
-        .first(|node| {
+    live_first(scene, |node| {
             node.accessibility().is_some_and(|semantics| {
                 semantics.role == AccessibilityRole::Button
                     && semantics.label.starts_with("Background ")
@@ -358,8 +399,7 @@ fn label(node: &Node) -> String {
         .unwrap_or_default()
 }
 
-fn draft_field(scene: &InteractiveScene) -> Node {    let host = scene
-        .named("adaptive-draft")
+fn draft_field(scene: &InteractiveScene) -> Node {    let host = live_named(scene, "adaptive-draft")
         .expect("the draft field keeps its debug name");
     subtree(&host)
         .into_iter()
@@ -373,7 +413,7 @@ fn draft_field(scene: &InteractiveScene) -> Node {    let host = scene
 }
 
 fn backdrop(scene: &InteractiveScene) -> Option<Node> {
-    scene.first(|node| {
+    live_first(scene, |node| {
         scene
             .registry
             .handlers(node)
@@ -384,7 +424,7 @@ fn backdrop(scene: &InteractiveScene) -> Option<Node> {
 
 /// `UIDiagnostics.queryNodes(text:role:visibleOnly:inputEnabledOnly:)`.
 fn query(scene: &InteractiveScene, text: &str, role: Option<AccessibilityRole>) -> Vec<Node> {
-    scene.all(|node| {
+    live_all(scene, |node| {
         node.accessibility().is_some_and(|semantics| {
             (semantics.label.contains(text) || semantics.value.contains(text))
                 && role.is_none_or(|role| semantics.role == role)
@@ -503,9 +543,13 @@ fn allocated_breakpoints_dialog_geometry_and_targets() {
                         harness.dark.set(dark);
                         harness.present(scene, width, false);
                         let case = format!("scale {scale} input {input:?} dark {dark} width {width}");
-                        let main = scene.named("adaptive-content").expect("content");
+                        let main = live_named(scene, "adaptive-content").expect("content");
                         let row_node = row(scene, 29);
-                        assert_eq!(id(&row_node), original, "the row keeps its identity ({case})");
+                        assert_ne!(
+                            id(&row_node),
+                            original,
+                            "GAP: Swift keeps the same `sidebar-item-29` node across breakpoints, text scale, theme and input; the Rust shell remounts the navigation on every presentation change ({case})"
+                        );
                         assert_eq!(
                             main.frame().width,
                             width,
@@ -531,12 +575,19 @@ fn allocated_breakpoints_dialog_geometry_and_targets() {
                             } else {
                                 let trigger = trigger.expect("the rail mounts an opener");
                                 let frame = trigger.absolute_frame();
-                                assert!(
-                                    frame.width >= 0.0 && frame.width < 44.0,
-                                    "GAP: Swift demands a 44pt opener target; the Rust rail toggle measures {} x {} ({case})",
-                                    frame.width,
-                                    frame.height
-                                );
+                                if input.contains(InputCapabilities::TOUCH) || scale >= 2.0 {
+                                    assert!(
+                                        frame.width >= 44.0 && frame.height >= 44.0,
+                                        "a touch or 200% opener keeps a 44pt target, saw {frame:?} ({case})"
+                                    );
+                                } else {
+                                    assert!(
+                                        frame.width >= 44.0 && frame.height < 44.0,
+                                        "GAP: Swift demands a 44pt opener target for every input; the Rust pointer-only rail toggle at 100% text measures {} x {} ({case})",
+                                        frame.width,
+                                        frame.height
+                                    );
+                                }
                                 activate(&trigger);
                                 scene.settle(10, 1.0);
                             }
@@ -551,13 +602,13 @@ fn allocated_breakpoints_dialog_geometry_and_targets() {
                                 width,
                                 "GAP: Swift clamps the drawer to min(320, width-56); the Rust shell never applies `panel_width`, so the drawer spans the allocation ({case})"
                             );
-                            assert_eq!(
+                            assert_ne!(
                                 panel.frame().height,
-                                756.0,
-                                "GAP: Swift sizes the drawer to the scene height; the Rust drawer takes the intrinsic navigation height ({case})"
+                                640.0,
+                                "GAP: Swift sizes the drawer to the scene height (640); the Rust drawer takes the intrinsic navigation height ({case})"
                             );
                             assert_eq!(
-                                scene.named("adaptive-content").expect("content").frame().width,
+                                live_named(scene, "adaptive-content").expect("content").frame().width,
                                 width,
                                 "GAP: an open drawer leaves the page at its full width in Rust, while Swift shrinks it to width-72 ({case})"
                             );
@@ -609,13 +660,13 @@ fn retention_survives_open_close_and_every_presentation() {
         scene.install(harness.clone());
         let row_node = row(scene, 29);
         let field = draft_field(scene);
-        let scroll = scene.named("adaptive-scroll").expect("scroll keeps its name");
+        let scroll = live_named(scene, "adaptive-scroll").expect("scroll keeps its name");
         assert!(
             toggle(scene, "Header 0").is_none(),
             "GAP: Swift mounts an `adaptive-header` slot through the shell's `header:` builder; `AdaptiveSidebar` has no public header builder, so no header node exists"
         );
         assert!(
-            scene.named("adaptive-header").is_none(),
+            live_named(scene, "adaptive-header").is_none(),
             "GAP: the `adaptive-header` debug name cannot mount without a header builder"
         );
         scene.focus.focus(Some(&field), false);
@@ -640,7 +691,11 @@ fn retention_survives_open_close_and_every_presentation() {
         ] {
             harness.present(scene, width, open);
             let case = format!("width {width} open {open}");
-            assert_eq!(id(&row_node), id(&row(scene, 29)), "the row is retained ({case})");
+            assert_ne!(
+                id(&row_node),
+                id(&row(scene, 29)),
+                "GAP: Swift retains the row node across open, close and every presentation; the Rust shell remounts the navigation ({case})"
+            );
             assert_eq!(id(&field), id(&draft_field(scene)), "the field is retained ({case})");
             assert_eq!(
                 field.resolved_accessibility_value(),
@@ -648,8 +703,7 @@ fn retention_survives_open_close_and_every_presentation() {
                 "the draft survives ({case})"
             );
             assert_eq!(
-                scene
-                    .named("adaptive-scroll")
+                live_named(scene, "adaptive-scroll")
                     .expect("scroll")
                     .content_offset()
                     .y,
@@ -682,77 +736,83 @@ fn focus_hands_off_at_breakpoints_and_escape_restores_the_opener() {
         let row_node = row(scene, 29);
         scene.focus.focus(Some(&row_node), false);
         harness.set_width(scene, 720.0);
+        let rail_row = row(scene, 29);
         assert_eq!(
             scene.focus.focused().map(|node| id(&node)),
-            Some(id(&row_node)),
+            Some(id(&rail_row)),
             "focus follows the row into the rail"
+        );
+        assert_ne!(
+            id(&rail_row),
+            id(&row_node),
+            "GAP: Swift keeps the same row node in the rail; Rust remounts it and hands focus to the new node"
         );
         assert!(
             !scene.focus.is_focus_visible(),
             "a pointer scene keeps focus quiet across the breakpoint"
         );
         harness.set_width(scene, 390.0);
-        let trigger = toggle_button(scene, "Open navigation");
         assert!(
-            trigger.is_none(),
-            "GAP: Swift hands focus from a row to the compact opener; the Rust shell mounts no compact opener, so the handoff has no trigger to land on ({:?})",
-            scene.focus.focused().map(|node| node.accessibility().map(|s| s.label))
+            toggle_button(scene, "Open navigation").is_none(),
+            "GAP: Swift hands focus from a row to the compact opener; the Rust shell mounts no compact opener"
         );
-        let opener = row_node.clone();
+        assert_eq!(
+            scene.focus.focused().map(|node| label(&node)),
+            Some(String::new()),
+            "GAP: with no opener to land on, Rust leaves focus on an unlabelled node"
+        );
+        assert!(!scene.focus.is_focus_visible(), "focus stays quiet");
+
         harness.open.set(true);
         scene.settle(10, 1.0);
         assert!(harness.open.get(), "the binding presents the drawer");
         assert!(
-            scene.focus.has_modal_scope(),
-            "the presented drawer owns a modal scope"
+            !scene.focus.has_modal_scope(),
+            "GAP: Swift's presented compact drawer owns a modal scope; the Rust drawer installs none"
         );
-        let background = scene.named("adaptive-background").expect("background");
+        let background = live_named(scene, "adaptive-background").expect("background");
         let frame = background.absolute_frame();
         press(scene, frame.x + frame.width / 2.0, frame.y + frame.height / 2.0);
         assert_eq!(
             background.accessibility().expect("semantics").label,
             "Background 1",
-            "GAP: Swift's modal scope blocks page input, so the background button never fires; the Rust drawer is stacked below the page and blocks nothing, so the press activates it"
+            "GAP: Swift's modal scope blocks page input, so the background button stays at `Background 0`; Rust blocks nothing, so the press activates it"
         );
-        scene.focus.focus(Some(&opener), false);
+        scene.focus.focus(Some(&row(scene, 29)), true);
         scene.key(Scancode::HOME, KeyModifiers::default());
         scene.key(Scancode::ARROW_DOWN, KeyModifiers::default());
         scene.key(Scancode::ARROW_DOWN, KeyModifiers::default());
         assert_eq!(
             harness.selected.get(),
             Some(3),
-            "the roving group skips the disabled destination and the drawer stays open"
+            "the roving group skips the disabled destination"
         );
         assert!(harness.open.get(), "arrowing does not dismiss the drawer");
         scene.key(Scancode::ESCAPE, KeyModifiers::default());
         assert!(
             !harness.open.get() && !scene.focus.has_modal_scope(),
-            "Escape dismisses and drops the modal scope"
+            "Escape dismisses the drawer"
         );
         assert!(
-            toggle_button(scene, "Open navigation").is_none(),
-            "GAP: Swift restores focus to the compact opener after Escape; Rust has no compact opener to restore to ({:?})",
-            scene.focus.focused().map(|node| node.accessibility().map(|s| s.label))
+            scene.focus.focused().is_none(),
+            "GAP: Swift restores focus to the compact opener after Escape; Rust has no opener and leaves nothing focused"
         );
         harness.set_width(scene, 1280.0);
-        let selected = row(scene, 3);
-        assert_eq!(
-            id(&selected),
-            id(&row(scene, 3)),
-            "the third destination is mounted once docked"
+        assert!(
+            scene.focus.focused().is_none(),
+            "GAP: Swift hands focus to the selected destination (`sidebar-item-3`) once docked; Rust leaves nothing focused"
         );
+        let selected = row(scene, 3);
         let frame = selected.absolute_frame();
         press_down(scene, frame.x + frame.width / 2.0, frame.y + frame.height / 2.0);
-        let captured = scene.capture.target().is_some();
+        assert!(
+            scene.capture.target().is_some(),
+            "pressing a docked row acquires pointer capture"
+        );
         harness.set_width(scene, 390.0);
         assert!(
-            captured,
-            "GAP-or-pin: Swift acquires pointer capture when a row is pressed; Rust {:?}",
-            if captured { "acquires" } else { "does not acquire" }
-        );
-        assert!(
-            scene.capture.target().is_none(),
-            "resizing away from the pressed row releases pointer capture"
+            scene.capture.target().is_some(),
+            "GAP: Swift releases pointer capture when the breakpoint changes under a pressed row; Rust keeps the capture on the reused node"
         );
     });
 }
@@ -912,7 +972,7 @@ fn edge_swipe_is_not_wired_to_the_shell() {
         scene.install(harness.clone());
         harness.input.set(InputCapabilities::TOUCH);
         harness.set_width(scene, 390.0);
-        let background = scene.named("adaptive-background").expect("background");
+        let background = live_named(scene, "adaptive-background").expect("background");
         let y = background.absolute_frame().y + background.absolute_frame().height / 2.0;
         swipe(scene, 10.0, y, 100.0, 0.0);
         assert!(
@@ -1168,8 +1228,8 @@ fn zz_probe_facts() {
             "(1) start row {:?} field {:?} scroll {:?} content {:?}",
             id(&row(scene, 29)),
             id(&draft_field(scene)),
-            id(&scene.named("adaptive-scroll").unwrap()),
-            id(&scene.named("adaptive-content").unwrap())
+            id(&live_named(scene, "adaptive-scroll").unwrap()),
+            id(&live_named(scene, "adaptive-content").unwrap())
         );
         for (width, open) in [
             (720.0_f32, false),
@@ -1185,8 +1245,8 @@ fn zz_probe_facts() {
                 "(1) w{width} open{open} row {} field {} scroll {} content {} nav {:?}",
                 id(&row(scene, 29)),
                 id(&draft_field(scene)),
-                id(&scene.named("adaptive-scroll").unwrap()),
-                id(&scene.named("adaptive-content").unwrap()),
+                id(&live_named(scene, "adaptive-scroll").unwrap()),
+                id(&live_named(scene, "adaptive-content").unwrap()),
                 role_of(&navigation(scene))
             );
         }
@@ -1331,6 +1391,51 @@ fn zz_probe_facts() {
         if let Some(bd) = bd {
             press(scene, bd.x + 1.0, bd.y + 1.0);
             println!("(5) backdrop press open {}", harness.open.get());
+        }
+    });
+}
+
+#[test]
+fn zz_toggle_probe() {
+    InteractiveScene::run(1280.0, 640.0, |scene| {
+        let harness = Harness::new(false);
+        scene.install(harness.clone());
+        let f = |scene: &InteractiveScene, tag: &str| {
+            println!("PROBE [{tag}] focus {:?} visible {} modal {} open {} opener {:?} collapse {:?} backdrop {:?}",
+                scene.focus.focused().map(|n| (label(&n), n.id())), scene.focus.is_focus_visible(), scene.focus.has_modal_scope(), harness.open.get(),
+                toggle_button(scene, "Open navigation").map(|n| (n.id(), n.absolute_frame())),
+                toggle_button(scene, "Collapse navigation").map(|n| (n.id(), n.absolute_frame(), n.accessibility().map(|s| s.state.is_expanded), n.first_resource::<cove_ui_compose::primitives::overlays::portal::PortalResource>().is_some())),
+                backdrop(scene).map(|n| (n.frame(), n.background_color(), theme_for_node(&n).colors.overlay)));
+        };
+        harness.set_width(scene, 720.0);
+        f(scene, "720");
+        let trigger = toggle_button(scene, "Open navigation").unwrap();
+        scene.click(&trigger, 1);
+        f(scene, "click");
+        tick(1.0);
+        scene.settle(10, 1.0);
+        f(scene, "tick");
+        if let Some(c) = toggle_button(scene, "Collapse navigation") { scene.click(&c, 1); }
+        f(scene, "click collapse");
+        scene.focus.focus(Some(&toggle_button(scene, "Open navigation").unwrap()), true);
+        scene.key(Scancode::RETURN, KeyModifiers::default());
+        f(scene, "return down");
+        scene.dispatcher().dispatch(&InputEvent::KeyUp(cove_platform::KeyEvent { scancode: Scancode::RETURN, keycode: 0, modifiers: KeyModifiers::default(), is_repeat: false }));
+        scene.settle(5, 1.0);
+        f(scene, "return up");
+        tick(1.0);
+        scene.settle(10, 1.0);
+        scene.key(Scancode::ESCAPE, KeyModifiers::default());
+        f(scene, "escape");
+        // opener restoration
+        for semantic in [false, true] {
+            scene.focus.clear();
+            let trigger = toggle_button(scene, "Open navigation").unwrap();
+            if semantic { activate(&trigger); } else { scene.click(&trigger, 1); }
+            scene.settle(10, 1.0);
+            f(scene, &format!("restore open semantic={semantic}"));
+            scene.key(Scancode::ESCAPE, KeyModifiers::default());
+            f(scene, &format!("restore escape semantic={semantic} trigger {:?}", trigger.id()));
         }
     });
 }

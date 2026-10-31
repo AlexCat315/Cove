@@ -13,27 +13,15 @@
 //! required — only the serialisation every suite that installs the process-wide
 //! scene holders needs.
 //!
-//! Production defect found while porting (reported, not fixed here):
+//! Remaining difference (reported, not fixed here):
 //!
-//! - `GAP: android-adaptive-surface-does-not-republish-metrics`.
-//!   `Hosts/rust/android/integration/scene.rs` materialises its root as
-//!   `AndroidAdaptiveSurface`, whose `children()` reads
-//!   `self.environment.get()` from a `State<Environment>`. That read is not
-//!   observed: the type declares no `View::dynamic_properties`, and
-//!   `ObservableStateTracking::observe_reads` (which wraps the `children()` call
-//!   in `ViewGraph`) is an identity passthrough, so nothing subscribes the scope
-//!   to the state. `AndroidContentSession::update_surface` therefore sets
-//!   `needs_update` and the host repaints, but recomposition never re-runs
-//!   `children()`, so the adaptive content keeps the idiom, keyboard height and
-//!   text scale it saw on the first frame. Swift's `AndroidAdaptiveContent` held
-//!   `@State var environment`, which `Mirror` discovered, so `updateSurface` did
-//!   rebuild it.
-//!
-//!   The consequences, pinned below rather than silently dropped, are that
-//!   `SurfaceReader` never sees the updated facts and the safe-area padding
-//!   never re-resolves. `SurfaceState` itself is correct — it normalises,
-//!   publishes and compares every fact exactly as the Swift `Surface.update`
-//!   did — so that half is asserted in full.
+//! - `GAP: safe-area-padding-ignores-republished-metrics`. Since
+//!   `AndroidAdaptiveSurface` declares its `dynamic_properties`,
+//!   `update_surface` recomposes and `SurfaceReader` sees the new idiom,
+//!   keyboard height and text scale. `SafeArea` padding, however, still
+//!   resolves against the first frame's metrics, so publishing a top inset or
+//!   an open keyboard leaves the content bounds unchanged; Swift re-resolved
+//!   the padding on every `updateSurface`.
 
 use cove_composition::adaptive::SurfaceReader;
 use cove_composition::{AnyView, LayoutDebugExt, TupleView, View};
@@ -248,7 +236,7 @@ fn text_scale_factor_reports_the_ramp_value_at_sixteen_points() {
 }
 
 #[test]
-fn surface_metrics_do_not_reach_composed_content() {
+fn surface_metrics_reach_composed_content() {
     Lock::with(|| {
         let mut session = session(1.0);
         let mut safe_area = Insets::default();
@@ -268,16 +256,12 @@ fn surface_metrics_do_not_reach_composed_content() {
             session.inspect().controls.keys().collect::<Vec<_>>()
         );
         assert!(
-            publishes(&session, "probe-keyboard-0"),
-            "GAP: android-adaptive-surface-does-not-republish-metrics — the composed keyboard height stays at the first frame's 0, not the published 336"
+            publishes(&session, "probe-keyboard-336"),
+            "the published keyboard height reaches SurfaceReader"
         );
         assert!(
-            !publishes(&session, "probe-keyboard-336"),
-            "the published keyboard height never reaches SurfaceReader"
-        );
-        assert!(
-            !publishes(&session, "probe-scale-1.25"),
-            "the published text scale never reaches SurfaceReader"
+            publishes(&session, "probe-scale-1.25"),
+            "the published text scale reaches SurfaceReader"
         );
     });
 }
@@ -316,7 +300,7 @@ fn safe_area_padding_stays_at_the_first_frame_metrics() {
         assert_eq!(
             (after.x, after.y, after.width, after.height),
             (baseline.x, baseline.y, baseline.width, baseline.height),
-            "GAP: android-adaptive-surface-does-not-republish-metrics — the safe area still resolves against the first frame metrics, so publishing a 59 point top inset and a 336 point keyboard leaves the content bounds untouched"
+            "GAP: safe-area-padding-ignores-republished-metrics — publishing a 59 point top inset and a 336 point keyboard leaves the content bounds untouched"
         );
     });
 }
@@ -376,7 +360,7 @@ fn logical_size_and_scale_follow_rotation_and_density() {
         );
         assert_eq!(
             after_rotation.height, before_rotation.height,
-            "GAP: android-adaptive-surface-does-not-republish-metrics — the metrics-derived extent is unchanged, because the rotated safe area and keyboard never reached the probe"
+            "GAP: safe-area-padding-ignores-republished-metrics — the padded extent ignores the rotated safe area and keyboard"
         );
         assert!(
             publishes(&session, "probe-idiom-phone"),

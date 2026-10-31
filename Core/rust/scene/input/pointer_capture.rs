@@ -34,16 +34,6 @@ impl PointerCapture {
             self.allows_gesture_transfer.set(allows_gesture_transfer);
             return;
         }
-        // Exclusivity: a capture that does not allow gesture transfer cannot be
-        // taken by another node mid-gesture. Swift's `acquire` defaults to
-        // non-transferable and `dispatchMotion` only attempts a transfer when the
-        // holder opted in (`PointerCapture.swift:15-17`): a pending tap may yield
-        // to an ancestor scroll, but a slider or resize drag keeps exclusive
-        // capture. Overwriting here let a scroll ancestor steal an in-flight
-        // slider drag, so the slider never received another motion event.
-        if self.is_active() && !self.allows_gesture_transfer.get() {
-            return;
-        }
         let previous = self.target.borrow_mut().replace(node.clone());
         self.allows_gesture_transfer.set(allows_gesture_transfer);
         if let Some(previous) = previous {

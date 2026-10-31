@@ -66,6 +66,9 @@ pub struct DevServer {
     started: bool,
     logs: Arc<DevToolsLogFeed>,
     tree_broadcast_pending: bool,
+    /// Full-tree traffic is bounded to 10 Hz: a broadcast stays in flight for
+    /// 100 ms and changes meanwhile coalesce into one final delta.
+    tree_broadcast_in_flight_until: Option<std::time::Instant>,
     next_lease: u64,
     /// Transport events awaiting dispatch on the host's UI thread.
     inbox: Option<crate::server::transport::EventReceiver>,
@@ -116,6 +119,7 @@ impl DevServer {
             started: false,
             logs: Arc::new(DevToolsLogFeed::default()),
             tree_broadcast_pending: false,
+            tree_broadcast_in_flight_until: None,
             next_lease: 1,
             inbox: None,
             outbound: crate::devtools::mirror::OutboundQueue::default(),
@@ -169,6 +173,7 @@ impl DevServer {
         self.inspection_owner = None;
         self.inspection_lease = 0;
         self.tree_broadcast_pending = false;
+        self.tree_broadcast_in_flight_until = None;
         if let Some(capture) = &self.host.observation.capture {
             capture(false);
         }
@@ -194,6 +199,7 @@ impl DevServer {
     /// Read pending transport events and queued broadcasts without blocking. The
     /// host calls this once per frame; several events per call are fine.
     pub fn pump(&mut self) {
+        self.flush_tree_broadcast();
         // Drain broadcasts first so a frame produced this tick is delivered on
         // this tick.
         let queued: Vec<Outbound> = {
@@ -898,16 +904,31 @@ impl DevServer {
         if !self.has_subscribers(Subscription::Tree) {
             return;
         }
-        if self.tree_broadcast_pending {
+        if self.tree_broadcast_in_flight_until.is_some() {
+            self.tree_broadcast_pending = true;
             return;
         }
         let Some(snapshot) = self.host.scene.snapshot.clone() else {
             return;
         };
         let snapshot = snapshot();
-        self.tree_broadcast_pending = true;
         self.broadcast_tree(&snapshot, "tree.delta", None);
-        self.tree_broadcast_pending = false;
+        self.tree_broadcast_in_flight_until =
+            Some(std::time::Instant::now() + std::time::Duration::from_millis(100));
+    }
+
+    /// Ends an expired 10 Hz window and sends the change that arrived during it.
+    fn flush_tree_broadcast(&mut self) {
+        let Some(until) = self.tree_broadcast_in_flight_until else {
+            return;
+        };
+        if std::time::Instant::now() < until {
+            return;
+        }
+        self.tree_broadcast_in_flight_until = None;
+        if std::mem::take(&mut self.tree_broadcast_pending) {
+            self.broadcast_tree_delta();
+        }
     }
 
     fn broadcast_tree(&mut self, snapshot: &TreeSnapshot, kind: &str, id: Option<i64>) {

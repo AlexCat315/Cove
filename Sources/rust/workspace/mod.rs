@@ -4,6 +4,7 @@
 //! The document is pure data; every mutation goes through `WorkspaceController`
 //! so observers, maximize/focus reconciliation and persistence dirtiness stay in
 //! one place. The view layer reads only the document and the controller.
+mod coding;
 mod controller;
 mod drag;
 mod icons;

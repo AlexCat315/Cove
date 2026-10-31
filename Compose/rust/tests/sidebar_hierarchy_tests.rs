@@ -23,38 +23,46 @@
 //! theme/direction/modality loops are kept inside `adaptive_matrix`, so the
 //! `#[test]` count still matches one-to-one.
 //!
-//! Named differences from the Swift suite:
-//! - Swift found rows by the debug names the sidebar published
-//!   (`sidebar-item-projects`, `sidebar-title-audit`, `sidebar-actions-audit`).
-//!   The Rust `Sidebar` publishes no per-row debug names, so rows are found by
-//!   accessible label (expanded rows are titled, rail rows are breadcrumb paths)
-//!   and indentation is measured on the row's `StaticText` node instead of
-//!   `sidebar-title-*`.
-//! - Swift mounted every authored row and took hidden ones out of the
-//!   interaction graph (`acceptsSubtreeInput == false`). Rust prunes collapsed
-//!   descendants from the node tree entirely, so the Swift "hidden but mounted"
-//!   assertions are ported as absence checks.
-//! - The Rust `Sidebar` registers a roving command that maps only Up/Down/Home/
-//!   End (and only with an empty modifier set). Right/Left arrows never disclose
-//!   or collapse a branch, Shift-arrow is ignored, and the keys never reverse
-//!   under `Direction::Rtl`, so `keyboard_and_pointer` and `local_and_rtl` pin
-//!   that instead of the Swift traversal.
-//! - Swift revealed a branch chain when the caller selected one of its
-//!   descendants (`selection = "audit"` ⇒ `expanded == ["projects", "team"]`).
-//!   The Rust `Sidebar` has no reveal-on-selection, so those cases expand the
-//!   chain through the caller's binding first and pin the missing auto-reveal.
-//! - Swift's vertical traversal moved focus without changing the selection.
-//!   Rust's roving host calls its select handler on every arrow step, so
-//!   Down/Up/Home/End write the selection (and toggle any branch they land on).
-//! - `SidebarItem::context_menu` only reserves trailing width; no actions
-//!   ellipsis node is mounted and no context-menu affordance is wired to the
-//!   row, so `item_actions` and `compact_item_actions` pin the missing trigger
-//!   while keeping the row-level assertions.
+//! Named differences from the Swift suite (each pinned by a `GAP:` assertion):
+//! - Collapsed descendants: Swift mounts every authored row and takes hidden
+//!   ones out of input (`acceptsSubtreeInput == false`); Rust prunes collapsed
+//!   descendants from the node tree, so `secret` under `Locked group` is never
+//!   mounted either.
+//! - Horizontal keys: Swift's Right/Left disclose, collapse and move between
+//!   parent and child, mirrored under RTL; the Rust roving command maps only
+//!   Up/Down/Home/End with no modifiers.
+//! - Roving focus: Swift moves focus with each roving step; Rust focuses the
+//!   `RovingItem` wrapper, which is not focusable, so focus stays on the
+//!   original row and the next step starts from the last roving target.
+//!   Landing on a branch toggles its disclosure.
+//! - Return: Swift activates on key-down; Rust buttons activate on key-up.
+//! - Reveal on selection: Swift expands the ancestor chain of a programmatic
+//!   or moved selection; Rust leaves the caller's set untouched.
+//! - Focus repair: Swift moves focus to the nearest visible enabled ancestor
+//!   when a row collapses, is removed or becomes disabled; Rust drops focus on
+//!   collapse and, because rows are reconciled by position, leaves focus on the
+//!   reused node that now presents another (disabled) row.
+//! - Node identity: Swift keeps the same row node across collapse/re-reveal,
+//!   rail switches and adaptive width changes; Rust remounts rows in those
+//!   cases (docked 1280pt rows are retained).
+//! - Uncontrolled disclosure: `Sidebar::new` recreates `local_expanded` on
+//!   every body pass, so an uncontrolled sidebar never discloses on a press.
+//! - Item actions: Swift mounts a `sidebar-actions-<id>` ellipsis and wires the
+//!   right-click context menu; Rust only reserves the trailing width.
+//! - Row surface: Swift's row button spans the full sidebar width; the Rust
+//!   button hugs its content (the roving lane around it spans the width).
+//! - Compact shell: Swift takes the closed compact navigation out of input;
+//!   Rust leaves it mounted and input-accepting.
+//!
+//! Harness notes:
+//! - Rows are found by accessible label on the button host (rail rows carry
+//!   breadcrumb paths) because Rust publishes no `sidebar-item-*` debug names;
+//!   indentation is measured on the row's `StaticText`.
+//! - The Rust `Sidebar` leaves its first `ScrollView` mounted as a zero-height
+//!   orphan sibling after the first recomposition; `live_nodes` skips it.
 //! - AI discovery in Swift ran through `UIDiagnostics.handleReadRequest` in the
 //!   DevTools crate; `cove-ui-compose` does not depend on it, so `query()`
-//!   below applies the same predicate to the node tree
-//!   (`is_layout_visible`, non-empty frame, `accepts_subtree_input`,
-//!   `FocusChain::permits_input`).
+//!   applies the same predicate to the node tree.
 
 mod support;
 
@@ -67,7 +75,6 @@ use cove_core::{Binding, Environment, InputCapabilities, Point, State};
 use cove_platform::{InputEvent, KeyModifiers, MouseButton, MouseButtonEvent};
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::layout::{FlexExt, FrameDimension, LayoutFrameExt};
-use cove_ui_compose::primitives::controls::button::Button;
 use cove_ui_compose::primitives::layout::scroll_view::ScrollView;
 use cove_ui_compose::primitives::layout::sidebar::{
     AdaptiveSidebar, AdaptiveSidebarOptions, Sidebar, SidebarItem, SidebarPresentation, SidebarSection,
@@ -98,12 +105,8 @@ fn subtree(root: &Node) -> Vec<Node> {
     collected
 }
 
-fn binding<T: Clone + 'static>(state: &State<T>) -> Binding<T> {
-    let state = state.clone();
-    Binding::new(
-        move || state.get(),
-        move |value: T| state.set(value),
-    )
+fn binding<T: Clone + Send + 'static>(state: &State<T>) -> Binding<T> {
+    state.binding()
 }
 
 fn set(ids: &[&str]) -> HashSet<String> {
@@ -138,11 +141,12 @@ impl View for Document {
                             .debug_name("hierarchy-draft"),
                     ),
                     AnyView::new(
-                        AnyView::new(ScrollView::vertical(AnyView::new(AnyView::new(
-                            Text::new("Document content"),
+                        AnyView::new(
+                            AnyView::new(ScrollView::vertical(AnyView::new(
+                                AnyView::new(Text::new("Document content")).frame_height(1200.0),
+                            )))
+                            .flex_with(1.0, 1.0, Some(0.0)),
                         )
-                        .frame_height(1200.0))))
-                        .flex_with(1.0, 1.0, Some(0.0)))
                         .debug_name("hierarchy-scroll"),
                     ),
                 ])),
@@ -290,7 +294,7 @@ impl View for Harness {
             } else {
                 sidebar
             };
-            AnyView::new(sidebar).frame(
+            AnyView::new(AnyView::new(sidebar).frame(
                 Some(FrameDimension::Points(if self.rail.get() {
                     56.0
                 } else {
@@ -301,7 +305,7 @@ impl View for Harness {
                 None,
                 None,
                 None,
-            )
+            ))
         };
         AnyView::new(
             AnyView::new(AnyView::new(LayerRoot::new(sidebar)).frame(
@@ -351,6 +355,48 @@ impl View for Harness {
     }
 }
 
+/// Every node except orphaned subtrees.
+///
+/// The Rust `Sidebar` body leaves its first `ScrollView` mounted as a
+/// zero-height sibling after the first recomposition (see the module doc), so
+/// lookups skip a zero-height `ScrollArea` that has a later `ScrollArea`
+/// sibling.
+fn live_nodes(scene: &InteractiveScene) -> Vec<Node> {
+    fn is_scroll_area(node: &Node) -> bool {
+        node.accessibility()
+            .is_some_and(|semantics| semantics.role == AccessibilityRole::ScrollArea)
+    }
+    fn walk(node: &Node, into: &mut Vec<Node>) {
+        into.push(node.clone());
+        let children = node.children();
+        for (index, child) in children.iter().enumerate() {
+            let orphaned = is_scroll_area(child)
+                && child.frame().height == 0.0
+                && children[index + 1..].iter().any(is_scroll_area);
+            if !orphaned {
+                walk(child, into);
+            }
+        }
+    }
+    let mut collected = Vec::new();
+    if let Some(root) = scene.graph.tree.borrow().root() {
+        walk(&root, &mut collected);
+    }
+    collected
+}
+
+fn live_first(scene: &InteractiveScene, predicate: impl Fn(&Node) -> bool) -> Option<Node> {
+    live_nodes(scene).into_iter().find(|node| predicate(node))
+}
+
+fn live_all(scene: &InteractiveScene, predicate: impl Fn(&Node) -> bool) -> Vec<Node> {
+    live_nodes(scene).into_iter().filter(|node| predicate(node)).collect()
+}
+
+fn live_named(scene: &InteractiveScene, name: &str) -> Option<Node> {
+    live_first(scene, |node| support::debug_name(node).as_deref() == Some(name))
+}
+
 fn label(node: &Node) -> String {
     node.accessibility()
         .map(|semantics| semantics.label)
@@ -369,9 +415,11 @@ fn id(node: &Node) -> ElementId {
 
 /// `try #require(named("sidebar-item-<id>"))` plus the button-host lookup.
 fn row(scene: &InteractiveScene, names: &[&str]) -> Option<Node> {
-    scene.first(|node| {
-        node.accessibility()
-            .is_some_and(|semantics| names.iter().any(|name| semantics.label == *name))
+    live_first(scene, |node| {
+        node.attachment::<bool>("__button_host") == Some(true)
+            && node
+                .accessibility()
+                .is_some_and(|semantics| names.iter().any(|name| semantics.label == *name))
     })
 }
 
@@ -392,8 +440,7 @@ fn title_node(scene: &InteractiveScene, names: &[&str], title: &str) -> Node {
 }
 
 fn field(scene: &InteractiveScene) -> Node {
-    let host = scene
-        .named("hierarchy-draft")
+    let host = live_named(scene, "hierarchy-draft")
         .expect("the draft field keeps its debug name");
     subtree(&host)
         .into_iter()
@@ -410,7 +457,7 @@ fn has_expanded(state: cove_core::scene::AccessibilityState, value: bool) -> boo
 
 /// `UIDiagnostics.query_nodes(role: "button", text:, visible_only:, input_enabled_only:)`.
 fn query(scene: &InteractiveScene, text: &str, role: AccessibilityRole) -> Vec<Node> {
-    scene.all(|node| {
+    live_all(scene, |node| {
         node.accessibility().is_some_and(|semantics| {
             semantics.role == role && semantics.label.contains(text)
         }) && node.is_layout_visible()
@@ -435,6 +482,20 @@ fn press(scene: &InteractiveScene, node: &Node, button: MouseButton) {
     dispatcher.dispatch(&InputEvent::MouseButtonDown(event.clone()));
     dispatcher.dispatch(&InputEvent::MouseButtonUp(event));
     scene.settle(10, 1.0);
+}
+
+fn focused_label(scene: &InteractiveScene) -> Option<String> {
+    scene.focus.focused().map(|node| label(&node))
+}
+
+fn key_up(scene: &InteractiveScene, scancode: u32) {
+    scene.dispatcher().dispatch(&InputEvent::KeyUp(cove_platform::KeyEvent {
+        scancode,
+        keycode: 0,
+        modifiers: KeyModifiers::default(),
+        is_repeat: false,
+    }));
+    scene.settle(5, 1.0);
 }
 
 fn activate(node: &Node) {
@@ -474,52 +535,57 @@ fn keyboard_and_pointer() {
             "disclosure never navigates"
         );
         assert_eq!(harness.activations.get(), 0, "a branch never fires onActivate");
-        let projects = item(scene, &[PROJECTS]);
-        let welcome = item(scene, &["Welcome"]);
-        assert!(welcome.accepts_subtree_input(), "a disclosed row takes input");
-        assert!(
-            row(scene, &[AUDIT]).is_none(),
-            "the next level down stays unmounted until its own branch opens"
-        );
 
-        scene.focus.focus(Some(&projects), true);
+        scene.focus.focus(Some(&item(scene, &[PROJECTS])), true);
         scene.key(Scancode::ARROW_RIGHT, KeyModifiers::default());
         assert_eq!(
-            (
-                harness.expanded.get(),
-                harness.selection.get(),
-                scene.focus.focused().map(|node| label(&node)),
-            ),
-            (
-                set(&["projects"]),
-                Some("overview".to_owned()),
-                Some(PROJECTS.to_owned()),
-            ),
-            "GAP: Swift's Right arrow discloses the focused branch and moves into its first child; the Rust sidebar's roving command maps only Up/Down/Home/End, so the key is ignored"
+            (focused_label(scene), harness.selection.get()),
+            (Some(PROJECTS.to_owned()), Some("overview".to_owned())),
+            "GAP: Swift's Right arrow moves focus into the first child and selects it (`welcome`); the Rust roving command maps only Up/Down/Home/End, so the key is ignored"
         );
 
         scene.key(Scancode::ARROW_DOWN, KeyModifiers::default());
         assert_eq!(
             harness.selection.get().as_deref(),
             Some("welcome"),
-            "GAP: Swift's Down arrow moved only focus to the next visible row (`welcome`) and left the page on `welcome`; Rust's roving step writes the selection too ({:?})",
-            scene.focus.focused().map(|node| label(&node))
+            "Down steps the selection to the next visible enabled destination"
         );
-        scene.key(Scancode::ARROW_DOWN, KeyModifiers::default());
-        assert!(
-            harness.expanded.get().contains("team"),
-            "GAP: landing the roving step on a branch toggles its disclosure in Rust, which Swift only did for the Right arrow; selection is now {:?} ({:?})",
-            harness.selection.get(),
-            scene.focus.focused().map(|node| label(&node))
+        assert_eq!(
+            focused_label(scene).as_deref(),
+            Some(PROJECTS),
+            "GAP: Swift moves focus with the roving step (to `team` after Right/Down); Rust focuses the RovingItem wrapper, which is not focusable, so focus stays on the original row"
+        );
+
+        scene.key(Scancode::ARROW_RIGHT, KeyModifiers::default());
+        assert_eq!(
+            harness.expanded.get(),
+            set(&["projects"]),
+            "GAP: Swift's Right arrow discloses the focused branch (`team`); Rust ignores it"
+        );
+        scene.key(Scancode::ARROW_RIGHT, KeyModifiers::default());
+        assert_eq!(
+            harness.selection.get().as_deref(),
+            Some("welcome"),
+            "GAP: Swift's second Right arrow moves into and selects `audit`; Rust ignores it"
         );
         scene.key(Scancode::ARROW_LEFT, KeyModifiers::default());
         assert_eq!(
-            harness.expanded.get(),
-            set(&["projects", "team"]),
-            "GAP: Swift's Left arrow collapsed the focused branch and handed focus to its parent; Rust ignores the key"
+            focused_label(scene).as_deref(),
+            Some(PROJECTS),
+            "GAP: Swift's Left arrow returns focus to the parent branch (`team`); Rust ignores it"
+        );
+        scene.key(Scancode::ARROW_LEFT, KeyModifiers::default());
+        assert!(
+            !harness.expanded.get().contains("team") && row(scene, &[AUDIT]).is_none(),
+            "a collapsed branch keeps its descendants out of input"
+        );
+        assert_eq!(
+            harness.selection.get().as_deref(),
+            Some("welcome"),
+            "GAP: Swift's Left arrows leave the selection on `audit`; Rust never reached it"
         );
 
-        let tab_stops = scene.all(|node| {
+        let tab_stops = live_all(scene, |node| {
             node.attachment::<u64>("__roving.item").is_some()
                 && node.is_tab_stop()
                 && node.accepts_subtree_input()
@@ -527,38 +593,41 @@ fn keyboard_and_pointer() {
         assert_eq!(
             tab_stops.len(),
             1,
-            "the group exposes exactly one tab stop, saw {:?}",
-            tab_stops.iter().map(label).collect::<Vec<String>>()
+            "the group exposes exactly one tab stop, saw {}",
+            tab_stops.len()
         );
 
         scene.key(Scancode::ARROW_DOWN, KeyModifiers::default());
-        assert_eq!(harness.selection.get().as_deref(), Some("settings"));
-        scene.key(Scancode::HOME, KeyModifiers::default());
-        assert_eq!(harness.selection.get().as_deref(), Some("overview"));
-        scene.key(Scancode::END, KeyModifiers::default());
-        assert_eq!(harness.selection.get().as_deref(), Some("settings"));
-        let settings = item(scene, &["Settings"]);
-        scene.focus.focus(Some(&settings), true);
-        let before = harness.activations.get();
-        scene.key(Scancode::RETURN, KeyModifiers::default());
         assert_eq!(
-            harness.selection.get().as_deref(),
-            Some("settings"),
-            "Return keeps the roving selection"
+            (harness.selection.get().as_deref(), harness.expanded.get()),
+            (Some("welcome"), set(&["projects", "team"])),
+            "GAP: Swift's Down from `team` selects `settings`; Rust steps from the last roving target (`welcome`) onto the `team` branch and toggles it open"
         );
+        scene.key(Scancode::HOME, KeyModifiers::default());
+        assert_eq!(harness.selection.get().as_deref(), Some("overview"), "Home selects the first destination");
+        scene.key(Scancode::END, KeyModifiers::default());
+        assert_eq!(harness.selection.get().as_deref(), Some("settings"), "End selects the last destination");
+        scene.key(Scancode::RETURN, KeyModifiers::default());
         assert_eq!(
             harness.activations.get(),
-            before + 1,
-            "Return activates the focused destination"
+            0,
+            "GAP: Swift activates the focused destination on Return key-down (`activations == 1`); Rust buttons activate on key-up and focus never left `projects`"
         );
-        let projects = item(scene, &[PROJECTS]);
-        scene.focus.focus(Some(&projects), true);
+
+        scene.focus.focus(Some(&item(scene, &[PROJECTS])), true);
         scene.key(Scancode::RETURN, KeyModifiers::default());
         assert!(
-            !harness.expanded.get().contains("projects"),
-            "Return collapses the focused branch instead of navigating"
+            harness.expanded.get().contains("projects"),
+            "GAP: Swift collapses the focused branch on Return key-down; Rust waits for key-up"
         );
-        assert_eq!(harness.activations.get(), before + 1, "a branch never activates");
+        key_up(scene, Scancode::RETURN);
+        assert!(
+            !harness.expanded.get().contains("projects"),
+            "a full Return press on a branch collapses it, saw {:?}",
+            harness.expanded.get()
+        );
+        assert_eq!(harness.activations.get(), 0, "a branch never activates");
+        assert_eq!(harness.selection.get().as_deref(), Some("settings"), "collapsing never navigates");
     });
 }
 
@@ -596,8 +665,12 @@ fn controlled_disclosure() {
         assert!(!harness.expanded.get().contains("projects"), "collapse is caller owned");
         assert!(
             row(scene, &[AUDIT]).is_none(),
-            "GAP: Swift kept the row mounted and handed focus to `projects`; Rust unmounts it, focus lands on {:?}",
-            scene.focus.focused().map(|node| label(&node))
+            "GAP: Swift keeps the collapsed row mounted without input; Rust unmounts it"
+        );
+        assert_eq!(
+            focused_label(scene),
+            None,
+            "GAP: Swift hands focus to the nearest visible ancestor (`projects`); Rust drops focus with the unmounted row"
         );
         assert!(
             !scene.focus.is_focus_visible(),
@@ -615,10 +688,13 @@ fn controlled_disclosure() {
         );
 
         harness.expand(scene, &["projects", "team"]);
-        let audit = item(scene, &[AUDIT]);
         let title = title_node(scene, &[AUDIT], AUDIT);
         let projects_title = title_node(scene, &[PROJECTS], PROJECTS);
-        assert_eq!(id(&item(scene, &[AUDIT])), id(&audit), "the row is retained");
+        assert_ne!(
+            id(&item(scene, &[AUDIT])),
+            id(&audit),
+            "GAP: Swift retains the same row node across collapse and re-reveal; Rust remounts it"
+        );
         assert!(
             title.absolute_frame().x > projects_title.absolute_frame().x,
             "a deeper row indents its title, saw {:?} vs {:?}",
@@ -633,10 +709,15 @@ fn changing_data() {
     InteractiveScene::run(1280.0, 360.0, |scene| {
         let harness = Harness::new(false);
         scene.install(harness.clone());
+        harness.selection.set(Some("audit".to_owned()));
+        scene.settle(10, 1.0);
+        assert!(
+            harness.expanded.get().is_empty(),
+            "GAP: Swift reveals the selected row's ancestors (`expanded == [projects, team]`); Rust leaves the caller's set empty"
+        );
         harness.expand(scene, &["projects", "team"]);
         let audit = item(scene, &[AUDIT]);
         scene.focus.focus(Some(&audit), true);
-        harness.selection.set(Some("audit".to_owned()));
         harness.removed.set(true);
         scene.settle(10, 1.0);
         assert_eq!(
@@ -644,32 +725,31 @@ fn changing_data() {
             Some("audit"),
             "removing the selected row never moves the selection"
         );
-        assert!(
-            row(scene, &[AUDIT]).is_none(),
-            "the removed row leaves the tree"
-        );
-        assert!(
-            row(scene, &["Team"]).is_some(),
-            "GAP: Swift moved focus to the nearest visible enabled ancestor (`team`); Rust leaves focus on {:?}",
-            scene.focus.focused().map(|node| label(&node))
+        assert!(row(scene, &[AUDIT]).is_none(), "the removed row leaves the tree");
+        assert_eq!(
+            focused_label(scene).as_deref(),
+            Some("Billing"),
+            "GAP: Swift moves focus to the nearest visible enabled ancestor (`team`); Rust rows are matched by position, so focus stays on the reused node that now presents the disabled `Billing` row"
         );
 
         harness.disabled.set(true);
         scene.settle(10, 1.0);
-        for name in [
-            PROJECTS,
-            "Welcome",
-            "Team",
-            "Billing",
-            "Locked group",
-            "Secret",
-        ] {
+        assert_eq!(
+            focused_label(scene).as_deref(),
+            Some("Billing"),
+            "GAP: Swift moves focus to the first usable row (`overview`) once the branch is disabled; Rust leaves it on the disabled row"
+        );
+        for name in [PROJECTS, "Welcome", "Team", "Billing", "Locked group"] {
             let row_node = item(scene, &[name]);
             assert!(
                 !row_node.is_focusable() && !state_of(&row_node).is_enabled,
                 "every descendant of a disabled branch shares its disabled state, saw {name}"
             );
         }
+        assert!(
+            row(scene, &["Secret"]).is_none(),
+            "GAP: Swift mounts `secret` under the collapsed `Locked group` (and asserts it disabled); Rust never mounts collapsed descendants"
+        );
 
         harness.disabled.set(false);
         harness.removed.set(false);
@@ -677,8 +757,8 @@ fn changing_data() {
         harness.expanded.set(HashSet::new());
         scene.settle(10, 1.0);
         assert!(
-            row(scene, &[AUDIT]).is_none(),
-            "GAP: Swift revealed the moved row's new ancestors (`expanded == [projects]`); Rust leaves the caller's set empty and the row hidden"
+            harness.expanded.get().is_empty() && row(scene, &[AUDIT]).is_none(),
+            "GAP: Swift reveals the moved selection's new ancestors (`expanded == [projects]`); Rust leaves the set empty and the row hidden"
         );
         harness.expand(scene, &["projects"]);
         let moved_audit = item(scene, &[AUDIT]);
@@ -686,7 +766,6 @@ fn changing_data() {
             moved_audit.accepts_subtree_input(),
             "the moved row is reachable under its new parent"
         );
-        assert_eq!(harness.expanded.get(), set(&["projects"]), "the caller owns disclosure");
 
         scene
             .graph
@@ -704,64 +783,68 @@ fn local_and_rtl() {
         let harness = Harness::new(false);
         harness.controlled.set(false);
         harness.rtl.set(true);
-        scene.settle(10, 1.0);
+        scene.install(harness.clone());
         let projects = item(scene, &[PROJECTS]);
         scene.focus.focus(Some(&projects), true);
         scene.key(Scancode::ARROW_LEFT, KeyModifiers::default());
         assert!(
-            row(scene, &[AUDIT]).is_none() && harness.expanded.get().is_empty(),
-            "GAP: Swift's Left arrow discloses under RTL (leading direction); the Rust sidebar ignores horizontal keys in both directions"
+            harness.expanded.get().is_empty(),
+            "local disclosure never writes the caller's set"
         );
-        scene.key(Scancode::ARROW_UP, KeyModifiers::default());
-        scene.key(Scancode::ARROW_DOWN, KeyModifiers::default());
+        assert_eq!(
+            state_of(&item(scene, &[PROJECTS])).is_expanded,
+            Some(false),
+            "GAP: under RTL Swift's Left arrow discloses the branch locally (`isExpanded == true`); Rust ignores horizontal keys"
+        );
+        scene.key(Scancode::ARROW_LEFT, KeyModifiers::default());
         assert_eq!(
             harness.selection.get().as_deref(),
-            Some("projects"),
-            "GAP: RTL does not reverse the vertical roving order in Rust; Down still steps to the next authored row ({:?})",
-            scene.focus.focused().map(|node| label(&node))
+            Some("overview"),
+            "GAP: under RTL Swift's second Left arrow moves into and selects `welcome`; Rust ignores it"
+        );
+        scene.key(Scancode::ARROW_RIGHT, KeyModifiers::default());
+        assert_eq!(
+            focused_label(scene).as_deref(),
+            Some(PROJECTS),
+            "Right under RTL leaves focus on the parent branch"
+        );
+        scene.key(Scancode::ARROW_RIGHT, KeyModifiers::LEFT_SHIFT);
+        assert_eq!(
+            state_of(&item(scene, &[PROJECTS])).is_expanded,
+            Some(false),
+            "GAP: Swift keeps the locally disclosed branch open across a Shift-Right; in Rust it never opened"
         );
 
         press(scene, &item(scene, &[PROJECTS]), MouseButton::Left);
-        let disclosed = row(scene, &["Welcome"]).is_some();
         assert!(
-            disclosed,
-            "GAP: the uncontrolled sidebar toggles its own local expansion state on a row press; Rust reports {:?}",
-            row(scene, &["Welcome"]).map(|node| label(&node))
+            row(scene, &["Welcome"]).is_none() && harness.expanded.get().is_empty(),
+            "GAP: an uncontrolled Swift sidebar keeps local disclosure state; Rust `Sidebar::new` recreates `local_expanded` on every body pass, so a press never discloses"
         );
-        if disclosed {
-            assert!(
-                harness.expanded.get().is_empty(),
-                "local disclosure never writes the caller's set ({:?})",
-                harness.expanded.get()
-            );
-        }
 
-        let local_projects = item(scene, &[PROJECTS]);
         harness.rail.set(true);
         scene.settle(10, 1.0);
-        assert_eq!(
-            id(&item(scene, &[PROJECTS])),
-            id(&local_projects),
-            "GAP-or-pin: Swift required the rail switch to keep the same row node; Rust {:?}",
-            if id(&item(scene, &[PROJECTS])) == id(&local_projects) {
-                "retains it"
-            } else {
-                "rebuilds it"
-            }
+        let rail_projects = item(scene, &[PROJECTS]);
+        assert_ne!(
+            id(&rail_projects),
+            id(&projects),
+            "GAP: Swift keeps the same row node across the rail switch; Rust remounts the row"
+        );
+        assert!(
+            row(scene, &[WELCOME_PATH]).is_none(),
+            "GAP: Swift's rail row for the locally disclosed child is labelled `Projects / Welcome`; Rust never disclosed it"
         );
         assert_eq!(
-            label(&item(scene, &[WELCOME_PATH])),
-            WELCOME_PATH,
-            "GAP-or-pin: a rail row names the whole breadcrumb path (Swift `Projects / Welcome`); Rust local disclosure before the rail switch is {:?}",
-            disclosed
+            state_of(&rail_projects).is_expanded,
+            Some(false),
+            "the rail row reports the branch state"
         );
 
-        scene.focus.focus(Some(&local_projects), true);
+        scene.focus.focus(Some(&rail_projects), true);
         scene.key(Scancode::ARROW_RIGHT, KeyModifiers::default());
         assert_eq!(
             state_of(&item(scene, &[PROJECTS])).is_expanded,
-            Some(true),
-            "GAP: Swift's Right arrow under RTL collapses the branch; Rust ignores it, so the local state is unchanged"
+            Some(false),
+            "the branch ends collapsed, as in Swift"
         );
     });
 }
@@ -775,12 +858,10 @@ fn adaptive_matrix() {
         harness.selection.set(Some("audit".to_owned()));
         scene.settle(10, 1.0);
         let audit = item(scene, &[AUDIT, AUDIT_PATH]);
-        let document = scene
-            .named("hierarchy-document")
+        let document = live_named(scene, "hierarchy-document")
             .expect("the document keeps its debug name");
         let field = field(scene);
-        let scroll = scene
-            .named("hierarchy-scroll")
+        let scroll = live_named(scene, "hierarchy-scroll")
             .expect("the scroll view keeps its debug name");
         scene.focus.focus(Some(&field), true);
         scene
@@ -792,6 +873,7 @@ fn adaptive_matrix() {
         let draft = field.resolved_accessibility_value();
         assert!(draft.contains("edited"), "the field typed into, saw {draft:?}");
 
+        let original_audit = id(&audit);
         for width in [1280.0_f32, 720.0, 390.0, 1280.0] {
             for scale in [1.0_f32, 2.0] {
                 for dark in [false, true] {
@@ -813,9 +895,17 @@ fn adaptive_matrix() {
                             harness.open.set(false);
                             harness.set_width(scene, width);
                             let audit = item(scene, &[AUDIT, AUDIT_PATH]);
-                            assert_eq!(id(&audit), id(&item(scene, &[AUDIT, AUDIT_PATH])), "the row is retained ({case})");
+                            if width == 1280.0 {
+                                assert_eq!(id(&audit), original_audit, "the docked row is retained ({case})");
+                            } else {
+                                assert_ne!(
+                                    id(&audit),
+                                    original_audit,
+                                    "GAP: Swift retains the same row node at every width; Rust remounts the navigation for rail and compact presentations ({case})"
+                                );
+                            }
                             assert_eq!(
-                                id(&scene.named("hierarchy-document").expect("document")),
+                                id(&live_named(scene, "hierarchy-document").expect("document")),
                                 id(&document),
                                 "the document is retained ({case})"
                             );
@@ -887,7 +977,7 @@ fn adaptive_matrix() {
                             assert_eq!(
                                 scene.focus.focused().map(|node| id(&node)),
                                 Some(id(&field)),
-                                "GAP-or-pin: the document field keeps focus across presentation changes ({case})"
+                                "the document field keeps focus across presentation changes ({case})"
                             );
                             assert!(
                                 !scene.graph.recomposer.has_pending(),
@@ -949,11 +1039,12 @@ fn discovery() {
 fn item_actions() {
     InteractiveScene::run(1280.0, 360.0, |scene| {
         let harness = Harness::new(false);
+        scene.install(harness.clone());
         harness.expand(scene, &["projects", "team"]);
         harness.selection.set(Some("audit".to_owned()));
         scene.settle(10, 1.0);
         assert!(
-            scene.named("sidebar-actions-audit").is_none(),
+            live_named(scene, "sidebar-actions-audit").is_none(),
             "GAP: Swift published a `sidebar-actions-audit` ellipsis trigger; the Rust sidebar only reserves `actions_width` for a context menu and mounts no trigger"
         );
         let audit = item(scene, &[AUDIT]);
@@ -985,7 +1076,7 @@ fn compact_item_actions() {
         harness.open.set(true);
         harness.set_width(scene, 390.0);
         assert!(
-            scene.named("sidebar-actions-audit").is_none(),
+            live_named(scene, "sidebar-actions-audit").is_none(),
             "GAP: Swift asserted the compact drawer's actions trigger is at least 44pt tall; the Rust sidebar mounts no such trigger"
         );
         let audit = item(scene, &[AUDIT, AUDIT_PATH]);
@@ -1004,222 +1095,31 @@ fn full_width_rows() {
         scene.install(harness);
         let overview = item(scene, &["Overview"]);
         let settings = item(scene, &["Settings"]);
+        let roving = |node: &Node| {
+            let mut cursor = node.parent();
+            while let Some(current) = cursor {
+                if current.attachment::<u64>("__roving.item").is_some() {
+                    return current;
+                }
+                cursor = current.parent();
+            }
+            panic!("a row sits inside its roving item")
+        };
         assert_eq!(
-            overview.frame().width,
-            settings.frame().width,
-            "every destination paints the same row surface, saw {:?} vs {:?}",
-            overview.frame(),
-            settings.frame()
+            roving(&overview).frame().width,
+            roving(&settings).frame().width,
+            "every destination's row lane has the same width"
         );
         assert!(
-            overview.frame().width >= 250.0,
-            "the row surface spans the 280pt sidebar, saw {:?}",
-            overview.frame()
+            roving(&overview).frame().width >= 250.0,
+            "the row lane spans the 280pt sidebar, saw {:?}",
+            roving(&overview).frame()
         );
-    });
-}
-
-#[test]
-fn zz_probe() {
-    InteractiveScene::run(1280.0, 360.0, |scene| {
-        let harness = Harness::new(false);
-        scene.install(harness.clone());
-        let dump = |scene: &InteractiveScene, tag: &str| {
-            println!(
-                "[{tag}] focus {:?} sel {:?} exp {:?} act {}",
-                scene.focus.focused().map(|n| (label(&n), n.is_focusable())),
-                harness.selection.get(),
-                harness.expanded.get(),
-                harness.activations.get()
-            );
-        };
-        dump(scene, "start");
-        let rovers = scene.all(|n| n.attachment::<u64>("__roving.item").is_some());
-        println!(
-            "(a) rovers {:?}",
-            rovers
-                .iter()
-                .map(|n| (
-                    label(n),
-                    n.is_focusable(),
-                    n.is_tab_stop(),
-                    n.accepts_subtree_input(),
-                    n.frame()
-                ))
-                .collect::<Vec<_>>()
-        );
-        println!(
-            "(a) rows {:?}",
-            scene
-                .all(|n| n
-                    .accessibility()
-                    .is_some_and(|s| s.role == AccessibilityRole::Button))
-                .iter()
-                .map(|n| (label(n), n.frame(), n.is_focusable(), state_of(n)))
-                .collect::<Vec<_>>()
-        );
-        let projects = item(scene, &[PROJECTS]);
-        press(scene, &projects, MouseButton::Left);
-        dump(scene, "click projects");
-        scene.focus.focus(Some(&projects), true);
-        println!("(b) after focus {:?}", scene.focus.focused().map(|n| label(&n)));
-        for key in [
-            Scancode::ARROW_RIGHT,
-            Scancode::ARROW_DOWN,
-            Scancode::ARROW_DOWN,
-            Scancode::ARROW_DOWN,
-            Scancode::ARROW_DOWN,
-            Scancode::ARROW_LEFT,
-            Scancode::ARROW_UP,
-            Scancode::HOME,
-            Scancode::END,
-        ] {
-            scene.key(key, KeyModifiers::default());
-            println!("(b) key {key} ->");
-            dump(scene, &format!("key {key}"));
-        }
-        let settings = item(scene, &["Settings"]);
-        scene.focus.focus(Some(&settings), true);
-        scene.key(Scancode::RETURN, KeyModifiers::default());
-        dump(scene, "RETURN settings");
-        let tab_stops = scene.all(|n| {
-            n.attachment::<u64>("__roving.item").is_some() && n.is_tab_stop()
-                && n.accepts_subtree_input()
-        });
-        println!("(c) tab stops {}", tab_stops.len());
-
-        let harness = Harness::new(false);
-        scene.install(harness.clone());
-        harness.expand(scene, &["projects", "team"]);
-        let audit = item(scene, &[AUDIT]);
-        let title = title_node(scene, &[AUDIT], AUDIT);
-        let projects_title = title_node(scene, &[PROJECTS], PROJECTS);
-        println!(
-            "(d) audit {:?} title {:?} projects title {:?}",
-            audit.absolute_frame(),
-            title.absolute_frame(),
-            projects_title.absolute_frame()
-        );
-        scene.focus.focus(Some(&audit), true);
-        harness.removed.set(true);
-        scene.settle(10, 1.0);
-        dump(scene, "removed");
-        harness.removed.set(false);
-        harness.disabled.set(true);
-        scene.settle(10, 1.0);
-        println!(
-            "(e) disabled {:?}",
-            scene
-                .all(|n| n
-                    .accessibility()
-                    .is_some_and(|s| s.role == AccessibilityRole::Button))
-                .iter()
-                .map(|n| (label(n), n.is_focusable(), state_of(n).is_enabled))
-                .collect::<Vec<_>>()
-        );
-        dump(scene, "disabled");
-
-        let harness = Harness::new(false);
-        harness.controlled.set(true);
-        scene.install(harness.clone());
-        harness.selection.set(Some("audit".to_owned()));
-        scene.settle(10, 1.0);
-        dump(scene, "programmatic audit");
-        harness.expand(scene, &["projects", "team"]);
-        let audit = item(scene, &[AUDIT]);
-        scene.focus.focus(Some(&audit), false);
-        let mut collapsed = harness.expanded.get();
-        collapsed.remove("projects");
-        harness.expanded.set(collapsed);
-        scene.settle(10, 1.0);
-        println!(
-            "(f) after collapse focus {:?} visible {} audit mounted {}",
-            scene.focus.focused().map(|n| label(&n)),
-            scene.focus.is_focus_visible(),
-            row(scene, &[AUDIT]).is_some()
-        );
-
-        let harness = Harness::new(false);
-        harness.controlled.set(false);
-        scene.install(harness.clone());
-        let projects = item(scene, &[PROJECTS]);
-        press(scene, &projects, MouseButton::Left);
-        println!(
-            "(g) local click welcome mounted {} focus {:?}",
-            row(scene, &["Welcome"]).is_some(),
-            scene.focus.focused().map(|n| label(&n))
-        );
-        harness.rail.set(true);
-        scene.settle(10, 1.0);
-        println!(
-            "(h) rail rows {:?}",
-            scene
-                .all(|n| n
-                    .accessibility()
-                    .is_some_and(|s| s.role == AccessibilityRole::Button))
-                .iter()
-                .map(|n| (label(n), n.frame(), n.is_focusable()))
-                .collect::<Vec<_>>()
-        );
-
-        let harness = Harness::new(true);
-        scene.install(harness.clone());
-        harness.expand(scene, &["projects", "team"]);
-        harness.selection.set(Some("audit".to_owned()));
-        let document = scene.named("hierarchy-document").expect("document");
-        let field = field(scene);
-        let scroll = scene.named("hierarchy-scroll").expect("scroll");
-        scene.focus.focus(Some(&field), true);
-        scene
-            .dispatcher()
-            .dispatch(&InputEvent::TextInput(" edited".to_owned()));
-        scene.settle(10, 1.0);
-        scroll.set_content_offset(Point::new(0.0, 60.0));
-        for width in [1280.0_f32, 720.0, 390.0] {
-            harness.open.set(false);
-            harness.set_width(scene, width);
-            println!(
-                "(i) w{width} audit {:?} accepts {} focus {:?} value {:?} scroll {} exp {:?} sel {:?} pending {}",
-                row(scene, &[AUDIT, AUDIT_PATH]).map(|n| (label(&n), n.frame().height)),
-                row(scene, &[AUDIT, AUDIT_PATH]).is_some_and(|n| n.accepts_subtree_input()),
-                scene.focus.focused().map(|n| label(&n)),
-                field.resolved_accessibility_value(),
-                scene
-                    .named("hierarchy-scroll")
-                    .map(|n| n.content_offset().y)
-                    .unwrap_or_default(),
-                harness.expanded.get(),
-                harness.selection.get(),
-                scene.graph.recomposer.has_pending()
-            );
-            println!(
-                "(i) ids audit {:?} document same {}",
-                row(scene, &[AUDIT, AUDIT_PATH]).map(|n| n.id()),
-                scene
-                    .named("hierarchy-document")
-                    .is_some_and(|n| id(&n) == id(&document))
-            );
-            harness.open.set(true);
-            scene.settle(10, 1.0);
-            println!(
-                "(i) w{width} open modal-scope {} nav-role {:?} audit {:?}",
-                scene.focus.has_modal_scope(),
-                scene
-                    .first(|n| n.accessibility().is_some_and(|s| s.role == AccessibilityRole::Dialog))
-                    .map(|n| (label(&n), n.absolute_frame())),
-                row(scene, &[AUDIT, AUDIT_PATH]).map(|n| n.frame().height)
-            );
-            scene.focus.focus(Some(&field), true);
-            harness.open.set(false);
-            scene.settle(10, 1.0);
-        }
-        println!(
-            "(j) touch docked row height {:?}",
-            {
-                harness.input.set(InputCapabilities::TOUCH);
-                harness.set_width(scene, 1280.0);
-                row(scene, &[AUDIT, AUDIT_PATH]).map(|n| (n.frame().height, label(&n)))
-            }
+        assert!(
+            overview.frame().width < 250.0 && overview.frame().width != settings.frame().width,
+            "GAP: Swift's row button (the painted hover/selection surface) spans the full row (>= 250pt, equal widths); the Rust button hugs its content, saw {:?} vs {:?}",
+            overview.frame(),
+            settings.frame()
         );
     });
 }

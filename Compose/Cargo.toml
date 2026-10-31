@@ -810,3 +810,55 @@ path = "rust/tests/sidebar_resize_tests.rs"
 [[test]]
 name = "sidebar_hierarchy_tests"
 path = "rust/tests/sidebar_hierarchy_tests.rs"
+
+[[test]]
+name = "scroll_physics_tests"
+path = "rust/tests/scroll_physics_tests.rs"
+
+[[test]]
+name = "date_range_rules_tests"
+path = "rust/tests/date_range_rules_tests.rs"
+
+[[test]]
+name = "calendar_modes_tests"
+path = "rust/tests/calendar_modes_tests.rs"
+
+[[test]]
+name = "scroll_offset_binding_tests"
+path = "rust/tests/scroll_offset_binding_tests.rs"
+
+[[test]]
+name = "scrollbar_tests"
+path = "rust/tests/scrollbar_tests.rs"
+
+[[test]]
+name = "button_scroll_view_tests"
+path = "rust/tests/button_scroll_view_tests.rs"
+
+[[test]]
+name = "calendar_keyboard_navigation_tests"
+path = "rust/tests/calendar_keyboard_navigation_tests.rs"
+
+[[test]]
+name = "text_field_tests"
+path = "rust/tests/text_field_tests.rs"
+
+[[test]]
+name = "list_row_tests"
+path = "rust/tests/list_row_tests.rs"
+
+[[test]]
+name = "rating_tests"
+path = "rust/tests/rating_tests.rs"
+
+[[test]]
+name = "typography_raster_tests"
+path = "rust/tests/typography_raster_tests.rs"
+
+[[test]]
+name = "popconfirm_tests"
+path = "rust/tests/popconfirm_tests.rs"
+
+[[test]]
+name = "text_field_navigation_tests"
+path = "rust/tests/text_field_navigation_tests.rs"

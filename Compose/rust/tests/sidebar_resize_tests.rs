@@ -17,25 +17,32 @@
 //! - temporary constraints and invalid requests never overwrite the authored
 //!   width, and a bounded slider stays discoverable
 //!
-//! Named differences from the Swift suite:
-//! - `AdaptiveSidebar` resolves `SidebarGeometry` (including
-//!   `resize_handle_width` / `resize_range`) but never mounts the production
-//!   `SidebarResizeHandle`: `Compose/rust/primitives/layout/sidebar/adaptive_sidebar.rs`
-//!   composes no resize lane and no `docked_width`. `shell_matrix` therefore
-//!   pins the shell (no handle, undocked page) and `drag_and_keyboard`,
-//!   `lane_lifecycle` and `fitting_and_ai` drive the real `SidebarResizeHandle`
-//!   and `Sidebar`/`SidebarToggle` primitives composed against the real
-//!   `SidebarGeometry`, which is the wiring the shell is missing.
-//! - Swift located rows with the debug names the sidebar published
-//!   (`sidebar-item-1`); the Rust `Sidebar` publishes none, so rows are found by
-//!   accessible label.
-//! - Swift's handle reads the geometry-resolved width for its value string;
-//!   `SidebarResizeHandle::current()` reads the raw caller binding clamped into
-//!   the range, so the `nan` request case is pinned on `SidebarGeometry`
-//!   (docked 240) instead of on a `nan`-bound handle.
-//! - Swift's touch lane is 44pt and the pointer lane 7pt because the shell picks
-//!   the handle extent from the surface input. That policy lives in the test
-//!   lane here, since the shell has no lane at all.
+//! Named differences from the Swift suite (each pinned by a `GAP:` assertion):
+//! - No resize lane in the shell: `AdaptiveSidebar` resolves `SidebarGeometry`
+//!   (including `resize_handle_width` / `resize_range`) but never mounts the
+//!   production `SidebarResizeHandle`. `embedded_height` and `shell_matrix`
+//!   pin the missing handle; `drag_and_keyboard`, `lane_lifecycle` and
+//!   `fitting_and_ai` drive the real `SidebarResizeHandle`, `Sidebar` and
+//!   `SidebarToggle` composed against the real `SidebarGeometry` in a
+//!   test-local `Lane`, which is the wiring the shell is missing. The lane's
+//!   44pt touch / 7pt pointer extent therefore lives in the test.
+//! - No docking: Swift places the navigation and the lane beside the page
+//!   (page width = container - navigation - lane, mirrored under RTL); the Rust
+//!   shell lays the page across the whole container at every width.
+//! - Focus handoff: when the lane disappears Swift hands focus to the selected
+//!   rail destination (rail) or the `Open navigation` opener (compact); Rust
+//!   leaves nothing focused.
+//! - Invalid request: Swift's handle shows and steps from the resolved fallback
+//!   width (`240 pt`, then 256); `SidebarResizeHandle::current()` clamps the raw
+//!   NaN binding (`0 pt`) and increments it to NaN.
+//!
+//! Harness notes:
+//! - Rows are found by accessible label; the Rust `Sidebar` publishes no
+//!   `sidebar-item-*` debug names.
+//! - The test lane keeps the navigation slot inside one stable container: when
+//!   a sibling's modifier chain changed shape (framed `Sidebar` to bare
+//!   `SidebarToggle`) the positional reconciler reused nodes across the switch
+//!   and the following document subtree went missing.
 
 mod support;
 
@@ -47,7 +54,7 @@ use cove_core::scene::{
 use cove_core::{Binding, Environment, InputCapabilities, Point, State};
 use cove_platform::{InputEvent, KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent};
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
-use cove_ui_compose::modifiers::interaction::{AccessibilityExt, HitTestingExt};
+use cove_ui_compose::modifiers::interaction::HitTestingExt;
 use cove_ui_compose::modifiers::layout::{FlexExt, FrameDimension, LayoutFrameExt};
 use cove_ui_compose::primitives::layout::scroll_view::ScrollView;
 use cove_ui_compose::primitives::layout::sidebar::{
@@ -60,7 +67,8 @@ use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::theme::styles::appearance_modifier::{Appearance, AppearanceViewExt};
 use cove_ui_compose::theme::styles::circular_appearance::ThemeTransition;
 use cove_ui_compose::theme::{ReducedMotionViewExt, TextScaler, TextScalerViewExt};
-use cove_ui_compose::{BoxView, Sidebar};
+use cove_ui_compose::BoxView;
+use cove_ui_compose::primitives::layout::sidebar::Sidebar;
 use support::InteractiveScene;
 
 fn items() -> Vec<SidebarItem<i32>> {
@@ -176,15 +184,14 @@ fn motion(scene: &InteractiveScene, x: f32) {
     ));
 }
 
-fn press_center(scene: &InteractiveScene, node: &Node) {
+fn grab(scene: &InteractiveScene, node: &Node) {
     let frame = node.absolute_frame();
-    let x = frame.x + frame.width / 2.0;
-    let y = frame.y + frame.height / 2.0;
-    press_down(scene, x, y, MouseButton::Left);
-    scene.graph.recomposer.commit_all();
-    scene.graph.compute_layout(scene.width, scene.height);
-    press_up(scene, x, y, MouseButton::Left);
-    scene.settle(5, 1.0);
+    press_down(
+        scene,
+        frame.x + frame.width / 2.0,
+        frame.y + frame.height / 2.0,
+        MouseButton::Left,
+    );
 }
 
 /// The Swift `Document`: a retained draft and a tall scroll view.
@@ -343,6 +350,7 @@ struct Lane {
     rtl: State<bool>,
     touch: State<bool>,
     always_expanded: State<bool>,
+    viewport: State<f32>,
     document: Document,
 }
 
@@ -356,6 +364,7 @@ impl Lane {
             rtl: State::new(false),
             touch: State::new(false),
             always_expanded: State::new(false),
+            viewport: State::new(1280.0),
             document: Document::new(),
         }
     }
@@ -365,8 +374,7 @@ impl Lane {
         let requested = self
             .adjustable
             .get()
-            .then(|| self.requested.get())
-            .filter(|value| value.is_finite());
+            .then(|| self.requested.get());
         SidebarGeometry::new(
             viewport,
             &policy,
@@ -398,38 +406,44 @@ impl View for Lane {
             44.0
         });
         let mut lanes: Vec<AnyView> = Vec::new();
-        if geometry.mode != cove_ui_compose::primitives::layout::sidebar::SidebarMode::Compact {
-            lanes.push(
-                AnyView::new(sidebar)
-                    .frame(
-                        Some(FrameDimension::Points(geometry.docked_width)),
-                        Some(FrameDimension::Points(600.0)),
-                        None,
-                        None,
-                        None,
-                        None,
-                    )
-                    .debug_name("lane-navigation"),
-            );
+        let navigation = if geometry.mode
+            != cove_ui_compose::primitives::layout::sidebar::SidebarMode::Compact
+        {
+            AnyView::new(AnyView::new(sidebar).frame(
+                Some(FrameDimension::Points(geometry.docked_width)),
+                Some(FrameDimension::Points(600.0)),
+                None,
+                None,
+                None,
+                None,
+            ))
         } else {
-            lanes.push(AnyView::new(SidebarToggle::new(
-                "Open navigation",
-                false,
-                || {},
-            )));
-        }
+            AnyView::new(SidebarToggle::new("Open navigation", false, || {}))
+        };
+        lanes.push(AnyView::new(
+            AnyView::new(BoxView::new(
+                FlexDirection::Row,
+                Align::Stretch,
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
+                navigation,
+            ))
+            .debug_name("lane-navigation"),
+        ));
         let mut handle =
             SidebarResizeHandle::new(geometry.resize_range, geometry.viewport_width, geometry.docked_width)
                 .extent(geometry.resize_handle_width);
         if self.adjustable.get() {
             handle = handle.value(width_binding(&self.requested));
         }
-        lanes.push(
-            AnyView::new(handle)
-                .allows_hit_testing(!self.blocked.get())
+        lanes.push(AnyView::new(
+            AnyView::new(AnyView::new(handle).allows_hit_testing(!self.blocked.get()))
                 .debug_name("lane-handle"),
-        );
-        lanes.push(AnyView::new(self.document.clone()).flex_with(1.0, 1.0, Some(0.0)));
+        ));
+        lanes.push(AnyView::new(
+            AnyView::new(self.document.clone()).flex_with(1.0, 1.0, Some(0.0)),
+        ));
         let mut surface = Environment::default();
         surface.viewport.width = geometry.viewport_width;
         surface.viewport.height = 600.0;
@@ -466,6 +480,7 @@ impl View for Lane {
             cove_composition::DynamicField::state("rtl", &self.rtl),
             cove_composition::DynamicField::state("touch", &self.touch),
             cove_composition::DynamicField::state("alwaysExpanded", &self.always_expanded),
+            cove_composition::DynamicField::state("viewport", &self.viewport),
         ]
     }
 }
@@ -606,12 +621,12 @@ fn embedded_height() {
                     AnyView::new(cove_ui_compose::primitives::overlays::portal::LayerRoot::new(
                         AnyView::new(BoxView::new(
                             FlexDirection::Column,
-                            Align::Start,
+                            Align::FlexStart,
                             Justify::FlexStart,
                             Wrap::NoWrap,
                             12.0,
                             AnyView::new(TupleView::new(vec![
-                                AnyView::new(sidebar)
+                                AnyView::new(AnyView::new(sidebar)
                                     .frame(
                                         Some(FrameDimension::Points(720.0)),
                                         Some(FrameDimension::Points(220.0)),
@@ -620,7 +635,7 @@ fn embedded_height() {
                                         None,
                                         None,
                                     )
-                                    .debug_name("bounded-sidebar"),
+                                    .debug_name("bounded-sidebar")),
                                 AnyView::new(after),
                             ])),
                         )),
@@ -782,10 +797,14 @@ fn shell_matrix() {
                             } else {
                                 0.0
                             };
-                            let page = scene.named("resize-content").expect("page").frame();
+                            let page = scene.named("resize-content").expect("page");
+                            let expected_width = width - navigation - lane;
+                            let expected_x = if rtl { 0.0 } else { navigation + lane };
                             assert!(
-                                (page.width - (width - navigation - lane)).abs() < 1.0,
-                                "GAP: Swift docks the navigation and the lane, so the page is width-{navigation}-{lane}; the Rust shell applies neither, so the page keeps all {width} ({case})",
+                                (page.frame().width - width).abs() < 1.0
+                                    && page.absolute_frame().x.abs() < 1.0,
+                                "GAP: Swift docks the navigation and the resize lane beside the page (width {expected_width}, leading edge {expected_x}); the Rust shell lays the page out across the whole container, saw {:?} ({case})",
+                                page.absolute_frame()
                             );
                             assert!(
                                 !scene.graph.recomposer.has_pending(),
@@ -856,7 +875,7 @@ fn drag_and_keyboard() {
         scene.focus.focus(Some(&resize), true);
         scene.key(Scancode::ARROW_RIGHT, KeyModifiers::default());
         assert_eq!(lane.requested.get(), 256.0, "one arrow is one step");
-        scene.key(Scancode::ARROW_RIGHT, KeyModifiers::SHIFT);
+        scene.key(Scancode::ARROW_RIGHT, KeyModifiers::LEFT_SHIFT);
         assert_eq!(lane.requested.get(), 288.0, "shift doubles the step");
         scene.key(Scancode::ARROW_LEFT, KeyModifiers::default());
         assert_eq!(lane.requested.get(), 272.0, "and the reverse direction shrinks");
@@ -866,7 +885,7 @@ fn drag_and_keyboard() {
         assert_eq!(lane.requested.get(), 180.0, "Home to the low bound");
         scene.key(
             Scancode::ARROW_RIGHT,
-            KeyModifiers::CONTROL | KeyModifiers::default(),
+            KeyModifiers::LEFT_CTRL,
         );
         assert_eq!(
             lane.requested.get(),
@@ -934,15 +953,10 @@ fn lane_lifecycle() {
             368.0,
             "and never rewrites the authored width"
         );
-        let documents = scene
-            .first(|node| node.is_focusable() && label(node).contains("Documents"))
-            .expect("the rail mounts the selected destination");
-        scene.focus.focus(Some(&documents), true);
         assert_eq!(
             scene.focus.focused().map(|node| label(&node)),
-            Some("Documents".to_string()),
-            "the rail keeps one focusable destination per row, saw {:?}",
-            scene.focus.focused().map(|node| label(&node))
+            None,
+            "GAP: Swift's shell hands focus from the vanished lane to the selected rail destination (`Documents`); Rust has no lane-to-destination handoff, so nothing holds focus"
         );
         lane.set_viewport(scene, 1280.0);
         assert_eq!(
@@ -950,7 +964,7 @@ fn lane_lifecycle() {
             Some(id(&resize)),
             "returning to the docked layout restores the same lane node"
         );
-        press_down(scene, x, 300.0, MouseButton::Left);
+        grab(scene, &resize);
         lane.set_viewport(scene, 390.0);
         assert!(
             scene.capture.target().is_none(),
@@ -958,11 +972,15 @@ fn lane_lifecycle() {
         );
         assert!(
             resize_lane(scene).is_none(),
-            "GAP-or-pin: Swift's compact breakpoint hides the lane but keeps the opener focusable; the lane mounts no handle below the compact breakpoint, and focus lands on {:?}",
-            scene.focus.focused().map(|node| label(&node))
+            "the compact breakpoint removes the lane"
+        );
+        assert_eq!(
+            scene.focus.focused().map(|node| label(&node)),
+            None,
+            "GAP: Swift's compact shell hands focus to the `Open navigation` opener; Rust has no lane-to-opener handoff, so nothing holds focus"
         );
         lane.set_viewport(scene, 1280.0);
-        press_down(scene, x, 300.0, MouseButton::Left);
+        grab(scene, &resize);
         lane.touch.set(true);
         scene.settle(8, 1.0);
         assert!(
@@ -974,7 +992,7 @@ fn lane_lifecycle() {
             44.0,
             "a touch lane reserves the 44pt target"
         );
-        press_down(scene, x, 300.0, MouseButton::Left);
+        grab(scene, &resize);
         lane.blocked.set(true);
         scene.settle(8, 1.0);
         assert!(
@@ -985,9 +1003,14 @@ fn lane_lifecycle() {
             !resize.accepts_subtree_input(),
             "and the lane leaves the interaction graph"
         );
+        assert!(
+            scene.focus.focused().is_none(),
+            "a disabled subtree holds no focus, saw {:?}",
+            scene.focus.focused().map(|node| label(&node))
+        );
         lane.blocked.set(false);
         scene.settle(8, 1.0);
-        press_down(scene, x, 300.0, MouseButton::Left);
+        grab(scene, &resize);
         assert_eq!(
             scene.capture.target().map(|node| id(&node)),
             Some(id(&resize)),
@@ -1005,7 +1028,7 @@ fn lane_lifecycle() {
         );
         lane.adjustable.set(true);
         scene.settle(8, 1.0);
-        press_down(scene, x, 300.0, MouseButton::Left);
+        grab(scene, &resize);
         assert_eq!(
             scene.capture.target().map(|node| id(&node)),
             Some(id(&resize)),
@@ -1080,22 +1103,20 @@ fn fitting_and_ai() {
             "the resolved geometry agrees with the lane"
         );
         lane.requested.set(f32::NAN);
-        let nan = lane.geometry(1280.0);
+        scene.settle(8, 1.0);
         assert!(
             lane.requested.get().is_nan(),
             "an invalid request is left untouched rather than normalised into the caller's width"
         );
         assert_eq!(
-            nan.docked_width,
+            lane.geometry(1280.0).docked_width,
             240.0,
-            "GAP: Swift shows the fallback width on the handle; the Rust handle formats its raw binding, so only `SidebarGeometry` falls back to the policy width"
+            "the geometry falls back to the policy width"
         );
-        lane.requested.set(240.0);
-        scene.settle(8, 1.0);
         assert_eq!(
             resize.accessibility().expect("semantics").value,
-            "240 pt",
-            "the handle follows the resolved fallback width once the caller supplies it"
+            "0 pt",
+            "GAP: Swift's handle reports the resolved fallback width (`240 pt`); `SidebarResizeHandle::current()` clamps the raw NaN binding and formats it as `0 pt`"
         );
         let increment = resize
             .accessibility_actions()
@@ -1103,17 +1124,31 @@ fn fitting_and_ai() {
             .expect("the slider offers increment");
         increment();
         scene.settle(8, 1.0);
-        assert_eq!(lane.requested.get(), 256.0, "and steps from it");
-        let found = scene.all(|node| {
-            node.accessibility().is_some_and(|semantics| {
-                semantics.role == AccessibilityRole::Slider && semantics.value == "256 pt"
-            }) && node.is_layout_visible()
-                && node.accepts_subtree_input()
-        });
+        assert!(
+            lane.requested.get().is_nan(),
+            "GAP: Swift steps from the resolved fallback (`256`); the Rust increment adds to the raw NaN binding, which stays NaN"
+        );
+        let query = |scene: &InteractiveScene, value: &str| {
+            scene
+                .all(|node| {
+                    node.accessibility().is_some_and(|semantics| {
+                        semantics.role == AccessibilityRole::Slider && semantics.value == value
+                    }) && node.is_layout_visible()
+                        && node.accepts_subtree_input()
+                })
+                .len()
+        };
         assert_eq!(
-            found.len(),
+            query(scene, "256 pt"),
+            0,
+            "GAP: Swift discovery finds the slider at `256 pt`; the Rust slider still reads `0 pt`"
+        );
+        lane.requested.set(256.0);
+        scene.settle(8, 1.0);
+        assert_eq!(
+            query(scene, "256 pt"),
             1,
-            "discovery finds exactly one visible, enabled slider at the new width"
+            "discovery finds exactly one visible, enabled slider at a valid width"
         );
         let x = {
             let frame = resize.absolute_frame();

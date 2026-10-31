@@ -131,7 +131,8 @@ fn server(transport: &Arc<TestTransport>) -> DevServer {
 /// Pump until `kind` arrives, or fail. Dispatch is synchronous, so this only
 /// needs to drain the inbox the transport filled.
 fn receive(server: &mut DevServer, kind: &str, connection: &Arc<TestConnection>) -> Envelope {
-    for _ in 0..8 {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+    while std::time::Instant::now() < deadline {
         server.pump();
         if let Some(message) = connection
             .take()
@@ -140,6 +141,7 @@ fn receive(server: &mut DevServer, kind: &str, connection: &Arc<TestConnection>)
         {
             return message;
         }
+        std::thread::sleep(std::time::Duration::from_millis(5));
     }
     panic!("timed out waiting for {kind}");
 }
@@ -955,12 +957,7 @@ fn logs_replay_before_connection_filter_and_report_slow_consumer_loss() {
         "live",
     ));
     cove_logging::LogSystem::flush();
-    server.pump();
-    let messages = connection.take();
-    let live = messages
-        .iter()
-        .find(|message| message.r#type == "log.entry")
-        .expect("live entry");
+    let live = receive(&mut server, "log.entry", &connection);
     let record: cove_logging::LogRecord = decode_payload(&live.payload).expect("log record");
     assert_eq!(record.message, "live");
     assert!(record.sequence > last_sequence);
