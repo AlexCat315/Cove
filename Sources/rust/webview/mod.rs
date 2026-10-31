@@ -2,16 +2,19 @@
 //!
 //! One composed `WebView` drives a platform surface through [`WebViewHost`], so
 //! the same code runs in an SDL window, an app host or a custom embedded
-//! surface. Every desktop and mobile platform has a real host:
+//! surface. Desktop hosts:
 //!
 //! | Platform            | Engine     | Module      |
 //! |---------------------|------------|-------------|
-//! | macOS / iOS         | WKWebView  | `apple`     |
+//! | macOS               | WKWebView  | `apple`     |
 //! | Windows             | WebView2   | `windows`   |
 //! | Linux               | WebKitGTK  | `linux`     |
+//!
+//! iOS (UIKit `WKWebView`) and Android (`android.webkit.WebView`) have no host
+//! yet; the Swift original was AppKit-only as well.
 mod view;
 
-#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[cfg(target_os = "macos")]
 pub mod apple;
 #[cfg(target_os = "linux")]
 pub mod linux;
@@ -25,7 +28,7 @@ pub use cove_core::Rect;
 /// Platform cursor/geometry helpers shared with the surface implementations.
 pub type Point = cove_core::Point;
 
-#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[cfg(target_os = "macos")]
 pub use apple::{AppleWebKitHost, AppleWebKitSurface};
 #[cfg(target_os = "linux")]
 pub use linux::{LinuxWebKitHost, LinuxWebKitSurface};

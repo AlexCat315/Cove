@@ -11,7 +11,7 @@
 //! the part that survives ancestor clipping; a container view turns the latter
 //! into AppKit's clip. Rounded corners, opacity and transforms are not
 //! representable on a child `NSView` and are intentionally not faked.
-#![cfg(any(target_os = "macos", target_os = "ios"))]
+#![cfg(target_os = "macos")]
 
 use super::{
     WebViewCommand, WebViewGeometry, WebViewHost, WebViewRequest, WebViewState, WebViewSurface,
