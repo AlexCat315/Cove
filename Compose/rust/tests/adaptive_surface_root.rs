@@ -157,15 +157,6 @@ fn safe_area_is_consumed_once_and_ime_replaces_the_bottom_floor() {
             let root = graph.tree.borrow().root().expect("root node");
             let node = support::find_named(&root, "surface-fill").expect("the fill node exists");
             let frame = node.absolute_frame();
-            {
-                fn dump(n: &Node, depth: usize) {
-                    let f = n.absolute_frame();
-                    println!("{}{} frame={:?}", "  ".repeat(depth), support::debug_name(n).unwrap_or_else(|| n.view_tag().unwrap_or_default()), (f.x,f.y,f.width,f.height),);
-                    for c in n.children() { dump(&c, depth+1); }
-                }
-                println!("=== keyboard {keyboard}");
-                dump(&root, 0);
-            }
             let bottom = if keyboard.is_finite() {
                 34.0_f32.max(keyboard)
             } else {

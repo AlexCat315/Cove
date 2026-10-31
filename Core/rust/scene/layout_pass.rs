@@ -51,7 +51,11 @@ mod tests {
         layout_child.set_height(Some(40.0));
         layout_root.add_child(&layout_child);
         LayoutPass::run(&layout_root, &root, Some(200.0), Some(400.0));
-        assert_eq!(root.frame(), Rect::new(0.0, 0.0, 200.0, 40.0));
+        // Yoga's `calculateLayout` stretch-fits the root: this root sets a width
+        // but leaves height auto, so under a 400pt owner it becomes exactly 400
+        // and the 40pt child sits at the top. Hugging content here was the bug
+        // that collapsed every viewport-filling root to height 0.
+        assert_eq!(root.frame(), Rect::new(0.0, 0.0, 200.0, 400.0));
         assert_eq!(child.frame(), Rect::new(0.0, 0.0, 200.0, 40.0));
     }
 }

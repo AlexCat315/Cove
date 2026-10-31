@@ -33,3 +33,11 @@ path = "rust/tests/zz_probe.rs"
 [[test]]
 name = "font_pipeline_tests"
 path = "rust/tests/font_pipeline_tests.rs"
+
+[[test]]
+name = "fallback_style_tests"
+path = "rust/tests/fallback_style_tests.rs"
+
+[[test]]
+name = "system_font_instance_tests"
+path = "rust/tests/system_font_instance_tests.rs"

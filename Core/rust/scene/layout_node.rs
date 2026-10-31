@@ -826,6 +826,16 @@ impl LayoutNode {
     // MARK: - Layout calculation
 
     /// Run flex layout from this node as the root.
+    ///
+    /// Yoga's `calculateLayout` sizes the root against the owner viewport. A
+    /// root dimension that is `auto` while the owner defines one is
+    /// `StretchFit`: the root occupies exactly the viewport. Without that rule a
+    /// viewport-filling root (`Box {}.flex(1, shrink: 1, basis: 0)`) measures at
+    /// `AtMost` and collapses to its content height, so `flex_grow` has no free
+    /// space to distribute.
+    ///
+    /// An explicit root `width`/`height` keeps precedence, which is the
+    /// `hasDefiniteLength` branch in Yoga.
     pub fn calculate_layout(
         &self,
         available_width: Option<f32>,
@@ -833,7 +843,35 @@ impl LayoutNode {
         direction: Direction,
     ) {
         self.prepare_custom_layouts();
-        let size = self.measure(None, None, available_width, available_height, direction);
+        let style = self.0.borrow().style;
+        let (padding, border, _) = self.resolved_style_insets(available_width);
+        let inset_width = padding.horizontal() + border.horizontal();
+        let inset_height = padding.vertical() + border.vertical();
+        let stretched_width = style.width.is_auto().then(|| {
+            available_width.map(|width| match style.box_sizing {
+                BoxSizing::ContentBox => (width - inset_width).max(0.0),
+                BoxSizing::BorderBox => width,
+            })
+        });
+        let stretched_height = style.height.is_auto().then(|| {
+            available_height.map(|height| match style.box_sizing {
+                BoxSizing::ContentBox => (height - inset_height).max(0.0),
+                BoxSizing::BorderBox => height,
+            })
+        });
+        let exact_width = stretched_width.flatten();
+        let exact_height = stretched_height.flatten();
+        let size = self.measure(
+            available_width,
+            available_height,
+            exact_width,
+            exact_height,
+            direction,
+        );
+        let size = Size {
+            width: exact_width.unwrap_or(size.width),
+            height: exact_height.unwrap_or(size.height),
+        };
         self.arrange(0.0, 0.0, size.width, size.height, direction);
         self.place_custom_layouts();
         self.clear_layout_dirty_hints();

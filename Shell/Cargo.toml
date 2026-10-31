@@ -16,3 +16,7 @@ thiserror.workspace = true
 cc.workspace = true
 [lints]
 workspace = true
+
+[[test]]
+name = "display_refresh_rate_tests"
+path = "rust/tests/display_refresh_rate_tests.rs"

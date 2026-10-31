@@ -97,3 +97,15 @@ path = "rust/tests/native_texture_copy.rs"
 [[test]]
 name = "native_recorded_texture_upload"
 path = "rust/tests/native_recorded_texture_upload.rs"
+
+[[test]]
+name = "native_rhi_smoke_tests"
+path = "rust/tests/native_rhi_smoke_tests.rs"
+
+[[test]]
+name = "metal_capability_probe_tests"
+path = "rust/tests/metal_capability_probe_tests.rs"
+
+[[test]]
+name = "metal_clear_readback_tests"
+path = "rust/tests/metal_clear_readback_tests.rs"

@@ -29,7 +29,7 @@ mod support;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cove_composition::{AnyView, LayoutDebugExt, PrimitiveView, View};
+use cove_composition::{AnyView, LayoutDebugExt, PrimitiveView};
 use cove_core::scene::{AccessibilityRole, AccessibilityTree, Node};
 use cove_core::{Binding, Environment, InputCapabilities, State};
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
@@ -79,23 +79,40 @@ fn nodes(root: &Node) -> Vec<Node> {
     collected
 }
 
-/// The clickable strip item: the node that owns an activate action and holds
-/// a static-text descendant with `label`.
+/// The clickable strip item for `label`: the button that holds a static-text
+/// descendant carrying that label.
 fn strip_item(root: &Node, label: &str) -> Node {
     nodes(root)
         .into_iter()
         .find(|node| {
             node.accessibility_actions().activate.is_some()
                 && nodes(node).iter().any(|child| {
-                    child
-                        .accessibility()
-                        .is_some_and(|semantics| {
-                            semantics.role == AccessibilityRole::StaticText
-                                && semantics.label == label
-                        })
+                    child.accessibility().is_some_and(|semantics| {
+                        semantics.role == AccessibilityRole::StaticText
+                            && semantics.label == label
+                    })
                 })
         })
         .unwrap_or_else(|| panic!("a strip item for {label:?} mounts"))
+}
+
+fn is_strip(node: &Node) -> bool {
+    node.view_tag()
+        .is_some_and(|tag| tag.rsplit("::").next() == Some("TabStrip"))
+}
+
+/// The strip container. Ordering is asserted against it rather than against an
+/// item: `ScrollView` content keeps item-local frames, so an item's
+/// `absolute_frame` is not offset by the scroller's origin.
+fn strip_container(root: &Node, label: &str) -> Node {
+    let target = strip_item(root, label);
+    fn climb(node: &Node, target: &Node) -> Option<Node> {
+        if is_strip(node) && nodes(node).iter().any(|child| child == target) {
+            return Some(node.clone());
+        }
+        node.children().iter().find_map(|child| climb(child, target))
+    }
+    climb(root, &target).unwrap_or_else(|| panic!("the strip containing {label:?} mounts"))
 }
 
 fn panel_node(root: &Node) -> Node {
@@ -170,16 +187,17 @@ fn explicit_top_places_the_strip_above_the_panel() {
         );
 
         let root = graph.tree.borrow().root().expect("root");
-        let tab = strip_item(&root, "Overview");
+        let strip = strip_container(&root, "Overview");
         let panel = panel_node(&root);
         assert!(
-            tab.absolute_frame().max_y() <= panel.absolute_frame().y,
-            "explicit Top keeps the strip above the panel: tab {:?} panel {:?}",
-            tab.absolute_frame(),
+            strip.absolute_frame().max_y() <= panel.absolute_frame().y,
+            "explicit Top keeps the strip above the panel: strip {:?} panel {:?}",
+            strip.absolute_frame(),
             panel.absolute_frame()
         );
 
-        tab.accessibility_actions()
+        strip_item(&root, "Overview")
+            .accessibility_actions()
             .activate
             .expect("the tab exposes an activate action")();
         settle(&graph, 800.0);
@@ -200,6 +218,15 @@ fn explicit_top_places_the_strip_above_the_panel() {
             "activating the panel button increments it"
         );
         assert_eq!(count.get(), 1, "the panel state moved to 1");
+        {
+            fn w(n: &Node, d: usize) {
+                eprintln!("{}{} f={:?} lbl={:?}", "  ".repeat(d),
+                    n.view_tag().unwrap_or_default().rsplit("::").next().unwrap_or(""),
+                    n.absolute_frame(), AccessibilityTree::resolved_label(n));
+                for c in n.children() { w(&c, d+1); }
+            }
+            w(&root, 0);
+        }
         assert_eq!(
             AccessibilityTree::resolved_label(&panel_node(&root)),
             "Count 1",
@@ -221,12 +248,12 @@ fn compact_places_the_strip_below_the_retained_panel() {
 
         let root = graph.tree.borrow().root().expect("root");
         let panel_before = panel_node(&root);
-        let tab = strip_item(&root, "Overview");
+        let strip = strip_container(&root, "Overview");
         assert!(
-            panel_before.absolute_frame().max_y() <= tab.absolute_frame().y,
-            "compact puts the strip below the panel: panel {:?} tab {:?}",
+            panel_before.absolute_frame().max_y() <= strip.absolute_frame().y,
+            "compact puts the strip below the panel: panel {:?} strip {:?}",
             panel_before.absolute_frame(),
-            tab.absolute_frame()
+            strip.absolute_frame()
         );
 
         panel_node(&root)
@@ -260,12 +287,12 @@ fn explicit_top_wins_over_compactness() {
         );
 
         let root = graph.tree.borrow().root().expect("root");
-        let tab = strip_item(&root, "Overview");
+        let strip = strip_container(&root, "Overview");
         let panel = panel_node(&root);
         assert!(
-            tab.absolute_frame().max_y() <= panel.absolute_frame().y,
-            "an explicit Top placement overrides compactness: tab {:?} panel {:?}",
-            tab.absolute_frame(),
+            strip.absolute_frame().max_y() <= panel.absolute_frame().y,
+            "an explicit Top placement overrides compactness: strip {:?} panel {:?}",
+            strip.absolute_frame(),
             panel.absolute_frame()
         );
     });
@@ -284,10 +311,10 @@ fn compact_placement_comes_from_caller_flags() {
             Rc::new(RefCell::new(0)),
         );
         let root = graph.tree.borrow().root().expect("root");
-        let tab = strip_item(&root, "Overview");
+        let strip = strip_container(&root, "Overview");
         let panel = panel_node(&root);
         assert!(
-            tab.absolute_frame().max_y() <= panel.absolute_frame().y,
+            strip.absolute_frame().max_y() <= panel.absolute_frame().y,
             "a 390pt surface alone does not move the strip: the caller flag decides"
         );
     });
@@ -316,14 +343,19 @@ fn strip_height_ignores_the_touch_control_extent() {
             Rc::new(RefCell::new(0)),
         );
         let root = graph.tree.borrow().root().expect("root");
-        let tab = strip_item(&root, "Overview");
+        let item = strip_item(&root, "Overview");
         assert_eq!(
-            tab.absolute_frame().height,
+            item.absolute_frame().height,
             32.0,
             "the Rust strip item is 32pt tall regardless of the touch extent"
         );
+        assert_eq!(
+            strip_container(&root, "Overview").absolute_frame().height,
+            40.0,
+            "the Rust scroller is a fixed 40pt tall, not the touch extent"
+        );
         assert!(
-            nodes(&root)
+            nodes(&strip_container(&root, "Overview"))
                 .iter()
                 .all(|node| node.absolute_frame().height < 44.0),
             "no strip node reaches the 44pt touch extent"
@@ -344,8 +376,10 @@ fn strip_items_are_buttons_not_tabs() {
             Rc::new(RefCell::new(0)),
         );
         let root = graph.tree.borrow().root().expect("root");
-        let tab = strip_item(&root, "Overview");
-        let role = tab.accessibility().expect("the strip item is semantic").role;
+        let role = strip_item(&root, "Overview")
+            .accessibility()
+            .expect("the strip item is semantic")
+            .role;
         assert_eq!(
             role,
             AccessibilityRole::Button,

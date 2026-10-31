@@ -20,6 +20,18 @@ use cove_ui_compose::primitives::layout::grid::{GridRowHeights, LazyGrid};
 
 use support::GlobalTestLock;
 
+/// A bare box, matching the Swift suite's `Box {}` cell.
+fn cell_box() -> AnyView {
+    AnyView::new(cove_ui_compose::BoxView::new(
+        cove_core::scene::FlexDirection::Column,
+        cove_core::scene::Align::Stretch,
+        cove_core::scene::Justify::FlexStart,
+        cove_core::scene::Wrap::NoWrap,
+        0.0,
+        AnyView::new(cove_composition::EmptyView),
+    ))
+}
+
 fn descendants(node: &Node) -> Vec<Node> {
     let mut collected = vec![node.clone()];
     for child in node.children() {
@@ -149,7 +161,7 @@ fn harness(probe: Rc<BuildProbe>, count: State<usize>, offset: Rc<State<Point>>)
     let build = probe.clone();
     let content = move |index: &usize| {
         build.count.set(build.count.get() + 1);
-        AnyView::new(AnyView::new(cove_composition::EmptyView).debug_name(&format!("lazy-cell-{index}")))
+        AnyView::new(cell_box().debug_name(&format!("lazy-cell-{index}")))
     };
     AnyView::new(
         AnyView::new(LazyGrid::new(
@@ -244,10 +256,7 @@ fn variable_height_grid_keeps_full_extent_with_a_partial_last_row() {
             None,
             None,
             Rc::new(|index: &usize| {
-                AnyView::new(
-                    AnyView::new(cove_composition::EmptyView)
-                        .debug_name(&format!("lazy-cell-{index}")),
-                )
+                AnyView::new(cell_box().debug_name(&format!("lazy-cell-{index}")))
             }),
         );
         graph.install_view(

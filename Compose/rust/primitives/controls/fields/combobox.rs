@@ -13,12 +13,14 @@
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
+use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
 use cove_core::{Binding, Color};
 
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt, SurfaceStyleExt};
-use crate::primitives::controls::button::{Button, ButtonIcon, ButtonIconSource, ButtonRole};
+use crate::primitives::controls::button::{
+    ActionControlAccessibility, Button, ButtonIcon, ButtonIconSource, ButtonRole,
+};
 use crate::primitives::controls::fields::combobox_model::{
     ComboboxResultsPresentation, ComboboxSearchPhase, ComboboxSearchSession, results_presentation,
     too_short_prompt,
@@ -32,7 +34,7 @@ use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
 use crate::theme::{SemanticColorRef, SemanticFontRef, theme_for_node};
 use crate::{
-    AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View, ViewKind,
+    AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View, ViewExt, ViewKind,
     impl_primitive_view,
 };
 
@@ -479,16 +481,23 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> View for Combobox<Value> 
             .surface(PopoverSurface::Content)
             .overflow(PopoverOverflow::Flip)
             .trigger_description(PopoverTriggerDescription {
-                label: title,
-                value: selected_label.unwrap_or_default(),
+                label: title.clone(),
+                value: selected_label.clone().unwrap_or_default(),
                 help: None,
             });
 
+        // Swift provides the role and name as composition locals so the trigger
+        // `Button` reads them in `Button::update_node`; a wrapper node carried no
+        // semantics of its own.
         AnyView::new(
-            ComboboxRole {
-                content: AnyView::new(popover),
-            }
-            .frame_width(self.presentation.width),
+            AnyView::new(popover)
+                .composition_local(ActionControlAccessibility::role(), AccessibilityRole::ComboBox)
+                .composition_local(ActionControlAccessibility::label(), Some(title))
+                .composition_local(
+                    ActionControlAccessibility::value(),
+                    selected_label.unwrap_or_default(),
+                )
+                .frame_width(self.presentation.width),
         )
     }
 }
@@ -499,34 +508,6 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Clone for Combobox<Value>
     }
 }
 
-/// Marks the popover trigger as a combo box.
-struct ComboboxRole {
-    content: AnyView,
-}
-
-impl PrimitiveView for ComboboxRole {
-    fn make_node(&self) -> Node {
-        let node = Node::new();
-        node.set_is_hit_testable(false);
-        node
-    }
-
-    fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
-        None
-    }
-
-    fn update_node(&self, node: &Node) {
-        if let Some(mut semantics) = node.accessibility() {
-            semantics.role = cove_core::scene::AccessibilityRole::ComboBox;
-            node.set_accessibility(Some(semantics));
-        }
-    }
-
-    fn children(&self, _node: &Node) -> Vec<AnyView> {
-        vec![self.content.clone()]
-    }
-}
-impl_primitive_view!(ComboboxRole);
 
 /// The field-chrome trigger: title, an optional clear button and a chevron.
 struct ComboboxTrigger<Value: PartialEq + Clone + Send + Sync + 'static> {

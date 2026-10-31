@@ -152,14 +152,14 @@ use std::rc::Rc;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
-use crate::primitives::controls::button::{ButtonIcon, ButtonIconSource};
+use crate::primitives::controls::button::{ActionControlAccessibility, ButtonIcon, ButtonIconSource};
 use crate::primitives::overlays::anchored::{PopoverOverflow, PopoverSurface};
 use crate::primitives::overlays::menu::{Menu, MenuEntry, MenuItem, MenuItemRole};
 use crate::primitives::overlays::popover::{Popover, PopoverSizing, PopoverTriggerDescription};
 use crate::primitives::text::Text;
 use crate::theme::{SemanticFontRef, Theme, theme_for_node};
-use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
-use cove_core::scene::{Align, FlexDirection, HoverPhase, Justify, Node, Wrap};
+use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, ViewExt};
+use cove_core::scene::{AccessibilityRole, Align, FlexDirection, HoverPhase, Justify, Node, Wrap};
 use cove_core::{Binding, Color};
 
 /// Trigger height floor, matching the text fields beside it.
@@ -282,8 +282,8 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> View for Select<Value> {
             .surface(PopoverSurface::Content)
             .overflow(PopoverOverflow::Flip)
             .trigger_description(PopoverTriggerDescription {
-                label: selected_label,
-                value: detail,
+                label: selected_label.clone(),
+                value: detail.clone(),
                 help: None,
             });
         let popover = match self.width {
@@ -291,12 +291,18 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> View for Select<Value> {
             None => popover,
         };
         // The selected value is already the trigger's visible text, so it is the
-        // control's name and value, not help.
-        AnyView::new(SelectComboBoxRole {
-            content: AnyView::new(popover),
-        })
+        // control's name and value, not help. Swift provides the role and name as
+        // composition locals (`Select.swift:213`, `Popover.swift:60`) so the
+        // trigger `Button` picks them up in `Button::update_node`.
+        AnyView::new(
+            AnyView::new(popover)
+                .composition_local(ActionControlAccessibility::role(), AccessibilityRole::ComboBox)
+                .composition_local(ActionControlAccessibility::label(), Some(selected_label.clone()))
+                .composition_local(ActionControlAccessibility::value(), detail),
+        )
     }
 }
+
 
 impl<Value: PartialEq + Clone + Send + Sync + 'static> Select<Value> {
     fn menu(&self) -> AnyView {
@@ -304,29 +310,6 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Select<Value> {
     }
 }
 
-/// Marks the popover trigger as a combo box for assistive technology.
-struct SelectComboBoxRole {
-    content: AnyView,
-}
-
-impl PrimitiveView for SelectComboBoxRole {
-    fn make_node(&self) -> Node {
-        let node = Node::new();
-        node.set_is_hit_testable(false);
-        node
-    }
-
-    fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
-        None
-    }
-
-    fn update_node(&self, _node: &Node) {}
-
-    fn children(&self, _node: &Node) -> Vec<AnyView> {
-        vec![self.content.clone()]
-    }
-}
-crate::impl_primitive_view!(SelectComboBoxRole);
 
 /// Presentation flag kept outside the view value so a toggle rebuilds it.
 fn select_presentation_state() -> cove_core::State<bool> {

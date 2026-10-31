@@ -43,9 +43,18 @@ struct Harness {
 impl View for Harness {
     fn body(&self) -> AnyView {
         let panel = AnyView::new(
-            AnyView::new(DebugNode::new("panel"))
+            AnyView::new(
+                BoxView::new(
+                    FlexDirection::Column,
+                    Align::Stretch,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    0.0,
+                    AnyView::new(DebugNode::new("panel")),
+                )
                 .frame_width(200.0)
                 .frame_height(100.0),
+            )
         )
         .debug_name("panel");
         AnyView::new(
@@ -243,6 +252,9 @@ fn reversal_continues_from_the_displayed_scale_and_exit_disables_input() {
             fixture.harness.visible.set(false);
             fixture.frame(0.0);
             let host = fixture.host();
+            eprintln!("DBG displayed={displayed:?} after_frame0={:?}", host.transform());
+            fixture.frame(0.0);
+            eprintln!("DBG after_frame0_again={:?}", fixture.host().transform());
             assert_eq!(
                 host.transform(),
                 displayed,
@@ -395,9 +407,18 @@ fn combined_and_identity_transitions_keep_the_host_well_formed() {
             };
             let graph = support::graph();
             let panel = AnyView::new(
-                AnyView::new(DebugNode::new("panel"))
+                AnyView::new(
+                    BoxView::new(
+                        FlexDirection::Column,
+                        Align::Stretch,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        0.0,
+                        AnyView::new(DebugNode::new("panel")),
+                    )
                     .frame_width(200.0)
                     .frame_height(100.0),
+                ),
             );
             graph.install_view(
                 AnyView::new(
