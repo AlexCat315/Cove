@@ -591,7 +591,7 @@
       "source_lines": 4,
       "status": "written_unverified",
       "rust": [
-        "Compose/rust/core/log.rs"
+        "Compose/rust/primitives/overlays/modal/dialog.rs"
       ],
       "module": "Compose",
       "kind": "production",
@@ -7119,18 +7119,6 @@
       "note": "mobile example content folded into the cove-examples crate"
     },
     {
-      "source": "Examples/Mobile/Platforms/iOS/main.swift",
-      "source_sha256": "18494856a64dcfa69f549019c2bb329a1896e501c145c113947b8fdf7766dd52",
-      "source_lines": 4,
-      "status": "written_unverified",
-      "rust": [
-        "Examples/RustCounter/src/main.rs"
-      ],
-      "module": "Examples",
-      "kind": "production",
-      "planned": false
-    },
-    {
       "source": "Examples/Mobile/Sources/AppContent/App.swift",
       "source_sha256": "f9ea376a67bcecf7b707a321e408949490bbf0cde4ceb46d82e63d7e9de3e525",
       "source_lines": 33,
@@ -10947,7 +10935,7 @@
       "source_lines": 9,
       "status": "written_unverified",
       "rust": [
-        "Runtime/rust/log.rs"
+        "Runtime/rust/sdl3_platform_host.rs"
       ],
       "module": "Runtime",
       "kind": "production",
@@ -11131,7 +11119,7 @@
       "source_lines": 5,
       "status": "written_unverified",
       "rust": [
-        "Shell/rust/log.rs"
+        "Shell/rust/native.rs"
       ],
       "module": "Shell",
       "kind": "production",

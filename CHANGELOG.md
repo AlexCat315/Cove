@@ -19,6 +19,18 @@
   - Android JNI 胶水 `Hosts/Android/Sources/CAndroidHost/{Host,Input}.c` 迁移为
     `Hosts/rust/android/jni.rs`：`cdylib` 只导出 Rust 符号，静态库里的 C `Java_*` 符号会被隐藏。
   - `Examples/Mobile` 成为 Cargo 包 `cove-mobile-example`，删除其 Xcode 工程与 `main.swift`。
+- **首次为移动目标完整编译并链接，修复其中暴露的缺陷**（此前 Android/iOS 路径从未被构建过）：
+  - `Terminal` 的 `libghostty-vt` 缺少 Android 与 iOS 的 Zig 目标映射。
+  - `Shell` 移动端 `PlatformApplication::run` 的泛型推断失败（`T` 回退为 `!`），无法编译。
+  - Android 日志绑定把 `__android_log_write` 声明为 4 个参数（实为 3 个）。
+  - `Imaging`/`Text` 在 Android 上以显式未版本化 sysroot 路径静态链接 `c++_static`：既与 `Shell`
+    的 `c++_shared` 混用两套 C++ 运行库，又使链接器选中 NDK r30 自带 Rust std 的 `libc.a`，导致
+    `rust_eh_personality` 重复定义。统一改为 `c++_shared`。
+  - `Shell` 在 iOS 上缺少 `CoreMotion` 框架（SDL 传感器后端需要）。
+  - `cove-ui-addons` 的 WebKit 宿主声称支持 iOS，实际只基于 AppKit（Swift 原版同样只有 AppKit）；
+    改为仅 macOS 编译。**iOS（UIKit `WKWebView`）与 Android 的 WebView 宿主仍缺失。**
+  - 验证：Android `.so` 导出全部 19 个 `Java_*` 原生方法与 `JNI_OnLoad`，Gradle 产出 APK；
+    iOS 模拟器 `.app` 构建并签名。两者都未在设备或模拟器上启动。
 - **移除 Cove CLI（破坏性）**：删除 `Tools/Cove`（`cove-cli` 及其 Swift 原版、项目模板、
   安装脚本）、仅被它使用的 `Tools/Support`（`cove-tool-support`），以及根目录 `cove` /
   `cove.cmd`。构建、运行、测试、交叉编译直接使用 Cargo；原生依赖由各 crate 的 `build.rs`

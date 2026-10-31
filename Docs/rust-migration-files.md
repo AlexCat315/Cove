@@ -13,11 +13,11 @@
 
 | 范围 | 文件数 | 已写入 | 进行中 | 未开始 |
 | --- | ---: | ---: | ---: | ---: |
-| 生产源码 | 915 | 915 | 0 | 0 |
+| 生产源码 | 914 | 914 | 0 | 0 |
 | 测试源码 | 411 | 117 | 0 | 294 |
 | SwiftPM 清单 | 23 | 23 | 0 | 0 |
 | 项目模板 | 0 | 0 | 0 | 0 |
-| 合计 | 1349 | — | — | — |
+| 合计 | 1348 | — | — | — |
 
 ## 生产源码逐文件映射
 
@@ -71,7 +71,7 @@
 | `Compose/Sources/CoveUICompose/Animation/TransitionView.swift` | 33 | 已写入（未验证） | `Compose/rust/animation/transition_view.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/Animation/WithAnimation.swift` | 52 | 已写入（未验证） | `Compose/rust/lib.rs`<br>`Core/rust/scene/animation/context.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/AppStorage.swift` | 318 | 已写入（未验证） | `Compose/rust/app_storage.rs` | 未编译、未行为对照 |
-| `Compose/Sources/CoveUICompose/Core/Log.swift` | 4 | 已写入（未验证） | `Compose/rust/core/log.rs` | 未编译、未行为对照 |
+| `Compose/Sources/CoveUICompose/Core/Log.swift` | 4 | 已写入（未验证） | `Compose/rust/primitives/overlays/modal/dialog.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/CoreExports.swift` | 3 | 已写入（未验证） | `Compose/rust/core_exports.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/CoveUICompose.swift` | 7 | 已写入（未验证） | `Compose/rust/lib.rs` | 未编译、未行为对照 |
 | `Compose/Sources/CoveUICompose/CoveUIComposeResourceBundle.swift` | 6 | 已写入（未验证） | `Compose/rust/resource_bundle.rs`<br>`PlatformCore/rust/resources.rs` | 未编译、未行为对照 |
@@ -662,12 +662,11 @@
 
 ### Examples
 
-共 61 个文件：已写入 61，进行中 0，未开始 0。
+共 60 个文件：已写入 60，进行中 0，未开始 0。
 
 | 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
 | --- | ---: | --- | --- | --- |
 | `Examples/Counter/Sources/CounterExample/CounterView.swift` | 200 | 已写入（未验证） | `Examples/rust/counter.rs` | 未编译、未行为对照 |
-| `Examples/Mobile/Platforms/iOS/main.swift` | 4 | 已写入（未验证） | `Examples/RustCounter/src/main.rs` | 未编译、未行为对照 |
 | `Examples/Mobile/Sources/AppContent/App.swift` | 33 | 已写入（未验证） | `Examples/rust/mobile/app.rs` | 未编译、未行为对照 |
 | `Examples/Mobile/Sources/AppContent/Model.swift` | 30 | 已写入（未验证） | `Compose/rust/primitives/data/chart/model.rs` | 未编译、未行为对照 |
 | `Examples/Mobile/Sources/AppContent/Projects.swift` | 57 | 已写入（未验证） | `Examples/rust/mobile/model.rs`<br>`Examples/rust/mobile/today.rs` | 未编译、未行为对照 |
@@ -986,7 +985,7 @@
 | `Shell/Sources/PlatformShell/DisplayRefresh/MacDisplayLink.swift` | 29 | 已写入（未验证） | `Shell/rust/display_refresh/mod.rs` | 未编译、未行为对照 |
 | `Shell/Sources/PlatformShell/DisplayRefresh/Signal.swift` | 50 | 已写入（未验证） | `Shell/rust/display_refresh/signal.rs` | 未编译、未行为对照 |
 | `Shell/Sources/PlatformShell/DisplayRefresh/WindowDisplayLink.swift` | 45 | 已写入（未验证） | `Shell/rust/display_refresh/mod.rs` | 未编译、未行为对照 |
-| `Shell/Sources/PlatformShell/Log.swift` | 5 | 已写入（未验证） | `Shell/rust/log.rs` | 未编译、未行为对照 |
+| `Shell/Sources/PlatformShell/Log.swift` | 5 | 已写入（未验证） | `Shell/rust/native.rs` | 未编译、未行为对照 |
 | `Shell/Sources/PlatformShell/NativeMenuPopover.swift` | 100 | 已写入（未验证） | `Shell/rust/native_menu_popover.rs` | 未编译、未行为对照 |
 | `Shell/Sources/PlatformShell/PlatformShell.swift` | 579 | 已写入（未验证） | `Shell/rust/platform_shell.rs`<br>`Shell/rust/sdl3_shell.rs` | 未编译、未行为对照 |
 | `Shell/Sources/PlatformShell/SDL3Clipboard.swift` | 22 | 已写入（未验证） | `Shell/rust/sdl3_clipboard.rs` | 未编译、未行为对照 |
@@ -1003,7 +1002,7 @@
 | `Runtime/Sources/CoveUIRuntime/Core/CoveUIRuntime.swift` | 17 | 已写入（未验证） | `Runtime/rust/lib.rs` | 未编译、未行为对照 |
 | `Runtime/Sources/CoveUIRuntime/Core/FrameDeadline.swift` | 28 | 已写入（未验证） | `Runtime/rust/frame_deadline.rs` | 未编译、未行为对照 |
 | `Runtime/Sources/CoveUIRuntime/Core/FrameDrive.swift` | 24 | 已写入（未验证） | `Runtime/rust/frame_drive.rs` | 未编译、未行为对照 |
-| `Runtime/Sources/CoveUIRuntime/Core/Log.swift` | 9 | 已写入（未验证） | `Runtime/rust/log.rs` | 未编译、未行为对照 |
+| `Runtime/Sources/CoveUIRuntime/Core/Log.swift` | 9 | 已写入（未验证） | `Runtime/rust/sdl3_platform_host.rs` | 未编译、未行为对照 |
 | `Runtime/Sources/CoveUIRuntime/Core/NativeAccessibility.swift` | 303 | 已写入（未验证） | `Runtime/rust/native_accessibility.rs` | 未编译、未行为对照 |
 | `Runtime/Sources/CoveUIRuntime/Core/PlatformHost.swift` | 17 | 已写入（未验证） | `Runtime/rust/platform_host.rs` | 未编译、未行为对照 |
 | `Runtime/Sources/CoveUIRuntime/Core/SDL3PlatformHost.swift` | 993 | 已写入（未验证） | `Runtime/rust/sdl3_platform_host.rs` | 未编译、未行为对照 |
