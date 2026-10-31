@@ -890,3 +890,51 @@ path = "rust/tests/row_density_tests.rs"
 [[test]]
 name = "tab_overflow_tests"
 path = "rust/tests/tab_overflow_tests.rs"
+
+[[test]]
+name = "rich_text_tests"
+path = "rust/tests/rich_text_tests.rs"
+
+[[test]]
+name = "text_scale_rows"
+path = "rust/tests/text_scale_rows.rs"
+
+[[test]]
+name = "list_tree_tests"
+path = "rust/tests/list_tree_tests.rs"
+
+[[test]]
+name = "sectioned_list_tests"
+path = "rust/tests/sectioned_list_tests.rs"
+
+[[test]]
+name = "render_tree_mirror_tests"
+path = "rust/tests/render_tree_mirror_tests.rs"
+
+[[test]]
+name = "control_discovery_tests"
+path = "rust/tests/control_discovery_tests.rs"
+
+[[test]]
+name = "menu_pointer_routing_tests"
+path = "rust/tests/menu_pointer_routing_tests.rs"
+
+[[test]]
+name = "wheel_picker_tests"
+path = "rust/tests/wheel_picker_tests.rs"
+
+[[test]]
+name = "theme_interaction_regression_tests"
+path = "rust/tests/theme_interaction_regression_tests.rs"
+
+[[test]]
+name = "with_animation_properties_tests"
+path = "rust/tests/with_animation_properties_tests.rs"
+
+[[test]]
+name = "menu_hierarchy_tests"
+path = "rust/tests/menu_hierarchy_tests.rs"
+
+[[test]]
+name = "route_and_preload_tests"
+path = "rust/tests/route_and_preload_tests.rs"

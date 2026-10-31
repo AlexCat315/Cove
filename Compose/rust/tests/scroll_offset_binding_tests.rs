@@ -13,9 +13,9 @@
 //! - GAP `scroll_anchor_modifier`: Swift exposes `.scrollAnchor()` on any view.
 //!   Rust has the anchor-preserving logic inside `ScrollView` (it reads the
 //!   `__scrollview_anchor` attachment) but no public modifier sets that marker,
-//!   so rows built only from public API do not anchor and the offset stays
-//!   where it was. The anchoring itself is still verified through a local
-//!   marker modifier.
+//!   so rows built only from public API do not anchor and the offset stays at
+//!   400 instead of 520. `scroll_anchor` pins both the anchored result (through
+//!   a local marker modifier) and the unmarked result.
 
 mod support;
 
@@ -28,11 +28,11 @@ use cove_core::scene::{
 };
 use cove_core::{Point, State};
 use cove_platform::{InputEvent, MouseWheelEvent, WindowId};
+use cove_ui_compose::BoxView;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::primitives::layout::scroll_view::{ScrollAxis, ScrollRequest, ScrollView};
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::theme::tokens::reduced_motion_environment::ReducedMotionViewExt;
-use cove_ui_compose::BoxView;
 
 use support::GlobalTestLock;
 
@@ -224,14 +224,22 @@ fn content_growth_and_shrink() {
         harness.content_height.set(800.0);
         harness.offset.set(Point::new(0.0, 650.0));
         settle(&graph);
-        assert_eq!(scroll.content_offset().y, 650.0, "the grown range admits 650");
+        assert_eq!(
+            scroll.content_offset().y,
+            650.0,
+            "the grown range admits 650"
+        );
         assert_eq!(harness.offset.get().y, 650.0);
 
         wheel(&graph, context);
         let after_wheel = scroll.content_offset().y;
         assert_eq!(after_wheel, 680.0, "one line notch moves 30pt");
         AnimatorScheduler::current().tick(0.2);
-        assert_eq!(scroll.content_offset().y, after_wheel, "wheel input is direct");
+        assert_eq!(
+            scroll.content_offset().y,
+            after_wheel,
+            "wheel input is direct"
+        );
         let motion = scroll
             .attachment::<Rc<ScrollAnimator>>("__scrollview_motion")
             .expect("motion animator");
@@ -245,8 +253,16 @@ fn content_growth_and_shrink() {
 
         harness.offset.set(Point::new(0.0, 9_000.0));
         settle(&graph);
-        assert_eq!(scroll.content_offset().y, 80.0, "the offset clamps to the shrunk range");
-        assert_eq!(harness.offset.get().y, 80.0, "the clamped offset is written back");
+        assert_eq!(
+            scroll.content_offset().y,
+            80.0,
+            "the offset clamps to the shrunk range"
+        );
+        assert_eq!(
+            harness.offset.get().y,
+            80.0,
+            "the clamped offset is written back"
+        );
         graph.install(cove_composition::EmptyView, Default::default());
     });
 }
@@ -269,7 +285,10 @@ fn timed_scroll() {
         settle(&graph);
         AnimatorScheduler::current().tick(0.1);
         let mid = scroll.content_offset().y;
-        assert!(mid > 0.0 && mid < 600.0, "a timed request animates (mid {mid})");
+        assert!(
+            mid > 0.0 && mid < 600.0,
+            "a timed request animates (mid {mid})"
+        );
         AnimatorScheduler::current().tick(0.3);
         assert_eq!(scroll.content_offset().y, 600.0);
         assert_eq!(harness.offset.get().y, 600.0);
@@ -281,7 +300,11 @@ fn timed_scroll() {
         AnimatorScheduler::current().tick(0.05);
         let before_wheel = scroll.content_offset().y;
         wheel(&graph, context);
-        assert_ne!(scroll.content_offset().y, before_wheel, "the wheel moves the content");
+        assert_ne!(
+            scroll.content_offset().y,
+            before_wheel,
+            "the wheel moves the content"
+        );
         AnimatorScheduler::current().tick(0.5);
         assert!(
             scroll.content_offset().y < 900.0,
@@ -300,7 +323,11 @@ fn timed_scroll() {
         graph.install(harness.reduced_motion(true), Default::default());
         settle(&graph);
         let scroll = scroll_node(&graph);
-        assert_eq!(scroll.content_offset().y, 700.0, "reduced motion snaps the request");
+        assert_eq!(
+            scroll.content_offset().y,
+            700.0,
+            "reduced motion snaps the request"
+        );
         graph.install(cove_composition::EmptyView, Default::default());
     });
 }
@@ -335,10 +362,7 @@ fn scroll_anchor() {
     let (offset, bound) = prepend_rows(true);
     assert_eq!(offset, 520.0, "the anchor keeps its viewport position");
     assert_eq!(bound, 520.0, "the anchored offset is written back");
-}
 
-#[test]
-fn scroll_anchor_requires_a_marker() {
     let (offset, bound) = prepend_rows(false);
     assert_eq!(
         (offset, bound),

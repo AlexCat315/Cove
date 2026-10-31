@@ -113,6 +113,7 @@ fn check_rows(
     role: AccessibilityRole,
     expected: f32,
     max_rows: usize,
+    check_tops: bool,
     gap: &str,
 ) {
     let container = scene.named(name).expect("collection mounted");
@@ -134,13 +135,26 @@ fn check_rows(
             row.frame().height
         );
     }
-    let tops = row_tops(&rows);
-    for pair in tops.windows(2) {
-        assert_eq!(
-            pair[1] - pair[0],
-            expected,
-            "{name} consecutive row tops; {gap}"
-        );
+    if !check_tops {
+        return;
+    }
+    let mut lanes: Vec<f32> = rows.iter().map(|row| row.absolute_frame().x).collect();
+    lanes.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    lanes.dedup();
+    for lane in lanes {
+        let lane_rows: Vec<Node> = rows
+            .iter()
+            .filter(|row| row.absolute_frame().x == lane)
+            .cloned()
+            .collect();
+        let tops = row_tops(&lane_rows);
+        for pair in tops.windows(2) {
+            assert_eq!(
+                pair[1] - pair[0],
+                expected,
+                "{name} consecutive row tops in lane {lane}; {gap}"
+            );
+        }
     }
 }
 
@@ -294,6 +308,7 @@ fn collection_rows_share_density_and_retain_identity() {
                         AccessibilityRole::TreeItem,
                         tree_height,
                         40,
+                        true,
                         "GAP: tree has no touch floor in this surface",
                     );
                     let table = scene.named("table").expect("table mounted");
@@ -317,8 +332,40 @@ fn collection_rows_share_density_and_retain_identity() {
                         AccessibilityRole::Cell,
                         authored,
                         40,
+                        false,
                         "GAP: data-table has no touch floor",
                     );
+                    let data_table = scene.named("data-table").expect("data-table mounted");
+                    for role in [AccessibilityRole::Group, AccessibilityRole::Row] {
+                        let marker_rows: Vec<Node> = nodes(&data_table)
+                            .into_iter()
+                            .filter(|node| {
+                                node.attachment::<usize>("dataTable.rowIndex").is_some()
+                                    && node.accessibility().map(|s| s.role) == Some(role)
+                            })
+                            .collect();
+                        assert!(
+                            !marker_rows.is_empty() && marker_rows.len() < 40,
+                            "data-table {role:?} window, saw {}",
+                            marker_rows.len()
+                        );
+                        for row in &marker_rows {
+                            assert_eq!(
+                                row.frame().height,
+                                authored,
+                                "data-table {role:?} row height (actual {})",
+                                row.frame().height
+                            );
+                        }
+                        let tops = row_tops(&marker_rows);
+                        for pair in tops.windows(2) {
+                            assert_eq!(
+                                pair[1] - pair[0],
+                                authored,
+                                "data-table {role:?} row tops"
+                            );
+                        }
+                    }
                     assert_eq!(
                         scene.all(|node| node.id() == tree_row).len(),
                         1,

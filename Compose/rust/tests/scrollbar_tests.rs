@@ -100,7 +100,9 @@ fn thumb(graph: &ViewGraph) -> Node {
 }
 
 fn value(bar: &Node) -> String {
-    bar.accessibility().map(|semantics| semantics.value).unwrap_or_default()
+    bar.accessibility()
+        .map(|semantics| semantics.value)
+        .unwrap_or_default()
 }
 
 fn settle(graph: &ViewGraph) {
@@ -254,9 +256,15 @@ fn drag() {
             delta_y: frame.height - 20.0,
             kind: Default::default(),
         }));
-        dispatcher.dispatch(&InputEvent::MouseButtonUp(button(Point::new(start.x, end_y))));
+        dispatcher.dispatch(&InputEvent::MouseButtonUp(button(Point::new(
+            start.x, end_y,
+        ))));
         settle(graph);
-        assert!(harness.offset.get() > 500.0, "offset {}", harness.offset.get());
+        assert!(
+            harness.offset.get() > 500.0,
+            "offset {}",
+            harness.offset.get()
+        );
     });
 }
 

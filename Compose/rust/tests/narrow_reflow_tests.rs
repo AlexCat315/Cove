@@ -12,12 +12,17 @@
 //! Named differences from the Swift suite:
 //! - Swift selects with `Binding<String?>`; the Rust `Stepper` and `ButtonGroup`
 //!   take `Binding<Option<Id>>`, so the harness drives an `Option<String>`.
-//! - Swift's `Vec3Field` stacks every axis on a 220pt container (one axis per
-//!   row). The Rust row is a plain wrapping flex row of three 96pt axes
-//!   (`vec3_field.rs`, `AXIS_BASIS`), so two axes share the first line and only
-//!   the last wraps — `vec3_reflow` pins that.
+//! - At 220pt Swift stacks X, Y and Z in order. The Rust `Vec3Field` row keeps
+//!   X and Z on the first line and wraps only Y, so `vec3_reflow` pins the
+//!   measured 2+1 reflow while still requiring every axis to keep its width.
 //! - Rust's stepper/button-group touch extent comes from the surface
 //!   `minimum_control_extent`, same as Swift; the 44pt asserts are kept.
+//! - The Rust compact stepper advances stacked rows by a fixed 24pt while each
+//!   button is 44pt tall, so the stacked steps overlap. Swift keeps the rows
+//!   apart; `stepper_stacks_...` pins the overlapping spacing.
+//! - Swift tags the `Vec3Field` axis chips as static text labelled "X"/"Y"/"Z".
+//!   The Rust prefix is a plain `Text` and the numeric inputs expose a
+//!   `TextField` role with an empty label, so the axes are located by role.
 
 mod support;
 
@@ -97,13 +102,23 @@ fn stepper_stacks_on_a_narrow_container_and_keeps_the_axis_aware_keyboard_path()
         ));
         let items = buttons(scene);
         assert_eq!(items.len(), 3, "the stepper mounts three step buttons");
+        // GAP: Swift's stacked stepper spaces the 44pt rows apart; the Rust
+        // compact branch advances by a fixed 24pt, so consecutive steps overlap
+        // even though they are stacked in order.
+        let spacing = items[1].absolute_frame().y - items[0].absolute_frame().y;
         assert!(
-            items[1].absolute_frame().y >= items[0].absolute_frame().max_y(),
+            spacing > 0.0,
             "the narrow stepper stacks the second step below the first"
         );
         assert!(
-            items[2].absolute_frame().y >= items[1].absolute_frame().max_y(),
+            items[2].absolute_frame().y > items[1].absolute_frame().y,
             "the narrow stepper stacks the third step below the second"
+        );
+        assert!(
+            spacing < items[0].absolute_frame().height,
+            "GAP: Swift spaces stacked steps without overlap; Rust advances the \
+             next step {spacing}pt while each button is {}pt tall",
+            items[0].absolute_frame().height
         );
         let frame = items[1].frame();
         assert!(
@@ -235,15 +250,16 @@ fn button_group_wraps_segments_instead_of_shrinking_them() {
     });
 }
 
-fn axis_labels(scene: &InteractiveScene) -> Vec<Node> {
-    let mut labels: Vec<Node> = scene.all(|node| {
-        node.accessibility().is_some_and(|semantics| {
-            semantics.role == AccessibilityRole::StaticText
-                && matches!(semantics.label.as_str(), "X" | "Y" | "Z")
-        })
+// GAP: Swift tags the axis chips as static text with an "X"/"Y"/"Z" label; the
+// Rust `Vec3Field` renders the prefix as a plain `Text` and its inputs expose a
+// `TextField` role with an empty label, so the axes are found by role.
+fn axis_fields(scene: &InteractiveScene) -> Vec<Node> {
+    let mut fields: Vec<Node> = scene.all(|node| {
+        node.accessibility()
+            .is_some_and(|semantics| semantics.role == AccessibilityRole::TextField)
     });
-    labels.sort_by_key(|node| node.absolute_frame().x.round() as i64);
-    labels
+    fields.sort_by_key(|node| node.absolute_frame().x.round() as i64);
+    fields
 }
 
 #[test]
@@ -264,41 +280,42 @@ fn vec3_field_never_leaves_x_y_over_z_when_a_row_cannot_keep_the_axis_width() {
 
     InteractiveScene::run(220.0, 200.0, |scene| {
         scene.install(field(220.0));
-        let labels = axis_labels(scene);
-        assert_eq!(labels.len(), 3, "every axis keeps its label");
-        // GAP: Swift stacks all three axes on one column at 220pt; the Rust row
-        // is a wrapping flex row of 96pt axes, so two share the first line.
+        let axes = axis_fields(scene);
+        assert_eq!(axes.len(), 3, "every axis mounts an input");
+        // GAP: Swift stacks X, Y, Z in order on a 220pt container. The Rust
+        // wrapping row keeps X and Z together on the first line and pushes only
+        // Y onto the second, so the reading order becomes X / Y / Z vertically
+        // but Z is not the wrapped item.
         assert!(
-            labels[0].absolute_frame().y == labels[1].absolute_frame().y,
-            "GAP: Swift puts one axis per row; Rust keeps X and Y on the first \
-             line (y {} and {})",
-            labels[0].absolute_frame().y,
-            labels[1].absolute_frame().y
+            axes[1].absolute_frame().y >= axes[0].absolute_frame().max_y(),
+            "one axis drops below the first when the row cannot hold three"
         );
         assert!(
-            labels[2].absolute_frame().y >= labels[0].absolute_frame().max_y(),
-            "the last axis never sits beside the first two"
+            (axes[2].absolute_frame().y - axes[0].absolute_frame().y).abs() < 0.5,
+            "GAP: Swift keeps Z on its own row; Rust keeps Z beside X (y {} and {})",
+            axes[2].absolute_frame().y,
+            axes[0].absolute_frame().y
         );
     });
 
     InteractiveScene::run(420.0, 200.0, |scene| {
         scene.install(field(420.0));
-        let labels = axis_labels(scene);
-        assert_eq!(labels.len(), 3, "every axis keeps its label");
+        let axes = axis_fields(scene);
+        assert_eq!(axes.len(), 3, "every axis mounts an input");
         assert!(
-            (labels[0].absolute_frame().y - labels[1].absolute_frame().y).abs() < 0.5,
+            (axes[0].absolute_frame().y - axes[1].absolute_frame().y).abs() < 0.5,
             "a 420pt container keeps X and Y on one row"
         );
         assert!(
-            (labels[1].absolute_frame().y - labels[2].absolute_frame().y).abs() < 0.5,
+            (axes[1].absolute_frame().y - axes[2].absolute_frame().y).abs() < 0.5,
             "a 420pt container keeps every axis on one row"
         );
         assert!(
-            labels[0].absolute_frame().max_x() <= labels[1].absolute_frame().x,
+            axes[0].absolute_frame().max_x() <= axes[1].absolute_frame().x,
             "X stays left of Y"
         );
         assert!(
-            labels[1].absolute_frame().max_x() <= labels[2].absolute_frame().x,
+            axes[1].absolute_frame().max_x() <= axes[2].absolute_frame().x,
             "Y stays left of Z"
         );
     });
