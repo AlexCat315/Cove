@@ -122,8 +122,14 @@ impl Text {
         metrics: &TextMetrics,
         width: f32,
     ) -> (TextLayoutResult, bool) {
+        // A zero or non-finite authored width means the label has no room: it
+        // must not fall back to "unbounded", or a truncating label at width 0
+        // shapes and paints the entire string. Swift passes the authored width
+        // through and paints nothing.
         let max_width = if width.is_finite() && width > 0.0 {
             width
+        } else if width.is_finite() {
+            0.0
         } else {
             f32::INFINITY
         };

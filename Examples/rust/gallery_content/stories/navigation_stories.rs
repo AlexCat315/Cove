@@ -35,7 +35,9 @@ pub struct AppBarStory {
     // `Send + Sync` requirement; `Rc<Cell>` does not.
     long_title: cove_core::State<bool>,
     text_primary: cove_core::State<bool>,
-    last_action: Rc<RefCell<String>>,
+    // `State` (not `Rc<RefCell<_>>`) so the result line recomposes when an
+    // action is recorded — otherwise the Save button visibly does nothing.
+    last_action: cove_core::State<String>,
 }
 
 impl AppBarStory {
@@ -44,7 +46,7 @@ impl AppBarStory {
             options,
             long_title: cove_core::State::new(true),
             text_primary: cove_core::State::new(false),
-            last_action: Rc::new(RefCell::new("No action yet".to_owned())),
+            last_action: cove_core::State::new("No action yet".to_owned()),
         }
     }
 
@@ -57,12 +59,12 @@ impl AppBarStory {
     }
 
     pub fn last_action(&self) -> String {
-        self.last_action.borrow().clone()
+        self.last_action.get()
     }
 
     /// Records the action the header performed.
     pub fn record(&self, action: impl Into<String>) {
-        *self.last_action.borrow_mut() = action.into();
+        self.last_action.set(action.into());
     }
 
     pub fn uses_text_primary(&self) -> bool {
@@ -78,7 +80,7 @@ impl AppBarStory {
         let record = self.last_action.clone();
         vec![
             ToolbarItem::new(MenuItem::new(1, "Find in workspace", move || {
-                *record.borrow_mut() = "Find".to_owned();
+                record.set("Find".to_owned());
             }))
             .icon(
                 cove_ui_compose::primitives::controls::button::ButtonIconSource::Resource(
@@ -88,7 +90,7 @@ impl AppBarStory {
             .placement(ToolbarItemPlacement::AutomaticWithPriority(10)),
             ToolbarItem::new(MenuItem::new(2, "Export project", {
                 let record = self.last_action.clone();
-                move || *record.borrow_mut() = "Exported".to_owned()
+                move || record.set("Exported".to_owned())
             }))
             .icon(
                 cove_ui_compose::primitives::controls::button::ButtonIconSource::Resource(
@@ -97,7 +99,7 @@ impl AppBarStory {
             ),
             ToolbarItem::new(MenuItem::new(3, "Share project", {
                 let record = self.last_action.clone();
-                move || *record.borrow_mut() = "Shared".to_owned()
+                move || record.set("Shared".to_owned())
             }))
             .icon(
                 cove_ui_compose::primitives::controls::button::ButtonIconSource::Resource(
@@ -106,7 +108,7 @@ impl AppBarStory {
             ),
             ToolbarItem::new(MenuItem::new(4, "Pinned", {
                 let record = self.last_action.clone();
-                move || *record.borrow_mut() = "Pinned".to_owned()
+                move || record.set("Pinned".to_owned())
             }))
             .placement(ToolbarItemPlacement::Overflow),
             // A disabled command stays listed so the menu can explain itself.
@@ -155,11 +157,11 @@ impl View for AppBarStory {
         let header = AppBar::new(self.title())
             .subtitle("All changes saved locally")
             .back(MenuItem::new(10, "Back to projects", move || {
-                *record_back.borrow_mut() = "Back".to_owned();
+                record_back.set("Back".to_owned());
             }))
             .primary(
                 ToolbarItem::new(MenuItem::new(11, "Save workspace", move || {
-                    *record_save.borrow_mut() = "Saved".to_owned();
+                    record_save.set("Saved".to_owned());
                 }))
                 .icon(
                     cove_ui_compose::primitives::controls::button::ButtonIconSource::Resource(
@@ -200,6 +202,18 @@ impl View for AppBarStory {
 
     fn tag(&self) -> &'static str {
         "AppBarStory"
+    }
+
+    /// The story reads three pieces of live state, so all three must be
+    /// declared or the toggles and the action result never recompose. This is
+    /// the same defect class that silently froze the timeline, SplitView and
+    /// ten other views.
+    fn dynamic_properties(&self) -> Vec<cove_ui_compose::DynamicField> {
+        vec![
+            cove_ui_compose::DynamicField::state("long_title", &self.long_title),
+            cove_ui_compose::DynamicField::state("text_primary", &self.text_primary),
+            cove_ui_compose::DynamicField::state("last_action", &self.last_action),
+        ]
     }
 }
 

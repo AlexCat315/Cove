@@ -37,9 +37,15 @@ impl SwapchainResource {
         if self.closed {
             return Ok(());
         }
-        self.closed = true;
+        // Mark closed only once the close actually succeeded. `close_swapchain`
+        // legitimately refuses to run while a frame is open; setting the flag
+        // first would make the retry a no-op `Ok(())` that never closes, and
+        // `Drop` would then skip `destroy_swapchain` and leak the native
+        // swapchain. Swift carries no flag at all and always destroys in deinit.
         self.device
-            .with_frame_session(|| self.device.close_swapchain(self.swapchain))
+            .with_frame_session(|| self.device.close_swapchain(self.swapchain))?;
+        self.closed = true;
+        Ok(())
     }
 }
 impl Drop for SwapchainResource {

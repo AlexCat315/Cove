@@ -248,16 +248,19 @@ impl View for ActivityRow {
 }
 
 /// A flexible gap, matching Swift's `Spacer()`.
+///
+/// Swift's `Spacer()` is an empty view with no content of its own, so this
+/// returns `EmptyView` directly. It used to route through a bare
+/// `EmptyDashboardSpace` with an empty `impl View`, which made `kind()` fall
+/// back to `Component` and panicked on mount with "this view is materialized
+/// directly through ViewGraph" — the last instance of that defect class.
 struct DashboardSpacer;
 
 impl View for DashboardSpacer {
     fn body(&self) -> AnyView {
-        AnyView::new(EmptyDashboardSpace)
+        AnyView::new(cove_composition::EmptyView)
     }
 }
-
-struct EmptyDashboardSpace;
-impl View for EmptyDashboardSpace {}
 
 /// The `introduction` page: a working composition of live state.
 pub struct IntroductionStory {

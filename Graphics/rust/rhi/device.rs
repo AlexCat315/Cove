@@ -365,11 +365,30 @@ impl Device {
     /// begin_frame, submissions, presentation and end_frame, on a shared device.
     /// Low-level frame methods still require balanced begin/end on their caller.
     pub fn with_frame_session<T>(&self, body: impl FnOnce() -> RhiResult<T>) -> RhiResult<T> {
-        let _guard = self
-            .session
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        body()
+        // Swift uses `NSRecursiveLock`, so same-thread nesting is legal: a
+        // preparation session may open a frame session, and the Swift suite
+        // explicitly nests to prove an inner call is refused *with an error*
+        // rather than blocking. A plain `Mutex` deadlocks there and hangs the
+        // render thread silently. `std::sync::ReentrantLock` is still unstable,
+        // so reentrancy is tracked per thread and the mutex is taken once.
+        thread_local! {
+            static DEPTH: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+        }
+        let outermost = DEPTH.with(|depth| {
+            let previous = depth.get();
+            depth.set(previous + 1);
+            previous == 0
+        });
+        // Only the outermost call owns the lock; nested calls on the same thread
+        // pass through, exactly like a recursive lock.
+        let _guard = outermost.then(|| {
+            self.session
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+        });
+        let result = body();
+        DEPTH.with(|depth| depth.set(depth.get().saturating_sub(1)));
+        result
     }
 
     // MARK: Resources

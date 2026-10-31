@@ -226,6 +226,20 @@ impl View for NumberField {
                 ..Default::default()
             })
             .events(TextFieldEvents {
+                // Swift tracks the draft in the *binding setter*
+                // (`NumberField.swift:90`: `set: { draft = $0; draftChanged = true }`),
+                // so `draftChanged` is set by every edit. Rust has no setter hook,
+                // so without `on_change` the flag stayed false forever and
+                // `commit_draft` always returned early — Return and blur fired but
+                // committed nothing.
+                on_change: Some({
+                    let draft = draft.clone();
+                    let draft_changed = draft_changed.clone();
+                    Rc::new(move |buffer: &TextBuffer| {
+                        draft.set(buffer.clone());
+                        draft_changed.set(true);
+                    })
+                }),
                 on_submit: Some({
                     let field = field.clone();
                     let draft = draft.clone();

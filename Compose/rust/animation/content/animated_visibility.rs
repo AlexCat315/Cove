@@ -441,8 +441,12 @@ impl VisibilityHost {
         }
         let weak_state: Weak<VisibilityState> = Rc::downgrade(state);
         let weak_node = node.downgrade();
+        // The controller drives a 0..1 *fraction*; `from_progress`/`target` are the
+        // values it interpolates between below. Seeding the controller range with
+        // them interpolated twice, so a reversal overshot and a full exit walked
+        // 0->1 instead of 1->0 and never retired the subtree. Swift passes 0..1.
         let controller =
-            AnimationController::new(from_progress, target, animation, 0.0, move |amount| {
+            AnimationController::new(0.0, 1.0, animation, 0.0, move |amount| {
                 let (Some(state), Some(node)) = (weak_state.upgrade(), Node::upgrade(&weak_node))
                 else {
                     return;

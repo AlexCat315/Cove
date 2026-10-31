@@ -9,6 +9,13 @@ description = "CoveUI widget layer (Compose)"
 [lib]
 path = "rust/lib.rs"
 
+# The committed `Sources/CTextSelection/Selection.c` shim backs the
+# `extern "C"` declarations in `rust/primitives/text/rich/text_selection.rs`.
+# Without a build script nothing compiled it, so any target that instantiated a
+# `TextSelectionScope` failed to link with undefined `_cove_selection_sort` /
+# `_cove_selection_find`.
+build = "build.rs"
+
 [dependencies]
 cove-composition.workspace = true
 cove-core.workspace = true
@@ -22,6 +29,9 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 pulldown-cmark.workspace = true
+
+[build-dependencies]
+cc.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
@@ -406,13 +416,341 @@ name = "disclosure_container_tests"
 path = "rust/tests/disclosure_container_tests.rs"
 
 [[test]]
-name = "zz_probe_as"
-path = "rust/tests/zz_probe_as.rs"
-
-[[test]]
 name = "primitive_view_kind_regression"
 path = "rust/tests/primitive_view_kind_regression.rs"
 
 [[test]]
 name = "single_line_text_tests"
 path = "rust/tests/single_line_text_tests.rs"
+
+[[test]]
+name = "action_sheet_tests"
+path = "rust/tests/action_sheet_tests.rs"
+
+[[test]]
+name = "retained_visibility_tests"
+path = "rust/tests/retained_visibility_tests.rs"
+
+[[test]]
+name = "sidebar_slot_tests"
+path = "rust/tests/sidebar_slot_tests.rs"
+
+[[test]]
+name = "container_query_tests"
+path = "rust/tests/container_query_tests.rs"
+
+[[test]]
+name = "control_motion_tests"
+path = "rust/tests/control_motion_tests.rs"
+
+[[test]]
+name = "snippet_tests"
+path = "rust/tests/snippet_tests.rs"
+
+[[test]]
+name = "time_picker_tests"
+path = "rust/tests/time_picker_tests.rs"
+
+[[test]]
+name = "toggle_tests"
+path = "rust/tests/toggle_tests.rs"
+
+[[test]]
+name = "truncation_tests"
+path = "rust/tests/truncation_tests.rs"
+
+[[test]]
+name = "touch_density_tests"
+path = "rust/tests/touch_density_tests.rs"
+
+[[test]]
+name = "calendar_adaptive_tests"
+path = "rust/tests/calendar_adaptive_tests.rs"
+
+[[test]]
+name = "composition_local_tests"
+path = "rust/tests/composition_local_tests.rs"
+
+[[test]]
+name = "grid_layout_tests"
+path = "rust/tests/grid_layout_tests.rs"
+
+[[test]]
+name = "four_tree_consistency_tests"
+path = "rust/tests/four_tree_consistency_tests.rs"
+
+[[test]]
+name = "portal_scope_tests"
+path = "rust/tests/portal_scope_tests.rs"
+
+[[test]]
+name = "focus_ring_tests"
+path = "rust/tests/focus_ring_tests.rs"
+
+[[test]]
+name = "text_shape_cache_tests"
+path = "rust/tests/text_shape_cache_tests.rs"
+
+[[test]]
+name = "portal_layout_tests"
+path = "rust/tests/portal_layout_tests.rs"
+
+[[test]]
+name = "timeline_group_tests"
+path = "rust/tests/timeline_group_tests.rs"
+
+[[test]]
+name = "indicator_tests"
+path = "rust/tests/indicator_tests.rs"
+
+[[test]]
+name = "alert_tests"
+path = "rust/tests/alert_tests.rs"
+
+[[test]]
+name = "split_view_panel_tests"
+path = "rust/tests/split_view_panel_tests.rs"
+
+[[test]]
+name = "keyboard_focus_tests"
+path = "rust/tests/keyboard_focus_tests.rs"
+
+[[test]]
+name = "drag_and_drop_tests"
+path = "rust/tests/drag_and_drop_tests.rs"
+
+[[test]]
+name = "nested_scroll_routing_tests"
+path = "rust/tests/nested_scroll_routing_tests.rs"
+
+[[test]]
+name = "date_range_picker_tests"
+path = "rust/tests/date_range_picker_tests.rs"
+
+[[test]]
+name = "button_style_animation_tests"
+path = "rust/tests/button_style_animation_tests.rs"
+
+[[test]]
+name = "carousel_tests"
+path = "rust/tests/carousel_tests.rs"
+
+[[test]]
+name = "list_multiple_selection_tests"
+path = "rust/tests/list_multiple_selection_tests.rs"
+
+[[test]]
+name = "with_animation_opacity_tests"
+path = "rust/tests/with_animation_opacity_tests.rs"
+
+[[test]]
+name = "with_animation_completion_tests"
+path = "rust/tests/with_animation_completion_tests.rs"
+
+[[test]]
+name = "spring_interruption_tests"
+path = "rust/tests/spring_interruption_tests.rs"
+
+[[test]]
+name = "custom_layout_visibility_tests"
+path = "rust/tests/custom_layout_visibility_tests.rs"
+
+[[test]]
+name = "floating_surface_tests"
+path = "rust/tests/floating_surface_tests.rs"
+
+[[test]]
+name = "number_field_tests"
+path = "rust/tests/number_field_tests.rs"
+
+[[test]]
+name = "menu_button_tests"
+path = "rust/tests/menu_button_tests.rs"
+
+[[test]]
+name = "theme_cross_fade_component_tests"
+path = "rust/tests/theme_cross_fade_component_tests.rs"
+
+[[test]]
+name = "command_palette_adaptive_tests"
+path = "rust/tests/command_palette_adaptive_tests.rs"
+
+[[test]]
+name = "text_editor_appearance_tests"
+path = "rust/tests/text_editor_appearance_tests.rs"
+
+[[test]]
+name = "animated_visibility_tests"
+path = "rust/tests/animated_visibility_tests.rs"
+
+[[test]]
+name = "asset_field_tests"
+path = "rust/tests/asset_field_tests.rs"
+
+[[test]]
+name = "navigation_stack_tests"
+path = "rust/tests/navigation_stack_tests.rs"
+
+[[test]]
+name = "command_palette_footer_tests"
+path = "rust/tests/command_palette_footer_tests.rs"
+
+[[test]]
+name = "range_slider_tests"
+path = "rust/tests/range_slider_tests.rs"
+
+[[test]]
+name = "button_icon_tests"
+path = "rust/tests/button_icon_tests.rs"
+
+[[test]]
+name = "split_button_tests"
+path = "rust/tests/split_button_tests.rs"
+
+[[test]]
+name = "sidebar_tests"
+path = "rust/tests/sidebar_tests.rs"
+
+[[test]]
+name = "masonry_tests"
+path = "rust/tests/masonry_tests.rs"
+
+[[test]]
+name = "slider_axis_tests"
+path = "rust/tests/slider_axis_tests.rs"
+
+[[test]]
+name = "refresh_tests"
+path = "rust/tests/refresh_tests.rs"
+
+[[test]]
+name = "reorderable_list_tests"
+path = "rust/tests/reorderable_list_tests.rs"
+
+[[test]]
+name = "primitive_layout_tests"
+path = "rust/tests/primitive_layout_tests.rs"
+
+[[test]]
+name = "tab_view_tests"
+path = "rust/tests/tab_view_tests.rs"
+
+[[test]]
+name = "modifier_replay_tests"
+path = "rust/tests/modifier_replay_tests.rs"
+
+[[test]]
+name = "vertical_toolbar_tests"
+path = "rust/tests/vertical_toolbar_tests.rs"
+
+[[test]]
+name = "app_bar_tests"
+path = "rust/tests/app_bar_tests.rs"
+
+[[test]]
+name = "menu_content_tests"
+path = "rust/tests/menu_content_tests.rs"
+
+[[test]]
+name = "image_file_content_mode_tests"
+path = "rust/tests/image_file_content_mode_tests.rs"
+
+[[test]]
+name = "image_pipeline_tests"
+path = "rust/tests/image_pipeline_tests.rs"
+
+[[test]]
+name = "chart_interaction_tests"
+path = "rust/tests/chart_interaction_tests.rs"
+
+[[test]]
+name = "custom_layout_tests"
+path = "rust/tests/custom_layout_tests.rs"
+
+[[test]]
+name = "scroll_view_input_tests"
+path = "rust/tests/scroll_view_input_tests.rs"
+
+[[test]]
+name = "sheet_tests"
+path = "rust/tests/sheet_tests.rs"
+
+[[test]]
+name = "field_layout_tests"
+path = "rust/tests/field_layout_tests.rs"
+
+[[test]]
+name = "responsive_layout_tests"
+path = "rust/tests/responsive_layout_tests.rs"
+
+[[test]]
+name = "catalog_interaction_tests"
+path = "rust/tests/catalog_interaction_tests.rs"
+
+[[test]]
+name = "chart_performance_tests"
+path = "rust/tests/chart_performance_tests.rs"
+
+[[test]]
+name = "combobox_search_tests"
+path = "rust/tests/combobox_search_tests.rs"
+
+[[test]]
+name = "chart_orientation_tests"
+path = "rust/tests/chart_orientation_tests.rs"
+
+[[test]]
+name = "state_propagation_regression_tests"
+path = "rust/tests/state_propagation_regression_tests.rs"
+
+[[test]]
+name = "toast_animation_tests"
+path = "rust/tests/toast_animation_tests.rs"
+
+[[test]]
+name = "chart_accessibility_tests"
+path = "rust/tests/chart_accessibility_tests.rs"
+
+[[test]]
+name = "chart_viewport_tests"
+path = "rust/tests/chart_viewport_tests.rs"
+
+[[test]]
+name = "view_that_fits_tests"
+path = "rust/tests/view_that_fits_tests.rs"
+
+[[test]]
+name = "button_style_tests"
+path = "rust/tests/button_style_tests.rs"
+
+[[test]]
+name = "text_selection_scope_tests"
+path = "rust/tests/text_selection_scope_tests.rs"
+
+[[test]]
+name = "text_buffer_tests"
+path = "rust/tests/text_buffer_tests.rs"
+
+[[test]]
+name = "overlay_scroll_input_tests"
+path = "rust/tests/overlay_scroll_input_tests.rs"
+
+[[test]]
+name = "button_press_recompose_tests"
+path = "rust/tests/button_press_recompose_tests.rs"
+
+[[test]]
+name = "label_selection_tests"
+path = "rust/tests/label_selection_tests.rs"
+
+[[test]]
+name = "chart_tests"
+path = "rust/tests/chart_tests.rs"
+
+[[test]]
+name = "status_bar_panel_truncation_tests"
+path = "rust/tests/status_bar_panel_truncation_tests.rs"
+
+[[test]]
+name = "zz_probe_vtf"
+path = "rust/tests/zz_probe_vtf.rs"

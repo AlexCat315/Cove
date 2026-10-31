@@ -27,23 +27,13 @@ use cove_platform::{InputEvent, KeyEvent, KeyModifiers, MouseButton, MouseButton
 use cove_text::{
     SystemFontDefaults, TextBootstrapOptions, TextEnvironment, TextEnvironmentHolder,
 };
-use cove_ui_compose::primitives::overlays::portal::{PortalStore, PortalStoreHolder};
+use cove_ui_compose::primitives::overlays::portal::PortalStore;
 
 /// Scopes a portal store with the window context.
 ///
-/// `PortalStoreAmbient` is not re-exported from the portal module, so this
-/// reproduces it: make the store current, restore the previous on drop.
-struct ScopedPortalStore {
-    store: Rc<PortalStore>,
-}
-
-impl ScopedAmbient for ScopedPortalStore {
-    fn activate(&self) -> Box<dyn FnOnce()> {
-        let previous = PortalStoreHolder::current();
-        PortalStoreHolder::set_current(Some(self.store.clone()));
-        Box::new(move || PortalStoreHolder::set_current(Some(previous)))
-    }
-}
+/// `PortalStoreAmbient` now implements `ScopedAmbient` and is re-exported, so
+/// this is a thin alias rather than a reimplementation.
+type ScopedPortalStore = cove_ui_compose::primitives::overlays::portal::PortalStoreAmbient;
 
 /// Process-wide serialization for every suite that touches a shared holder.
 pub struct GlobalTestLock;
@@ -122,7 +112,7 @@ impl GalleryScene {
                 let context = PlatformInputContext::new();
                 let scheduler = AnimatorScheduler::default();
                 let portals = Rc::new(PortalStore::new());
-                context.add_scoped_ambient(Rc::new(ScopedPortalStore { store: portals.clone() }));
+                context.add_scoped_ambient(Rc::new(ScopedPortalStore::new(portals.clone())));
                 let (interactions, focus, capture) = (
                     context.interactions.clone(),
                     context.focus_chain.clone(),
@@ -269,6 +259,11 @@ impl GalleryScene {
             .filter_map(|node| self.graph.layout_node(&node))
             .filter_map(|layout| layout.text_inputs().map(|inputs| inputs.text))
             .collect()
+    }
+
+    /// Whether a recomposition is still queued.
+    pub fn recomposer_has_pending(&self) -> bool {
+        self.graph.recomposer.has_pending()
     }
 
     /// The debug name of the node carrying `text` as its layout text run.

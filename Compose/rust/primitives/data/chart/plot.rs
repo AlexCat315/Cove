@@ -635,16 +635,22 @@ impl ChartPlot {
             return self.build_resolution(size, origin, text, &self.content);
         };
         let token = text.token.clone();
-        let cached = cache.borrow_mut().resolution(size, origin, &token, || {
-            let content = cache
-                .borrow()
-                .samples
-                .as_ref()
-                .map(|samples| samples.applying(&self.content))
-                .unwrap_or_else(|| self.content.clone());
-            self.build_resolution(size, origin, text, &content)
-        });
-        cached
+        // Sample before taking the cache borrow. `resolution` holds `&mut self`
+        // for the whole call, so re-borrowing the same `RefCell` inside `build`
+        // panicked with "already mutably borrowed" on the first paint of any
+        // chart that reached the cached path — every chart interaction behaviour
+        // was unreachable. Reading `samples` first keeps the borrow flat.
+        let content = cache
+            .borrow()
+            .samples
+            .as_ref()
+            .map(|samples| samples.applying(&self.content))
+            .unwrap_or_else(|| self.content.clone());
+        cache
+            .borrow_mut()
+            .resolution(size, origin, &token, || {
+                self.build_resolution(size, origin, text, &content)
+            })
     }
 
     fn build_resolution(

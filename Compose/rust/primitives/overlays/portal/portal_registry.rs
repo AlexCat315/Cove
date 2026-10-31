@@ -506,6 +506,17 @@ impl PortalStoreAmbient {
     }
 }
 
+/// The runtime swaps scoped ambients through this trait, so the portal store can
+/// travel with a window's input context. Without this impl the store was only
+/// swappable by hand, and callers had to reimplement it.
+impl cove_core::scene::ScopedAmbient for PortalStoreAmbient {
+    fn activate(&self) -> Box<dyn FnOnce()> {
+        let previous = PortalStoreHolder::current();
+        PortalStoreHolder::set_current(Some(self.store.clone()));
+        Box::new(move || PortalStoreHolder::set_current(Some(previous)))
+    }
+}
+
 fn animated_visibility(
     is_visible: bool,
     transition: Transition,

@@ -44,3 +44,15 @@ path = "rust/tests/mirror_backdrop_tests.rs"
 [[test]]
 name = "dev_server_smoke_tests"
 path = "rust/tests/dev_server_smoke_tests.rs"
+
+[[test]]
+name = "diagnostics_tests"
+path = "rust/tests/diagnostics_tests.rs"
+
+[[test]]
+name = "diagnostic_presentation_tests"
+path = "rust/tests/diagnostic_presentation_tests.rs"
+
+[[test]]
+name = "editor_pick_borrow_regression"
+path = "rust/tests/editor_pick_borrow_regression.rs"

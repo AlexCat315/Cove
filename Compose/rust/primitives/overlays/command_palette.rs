@@ -595,6 +595,15 @@ impl View for PaletteBody {
     fn tag(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
+
+    /// `body` reads `focus_token` from `State`, so the
+    /// scope must declare those dependencies. Without this the writes never
+    /// subscribe and the view keeps its first layout forever.
+    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
+        vec![
+            crate::DynamicField::state("focus_token", &self.focus_token),
+        ]
+    }
 }
 
 /// Fires once per presentation so the palette can reset its transient state.

@@ -28,7 +28,7 @@ use crate::primitives::overlays::roving_focus::{RovingFocusHost, RovingItem, rov
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, TabButtonStyle};
 use crate::theme::{SemanticColorRef, SemanticFontRef, ThemeMetric, theme_for_node};
-use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
+use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, ViewExt};
 use cove_core::Binding;
 use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 use cove_imaging::BundleImageResource;
@@ -228,12 +228,11 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> TabView<Id> {
 
     /// The active tab: the bound one when enabled, else the first enabled one.
     fn active(&self, enabled: &[Id]) -> Option<Id> {
+        // No substitution: Swift mounts nothing when the selection matches no
+        // enabled tab (`TabView.swift:127`). Falling back to the first enabled tab
+        // rendered tab 0's content for a selection the caller never authored.
         let selected = self.selection.get();
-        if enabled.contains(&selected) {
-            Some(selected)
-        } else {
-            enabled.first().cloned()
-        }
+        enabled.contains(&selected).then_some(selected)
     }
 
     /// `Adaptive` resolves against the surface: a phone bar of plain tabs goes to
@@ -354,11 +353,21 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for TabVie
                 .iter()
                 .find(|tab| &tab.id == active_id && tab.is_enabled)
         {
-            content.push(AnyView::new(tab.content.clone().flex_with(
-                1.0,
-                1.0,
-                Some(0.0),
-            )));
+            // Give the panel a per-tab identity. Without it the content slot is
+            // reused across a switch, so two tabs hosting the same panel type
+            // shared one `State` — bumping tab A's counter made tab B read it
+            // too. Swift does `.id(active.id)` on the content slot
+            // (`TabView.swift:128`). A hash-derived key avoids requiring `Eq` on
+            // `Id`, which `TabView` does not bound.
+            let identity = {
+                use std::hash::{Hash, Hasher};
+                let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                tab.id.hash(&mut hasher);
+                hasher.finish()
+            };
+            content.push(AnyView::new(
+                AnyView::new(tab.content.clone().flex_with(1.0, 1.0, Some(0.0))).id(identity),
+            ));
         }
 
         let mut column: Vec<AnyView> = Vec::new();
@@ -634,11 +643,12 @@ mod tests {
     }
 
     #[test]
-    fn active_falls_back_to_the_first_enabled_tab() {
-        // A selection pointing at a disabled tab must not leave the panel blank.
+    fn a_selection_on_a_disabled_tab_mounts_no_content() {
+        // Swift mounts nothing here (`TabView.swift:127`); only the *tab stop*
+        // falls back, which `children` handles separately.
         let v = view("b", vec![tab("a", true), tab("b", false), tab("c", true)]);
         let enabled = v.enabled_ids();
-        assert_eq!(v.active(&enabled), Some("a".to_string()));
+        assert_eq!(v.active(&enabled), None);
     }
 
     #[test]

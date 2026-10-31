@@ -138,13 +138,58 @@ name = "adaptive_examples"
 path = "rust/tests/adaptive_examples.rs"
 
 [[test]]
-name = "probe_harness"
-path = "rust/tests/probe_harness.rs"
-
-[[test]]
 name = "shared_scene_tests"
 path = "rust/tests/shared_scene_tests.rs"
 
 [[test]]
 name = "inspection_tests"
 path = "rust/tests/inspection_tests.rs"
+
+
+[[test]]
+name = "component_analysis_tests"
+path = "rust/tests/component_analysis_tests.rs"
+
+[[test]]
+name = "model"
+path = "rust/tests/model.rs"
+
+[[test]]
+name = "gallery_tests"
+path = "rust/tests/gallery_tests.rs"
+
+[[test]]
+name = "animation_tests"
+path = "rust/tests/animation_tests.rs"
+
+[[test]]
+name = "animation_system_tests"
+path = "rust/tests/animation_system_tests.rs"
+
+[[test]]
+name = "app_bar_tests"
+path = "rust/tests/app_bar_tests.rs"
+
+[[test]]
+name = "surface_traits_tests"
+path = "rust/tests/surface_traits_tests.rs"
+
+[[test]]
+name = "rating_layout_tests"
+path = "rust/tests/rating_layout_tests.rs"
+
+[[test]]
+name = "split_tests"
+path = "rust/tests/split_tests.rs"
+
+[[test]]
+name = "image_layout_tests"
+path = "rust/tests/image_layout_tests.rs"
+
+[[test]]
+name = "text_editor_layout_tests"
+path = "rust/tests/text_editor_layout_tests.rs"
+
+[[test]]
+name = "navigation_state_tests"
+path = "rust/tests/navigation_state_tests.rs"

@@ -1211,11 +1211,20 @@ impl LayoutNode {
                 child_style.flex_basis
             };
             let resolved = basis_value.resolve(Some(main_extent));
+            // `main_extent`/`cross_extent` are axis-relative, but `measure` takes
+            // physical width and height. In a column the main axis is vertical,
+            // so passing `main_extent` as the available *width* transposed the
+            // two and shaped every child text against the container's height.
+            let (available_width, available_height) = if row {
+                (main_extent, cross_extent)
+            } else {
+                (cross_extent, main_extent)
+            };
             let measured = child.measure(
                 Some(content.width),
                 Some(content.height),
-                Some(main_extent),
-                Some(cross_extent),
+                Some(available_width),
+                Some(available_height),
                 direction,
             );
             let main = resolved.unwrap_or(if row { measured.width } else { measured.height });
@@ -1467,14 +1476,27 @@ impl LayoutNode {
                 Some(content.height),
                 direction,
             );
-            let width = child_style
-                .width
-                .resolve(Some(content.width))
-                .unwrap_or(measured.width);
-            let height = child_style
-                .height
-                .resolve(Some(content.height))
-                .unwrap_or(measured.height);
+            // An absolutely-positioned child with auto width/height but both
+            // opposing insets resolved stretches between them: Yoga gives
+            // `parent - left - right` (and likewise vertically). Using the
+            // measured size instead collapsed every pinned-edge overlay — a
+            // portal layer pinning all four edges to 0 measured 0x0.
+            let right_for_width = child_style.position.right.resolve(Some(content.width));
+            let left_for_width = child_style.position.left.resolve(Some(content.width));
+            let bottom_for_height = child_style.position.bottom.resolve(Some(content.height));
+            let top_for_height = child_style.position.top.resolve(Some(content.height));
+            let width = child_style.width.resolve(Some(content.width)).unwrap_or_else(|| {
+                match (left_for_width, right_for_width) {
+                    (Some(left), Some(right)) => (content.width - left - right).max(0.0),
+                    _ => measured.width,
+                }
+            });
+            let height = child_style.height.resolve(Some(content.height)).unwrap_or_else(|| {
+                match (top_for_height, bottom_for_height) {
+                    (Some(top), Some(bottom)) => (content.height - top - bottom).max(0.0),
+                    _ => measured.height,
+                }
+            });
             // Resolve logical start/end with the direction actually in force at
             // layout time. The eager physical value written by `set` is only a
             // fallback for nodes created before their direction was known.

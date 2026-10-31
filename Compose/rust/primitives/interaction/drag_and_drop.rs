@@ -284,6 +284,15 @@ impl View for DragScope {
             .composition_local(DragScopeEnvironment::key(), Some(self.session.clone())),
         )
     }
+
+    /// `body` reads `revision` from `State`, so the
+    /// scope must declare those dependencies. Without this the writes never
+    /// subscribe and the view keeps its first layout forever.
+    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
+        vec![
+            crate::DynamicField::state("revision", &self.revision),
+        ]
+    }
 }
 
 /// A view that can start a drag with a typed payload and preview.

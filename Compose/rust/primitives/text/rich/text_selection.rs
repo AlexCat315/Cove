@@ -87,6 +87,7 @@ impl NodeResource for SelectionRegistration {
     }
 }
 
+#[derive(Clone)]
 pub struct TextSelectionScope {
     members: std::collections::HashMap<u64, SelectionMember>,
     ordered_ids: Vec<u64>,

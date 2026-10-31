@@ -15,6 +15,7 @@ use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
 use crate::theme::{SemanticColorRef, SemanticFontRef, theme_for_node};
 use crate::{AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View};
+use cove_composition::adaptive::SurfaceEnvironment;
 use cove_core::scene::{AccessibilityRole, AccessibilitySemantics};
 use cove_core::scene::{Align, EventResult, FlexDirection, Justify, Node, Wrap};
 
@@ -311,13 +312,26 @@ impl PrimitiveView for CalendarBody {
         );
     }
 
-    fn children(&self, _node: &Node) -> Vec<AnyView> {
+    fn children(&self, node: &Node) -> Vec<AnyView> {
         let view = self.view.snapshot();
         let panel = view.session.borrow().panel;
         let content = if panel == CalendarPanel::Days {
             let months = view.options.presentation.number_of_months;
             let mut columns: Vec<AnyView> = Vec::new();
             let base = view.session.borrow().month;
+            // A touch surface raises every cell to the minimum control extent, so
+            // the grid stays pointer- and finger-reachable. Swift does this once
+            // per body, in `SurfaceReader`.
+            let surface = node.composition_value(&SurfaceEnvironment::key());
+            let authored = view.options.presentation.cell_size;
+            let cell_size = if surface
+                .input
+                .contains(cove_core::InputCapabilities::TOUCH)
+            {
+                authored.max(surface.minimum_control_extent())
+            } else {
+                authored
+            };
             for index in 0..months {
                 let month = view
                     .options
@@ -329,6 +343,7 @@ impl PrimitiveView for CalendarBody {
                     month,
                     index,
                     count: months,
+                    cell_size,
                 }));
             }
             AnyView::new(BoxView::new(
@@ -448,6 +463,10 @@ struct CalendarMonth {
     month: Date,
     index: usize,
     count: usize,
+    /// Resolved once for the whole page: a touch surface raises the authored
+    /// cell size to `minimum_control_extent`, matching Swift's
+    /// `max(cellSize, surface.input.contains(.touch) ? surface.minimumControlExtent : 0)`.
+    cell_size: f32,
 }
 
 impl PrimitiveView for CalendarMonth {
@@ -466,7 +485,7 @@ impl PrimitiveView for CalendarMonth {
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         let view = &self.view;
         let calendar = &view.options.calendar;
-        let cell_size = view.options.presentation.cell_size;
+        let cell_size = self.cell_size;
         let is_week = view.options.granularity == CalendarGranularity::Week;
         let title = month_title(self.month, calendar);
         let days = crate::primitives::controls::date_values::CalendarGrid::days_in_month(

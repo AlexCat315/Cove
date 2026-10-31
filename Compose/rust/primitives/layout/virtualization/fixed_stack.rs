@@ -206,6 +206,16 @@ impl<Id: Clone + 'static> View for FixedVirtualStack<Id> {
         };
         AnyView::new(AnyView::new(scroll).frame(None, None, Some(0.0), Some(0.0), None, None))
     }
+
+    /// `body` reads `viewport`, `previous_target` from `State`, so the
+    /// scope must declare those dependencies. Without this the writes never
+    /// subscribe and the view keeps its first layout forever.
+    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
+        vec![
+            crate::DynamicField::state("viewport", &self.viewport),
+            crate::DynamicField::state("previous_target", &self.previous_target),
+        ]
+    }
 }
 
 /// Positions one virtual row absolutely at its index, so offscreen rows take no

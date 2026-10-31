@@ -16,7 +16,7 @@ use cove_composition::layout::LayoutDirectionExt;
 use cove_composition::{Alignment, AnyView, LayoutDebugExt, TupleView, View, ViewExt, ViewGraph};
 use cove_core::scene::{Align, Direction, EventDispatcher, FlexDirection, Justify, Node, Wrap};
 use cove_platform::{InputEvent, MouseButton, MouseButtonEvent, PointerKind, WindowId};
-use cove_ui_compose::BoxView;
+use cove_ui_compose::{BoxView, Row, VerticalAlignment};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::primitives::controls::button::Button;
 use cove_ui_compose::primitives::layout::zstack::ZStack;
@@ -42,6 +42,15 @@ fn sized(width: f32, height: f32, name: &str) -> AnyView {
     )
 }
 
+/// The Swift `Row { ... }` wrapper the ZStack fixtures install into.
+fn row(children: Vec<AnyView>) -> AnyView {
+    AnyView::new(Row::new(
+        VerticalAlignment::Center,
+        0.0,
+        AnyView::new(TupleView::new(children)),
+    ))
+}
+
 fn unsized_box() -> AnyView {
     AnyView::new(BoxView::new(
         FlexDirection::Column,
@@ -57,7 +66,11 @@ fn unsized_box() -> AnyView {
 fn measures_and_aligns() {
     GlobalTestLock::with_scheduler(|| {
         let graph = support::graph();
-        let stack = AnyView::new(
+        // Swift installs `Row { ZStack { ... } }`. The `Row` matters: a stack
+        // installed directly at the root is stretched to the viewport's width by
+        // the root's stretch-fit, so it would measure 300 instead of its largest
+        // child's 100. Inside a row it is measured as content.
+        let stack = AnyView::new(row(vec![AnyView::new(
             AnyView::new(ZStack::new(
                 Alignment::TopLeading,
                 AnyView::new(TupleView::new(vec![
@@ -66,7 +79,7 @@ fn measures_and_aligns() {
                 ])),
             ))
             .debug_name("stack"),
-        );
+        )]));
         graph.install_view(stack, Default::default());
         graph.compute_layout(300.0, 200.0);
 
@@ -88,7 +101,7 @@ fn measures_and_aligns() {
         );
 
         // The default alignment centers the small child within the large one.
-        let stack = AnyView::new(
+        let stack = AnyView::new(row(vec![AnyView::new(
             AnyView::new(ZStack::new(
                 Alignment::Center,
                 AnyView::new(TupleView::new(vec![
@@ -97,7 +110,7 @@ fn measures_and_aligns() {
                 ])),
             ))
             .debug_name("stack"),
-        );
+        )]));
         graph.install_view(stack, Default::default());
         graph.compute_layout(300.0, 200.0);
         assert_eq!(
@@ -121,7 +134,7 @@ fn rtl_alignment() {
         // concrete type, and a modifier applied to the erased value attaches to a
         // wrapper node rather than to the stack's own layout node — so the
         // children would still read the inherited direction.
-        let stack = AnyView::new(
+        let stack = AnyView::new(row(vec![AnyView::new(
             ZStack::new(
                 Alignment::TopLeading,
                 AnyView::new(TupleView::new(vec![
@@ -130,7 +143,7 @@ fn rtl_alignment() {
                 ])),
             )
             .layout_direction(Direction::Rtl),
-        );
+        )]));
         graph.install_view(stack, Default::default());
         graph.compute_layout(300.0, 200.0);
         assert_eq!(

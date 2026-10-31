@@ -458,6 +458,7 @@ dependencies = [
 name = "cove-ui-compose"
 version = "0.3.0-dev"
 dependencies = [
+ "cc",
  "cove-composition",
  "cove-core",
  "cove-graphics",

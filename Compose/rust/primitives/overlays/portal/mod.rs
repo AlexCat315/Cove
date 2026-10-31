@@ -8,7 +8,8 @@ pub use fit_constraints::PortalFitConstraints;
 pub use overlay_placement::OverlayPlacement;
 pub use portal_placement::{PortalPlacement, PortalPlacementMode, portal_window_bounds};
 pub use portal_registry::{
-    PortalEntry, PortalResource, PortalStore, PortalStoreEnvironment, PortalStoreHolder,
+    PortalEntry, PortalResource, PortalStore, PortalStoreAmbient, PortalStoreEnvironment,
+    PortalStoreHolder,
 };
 pub mod layer_root;
 pub mod portal_host;

@@ -47,9 +47,12 @@ pub trait FrameUploader: Send {
 /// through this frame; retaining a ticket does not make it a persistent image.
 /// Backend texture IDs may be recycled, but old tickets never become current.
 ///
-/// Swift distinguishes tickets by reference identity; `generation` plays that
-/// role here, so two tickets for the same swapchain frame compare equal and
-/// tickets from different acquisitions never do.
+/// Swift distinguishes tickets by *reference identity* (`Plan.swift:51`,
+/// `lhs === rhs`). `generation` alone cannot stand in for that: every backend
+/// sets it per *window*, not per acquisition, so two acquisitions of the same
+/// pooled texture were fully field-equal and a stale ticket could pass the
+/// presentation guard and consume the current frame. `serial` is unique per
+/// acquisition and participates in equality, which restores the Swift semantics.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct SwapchainImage {
     pub swapchain: Swapchain,
@@ -57,9 +60,12 @@ pub struct SwapchainImage {
     pub texture: Texture,
     pub width: usize,
     pub height: usize,
+    /// Per-acquisition identity. Never compared against a saved value; only two
+    /// tickets created by the same acquisition share it.
+    pub serial: u64,
 }
 impl SwapchainImage {
-    pub const fn new(
+    pub fn new(
         swapchain: Swapchain,
         generation: u64,
         texture: Texture,
@@ -72,8 +78,16 @@ impl SwapchainImage {
             texture,
             width,
             height,
+            serial: next_acquisition_serial(),
         }
     }
+}
+
+/// Monotonic per-process acquisition counter. Distinct acquisitions never share
+/// a serial, which is what `SwapchainImage` equality relies on.
+fn next_acquisition_serial() -> u64 {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
 
 /// One linear command stream for a single queue submission. Barriers are

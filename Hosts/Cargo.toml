@@ -58,5 +58,5 @@ name = "surface_metrics_tests"
 path = "rust/tests/surface_metrics_tests.rs"
 
 [[test]]
-name = "sm_probe"
-path = "rust/tests/sm_probe.rs"
+name = "session_tests"
+path = "rust/tests/session_tests.rs"

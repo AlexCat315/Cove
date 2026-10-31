@@ -70,6 +70,15 @@ impl View for Modal {
             content: self.content.clone(),
         })
     }
+
+    /// `retained` keeps the panel mounted and painting while it animates out
+    /// (`Modal.swift:21-25`). `AnimatedVisibility::on_finished` writes it, but
+    /// nothing subscribed, so the portal was released in the dismissal frame and
+    /// the exit visibly snapped. `Sheet`, `Dialog`, `ActionSheet` and `Toast` all
+    /// route through `Modal`, so this fixes the whole modal family.
+    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
+        vec![crate::DynamicField::state("retained", &self.retained)]
+    }
 }
 
 struct ModalPresenter {

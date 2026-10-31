@@ -60,5 +60,5 @@ name = "workspace_controller_tests"
 path = "rust/tests/workspace_controller_tests.rs"
 
 [[test]]
-name = "zz_name_probe"
-path = "rust/tests/zz_name_probe.rs"
+name = "workspace_view_tests"
+path = "rust/tests/workspace_view_tests.rs"

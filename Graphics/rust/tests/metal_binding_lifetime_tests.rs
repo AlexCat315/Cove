@@ -45,8 +45,8 @@ use cove_graphics::rhi::{
     BindingSetDescriptor, BindingSetEntry, BindingType, Buffer, BufferDescriptor, BufferUsage,
     CommandBuffer, ComputePipelineDescriptor, Device, DeviceConfig, GraphicsApi,
     PipelineLayoutDescriptor, QueueClass, RhiBackend, RhiError, Sampler, SamplerDescriptor,
-    ShaderFormat, ShaderModuleDescriptor, ShaderStage, ShaderVisibility, Texture,
-    TextureDescriptor, TextureFormat, TextureUsage,
+    ShaderModuleDescriptor, ShaderStage, ShaderVisibility, Texture, TextureDescriptor,
+    TextureFormat, TextureUsage,
 };
 
 fn frontend_device() -> Option<Device> {

@@ -478,15 +478,21 @@ impl SceneEditor {
     /// handled and the host must not forward it to the scene.
     pub fn intercept(&self, event: &cove_platform::InputEvent) -> bool {
         use cove_platform::InputEvent;
-        if let InputEvent::MouseButtonUp(button) = event
-            && let Some(position) = self
-                .swallowed_buttons
-                .borrow()
-                .iter()
-                .position(|candidate| *candidate == button.button)
-        {
-            self.swallowed_buttons.borrow_mut().remove(position);
-            return true;
+        if let InputEvent::MouseButtonUp(button) = event {
+            // Resolve the position in its own scope: under Rust 2024 the temporary
+            // `RefMut` from an `if let` scrutinee lives for the whole body, so
+            // calling `borrow_mut()` inside it panics with "RefCell already
+            // borrowed" on every second mouse-up while picking.
+            let position = {
+                self.swallowed_buttons
+                    .borrow()
+                    .iter()
+                    .position(|candidate| *candidate == button.button)
+            };
+            if let Some(position) = position {
+                self.swallowed_buttons.borrow_mut().remove(position);
+                return true;
+            }
         }
         if !self.picking.get() {
             return false;

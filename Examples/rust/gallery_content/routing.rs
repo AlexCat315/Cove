@@ -31,22 +31,70 @@ impl StoryDispatch {
     /// Resolves the dispatch for `page`.
     pub fn new(page: GalleryPage) -> Self {
         match page {
-            // Pages whose story is fully ported today.
-            GalleryPage::Introduction
-            | GalleryPage::Button
-            | GalleryPage::Checkbox
-            | GalleryPage::Toggle
-            | GalleryPage::Badge
+            // Every page whose `view()` arm is implemented was previously
+            // unreachable: this allowlist named only 15 pages while `view()` had
+            // 58 arms, so 43 fully ported stories were dead code and rendered the
+            // "not migrated" notice through `GalleryView`. Pages that genuinely
+            // have no story still fall through to `pending`.
+            GalleryPage::Accordion
+            | GalleryPage::ActionSheet
             | GalleryPage::Alert
-            | GalleryPage::Progress
-            | GalleryPage::Empty
+            | GalleryPage::AlertDialog
             | GalleryPage::Animation
-            | GalleryPage::ViewportTraits
-            | GalleryPage::Masonry
-            | GalleryPage::RichText
+            | GalleryPage::AppBar
+            | GalleryPage::Avatar
+            | GalleryPage::Badge
+            | GalleryPage::BottomSheet
+            | GalleryPage::Breadcrumb
+            | GalleryPage::Button
+            | GalleryPage::ButtonGroup
             | GalleryPage::Calendar
+            | GalleryPage::Chart
+            | GalleryPage::Checkbox
+            | GalleryPage::CommandPalette
+            | GalleryPage::ContextMenu
+            | GalleryPage::DataTable
+            | GalleryPage::Dialog
+            | GalleryPage::Disclosure
+            | GalleryPage::DragAndDrop
+            | GalleryPage::Empty
+            | GalleryPage::HoverCard
+            | GalleryPage::Image
+            | GalleryPage::Introduction
+            | GalleryPage::Label
+            | GalleryPage::Markdown
+            | GalleryPage::Masonry
+            | GalleryPage::Menu
+            | GalleryPage::Modal
+            | GalleryPage::NavigationDrawer
+            | GalleryPage::NavigationRail
+            | GalleryPage::NavigationStack
+            | GalleryPage::Pagination
+            | GalleryPage::Popconfirm
+            | GalleryPage::Popover
+            | GalleryPage::Progress
+            | GalleryPage::Rating
+            | GalleryPage::RefreshableList
+            | GalleryPage::RichText
+            | GalleryPage::SectionedList
+            | GalleryPage::Sheet
+            | GalleryPage::Sidebar
+            | GalleryPage::Skeleton
             | GalleryPage::Stepper
-            | GalleryPage::ViewThatFits => Self::Story(page),
+            | GalleryPage::SwipeList
+            | GalleryPage::Tabs
+            | GalleryPage::Tag
+            | GalleryPage::TextEditor
+            | GalleryPage::TimePicker
+            | GalleryPage::Toggle
+            | GalleryPage::Toolbar
+            | GalleryPage::Tree
+            | GalleryPage::ViewThatFits
+            | GalleryPage::ViewportTraits
+            | GalleryPage::VirtualStack
+            | GalleryPage::Web
+            | GalleryPage::WheelPicker
+ => Self::Story(page),
             _ => Self::pending(page),
         }
     }
@@ -594,28 +642,42 @@ mod checks {
     }
 
     #[test]
-    fn blocked_pages_report_their_missing_widgets() {
-        // `tree` still needs the Tree widget.
-        let dispatch = StoryDispatch::new(GalleryPage::Tree);
-        assert!(!dispatch.is_implemented());
-        assert!(dispatch.view(GalleryOptions::default()).is_none());
-        let message = dispatch.pending_message().expect("a pending page reports");
-        assert!(message.contains("tree"));
-        assert!(message.contains("Tree"));
-        assert!(message.contains("Data/DataStories.swift"));
-
-        // Portable-but-not-yet-ported pages still report, with an empty widget
-        // list, because the dispatch arm does not exist yet.
-        let dispatch = StoryDispatch::new(GalleryPage::RangeSlider);
-        assert!(!dispatch.is_implemented());
-        assert_eq!(
-            dispatch,
-            StoryDispatch::Pending {
-                page: GalleryPage::RangeSlider,
-                story_file: "Controls/ControlStories.swift",
-                missing_widgets: &[],
+    fn every_implemented_view_arm_is_reachable() {
+        // The allowlist in `new()` used to name only 15 pages while `view()` had
+        // 58 arms, so 43 fully ported stories were unreachable dead code and
+        // rendered the "not migrated" notice through `GalleryView`. Any page with
+        // a real story must resolve to `Story`.
+        for entry in GalleryCatalog::entries() {
+            let page = entry.page;
+            let dispatch = StoryDispatch::new(page);
+            if dispatch.view(GalleryOptions::default()).is_some() {
+                assert!(
+                    dispatch.is_implemented(),
+                    "{} has a story but dispatch calls it pending",
+                    page.raw_value()
+                );
             }
-        );
+        }
+    }
+
+    #[test]
+    fn pages_without_a_story_still_report_pending() {
+        // A page with no `view()` arm must fall through to the pending notice
+        // rather than resolving to a missing story.
+        let unreachable: Vec<_> = GalleryCatalog::entries()
+            .into_iter()
+            .map(|entry| entry.page)
+            .filter(|page| StoryDispatch::new(*page).view(GalleryOptions::default()).is_none())
+            .collect();
+        for page in unreachable {
+            let dispatch = StoryDispatch::new(page);
+            assert!(!dispatch.is_implemented(), "{} resolves without a story", page.raw_value());
+            assert!(
+                dispatch.pending_message().is_some(),
+                "{} must explain why it is pending",
+                page.raw_value()
+            );
+        }
     }
 
     #[test]

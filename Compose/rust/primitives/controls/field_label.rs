@@ -134,14 +134,25 @@ impl ButtonStyle for FieldLabelStyle {
             cove_core::Color::CLEAR
         };
         AnyView::new(
+            // `Stretch` on the cross axis, not `Center`: a centred row
+            // shrink-to-fits its child, so the label was measured unconstrained
+            // (306pt intrinsic) inside a 220pt host and never wrapped. Swift's
+            // row hands its definite width down, which is what makes the label
+            // wrap. The glyphs stay centred because the label fills the row.
+            // Swift puts `.flex(1, shrink: 1).frame(minWidth: 0)` on the *row*
+            // (FieldLabel.swift:44), not only on the label. Without it the row
+            // shrink-to-fits, so the label is measured unconstrained at its
+            // 306pt intrinsic width inside a 220pt host and never wraps.
             crate::BoxView::new(
                 cove_core::scene::FlexDirection::Row,
                 cove_core::scene::Align::Center,
                 cove_core::scene::Justify::FlexStart,
                 cove_core::scene::Wrap::NoWrap,
                 0.0,
-                AnyView::new(label.flex(1.0).shrink(1.0).frame_min_width(0.0)),
+                AnyView::new(label.flex(0.0).shrink(1.0).frame_min_width(0.0)),
             )
+            .flex(1.0)
+            .shrink(1.0)
             .frame_min_width(0.0)
             .border_color(border, if configuration.is_focused { 1.0 } else { 0.0 }),
         )

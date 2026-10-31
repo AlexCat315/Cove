@@ -341,6 +341,15 @@ impl<T: Clone + 'static> View for LazyGridView<T> {
     fn tag(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
+
+    /// `body` reads `visible_rows` from `State`, so the
+    /// scope must declare those dependencies. Without this the writes never
+    /// subscribe and the view keeps its first layout forever.
+    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
+        vec![
+            crate::DynamicField::state("visible_rows", &self.visible_rows),
+        ]
+    }
 }
 impl<T: Clone + 'static> LazyGridView<T> {
     fn cells(&self, row: usize, rows: &LazyGridRows, height: f32) -> AnyView {

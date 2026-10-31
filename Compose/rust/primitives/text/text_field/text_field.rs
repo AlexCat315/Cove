@@ -444,6 +444,37 @@ fn install_text_input_client(node: &Node, field: &TextField, state: &Rc<RefCell<
 
 fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldState>>) {
     install_text_input_client(node, field, &state);
+    // Publish the caller's `TextFieldEvents` callbacks on the node. Every handler
+    // below *reads* these attachments, but nothing ever wrote them, so
+    // `on_submit`/`on_change`/`on_blur` and friends were silently dead — a
+    // `TextField` with an `on_submit` could never commit on Return. Swift calls
+    // them directly from the host (`TextField.swift:588`,
+    // `TextFieldHost.swift:134`). Swift installs these unconditionally, including
+    // while disabled, because the disabled path still publishes chrome state.
+    if let Some(handler) = field.events.on_submit.clone() {
+        node.set_attachment("__textfield_submit", handler);
+    }
+    if let Some(handler) = field.events.on_change.clone() {
+        node.set_attachment("__textfield_change", handler);
+    }
+    if let Some(handler) = field.events.on_focus.clone() {
+        node.set_attachment("__textfield_focus", handler);
+    }
+    if let Some(handler) = field.events.on_blur.clone() {
+        node.set_attachment("__textfield_blur", handler);
+    }
+    if let Some(handler) = field.events.on_clear.clone() {
+        node.set_attachment("__textfield_clear", handler);
+    }
+    if let Some(handler) = field.events.on_key_down.clone() {
+        node.set_attachment("__textfield_key", handler);
+    }
+    if let Some(handler) = field.events.on_hover_change.clone() {
+        node.set_attachment("__textfield_hover", handler);
+    }
+    if let Some(handler) = field.events.on_caret_change.clone() {
+        node.set_attachment("__textfield_caret", handler);
+    }
     let Some(registry) = InteractionRegistryHolder::current() else {
         return;
     };
@@ -574,6 +605,79 @@ fn install_interaction(node: &Node, field: &TextField, state: Rc<RefCell<FieldSt
                     EventResult::Handled
                 }
             }
+        }),
+    );
+
+    // Typed text and IME composition. Swift registers both on the same
+    // `.textInput` route (`TextFieldInputController.swift:23,32`). Without them
+    // `EventDispatcher::dispatch_text` finds no handler and every keystroke is a
+    // no-op — the platform layer cannot enter text on desktop or Android.
+    let text_node = node.downgrade();
+    let text_state = state.clone();
+    let text_behavior = field.behavior.clone();
+    let text_binding = field.text.clone();
+    registry.set_text(
+        node,
+        InputHandlerRoute::text_input(),
+        Rc::new(move |incoming: &str, _phase| {
+            if text_behavior.read_only {
+                return EventResult::Handled;
+            }
+            let Some(owner) = Node::upgrade(&text_node) else {
+                return EventResult::Ignored;
+            };
+            crate::primitives::text::text_field::text_field_editing::insert_replacing_selection(
+                &mut text_state.borrow_mut(),
+                incoming,
+            );
+            text_state.borrow_mut().record_activity();
+            // Publish the edit back to the caller's binding. Nothing ever wrote
+            // `field.text`, so `TextFieldHost::update_node` re-read the unchanged
+            // binding on the next pass and normalised the internal buffer back —
+            // the user's keystrokes were discarded before any commit could see
+            // them. Swift assigns through the binding itself.
+            let buffer = text_state.borrow().buffer.clone();
+            text_binding.set(buffer.clone());
+            if let Some(handler) =
+                owner.attachment::<Rc<dyn Fn(&TextBuffer)>>("__textfield_change")
+            {
+                handler(&buffer);
+            }
+            EventResult::Handled
+        }),
+    );
+
+    let editing_node = node.downgrade();
+    let editing_state = state.clone();
+    let editing_behavior = field.behavior.clone();
+    registry.set_editing(
+        node,
+        InputHandlerRoute::text_input(),
+        Rc::new(move |event: &cove_platform::TextEditingEvent, _phase| {
+            if editing_behavior.read_only {
+                return EventResult::Handled;
+            }
+            let Some(owner) = Node::upgrade(&editing_node) else {
+                return EventResult::Ignored;
+            };
+            let mut state = editing_state.borrow_mut();
+            // `FieldCompositionState` stores `usize` offsets while the platform
+            // event carries `i32`, so clamp in the event's domain and convert
+            // once. The subtraction saturates: a length past the text end is
+            // simply the remainder.
+            let count = event.text.chars().count() as i32;
+            let start = event.start.clamp(0, count) as usize;
+            state.composition.text = event.text.clone();
+            state.composition.start = start;
+            state.composition.length = event
+                .length
+                .clamp(0, (count - start as i32).max(0)) as usize;
+            drop(state);
+            editing_state.borrow_mut().record_activity();
+            if let Some(handler) = owner.attachment::<Rc<dyn Fn()>>("__textfield_editing") {
+                handler();
+            }
+            EventResult::Handled
         }),
     );
 

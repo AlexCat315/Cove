@@ -540,4 +540,13 @@ impl View for TouchHoverCard {
         );
         AnyView::new(column)
     }
+
+    /// `body` reads `is_presented` from `State`, so the
+    /// scope must declare those dependencies. Without this the writes never
+    /// subscribe and the view keeps its first layout forever.
+    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
+        vec![
+            crate::DynamicField::state("is_presented", &self.is_presented),
+        ]
+    }
 }

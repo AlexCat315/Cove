@@ -672,17 +672,28 @@ fn flash_touch_indicator(node: &Node) {
         return;
     }
     let weak = node.downgrade();
-    node.animatable_set_with(
-        "__scrollview.chromeFade",
-        1.0_f32,
-        0.0_f32,
-        move |opacity| {
-            if let Some(owner) = Node::upgrade(&weak) {
-                owner.set_attachment(CHROME_OPACITY, opacity);
-                owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
-                    "scrollbarChromeOpacity",
-                ));
-            }
+    // Swift wraps this fade in `withAnimation(.easeOut(duration: 0.3, delay: 0.7))`.
+    // Without the context `animatable_set_with` snaps, so the reveal above and this
+    // fade collapse into 0 -> 1 -> 0 in one call and the indicator is never seen.
+    cove_core::scene::with_animation(
+        Some(
+            cove_core::scene::Animation::new(0.3, cove_core::scene::AnimationCurve::EaseOut)
+                .with_delay(0.7),
+        ),
+        || {
+            node.animatable_set_with(
+                "__scrollview.chromeFade",
+                1.0_f32,
+                0.0_f32,
+                move |opacity| {
+                    if let Some(owner) = Node::upgrade(&weak) {
+                        owner.set_attachment(CHROME_OPACITY, opacity);
+                        owner.mark_render_dirty(cove_core::scene::InvalidationSource::style_set(
+                            "scrollbarChromeOpacity",
+                        ));
+                    }
+                },
+            );
         },
     );
 }
@@ -1444,7 +1455,10 @@ fn install_interaction(
                 if !next_state.dragged {
                     next_state.dragged = true;
                     if let Some(capture) = PointerCaptureHolder::current() {
-                        capture.acquire(&owner, true);
+                        // Non-transferable, matching Swift's bare `acquire(node)`
+                        // (`ScrollView.swift:585`). Marking it transferable let the
+                        // scroll steal an in-flight slider or resize drag.
+                        capture.acquire(&owner, false);
                     }
                 }
                 owner.set_attachment(CONTENT_DRAG_STATE, next_state);

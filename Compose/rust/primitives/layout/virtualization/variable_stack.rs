@@ -165,4 +165,14 @@ impl<Id: Ord + Clone + 'static> View for VariableVirtualStack<Id> {
             })),
         )
     }
+
+    /// `body` reads `offset`, `viewport` from `State`, so the
+    /// scope must declare those dependencies. Without this the writes never
+    /// subscribe and the view keeps its first layout forever.
+    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
+        vec![
+            crate::DynamicField::state("offset", &self.offset),
+            crate::DynamicField::state("viewport", &self.viewport),
+        ]
+    }
 }

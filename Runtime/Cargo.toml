@@ -39,3 +39,7 @@ path = "rust/tests/frame_deadline_tests.rs"
 [[test]]
 name = "draw_list_tests"
 path = "rust/tests/draw_list_tests.rs"
+
+[[test]]
+name = "native_accessibility_tests"
+path = "rust/tests/native_accessibility_tests.rs"

@@ -293,6 +293,15 @@ impl View for SplitView {
     fn tag(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
+
+    /// `body` reads `measured_extent` from `State`, so the
+    /// scope must declare those dependencies. Without this the writes never
+    /// subscribe and the view keeps its first layout forever.
+    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
+        vec![
+            crate::DynamicField::state("measured_extent", &self.measured_extent),
+        ]
+    }
 }
 
 impl SplitView {

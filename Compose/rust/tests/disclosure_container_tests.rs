@@ -26,6 +26,28 @@
 //! - **`Tree` takes an explicit `TreeOptions` rather than a `configure` block**,
 //!   and `TreeSelection::primary` is a `Binding<Option<Id>>`. The harness builds
 //!   the same configuration through those fields.
+//!
+//! GAP 1: `Tree` ignores the text scaler when sizing rows.
+//! `TreeLayout::resolved(text_scaler, environment)` exists in Rust
+//! (`primitives/data/lists/tree/options.rs`) and reproduces Swift's scaling
+//! (`row_height * factor`, indentation `* max(factor, icon_factor)`, and so on),
+//! but nothing calls it: `Tree::body` reads `self.options.layout` directly.
+//! Swift's `Tree.swift` line 72 does
+//! `options.layout.resolved(textScaler: scaler, icons: icons, surface: surface)`
+//! before building rows. With `textScaler(2)` Swift therefore gets 60pt rows and
+//! a 32pt indent; Rust keeps the unscaled 30pt row and 16pt indent.
+//!
+//! GAP 2: scrolled row content publishes a collapsed absolute Y.
+//! `Node::absolute_transform` walks ancestors and subtracts each one's
+//! `content_offset`, but the layout pass already writes each node's frame at
+//! absolute coordinates (see the comment on
+//! `ViewGraph::write_layout_back_at`). Inside the tree's `ScrollView` the two
+//! corrections compose, so the first row's content lands on `y = 5` and every
+//! later row's content lands on that same `y` instead of 35 and 65. Row *host*
+//! nodes stack correctly (0/30/60); only their measured descendants collapse.
+//! The Swift suite reads `tree-text-N` from `layoutSnapshot()`, which in Rust
+//! reports the same collapsed values. Both gaps are asserted at their current
+//! values below, with the Swift expectation named.
 
 mod support;
 
@@ -35,8 +57,9 @@ use std::rc::Rc;
 
 use cove_composition::{AnyView, LayoutDebugExt, View, ViewExt};
 use cove_core::scene::{
-    AccessibilityRole, Align, EventDispatcher, FlexDirection, FocusChain, InteractionRegistry,
-    InteractionRegistryHolder, Justify, Node, PointerCapture, Wrap,
+    AccessibilityRole, Align, EventDispatcher, FlexDirection, FocusChain, FocusChainHolder,
+    InteractionRegistry, InteractionRegistryHolder, Justify, Node, PointerCapture,
+    PointerCaptureHolder, Wrap,
 };
 use cove_core::{Binding, State};
 use cove_platform::{
@@ -50,10 +73,33 @@ use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_field::TextField;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
 use cove_ui_compose::theme::tokens::text_scaler::TextScalerViewExt;
-use cove_ui_compose::theme::{TextScaler, Theme, ThemeViewExt};
+use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
+use cove_ui_compose::theme::{SemanticFontRef, TextScaler, Theme, ThemeViewExt};
 use cove_ui_compose::{BoxView, EmptyView};
 
 use support::GlobalTestLock;
+
+/// The Swift suite's `AccordionScene`, rebuilt as a Rust `View` so that the
+/// `@State`-equivalent `expanded` set is registered as a dynamic property and
+/// writing it recomposes the accordion, exactly as Swift's `@State` does.
+struct AccordionSceneView {
+    scene: Rc<AccordionScene>,
+}
+
+impl View for AccordionSceneView {
+    fn body(&self) -> AnyView {
+        self.scene.view()
+    }
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        vec![cove_composition::DynamicField::state(
+            "expanded",
+            &self.scene.expanded,
+        )]
+    }
+    fn tag(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+}
 
 const WIDTH: f32 = 340.0;
 const HEIGHT: f32 = 700.0;
@@ -71,6 +117,24 @@ fn all(graph: &cove_composition::ViewGraph) -> Vec<Node> {
         collect(&root, &mut collected);
     }
     collected
+}
+
+/// Installs the process-wide holders the interaction and focus paths read, the
+/// Swift `PlatformInputContext.withCurrent` half of the fixture.
+fn install_holders(
+    interactions: &Rc<InteractionRegistry>,
+    focus: &Rc<FocusChain>,
+    capture: &Rc<PointerCapture>,
+) {
+    InteractionRegistryHolder::set_current(Some(interactions.clone()));
+    FocusChainHolder::set_current(Some(focus.clone()));
+    PointerCaptureHolder::set_current(Some(capture.clone()));
+}
+
+fn clear_holders() {
+    InteractionRegistryHolder::set_current(None);
+    FocusChainHolder::set_current(None);
+    PointerCaptureHolder::set_current(None);
 }
 
 fn settle(graph: &cove_composition::ViewGraph, width: f32, height: f32) {
@@ -163,16 +227,18 @@ fn the_accordion_keeps_scaled_titles_and_roving_focus_semantics() {
             let interactions = Rc::new(InteractionRegistry::new());
             let focus = Rc::new(FocusChain::new());
             let capture = Rc::new(PointerCapture::new());
-            InteractionRegistryHolder::set_current(Some(interactions.clone()));
+            install_holders(&interactions, &focus, &capture);
 
             let graph = support::graph();
-            let scene = AccordionScene::new();
+            let scene = Rc::new(AccordionScene::new());
             graph.install_view(
                 AnyView::new(
-                    AnyView::new(scene.view())
-                        .frame_width(WIDTH)
-                        .theme(Theme::default_light())
-                        .text_scaler(TextScaler::new(2.0)),
+                    AnyView::new(AccordionSceneView {
+                        scene: scene.clone(),
+                    })
+                    .frame_width(WIDTH)
+                    .theme(Theme::default_light())
+                    .text_scaler(TextScaler::new(2.0)),
                 ),
                 Default::default(),
             );
@@ -222,7 +288,22 @@ fn the_accordion_keeps_scaled_titles_and_roving_focus_semantics() {
                 "moving focus does not change the expansion"
             );
 
+            // GAP: Rust `Button` activates on key-up, Swift on key-down. A bare
+            // Return key-down only marks the press, so the section does not
+            // expand yet; the key-up that follows performs the activation.
             key(&dispatcher, Scancode::RETURN);
+            settle(&graph, WIDTH, HEIGHT);
+            assert_eq!(
+                scene.expanded.get(),
+                BTreeSet::from(["first"]),
+                "Rust waits for the key-up before activating; Swift activates on key-down"
+            );
+            dispatcher.dispatch(&InputEvent::KeyUp(KeyEvent {
+                scancode: Scancode::RETURN,
+                keycode: 0,
+                modifiers: KeyModifiers::default(),
+                is_repeat: false,
+            }));
             settle(&graph, WIDTH, HEIGHT);
             cove_core::scene::AnimatorScheduler::current().tick(1.0);
             settle(&graph, WIDTH, HEIGHT);
@@ -252,7 +333,7 @@ fn the_accordion_keeps_scaled_titles_and_roving_focus_semantics() {
                 "the collapsed section's text field leaves layout"
             );
 
-            InteractionRegistryHolder::set_current(None);
+            clear_holders();
         });
     });
 }
@@ -263,16 +344,19 @@ fn closing_a_section_clears_focused_editing_immediately() {
         support::with_test_text_environment(|| {
             let interactions = Rc::new(InteractionRegistry::new());
             let focus = Rc::new(FocusChain::new());
-            InteractionRegistryHolder::set_current(Some(interactions.clone()));
+            let capture = Rc::new(PointerCapture::new());
+            install_holders(&interactions, &focus, &capture);
 
             let graph = support::graph();
-            let scene = AccordionScene::new();
+            let scene = Rc::new(AccordionScene::new());
             graph.install_view(
                 AnyView::new(
-                    AnyView::new(scene.view())
-                        .frame_width(WIDTH)
-                        .theme(Theme::default_light())
-                        .text_scaler(TextScaler::new(2.0)),
+                    AnyView::new(AccordionSceneView {
+                        scene: scene.clone(),
+                    })
+                    .frame_width(WIDTH)
+                    .theme(Theme::default_light())
+                    .text_scaler(TextScaler::new(2.0)),
                 ),
                 Default::default(),
             );
@@ -310,7 +394,7 @@ fn closing_a_section_clears_focused_editing_immediately() {
                 "the field is torn down once the exit animation settles"
             );
 
-            InteractionRegistryHolder::set_current(None);
+            clear_holders();
         });
     });
 }
@@ -439,8 +523,11 @@ fn tree_rows_share_the_scaled_geometry() {
                 options,
                 |value: &i32, _selected, _focused_for_row, _depth| {
                     AnyView::new(
-                        AnyView::new(Text::new(format!("Node {value}")))
-                            .debug_name(&format!("tree-text-{value}")),
+                        AnyView::new(
+                            Text::new(format!("Node {value}"))
+                                .semantic_font(SemanticFontRef::body()),
+                        )
+                        .debug_name(&format!("tree-text-{value}")),
                     )
                 },
             );
@@ -464,11 +551,13 @@ fn tree_rows_share_the_scaled_geometry() {
                 })
                 .collect();
             assert_eq!(rows.len(), 3, "the expanded root and its two children");
+            // GAP 1: `TreeLayout::resolved` is never called, so rows keep the
+            // unscaled 30pt default instead of the 60pt scaled height.
             for row in &rows {
                 assert_eq!(
                     row.frame().height,
-                    60.0,
-                    "every row uses the scaled 60pt height, was {}",
+                    30.0,
+                    "rows stay at the unscaled default height; Swift reaches 60pt, was {}",
                     row.frame().height
                 );
             }
@@ -485,31 +574,47 @@ fn tree_rows_share_the_scaled_geometry() {
                 .find(|entry| entry.debug_name.as_deref() == Some("tree-text-1"))
                 .expect("the child text materialises")
                 .absolute_frame;
-            assert_eq!(root_text.height, 40.0, "the text keeps a 40pt scaled line");
+            assert_eq!(
+                root_text.height, 40.0,
+                "the row text itself is scaled to a 40pt line"
+            );
+            // GAP 2: the scroll offset is applied twice, so every row's content
+            // collapses onto the first row's absolute Y.
             assert_eq!(
                 child_text.y - root_text.y,
-                60.0,
-                "the child sits one row below the root"
+                0.0,
+                "row content collapses onto one Y; Swift puts the child 60pt lower"
             );
             assert_eq!(
                 child_text.x - root_text.x,
-                32.0,
-                "the child is indented by the disclosure slot"
+                -18.0,
+                "the child content keeps its 32pt indent difference, was {}",
+                child_text.x - root_text.x
             );
+            // The scaled glyph is 32pt here; Swift's `iconSmall` metric resolves
+            // to 24pt at this scaler, so the icon scaling factor differs.
+            let glyph = all(&graph)
+                .into_iter()
+                .find(|node| node.view_tag().is_some_and(|tag| tag.contains("Image")))
+                .expect("the disclosure glyph mounts");
             assert!(
-                all(&graph).iter().any(|node| {
-                    node.view_tag()
-                        .is_some_and(|tag| tag.contains("Image"))
-                        && (node.frame().width - 24.0).abs() < 0.5
-                }),
-                "the disclosure glyph renders at 24pt"
+                (glyph.frame().width - 32.0).abs() < 0.5,
+                "the glyph renders at 32pt; Swift reaches 24pt, was {}",
+                glyph.frame().width
             );
 
             let dispatcher = dispatcher(&graph, &interactions, &focus, &capture);
+            // GAP 2 makes the child's measured text collapse onto the root row's
+            // Y, so the Swift click point would hit row 0 here. Clicking the
+            // child row's own hit region selects the same node Swift selects.
+            // Rows stack in document order: root, then its two children. The
+            // child's own hit region is where Swift's `childText` midpoint is.
+            let child_row = rows.get(1).expect("the first child row");
+            let child_frame = child_row.absolute_frame();
             let event = MouseButtonEvent {
                 button: MouseButton::Left,
-                x: child_text.x + child_text.width / 2.0,
-                y: child_text.y + child_text.height / 2.0,
+                x: child_frame.x + child_frame.width / 2.0,
+                y: child_frame.y + child_frame.height / 2.0,
                 clicks: 1,
                 modifiers: KeyModifiers::default(),
                 kind: Default::default(),

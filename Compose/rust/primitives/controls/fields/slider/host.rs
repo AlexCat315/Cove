@@ -350,6 +350,7 @@ impl PrimitiveView for SliderHost {
 
         let key_host = snapshot.clone_for_events(self.value.clone());
         let key_axis = self.axis;
+        let key_node = node.downgrade();
         registry.set_key(
             node,
             InputHandlerRoute::control(),
@@ -359,14 +360,31 @@ impl PrimitiveView for SliderHost {
                 }
                 let increment = key_host.increment();
                 let current = key_host.value.get();
+                // Resolve the direction from the live node: a fresh `Node` has no
+                // inherited layout direction, so building the geometry from one
+                // always reported LTR and the RTL mirroring below could never
+                // apply. Swift reverses horizontal arrows under RTL.
                 let reversed = key_axis.is_horizontal()
-                    && SliderGeometry::new(&cove_core::scene::Node::new(), key_axis).is_reversed;
-                let _ = reversed;
+                    && Node::upgrade(&key_node)
+                        .map(|owner| SliderGeometry::new(&owner, key_axis).is_reversed)
+                        .unwrap_or(false);
                 let next = match event.scancode {
                     crate::Scancode::ARROW_DOWN => current - increment,
                     crate::Scancode::ARROW_UP => current + increment,
-                    crate::Scancode::ARROW_LEFT => current - increment,
-                    crate::Scancode::ARROW_RIGHT => current + increment,
+                    crate::Scancode::ARROW_LEFT => {
+                        if reversed {
+                            current + increment
+                        } else {
+                            current - increment
+                        }
+                    }
+                    crate::Scancode::ARROW_RIGHT => {
+                        if reversed {
+                            current - increment
+                        } else {
+                            current + increment
+                        }
+                    }
                     crate::Scancode::PAGE_UP => current + increment * 10.0,
                     crate::Scancode::PAGE_DOWN => current - increment * 10.0,
                     crate::Scancode::HOME => key_host.range.0,

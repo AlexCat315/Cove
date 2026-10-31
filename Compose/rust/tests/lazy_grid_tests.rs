@@ -7,17 +7,7 @@
 //! - nonpositive heights normalise, and fixed/variable geometry agrees
 //! - a large collection mounts only the viewport and clamps after a data shrink
 //! - a variable-height grid keeps its full extent with a partial last row
-//!
-//! Production gap (reported, not fixed): `LazyGrid`/`LazyGridView` hold their
-//! window in `State<Range<usize>>` (`visible_rows`/`visible_columns`) but never
-//! declare them in `dynamic_properties`. `ViewGraph` only wires state into the
-//! recomposer through that hook, so `visible_rows.set()` from the scroll
-//! geometry callback never schedules a recomposition. The window stays at its
-//! initial `0..1`, so a two-column grid mounts its first row only and never
-//! widens past it. Swift gets this for free from `@State`.
-//! `scroll_geometry_never_widens_the_mounted_window` pins the current behaviour
-//! at full strength, and the extent/mounting cases assert everything that is
-//! genuinely observable today.
+
 
 mod support;
 
@@ -168,38 +158,66 @@ struct BuildProbe {
     count: State<u32>,
 }
 
-fn harness(probe: Rc<BuildProbe>, count: State<usize>, offset: Rc<State<Point>>) -> AnyView {
-    let build = probe.clone();
-    let content = move |index: &usize| {
-        build.count.set(build.count.get() + 1);
-        AnyView::new(cell_box().debug_name(&format!("lazy-cell-{index}")))
-    };
-    AnyView::new(
-        AnyView::new(LazyGrid::new(
-            (0..count.get()).collect::<Vec<usize>>(),
-            Rc::new(|index: &usize| index.to_string()),
-            3,
-            GridRowHeights::fixed(20.0),
-            6.0,
-            5.0,
-            2,
-            Some(offset),
-            None,
-            None,
-            Rc::new(content),
-        ))
-        .frame_width(300.0)
-        .frame_height(100.0),
-    )
+/// The Swift `Harness`: `@State` row count and scroll offset driving a grid.
+struct Harness {
+    probe: Rc<BuildProbe>,
+    count: State<usize>,
+    offset: State<Point>,
+}
+
+impl View for Harness {
+    fn body(&self) -> AnyView {
+        let build = self.probe.clone();
+        let content = move |index: &usize| {
+            build.count.set(build.count.get() + 1);
+            AnyView::new(cell_box().debug_name(&format!("lazy-cell-{index}")))
+        };
+        AnyView::new(
+            AnyView::new(LazyGrid::new(
+                (0..self.count.get()).collect::<Vec<usize>>(),
+                Rc::new(|index: &usize| index.to_string()),
+                3,
+                GridRowHeights::fixed(20.0),
+                6.0,
+                5.0,
+                2,
+                Some(Rc::new(self.offset.clone())),
+                None,
+                None,
+                Rc::new(content),
+            ))
+            .frame_width(300.0)
+            .frame_height(100.0),
+        )
+    }
+
+    fn tag(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        vec![
+            cove_composition::DynamicField::state("count", &self.count),
+            cove_composition::DynamicField::state("offset", &self.offset),
+        ]
+    }
+}
+
+fn harness(probe: Rc<BuildProbe>, count: State<usize>, offset: State<Point>) -> AnyView {
+    AnyView::new(Harness {
+        probe,
+        count,
+        offset,
+    })
 }
 
 #[test]
-fn scroll_geometry_never_widens_the_mounted_window() {
+fn scroll_geometry_widens_the_mounted_window_to_the_viewport() {
     GlobalTestLock::locked(|| {
         let probe = Rc::new(BuildProbe {
             count: State::new(0),
         });
-        let offset = Rc::new(State::new(Point::default()));
+        let offset = State::new(Point::default());
         let graph = support::graph();
         graph.install_view(
             harness(probe.clone(), State::new(100_000), offset.clone()),
@@ -207,25 +225,48 @@ fn scroll_geometry_never_widens_the_mounted_window() {
         );
         settle(&graph, 300.0, 100.0);
 
+        // A 100pt viewport over 20pt rows with 5pt gaps holds rows 0..6, which
+        // is 6 rows x 3 columns = 18 cells. That is exactly what Swift mounts.
         let initial = mounted(&graph);
         assert_eq!(
-            initial
-                .iter()
-                .map(|(name, _)| name.as_str())
-                .collect::<Vec<_>>(),
-            ["lazy-cell-0", "lazy-cell-1", "lazy-cell-2"],
-            "only the initial 0..1 row window mounts, even though the 100pt viewport holds five rows"
+            initial.len(),
+            18,
+            "the window covers the whole viewport: {:?}",
+            initial.iter().map(|(name, _)| name.as_str()).collect::<Vec<_>>()
+        );
+        assert!(
+            initial.iter().any(|(name, _)| name == "lazy-cell-0"),
+            "row 0 is mounted"
+        );
+        assert!(
+            initial.iter().any(|(name, _)| name == "lazy-cell-17"),
+            "the last cell of the sixth row is mounted"
         );
 
         offset.set(Point::new(0.0, 200_000.0));
         settle(&graph, 300.0, 100.0);
+        let scrolled = mounted(&graph);
+        // Mid-list there is room for overscan on both edges: four visible rows
+        // plus two either side is eight rows, so 24 cells.
         assert_eq!(
-            mounted(&graph)
-                .iter()
-                .map(|(name, _)| name.as_str())
-                .collect::<Vec<_>>(),
-            ["lazy-cell-0", "lazy-cell-1", "lazy-cell-2"],
-            "the window never follows the scroll offset, so the same three cells stay mounted"
+            scrolled.len(),
+            24,
+            "a far offset mounts the viewport plus overscan on both edges: {:?}",
+            scrolled.iter().map(|(name, _)| name.as_str()).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            scrolled.first().map(|(name, _)| name.as_str()),
+            Some("lazy-cell-23994"),
+            "the window starts two rows above the visible top"
+        );
+        assert!(
+            !scrolled.iter().any(|(name, _)| name == "lazy-cell-0"),
+            "the first cell is unmounted once the viewport leaves it"
+        );
+        assert!(
+            probe.count.get() < 1_000,
+            "a far offset builds only a window, not the whole 100K collection, built {}",
+            probe.count.get()
         );
     });
 }
@@ -236,7 +277,7 @@ fn large_collections_mount_a_bounded_number_of_cells() {
         let probe = Rc::new(BuildProbe {
             count: State::new(0),
         });
-        let offset = Rc::new(State::new(Point::default()));
+        let offset = State::new(Point::default());
         let graph = support::graph();
         graph.install_view(
             harness(probe.clone(), State::new(100_000), offset.clone()),
@@ -285,8 +326,8 @@ fn large_collections_mount_a_bounded_number_of_cells() {
             mounted(&graph).len()
         );
         assert!(
-            probe.count.get() < 100,
-            "no additional cells are built for a far offset, built {}",
+            probe.count.get() < 1_000,
+            "a far offset builds only a window, not the whole 100K collection, built {}",
             probe.count.get()
         );
     });
@@ -323,8 +364,8 @@ fn variable_height_grid_keeps_full_extent_with_a_partial_last_row() {
                 .iter()
                 .map(|(name, _)| name.as_str())
                 .collect::<Vec<_>>(),
-            ["lazy-cell-0", "lazy-cell-1"],
-            "the initial window mounts row 0 only, because the window never widens"
+            ["lazy-cell-0", "lazy-cell-1", "lazy-cell-2", "lazy-cell-3"],
+            "a 50pt viewport over 15pt and 35pt rows mounts rows 0 and 1"
         );
         // Swift applies the row height to each cell, so the named node owns it.
         // The Rust `LazyGridFixedHeight` wrapper owns the height and its inner
@@ -344,6 +385,21 @@ fn variable_height_grid_keeps_full_extent_with_a_partial_last_row() {
         assert_eq!(
             cells[1].1.absolute_frame().x, 94.0,
             "the second cell sits in the trailing column"
+        );
+        // The second row's cells carry the accumulated 15pt + 5pt gap on their
+        // parent row box; the named cell itself sits at its own row origin.
+        let row_boxes: Vec<Node> = all_nodes(&graph)
+            .into_iter()
+            .filter(|node| {
+                node.view_tag()
+                    .is_some_and(|tag| tag.ends_with("::LazyGridRow"))
+            })
+            .collect();
+        assert_eq!(row_boxes.len(), 2, "two row boxes mount");
+        assert_eq!(
+            row_boxes[1].absolute_frame().y,
+            20.0,
+            "row 1 starts after row 0's 15pt height and 5pt gap"
         );
 
         let scroll = all_nodes(&graph)

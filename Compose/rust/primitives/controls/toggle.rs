@@ -10,6 +10,7 @@ use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::adaptive::apply_touch_control_extent;
 use crate::primitives::text::Text;
+use crate::theme::tokens::semantic_motion::{SemanticMotionRef, semantic_animation};
 use crate::theme::{SemanticFontRef, theme_for_node};
 use crate::{
     AnyView, PrimitiveView, Row, TupleView, VerticalAlignment, View, ViewExt, impl_primitive_view,
@@ -418,9 +419,35 @@ fn update_appearance(node: &Node, is_on: bool, is_enabled: bool) {
             }
         }
     };
+    // Swift wraps only the *update* case in a motion (Toggle.swift:494-500), so a
+    // first mount snaps and a change animates. Both arms used to call the writers
+    // bare, which left `ActiveAnimationContext` empty and made
+    // `animatable_set_with` take its instant-write path — the toggle jumped
+    // straight to its target instead of travelling.
     if previous.is_some() {
-        write_progress(node);
-        write_fill(node);
+        let theme = theme_for_node(node);
+        let is_switch = node
+            .attachment::<u8>(VARIANT)
+            .map(|value| value == 0)
+            .unwrap_or(true);
+        let progress_motion = if is_switch {
+            // Swift marks the switch spring `allowsOvershoot: true` (Toggle.swift:495).
+            // Without the flag `inherit_motion` bails and a reversal restarts from
+            // rest instead of continuing with the live velocity.
+            cove_core::scene::Animation::spring(theme.motion.fast, 0.9).with_overshoot(true)
+        } else {
+            semantic_animation(&SemanticMotionRef::fast(), &theme)
+        };
+        let fill_motion = semantic_animation(&SemanticMotionRef::fast(), &theme);
+        cove_core::scene::ActiveAnimationContext::with(
+            Some(progress_motion),
+            None,
+            None,
+            || write_progress(node),
+        );
+        cove_core::scene::ActiveAnimationContext::with(Some(fill_motion), None, None, || {
+            write_fill(node)
+        });
     } else {
         write_progress(node);
         write_fill(node);

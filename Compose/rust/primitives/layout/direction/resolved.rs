@@ -38,6 +38,15 @@ impl<Content: View + 'static> View for ResolvedLayoutDirection<Content> {
     fn tag(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
+
+    /// `body` reads `direction` from `State`, so the
+    /// scope must declare those dependencies. Without this the writes never
+    /// subscribe and the view keeps its first layout forever.
+    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
+        vec![
+            crate::DynamicField::state("direction", &self.direction),
+        ]
+    }
 }
 
 /// Reads the nearest explicit direction from the node ancestry after layout.

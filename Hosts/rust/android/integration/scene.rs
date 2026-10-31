@@ -59,6 +59,16 @@ impl View for AndroidAdaptiveSurface {
     fn tag(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
+    /// `children()` reads the surface environment from `State`, so the scope must
+    /// declare that dependency. Without it nothing subscribes and a repaint never
+    /// re-runs `children()`, leaving idiom, keyboard height and text scale frozen
+    /// at the first frame — which is what broke Android safe-area avoidance.
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        vec![cove_composition::DynamicField::state(
+            "environment",
+            &self.environment,
+        )]
+    }
 }
 
 /// Compose, input and font ownership for a native Android surface host.

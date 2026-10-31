@@ -17,37 +17,42 @@ use cove_ui_compose::{AnyView, PrimitiveView, View};
 
 use support::GlobalTestLock;
 
-/// Primitive wrapper whose child reads the observed string, mirroring the
-/// Swift `@State`-driven `Content` view.
+/// Mirror of the Swift `Content` view:
+/// ```swift
+/// struct Content: View {
+///     @State var text: String
+///     var body: some View { Text(text).frame(width: 100, height: 30) }
+/// }
+/// ```
+///
+/// `Content` is a plain `View` whose `@State` Swift auto-wires by reflection, so
+/// mutating the state schedules a recompose. `impl_primitive_view!` provides no
+/// `body` and no property discovery, so a primitive harness reading the state in
+/// `children()` is never subscribed and `state.set(...)` silently invalidates
+/// nothing — the text then renders identically and the vertex-count assertion
+/// fails. Declaring the real `View`/`body` and publishing the state as a
+/// dynamic property is what makes the third render actually rebuild the text.
 #[derive(Clone)]
 struct StateText {
     state: State<String>,
 }
 
-impl PrimitiveView for StateText {
-    fn make_node(&self) -> Node {
-        Node::new()
-    }
-
-    fn update_node(&self, _node: &Node) {}
-
-    fn make_layout_node(&self) -> Option<LayoutNode> {
-        None
-    }
-
-    fn children(&self, _node: &Node) -> Vec<AnyView> {
-        let text = self.state.get();
-        vec![AnyView::new(Text::new(text).frame(
+impl View for StateText {
+    fn body(&self) -> AnyView {
+        AnyView::new(Text::new(self.state.get()).frame(
             Some(FrameDimension::Points(100.0)),
             Some(FrameDimension::Points(30.0)),
             None,
             None,
             None,
             None,
-        ))]
+        ))
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        vec![cove_composition::DynamicField::state("text", &self.state)]
     }
 }
-cove_ui_compose::impl_primitive_view!(StateText);
 
 #[test]
 fn unchanged_snapshots_reuse_geometry_and_trim_rebuilds_it() {

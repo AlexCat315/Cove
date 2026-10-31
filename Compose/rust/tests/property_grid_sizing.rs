@@ -302,9 +302,12 @@ fn the_authored_sizing_overrides_the_defaults() {
         guarded.label_width, 96.0,
         "a non-finite label width reverts"
     );
+    // Swift: `minValueWidth.isFinite ? max(1, minValueWidth) : 220`
+    // (PropertyGrid.swift:131), so a non-finite value reverts to the default —
+    // the 1pt floor only applies to a finite width.
     assert_eq!(
-        guarded.min_value_width, 1.0,
-        "a non-finite value width clamps to the floor"
+        guarded.min_value_width, 220.0,
+        "a non-finite value width reverts to the default"
     );
     assert_eq!(guarded.row_height, 24.0, "a non-finite row height reverts");
 }

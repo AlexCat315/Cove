@@ -141,16 +141,57 @@ fn texel(pixels: &[u8], width: usize, x: usize, y: usize) -> [u8; 4] {
     ]
 }
 
+/// A list of two batches that both carry the same 10x10 scissor, with one
+/// vertex optionally moved. Whether they coalesce into a single draw is exactly
+/// the classification: the batch may only drop the scissor when every vertex
+/// stays inside it, up to one hundredth of a point.
+fn coalesced_draw_calls(scene: &mut Scene, moved: Option<(usize, f32, f32)>) -> usize {
+    let mut geometry = DrawList::default();
+    geometry.push_clip_rect(Rect::new(0.0, 0.0, 10.0, 10.0));
+    let _ = geometry.add_rect(Rect::new(0.0, 0.0, 5.0, 10.0), Color::WHITE);
+    // A second clip keeps the two rects in their own batches without changing
+    // the scissor they end up with.
+    geometry.push_clip_rect(Rect::new(0.0, 0.0, 1.0, 1.0));
+    let _ = geometry.add_rect(Rect::new(5.0, 0.0, 5.0, 10.0), Color::WHITE);
+    geometry.pop_clip_rect();
+    geometry.pop_clip_rect();
+
+    let mut batches: Vec<cove_core::DrawBatch> = geometry.batches().to_vec();
+    assert_eq!(batches.len(), 2, "the two rects start in separate batches");
+    for batch in &mut batches {
+        batch.scissor = Some(Rect::new(0.0, 0.0, 10.0, 10.0));
+    }
+
+    let mut vertices: Vec<cove_core::Vertex> = geometry.vertices().to_vec();
+    if let Some((index, x, y)) = moved {
+        vertices[index].x = x;
+        vertices[index].y = y;
+    }
+
+    let mut list = DrawList::default();
+    list.load(
+        vertices,
+        geometry.indices().to_vec(),
+        batches,
+        Default::default(),
+    )
+    .expect("the list validates");
+
+    let (_, statistics) = scene.render(&list);
+    statistics.draw_calls
+}
+
 #[test]
 fn clip_classification_checks_every_edge_and_preserves_its_tolerance() {
     let Some(device) = device() else {
         eprintln!("no Metal device available; skipping the clip classification test");
         return;
     };
-    // A 10x10 white fill clipped to its own 10x10 rect can drop the scissor;
-    // nudging any corner just outside the boundary must restore it. The
-    // tolerance is one hundredth of a point, so -0.009/10.009 still classify as
-    // inside and -0.011/10.011 do not.
+    let mut scene = Scene::new(device, [16, 16], [10.0, 10.0]);
+
+    // A vertex inside the clip rect needs no scissor; nudging any edge out by
+    // more than the one-hundredth-of-a-point tolerance does. -0.009 and 10.009
+    // are still inside, -0.011 and 10.011 are not.
     let cases: [((f32, f32), bool); 9] = [
         ((5.0, 5.0), false),
         ((-0.009, 5.0), false),
@@ -163,53 +204,80 @@ fn clip_classification_checks_every_edge_and_preserves_its_tolerance() {
         ((5.0, 10.011), true),
     ];
 
-    for (position, expected) in cases {
+    for (position, relies_on_clip) in cases {
         for corner in [0usize, 5] {
-            let mut geometry = DrawList::default();
-            geometry.push_clip_rect(Rect::new(0.0, 0.0, 10.0, 10.0));
-            let _ = geometry.add_rect(Rect::new(0.0, 0.0, 10.0, 10.0), Color::WHITE);
-            let batch = geometry.batches()[0].clone();
-
-            let mut list = DrawList::default();
-            let vertices: Vec<cove_core::Vertex> = geometry
-                .vertices()
-                .iter()
-                .copied()
-                .enumerate()
-                .map(|(index, mut vertex)| {
-                    if index == corner {
-                        vertex.x = position.0;
-                        vertex.y = position.1;
-                    }
-                    vertex
-                })
-                .collect();
-            list.load(
-                vertices,
-                geometry.indices().to_vec(),
-                vec![batch],
-                Default::default(),
-            )
-            .expect("the modified geometry still validates");
-
-            // A batch that needs the scissor paints only inside the clip; one
-            // that does not keeps the escaped corner outside it.
-            let mut scene = Scene::new(device.clone(), [32, 24], [10.0, 10.0]);
-            let (pixels, _) = scene.render(&list);
-            let escaped = texel(&pixels, 32, 32 - 1, 24 - 1);
-            if expected {
-                assert_eq!(
-                    escaped[3], 0,
-                    "corner {corner} at {position:?} escapes the clip, so the scissor must apply",
-                );
-            } else {
-                assert_ne!(
-                    escaped[3], 0,
-                    "corner {corner} at {position:?} stays inside the tolerance, so the scissor may drop",
-                );
-            }
+            let calls = coalesced_draw_calls(&mut scene, Some((corner, position.0, position.1)));
+            assert_eq!(
+                calls,
+                if relies_on_clip { 2 } else { 1 },
+                "corner {corner} at {position:?}: rely_on_clip is {relies_on_clip}",
+            );
         }
     }
+
+    assert_eq!(
+        coalesced_draw_calls(&mut scene, None),
+        1,
+        "an untouched batch drops its scissor and coalesces",
+    );
+}
+
+#[test]
+fn a_batch_without_a_scissor_or_without_indices_never_relies_on_the_clip() {
+    let Some(device) = device() else {
+        eprintln!("no Metal device available; skipping the clip classification test");
+        return;
+    };
+    let mut scene = Scene::new(device, [16, 16], [10.0, 10.0]);
+
+    // An escaped vertex only forces two draws because a scissor is present.
+    // Without one there is nothing to rely on, so the batches always merge.
+    let mut geometry = DrawList::default();
+    let _ = geometry.add_rect(Rect::new(0.0, 0.0, 5.0, 10.0), Color::WHITE);
+    geometry.push_clip_rect(Rect::new(0.0, 0.0, 1.0, 1.0));
+    let _ = geometry.add_rect(Rect::new(5.0, 0.0, 5.0, 10.0), Color::WHITE);
+    geometry.pop_clip_rect();
+
+    let mut batches: Vec<cove_core::DrawBatch> = geometry.batches().to_vec();
+    for batch in &mut batches {
+        batch.scissor = None;
+    }
+    let mut vertices: Vec<cove_core::Vertex> = geometry.vertices().to_vec();
+    vertices[0].x = -50.0;
+    vertices[0].y = 5.0;
+    let mut list = DrawList::default();
+    list.load(
+        vertices,
+        geometry.indices().to_vec(),
+        batches.clone(),
+        Default::default(),
+    )
+    .expect("the list validates");
+    let (_, statistics) = scene.render(&list);
+    assert_eq!(
+        statistics.draw_calls, 1,
+        "without a scissor an escaped vertex still coalesces",
+    );
+
+    // An empty batch contributes nothing, so it cannot block its neighbour.
+    let empty = &mut batches[0];
+    empty.index_count = 0;
+    let mut vertices: Vec<cove_core::Vertex> = geometry.vertices().to_vec();
+    vertices[0].x = -50.0;
+    vertices[0].y = 5.0;
+    let mut list = DrawList::default();
+    list.load(
+        vertices,
+        geometry.indices().to_vec(),
+        batches,
+        Default::default(),
+    )
+    .expect("the list validates");
+    let (_, statistics) = scene.render(&list);
+    assert_eq!(
+        statistics.draw_calls, 1,
+        "an empty batch does not rely on the clip",
+    );
 }
 
 #[test]

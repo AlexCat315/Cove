@@ -79,7 +79,43 @@ impl PrimitiveView for Harness {
         )]
     }
 }
-cove_ui_compose::impl_primitive_view!(Harness);
+/// Harness is a *container* view, not a primitive: Swift's `Harness` is a plain
+/// `View` whose `body` reads `@State var tick` and `value`, and reflection
+/// auto-wires both so an observed write schedules a recompose.
+/// `impl_primitive_view!` provides neither a `body` nor property discovery, so
+/// the port has to declare the trait and publish the fields explicitly. Without
+/// `dynamic_properties` the states are never subscribed and `value.set(1)`
+/// silently invalidates nothing — that was the whole failure, a harness gap
+/// rather than a production defect.
+impl cove_composition::View for Harness {
+    /// `body` reads both states, exactly like Swift's `Harness.body`. Reading
+    /// `tick` is what makes an *unrelated* recompose happen without repainting.
+    fn body(&self) -> AnyView {
+        let _tick = self.tick.get();
+        let value = self.value.get();
+        AnyView::new(
+            Painter {
+                value,
+                counter: self.counter.clone(),
+            }
+            .frame(
+                Some(FrameDimension::Points(10.0)),
+                Some(FrameDimension::Points(10.0)),
+                None,
+                None,
+                None,
+                None,
+            ),
+        )
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        vec![
+            cove_composition::DynamicField::state("tick", &self.tick),
+            cove_composition::DynamicField::state("value", &self.value),
+        ]
+    }
+}
 
 #[test]
 fn unchanged_output_reuses_geometry_with_diagnostics_enabled() {

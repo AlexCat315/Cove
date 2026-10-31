@@ -24,8 +24,8 @@ use std::sync::Arc;
 use cove_core::{Color, DrawList, Rect, RoundedRect};
 use cove_graphics::rhi::{
     ColorLoadAction, CommandBuffer, Device, DeviceConfig, GraphicsApi, QueueClass,
-    RenderColorTarget, Texture, TextureDescriptor, TextureFormat, TextureResource,
-    TextureSubresource, TextureUploadRegion, TextureUsage,
+    RenderColorTarget, TextureDescriptor, TextureFormat, TextureResource,
+    TextureSubresource, TextureUsage,
 };
 use cove_graphics::ui::{
     NativeDrawListRenderer, NativeUIDrawStatistics, NativeUIViewport,
@@ -173,10 +173,12 @@ fn translucent_mask_and_stroke_do_not_accumulate_alpha() {
         list.pixel_scale = 1.0;
         list.geometry_antialiasing = cove_core::GeometryAntialiasing::Analytic;
         if stroke {
-            list.add_rounded_rect_stroke(rect, 10.0, 3.0, white(0.5));
+            list.add_rounded_rect_stroke(rect, 10.0, 3.0, white(0.5))
+                .expect("rounded stroke");
         } else {
             list.push_mask(RoundedRect::new(rect, 10.0));
-            let _ = list.add_rect(Rect::new(0.0, 0.0, 64.0, 64.0), white(0.5));
+            list.add_rect(Rect::new(0.0, 0.0, 64.0, 64.0), white(0.5))
+                .expect("full-frame rect");
             list.pop_mask();
         }
 

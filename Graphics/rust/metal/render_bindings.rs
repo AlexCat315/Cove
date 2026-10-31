@@ -10,10 +10,14 @@ use objc2_metal::{MTLBuffer, MTLSamplerState, MTLTexture};
 
 use crate::rhi::ShaderStage;
 
-/// The number of slots cached per stage group.
+/// Total length of each cache array: four stage groups of `SLOTS_PER_GROUP`.
 const SLOTS: usize = 128;
+/// Stride between stage groups. This is the slot bound, not the array length —
+/// Swift indexes `group * 32 + slot` into 128-element arrays, so conflating the
+/// two made every non-vertex lookup run past the end of the array.
+const SLOTS_PER_GROUP: usize = 32;
 /// Highest slot index cached per stage. Uncached slots always report a change.
-const CACHED_SLOT_LIMIT: u32 = 32;
+const CACHED_SLOT_LIMIT: u32 = SLOTS_PER_GROUP as u32;
 
 /// Identity comparison for retained Objective-C objects. Swift compares the
 /// references (`===`); Objective-C pointer equality is the same relation.
@@ -132,6 +136,86 @@ impl MetalRenderBindings {
             ShaderStage::Mesh => 3,
             ShaderStage::Compute => return None,
         };
-        Some(group * SLOTS + slot as usize)
+        Some(group * SLOTS_PER_GROUP + slot as usize)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Regression: `index()` used to compute `group * SLOTS + slot` with
+    /// `SLOTS = 128`, while each cache array is 128 long. Every non-vertex
+    /// binding therefore indexed past the end and panicked with
+    /// `index out of bounds: the len is 128 but the index is 129`. Swift uses a
+    /// group stride of 32 into the same 128-element arrays.
+    #[test]
+    fn every_stage_group_indexes_inside_the_cache_arrays() {
+        for stage in [
+            ShaderStage::Vertex,
+            ShaderStage::Fragment,
+            ShaderStage::Task,
+            ShaderStage::Mesh,
+        ] {
+            for slot in 0..CACHED_SLOT_LIMIT {
+                let index = MetalRenderBindings::index(slot, stage)
+                    .unwrap_or_else(|| panic!("slot {slot} in {stage:?} is cacheable"));
+                assert!(
+                    index < SLOTS,
+                    "{stage:?} slot {slot} indexed {index} into a {SLOTS}-element array"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn stage_groups_have_disjoint_index_ranges_and_compute_is_uncached() {
+        // Slot 0 of each group must land in its own band, and the bands must not
+        // overlap — that is what makes the cache per-stage.
+        let mut seen = std::collections::BTreeSet::new();
+        for stage in [
+            ShaderStage::Vertex,
+            ShaderStage::Fragment,
+            ShaderStage::Task,
+            ShaderStage::Mesh,
+        ] {
+            let index = MetalRenderBindings::index(0, stage).expect("cacheable");
+            assert!(seen.insert(index), "{stage:?} reuses another group's index {index}");
+        }
+        assert_eq!(seen.len(), 4, "four disjoint groups");
+        assert!(
+            MetalRenderBindings::index(0, ShaderStage::Compute).is_none(),
+            "compute has no cached binding slots"
+        );
+    }
+
+    #[test]
+    fn slots_at_or_beyond_the_limit_are_uncached() {
+        for slot in [CACHED_SLOT_LIMIT, CACHED_SLOT_LIMIT + 1, 127, 4096] {
+            for stage in [ShaderStage::Vertex, ShaderStage::Fragment, ShaderStage::Mesh] {
+                assert!(
+                    MetalRenderBindings::index(slot, stage).is_none(),
+                    "slot {slot} in {stage:?} must stay uncached"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn invalidating_every_cacheable_slot_does_not_panic() {
+        let mut bindings = MetalRenderBindings::new();
+        for stage in [
+            ShaderStage::Vertex,
+            ShaderStage::Fragment,
+            ShaderStage::Task,
+            ShaderStage::Mesh,
+        ] {
+            for slot in 0..CACHED_SLOT_LIMIT {
+                bindings.invalidate_buffer(slot, stage);
+            }
+        }
+        for slot in [CACHED_SLOT_LIMIT, 4096] {
+            bindings.invalidate_buffer(slot, ShaderStage::Fragment);
+        }
     }
 }

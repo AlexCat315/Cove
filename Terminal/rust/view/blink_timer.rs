@@ -14,13 +14,27 @@ use std::{
 /// Half a blink period: the visible and hidden phases are each this long.
 pub const INTERVAL_SECONDS: f64 = 0.6;
 
-#[derive(Default)]
 pub struct BlinkTimer {
-    is_visible: Cell<bool>,
+    /// Shared with the animation closure. A bare `Cell<bool>` is `Copy`, so
+    /// `clone()` would hand the animation a detached copy and the timer would
+    /// never observe the toggle — the cursor would never blink.
+    is_visible: Rc<Cell<bool>>,
     on_toggle: RefCell<Option<Rc<dyn Fn()>>>,
     controller: RefCell<Option<Rc<dyn AnyAnimationController>>>,
     scheduler: RefCell<Option<AnimatorScheduler>>,
     active: Cell<bool>,
+}
+
+impl Default for BlinkTimer {
+    fn default() -> Self {
+        Self {
+            is_visible: Rc::new(Cell::new(true)),
+            on_toggle: RefCell::new(None),
+            controller: RefCell::new(None),
+            scheduler: RefCell::new(None),
+            active: Cell::new(false),
+        }
+    }
 }
 
 impl BlinkTimer {
@@ -93,7 +107,7 @@ impl BlinkTimer {
             cove_core::scene::AnimationCurve::Linear,
         )
         .repeat_forever(false);
-        let visible = self.is_visible.clone();
+        let visible = Rc::clone(&self.is_visible);
         let toggle = self.on_toggle.clone();
         let controller = AnimationController::new(0.0_f64, 1.0, animation, 0.0, move |progress| {
             let visible_now = progress < 0.5;

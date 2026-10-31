@@ -6,9 +6,10 @@
 //! - ConPTY forwards cmd switches and their command
 //!
 //! Gated on `cfg(windows)` for the same reason as the Swift `#if os(Windows)`:
-//! these need `powershell.exe`/`cmd.exe` and a real ConPTY pseudo console. The
-//! whole suite compiles on every platform — the gate only removes the bodies —
-//! so `cargo test --no-run` still type-checks the port on macOS.
+//! these need `powershell.exe`/`cmd.exe` and a real ConPTY pseudo console. Only
+//! the test functions carry the gate, so the helpers and their use of
+//! `TerminalCommand`, `TerminalSession` and `SessionStatus` are still compiled
+//! and type-checked on every platform by `cargo test --no-run`.
 //!
 //! Named difference (`GAP:`): the Swift helper ran on a `@MainActor` and applied
 //! output through `DispatchQueue.main.async`. The Rust session hands output to
@@ -17,11 +18,16 @@
 //! `TerminalSession::pump()` in its wait loop exactly as a host's invalidation
 //! wake does.
 
-#![cfg(windows)]
-
 use cove_terminal::process::TerminalCommand;
 use cove_terminal::session::{SessionStatus, TerminalSession};
 use std::time::{Duration, Instant};
+
+// A non-Windows build has no test function that calls these, so keep the
+// helpers type-checked without tripping the dead-code lint.
+#[cfg(not(windows))]
+const _: fn() = || {
+    let _ = run;
+};
 
 /// Runs `executable` on a ConPTY and reports where it ended up.
 fn run(executable: &str, arguments: &[&str], wait_for_output: bool) -> (SessionStatus, String) {
@@ -68,6 +74,7 @@ fn read_screen(session: &TerminalSession) -> String {
 }
 
 #[test]
+#[cfg(windows)]
 fn conpty_runs_a_program_and_reports_its_exit_code() {
     let (status, _) = run(
         "powershell.exe",
@@ -78,6 +85,7 @@ fn conpty_runs_a_program_and_reports_its_exit_code() {
 }
 
 #[test]
+#[cfg(windows)]
 fn conpty_delivers_program_output() {
     let (status, screen) = run(
         "powershell.exe",
@@ -92,6 +100,7 @@ fn conpty_delivers_program_output() {
 }
 
 #[test]
+#[cfg(windows)]
 fn conpty_forwards_cmd_switches_and_their_command() {
     let (status, screen) = run("cmd.exe", &["/d", "/c", "echo", "hello-cove"], true);
     assert_eq!(status, SessionStatus::Exited(0), "the program exited cleanly");

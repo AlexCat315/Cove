@@ -163,5 +163,77 @@ name = "resource_preparation_tests"
 path = "rust/tests/resource_preparation_tests.rs"
 
 [[test]]
-name = "zz_probe_ref"
-path = "rust/tests/zz_probe_ref.rs"
+name = "native_rounded_fill_tests"
+path = "rust/tests/native_rounded_fill_tests.rs"
+
+[[test]]
+name = "transient_msaa_tests"
+path = "rust/tests/transient_msaa_tests.rs"
+
+[[test]]
+name = "circular_reveal_pixels"
+path = "rust/tests/circular_reveal_pixels.rs"
+
+[[test]]
+name = "native_draw_list_benchmark_tests"
+path = "rust/tests/native_draw_list_benchmark_tests.rs"
+
+[[test]]
+name = "native_ui_binding_reuse_tests"
+path = "rust/tests/native_ui_binding_reuse_tests.rs"
+
+[[test]]
+name = "native_shader_library_tests"
+path = "rust/tests/native_shader_library_tests.rs"
+
+[[test]]
+name = "native_draw_list_lifecycle_tests"
+path = "rust/tests/native_draw_list_lifecycle_tests.rs"
+
+[[test]]
+name = "native_draw_list_parity_tests"
+path = "rust/tests/native_draw_list_parity_tests.rs"
+
+[[test]]
+name = "native_image_asset_tests"
+path = "rust/tests/native_image_asset_tests.rs"
+
+[[test]]
+name = "native_ui_backdrop_tests"
+path = "rust/tests/native_ui_backdrop_tests.rs"
+
+[[test]]
+name = "effect_replay_tests"
+path = "rust/tests/effect_replay_tests.rs"
+
+[[test]]
+name = "msaa_evaluation_tests"
+path = "rust/tests/msaa_evaluation_tests.rs"
+
+[[test]]
+name = "shader_specialization_tests"
+path = "rust/tests/shader_specialization_tests.rs"
+
+[[test]]
+name = "native_gpu_contract_tests"
+path = "rust/tests/native_gpu_contract_tests.rs"
+
+[[test]]
+name = "swapchain_lifetime_tests"
+path = "rust/tests/swapchain_lifetime_tests.rs"
+
+[[test]]
+name = "mac_surface_tests"
+path = "rust/tests/mac_surface_tests.rs"
+
+[[test]]
+name = "vulkan_upload_readback_tests"
+path = "rust/tests/vulkan_upload_readback_tests.rs"
+
+[[test]]
+name = "vulkan_capability_probe_tests"
+path = "rust/tests/vulkan_capability_probe_tests.rs"
+
+[[test]]
+name = "native_multisample_tests"
+path = "rust/tests/native_multisample_tests.rs"

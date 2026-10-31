@@ -18,7 +18,6 @@
 //! `TransitionEffect` is crate-private and only `Transition` is exposed, so the
 //! effect-algebra cases assert the same facts through the mounted node's
 //! transform — which is where those effects are observable in production.
-
 mod support;
 
 use cove_composition::{AnyView, LayoutDebugExt, View, ViewExt};
@@ -32,7 +31,41 @@ use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::theme::tokens::reduced_motion_environment::ReducedMotionViewExt;
 use cove_ui_compose::BoxView;
 
-use support::{DebugNode, GlobalTestLock};
+use support::GlobalTestLock;
+
+/// A sized, hit-testable leaf that records `name` as its layout debug name —
+/// the Swift `_DebugNode(label:).frame(width:height:).debugName(_:)` shape,
+/// which materialises one node carrying both the name and the geometry.
+struct NamedPanel(&'static str, f32, f32);
+
+impl cove_composition::PrimitiveView for NamedPanel {
+    fn make_node(&self) -> Node {
+        let node = Node::new();
+        node.set_is_hit_testable(true);
+        node
+    }
+    fn update_node(&self, node: &Node) {
+        node.set_attachment(
+            cove_composition::LayoutDebugAttachmentKey::DEBUG_NAME,
+            self.0.to_string(),
+        );
+    }
+    fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
+        let layout = cove_core::scene::LayoutNode::new();
+        layout.set_width(Some(self.1));
+        layout.set_height(Some(self.2));
+        Some(layout)
+    }
+}
+
+impl View for NamedPanel {
+    fn kind(&self) -> cove_composition::ViewKind<'_> {
+        cove_composition::ViewKind::Primitive(self)
+    }
+    fn tag(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+}
 
 /// The Swift harness: one debug-named panel inside a scaling visibility host.
 struct Harness {
@@ -42,21 +75,7 @@ struct Harness {
 
 impl View for Harness {
     fn body(&self) -> AnyView {
-        let panel = AnyView::new(
-            AnyView::new(
-                BoxView::new(
-                    FlexDirection::Column,
-                    Align::Stretch,
-                    Justify::FlexStart,
-                    Wrap::NoWrap,
-                    0.0,
-                    AnyView::new(DebugNode::new("panel")),
-                )
-                .frame_width(200.0)
-                .frame_height(100.0),
-            )
-        )
-        .debug_name("panel");
+        let panel = AnyView::new(NamedPanel("panel", 200.0, 100.0));
         AnyView::new(
             AnyView::new(
                 AnimatedVisibility::new(
@@ -221,7 +240,8 @@ fn part_grown_panel_is_hit_where_it_is_drawn() {
             let root = fixture.graph.tree.borrow().root().expect("root");
             let panel_id = host.id();
 
-            let inside = HitTester::hit_test(&root, Point::new(panel.x + 2.0, panel.y + 2.0))
+            let probe = Point::new(panel.x + 2.0, panel.y + 2.0);
+            let inside = HitTester::hit_test(&root, probe)
                 .expect("the grown rectangle is hittable");
             assert!(
                 inside.path.iter().any(|node| node.id() == panel_id),
@@ -251,9 +271,7 @@ fn reversal_continues_from_the_displayed_scale_and_exit_disables_input() {
             fixture.harness.visible.set(false);
             fixture.frame(0.0);
             let host = fixture.host();
-            eprintln!("DBG displayed={displayed:?} after_frame0={:?}", host.transform());
-            fixture.frame(0.0);
-            eprintln!("DBG after_frame0_again={:?}", fixture.host().transform());
+
             assert_eq!(
                 host.transform(),
                 displayed,
@@ -405,20 +423,7 @@ fn combined_and_identity_transitions_keep_the_host_well_formed() {
                 reduced_motion: State::new(false),
             };
             let graph = support::graph();
-            let panel = AnyView::new(
-                AnyView::new(
-                    BoxView::new(
-                        FlexDirection::Column,
-                        Align::Stretch,
-                        Justify::FlexStart,
-                        Wrap::NoWrap,
-                        0.0,
-                        AnyView::new(DebugNode::new("panel")),
-                    )
-                    .frame_width(200.0)
-                    .frame_height(100.0),
-                ),
-            );
+            let panel = AnyView::new(NamedPanel("panel", 200.0, 100.0));
             graph.install_view(
                 AnyView::new(
                     AnyView::new(AnimatedVisibility::new(

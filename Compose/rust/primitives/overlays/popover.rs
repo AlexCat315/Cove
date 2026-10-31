@@ -167,6 +167,7 @@ impl View for Popover {
             AnyView::new(crate::TupleView::new(vec![trigger, overlay])),
         ))
     }
+
 }
 
 /// Trigger content with the accessibility description applied.
