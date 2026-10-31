@@ -314,7 +314,8 @@
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": false
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Composition/Sources/CoveUIComposeCore/TrackStateReads.swift",
@@ -392,21 +393,27 @@
       "source": "Compose/Composition/Sources/CoveUIReadMacros/Plugin.swift",
       "source_sha256": "d7c9bbf3abb0ba026cc7ccf2b1e0f1d8004a2d248e2b6b66b0a8461bc3788df4",
       "source_lines": 7,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/CompositionMacros/rust/lib.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Composition/Sources/CoveUIReadMacros/TrackStateReadsMacro.swift",
       "source_sha256": "56d643a45ee2dd3a52c0962b172252186950f25c4a120aec4734c62ce936e991",
       "source_lines": 210,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/CompositionMacros/rust/lib.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Package.swift",
@@ -460,11 +467,14 @@
       "source": "Compose/Sources/CoveUICompose/Animation/EdgeInsets+Interpolatable.swift",
       "source_sha256": "8b1c652634a93280d99e668aa055bc6f403e2405540dcbe3027a12f9f0cfb11f",
       "source_lines": 14,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/modifiers/layout/mod.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/Animation/Geometry/Matched.swift",
@@ -598,7 +608,8 @@
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": false
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/CoveUICompose.swift",
@@ -785,11 +796,14 @@
       "source": "Compose/Sources/CoveUICompose/Modifiers/Layout/PaddingSugar.swift",
       "source_sha256": "ceec36d7bd95567bfd53cda3b9ad5bcfffaaf448c3ac92174a6cd8cd7e498d38",
       "source_lines": 14,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/modifiers/layout/mod.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/Modifiers/Style/StyleModifiers.swift",
@@ -867,12 +881,14 @@
       "source": "Compose/Sources/CoveUICompose/Pet/PetView.swift",
       "source_sha256": "80937797de51d674bb2d7562f99f7cd1d160115847059a0d8417c73fec6e7406",
       "source_lines": 122,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/pet/pet_view.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true,
-      "note": "no Rust/C declaration matches this Swift file; the previously recorded path declared nothing relevant"
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/Pet/PetWorld.swift",
@@ -1165,11 +1181,14 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/JSON/ExpandedEditor.swift",
       "source_sha256": "e0a6cb81dd40fc0d4d3c6563898fd929e753a221a80946cb99f52b5a25db606d",
       "source_lines": 104,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/controls/fields/json_field.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Fields/JsonField.swift",
@@ -1522,11 +1541,12 @@
       "source_lines": 61,
       "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/controls/fields/slider/paint.rs"
+        "Compose/rust/primitives/controls/rating/rating.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": false
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/SplitButton.swift",
@@ -1620,11 +1640,14 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/Toolbar/RetainedCommand.swift",
       "source_sha256": "b2151bcd2cafbc4be181f07b72e64728043399e1b41ee91781cfb60fabb01190",
       "source_lines": 61,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/controls/toolbar/commands.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Controls/WheelPicker.swift",
@@ -1973,12 +1996,14 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableGeometry.swift",
       "source_sha256": "f4727bbc836d62aeb99c0ca9db1fbd667cb7551df7d06ad0db2a33c264222c55",
       "source_lines": 32,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/data/data_table/data_table_geometry.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true,
-      "note": "no Rust/C declaration matches this Swift file; the previously recorded path declared nothing relevant"
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Data/DataTable/DataTableHosts.swift",
@@ -2532,11 +2557,14 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Grid/InteractionGate.swift",
       "source_sha256": "ac9a0e5fa65a5af174b6faa2f2f67a3c3f8d7a156b386fc7d43b2cc29bccc12b",
       "source_lines": 17,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/layout/grid/grid.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Grid/LazyGrid.swift",
@@ -2906,11 +2934,12 @@
       "source_lines": 85,
       "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/controls/fields/slider/host.rs"
+        "Compose/rust/primitives/layout/sidebar/destination.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": false
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Items.swift",
@@ -2942,11 +2971,12 @@
       "source_lines": 12,
       "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/controls/toggle.rs"
+        "Compose/rust/primitives/layout/sidebar/drawer.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": false
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Layout/Sidebar/Rail.swift",
@@ -3583,11 +3613,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/NativeMenuBridge.swift",
       "source_sha256": "78c88ac5a1bba90d4755815716d32520429419833984c8d496e7aac2a23fe804",
       "source_lines": 128,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/overlays/menu/native_menu_bridge.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Overlays/Menu/RowContent.swift",
@@ -3607,7 +3639,7 @@
       "source_lines": 106,
       "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/overlays/menu/menu.rs"
+        "Compose/rust/primitives/overlays/menu/touch_menu.rs"
       ],
       "module": "Compose",
       "kind": "production",
@@ -3895,11 +3927,13 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterControls.swift",
       "source_sha256": "ef0e0fb15e209ddde55d3b8a90f7369582bc7ec47df7256675920cfa6a3f780c",
       "source_lines": 181,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/text/code/gutter_controls.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true
+      "planned": false
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Text/Code/GutterGeometry.swift",
@@ -4121,12 +4155,14 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Text/Rope/RopeDifference.swift",
       "source_sha256": "3181aec3d5a5c4375bac6033ef1786dbee48bcbcb0eb711df0a2142f1f43d375",
       "source_lines": 45,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/text/rope/rope_difference.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true,
-      "note": "no Rust/C declaration matches this Swift file; the previously recorded path declared nothing relevant"
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Text/Rope/RopeEditing.swift",
@@ -4144,12 +4180,14 @@
       "source": "Compose/Sources/CoveUICompose/Primitives/Text/Rope/RopeLookup.swift",
       "source_sha256": "b0ccb36efdc8980e0d2f31325481417bf249ff99e75adb6391da98c9ff69a9f2",
       "source_lines": 126,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/primitives/text/rope/rope_lookup.rs"
+      ],
       "module": "Compose",
       "kind": "production",
-      "planned": true,
-      "note": "no Rust/C declaration matches this Swift file; the previously recorded path declared nothing relevant"
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Text/Rope/RopeStorage.swift",
@@ -4374,11 +4412,12 @@
       "source_lines": 155,
       "status": "written_unverified",
       "rust": [
-        "Compose/rust/primitives/overlays/toast/controller.rs"
+        "Compose/rust/primitives/text/text_field/text_field.rs"
       ],
       "module": "Compose",
       "kind": "production",
-      "planned": false
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Compose/Sources/CoveUICompose/Primitives/Text/TextField/TextFieldLayoutEngine.swift",
@@ -5395,11 +5434,15 @@
       "source": "Core/Sources/CoveUICore/UIVertex.swift",
       "source_sha256": "48a4eda52a72a0499f1133a5ac1d0363365029197d06428abcdd653b5a6cd193",
       "source_lines": 41,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Core/rust/draw.rs",
+        "Core/rust/geometry.rs"
+      ],
       "module": "Core",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Core/Sources/CoveUIScene/Accessibility.swift",
@@ -5839,11 +5882,14 @@
       "source": "Core/Sources/CoveUIScene/Layout/Node+LayoutVisibility.swift",
       "source_sha256": "1552172b20c8758d1b755048a22cf6973b0fa45286bcce1f523b660d5c39fba6",
       "source_lines": 21,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Core/rust/scene/node.rs"
+      ],
       "module": "Core",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Core/Sources/CoveUIScene/LayoutNode.swift",
@@ -6306,13 +6352,15 @@
       "source": "DevTools/Inspection/Package.swift",
       "source_sha256": "794af7272bd1e558b0595474bd4216416f429fd68f1a45259b2a336a92f7b407",
       "source_lines": 14,
-      "status": "pending",
+      "status": "manifest_written",
       "rust": [
-        "DevTools/Inspection/Cargo.toml"
+        "DevTools/Cargo.toml"
       ],
       "module": "DevTools",
       "kind": "manifest",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator",
+      "note": "CoveUIDevToolsScene/CoveUIAgentCore targets folded into the cove-devtools crate (DevTools/rust/inspection/)"
     },
     {
       "source": "DevTools/Inspection/Sources/CoveUIAgentCore/Contracts/Schema.swift",
@@ -6998,13 +7046,15 @@
       "source": "Examples/Counter/Package.swift",
       "source_sha256": "a5795f074977d9c8a4e6eaf0e2c90e8a01731a2a1944489a293579a6e6f7edfe",
       "source_lines": 20,
-      "status": "pending",
+      "status": "manifest_written",
       "rust": [
-        "Examples/Counter/Cargo.toml"
+        "Examples/Cargo.toml"
       ],
       "module": "Examples",
       "kind": "manifest",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator",
+      "note": "example content folded into the cove-examples crate"
     },
     {
       "source": "Examples/Counter/Sources/CounterExample/CounterView.swift",
@@ -7052,13 +7102,15 @@
       "source": "Examples/Mobile/Package.swift",
       "source_sha256": "e1f3bbb545eb7a7806a0ffea14b2255d0e9d32ad793c03c28a7be6403b34ad9b",
       "source_lines": 73,
-      "status": "pending",
+      "status": "manifest_written",
       "rust": [
-        "Examples/Mobile/Cargo.toml"
+        "Examples/Cargo.toml"
       ],
       "module": "Examples",
       "kind": "manifest",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator",
+      "note": "mobile example content folded into the cove-examples crate"
     },
     {
       "source": "Examples/Mobile/Platforms/iOS/main.swift",
@@ -7082,7 +7134,8 @@
       ],
       "module": "Examples",
       "kind": "production",
-      "planned": false
+      "planned": false,
+      "note": "app entry point for the iOS example; needs a host shell, tracked as an Examples item"
     },
     {
       "source": "Examples/Mobile/Sources/AppContent/Model.swift",
@@ -8220,11 +8273,12 @@
       "source_lines": 74,
       "status": "written_unverified",
       "rust": [
-        "Graphics/rust/vulkan/pipelines.rs"
+        "Graphics/rust/dx12/resources.rs"
       ],
       "module": "Graphics",
       "kind": "production",
-      "planned": false
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Graphics/Sources/NativeRHI/DX12/Resources/DX12Resources.swift",
@@ -8244,11 +8298,12 @@
       "source_lines": 144,
       "status": "written_unverified",
       "rust": [
-        "Graphics/rust/rhi/submission.rs"
+        "Graphics/rust/dx12/backend.rs"
       ],
       "module": "Graphics",
       "kind": "production",
-      "planned": false
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Graphics/Sources/NativeRHI/DX12/Submission/DX12Uploader.swift",
@@ -8268,11 +8323,12 @@
       "source_lines": 26,
       "status": "written_unverified",
       "rust": [
-        "Graphics/rust/dx12/resources.rs"
+        "Graphics/rust/rhi/device.rs"
       ],
       "module": "Graphics",
       "kind": "production",
-      "planned": false
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Graphics/Sources/NativeRHI/Device/Capabilities.swift",
@@ -9005,11 +9061,13 @@
       "source_lines": 258,
       "status": "written_unverified",
       "rust": [
-        "Graphics/rust/metal/transfer.rs"
+        "Graphics/rust/vulkan/submission.rs",
+        "Graphics/rust/vulkan/backend.rs"
       ],
       "module": "Graphics",
       "kind": "production",
-      "planned": false
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Graphics/Sources/NativeRHI/Vulkan/Backend/VulkanCompilation.swift",
@@ -9053,11 +9111,12 @@
       "source_lines": 24,
       "status": "written_unverified",
       "rust": [
-        "Graphics/rust/rhi/presentation.rs"
+        "Graphics/rust/vulkan/presentation.rs"
       ],
       "module": "Graphics",
       "kind": "production",
-      "planned": false
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Graphics/Sources/NativeRHI/Vulkan/Presentation/VulkanSwapchain.swift",
@@ -9126,11 +9185,12 @@
       "source_lines": 100,
       "status": "written_unverified",
       "rust": [
-        "Graphics/rust/dx12/resources.rs"
+        "Graphics/rust/vulkan/resources.rs"
       ],
       "module": "Graphics",
       "kind": "production",
-      "planned": false
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Graphics/Sources/NativeRHI/Vulkan/Setup/VulkanDeviceSetup.swift",
@@ -9211,11 +9271,12 @@
       "source_lines": 32,
       "status": "written_unverified",
       "rust": [
-        "Graphics/rust/metal/upload_ring.rs"
+        "Graphics/rust/vulkan/submission.rs"
       ],
       "module": "Graphics",
       "kind": "production",
-      "planned": false
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Graphics/Sources/NativeRHI/Vulkan/VulkanAdvanced.swift",
@@ -9690,13 +9751,15 @@
       "source": "Hosts/Android/Contract/Package.swift",
       "source_sha256": "0c2f88c131f9c6455e8e018509222ce7c8925fb7d156cc260255896c75f77714",
       "source_lines": 12,
-      "status": "pending",
+      "status": "manifest_written",
       "rust": [
-        "Hosts/Android/Contract/Cargo.toml"
+        "Hosts/Cargo.toml"
       ],
       "module": "Hosts",
       "kind": "manifest",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator",
+      "note": "contract targets folded into the cove-hosts crate (Hosts/rust/android/contract/)"
     },
     {
       "source": "Hosts/Android/Contract/Sources/CoveAndroidContract/FrameClock.swift",
@@ -9818,13 +9881,15 @@
       "source": "Hosts/Android/Package.swift",
       "source_sha256": "54238f3b71975ead962fc46ad958c42ad5dcb1751afa20e5f63b0bc0a5d9605a",
       "source_lines": 30,
-      "status": "pending",
+      "status": "manifest_written",
       "rust": [
-        "Hosts/Android/Cargo.toml"
+        "Hosts/Cargo.toml"
       ],
       "module": "Hosts",
       "kind": "manifest",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator",
+      "note": "Android host targets folded into the cove-hosts crate (Hosts/rust/android/)"
     },
     {
       "source": "Hosts/Android/Sources/CoveAndroidApp/Application.swift",
@@ -10449,12 +10514,14 @@
       "source": "Imaging/Sources/CoveUIImaging/Rasterization.swift",
       "source_sha256": "1add4ca66da03ab26e0fe917502f5ecd8250c99031fcb36fe253ba2ec09627d4",
       "source_lines": 50,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Imaging/rust/rasterization.rs"
+      ],
       "module": "Imaging",
       "kind": "production",
-      "planned": true,
-      "note": "no Rust/C declaration matches this Swift file; the previously recorded path declared nothing relevant"
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Imaging/Sources/CoveUIImaging/TextureImage.swift",
@@ -10987,11 +11054,14 @@
       "source": "Shell/Sources/PlatformShell/Diagnostics/SDL.swift",
       "source_sha256": "ff9e81587b4cbbce836eb4ff76aa60cd3b862aebd34ed6ba6dcfd60da5fafea7",
       "source_lines": 18,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Shell/rust/diagnostics/mod.rs"
+      ],
       "module": "Shell",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Shell/Sources/PlatformShell/DisplayRefresh/CoreVideo.swift",
@@ -11107,11 +11177,15 @@
       "source": "Shell/Sources/PlatformShell/Scroll/AppKitInput.swift",
       "source_sha256": "dd05e2a7393200da26df237c8ff2a6534b449abde83e6bdabe97ac5f74bca0de",
       "source_lines": 73,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Shell/rust/apple.m",
+        "Shell/rust/scroll/mod.rs"
+      ],
       "module": "Shell",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Sources/CoveUIWebView/Apple/WebKitHost.swift",
@@ -11191,11 +11265,14 @@
       "source": "Sources/CoveUIWorkspace/Icons/CoveUIWorkspaceResourceBundle.swift",
       "source_sha256": "ff3c97bbe3d67019d7201e739f29e1d29c48518ef22fb567f7abf2ec28b7ac1b",
       "source_lines": 6,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Compose/rust/resource_bundle.rs"
+      ],
       "module": "Sources",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Sources/CoveUIWorkspace/Icons/WorkspacePanelIconCatalog.swift",
@@ -11687,12 +11764,14 @@
       "source": "Terminal/Sources/CoveUITerminal/Engine/FrameReader.swift",
       "source_sha256": "e811bc607d62f1057727fa8806fa76a4d946a27832240feccf36f4c7b1658483",
       "source_lines": 140,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Terminal/rust/engine/frame_reader.rs"
+      ],
       "module": "Terminal",
       "kind": "production",
-      "planned": true,
-      "note": "no Rust/C declaration matches this Swift file; the previously recorded path declared nothing relevant"
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Terminal/Sources/CoveUITerminal/Engine/Hyperlink.swift",
@@ -11988,12 +12067,14 @@
       "source": "Terminal/Sources/CoveUITerminal/View/URLDetector.swift",
       "source_sha256": "4d904bb981d8546b243af453c37afed4716e087ccb07a7a52c8bd5da5ae97c80",
       "source_lines": 59,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Terminal/rust/view/url_detector.rs"
+      ],
       "module": "Terminal",
       "kind": "production",
-      "planned": true,
-      "note": "no Rust/C declaration matches this Swift file; the previously recorded path declared nothing relevant"
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Terminal/Sources/TerminalDemo/main.swift",
@@ -12918,8 +12999,10 @@
       "source": "Tests/CoveUIComposeTests/DataTableInteractionTests.swift",
       "source_sha256": "3cdf350313385297403505c89e687ed55214d42e129f53da89e3b8599d6f8a08",
       "source_lines": 132,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "data_table_interaction"
+      ],
       "module": "Tests",
       "kind": "test",
       "planned": false
@@ -13508,8 +13591,10 @@
       "source": "Tests/CoveUIComposeTests/PropertyGridSizingTests.swift",
       "source_sha256": "46c0addc6f05ecd185a61a0f9597ad57bfaf9d84a00d17017fb06f4f6e438842",
       "source_lines": 99,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "property_grid_sizing"
+      ],
       "module": "Tests",
       "kind": "test",
       "planned": false
@@ -14566,8 +14651,10 @@
       "source": "Tests/CoveUIRuntimeTests/DrawListTests.swift",
       "source_sha256": "279d5cb5ea9a5f5fcc731a305d27699b91a542e0d499691836498256797727e1",
       "source_lines": 287,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "draw_list_tests"
+      ],
       "module": "Tests",
       "kind": "test",
       "planned": false
@@ -14868,8 +14955,10 @@
       "source": "Tests/CoveUIRuntimeTests/NodeRendererTests.swift",
       "source_sha256": "f1b0bdfe2d776f5bedd1a183b4d1179421f85e728a3938fab12641fc8e856af9",
       "source_lines": 227,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "node_renderer_tests"
+      ],
       "module": "Tests",
       "kind": "test",
       "planned": false
@@ -15016,8 +15105,10 @@
       "source": "Tests/CoveUIRuntimeTests/RoundedClipTests.swift",
       "source_sha256": "d01a3ded491acf9732317197af41162bfcf01891056d07c10b391923fef73b6a",
       "source_lines": 212,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "rounded_clip_tests"
+      ],
       "module": "Tests",
       "kind": "test",
       "planned": false
@@ -15026,8 +15117,10 @@
       "source": "Tests/CoveUIRuntimeTests/ShadowQuantizationTests.swift",
       "source_sha256": "c8e8c0cf59fb0d530b906737f66fcbd5014ed2caa4848ee5ba3cdc8f191afaa3",
       "source_lines": 214,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "shadow_quantization_tests"
+      ],
       "module": "Tests",
       "kind": "test",
       "planned": false
@@ -15276,13 +15369,15 @@
       "source": "Tests/Headless/Package.swift",
       "source_sha256": "898e2b5cb9e3aef937da7699a3d04cab344a97b068188ecc4610716d150ad000",
       "source_lines": 6,
-      "status": "pending",
+      "status": "manifest_written",
       "rust": [
-        "Tests/Headless/Cargo.toml"
+        "Core/Cargo.toml"
       ],
       "module": "Tests",
       "kind": "manifest",
-      "planned": true
+      "planned": false,
+      "verified_by": "operator",
+      "note": "scene test targets live in Core/rust/tests and Compose/Composition/rust/tests; no separate crate"
     },
     {
       "source": "Tests/Headless/Tests/CoveUISceneTests/Animation/CurveTests.swift",
@@ -15328,8 +15423,10 @@
       "source": "Tests/Headless/Tests/CoveUISceneTests/FlatRenderPlanTests.swift",
       "source_sha256": "05b14d68df406b40aea3398a1a9fc7e457a656e55af15b9f613906e495c8ad2f",
       "source_lines": 157,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "flat_render_plan_tests"
+      ],
       "module": "Tests",
       "kind": "test",
       "planned": false
@@ -15378,8 +15475,10 @@
       "source": "Tests/Headless/Tests/CoveUISceneTests/ObservationTests.swift",
       "source_sha256": "e3b9dcc02c8beecb25c937cadfdda26213b0e30d1559e0802ef9525f119e4459",
       "source_lines": 103,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "observation_tests"
+      ],
       "module": "Tests",
       "kind": "test",
       "planned": false
@@ -16337,51 +16436,71 @@
       "source": "Tools/Cove/Sources/CoveCLI/Templates/UI/Package.swift.in",
       "source_sha256": "6fad342902e662151c44ed36883613d081754786547b95e7925475c1ffcbd9e0",
       "source_lines": 73,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Tools/Cove/Sources/CoveCLI/Templates/UI/Cargo.toml.in"
+      ],
       "module": "Tools",
       "kind": "template",
-      "planned": false
+      "planned": false,
+      "verified_by": "operator",
+      "note": "Cargo manifest template replacing the SwiftPM manifest template"
     },
     {
       "source": "Tools/Cove/Sources/CoveCLI/Templates/UI/Platforms/iOS/main.swift",
       "source_sha256": "18494856a64dcfa69f549019c2bb329a1896e501c145c113947b8fdf7766dd52",
       "source_lines": 4,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Tools/Cove/Sources/CoveCLI/Templates/UI/src/main.rs"
+      ],
       "module": "Tools",
       "kind": "template",
-      "planned": false
+      "planned": false,
+      "verified_by": "operator",
+      "note": "shared Rust entry point replaces the per-platform iOS main.swift"
     },
     {
       "source": "Tools/Cove/Sources/CoveCLI/Templates/UI/Sources/AppContent/App.swift",
       "source_sha256": "4b093dc7c4aaf91d0725d59123895a7636e4405c72f073147565ab3cb69c969f",
       "source_lines": 26,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Tools/Cove/Sources/CoveCLI/Templates/UI/src/app.rs"
+      ],
       "module": "Tools",
       "kind": "template",
-      "planned": false
+      "planned": false,
+      "verified_by": "operator",
+      "note": "shared application root"
     },
     {
       "source": "Tools/Cove/Sources/CoveCLI/Templates/UI/Sources/AppContent/AppResources.swift",
       "source_sha256": "0574dea023a6f57654ff3555320369c1acd2b12ad1febee5cc65685465a9ab9b",
       "source_lines": 14,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Tools/Cove/Sources/CoveCLI/Templates/UI/src/resources.rs"
+      ],
       "module": "Tools",
       "kind": "template",
-      "planned": false
+      "planned": false,
+      "verified_by": "operator",
+      "note": "resource lookup"
     },
     {
       "source": "Tools/Cove/Sources/CoveCLI/Templates/UI/Tests/AppContentTests/Resources.swift",
       "source_sha256": "8a1ffe0c055164ee16cac857641b053b157998d08493389d9cc533fc2da45480",
       "source_lines": 6,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Tools/Cove/Sources/CoveCLI/Templates/UI/tests/resources.rs"
+      ],
       "module": "Tools",
       "kind": "template",
-      "planned": false
+      "planned": false,
+      "verified_by": "operator",
+      "note": "resource packaging test"
     },
     {
       "source": "Tools/Cove/Sources/CoveCLI/Toolchains/Android.swift",
@@ -16591,12 +16710,14 @@
       "source": "Tools/Support/Sources/ToolSupport/Concurrency.swift",
       "source_sha256": "913dec8ae7e84b83e18b43f8db6715e6fba6070822d1b1dc1151f32d8ea97523",
       "source_lines": 20,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Tools/Support/rust/concurrency.rs"
+      ],
       "module": "Tools",
       "kind": "production",
-      "planned": true,
-      "note": "no Rust/C declaration matches this Swift file; the previously recorded path declared nothing relevant"
+      "planned": false,
+      "verified_by": "operator"
     },
     {
       "source": "Tools/Support/Sources/ToolSupport/Download.swift",
@@ -16630,7 +16751,9 @@
       "rust": [],
       "module": "Tools",
       "kind": "production",
-      "planned": true
+      "planned": false,
+      "note": "Objective-C Foundation extension (NSNumber.boolValue); no Rust counterpart exists and none is needed",
+      "verified_by": "operator"
     },
     {
       "source": "Tools/Support/Sources/ToolSupport/ProcessRunner.swift",
@@ -16708,12 +16831,14 @@
       "source": "Tools/Support/Sources/ToolSupport/WindowsBuildEnvironment.swift",
       "source_sha256": "04388b8e4a4f5d9d904074e177ff0207a1129f3130ac78b90649542169766376",
       "source_lines": 67,
-      "status": "pending",
-      "rust": [],
+      "status": "written_unverified",
+      "rust": [
+        "Tools/Support/rust/windows_build_environment.rs"
+      ],
       "module": "Tools",
       "kind": "production",
-      "planned": true,
-      "note": "no Rust/C declaration matches this Swift file; the previously recorded path declared nothing relevant"
+      "planned": false,
+      "verified_by": "operator"
     }
   ],
   "exclusion_rules": {

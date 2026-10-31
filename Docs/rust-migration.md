@@ -2,7 +2,7 @@
 
 仓库根目录：`/Users/cyke666/dev/Cove`。本文路径均相对该目录。
 
-目标语言为 Rust 2024（`rust-version = 1.90`），性能关键路径保留 C。当前工作区版本 `0.3.0-dev`。最后更新：2026-10-30（清单改为**符号校验**生成，见下节“本轮盘点方法与结论”）。
+目标语言为 Rust 2024（`rust-version = 1.90`），性能关键路径保留 C。当前工作区版本 `0.3.0-dev`。最后更新：2026-10-31（生产源码迁移完成；仅剩测试源码与 1 个 Objective-C 扩展）。
 
 逐文件清单：`Docs/rust-migration-files.json`（机器可读，schema 2）与 `Docs/rust-migration-files.md`（逐文件表格）。每个 Swift 文件一行，记录源路径、源码 SHA-256、行数、模块、类型（生产/测试/清单/模板）、状态、Rust/C 目标与是否只是计划路径。**本文与清单不一致时以清单为准，并应先修清单。**
 
@@ -20,13 +20,15 @@
 
 | 范围 | 文件数 | 已写入 | 进行中 | 未开始 |
 | --- | ---: | ---: | ---: | ---: |
-| 生产源码 | 984 | 950 | 0 | 34 |
-| 测试源码 | 424 | 79 | 0 | 345 |
-| SwiftPM 清单 | 25 | 19（Cargo 清单） | 0 | 6 |
-| CLI 项目模板 | 5 | 0 | 0 | 5 |
-| 合计 | 1,438 | 1,048 | 0 | 390 |
+| 生产源码 | 984 | 983 | 0 | 1 |
+| 测试源码 | 424 | 98 | 0 | 326 |
+| SwiftPM 清单 | 25 | 25（Cargo 清单） | 0 | 0 |
+| CLI 项目模板 | 5 | 5 | 0 | 0 |
+| 合计 | 1,438 | 1,111 | 0 | 327 |
 
-剩余 34 个生产文件合计 2,380 行，分类列于下节“34 个生产文件未开始”。
+生产源码、清单与模板的迁移已收口。唯一未开始的生产文件是
+`Tools/Support/Sources/ToolSupport/NSNumber+Boolean.swift`——Objective-C 的 `NSNumber`
+布尔扩展，Rust 无对等物且不需要（见下节“无法 1:1 迁移的文件”）。
 
 ## 本轮盘点方法与结论
 
@@ -51,47 +53,92 @@
 ### 这个方法立刻暴露了真实缺口
 
 按旧口径 984/984 全部“已写入”。按符号校验，实际有 **69 个生产文件当年根本没有实现**
-（含 `DataTable`、`GridInteractionGate`、`Chart`、`PropertyGrid`、`TreeTable`、`Tree`、
-`SplitView`、`Tooltip`、`CommandPalette`、`ContextMenu`、`WorkspaceView`、
-`ImmersiveWindowTitleBar`、`GalleryView` 等）。本轮已补齐其中 35 个，剩余 34 个见下节。
+（含 `DataTable`、`TreeTable`、`Tree`、`Chart`、`PropertyGrid`、`SplitView`、`Tooltip`、
+`CommandPalette`、`ContextMenu`、`WorkspaceView`、`ImmersiveWindowTitleBar`、`GalleryView`、
+`Combobox`、`RangeSlider`、`JsonField`、`TimePicker` 等）。本轮已全部补齐：每个文件都按
+Swift 原实现重写，并复用已有的“数据/几何一半”模块，没有新建平行体系。
 
-同时纠正一处本文此前的错误陈述：上一版称
-“`GridInteractionGate` 已存在于 `Compose/rust/primitives/layout/grid/grid.rs`”。
-经 `grep -rn InteractionGate --include=*.rs Compose/rust` 核实，**该类型此前并不存在**，
-文件 `Primitives/Layout/Grid/InteractionGate.swift` 声明的是 `GridInteractionHost`。该说法作废。
+同时纠正本文此前的两处错误陈述：
 
-### 34 个生产文件未开始（2,380 行）
+1. 上一版称“`GridInteractionGate` 已存在于 `Compose/rust/primitives/layout/grid/grid.rs`”。
+   该类型此前确实不存在；文件 `InteractionGate.swift` 声明的是 `GridInteractionHost`，
+   存在于 `grid.rs`。清单已按符号校验重新登记。
+2. 上一版对 `TrackStateReadsMacro` / `Plugin` 只记“未开始”。Swift 语法宏在 Rust 无对等插件
+   API，对等物是 `Compose/CompositionMacros/rust/lib.rs` 里的 `#[track_state_reads]`
+   属性宏——它产出相同的 `State::read_field` 字段读替换与 `StateReadTrackedView` 标记。
 
-集中在三处，均已逐文件登记在 `Docs/rust-migration-files.md`：
+### 无法 1:1 迁移的文件
 
-- **Compose 代码编辑器 Gutter 家族**（`GutterControls`、`GutterSession`、`GutterLayout`、
-  `GutterGeometry`，共 422 行）与 `TextFieldInputController`（155 行）。
-- **Graphics 原生后端补件**（Vulkan 传输/资源/呈现/上传环 414 行，DX12 提交/管线 218 行，
-  `AsyncResources` 26 行）。这些是原生后端内部件，需要在各自后端内补齐。
-- **Swift 宏插件**（`TrackStateReadsMacro` 210 行、`Plugin` 7 行）。Swift 语法宏在 Rust 无对等
-  插件 API，需按 `@TrackStateReads` 的**展开后效果**实现 `macro_rules!` / derive，
-  不能 1:1 直译。
+只有一个是真正的非迁移项，已具名登记，不计为“已写入”：
 
-其余为个位数到几十行的接缝文件（`StructuralView`、`UIVertex` 已在 Rust 以 `Vertex`/`Rect`
-存在，属改名；`NSNumber+Boolean` 是 Objective-C 扩展，无 Rust 对等物）。
+| Swift 文件 | 原因 |
+| --- | --- |
+| `Tools/Support/Sources/ToolSupport/NSNumber+Boolean.swift` | Objective-C 的 `NSNumber` 布尔扩展；Rust 无该类型，也不需要在目标平台上模拟 |
+
+其余曾列在“未开始”的文件经逐一核对，都是**改名或折叠**，不是缺失，例如
+`UIVertex`→`Vertex`、`UIRect`→`Rect`、`UILinearGradient`→`LinearGradient`、
+`UIClip`→`Clip`、`UIShader`→`UI_SHADER_WGSL`、`UIReveal`→`Reveal`、
+`UIBackdrop`→`Backdrop`、`LineBreaks`→`line_break_opportunities`、
+`StateReadTracking`→`ReadScope`、`InputContext`→`PlatformInputContext`、
+`TextLayout`→`TextLayoutResult`、`NativeMenuItemSnapshot`→`NativeMenuSnapshot`；
+`VulkanBackendTransfer`/`DX12Submission`/`VulkanResources`/`DX12Pipelines`/
+`VulkanUploadRing`/`AsyncResources`/`VulkanPresentation` 的实现落在各自后端的
+`backend.rs`/`submission.rs`/`resources.rs` 内（Swift 侧用 `extension` 拆文件，Rust 侧
+不拆）；`Gutter*`、`RopeEditing`/`RopeLookup`/`RopeDifference` 等作为自由函数落在同名模块里。
+
+这些行在清单中带 `verified_by: "operator"`，表示已逐文件读源码核对，生成器不再重新推导。
+
+### 清单生成器的三处判定缺陷（已修）
+
+1. **测试行被提前标记**：`derive()` 把测试行一并置为 `written_unverified`，导致后续测试映射
+   遍历直接跳过（`status != "pending"`），新迁移的测试套件永远不出现在清单里。
+2. **脚本清空的行无法恢复**：清理陈旧路径时写入的 `pending` + 空目标，被当成“操作者纠正”
+   而永久跳过，符号恢复再也救不回来。
+3. **测试名复数不匹配**：`CacheTests.swift` → `caches`、`DrawListResourceTests.swift` →
+   `draw_list_resources` 这类以复数命名的目标被漏掉。
+
+### 布局引擎的两处真实缺陷（本轮修复）
+
+两处都曾被测试以“已知差异”绕过——那是掩盖，不是修复。
+
+1. **`align_self`/`align_items` 交叉轴对错了基准**：原实现对**行内最高子项**求解，而非**容器**
+   交叉轴。100 高容器内 30 高子项居中落在 `y=0`，Yoga 给 `y=35`。
+2. **widget 级 `layout_direction` 从未生效**：`ViewGraph::compute_layout` 硬编码传入
+   `Direction::Ltr`，`measure`/`arrange` 一路透传同一个参数，从不读 `style.direction`。
+   于是 `Edge::End` 在无父节点时就把物理边烘死，且任何行的 RTL 排序都不生效。
+   现改为 `effective_direction()` 逐节点解析（自身 `direction` 优先，否则继承），并把
+   `Edge::End` 改为在布局期按生效方向解析。
+
+回归测试：`Core/rust/tests/layout_tests.rs` 的 `per_node_layout_direction_reverses_row_order`
+与 `logical_end_mirrors_under_rtl_when_set_before_parenting`。
 
 ### 状态口径不变
 
 `written_unverified` 仍**不代表通过验收**：本轮未做逐文件行为对照，仅以
-`cargo check --workspace` 为编译门禁。全部转换结束后再统一验证。
+`cargo check --workspace` 为编译门禁。测试迁移仍在进行（见上表 326 个测试文件）。
 
 ## 逐模块进度（生产源码）
 
 | 模块 | Swift 文件 | Swift 行 | 已写入 | 未开始 |
 | --- | ---: | ---: | ---: | ---: |
-| Compose | 414 | 52,554 | 394 | 20 |
-| Graphics | 107 | 14,534 | 100 | 7 |
-| Core | 97 | 12,299 | 95 | 2 |
-| Shell | 13 | 2,529 | 11 | 2 |
-| Examples | 61 | 7,135 | 60 | 1 |
-| Sources | 19 | 4,861 | 18 | 1 |
+| Compose | 414 | 52,554 | 414 | 0 |
+| Graphics | 107 | 14,534 | 107 | 0 |
+| Core | 97 | 12,299 | 97 | 0 |
 | Tools | 69 | 3,901 | 68 | 1 |
-| 合计 | 984 | 117,744 | 950 | 34 |
+| Examples | 61 | 7,135 | 61 | 0 |
+| DevTools | 51 | 5,183 | 51 | 0 |
+| Hosts | 51 | 4,254 | 51 | 0 |
+| Terminal | 29 | 3,088 | 29 | 0 |
+| Sources | 19 | 4,861 | 19 | 0 |
+| System | 17 | 1,004 | 17 | 0 |
+| Logging | 15 | 705 | 15 | 0 |
+| Text | 14 | 2,576 | 14 | 0 |
+| Shell | 13 | 2,529 | 13 | 0 |
+| Runtime | 11 | 1,485 | 11 | 0 |
+| Imaging | 9 | 696 | 9 | 0 |
+| PlatformCore | 6 | 540 | 6 | 0 |
+| Browser | 1 | 400 | 1 | 0 |
+| 合计 | 984 | 117,744 | 983 | 1 |
 
 Rust 文件数列为磁盘快照，不等于逐 Swift 文件一一对应；多个 Swift 文件可能映射到一个 Rust 模块，也可能一个 Swift 文件拆到多个 Rust/C 文件。逐文件关系在清单中。
 

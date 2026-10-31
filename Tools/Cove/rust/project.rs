@@ -528,7 +528,18 @@ impl CreateApplication {
             }
         }
         let templates = ApplicationTemplates::root(root);
+        // The Rust template is a Cargo project, so the Swift sources, the
+        // SwiftPM manifest and the Swift test target are not copied. The Rust
+        // files live under `src/` and `tests/` and are emitted verbatim.
+        let swift_only = ["Sources/AppContent/", "Tests/", "Package.swift"];
         for source in Files::files(&templates)? {
+            let relative_source = Files::relative(&source, &templates);
+            if swift_only
+                .iter()
+                .any(|prefix| relative_source == prefix.trim_end_matches('/') || relative_source.starts_with(prefix))
+            {
+                continue;
+            }
             let mut relative = Files::relative(&source, &templates);
             if let Some(rest) = relative.strip_prefix("Platforms/") {
                 let name = rest.split('/').next().unwrap_or_default();

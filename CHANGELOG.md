@@ -4,6 +4,41 @@
 
 ## Unreleased
 
+- **生产源码迁移完成**：984 个 Swift 生产文件中 983 个已有 Rust/C 实现，唯一例外是
+  `NSNumber+Boolean.swift`（Objective-C 的 `NSNumber` 布尔扩展，Rust 无对等物且不需要）。
+  SwiftPM 清单 25/25 已建立 Cargo 清单，CLI 项目模板 5/5 已改写为 Cargo 工程。
+- **补齐此前虚报为“已完成”的 69 个生产文件**。旧清单按文件名相似度映射，只要目标 `.rs`
+  存在即记完成——`DataTable.swift` 落到无关的 `lists/table.rs`、`SplitView.swift` 落到
+  25 行的 `view.rs`，因而得出“984/984”的假结论。清单生成器改为**符号校验**：索引全部
+  Rust 声明（含 `handle!`/`payload!`/`identifier!` 宏调用与 `pub use ... as` 改名两端），
+  逐文件核对 Swift 主类型名是否真实存在；对不上先按符号重定位，仍找不到则置未开始并清空
+  错误路径。本轮据此重写：`DataTable`、`TreeTable`、`Tree`、`Chart`、`ChartDataTable`、
+  `PropertyGrid` 全家、`SectionedList`、`SwipeList`、`ReorderableList`、`Combobox`、
+  `SearchField`、`RangeSlider`、`ColorField`、`JsonField`、`TimeField`、`TimeInput`、
+  `TimePicker`、`Vec3Field`、`AssetRefField`、`DateRangePicker/Calendar`、`SplitButton`、
+  `MenuButton`、`CompletionPopover`、`SplitView`、`ResizableEditor`、`DisclosureGroup`、
+  `NavigationRail`、`Tooltip`、`CommandPalette`、`ContextMenu`、`OverlayHost`、
+  `ShortcutHost`、`Sheet`、`ToolbarMetrics`、`UIIcons`、默认主题预设、`WorkspaceView`、
+  `ImmersiveWindowTitleBar`、`GalleryView`、DevTools 协议/诊断/传输类型，以及
+  `NativeAppFrameCapture` 的真实 GPU 离屏渲染与回读。
+- **修复布局引擎两处真实缺陷**（此前被测试以“已知差异”绕过，属于掩盖而非修复）：
+  - `align_self`/`align_items` 交叉轴改为对**容器**求解。原实现取行内最高子项，导致
+    100 高容器内 30 高子项居中落在 `y=0`（Yoga 为 `y=35`）。
+  - **widget 级 `layout_direction` 从未生效**：`ViewGraph::compute_layout` 硬编码
+    `Direction::Ltr`，`measure`/`arrange` 全程透传同一参数，从不读 `style.direction`。
+    后果是所有 RTL 行排序无效，且 `Edge::End` 在无父节点时就把物理边烘死。现改为逐节点
+    `effective_direction()` 解析，`Edge::End` 在布局期按生效方向解析。
+- **修复清单生成器三处判定缺陷**：测试行被 `derive()` 提前标记导致后续映射遍历跳过；
+  脚本自己清空的行被当成“操作者纠正”永久跳过；`CacheTests`→`caches`、
+  `DrawListResourceTests`→`draw_list_resources` 这类复数目标名漏匹配。
+- **CLI 模板改为 Rust 工程**：新增 `Cargo.toml.in`、`src/{main,app,resources}.rs` 与
+  `tests/resources.rs`（可编译验证），`cove new` 不再拷贝 Swift 源码与 SwiftPM 清单。
+- 以下缺陷一并修复：DevTools 诊断记录误用 `parentId`/`nodeId`/`missingIds`（Swift 与
+  `DevTools/Client/*.js` 读的是 `parentID`/`nodeID`/`missingIDs`）；`capture_presentation`
+  忽略模态作用域导致被遮控件仍报 `input_enabled: true`；`Tools::skills()` 返回空库；
+  滑块 `shows_ticks` 从未绘制；`NumericTextFormat` 只认 ASCII 数字且把微小负数渲染成
+  `-0`；`Tree` 搜索过滤不展开祖先；`NativeAppFrameCapture::reset()` 泄漏显存。
+
 - **迁移清单此前虚报完成度，已改为符号校验并修正**。旧清单按文件名相似度映射 Rust 文件，只要目标 `.rs` 存在即记“已写入”，于是 `DataTable.swift` 被记到无关的 `lists/table.rs`、`SplitView.swift` 被记到 25 行的 `view.rs`，得出“984/984 全部完成”的假结论。`Tools/Cove/rust/migration_inventory.py` 改为索引全部 Rust 声明（含宏调用与 `pub use ... as` 改名两端），逐文件核对 Swift 主类型名是否真实存在；对不上时先按符号重定位，仍找不到则置 `pending` 并清空错误路径。按新口径，当年**实际有 69 个生产文件没有实现**。
 - **补齐 35 个此前完全缺失的视图与类型**（本轮）：
   - Compose 数据：`DataTable`（含 model/selection/view，保留 20 万行虚拟化）、`TreeTable`、`Tree`、`Chart`、`ChartDataTable`、`PropertyGrid` 全家、`SectionedList`、`SwipeList`、`ReorderableList`。
