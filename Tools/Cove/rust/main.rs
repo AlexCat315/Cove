@@ -169,9 +169,7 @@ fn execute(arguments: &Arguments) -> Result<u8, ToolError> {
             CargoVerb::run(arguments)?;
             Ok(0)
         }
-        Operation::Build | Operation::Run
-            if !arguments.directory().join("cove.json").is_file() =>
-        {
+        Operation::Build | Operation::Run if !arguments.directory().join("cove.json").is_file() => {
             CargoVerb::run(arguments)?;
             Ok(0)
         }

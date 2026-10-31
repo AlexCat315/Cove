@@ -575,6 +575,8 @@ impl PackageTests {
             command.push(filter.into());
         }
         if arguments.flags.contains(&Flag::NoParallel) {
+            // libtest options follow the `--` separator, not Cargo's own flags.
+            command.push("--".into());
             command.push("--test-threads=1".into());
         }
         let build = CargoPackage::command(

@@ -174,7 +174,10 @@ unsafe extern "C" fn native_log(
     function: *const c_char,
     line: u32,
 ) {
+    // SAFETY: every pointer comes from the C producer and is either null or
+    // NUL-terminated for the duration of this call.
     let label = unsafe { string_from_pointer(label) }.unwrap_or_else(|| "com.cove.native".into());
+    // SAFETY: same contract as `label`.
     let message = unsafe { string_from_pointer(message) }.unwrap_or_default();
     let mut metadata = BTreeMap::new();
     metadata.insert("origin".to_owned(), LogValue::from("native"));
@@ -183,7 +186,9 @@ unsafe extern "C" fn native_log(
         message,
         metadata: Some(metadata),
         source: "native".into(),
+        // SAFETY: same contract as `label`.
         file: unsafe { string_from_pointer(file) }.unwrap_or_default(),
+        // SAFETY: same contract as `label`.
         function: unsafe { string_from_pointer(function) }.unwrap_or_default(),
         line: u64::from(line),
     };
@@ -200,6 +205,8 @@ unsafe fn string_from_pointer(pointer: *const c_char) -> Option<String> {
     }
     // The native bridge guarantees NUL-terminated UTF-8 text.
     Some(
+        // SAFETY: the null case returned above; the caller guarantees a
+        // NUL-terminated buffer that outlives this borrow.
         unsafe { CStr::from_ptr(pointer) }
             .to_string_lossy()
             .into_owned(),
@@ -279,6 +286,8 @@ mod native {
     }
 
     pub fn set_handler(handler: Handler, flush: Flush) {
+        // SAFETY: `handler` and `flush` are `extern "C"` functions that never
+        // unwind, and the C router only stores them for later log calls.
         unsafe {
             cove_log_set_handler(handler, flush);
         }
