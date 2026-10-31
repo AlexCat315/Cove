@@ -19,3 +19,7 @@ cc.workspace = true
 
 [lints]
 workspace = true
+
+[[test]]
+name = "zz_probe"
+path = "rust/tests/zz_probe.rs"

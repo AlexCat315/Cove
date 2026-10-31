@@ -13,16 +13,21 @@
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
-use cove_composition::{LayoutDebugAttachmentKey, ViewGraph};
+use cove_composition::{LayoutDebugAttachmentKey, View, ViewGraph};
 use cove_core::scene::{
-    AnimatorScheduler, FocusChain, FocusChainHolder, InteractionRegistry,
-    InteractionRegistryHolder, Node, NodeTree, PointerCapture, PointerCaptureHolder, Recomposer,
+    AccessibilityRole, AnimatorScheduler, EventDispatcher, FocusChain, FocusChainHolder,
+    InteractionRegistry, InteractionRegistryHolder, Node, NodeTree, PointerCapture,
+    PointerCaptureHolder, Recomposer,
 };
 use std::rc::Rc;
 
-use cove_core::{Font, FontWeight};
+use cove_core::{Font, FontWeight, Point};
+use cove_platform::{
+    InputEvent, KeyEvent, KeyModifiers, MouseButton, MouseButtonEvent, MouseMotionEvent, WindowId,
+};
 use cove_text::TextCacheLimits;
 use cove_text::{FontAtlas, TextEnvironment, TextEnvironmentHolder, TextFontResolver, TextShaper};
+use cove_ui_compose::primitives::overlays::portal::{PortalStore, PortalStoreHolder};
 
 /// Cross-platform test font resolved from the host's system fonts. CoveUI no
 /// longer bundles a font, so the assertions below are font-agnostic.
@@ -227,6 +232,203 @@ impl cove_composition::View for DebugNode {
     }
     fn tag(&self) -> &'static str {
         std::any::type_name::<Self>()
+    }
+}
+
+/// One mounted graph with its own interaction, focus, capture, portal and text
+/// holders, plus real pointer and keyboard dispatch.
+///
+/// Translation of `Tests/CoveUIComposeTests/InteractiveScene.swift`. The Swift
+/// suite installed the holders inside a scoped lock and tore the graph down on
+/// scope exit; [`InteractiveScene::run`] keeps that shape, so a test body reads
+/// exactly the geometry the Swift suite read.
+pub struct InteractiveScene {
+    pub graph: Rc<ViewGraph>,
+    pub registry: Rc<InteractionRegistry>,
+    pub focus: Rc<FocusChain>,
+    pub capture: Rc<PointerCapture>,
+    pub portal: Rc<PortalStore>,
+    pub width: f32,
+    pub height: f32,
+}
+
+impl InteractiveScene {
+    /// Runs `body` under the global lock with private holders installed, then
+    /// reinstalls an empty root, ticks once and restores the holders.
+    pub fn run(width: f32, height: f32, body: impl FnOnce(&mut InteractiveScene)) {
+        GlobalTestLock::with_scheduler(|| {
+            let previous_registry = InteractionRegistryHolder::current();
+            let previous_focus = FocusChainHolder::current();
+            let previous_capture = PointerCaptureHolder::current();
+            let previous_portal = PortalStoreHolder::current();
+            let previous_text = TextEnvironmentHolder::current();
+
+            let mut scene = Self::new(width, height);
+            body(&mut scene);
+
+            scene
+                .graph
+                .install(cove_composition::EmptyView, Default::default());
+            AnimatorScheduler::current().tick(1.0);
+
+            InteractionRegistryHolder::set_current(previous_registry);
+            FocusChainHolder::set_current(previous_focus);
+            PointerCaptureHolder::set_current(previous_capture);
+            PortalStoreHolder::set_current(Some(previous_portal));
+            TextEnvironmentHolder::set_current(previous_text);
+        });
+    }
+
+    fn new(width: f32, height: f32) -> Self {
+        let registry = Rc::new(InteractionRegistry::new());
+        let focus = Rc::new(FocusChain::new());
+        let capture = Rc::new(PointerCapture::new());
+        let portal = Rc::new(PortalStore::new());
+        InteractionRegistryHolder::set_current(Some(registry.clone()));
+        FocusChainHolder::set_current(Some(focus.clone()));
+        PointerCaptureHolder::set_current(Some(capture.clone()));
+        PortalStoreHolder::set_current(Some(portal.clone()));
+        TextEnvironmentHolder::set_current(Some(test_text_environment(16.0, 20.0)));
+        let graph = Rc::new(ViewGraph::new(
+            Rc::new(std::cell::RefCell::new(NodeTree::new())),
+            Rc::new(Recomposer::new()),
+        ));
+        Self {
+            graph,
+            registry,
+            focus,
+            capture,
+            portal,
+            width,
+            height,
+        }
+    }
+
+    pub fn install<V: View + 'static>(&mut self, view: V) {
+        self.graph.install(view, Default::default());
+        self.settle(5, 1.0);
+    }
+
+    /// Recomposes, lays out and ticks `ticks` times, then commits and lays out
+    /// once more — the Swift `settle` loop.
+    pub fn settle(&self, ticks: usize, delta: f64) {
+        for _ in 0..ticks {
+            self.graph.recomposer.commit_all();
+            self.graph.compute_layout(self.width, self.height);
+            AnimatorScheduler::current().tick(delta);
+        }
+        self.graph.recomposer.commit_all();
+        self.graph.compute_layout(self.width, self.height);
+    }
+
+    pub fn dispatcher(&self) -> EventDispatcher {
+        EventDispatcher::new(
+            self.graph.tree.clone(),
+            self.registry.clone(),
+            self.capture.clone(),
+            self.focus.clone(),
+            WindowId::MAIN,
+        )
+    }
+
+    pub fn nodes(&self) -> Vec<Node> {
+        let mut collected = Vec::new();
+        if let Some(root) = self.graph.tree.borrow().root() {
+            collect(&root, &mut collected);
+        }
+        collected
+    }
+
+    pub fn first(&self, predicate: impl Fn(&Node) -> bool) -> Option<Node> {
+        self.nodes().into_iter().find(|node| predicate(node))
+    }
+
+    pub fn all(&self, predicate: impl Fn(&Node) -> bool) -> Vec<Node> {
+        self.nodes()
+            .into_iter()
+            .filter(|node| predicate(node))
+            .collect()
+    }
+
+    pub fn labelled(&self, label: &str, role: Option<AccessibilityRole>) -> Option<Node> {
+        self.first(|node| {
+            node.accessibility().is_some_and(|semantics| {
+                semantics.label == label && role.is_none_or(|role| semantics.role == role)
+            })
+        })
+    }
+
+    pub fn named(&self, name: &str) -> Option<Node> {
+        self.first(|node| debug_name(node).as_deref() == Some(name))
+    }
+
+    fn click_at(&self, x: f32, y: f32, clicks: u8) {
+        let event = MouseButtonEvent {
+            button: MouseButton::Left,
+            x,
+            y,
+            clicks,
+            modifiers: Default::default(),
+            kind: Default::default(),
+        };
+        let dispatcher = self.dispatcher();
+        dispatcher.dispatch(&InputEvent::MouseButtonDown(event.clone()));
+        self.graph.recomposer.commit_all();
+        dispatcher.dispatch(&InputEvent::MouseButtonUp(event));
+        self.settle(5, 1.0);
+    }
+
+    pub fn click(&self, node: &Node, clicks: u8) {
+        let frame = node.absolute_frame();
+        self.click_at(frame.x + frame.width / 2.0, frame.y + frame.height / 2.0, clicks);
+    }
+
+    pub fn click_at_point(&self, point: Point, clicks: u8) {
+        self.click_at(point.x, point.y, clicks);
+    }
+
+    pub fn drag(&self, start: Point, end: Point, steps: usize) {
+        let dispatcher = self.dispatcher();
+        dispatcher.dispatch(&InputEvent::MouseButtonDown(MouseButtonEvent {
+            button: MouseButton::Left,
+            x: start.x,
+            y: start.y,
+            clicks: 1,
+            modifiers: Default::default(),
+            kind: Default::default(),
+        }));
+        self.graph.recomposer.commit_all();
+        for step in 1..=steps {
+            let t = step as f32 / steps as f32;
+            dispatcher.dispatch(&InputEvent::MouseMotion(MouseMotionEvent {
+                x: start.x + (end.x - start.x) * t,
+                y: start.y + (end.y - start.y) * t,
+                delta_x: 0.0,
+                delta_y: 0.0,
+                kind: Default::default(),
+            }));
+            self.graph.recomposer.commit_all();
+            self.graph.compute_layout(self.width, self.height);
+        }
+        dispatcher.dispatch(&InputEvent::MouseButtonUp(MouseButtonEvent {
+            button: MouseButton::Left,
+            x: end.x,
+            y: end.y,
+            clicks: 1,
+            modifiers: Default::default(),
+            kind: Default::default(),
+        }));
+        self.settle(5, 1.0);
+    }
+
+    pub fn key(&self, scancode: u32, modifiers: KeyModifiers) {
+        self.dispatcher().dispatch(&InputEvent::KeyDown(KeyEvent {
+            scancode,
+            keycode: 0,
+            modifiers,
+            is_repeat: false,
+        }));
+        self.settle(5, 1.0);
     }
 }
 

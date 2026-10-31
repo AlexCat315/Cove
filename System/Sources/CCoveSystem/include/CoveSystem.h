@@ -5,6 +5,8 @@
 uint32_t cove_restrict_path(const char *path, int directory);
 int cove_same_file(const char *lhs, const char *rhs);
 intptr_t cove_file_lock(const char *path, uint32_t *error);
+// Non-blocking lock: returns -1 when another owner holds it.
+intptr_t cove_file_try_lock(const char *path);
 void cove_file_unlock(intptr_t handle);
 
 #if defined(_WIN32)

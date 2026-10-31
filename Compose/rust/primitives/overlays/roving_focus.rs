@@ -320,7 +320,11 @@ impl<Id: PartialEq + Clone + 'static> PrimitiveView for RovingFocusHost<Id> {
         vec![self.content.clone()]
     }
 }
-impl<Id: PartialEq + Clone + 'static> View for RovingFocusHost<Id> {}
+impl<Id: PartialEq + Clone + 'static> View for RovingFocusHost<Id> {
+    fn kind(&self) -> crate::ViewKind<'_> {
+        crate::ViewKind::Primitive(self)
+    }
+}
 
 /// Applies the roving Tab-stop policy to one item.
 pub struct RovingItem<Id: PartialEq + Clone + 'static> {

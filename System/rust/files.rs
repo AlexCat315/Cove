@@ -9,6 +9,7 @@ unsafe extern "C" {
     fn cove_restrict_path(path: *const std::ffi::c_char, directory: i32) -> u32;
     fn cove_same_file(lhs: *const std::ffi::c_char, rhs: *const std::ffi::c_char) -> i32;
     fn cove_file_lock(path: *const std::ffi::c_char, error: *mut u32) -> isize;
+    fn cove_file_try_lock(path: *const std::ffi::c_char) -> isize;
     fn cove_file_unlock(handle: isize);
     fn cove_replace_file(
         source: *const std::ffi::c_char,
@@ -153,6 +154,18 @@ impl FileLock {
         } else {
             Ok(Self { handle })
         }
+    }
+
+    /// Acquires the lock only if no other owner holds it.
+    ///
+    /// Swift's `cove_log_lock_file` is non-blocking (`LOCK_NB`); retention uses
+    /// it to skip a session another process is still writing instead of waiting
+    /// for that process to exit.
+    pub fn try_acquire(path: &Path) -> Option<Self> {
+        let path = native_path(path).ok()?;
+        // SAFETY: valid NUL-terminated path; handle is exclusively owned on success.
+        let handle = unsafe { cove_file_try_lock(path.as_ptr()) };
+        (handle != -1).then_some(Self { handle })
     }
 }
 impl Drop for FileLock {

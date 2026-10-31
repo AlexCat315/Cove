@@ -35,3 +35,19 @@ path = "rust/tests/transport_tests.rs"
 [[test]]
 name = "dev_server_tests"
 path = "rust/tests/dev_server_tests.rs"
+
+[[test]]
+name = "timing_publisher_tests"
+path = "rust/tests/timing_publisher_tests.rs"
+
+[[test]]
+name = "dev_server_input_and_state_tests"
+path = "rust/tests/dev_server_input_and_state_tests.rs"
+
+[[test]]
+name = "mirror_backdrop_tests"
+path = "rust/tests/mirror_backdrop_tests.rs"
+
+[[test]]
+name = "dev_server_smoke_tests"
+path = "rust/tests/dev_server_smoke_tests.rs"

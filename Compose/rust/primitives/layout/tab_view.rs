@@ -400,7 +400,11 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for TabVie
         vec![AnyView::new(host)]
     }
 }
-impl<Id: PartialEq + Clone + std::hash::Hash + 'static> View for TabViewBody<Id> {}
+impl<Id: PartialEq + Clone + std::hash::Hash + 'static> View for TabViewBody<Id> {
+    fn kind(&self) -> crate::ViewKind<'_> {
+        crate::ViewKind::Primitive(self)
+    }
+}
 
 /// The strip chrome: canvas behind a bar, a pill tray for segmented, nothing for
 /// cards.
@@ -570,7 +574,11 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for TabStr
         })]
     }
 }
-impl<Id: PartialEq + Clone + std::hash::Hash + 'static> View for TabStripItem<Id> {}
+impl<Id: PartialEq + Clone + std::hash::Hash + 'static> View for TabStripItem<Id> {
+    fn kind(&self) -> crate::ViewKind<'_> {
+        crate::ViewKind::Primitive(self)
+    }
+}
 
 /// Selection indicator under (or over) a bar tab.
 struct TabItemChrome {

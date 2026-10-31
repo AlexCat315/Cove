@@ -438,4 +438,8 @@ impl<Content: View + Clone + 'static> PrimitiveView for Matched<Content> {
         vec![AnyView::new(self.content.clone())]
     }
 }
-impl<Content: View + Clone + 'static> View for Matched<Content> {}
+impl<Content: View + Clone + 'static> View for Matched<Content> {
+    fn kind(&self) -> crate::ViewKind<'_> {
+        crate::ViewKind::Primitive(self)
+    }
+}

@@ -221,7 +221,11 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> PrimitiveView for Breadc
     }
 }
 
-impl<Id: PartialEq + Clone + std::hash::Hash + 'static> View for BreadcrumbBody<Id> {}
+impl<Id: PartialEq + Clone + std::hash::Hash + 'static> View for BreadcrumbBody<Id> {
+    fn kind(&self) -> crate::ViewKind<'_> {
+        crate::ViewKind::Primitive(self)
+    }
+}
 
 fn menu_id(id: &impl std::hash::Hash) -> u64 {
     use std::hash::{Hash, Hasher};

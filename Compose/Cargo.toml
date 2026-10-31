@@ -288,3 +288,99 @@ path = "rust/tests/recomposition_paint.rs"
 [[test]]
 name = "chrome_component"
 path = "rust/tests/chrome_component.rs"
+
+[[test]]
+name = "shortcut_host_tests"
+path = "rust/tests/shortcut_host_tests.rs"
+
+[[test]]
+name = "interactive_scene"
+path = "rust/tests/interactive_scene.rs"
+
+[[test]]
+name = "feedback_component_tests"
+path = "rust/tests/feedback_component_tests.rs"
+
+[[test]]
+name = "semantic_motion_tests"
+path = "rust/tests/semantic_motion_tests.rs"
+
+[[test]]
+name = "cursor_pipeline_tests"
+path = "rust/tests/cursor_pipeline_tests.rs"
+
+[[test]]
+name = "sequence_lifecycle_tests"
+path = "rust/tests/sequence_lifecycle_tests.rs"
+
+[[test]]
+name = "bidi_tests"
+path = "rust/tests/bidi_tests.rs"
+
+[[test]]
+name = "viewport_traits_tests"
+path = "rust/tests/viewport_traits_tests.rs"
+
+[[test]]
+name = "accessibility_semantics_tests"
+path = "rust/tests/accessibility_semantics_tests.rs"
+
+[[test]]
+name = "adaptive_navigation_tests"
+path = "rust/tests/adaptive_navigation_tests.rs"
+
+[[test]]
+name = "virtualization_estimate_tests"
+path = "rust/tests/virtualization_estimate_tests.rs"
+
+[[test]]
+name = "animation_integration_tests"
+path = "rust/tests/animation_integration_tests.rs"
+
+[[test]]
+name = "interaction_tests"
+path = "rust/tests/interaction_tests.rs"
+
+[[test]]
+name = "demo_cross_fade_tests"
+path = "rust/tests/demo_cross_fade_tests.rs"
+
+[[test]]
+name = "control_density_tests"
+path = "rust/tests/control_density_tests.rs"
+
+[[test]]
+name = "animation_value_modifier_tests"
+path = "rust/tests/animation_value_modifier_tests.rs"
+
+[[test]]
+name = "bottom_sheet_tests"
+path = "rust/tests/bottom_sheet_tests.rs"
+
+[[test]]
+name = "text_document_layout_tests"
+path = "rust/tests/text_document_layout_tests.rs"
+
+[[test]]
+name = "appearance_reveal_tests"
+path = "rust/tests/appearance_reveal_tests.rs"
+
+[[test]]
+name = "lazy_grid_tests"
+path = "rust/tests/lazy_grid_tests.rs"
+
+[[test]]
+name = "asset_ref_field_tests"
+path = "rust/tests/asset_ref_field_tests.rs"
+
+[[test]]
+name = "probe3"
+path = "rust/tests/probe3.rs"
+
+[[test]]
+name = "scale_tests"
+path = "rust/tests/scale_tests.rs"
+
+[[test]]
+name = "chrome_regression_tests"
+path = "rust/tests/chrome_regression_tests.rs"

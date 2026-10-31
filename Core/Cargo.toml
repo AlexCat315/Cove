@@ -164,3 +164,39 @@ path = "rust/tests/rounded_clip_tests.rs"
 [[test]]
 name = "animation_controller_tests"
 path = "rust/tests/animation_controller_tests.rs"
+
+[[test]]
+name = "layer_aware_node_renderer_tests"
+path = "rust/tests/layer_aware_node_renderer_tests.rs"
+
+[[test]]
+name = "hit_testing_tests"
+path = "rust/tests/hit_testing_tests.rs"
+
+[[test]]
+name = "shadow_tests"
+path = "rust/tests/shadow_tests.rs"
+
+[[test]]
+name = "composition_paint_tests"
+path = "rust/tests/composition_paint_tests.rs"
+
+[[test]]
+name = "rubber_band_tests"
+path = "rust/tests/rubber_band_tests.rs"
+
+[[test]]
+name = "capture_cancellation_tests"
+path = "rust/tests/capture_cancellation_tests.rs"
+
+[[test]]
+name = "focus_accessory_tests"
+path = "rust/tests/focus_accessory_tests.rs"
+
+[[test]]
+name = "render_pipeline_performance_tests"
+path = "rust/tests/render_pipeline_performance_tests.rs"
+
+[[test]]
+name = "accessibility_subtree_regression"
+path = "rust/tests/accessibility_subtree_regression.rs"

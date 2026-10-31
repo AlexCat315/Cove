@@ -27,3 +27,11 @@ workspace = true
 [[test]]
 name = "pipeline"
 path = "rust/tests/pipeline.rs"
+
+[[test]]
+name = "startup_tests"
+path = "rust/tests/startup_tests.rs"
+
+[[test]]
+name = "storage_tests"
+path = "rust/tests/storage_tests.rs"

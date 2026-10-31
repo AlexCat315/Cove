@@ -21,6 +21,24 @@ intptr_t cove_file_lock(const char *path, uint32_t *error) {
     return (intptr_t)handle;
 }
 
+intptr_t cove_file_try_lock(const char *path) {
+    int length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, NULL, 0);
+    if (!length) { return -1; }
+    wchar_t *wide = calloc((size_t)length, sizeof(wchar_t));
+    if (!wide) { return -1; }
+    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, wide, length);
+    HANDLE handle = CreateFileW(wide, GENERIC_READ | GENERIC_WRITE,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_ALWAYS,
+        FILE_ATTRIBUTE_NORMAL, NULL);
+    free(wide);
+    if (handle == INVALID_HANDLE_VALUE) { return -1; }
+    OVERLAPPED offset = {0};
+    if (!LockFileEx(handle, LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY, 0, MAXDWORD, MAXDWORD, &offset)) {
+        CloseHandle(handle); return -1;
+    }
+    return (intptr_t)handle;
+}
+
 void cove_file_unlock(intptr_t value) {
     OVERLAPPED offset = {0};
     HANDLE handle = (HANDLE)value;
@@ -41,6 +59,13 @@ intptr_t cove_file_lock(const char *path, uint32_t *error) {
         *error = (uint32_t)errno; close(fd); return -1;
     }
     return fd;
+}
+
+intptr_t cove_file_try_lock(const char *path) {
+    int fd = open(path, O_CREAT | O_RDWR | O_CLOEXEC, 0600);
+    if (fd < 0) { return -1; }
+    if (flock(fd, LOCK_EX | LOCK_NB) != 0) { close(fd); return -1; }
+    return (intptr_t)fd;
 }
 
 void cove_file_unlock(intptr_t handle) {

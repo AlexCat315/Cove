@@ -155,7 +155,7 @@ impl LogFile {
                 Ok(contents) if contents == LEASE_CONTENTS => {}
                 _ => continue,
             }
-            let Ok(_lock) = FileLock::acquire(&marker) else {
+            let Some(_lock) = FileLock::try_acquire(&marker) else {
                 continue;
             };
             // Do not delete another process's active session or unrelated

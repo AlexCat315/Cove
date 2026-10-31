@@ -405,6 +405,9 @@ fn collect(
     }
 
     let Some(frame) = bounds.intersection(clip) else {
+        // A node clipped out of view still contributes its descendants, which
+        // may lie inside the clip. Swift does the same in `appendChildren`.
+        output.extend(children);
         return;
     };
     let Some(mut semantic) = semantics else {

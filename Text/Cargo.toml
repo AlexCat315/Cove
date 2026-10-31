@@ -25,3 +25,11 @@ workspace = true
 [[test]]
 name = "color_glyph_atlas"
 path = "rust/tests/color_glyph_atlas.rs"
+
+[[test]]
+name = "zz_probe"
+path = "rust/tests/zz_probe.rs"
+
+[[test]]
+name = "font_pipeline_tests"
+path = "rust/tests/font_pipeline_tests.rs"
