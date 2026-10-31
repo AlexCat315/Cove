@@ -20,3 +20,11 @@ workspace = true
 [[test]]
 name = "display_refresh_rate_tests"
 path = "rust/tests/display_refresh_rate_tests.rs"
+
+[[test]]
+name = "app_kit_scroll_input_tests"
+path = "rust/tests/app_kit_scroll_input_tests.rs"
+
+[[test]]
+name = "native_display_refresh_tests"
+path = "rust/tests/native_display_refresh_tests.rs"

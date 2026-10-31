@@ -10,12 +10,12 @@ use std::rc::Rc;
 
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::modifiers::style::AppearanceExt;
-use crate::primitives::controls::button::{Button, ButtonRole};
+use crate::primitives::controls::button::{ActionControlAccessibility, Button, ButtonRole};
 use crate::primitives::overlays::anchored::{
     AnchoredOverlayHost, PopoverOverflow, PopoverPlacement, PopoverSurface,
 };
 use crate::theme::styles::buttons::{ButtonStyle, ButtonStyleConfiguration, ButtonStyleViewExt};
-use crate::{AnyView, BoxView, PrimitiveView, View, impl_primitive_view};
+use crate::{AnyView, BoxView, PrimitiveView, View, ViewExt, impl_primitive_view};
 use cove_core::Binding;
 use cove_core::scene::{Align, EventResult, FlexDirection, Justify, LayoutNode, Node, Wrap};
 
@@ -118,22 +118,29 @@ impl View for Popover {
         }
         let is_presented = self.is_presented.clone();
         let is_enabled = self.is_enabled;
+        // Swift provides the expanded state on the trigger inside `Popover.body`
+        // (`Popover.swift:79-83`), so a closed popover reports `Some(false)`
+        // rather than leaving assistive technology without a state.
+        let expanded = Some(self.is_presented.get() && is_enabled);
         let trigger = AnyView::new(
-            Button::with_options(
-                PopoverTriggerLabel {
-                    label: self.label.clone(),
-                    description: self.trigger_description.clone(),
-                },
-                move || is_presented.set(!is_presented.get()),
-                ButtonRole::Normal,
-                is_enabled,
-                false,
-                self.is_presented.get() && is_enabled,
-                self.trigger_description
-                    .as_ref()
-                    .and_then(|description| description.help.clone()),
+            AnyView::new(
+                Button::with_options(
+                    PopoverTriggerLabel {
+                        label: self.label.clone(),
+                        description: self.trigger_description.clone(),
+                    },
+                    move || is_presented.set(!is_presented.get()),
+                    ButtonRole::Normal,
+                    is_enabled,
+                    false,
+                    self.is_presented.get() && is_enabled,
+                    self.trigger_description
+                        .as_ref()
+                        .and_then(|description| description.help.clone()),
+                )
+                .button_style(PopoverTriggerStyle),
             )
-            .button_style(PopoverTriggerStyle),
+            .composition_local(ActionControlAccessibility::expanded(), expanded),
         );
         let overlay = AnyView::new(
             AnchoredOverlayHost::new(self.is_presented.get() && is_enabled, self.content.clone())

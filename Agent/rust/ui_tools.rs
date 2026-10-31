@@ -3,7 +3,7 @@
 //! Name, schema and the immediate-read capability live together so the DevTools
 //! wire adapter, the MCP toolbox and the handlers cannot drift into separate
 //! string lists.
-use crate::agent::{AgentError, AgentSkill, AgentSkillLibrary, AgentTool, JsonSchema};
+use crate::{AgentError, AgentSkill, AgentSkillLibrary, AgentTool, JsonSchema};
 use std::collections::BTreeMap;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -244,10 +244,12 @@ pub fn default_skill_library() -> AgentSkillLibrary {
 
 /// Build the portable toolbox that both `AgentSession` and `McpServer` accept.
 pub fn toolbox(
-    executor: impl Fn(&str, &serde_json::Value) -> Result<crate::agent::AgentToolResult, AgentError>
+    executor: impl Fn(&str, &serde_json::Value) -> Result<crate::AgentToolResult, AgentError>
+    + Send
+    + Sync
     + 'static,
-) -> Result<crate::agent::AgentToolbox, AgentError> {
-    crate::agent::AgentToolbox::new(Tools::tools(), std::rc::Rc::new(executor))
+) -> Result<crate::AgentToolbox, AgentError> {
+    crate::AgentToolbox::new(Tools::tools(), std::sync::Arc::new(executor))
 }
 
 #[cfg(test)]

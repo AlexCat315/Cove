@@ -49,15 +49,17 @@ Core + Composition + Text + Inspection ← Browser
 - `package` 访问不跨 SwiftPM 包。需要被上层调用的场景语义查询是下层的明确公开接口。
 - `import CoveUI` 继续作为主要应用入口。内部模块旧 product 的移除属于此次允许的破坏性迁移，不增加旧依赖图的兼容壳。
 
-三个窄入口有单独的 manifest，它们表达可独立使用的抽象：
+以下窄入口有单独的 manifest，它们表达可独立使用的抽象：
 
 | 入口 | 产品 | 用途 |
 |---|---|---|
 | `Compose/Composition` | `CoveUIComposition` | View/ViewBuilder/ViewGraph、宏、基础组合；不引入字体或图片实现 |
 | `DevTools/Protocol` | `CoveUIDevToolsProtocol` | 消息、会话与诊断值契约；CLI 不链接 socket、窗口、字体或 GPU |
 | `DevTools/Inspection` | `CoveUIInspection` | 场景/语义查询与 Agent 工具契约；Browser 和无窗口检查使用 |
+| `Agent` | `cove-agent` | 工具、skills、MCP 与传输；不依赖 UI，Diffuse 等应用直接使用 |
+| `Http` | `cove-http` | 通用 HTTP 客户端；图片传输与应用网络请求共用 |
 
-这三个入口不复制 target。完整 Compose/DevTools 包依赖它们。跨能力测试集中在 `Tests/Headless`，生产包不会为了测试反向依赖上层包。
+这些入口不复制 target。完整 Compose/DevTools 包依赖它们。跨能力测试集中在 `Tests/Headless`，生产包不会为了测试反向依赖上层包。
 
 ## 部署标注
 

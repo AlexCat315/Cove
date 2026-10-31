@@ -145,6 +145,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d07550c9036bf2ae0c684c4297d503f838287c83c53686d05370d0e139ae570"
 
 [[package]]
+name = "cove-agent"
+version = "0.3.0-dev"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "cove-browser"
 version = "0.3.0-dev"
 dependencies = [
@@ -196,6 +204,7 @@ dependencies = [
 name = "cove-devtools"
 version = "0.3.0-dev"
 dependencies = [
+ "cove-agent",
  "cove-composition",
  "cove-core",
  "cove-devtools-protocol",
@@ -268,6 +277,7 @@ dependencies = [
  "cove-composition",
  "cove-core",
  "cove-graphics",
+ "cove-http",
  "cove-imaging",
  "cove-logging",
  "cove-platform",
@@ -279,6 +289,14 @@ dependencies = [
  "libc",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "cove-http"
+version = "0.3.0-dev"
+dependencies = [
+ "cc",
+ "thiserror",
 ]
 
 [[package]]

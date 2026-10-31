@@ -143,6 +143,19 @@ pub fn prepare(project: &Project, mode: Mode) -> Result<PathBuf> {
         &llvm.join("sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"),
         &libraries.join("libc++_shared.so"),
     )?;
+    // cove-http loads OpenSSL at run time; Android ships none, so the app
+    // bundles an arm64 build or reports https as unavailable.
+    match std::env::var_os("COVE_OPENSSL_ANDROID_DIR") {
+        Some(directory) => {
+            for library in ["libssl.so", "libcrypto.so"] {
+                process::copy(
+                    &Path::new(&directory).join(library),
+                    &libraries.join(library),
+                )?;
+            }
+        }
+        None => eprintln!("COVE_OPENSSL_ANDROID_DIR is not set: https is unavailable in this APK"),
+    }
     let assets = staged.join("assets");
     process::write(
         &assets.join("launch.json"),

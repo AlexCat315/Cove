@@ -15,7 +15,7 @@ pub use cove_platform::*;
 pub use display_refresh::DisplayRefreshTick;
 pub use platform_shell::*;
 pub use sdl3_clipboard::Sdl3Clipboard;
-pub use sdl3_shell::{Sdl3Shell, Sdl3WindowHandle};
+pub use sdl3_shell::{Sdl3Shell, Sdl3WindowHandle, wheel_event};
 pub fn make_default_shell() -> Result<Sdl3Shell, ShellError> {
     Sdl3Shell::new()
 }

@@ -218,21 +218,20 @@ fn part_grown_panel_is_hit_where_it_is_drawn() {
             assert!(panel.width > 100.0, "the panel has grown (got {})", panel.width);
             assert!(panel.width < 200.0, "the panel has not finished (got {})", panel.width);
 
-            let content = named(&fixture.graph, "panel").expect("the panel is mounted");
             let root = fixture.graph.tree.borrow().root().expect("root");
+            let panel_id = host.id();
 
             let inside = HitTester::hit_test(&root, Point::new(panel.x + 2.0, panel.y + 2.0))
                 .expect("the grown rectangle is hittable");
-            assert_eq!(
-                inside.node.id(),
-                content.id(),
-                "a point inside the grown rectangle reaches the panel"
+            assert!(
+                inside.path.iter().any(|node| node.id() == panel_id),
+                "a point inside the grown rectangle reaches the panel's subtree"
             );
 
             let beyond =
                 HitTester::hit_test(&root, Point::new(panel.max_x() + 2.0, panel.y + 2.0));
             assert!(
-                beyond.is_none_or(|hit| hit.node.id() != content.id()),
+                beyond.is_none_or(|hit| !hit.path.iter().any(|node| node.id() == panel_id)),
                 "the space the panel has yet to reach is not clickable"
             );
         });

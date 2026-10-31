@@ -1,0 +1,29 @@
+[package]
+name = "cove-http"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Cove HTTP client: Foundation, WinHTTP, or HTTP/1.1 with OpenSSL"
+build = "rust/build.rs"
+
+[lib]
+path = "rust/lib.rs"
+
+[features]
+# Use the socket + OpenSSL backend on Apple and Windows too (testing; it is
+# always the backend on Linux, Android and other Unix targets).
+openssl = []
+
+[dependencies]
+thiserror.workspace = true
+
+[build-dependencies]
+cc.workspace = true
+
+[lints]
+workspace = true
+
+[[test]]
+name = "client_tests"
+path = "rust/tests/client_tests.rs"

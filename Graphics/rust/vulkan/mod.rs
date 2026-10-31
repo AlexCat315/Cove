@@ -19,3 +19,6 @@ pub(crate) mod submission;
 pub(crate) mod sys;
 
 pub use backend::{VulkanBackend, make_backend};
+// Pure VSync policy: no handles, so it is unit-testable on any host. Editing this
+// line? Keep it a re-export; the module itself stays crate-private.
+pub use presentation::choose_presentation_mode;

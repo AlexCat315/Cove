@@ -13,7 +13,7 @@ mod support;
 use cove_composition::View;
 use cove_core::scene::AccessibilityRole;
 use cove_core::Binding;
-use cove_ui_compose::primitives::controls::button::ButtonHost;
+use cove_ui_compose::theme::styles::buttons::builtin_button_chrome::BUTTON_HOST_MARKER_KEY;
 use cove_ui_compose::primitives::controls::fields::combobox::Combobox;
 use cove_ui_compose::primitives::controls::fields::select::{Select, SelectOption};
 
@@ -43,7 +43,7 @@ fn options() -> Vec<SelectOption<Mode>> {
 
 fn trigger(scene: &InteractiveScene) -> cove_core::scene::Node {
     scene
-        .first(|node| node.attachment::<()>(ButtonHost::MARKER_KEY).is_some())
+        .first(|node| node.attachment::<bool>(BUTTON_HOST_MARKER_KEY).is_some())
         .expect("the popover trigger is a button host")
 }
 
@@ -69,16 +69,18 @@ fn select_trigger_reads_as_a_combo_box_with_the_selected_name() {
             semantics.value, "Details",
             "the value mirrors the selected option so a reader announces it"
         );
+        assert_eq!(
+            semantics.state.is_expanded,
+            Some(false),
+            "a closed combo box reports an explicit collapsed state, not an absent one"
+        );
     });
 }
 
 #[test]
 fn combobox_trigger_reads_as_a_combo_box_with_its_title() {
     InteractiveScene::run(400.0, 300.0, |scene| {
-        scene.install(
-            Combobox::new(Binding::constant(None::<Mode>), options())
-                .placeholder("Pick a mode"),
-        );
+        scene.install(Combobox::new(Binding::constant(None::<Mode>), options()));
         let trigger = trigger(scene);
         let semantics = trigger
             .accessibility()
@@ -90,7 +92,7 @@ fn combobox_trigger_reads_as_a_combo_box_with_its_title() {
             "a Combobox trigger is a combo box"
         );
         assert_eq!(
-            semantics.label, "Pick a mode",
+            semantics.label, "Select an option",
             "the placeholder stands in as the accessible name before a selection"
         );
     });

@@ -29,7 +29,7 @@ mod support;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cove_composition::{AnyView, LayoutDebugExt, PrimitiveView};
+use cove_composition::{AnyView, LayoutDebugExt, View};
 use cove_core::scene::{AccessibilityRole, AccessibilityTree, Node};
 use cove_core::{Binding, Environment, InputCapabilities, State};
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
@@ -42,34 +42,31 @@ use cove_ui_compose::primitives::text::Text;
 
 use support::GlobalTestLock;
 
-/// Panel whose button counts its own activations, mirroring the Swift `Panel`.
+/// Panel whose button counts its own activations, mirroring the Swift `Panel`
+/// (`@State count` plus a body that reads it).
 struct Panel {
     count: State<i32>,
     clicks: Rc<RefCell<i32>>,
 }
 
-impl PrimitiveView for Panel {
-    fn make_node(&self) -> Node {
-        Node::new()
-    }
-    fn update_node(&self, _node: &Node) {}
-    fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
-        None
-    }
-    fn children(&self, _node: &Node) -> Vec<AnyView> {
+impl View for Panel {
+    fn body(&self) -> AnyView {
         let count = self.count.clone();
         let clicks = self.clicks.clone();
-        vec![AnyView::new(
+        AnyView::new(
             Button::new(Text::new(format!("Count {}", self.count.get())), move || {
                 let next = count.get() + 1;
                 count.set(next);
                 *clicks.borrow_mut() = next;
             })
             .debug_name("panel-counter"),
-        )]
+        )
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        vec![cove_composition::DynamicField::state("count", &self.count)]
     }
 }
-cove_ui_compose::impl_primitive_view!(Panel);
 
 fn nodes(root: &Node) -> Vec<Node> {
     let mut collected = vec![root.clone()];
@@ -218,15 +215,6 @@ fn explicit_top_places_the_strip_above_the_panel() {
             "activating the panel button increments it"
         );
         assert_eq!(count.get(), 1, "the panel state moved to 1");
-        {
-            fn w(n: &Node, d: usize) {
-                eprintln!("{}{} f={:?} lbl={:?}", "  ".repeat(d),
-                    n.view_tag().unwrap_or_default().rsplit("::").next().unwrap_or(""),
-                    n.absolute_frame(), AccessibilityTree::resolved_label(n));
-                for c in n.children() { w(&c, d+1); }
-            }
-            w(&root, 0);
-        }
         assert_eq!(
             AccessibilityTree::resolved_label(&panel_node(&root)),
             "Count 1",

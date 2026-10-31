@@ -12,7 +12,7 @@ pub mod http;
 /// bridge before the first frame. Returns the transport capability report so a
 /// caller can log what it will be able to load.
 pub fn install_platform_services() -> http::TransportCapabilities {
-    let capabilities = http::TransportCapabilities::PLATFORM;
+    let capabilities = http::TransportCapabilities::platform();
     let timeout =
         cove_ui_compose::primitives::media::image_data_download::ImageLoadingPolicy::default()
             .timeout;

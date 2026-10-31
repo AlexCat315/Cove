@@ -1,7 +1,8 @@
 //! Tool metadata, validation and the provider-neutral tool loop.
-use crate::agent::schema::{JsonSchema, JsonSchemaValidator};
+use crate::schema::{JsonSchema, JsonSchemaValidator};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::sync::Arc;
 
 /// Wire formats supported by the shared tool contract.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -130,8 +131,14 @@ pub const MAX_TOOL_NAME_BYTES: usize = 128;
 pub const MAX_TOOL_DESCRIPTION_BYTES: usize = 16_384;
 
 /// Executor signature. Synchronous by design: diagnostic reads run inside a
-/// native host's frame inbox, which cannot yield.
-pub type ToolExecutor = std::rc::Rc<dyn Fn(&str, &Value) -> Result<AgentToolResult, AgentError>>;
+/// native host's frame inbox, which cannot yield. `Send + Sync` so a toolbox can
+/// move to a stdio or socket server thread.
+pub type ToolExecutor =
+    Arc<dyn Fn(&str, &Value) -> Result<AgentToolResult, AgentError> + Send + Sync>;
+
+/// Model adapter for one turn of [`AgentSession`].
+pub type AgentModel =
+    Arc<dyn Fn(&[AgentMessage], &[AgentTool]) -> Result<AgentReply, AgentError> + Send + Sync>;
 
 /// One validated boundary shared by model sessions and MCP clients.
 #[derive(Clone)]
@@ -263,16 +270,16 @@ pub struct AgentSession {
     toolbox: AgentToolbox,
     instructions: String,
     maximum_tool_rounds: usize,
-    model: std::rc::Rc<dyn Fn(&[AgentMessage], &[AgentTool]) -> Result<AgentReply, AgentError>>,
+    model: AgentModel,
 }
 
 impl AgentSession {
     pub fn new(
         toolbox: AgentToolbox,
-        skills: &crate::agent::skills::AgentSkillLibrary,
+        skills: &crate::skills::AgentSkillLibrary,
         enabled_skills: &[String],
         maximum_tool_rounds: usize,
-        model: std::rc::Rc<dyn Fn(&[AgentMessage], &[AgentTool]) -> Result<AgentReply, AgentError>>,
+        model: AgentModel,
     ) -> Result<Self, AgentError> {
         Ok(Self {
             instructions: skills.instructions(enabled_skills)?,
@@ -361,7 +368,6 @@ impl AgentSession {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::rc::Rc;
 
     fn toolbox() -> AgentToolbox {
         let mut properties = std::collections::BTreeMap::new();
@@ -377,7 +383,7 @@ mod tests {
         )];
         AgentToolbox::new(
             tools,
-            Rc::new(|_name, _input| {
+            Arc::new(|_name, _input| {
                 Ok(AgentToolResult::encode(
                     &serde_json::json!({"ok": true}),
                     false,
@@ -392,7 +398,7 @@ mod tests {
         let tool = AgentTool::new("a", "d", JsonSchema::any(), true);
         let result = AgentToolbox::new(
             vec![tool.clone(), tool],
-            Rc::new(|_, _| Ok(AgentToolResult::encode(&serde_json::json!(null), false))),
+            Arc::new(|_, _| Ok(AgentToolResult::encode(&serde_json::json!(null), false))),
         );
         assert!(result.is_err());
     }
@@ -428,10 +434,10 @@ mod tests {
     fn session_rejects_duplicate_call_ids() {
         let session = AgentSession::new(
             toolbox(),
-            &crate::agent::skills::AgentSkillLibrary::default(),
+            &crate::skills::AgentSkillLibrary::default(),
             &[],
             4,
-            Rc::new(|_messages, _tools| {
+            Arc::new(|_messages, _tools| {
                 Ok(AgentReply::Tools(vec![
                     AgentToolCall {
                         id: "a".into(),
@@ -454,10 +460,10 @@ mod tests {
     fn step_limit_is_enforced() {
         let session = AgentSession::new(
             toolbox(),
-            &crate::agent::skills::AgentSkillLibrary::default(),
+            &crate::skills::AgentSkillLibrary::default(),
             &[],
             1,
-            Rc::new(|_messages, _tools| {
+            Arc::new(|_messages, _tools| {
                 Ok(AgentReply::Tools(vec![AgentToolCall {
                     id: "a".into(),
                     name: "query".into(),

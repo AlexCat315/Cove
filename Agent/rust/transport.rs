@@ -190,15 +190,46 @@ fn read_bounded_line(
     }
 }
 
+/// Shared, line-oriented output. The server writes responses through it and a
+/// host may clone it to emit notifications between responses.
+#[derive(Clone)]
+pub struct LineWriter(Arc<Mutex<Box<dyn Write + Send>>>);
+
+impl LineWriter {
+    pub fn new(writer: impl Write + Send + 'static) -> Self {
+        Self(Arc::new(Mutex::new(Box::new(writer))))
+    }
+
+    pub fn stdout() -> Self {
+        Self::new(std::io::stdout())
+    }
+
+    /// Writes `line` plus a newline and flushes, as one unit.
+    pub fn write_line(&self, line: &[u8]) -> io::Result<()> {
+        if line.len() > MAX_RESPONSE_BYTES {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "response exceeds 2 MiB",
+            ));
+        }
+        let mut writer = self.0.lock().unwrap_or_else(|error| error.into_inner());
+        writer.write_all(line)?;
+        writer.write_all(b"\n")?;
+        writer.flush()
+    }
+}
+
 /// Serve MCP over stdin/stdout, one JSON message per line.
 ///
 /// This is the shape a command-line agent host needs; it shares the handler and
 /// bounds with the socket server.
 pub fn serve_stdio(handler: Handler) -> io::Result<()> {
-    let stdin = std::io::stdin();
-    let mut reader = BufReader::new(stdin.lock());
-    let stdout = std::io::stdout();
-    let mut writer = stdout.lock();
+    serve_lines(std::io::stdin().lock(), &LineWriter::stdout(), &handler)
+}
+
+/// [`serve_stdio`] over any reader and writer.
+pub fn serve_lines(reader: impl BufRead, writer: &LineWriter, handler: &Handler) -> io::Result<()> {
+    let mut reader = reader;
     let mut line = String::new();
     loop {
         line.clear();
@@ -219,15 +250,7 @@ pub fn serve_stdio(handler: Handler) -> io::Result<()> {
         let Some(response) = handler(trimmed.as_bytes()) else {
             continue;
         };
-        if response.len() > MAX_RESPONSE_BYTES {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "response exceeds 2 MiB",
-            ));
-        }
-        writer.write_all(&response)?;
-        writer.write_all(b"\n")?;
-        writer.flush()?;
+        writer.write_line(&response)?;
     }
 }
 
@@ -262,6 +285,36 @@ mod tests {
         assert_eq!(text.lines().next(), Some("{\"a\":1}"));
         server.stop();
         assert!(server.bound_port().is_none());
+    }
+
+    #[derive(Clone, Default)]
+    struct Sink(Arc<Mutex<Vec<u8>>>);
+
+    impl Write for Sink {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn lines_interleave_responses_and_host_notifications() {
+        let sink = Sink::default();
+        let writer = LineWriter::new(sink.clone());
+        let notifier = writer.clone();
+        let handler: Handler = Arc::new(move |input: &[u8]| {
+            if input == b"notify" {
+                notifier.write_line(b"{\"method\":\"changed\"}").unwrap();
+                return None;
+            }
+            Some(input.to_vec())
+        });
+        serve_lines(&b"a\r\n\nnotify\nb\n"[..], &writer, &handler).unwrap();
+        let output = String::from_utf8(sink.0.lock().unwrap().clone()).unwrap();
+        assert_eq!(output, "a\n{\"method\":\"changed\"}\nb\n");
     }
 
     #[test]

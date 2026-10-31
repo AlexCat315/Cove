@@ -2,7 +2,7 @@
 //!
 //! Instructions are content. Loading a skill never executes code or grants
 //! tools.
-use crate::agent::tool::AgentError;
+use crate::tool::AgentError;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 

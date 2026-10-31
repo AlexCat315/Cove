@@ -21,6 +21,7 @@ cove-text.workspace = true
 cove-imaging.workspace = true
 cove-system.workspace = true
 cove-logging.workspace = true
+cove-http.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 libc.workspace = true

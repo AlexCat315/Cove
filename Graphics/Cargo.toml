@@ -109,3 +109,15 @@ path = "rust/tests/metal_capability_probe_tests.rs"
 [[test]]
 name = "metal_clear_readback_tests"
 path = "rust/tests/metal_clear_readback_tests.rs"
+
+[[test]]
+name = "zz_probe2"
+path = "rust/tests/zz_probe2.rs"
+
+[[test]]
+name = "presentation_policy_tests"
+path = "rust/tests/presentation_policy_tests.rs"
+
+[[test]]
+name = "vulkan_slang_tests"
+path = "rust/tests/vulkan_slang_tests.rs"

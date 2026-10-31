@@ -1,5 +1,9 @@
 //! AppKit scroll phases are retained by the native ordered SDL marker bridge.
-pub(crate) fn phase(value: i32) -> cove_platform::ScrollPhase {
+///
+/// Maps the phase value the AppKit monitor stores (`apple.m::phase_value`) onto
+/// the platform enum. Public so the decoding contract can be asserted without a
+/// live window: the marker never reaches a test otherwise.
+pub fn phase(value: i32) -> cove_platform::ScrollPhase {
     use cove_platform::ScrollPhase::*;
     match value {
         1 => MayBegin,

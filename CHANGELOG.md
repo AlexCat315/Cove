@@ -4,6 +4,27 @@
 
 ## Unreleased
 
+- **新增 `cove-agent`（`Agent/`），agent/MCP 层脱离 UI 栈**：
+  - `cove-devtools` 的 `agent/`、`agent_transport.rs` 与 `inspection/tools.rs` 移入，只依赖 serde；
+    `cove-devtools` 以 `pub use cove_agent as agent` 与 `agent_transport`、`inspection::tools` 保留原路径。
+  - 恢复 Swift 版行为：`McpServer::with_provider` 每次 `tools/list`/`tools/call` 重新读取工具并声明
+    `listChanged: true`；`ToolExecutor` 与新的 `AgentModel` 改为 `Arc<dyn Fn + Send + Sync>`，
+    工具箱可交给 stdio/TCP 服务线程（破坏性：原 `Rc` 执行器需改为 `Arc`；`McpServer::tools`
+    改为返回 `Result<Vec<AgentTool>, _>`）。
+  - 新增 `notification()`、`transport::LineWriter` 与 `serve_lines`，宿主可在响应之间写出
+    `notifications/tools/list_changed`。
+- **新增 `cove-http`（`Http/`），通用阻塞式 HTTP 客户端，响应体流式读取**：
+  - 任意方法、请求头与请求体；非 2xx 作为响应返回；重定向策略统一（303 及 POST 的 301/302 改为 GET，
+    跨源去掉 `Authorization`/`Cookie`，拒绝 https→http）；请求头注入与非法 URL 在发出前拒绝。
+  - macOS/iOS 用 NSURLSession（`native/apple.m`，带背压）；Windows 用 WinHTTP；Linux、Android 与其他
+    Unix 用 HTTP/1.1 + OpenSSL（`native/openssl.c` 运行时加载 `libssl` 1.1.1–4.x，校验证书链与主机名，
+    读取系统信任库，含 Android `cacerts`）。
+  - `cove-hosts` 的图片传输改为 `cove-http` 之上的薄适配：Linux 支持 `https://`；Apple 返回真实
+    `Content-Type`；Android 首次有图片传输。`TransportCapabilities::PLATFORM` 改为运行时的
+    `TransportCapabilities::platform()`（破坏性）。
+  - Android 没有系统 OpenSSL：`cargo xtask android-prepare` 从 `COVE_OPENSSL_ANDROID_DIR` 打包
+    `libssl.so`/`libcrypto.so`，未设置时 https 报告不可用。
+
 - **应用模板与打包改为 Cargo 生态方式**：
   - `Templates/app` 是 `cargo-generate` 模板：共享 UI（`src/`）、`Assets/`、`Platforms/`
     （Android Gradle、macOS/Windows/Linux 平台文件）与 `xtask/`。应用身份写在

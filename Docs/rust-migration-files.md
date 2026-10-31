@@ -14,7 +14,7 @@
 | 范围 | 文件数 | 已写入 | 进行中 | 未开始 |
 | --- | ---: | ---: | ---: | ---: |
 | 生产源码 | 914 | 914 | 0 | 0 |
-| 测试源码 | 411 | 117 | 0 | 294 |
+| 测试源码 | 411 | 174 | 0 | 237 |
 | SwiftPM 清单 | 23 | 23 | 0 | 0 |
 | 项目模板 | 0 | 0 | 0 | 0 |
 | 合计 | 1348 | — | — | — |
@@ -734,20 +734,20 @@
 | 源文件 | 行 | 状态 | Rust/C 目标 | 依赖或阻塞 |
 | --- | ---: | --- | --- | --- |
 | `DevTools/Inspection/Sources/CoveUIAgentCore/Contracts/Schema.swift` | 479 | 已写入（未验证） | `DevTools/rust/lib.rs` | 未编译、未行为对照 |
-| `DevTools/Inspection/Sources/CoveUIAgentCore/Contracts/Tool.swift` | 51 | 已写入（未验证） | `DevTools/rust/inspection/tools.rs` | 未编译、未行为对照 |
-| `DevTools/Inspection/Sources/CoveUIAgentCore/MCP/Server.swift` | 105 | 已写入（未验证） | `DevTools/rust/devtools/mod.rs` | 未编译、未行为对照 |
-| `DevTools/Inspection/Sources/CoveUIAgentCore/Session/Conversation.swift` | 86 | 已写入（未验证） | `DevTools/rust/agent/tool.rs` | 未编译、未行为对照 |
-| `DevTools/Inspection/Sources/CoveUIAgentCore/Skills/Directory.swift` | 49 | 已写入（未验证） | `DevTools/rust/agent/skills.rs` | 未编译、未行为对照 |
-| `DevTools/Inspection/Sources/CoveUIAgentCore/Skills/Skill.swift` | 42 | 已写入（未验证） | `DevTools/rust/agent/skills.rs` | 未编译、未行为对照 |
+| `DevTools/Inspection/Sources/CoveUIAgentCore/Contracts/Tool.swift` | 51 | 已写入（未验证） | `Agent/rust/ui_tools.rs` | 未编译、未行为对照 |
+| `DevTools/Inspection/Sources/CoveUIAgentCore/MCP/Server.swift` | 105 | 已写入（未验证） | `Agent/rust/mcp.rs` | 未编译、未行为对照 |
+| `DevTools/Inspection/Sources/CoveUIAgentCore/Session/Conversation.swift` | 86 | 已写入（未验证） | `Agent/rust/tool.rs` | 未编译、未行为对照 |
+| `DevTools/Inspection/Sources/CoveUIAgentCore/Skills/Directory.swift` | 49 | 已写入（未验证） | `Agent/rust/skills.rs` | 未编译、未行为对照 |
+| `DevTools/Inspection/Sources/CoveUIAgentCore/Skills/Skill.swift` | 42 | 已写入（未验证） | `Agent/rust/skills.rs` | 未编译、未行为对照 |
 | `DevTools/Inspection/Sources/CoveUIAgentCore/Tools/Diagnostics.swift` | 92 | 已写入（未验证） | `DevTools/rust/inspection/diagnostics.rs` | 未编译、未行为对照 |
-| `DevTools/Inspection/Sources/CoveUIAgentCore/Tools/Toolbox.swift` | 44 | 已写入（未验证） | `DevTools/rust/agent/tool.rs` | 未编译、未行为对照 |
+| `DevTools/Inspection/Sources/CoveUIAgentCore/Tools/Toolbox.swift` | 44 | 已写入（未验证） | `Agent/rust/tool.rs` | 未编译、未行为对照 |
 | `DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Actions.swift` | 41 | 已写入（未验证） | `DevTools/rust/inspection/actions.rs` | 未编译、未行为对照 |
 | `DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Geometry.swift` | 72 | 已写入（未验证） | `Compose/rust/primitives/controls/fields/slider/geometry.rs` | 未编译、未行为对照 |
 | `DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Memory.swift` | 11 | 已写入（未验证） | `Hosts/rust/desktop/application/memory.rs` | 未编译、未行为对照 |
 | `DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Presentation.swift` | 62 | 已写入（未验证） | `Graphics/rust/rhi/presentation.rs` | 未编译、未行为对照 |
 | `DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Queries.swift` | 200 | 已写入（未验证） | `DevTools/rust/inspection/diagnostics.rs` | 未编译、未行为对照 |
 | `DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Requests.swift` | 50 | 已写入（未验证） | `DevTools/rust/server/mod.rs` | 未编译、未行为对照 |
-| `DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Tools.swift` | 222 | 已写入（未验证） | `DevTools/rust/inspection/tools.rs` | 未编译、未行为对照 |
+| `DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Tools.swift` | 222 | 已写入（未验证） | `Agent/rust/ui_tools.rs` | 未编译、未行为对照 |
 | `DevTools/Inspection/Sources/CoveUIDevToolsScene/Diagnostics/Trace.swift` | 103 | 已写入（未验证） | `Core/rust/scene/timing_trace.rs` | 未编译、未行为对照 |
 | `DevTools/Inspection/Sources/CoveUIDevToolsScene/Observation.swift` | 19 | 已写入（未验证） | `Logging/rust/observation.rs` | 未编译、未行为对照 |
 | `DevTools/Inspection/Sources/CoveUIDevToolsScene/SceneEditor.swift` | 209 | 已写入（未验证） | `DevTools/rust/inspection/editor.rs` | 未编译、未行为对照 |
@@ -761,7 +761,7 @@
 | `DevTools/Protocol/Sources/CoveUIDevToolsProtocol/Observation.swift` | 57 | 已写入（未验证） | `DevTools/Protocol/rust/lib.rs` | 未编译、未行为对照 |
 | `DevTools/Protocol/Sources/CoveUIDevToolsProtocol/Protocol.swift` | 486 | 已写入（未验证） | `DevTools/Protocol/rust/lib.rs` | 未编译、未行为对照 |
 | `DevTools/Sources/CoveUIAgent/Exports.swift` | 3 | 已写入（未验证） | `Logging/rust/exports.rs` | 未编译、未行为对照 |
-| `DevTools/Sources/CoveUIAgentTransport/LocalServer.swift` | 110 | 已写入（未验证） | `DevTools/rust/agent_transport.rs` | 未编译、未行为对照 |
+| `DevTools/Sources/CoveUIAgentTransport/LocalServer.swift` | 110 | 已写入（未验证） | `Agent/rust/transport.rs` | 未编译、未行为对照 |
 | `DevTools/Sources/CoveUIDevTools/Integration/Exports.swift` | 4 | 已写入（未验证） | `Logging/rust/exports.rs` | 未编译、未行为对照 |
 | `DevTools/Sources/CoveUIDevTools/Mirror/NativeAppFrameCapture.swift` | 52 | 已写入（未验证） | `DevTools/rust/devtools/mirror.rs` | 未编译、未行为对照 |
 | `DevTools/Sources/CoveUIDevTools/Session/DevTools.swift` | 230 | 已写入（未验证） | `DevTools/rust/devtools/mod.rs` | 未编译、未行为对照 |

@@ -1,0 +1,25 @@
+[package]
+name = "cove-agent"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Cove agent tools, skills, MCP server and line transports"
+
+[lib]
+path = "rust/lib.rs"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true
+
+[[test]]
+name = "agent_tests"
+path = "rust/tests/agent_tests.rs"
+
+[[test]]
+name = "transport_tests"
+path = "rust/tests/transport_tests.rs"

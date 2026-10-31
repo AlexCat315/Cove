@@ -605,6 +605,46 @@ impl Drop for Sdl3Shell {
         self.shutdown();
     }
 }
+
+/// Decode the fields AppKit's scroll monitor captures into a wheel event.
+///
+/// Extracted verbatim from the `kind == 19` branch of [`decode_event`] so the
+/// unit/device/phase contract can be asserted without a live window: the marker
+/// is only ever produced by `apple.m`, which needs a window and event monitor.
+/// `flags & 4` is `hasPreciseScrollingDeltas`; `phase`/`momentum` are the values
+/// `apple.m::phase_value` stored.
+pub fn wheel_event(
+    dx: f32,
+    dy: f32,
+    x: f32,
+    y: f32,
+    timestamp: f64,
+    flags: u16,
+    phase: i32,
+    momentum: i32,
+) -> MouseWheelEvent {
+    MouseWheelEvent {
+        x: dx,
+        y: dy,
+        mouse_x: Some(x),
+        mouse_y: Some(y),
+        input: ScrollInput {
+            unit: if flags & 4 != 0 {
+                ScrollUnit::Points
+            } else {
+                ScrollUnit::Lines
+            },
+            device: if flags & 4 != 0 {
+                ScrollDevice::Continuous
+            } else {
+                ScrollDevice::Wheel
+            },
+            phase: crate::scroll::phase(phase),
+            momentum_phase: crate::scroll::phase(momentum),
+            timestamp,
+        },
+    }
+}
 fn decode_event(e: &native::Event) -> Option<InputEvent> {
     let key = || KeyEvent {
         scancode: e.a as u32,
@@ -670,27 +710,9 @@ fn decode_event(e: &native::Event) -> Option<InputEvent> {
                 InputEvent::MouseButtonUp(event)
             }
         }
-        19 => InputEvent::MouseWheel(MouseWheelEvent {
-            x: e.dx,
-            y: e.dy,
-            mouse_x: Some(e.x),
-            mouse_y: Some(e.y),
-            input: ScrollInput {
-                unit: if e.flags & 4 != 0 {
-                    ScrollUnit::Points
-                } else {
-                    ScrollUnit::Lines
-                },
-                device: if e.flags & 4 != 0 {
-                    ScrollDevice::Continuous
-                } else {
-                    ScrollDevice::Wheel
-                },
-                phase: crate::scroll::phase(e.a),
-                momentum_phase: crate::scroll::phase(e.b),
-                timestamp: e.timestamp,
-            },
-        }),
+        19 => InputEvent::MouseWheel(wheel_event(
+            e.dx, e.dy, e.x, e.y, e.timestamp, e.flags, e.a, e.b,
+        )),
         20 | 21 => {
             let buttons = [
                 GamepadButton::South,

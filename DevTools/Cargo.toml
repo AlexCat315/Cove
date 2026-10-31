@@ -10,6 +10,7 @@ description = "Cove DevTools client, inspection and local server"
 path = "rust/lib.rs"
 
 [dependencies]
+cove-agent.workspace = true
 cove-devtools-protocol.workspace = true
 cove-composition.workspace = true
 cove-core.workspace = true
@@ -23,14 +24,6 @@ thiserror.workspace = true
 
 [lints]
 workspace = true
-
-[[test]]
-name = "agent_tests"
-path = "rust/tests/agent_tests.rs"
-
-[[test]]
-name = "transport_tests"
-path = "rust/tests/transport_tests.rs"
 
 [[test]]
 name = "dev_server_tests"

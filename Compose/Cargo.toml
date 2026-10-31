@@ -390,21 +390,17 @@ name = "async_image_tests"
 path = "rust/tests/async_image_tests.rs"
 
 [[test]]
-name = "probe3"
-path = "rust/tests/probe3.rs"
-
-[[test]]
-name = "dbg2_tmp"
-path = "rust/tests/dbg2_tmp.rs"
-
-[[test]]
-name = "probe4"
-path = "rust/tests/probe4.rs"
-
-[[test]]
 name = "select_combo_role_tests"
 path = "rust/tests/select_combo_role_tests.rs"
 
 [[test]]
 name = "style_skeleton_tests"
 path = "rust/tests/style_skeleton_tests.rs"
+
+[[test]]
+name = "swift_observation_tests"
+path = "rust/tests/swift_observation_tests.rs"
+
+[[test]]
+name = "disclosure_container_tests"
+path = "rust/tests/disclosure_container_tests.rs"

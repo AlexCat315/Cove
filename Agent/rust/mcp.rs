@@ -2,21 +2,32 @@
 //!
 //! Stdio, sockets and embedded hosts pass JSON bytes in and receive response
 //! bytes out; the server owns no globals and no process, so several can coexist.
-use crate::agent::skills::AgentSkillLibrary;
-use crate::agent::tool::{AgentTool, AgentToolbox};
+use crate::skills::AgentSkillLibrary;
+use crate::tool::{AgentError, AgentTool, AgentToolbox, ToolExecutor};
 use serde_json::{Value, json};
+use std::sync::Arc;
 
 pub const MAX_REQUEST_BYTES: usize = 1_048_576;
 
 /// Supported MCP protocol revisions, newest first.
 pub const PROTOCOL_VERSIONS: [&str; 4] = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 
+/// Tool list re-read on every `tools/list` and `tools/call`.
+pub type ToolProvider = Arc<dyn Fn() -> Result<Vec<AgentTool>, AgentError> + Send + Sync>;
+
+enum Tools {
+    Fixed(AgentToolbox),
+    Provided {
+        list: ToolProvider,
+        execute: ToolExecutor,
+    },
+}
+
 pub struct McpServer {
     pub name: String,
     pub version: String,
-    toolbox: AgentToolbox,
+    tools: Tools,
     skills: AgentSkillLibrary,
-    tools_may_change: bool,
 }
 
 impl McpServer {
@@ -24,15 +35,49 @@ impl McpServer {
         Self {
             name: name.into(),
             version: version.into(),
-            toolbox,
+            tools: Tools::Fixed(toolbox),
             skills: AgentSkillLibrary::default(),
-            tools_may_change: false,
+        }
+    }
+
+    /// A server whose tools may change; it advertises `listChanged` and the
+    /// host emits [`notification`]`("notifications/tools/list_changed")`.
+    pub fn with_provider(
+        name: impl Into<String>,
+        version: impl Into<String>,
+        skills: AgentSkillLibrary,
+        tools: impl Fn() -> Result<Vec<AgentTool>, AgentError> + Send + Sync + 'static,
+        execute: impl Fn(&str, &Value) -> Result<crate::tool::AgentToolResult, AgentError>
+        + Send
+        + Sync
+        + 'static,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            version: version.into(),
+            tools: Tools::Provided {
+                list: Arc::new(tools),
+                execute: Arc::new(execute),
+            },
+            skills,
         }
     }
 
     pub fn with_skills(mut self, skills: AgentSkillLibrary) -> Self {
         self.skills = skills;
         self
+    }
+
+    pub fn tools_may_change(&self) -> bool {
+        matches!(self.tools, Tools::Provided { .. })
+    }
+
+    /// The current toolbox: the fixed one, or the provider's list validated.
+    pub fn toolbox(&self) -> Result<AgentToolbox, AgentError> {
+        match &self.tools {
+            Tools::Fixed(toolbox) => Ok(toolbox.clone()),
+            Tools::Provided { list, execute } => AgentToolbox::new(list()?, execute.clone()),
+        }
     }
 
     /// Returns `None` for notifications (a request without an `id`).
@@ -101,22 +146,24 @@ impl McpServer {
                         "protocolVersion": version,
                         "serverInfo": { "name": self.name, "version": self.version },
                         "capabilities": {
-                            "tools": { "listChanged": self.tools_may_change },
+                            "tools": { "listChanged": self.tools_may_change() },
                             "prompts": {}
                         }
                     }),
                 )
             }
             "ping" => response(id, json!({})),
-            "tools/list" => {
-                let tools: Vec<Value> = self
-                    .toolbox
-                    .tools
-                    .iter()
-                    .map(|tool| tool.mcp_definition())
-                    .collect();
-                response(id, json!({ "tools": tools }))
-            }
+            "tools/list" => match self.toolbox() {
+                Ok(toolbox) => {
+                    let tools: Vec<Value> = toolbox
+                        .tools
+                        .iter()
+                        .map(AgentTool::mcp_definition)
+                        .collect();
+                    response(id, json!({ "tools": tools }))
+                }
+                Err(failure) => error(id, -32602, &truncate(&failure.to_string())),
+            },
             "tools/call" => {
                 let (Some(name), true) = (
                     params.get("name").and_then(Value::as_str),
@@ -134,7 +181,11 @@ impl McpServer {
                     .get("arguments")
                     .cloned()
                     .unwrap_or_else(|| json!({}));
-                match self.toolbox.execute(name, &arguments) {
+                let toolbox = match self.toolbox() {
+                    Ok(toolbox) => toolbox,
+                    Err(failure) => return error(id, -32602, &truncate(&failure.to_string())),
+                };
+                match toolbox.execute(name, &arguments) {
                     Ok(result) => {
                         let text = String::from_utf8_lossy(&result.json).to_string();
                         let mut payload = json!({
@@ -193,9 +244,18 @@ impl McpServer {
     }
 
     /// Tools available on this server, for a host that wants to render them.
-    pub fn tools(&self) -> &[AgentTool] {
-        &self.toolbox.tools
+    pub fn tools(&self) -> Result<Vec<AgentTool>, AgentError> {
+        self.toolbox().map(|toolbox| toolbox.tools)
     }
+}
+
+/// A JSON-RPC notification line, e.g. `notifications/tools/list_changed`.
+pub fn notification(method: &str, params: Option<Value>) -> Vec<u8> {
+    let mut value = json!({ "jsonrpc": "2.0", "method": method });
+    if let Some(params) = params {
+        value["params"] = params;
+    }
+    encode(value)
 }
 
 fn truncate(message: &str) -> String {
@@ -221,14 +281,14 @@ fn encode(value: Value) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::agent::schema::JsonSchema;
-    use crate::agent::tool::AgentToolResult;
-    use std::rc::Rc;
+    use crate::schema::JsonSchema;
+    use crate::tool::AgentToolResult;
+    use std::sync::Arc;
 
     fn server() -> McpServer {
         let toolbox = AgentToolbox::new(
             vec![AgentTool::new("echo", "echo back", JsonSchema::any(), true)],
-            Rc::new(|_name, input| Ok(AgentToolResult::encode(input, false))),
+            Arc::new(|_name, input| Ok(AgentToolResult::encode(input, false))),
         )
         .unwrap();
         McpServer::new("test", "1.0", toolbox)
@@ -283,6 +343,89 @@ mod tests {
             )["error"]["code"],
             -32602
         );
+    }
+
+    #[test]
+    fn provider_tools_are_reread_and_advertise_list_changed() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let count = Arc::new(AtomicUsize::new(1));
+        let listed = count.clone();
+        let server = McpServer::with_provider(
+            "dynamic",
+            "1",
+            AgentSkillLibrary::default(),
+            move || {
+                Ok((0..listed.load(Ordering::SeqCst))
+                    .map(|index| AgentTool::new(format!("t{index}"), "d", JsonSchema::any(), true))
+                    .collect())
+            },
+            |name, _| Ok(AgentToolResult::encode(&json!({ "name": name }), false)),
+        );
+        let initialized = parse(
+            &server
+                .respond(br#"{"jsonrpc":"2.0","id":1,"method":"initialize"}"#)
+                .unwrap(),
+        );
+        assert_eq!(
+            initialized["result"]["capabilities"]["tools"]["listChanged"],
+            true
+        );
+        let list = br#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#;
+        assert_eq!(
+            parse(&server.respond(list).unwrap())["result"]["tools"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        count.store(3, Ordering::SeqCst);
+        assert_eq!(
+            parse(&server.respond(list).unwrap())["result"]["tools"]
+                .as_array()
+                .unwrap()
+                .len(),
+            3
+        );
+        let called = parse(
+            &server
+                .respond(
+                    br#"{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"t2"}}"#,
+                )
+                .unwrap(),
+        );
+        assert_eq!(called["result"]["structuredContent"]["name"], "t2");
+        assert_eq!(
+            parse(&notification("notifications/tools/list_changed", None)),
+            json!({ "jsonrpc": "2.0", "method": "notifications/tools/list_changed" })
+        );
+    }
+
+    #[test]
+    fn invalid_provider_tools_are_parameter_errors() {
+        let server = McpServer::with_provider(
+            "dynamic",
+            "1",
+            AgentSkillLibrary::default(),
+            || Ok(vec![AgentTool::new("", "d", JsonSchema::any(), true)]),
+            |_, input| Ok(AgentToolResult::encode(input, false)),
+        );
+        let listed = parse(
+            &server
+                .respond(br#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#)
+                .unwrap(),
+        );
+        assert_eq!(listed["error"]["code"], -32602);
+    }
+
+    #[test]
+    fn server_moves_to_another_thread() {
+        let server = server();
+        let response = std::thread::spawn(move || {
+            server.respond(br#"{"jsonrpc":"2.0","id":1,"method":"ping"}"#)
+        })
+        .join()
+        .unwrap();
+        assert!(response.is_some());
     }
 
     #[test]

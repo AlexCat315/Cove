@@ -3,7 +3,7 @@ mod actions;
 mod diagnostics;
 mod editor;
 mod inspector;
-pub mod tools;
+pub use cove_agent::ui_tools as tools;
 
 pub use actions::{UIAccessibilityActions, perform_accessibility_action};
 pub use diagnostics::{

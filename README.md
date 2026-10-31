@@ -39,6 +39,8 @@ cargo test --workspace --locked -- --test-threads=1
 | System | 原子文件替换、权限、文件身份与锁、恢复目录与 macOS 回收站、进程流/限额/超时/取消、Windows Job Object |
 | Logging | 过滤、递归脱敏、有界历史、UTF-8 截断、JSONL 文件轮转 |
 | DevTools/Protocol | 消息、树/状态/时间线数据、检查请求校验、会话、输入录制；Rust 协议 0.2 |
+| Agent | JSON Schema 子集、工具与工具循环、skills、MCP 服务端（动态工具）、stdio/本地 TCP 传输；不依赖 UI |
+| Http | 阻塞式 HTTP 客户端、流式响应体：NSURLSession、WinHTTP、HTTP/1.1 + OpenSSL |
 
 `RustCounter` 是无窗口状态示例。Gallery、原生 UI Runtime、完整 Core 场景与布局、Compose、Text、Imaging、Graphics、Shell、终端、WebView、Workspace、浏览器及移动宿主、SDK 安装/打包/发布仍待迁移。详见 [迁移清单](Docs/rust-migration.md)。
 

@@ -13,9 +13,9 @@ use std::net::TcpStream;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use cove_devtools::agent_transport::AgentLocalServer;
+use cove_agent::transport::AgentLocalServer;
 
-fn echo_handler() -> cove_devtools::agent_transport::Handler {
+fn echo_handler() -> cove_agent::transport::Handler {
     Arc::new(|line: &[u8]| Some(line.to_vec()))
 }
 

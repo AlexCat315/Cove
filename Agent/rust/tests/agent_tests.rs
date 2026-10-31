@@ -10,8 +10,9 @@
 //! - the tool-round limit stops a model that never answers
 //! - a skill file reached through a symlink outside the root is rejected
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-use cove_devtools::agent::{
+use cove_agent::{
     AgentError, AgentMessage, AgentReply, AgentRole, AgentSession, AgentSkill, AgentSkillLibrary,
     AgentTool, AgentToolCall, AgentToolResult, AgentToolbox, JsonSchema, McpServer,
 };
@@ -31,7 +32,7 @@ fn echo_tool() -> AgentTool {
 fn toolbox() -> AgentToolbox {
     AgentToolbox::new(
         vec![echo_tool()],
-        std::rc::Rc::new(|_, input| Ok(AgentToolResult::encode(input, false))),
+        std::sync::Arc::new(|_, input| Ok(AgentToolResult::encode(input, false))),
     )
     .expect("toolbox")
 }
@@ -58,7 +59,7 @@ fn validates_before_executing_and_bounds_results() {
     // An executor that emits non-JSON is rejected after it runs.
     let invalid = AgentToolbox::new(
         vec![echo_tool()],
-        std::rc::Rc::new(|_, _| Ok(AgentToolResult::new(b"invalid".to_vec(), false))),
+        std::sync::Arc::new(|_, _| Ok(AgentToolResult::new(b"invalid".to_vec(), false))),
     )
     .expect("toolbox");
     assert!(matches!(
@@ -78,8 +79,8 @@ fn model_receives_real_tool_results_and_explicit_skill_context() {
         .expect("skill"),
     ])
     .expect("library");
-    let saw_tool_names = std::rc::Rc::new(std::cell::Cell::new(false));
-    let saw_instructions = std::rc::Rc::new(std::cell::Cell::new(false));
+    let saw_tool_names = std::sync::Arc::new(AtomicBool::new(false));
+    let saw_instructions = std::sync::Arc::new(AtomicBool::new(false));
     let names_flag = saw_tool_names.clone();
     let instructions_flag = saw_instructions.clone();
     let session = AgentSession::new(
@@ -87,12 +88,16 @@ fn model_receives_real_tool_results_and_explicit_skill_context() {
         &library,
         &["inspect".to_string()],
         8,
-        std::rc::Rc::new(move |messages: &[AgentMessage], tools: &[AgentTool]| {
-            names_flag.set(tools.iter().map(|tool| tool.name.as_str()).eq(["echo"]));
-            instructions_flag.set(
+        std::sync::Arc::new(move |messages: &[AgentMessage], tools: &[AgentTool]| {
+            names_flag.store(
+                tools.iter().map(|tool| tool.name.as_str()).eq(["echo"]),
+                Ordering::SeqCst,
+            );
+            instructions_flag.store(
                 messages
                     .first()
                     .is_some_and(|message| message.text.contains("Read state")),
+                Ordering::SeqCst,
             );
             if let Some(result) = messages.last()
                 && result.role == AgentRole::Tool
@@ -116,11 +121,11 @@ fn model_receives_real_tool_results_and_explicit_skill_context() {
     assert_eq!(run.answer, "Verified");
     assert_eq!(run.tool_rounds, 1);
     assert!(
-        saw_tool_names.get(),
+        saw_tool_names.load(Ordering::SeqCst),
         "the model must see the registered tools"
     );
     assert!(
-        saw_instructions.get(),
+        saw_instructions.load(Ordering::SeqCst),
         "enabled skill instructions lead the messages"
     );
 }
@@ -172,7 +177,7 @@ fn tool_round_limit_is_enforced() {
         &AgentSkillLibrary::default(),
         &[],
         1,
-        std::rc::Rc::new(|_: &[AgentMessage], _: &[AgentTool]| {
+        std::sync::Arc::new(|_: &[AgentMessage], _: &[AgentTool]| {
             Ok(AgentReply::Tools(vec![AgentToolCall {
                 id: "loop".into(),
                 name: "echo".into(),
