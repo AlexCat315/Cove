@@ -53,3 +53,7 @@ path = "rust/tests/windows_command_line_tests.rs"
 [[test]]
 name = "windows_session_tests"
 path = "rust/tests/windows_session_tests.rs"
+
+[[test]]
+name = "interaction_tests"
+path = "rust/tests/interaction_tests.rs"

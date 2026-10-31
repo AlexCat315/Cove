@@ -198,3 +198,11 @@ path = "rust/tests/navigation_state_tests.rs"
 name = "list_row_layout_tests"
 path = "rust/tests/list_row_layout_tests.rs"
 
+
+[[test]]
+name = "gallery_appearance_tests"
+path = "rust/tests/gallery_appearance_tests.rs"
+
+[[test]]
+name = "drawer_tests"
+path = "rust/tests/drawer_tests.rs"

@@ -62,3 +62,11 @@ path = "rust/tests/workspace_controller_tests.rs"
 [[test]]
 name = "workspace_view_tests"
 path = "rust/tests/workspace_view_tests.rs"
+
+[[test]]
+name = "ui_resource_bundle_tests"
+path = "rust/tests/ui_resource_bundle_tests.rs"
+
+[[test]]
+name = "workspace_resource_bundle_tests"
+path = "rust/tests/workspace_resource_bundle_tests.rs"

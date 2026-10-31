@@ -380,7 +380,11 @@ impl InteractiveScene {
 
     pub fn click(&self, node: &Node, clicks: u8) {
         let frame = node.absolute_frame();
-        self.click_at(frame.x + frame.width / 2.0, frame.y + frame.height / 2.0, clicks);
+        self.click_at(
+            frame.x + frame.width / 2.0,
+            frame.y + frame.height / 2.0,
+            clicks,
+        );
     }
 
     pub fn click_at_point(&self, point: Point, clicks: u8) {

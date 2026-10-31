@@ -778,3 +778,35 @@ path = "rust/tests/scrolled_control_click_tests.rs"
 [[test]]
 name = "data_table_scroll_tests"
 path = "rust/tests/data_table_scroll_tests.rs"
+
+[[test]]
+name = "navigation_rail_tests"
+path = "rust/tests/navigation_rail_tests.rs"
+
+[[test]]
+name = "adaptive_sidebar_tests"
+path = "rust/tests/adaptive_sidebar_tests.rs"
+
+[[test]]
+name = "adaptive_disclosure_tests"
+path = "rust/tests/adaptive_disclosure_tests.rs"
+
+[[test]]
+name = "adaptive_dialog_tests"
+path = "rust/tests/adaptive_dialog_tests.rs"
+
+[[test]]
+name = "narrow_reflow_tests"
+path = "rust/tests/narrow_reflow_tests.rs"
+
+[[test]]
+name = "style_integration_tests"
+path = "rust/tests/style_integration_tests.rs"
+
+[[test]]
+name = "sidebar_resize_tests"
+path = "rust/tests/sidebar_resize_tests.rs"
+
+[[test]]
+name = "sidebar_hierarchy_tests"
+path = "rust/tests/sidebar_hierarchy_tests.rs"
