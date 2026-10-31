@@ -94,10 +94,44 @@ where
     Element: Clone,
     Id: std::hash::Hash + Eq + Clone,
 {
-    let query = search.map(|(_, query)| query.trim().to_lowercase()).unwrap_or_default();
-    let filter_active = !query.is_empty() && search.is_some();
+    flatten_tree_matching(
+        roots,
+        id_of,
+        children,
+        has_children,
+        expanded,
+        expanded_keys,
+        search,
+        true,
+    )
+}
 
-    let metadata = search.map(|(text, _)| {
+/// [`flatten_tree`] with the filter decision left to the caller.
+///
+/// A search marks matches in both policies; only `FilterAndAutoExpand` also
+/// hides non-matches and auto-expands their ancestors. `filters` separates the
+/// two, so a highlight-only search keeps every expanded row mounted and still
+/// reports `is_search_hit`.
+pub fn flatten_tree_matching<Element, Id>(
+    roots: &[Element],
+    id_of: &dyn Fn(&Element) -> Id,
+    children: &dyn Fn(&Element) -> Vec<Element>,
+    has_children: Option<&dyn Fn(&Element) -> bool>,
+    expanded: &HashSet<Id>,
+    expanded_keys: &HashSet<TreeNodeKey<Id>>,
+    search: Option<(&dyn Fn(&Element) -> String, &str)>,
+    filters: bool,
+) -> Vec<TreeEntry<Element, Id>>
+where
+    Element: Clone,
+    Id: std::hash::Hash + Eq + Clone,
+{
+    let query = search.map(|(_, query)| query.trim().to_lowercase()).unwrap_or_default();
+    let filter_active = filters && !query.is_empty() && search.is_some();
+
+    // A blank query matches nothing to mark, and walking it would resolve lazy
+    // children the tree has not asked for yet.
+    let metadata = search.filter(|_| !query.is_empty()).map(|(text, _)| {
         let mut self_matches = HashMap::new();
         let mut subtree_matches = HashMap::new();
         fn walk<Element, Id: std::hash::Hash + Eq + Clone>(
@@ -344,23 +378,24 @@ where
         let expanded = self.expanded_ids();
         let keys = self.expanded_keys();
         let query = self.options.search.query.clone();
+        // The search text always runs, so matches are marked under either
+        // policy; only FilterAndAutoExpand also hides non-matches and
+        // auto-expands ancestors.
         let search = self
             .options
             .search
             .text
             .as_ref()
             .map(|text| (text.as_ref(), query.as_str()));
-        let filter = search
-            .filter(|(_, query)| !query.trim().is_empty())
-            .filter(|_| self.options.search.policy == TreeSearchFilterPolicy::FilterAndAutoExpand);
-        flatten_tree(
+        flatten_tree_matching(
             &self.roots,
             &*self.id_of,
             &*self.children,
             self.has_children.as_deref(),
             &expanded,
             &keys,
-            filter,
+            search,
+            self.options.search.policy == TreeSearchFilterPolicy::FilterAndAutoExpand,
         )
     }
 
@@ -407,6 +442,10 @@ where
                 on_select: self.options.events.on_select.clone(),
             },
             modifiers: Rc::new(RefCell::new(*self.modifiers.borrow())),
+            roots: Rc::new(self.roots.clone()),
+            id_of: self.id_of.clone(),
+            children: self.children.clone(),
+            has_children: self.has_children.clone(),
         }
     }
 
@@ -686,6 +725,10 @@ where
     selection: TreeSelection<Id>,
     events: super::options::TreeEvents<Element, Id>,
     modifiers: Rc<RefCell<KeyModifiers>>,
+    roots: Rc<Vec<Element>>,
+    id_of: Rc<dyn Fn(&Element) -> Id>,
+    children: Rc<dyn Fn(&Element) -> Vec<Element>>,
+    has_children: Option<Rc<dyn Fn(&Element) -> bool>>,
 }
 
 impl<Element, Id> Clone for TreeActions<Element, Id>
@@ -711,6 +754,10 @@ where
                 on_select: self.events.on_select.clone(),
             },
             modifiers: self.modifiers.clone(),
+            roots: self.roots.clone(),
+            id_of: self.id_of.clone(),
+            children: self.children.clone(),
+            has_children: self.has_children.clone(),
         }
     }
 }
@@ -742,6 +789,58 @@ where
         match &self.selection.expanded {
             Some(binding) => binding.set(next),
             None => self.expanded.set(next),
+        }
+    }
+
+    fn collapse_all(&self) {
+        self.set_expanded(HashSet::new(), HashSet::new());
+    }
+
+    /// Expands every branch reachable through the child resolver.
+    fn expand_all(&self) {
+        let mut keys: HashSet<TreeNodeKey<Id>> = HashSet::new();
+        fn visit<Element: Clone, Id: std::hash::Hash + Eq + Clone>(
+            nodes: &[Element],
+            path: &[usize],
+            id_of: &dyn Fn(&Element) -> Id,
+            children: &dyn Fn(&Element) -> Vec<Element>,
+            has_children: Option<&dyn Fn(&Element) -> bool>,
+            keys: &mut HashSet<TreeNodeKey<Id>>,
+        ) {
+            for (index, element) in nodes.iter().enumerate() {
+                if has_children.is_some_and(|predicate| !predicate(element)) {
+                    continue;
+                }
+                let kids = children(element);
+                if kids.is_empty() {
+                    continue;
+                }
+                let mut next_path = path.to_vec();
+                next_path.push(index);
+                keys.insert(TreeNodeKey::new(id_of(element), next_path.clone()));
+                visit(&kids, &next_path, id_of, children, has_children, keys);
+            }
+        }
+        visit(
+            &self.roots,
+            &[],
+            &*self.id_of,
+            &*self.children,
+            self.has_children.as_deref(),
+            &mut keys,
+        );
+        let ids: HashSet<Id> = keys.iter().map(|key| key.id.clone()).collect();
+        self.set_expanded(ids, keys);
+    }
+
+    fn set_expanded(&self, ids: HashSet<Id>, keys: HashSet<TreeNodeKey<Id>>) {
+        if let Some(binding) = &self.selection.expanded_keys {
+            binding.set(keys.clone());
+        }
+        if let Some(binding) = &self.selection.expanded {
+            binding.set(ids.clone());
+        } else if self.selection.expanded_keys.is_none() {
+            self.expanded.set(ids);
         }
     }
 
@@ -858,6 +957,21 @@ where
         let entries = self.entries.borrow().clone();
         if entries.is_empty() {
             return false;
+        }
+        // Alt+Right expands every descendant and Alt+Left collapses the whole
+        // forest, whatever the current row is.
+        if event.modifiers.has_alt() {
+            match event.scancode {
+                Scancode::ARROW_RIGHT => {
+                    self.expand_all();
+                    return true;
+                }
+                Scancode::ARROW_LEFT => {
+                    self.collapse_all();
+                    return true;
+                }
+                _ => {}
+            }
         }
         let current = self
             .selection

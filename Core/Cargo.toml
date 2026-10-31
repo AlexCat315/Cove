@@ -160,3 +160,7 @@ path = "rust/tests/shadow_quantization_tests.rs"
 [[test]]
 name = "rounded_clip_tests"
 path = "rust/tests/rounded_clip_tests.rs"
+
+[[test]]
+name = "animation_controller_tests"
+path = "rust/tests/animation_controller_tests.rs"

@@ -18,6 +18,9 @@ cove-core.workspace = true
 cove-platform.workspace = true
 serde.workspace = true
 
+[dev-dependencies]
+serde_json.workspace = true
+
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 objc2.workspace = true
 objc2-app-kit.workspace = true
@@ -27,3 +30,11 @@ objc2-web-kit.workspace = true
 
 [lints]
 workspace = true
+
+[[test]]
+name = "panel_registry"
+path = "rust/tests/panel_registry.rs"
+
+[[test]]
+name = "panel_sizing"
+path = "rust/tests/panel_sizing.rs"

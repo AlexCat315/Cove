@@ -81,3 +81,19 @@ path = "rust/tests/shader_artifact.rs"
 [[test]]
 name = "reflected_binding_layout"
 path = "rust/tests/reflected_binding_layout.rs"
+
+[[test]]
+name = "pipeline_cache"
+path = "rust/tests/pipeline_cache.rs"
+
+[[test]]
+name = "native_texture_region"
+path = "rust/tests/native_texture_region.rs"
+
+[[test]]
+name = "native_texture_copy"
+path = "rust/tests/native_texture_copy.rs"
+
+[[test]]
+name = "native_recorded_texture_upload"
+path = "rust/tests/native_recorded_texture_upload.rs"

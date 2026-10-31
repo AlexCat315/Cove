@@ -231,22 +231,48 @@ fn arrow_keys_expand_collapse_and_step_into_the_focused_branch() {
         "ArrowRight on an open branch does not change the expansion"
     );
 
-    // Alt is not part of the Rust key contract yet: the Swift suite also
-    // requires Alt+ArrowRight to expand a whole subtree and Alt+ArrowLeft to
-    // collapse it. `Tree::handle_key` never consults `has_alt`, so the modified
-    // events behave exactly like the unmodified ones. Reported; the unmodified
-    // contract is asserted here so the gap cannot regress silently.
-    let before_alt = expanded.get();
-    tree.handle_key(&key(Scancode::ARROW_RIGHT, KeyModifiers::LEFT_ALT));
+
+}
+
+#[test]
+fn alt_arrow_expands_and_collapses_the_whole_subtree() {
+    let reads = Reads::default();
+    let expanded = Cell::new(HashSet::from([0usize]));
+    let tree = tree(
+        reads.clone(),
+        expanded.binding(),
+        Binding::constant(Some(1usize)),
+        "",
+        true,
+    );
+    assert_eq!(expanded.get(), HashSet::from([0]), "only the root is open");
+
+    assert!(
+        tree.handle_key(&key(Scancode::ARROW_RIGHT, KeyModifiers::LEFT_ALT)),
+        "Alt+ArrowRight is consumed"
+    );
     assert_eq!(
         expanded.get(),
-        before_alt,
-        "Alt+ArrowRight is currently indistinguishable from ArrowRight"
+        HashSet::from([0, 1]),
+        "Alt+ArrowRight expands every descendant branch, not just the root"
     );
-    tree.handle_key(&key(Scancode::ARROW_LEFT, KeyModifiers::RIGHT_ALT));
+    assert!(
+        tree.entries().iter().any(|entry| entry.id == 3),
+        "the grandchild under the nested branch is reachable"
+    );
+
+    assert!(
+        tree.handle_key(&key(Scancode::ARROW_LEFT, KeyModifiers::RIGHT_ALT)),
+        "Alt+ArrowLeft is consumed"
+    );
     assert!(
         expanded.get().is_empty(),
-        "Alt+ArrowLeft collapses the row like ArrowLeft, not the subtree"
+        "Alt+ArrowLeft collapses the whole subtree"
+    );
+    assert_eq!(
+        tree.entries().iter().map(|entry| entry.id).collect::<Vec<_>>(),
+        vec![0],
+        "only the root row survives a collapse-all"
     );
 }
 
@@ -308,7 +334,9 @@ fn a_search_query_filters_and_auto_expands_while_keeping_paths() {
 #[test]
 fn a_highlight_only_policy_keeps_every_row_mounted() {
     let reads = Reads::default();
-    let expanded = Binding::constant(HashSet::from([0usize]));
+    // Both branches open, so the matching grandchild is mounted and every
+    // non-matching row must stay mounted beside it.
+    let expanded = Binding::constant(HashSet::from([0usize, 1]));
     let primary = Binding::constant(Some(0usize));
     let mut options: TreeOptions<Item, usize> = TreeOptions::default();
     options.selection = TreeSelection {
@@ -335,18 +363,22 @@ fn a_highlight_only_policy_keeps_every_row_mounted() {
     let visible: Vec<usize> = entries.iter().map(|entry| entry.id).collect();
     assert_eq!(
         visible,
-        vec![0, 1, 2],
-        "highlight-only keeps the expanded rows regardless of the query"
+        vec![0, 1, 3, 2],
+        "highlight-only keeps every expanded row regardless of the query"
     );
-    // Known gap: `flatten_tree` computes the self-match table from the search
-    // text, but `Tree::entries` passes the caller's query verbatim and the
-    // highlight policy only reaches `flatten_tree` through the expansion path.
-    // The result is that no entry is flagged for a highlight-only search — the
-    // rows are all mounted, but nothing is marked. Reported; the mounting half
-    // (the policy's actual contract) is asserted.
+    let hits: Vec<usize> = entries
+        .iter()
+        .filter(|entry| entry.is_search_hit)
+        .map(|entry| entry.id)
+        .collect();
+    assert_eq!(
+        hits,
+        vec![3],
+        "highlight-only marks the matching row without hiding the others"
+    );
     assert!(
-        !entries.iter().any(|entry| entry.is_search_hit),
-        "highlight-only currently marks no rows"
+        entries.iter().all(|entry| !entry.is_search_hit || entry.id == 3),
+        "only the matching row is marked"
     );
 }
 

@@ -6,7 +6,7 @@
 pub mod options;
 pub mod view;
 
-pub use view::{flatten_tree, Tree, TreeEntry, TreeSearchMetadata};
+pub use view::{flatten_tree, flatten_tree_matching, Tree, TreeEntry, TreeSearchMetadata};
 pub use options::{
     TreeDragOperations, TreeEvents, TreeLayout, TreeOptions, TreeSearch, TreeSelection, TreeSlots,
 };

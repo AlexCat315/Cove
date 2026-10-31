@@ -244,3 +244,15 @@ path = "rust/tests/data_table_interaction.rs"
 [[test]]
 name = "property_grid_sizing"
 path = "rust/tests/property_grid_sizing.rs"
+
+[[test]]
+name = "chart_axis"
+path = "rust/tests/chart_axis.rs"
+
+[[test]]
+name = "nested_geometry_probe"
+path = "rust/tests/nested_geometry_probe.rs"
+
+[[test]]
+name = "search_field"
+path = "rust/tests/search_field.rs"

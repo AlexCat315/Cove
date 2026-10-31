@@ -439,6 +439,7 @@ dependencies = [
  "objc2-foundation",
  "objc2-web-kit",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

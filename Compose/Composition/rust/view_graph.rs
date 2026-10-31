@@ -184,13 +184,39 @@ impl ViewGraph {
     }
 
     fn write_layout_back(&self, node: &Node, parent_origin: Point, parent_placement_visible: bool) {
+        self.write_layout_back_at(node, parent_origin, Point::default(), parent_placement_visible);
+    }
+
+    /// `parent_layout` is the parent's absolute layout origin.
+    ///
+    /// Yoga reports child layout rectangles relative to their parent, and the
+    /// Swift `LayoutPass` copies them verbatim into `Node.frame`, so
+    /// `Node::absolute_frame` composes ancestor origins on top. The Rust layout
+    /// engine instead arranges children at already-translated coordinates, so
+    /// `LayoutNode::frame()` is absolute. Subtracting the parent's layout origin
+    /// here restores the parent-relative convention `absolute_frame` expects;
+    /// without it every nested node counted its parent's origin twice.
+    fn write_layout_back_at(
+        &self,
+        node: &Node,
+        parent_origin: Point,
+        parent_layout: Point,
+        parent_placement_visible: bool,
+    ) {
         let layout = self.layout_of.borrow().get(&node.id()).cloned();
         let placement_visible = parent_placement_visible && layout.as_ref().is_none_or(LayoutNode::custom_layout_is_visible);
+        let mut layout_origin = parent_layout;
         if let Some(layout) = &layout {
             node.set_layout_visibility(layout.custom_layout_is_visible());
+            let frame = layout.frame();
+            layout_origin = Point::new(frame.x, frame.y);
             // Hidden retained slots are not measured. Publish suppressed
             // geometry rather than uninitialized probe frames until placed.
-            node.set_frame(if placement_visible { layout.frame() } else { Rect::default() });
+            node.set_frame(if placement_visible {
+                Rect::new(frame.x - parent_layout.x, frame.y - parent_layout.y, frame.width, frame.height)
+            } else {
+                Rect::default()
+            });
         }
         let absolute_origin = Point::new(parent_origin.x + node.frame().x, parent_origin.y + node.frame().y);
         self.sync_text_input_area(node, absolute_origin);
@@ -198,7 +224,7 @@ impl ViewGraph {
         // geometry in the same space as what is actually on screen.
         let child_origin = Point::new(absolute_origin.x - node.content_offset().x, absolute_origin.y - node.content_offset().y);
         for child in node.children() {
-            self.write_layout_back(&child, child_origin, placement_visible);
+            self.write_layout_back_at(&child, child_origin, layout_origin, placement_visible);
         }
         if let Some(hook) = node.layout_did_update() {
             hook(node);
