@@ -1,8 +1,0 @@
-#!/bin/sh
-set -eu
-COVE_CHECKOUT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
-COVE_SDK_ROOT=${COVE_SDK_ROOT:-$COVE_CHECKOUT}
-export COVE_SDK_ROOT
-RUSTUP_TOOLCHAIN=${RUSTUP_TOOLCHAIN:-1.99.1}
-export RUSTUP_TOOLCHAIN
-exec "${COVE_CARGO_EXECUTABLE:-cargo}" run --quiet --manifest-path "$COVE_CHECKOUT/Cargo.toml" --package cove-cli --bin cove -- "$@"
