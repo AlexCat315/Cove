@@ -191,7 +191,7 @@ impl View for HarnessView {
 
 struct Scene {
     graph: Rc<cove_composition::ViewGraph>,
-    context: PlatformInputContext,
+    context: std::rc::Rc<PlatformInputContext>,
     name: State<TextBuffer>,
     viewport: std::cell::Cell<(f32, f32)>,
     settings: Settings,
@@ -205,14 +205,14 @@ impl Scene {
     fn run(settings: Settings, body: impl FnOnce(&Scene)) {
         GlobalTestLock::locked(|| {
             support::with_test_text_environment(|| {
-                let context = PlatformInputContext::new();
+                let context = std::rc::Rc::new(PlatformInputContext::new());
                 context.with_current(|| {
                     let name = State::new(TextBuffer::new("Draft"));
                     let email = State::new(TextBuffer::new("hello@example.com"));
                     let graph = support::graph();
                     let scene = Scene {
                         graph,
-                        context: PlatformInputContext::new(),
+                        context: context.clone(),
                         name,
                         viewport: std::cell::Cell::new((720.0, 600.0)),
                         settings,

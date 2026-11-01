@@ -488,8 +488,9 @@ impl PrimitiveView for ButtonHost {
             }),
         );
 
-        let key_down_node = node.downgrade();
-        let key_down_pressed = self.pressed.clone();
+        // Swift activates on key down; a repeat does not activate again.
+        let key_node = node.downgrade();
+        let key_action = self.action.clone();
         registry.set_key(
             node,
             InputHandlerRoute::control(),
@@ -505,41 +506,10 @@ impl PrimitiveView for ButtonHost {
                 {
                     return EventResult::Ignored;
                 }
-                let Some(node) = Node::upgrade(&key_down_node) else {
+                let Some(node) = Node::upgrade(&key_node) else {
                     return EventResult::Ignored;
                 };
-                node.set_attachment(ACTIVE_PRESS, true);
-                Self::write_interaction(&node, PRESSED, &key_down_pressed, true, recompose);
-                EventResult::Handled
-            }),
-        );
-        let key_up_node = node.downgrade();
-        let key_up_pressed = self.pressed.clone();
-        let key_up_action = self.action.clone();
-        registry.set_key_up(
-            node,
-            InputHandlerRoute::control(),
-            Rc::new(move |event, phase| {
-                if phase != EventPhase::Target
-                    || !matches!(
-                        event.scancode,
-                        crate::Scancode::RETURN
-                            | crate::Scancode::SPACE
-                            | crate::Scancode::KEYPAD_ENTER
-                    )
-                {
-                    return EventResult::Ignored;
-                }
-                let Some(node) = Node::upgrade(&key_up_node) else {
-                    return EventResult::Ignored;
-                };
-                let active = node.attachment::<bool>(ACTIVE_PRESS) == Some(true);
-                node.remove_attachment(ACTIVE_PRESS);
-                if !active {
-                    return EventResult::Ignored;
-                }
-                Self::write_interaction(&node, PRESSED, &key_up_pressed, false, recompose);
-                Self::activate(&node, key_up_action.as_ref());
+                Self::activate(&node, key_action.as_ref());
                 EventResult::Handled
             }),
         );

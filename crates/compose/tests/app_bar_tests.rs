@@ -40,7 +40,7 @@ use cove_ui_compose::primitives::layout::insets::safe_area::{
 };
 use cove_ui_compose::primitives::media::ui_icon_catalog::action;
 use cove_ui_compose::primitives::overlays::menu::MenuItem;
-use cove_ui_compose::primitives::overlays::portal::{PortalStore, PortalStoreAmbient};
+use cove_ui_compose::primitives::overlays::portal::{LayerRoot, PortalStore, PortalStoreAmbient};
 use cove_ui_compose::theme::TextScalerViewExt;
 use cove_ui_compose::theme::tokens::ReducedMotionViewExt;
 use cove_ui_compose::theme::{Theme, ThemeViewExt};
@@ -240,7 +240,7 @@ fn view(fixture: &Fixture) -> AnyView {
 /// One settled scene over the fixture.
 struct Scene {
     graph: std::rc::Rc<cove_composition::ViewGraph>,
-    context: PlatformInputContext,
+    context: std::rc::Rc<PlatformInputContext>,
 }
 
 impl Scene {
@@ -253,9 +253,9 @@ impl Scene {
         fixture: &Fixture,
         body: impl FnOnce(&Scene),
     ) {
-        GlobalTestLock::locked(|| {
+        GlobalTestLock::with_scheduler(|| {
             support::with_test_text_environment(|| {
-                let context = PlatformInputContext::new();
+                let context = std::rc::Rc::new(PlatformInputContext::new());
                 let store = Rc::new(PortalStore::new());
                 context.add_scoped_ambient(Rc::new(PortalStoreAmbient::new(store)));
                 context.with_current(|| {
@@ -264,7 +264,7 @@ impl Scene {
                     environment.viewport.width = 1280.0;
 
                     let graph = support::graph();
-                    let content = AnyView::new(view(fixture));
+                    let content = AnyView::new(LayerRoot::new(view(fixture)));
                     graph.install_view(
                         AnyView::new(
                             AnyView::new(content)
@@ -283,7 +283,7 @@ impl Scene {
                     );
                     let scene = Scene {
                         graph,
-                        context: PlatformInputContext::new(),
+                        context: context.clone(),
                     };
                     scene.settle(width);
                     body(&scene);
@@ -369,15 +369,9 @@ fn three_widths_keep_commands_and_fit_the_title() {
                             .into_iter()
                             .filter(|node| node.is_focusable() && node.accepts_subtree_input())
                             .collect();
-                        // Named difference: at a compact width the bar parks the
-                        // commands that do not fit but never reveals the overflow
-                        // trigger, because `ToolbarOverflowLayout::place` is the only
-                        // writer of `commands.overflow` and it never runs for this row —
-                        // `ToolbarRetainedCommand { is_visible: !overflow.is_empty() }`
-                        // therefore stays hidden. Swift exposes back + primary + overflow
-                        // (3) at 390pt; Rust exposes back + primary (2) and the parked
-                        // commands become unreachable. Pinned below.
-                        let expected = if width < 600.0 { 2 } else { 5 };
+                        // A compact width parks the commands that do not fit
+                        // behind the overflow trigger: back + primary + overflow.
+                        let expected = if width < 600.0 { 3 } else { 5 };
                         assert_eq!(
                             visible.len(),
                             expected,

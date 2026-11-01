@@ -2,7 +2,6 @@
 //!
 //! Measure commands at their natural size, then move lower-priority commands into
 //! a menu. Icon commands retain their full title as help and semantics.
-use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
@@ -12,7 +11,9 @@ use crate::primitives::media::ui_icon_catalog;
 use crate::primitives::overlays::anchored::{PopoverOverflow, PopoverPlacement, PopoverSurface};
 use crate::primitives::overlays::menu::{Menu, MenuEntry};
 use crate::primitives::overlays::popover::Popover;
-use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
+use crate::primitives::layout::scroll_view::{ScrollAxis, ScrollView, ScrollbarGutter};
+use cove_core::State;
+use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, ViewExt};
 use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 
 use super::{ToolbarAxis, ToolbarItem, ToolbarOverflowLayout};
@@ -33,10 +34,10 @@ pub struct ToolbarCommands {
     pub presentation: ToolbarCommandPresentation,
     pub on_content_width: Option<Rc<dyn Fn(f32)>>,
     pub axis: ToolbarAxis,
-    overflow: Rc<RefCell<Vec<u64>>>,
+    overflow: State<Vec<u64>>,
     overflow_focus: Rc<crate::primitives::layout::split::SplitFocusTransfer>,
-    is_presented: Rc<RefCell<bool>>,
-    overflow_hovered: Rc<RefCell<bool>>,
+    is_presented: State<bool>,
+    overflow_hovered: State<bool>,
 }
 
 impl ToolbarCommands {
@@ -59,10 +60,10 @@ impl ToolbarCommands {
             presentation: ToolbarCommandPresentation::default(),
             on_content_width: None,
             axis,
-            overflow: Rc::new(RefCell::new(Vec::new())),
+            overflow: State::new(Vec::new()),
             overflow_focus: crate::primitives::layout::split::SplitFocusTransfer::new(),
-            is_presented: Rc::new(RefCell::new(false)),
-            overflow_hovered: Rc::new(RefCell::new(false)),
+            is_presented: State::new(false),
+            overflow_hovered: State::new(false),
         }
     }
 
@@ -185,15 +186,65 @@ impl cove_composition::ViewModifier for ActionControlLabel {
 
 impl View for ToolbarCommands {
     fn body(&self) -> AnyView {
-        AnyView::new(ToolbarCommandsBody {
-            commands: self.snapshot(),
-            overflow_focus: self.overflow_focus.clone(),
-        })
+        if !self.is_enabled {
+            if self.is_presented.get() {
+                self.is_presented.set(false);
+            }
+            *self.overflow_focus.pending_visibility.borrow_mut() = None;
+        }
+        let commands = self.snapshot();
+        let vertical = self.axis == ToolbarAxis::Vertical;
+        let reader = crate::adaptive::ContainerSizeReader::new(move |size: cove_core::Size| {
+            let mut commands = commands.snapshot();
+            let fits_content = commands.available_width.is_some();
+            commands.available_width = Some(
+                commands
+                    .available_width
+                    .unwrap_or(if vertical { size.height } else { size.width }),
+            );
+            let overflow_focus = commands.overflow_focus.clone();
+            let body = ToolbarCommandsBody {
+                commands,
+                fits_content,
+                overflow_focus,
+            };
+            ScrollView::new(
+                if vertical {
+                    ScrollAxis::Vertical
+                } else {
+                    ScrollAxis::Horizontal
+                },
+                body,
+            )
+            .scrollbar_gutter(ScrollbarGutter::Overlay)
+        });
+        // The probe fills only the width by default; a vertical bar measures height.
+        if vertical {
+            AnyView::new(AnyView::new(reader).frame(
+                None,
+                Some(crate::modifiers::layout::FrameDimension::Percent(100.0)),
+                None,
+                Some(0.0),
+                None,
+                None,
+            ))
+        } else {
+            AnyView::new(reader)
+        }
+    }
+
+    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
+        vec![
+            crate::DynamicField::state("overflow", &self.overflow),
+            crate::DynamicField::state("is_presented", &self.is_presented),
+            crate::DynamicField::state("overflow_hovered", &self.overflow_hovered),
+        ]
     }
 }
 
 struct ToolbarCommandsBody {
     commands: ToolbarCommands,
+    fits_content: bool,
     /// Shared with `ToolbarRetainedCommand` so a hidden command remembers the
     /// focus visibility it had, and the overflow row can restore it.
     overflow_focus: Rc<crate::primitives::layout::split::SplitFocusTransfer>,
@@ -217,7 +268,7 @@ impl PrimitiveView for ToolbarCommandsBody {
         let vertical = commands.axis == ToolbarAxis::Vertical;
         let minimum = commands.presentation.minimum_extent.unwrap_or(0.0);
         let mut children: Vec<AnyView> = Vec::new();
-        let overflow = commands.overflow.borrow().clone();
+        let overflow = commands.overflow.get();
         for item in &commands.items {
             let visible = !overflow.contains(&item.command.id);
             children.push(AnyView::new(ToolbarRetainedCommand {
@@ -246,8 +297,8 @@ impl PrimitiveView for ToolbarCommandsBody {
             .map(|item| MenuEntry::Item(item.command.clone()))
             .collect();
         let trigger: AnyView = if commands.presentation.uses_overflow_icon || vertical {
-            let presented = *is_presented.borrow();
-            let hovered = *overflow_hovered.borrow();
+            let presented = is_presented.get();
+            let hovered = overflow_hovered.get();
             AnyView::new(OverflowButton {
                 vertical,
                 is_enabled: commands.is_enabled,
@@ -257,7 +308,9 @@ impl PrimitiveView for ToolbarCommandsBody {
                 on_hover: {
                     let overflow_hovered = overflow_hovered.clone();
                     Rc::new(move |hovered: bool| {
-                        *overflow_hovered.borrow_mut() = hovered;
+                        if overflow_hovered.get() != hovered {
+                            overflow_hovered.set(hovered);
+                        }
                     })
                 },
             })
@@ -274,9 +327,10 @@ impl PrimitiveView for ToolbarCommandsBody {
             trigger,
             AnyView::new(Menu::new(menu_items).on_item_activated({
                 let presented = is_presented.clone();
-                move || *presented.borrow_mut() = false
+                move || presented.set(false)
             })),
         )
+        .is_presented(is_presented.binding())
         .placement(if vertical {
             PopoverPlacement::TrailingBottom
         } else {
@@ -285,6 +339,10 @@ impl PrimitiveView for ToolbarCommandsBody {
         .surface(PopoverSurface::Content)
         .overflow(PopoverOverflow::Flip)
         .enabled(commands.is_enabled);
+        let popover = AnyView::new(popover).composition_local(
+            crate::primitives::controls::button::ActionControlAccessibility::label(),
+            Some("More actions".to_string()),
+        );
         children.push(AnyView::new(ToolbarRetainedCommand {
             is_visible: !overflow.is_empty(),
             is_overflow: true,
@@ -296,47 +354,42 @@ impl PrimitiveView for ToolbarCommandsBody {
         // fit, publishing the moved set during placement.
         let overflow_for_layout = commands.overflow.clone();
         let presented_for_layout = commands.is_presented.clone();
+        let focus_for_layout = self.overflow_focus.clone();
         let items_for_layout = commands.items.clone();
-        let content_extent = commands.on_content_width.clone();
         let mut layout = ToolbarOverflowLayout::new(
             commands.available_width.unwrap_or(0.0),
             commands.items.iter().map(|item| item.placement).collect(),
             4.0,
         );
         layout.axis = commands.axis;
-        layout.fits_content = commands.available_width.is_some();
+        layout.fits_content = self.fits_content;
         layout.on_overflow = Some(Rc::new(move |indices: &[usize]| {
             let next: Vec<u64> = indices
                 .iter()
                 .filter_map(|index| items_for_layout.get(*index).map(|item| item.command.id))
                 .collect();
-            if next != *overflow_for_layout.borrow() {
-                if *presented_for_layout.borrow() && next.is_empty() {
-                    // Closing the menu because nothing overflowed returns focus to
-                    // the bar only when focus was visible.
-                    *presented_for_layout.borrow_mut() = false;
+            if next != overflow_for_layout.get() {
+                if presented_for_layout.get() && next.is_empty() {
+                    // Closing the menu because nothing overflowed hands focus back
+                    // to the bar with the visibility it had.
+                    *focus_for_layout.pending_visibility.borrow_mut() = Some(
+                        cove_core::scene::FocusChainHolder::current()
+                            .map(|chain| chain.is_focus_visible())
+                            .unwrap_or(true),
+                    );
                 }
-                *overflow_for_layout.borrow_mut() = next;
-                *presented_for_layout.borrow_mut() = false;
+                overflow_for_layout.set(next);
+                presented_for_layout.set(false);
             }
         }));
-        layout.on_content_extent = content_extent;
-        if commands.available_width.is_some() {
-            // A fixed available width means the row hugs its measured content.
-            vec![AnyView::new(crate::LayoutContainer::<
-                ToolbarOverflowLayout,
-                AnyView,
-            >::with_erased_content(
-                layout,
-                AnyView::new(TupleView::new(children)),
-            ))]
-        } else {
-            // No allocation yet: report the row so the host can decide.
-            vec![AnyView::new(ToolbarCommandProbe {
-                content: AnyView::new(TupleView::new(children)),
-                axis: commands.axis,
-            })]
-        }
+        layout.on_content_extent = commands.on_content_width.clone();
+        vec![AnyView::new(crate::LayoutContainer::<
+            ToolbarOverflowLayout,
+            AnyView,
+        >::with_erased_content(
+            layout,
+            AnyView::new(TupleView::new(children)),
+        ))]
     }
 }
 crate::impl_primitive_view!(ToolbarCommandsBody);
@@ -509,39 +562,3 @@ impl PrimitiveView for OverflowButton {
     }
 }
 crate::impl_primitive_view!(OverflowButton);
-
-/// Measures the command row before an available width is known, so the host can
-/// feed the result back in.
-struct ToolbarCommandProbe {
-    content: AnyView,
-    axis: ToolbarAxis,
-}
-
-impl PrimitiveView for ToolbarCommandProbe {
-    fn make_node(&self) -> Node {
-        let node = Node::new();
-        node.set_is_hit_testable(false);
-        node
-    }
-
-    fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
-        None
-    }
-
-    fn update_node(&self, _node: &Node) {}
-
-    fn children(&self, _node: &Node) -> Vec<AnyView> {
-        // A vertical bar measures height, so it must fill the cross axis.
-        let content = if self.axis == ToolbarAxis::Vertical {
-            AnyView::new(
-                self.content
-                    .clone()
-                    .frame(None, None, None, Some(0.0), None, None),
-            )
-        } else {
-            self.content.clone()
-        };
-        vec![content]
-    }
-}
-crate::impl_primitive_view!(ToolbarCommandProbe);

@@ -11,7 +11,7 @@
 //! paint into another window. The process-shared fallback store is deliberately
 //! not pinned — it is not ownership evidence.
 
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::modifiers::layout::LayoutFrameExt;
@@ -23,7 +23,7 @@ use cove_core::scene::{
     Edge, InputHandlerRoute, InteractionRegistryHolder, LayoutNode, Node, PointerPhase,
     PositionType, WheelRoutingAttachmentKey, WheelRoutingPriority,
 };
-use cove_core::{Point, Rect, Size};
+use cove_core::{Point, Rect, Size, State};
 
 use super::portal_placement::{PortalPlacement, portal_window_bounds};
 use super::portal_registry::{PortalEntry, PortalStore, PortalStoreEnvironment, PortalStoreHolder};
@@ -42,14 +42,14 @@ pub struct PortalHost {
     /// Invalidation token. Incremented rather than storing the store's raw
     /// revision, so a late window-store capture and its first entry (both `1`)
     /// cannot collide into an equality no-op.
-    revision: Rc<Cell<u64>>,
+    revision: State<u64>,
 }
 
 impl PortalHost {
     pub fn new() -> Self {
         Self {
             store: Rc::new(RefCell::new(None)),
-            revision: Rc::new(Cell::new(0)),
+            revision: State::new(0),
         }
     }
 }
@@ -71,11 +71,16 @@ impl View for PortalHost {
     fn tag(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
+
+    /// Swift keeps `revision` in `@State`: a store change re-renders the host.
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        vec![cove_composition::DynamicField::state("revision", &self.revision)]
+    }
 }
 
 struct PortalHostPrimitive {
     store: Rc<RefCell<Option<Rc<PortalStore>>>>,
-    revision: Rc<Cell<u64>>,
+    revision: State<u64>,
 }
 
 impl PortalHostPrimitive {
