@@ -11,13 +11,14 @@
 //! `LayoutStyle` when that changed or when the inherited direction differs,
 //! always before any frame of the flex algorithm can read it: a container
 //! refreshes its children's styles before it lays them out.
+use super::value::{CalcStorage, resolve_calc};
 use super::{LayoutCell, LayoutNode, MeasureMode};
 use crate::Size;
 use crate::scene::Direction;
 use std::cell::{Cell, RefCell, UnsafeCell};
 use std::rc::Rc;
 use taffy::{
-    AvailableSpace, Cache, CacheTree, Layout, LayoutContainingBlock, LayoutFlexboxContainer,
+    AvailableSpace, Cache, CacheTree, Layout, LayoutContainingBlock, LayoutFlexboxContainer, LayoutGridContainer, compute_grid_layout,
     LayoutInput, LayoutOutput, LayoutPartialTree, Line, NodeId, RequestedAxis, ResolveOrZero,
     RunMode, SizingMode, Style, TraversePartialTree, compute_cached_layout, compute_flexbox_layout,
     compute_hidden_layout, compute_leaf_layout, compute_oof_layout,
@@ -58,6 +59,7 @@ struct Proposal {
 pub(super) struct EngineState {
     /// Written only by `refresh_style`, never while a reference is live.
     style: UnsafeCell<Style>,
+    calc: RefCell<CalcStorage>,
     style_stale: Cell<bool>,
     /// The resolved direction the style was built for.
     built_direction: Cell<Direction>,
@@ -71,6 +73,7 @@ impl Default for EngineState {
     fn default() -> Self {
         Self {
             style: UnsafeCell::new(Style::DEFAULT),
+            calc: RefCell::new(CalcStorage::default()),
             style_stale: Cell::new(true),
             built_direction: Cell::new(Direction::Ltr),
             cache: RefCell::new(Cache::new()),
@@ -166,13 +169,15 @@ fn refresh_style(cell: &LayoutCell, inherited: Direction) -> Direction {
     let engine = &cell.engine;
     let redirected = engine.built_direction.get() != direction;
     if engine.style_stale.get() || redirected {
+        let calc = CalcStorage::default();
         let style = data
             .style
-            .to_taffy(direction, data.debug_padding, data.minimum_size_floor);
+            .to_taffy(direction, data.debug_padding, data.minimum_size_floor, &calc);
         drop(data);
         // SAFETY: styles are only borrowed by the layout algorithm of the
         // node's parent, which refreshes them before taking any reference.
         unsafe { *engine.style.get() = style };
+        *engine.calc.borrow_mut() = calc;
         engine.style_stale.set(false);
         engine.built_direction.set(direction);
         if redirected {
@@ -260,6 +265,8 @@ impl LayoutPartialTree for LayoutTree {
     type CoreContainerStyle<'a> = &'a Style;
     type CustomIdent = String;
 
+    fn resolve_calc_value(&self, ptr: *const (), basis: f32) -> f32 { resolve_calc(ptr, basis) }
+
     fn get_core_container_style(&self, id: NodeId) -> &Style {
         style_of(id)
     }
@@ -323,11 +330,11 @@ fn compute_node(
         return compute_leaf_layout(
             inputs,
             style_of(id),
-            |_, _| 0.0,
+            resolve_calc,
             |_, available| {
                 let size = measure(
-                    available.width.into_option(),
-                    available.height.into_option(),
+                    proposal_axis(available.width),
+                    proposal_axis(available.height),
                     &children,
                 );
                 taffy::Size {
@@ -337,16 +344,17 @@ fn compute_node(
             },
         );
     }
-    if has_children {
+    if has_children || style_of(id).display == taffy::Display::Grid {
         refresh_children(node, resolved_direction(node));
-        return compute_flexbox_layout(tree, id, inputs);
+        return if style_of(id).display == taffy::Display::Grid {
+            compute_grid_layout(tree, id, inputs)
+        } else { compute_flexbox_layout(tree, id, inputs) };
     }
-    let known = inputs.known_dimensions;
     compute_leaf_layout(
         inputs,
         style_of(id),
-        |_, _| 0.0,
-        |_, available| {
+        resolve_calc,
+        |known, available| {
             let Some(measure) = &measure else {
                 return taffy::Size::ZERO;
             };
@@ -361,13 +369,18 @@ fn compute_node(
     )
 }
 
+fn proposal_axis(value: AvailableSpace) -> Option<f32> {
+    match value { AvailableSpace::MinContent => Some(0.0), value => value.into_option() }
+}
+
 /// Yoga's measure contract: a known extent is exact, a definite available
 /// extent is an upper bound, and intrinsic probes are unconstrained.
 fn axis(known: Option<f32>, available: AvailableSpace) -> (f32, MeasureMode) {
     match available {
         AvailableSpace::Definite(value) if known.is_some() => (value, MeasureMode::Exactly),
         AvailableSpace::Definite(value) => (value, MeasureMode::AtMost),
-        AvailableSpace::MinContent | AvailableSpace::MaxContent => (0.0, MeasureMode::Undefined),
+        AvailableSpace::MinContent => (0.0, MeasureMode::MinContent),
+        AvailableSpace::MaxContent => (0.0, MeasureMode::Undefined),
     }
 }
 
@@ -416,6 +429,13 @@ impl LayoutFlexboxContainer for LayoutTree {
     }
 }
 
+impl LayoutGridContainer for LayoutTree {
+    type GridContainerStyle<'a> = &'a Style;
+    type GridItemStyle<'a> = &'a Style;
+    fn get_grid_container_style(&self, id: NodeId) -> &Style { style_of(id) }
+    fn get_grid_child_style(&self, id: NodeId) -> &Style { style_of(id) }
+}
+
 fn definite(value: Option<f32>) -> AvailableSpace {
     value.map_or(AvailableSpace::MaxContent, AvailableSpace::Definite)
 }
@@ -459,7 +479,7 @@ pub(super) fn layout_root(
     };
     let mut tree = LayoutTree;
     let output = tree.compute_child_layout(id, inputs);
-    let resolve = |_: *const (), _: f32| 0.0;
+    let resolve = resolve_calc;
     let style = style_of(id);
     let mut layout = Layout::with_order(0);
     layout.size = output.size;

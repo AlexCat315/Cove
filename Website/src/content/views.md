@@ -44,7 +44,7 @@ struct CounterView: View {
 
 ## 布局容器
 
-Cove 使用基于 Yoga 的 Flexbox 布局，核心容器与 Web Flexbox 一一对应：
+Cove 使用基于 Taffy 的 Flexbox 布局，核心容器与 Web Flexbox 一一对应：
 
 | 容器 | 对应 Flexbox | 典型用途 |
 |------|-------------|---------|

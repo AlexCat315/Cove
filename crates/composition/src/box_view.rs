@@ -32,7 +32,7 @@ pub enum Alignment {
 }
 
 impl HorizontalAlignment {
-    pub fn yoga_justify(self, direction: FlexDirection) -> Justify {
+    pub fn layout_justify(self, direction: FlexDirection) -> Justify {
         match (direction, self) {
             (FlexDirection::Row, Self::Leading) | (FlexDirection::RowReverse, Self::Trailing) => {
                 Justify::FlexStart
@@ -44,7 +44,7 @@ impl HorizontalAlignment {
             _ => panic!("HorizontalAlignment only maps to row directions"),
         }
     }
-    pub fn yoga_align(self) -> Align {
+    pub fn layout_align(self) -> Align {
         match self {
             Self::Leading => Align::FlexStart,
             Self::Center => Align::Center,
@@ -53,7 +53,7 @@ impl HorizontalAlignment {
     }
 }
 impl VerticalAlignment {
-    pub fn yoga_justify(self, direction: FlexDirection) -> Justify {
+    pub fn layout_justify(self, direction: FlexDirection) -> Justify {
         match (direction, self) {
             (FlexDirection::Column, Self::Top) | (FlexDirection::ColumnReverse, Self::Bottom) => {
                 Justify::FlexStart
@@ -65,7 +65,7 @@ impl VerticalAlignment {
             _ => panic!("VerticalAlignment only maps to column directions"),
         }
     }
-    pub fn yoga_align(self) -> Align {
+    pub fn layout_align(self) -> Align {
         match self {
             Self::Top => Align::FlexStart,
             Self::Center => Align::Center,
@@ -87,14 +87,14 @@ impl Alignment {
             Self::BottomTrailing => (HorizontalAlignment::Trailing, VerticalAlignment::Bottom),
         }
     }
-    pub fn yoga_values(self, direction: FlexDirection) -> (Align, Justify) {
+    pub fn layout_values(self, direction: FlexDirection) -> (Align, Justify) {
         let (horizontal, vertical) = self.components();
         match direction {
             FlexDirection::Row | FlexDirection::RowReverse => {
-                (vertical.yoga_align(), horizontal.yoga_justify(direction))
+                (vertical.layout_align(), horizontal.layout_justify(direction))
             }
             FlexDirection::Column | FlexDirection::ColumnReverse => {
-                (horizontal.yoga_align(), vertical.yoga_justify(direction))
+                (horizontal.layout_align(), vertical.layout_justify(direction))
             }
         }
     }
@@ -136,7 +136,7 @@ impl BoxView {
         spacing: f32,
         content: AnyView,
     ) -> Self {
-        let (align_items, justify_content) = alignment.yoga_values(direction);
+        let (align_items, justify_content) = alignment.layout_values(direction);
         Self::new(
             direction,
             align_items,
@@ -205,7 +205,7 @@ impl PrimitiveView for Row {
     }
     fn update_layout(&self, layout: &LayoutNode) {
         layout.set_flex_direction(FlexDirection::Row);
-        layout.set_align_items(self.alignment.yoga_align());
+        layout.set_align_items(self.alignment.layout_align());
         if self.spacing > 0.0 {
             layout.set_gap(self.spacing, Gutter::All);
         }
@@ -244,7 +244,7 @@ impl PrimitiveView for Column {
     }
     fn update_layout(&self, layout: &LayoutNode) {
         layout.set_flex_direction(FlexDirection::Column);
-        layout.set_align_items(self.alignment.yoga_align());
+        layout.set_align_items(self.alignment.layout_align());
         if self.spacing > 0.0 {
             layout.set_gap(self.spacing, Gutter::All);
         }

@@ -547,7 +547,7 @@
    "name": "ComponentRecompositionMetrics",
    "kind": "struct",
    "category": "core",
-   "abstract": "Counts body evaluations, excluding the initial mount. Durations include body evaluation and reconciliation, but exclude Yoga layout and GPU rendering.",
+   "abstract": "Counts body evaluations, excluding the initial mount. Durations include body evaluation and reconciliation, but exclude Taffy layout and GPU rendering.",
    "conforms": [
     "Sendable"
    ],
@@ -897,7 +897,7 @@
    "name": "HorizontalAlignment",
    "kind": "enum",
    "category": "core",
-   "abstract": "Common alignment vocabulary mapped to Yoga's alignment enums.",
+   "abstract": "Common alignment vocabulary mapped to Taffy's alignment enums.",
    "conforms": [
     "Sendable",
     "Hashable"
@@ -1149,7 +1149,7 @@
    "name": "LayoutPass",
    "kind": "struct",
    "category": "core",
-   "abstract": "Applies Yoga layout results back to the `Node` tree in a single depth-first pass.",
+   "abstract": "Applies Taffy layout results back to the `Node` tree in a single depth-first pass.",
    "conforms": [],
    "module": "CoveUICore"
   },
@@ -2099,7 +2099,7 @@
    "name": "LayoutTree",
    "kind": "class",
    "category": "core",
-   "abstract": "Phase 3 wrapper around the Yoga-backed layout tree. Phase 6 dropped the auxiliary `TextMeasureCache` (NSMapTable) — the per-`LayoutNode` text measure cache now lives directly on `LayoutNode.textMeasure` as a typed stored property in Runtime. Phase 7 removed the `LayoutTreeHolder` shim because no primitive reads the active LayoutTree by global lookup any more.",
+   "abstract": "Phase 3 wrapper around the Taffy-backed layout tree. Phase 6 dropped the auxiliary `TextMeasureCache` (NSMapTable) — the per-`LayoutNode` text measure cache now lives directly on `LayoutNode.textMeasure` as a typed stored property in Runtime. Phase 7 removed the `LayoutTreeHolder` shim because no primitive reads the active LayoutTree by global lookup any more.",
    "conforms": [],
    "module": "CoveUIComposeCore"
   },
@@ -2579,7 +2579,7 @@
    "name": "Text",
    "kind": "struct",
    "category": "text",
-   "abstract": "Static text primitive. Participates in flexbox layout via Yoga's measure callback so a label sized by its parent will wrap; an unconstrained label reports its natural single-line width.",
+   "abstract": "Static text primitive. Participates in flexbox layout via Taffy's measure callback so a label sized by its parent will wrap; an unconstrained label reports its natural single-line width.",
    "conforms": [
     "View"
    ],

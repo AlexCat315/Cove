@@ -304,7 +304,7 @@ impl View for CounterView {
                         36.0,
                     )),
                     AnyView::new(DemoLabel::new(
-                        "Shared Compose · ViewGraph · Yoga",
+                        "Shared Compose · ViewGraph · Taffy",
                         14.0,
                         foreground,
                         24.0,

@@ -1,4 +1,4 @@
-`Text` 是静态文本原始视图。它通过 Yoga 的 measure 回调参与 flexbox 布局：父容器给出的宽度会触发换行，未约束时报告单行自然宽度。
+`Text` 是静态文本原始视图。它通过 Taffy 的 measure 回调参与 flexbox 布局：父容器给出的宽度会触发换行，未约束时报告单行自然宽度。
 
 ```swift
 Text("Build finished", alignment: .leading, lineLimit: 2)

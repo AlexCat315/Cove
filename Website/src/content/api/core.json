@@ -1753,7 +1753,7 @@
   "name": "ComponentRecompositionMetrics",
   "kind": "struct",
   "declaration": "public struct ComponentRecompositionMetrics: Sendable",
-  "abstract": "Counts body evaluations, excluding the initial mount. Durations include body evaluation and reconciliation, but exclude Yoga layout and GPU rendering.",
+  "abstract": "Counts body evaluations, excluding the initial mount. Durations include body evaluation and reconciliation, but exclude Taffy layout and GPU rendering.",
   "discussion": [],
   "availability": [],
   "conforms": [
@@ -3138,7 +3138,7 @@
   "declaration": "public struct HitTester",
   "abstract": "Hit-tests a `Node` tree against a window-local point.",
   "discussion": [
-   "Algorithm:\n- Frames are parent-local (set by `LayoutPass` from Yoga output).\n- Points are mapped into a node's space by the *inverse* of the same\n  placement the renderers use, so a scaled node is hit where it is drawn\n  rather than where layout left it.\n- Children are drawn in array order (last child on top → reverse iterate).\n- `clipsToBounds == true` rejects child hits outside this node's frame.\n- `isHitTestable == false` skips a node but keeps walking its children\n  (matches CSS `pointer-events: none` semantics for the node alone)."
+   "Algorithm:\n- Frames are parent-local (set by `LayoutPass` from Taffy output).\n- Points are mapped into a node's space by the *inverse* of the same\n  placement the renderers use, so a scaled node is hit where it is drawn\n  rather than where layout left it.\n- Children are drawn in array order (last child on top → reverse iterate).\n- `clipsToBounds == true` rejects child hits outside this node's frame.\n- `isHitTestable == false` skips a node but keeps walking its children\n  (matches CSS `pointer-events: none` semantics for the node alone)."
   ],
   "availability": [],
   "conforms": [],
@@ -3165,7 +3165,7 @@
   "name": "HorizontalAlignment",
   "kind": "enum",
   "declaration": "public enum HorizontalAlignment: Sendable, Hashable",
-  "abstract": "Common alignment vocabulary mapped to Yoga's alignment enums.",
+  "abstract": "Common alignment vocabulary mapped to Taffy's alignment enums.",
   "discussion": [],
   "availability": [],
   "conforms": [
@@ -4002,7 +4002,7 @@
   "name": "LayoutPass",
   "kind": "struct",
   "declaration": "public struct LayoutPass",
-  "abstract": "Applies Yoga layout results back to the `Node` tree in a single depth-first pass.",
+  "abstract": "Applies Taffy layout results back to the `Node` tree in a single depth-first pass.",
   "discussion": [
    "Usage:\n```swift\nLayoutPass.run(rootLayoutNode: rootLayout, rootNode: rootNode,\n               availableWidth: 800, availableHeight: 600)\n// rootNode.frame and all descendants are now populated.\n```"
   ],
@@ -4016,7 +4016,7 @@
     "abstract": "Calculate layout and write results to every `Node.frame`.",
     "discussion": [
      "Both trees must have the same structure (same child count and order at every level).",
-     "- Parameters:\n  - rootLayoutNode: Root of the `LayoutNode` tree (Yoga side).\n  - rootNode: Root of the `Node` tree (CoveUI side).\n  - availableWidth: Viewport width (`Float.nan` = unconstrained).\n  - availableHeight: Viewport height (`Float.nan` = unconstrained)."
+     "- Parameters:\n  - rootLayoutNode: Root of the `LayoutNode` tree (Taffy side).\n  - rootNode: Root of the `Node` tree (CoveUI side).\n  - availableWidth: Viewport width (`Float.nan` = unconstrained).\n  - availableHeight: Viewport height (`Float.nan` = unconstrained)."
     ]
    }
   ],
@@ -9162,7 +9162,7 @@
   "declaration": "public final class LayoutNode: @unchecked Sendable",
   "abstract": "Wraps a `YGNodeRef` and owns its lifetime.",
   "discussion": [
-   "Create a `LayoutNode` for every `Node` that participates in flexbox layout,\nmirroring the CoveUI node tree. After calling `calculateLayout()` on the root,\nread back `frame` to obtain the Yoga-computed rectangle.",
+   "Create a `LayoutNode` for every `Node` that participates in flexbox layout,\nmirroring the CoveUI node tree. After calling `calculateLayout()` on the root,\nread back `frame` to obtain the Taffy-computed rectangle.",
    "- Important: The tree owns its children — adding a `LayoutNode` as a child\n  transfers responsibility for its memory to the parent."
   ],
   "availability": [],
@@ -9172,7 +9172,7 @@
     "name": "attachments",
     "kind": "var",
     "declaration": "public var attachments: [String: Any] = [:]",
-    "abstract": "Side table for style metadata that affects measurement but is not part of Yoga's native style surface.",
+    "abstract": "Side table for style metadata that affects measurement but is not part of Taffy's native style surface.",
     "discussion": []
    },
    {
@@ -9242,7 +9242,7 @@
     "name": "reorderChildren",
     "kind": "func",
     "declaration": "public func reorderChildren(_ ordered: [LayoutNode])",
-    "abstract": "Reassign this node's children to `ordered` (which must be exactly the same set as the current children). Used by the keyed reconciler after reordering the matching `Node` tree, so Yoga sees siblings in the same final sequence.",
+    "abstract": "Reassign this node's children to `ordered` (which must be exactly the same set as the current children). Used by the keyed reconciler after reordering the matching `Node` tree, so Taffy sees siblings in the same final sequence.",
     "discussion": []
    },
    {
@@ -9508,7 +9508,7 @@
     "name": "calculateLayout",
     "kind": "func",
     "declaration": "public func calculateLayout( availableWidth: Float = Float.nan, availableHeight: Float = Float.nan, direction: Direction = .ltr )",
-    "abstract": "Run Yoga layout from this node as the root.",
+    "abstract": "Run Taffy layout from this node as the root.",
     "discussion": [
      "- Parameters:\n  - availableWidth: Container width (`Float.nan` = unconstrained).\n  - availableHeight: Container height (`Float.nan` = unconstrained).\n  - direction: Layout direction (default `.ltr`)."
     ]
@@ -9517,7 +9517,7 @@
     "name": "subtreeIsDirty",
     "kind": "var",
     "declaration": "public var subtreeIsDirty: Bool",
-    "abstract": "True when this node or any descendant still needs a Yoga layout pass.",
+    "abstract": "True when this node or any descendant still needs a Taffy layout pass.",
     "discussion": []
    },
    {
@@ -9533,21 +9533,21 @@
     "declaration": "public func setMeasureFunc(_ closure: MeasureFunc?)",
     "abstract": "Sets a measure callback for leaf nodes (e.g. Text). Calling `nil` clears it.",
     "discussion": [
-     "When replacing a container, defer installation until reconciliation\nremoves its Yoga children. Custom layouts remain Yoga leaves."
+     "When replacing a container, defer installation until reconciliation\nremoves its Taffy children. Custom layouts remain Taffy leaves."
     ]
    },
    {
     "name": "markDirty",
     "kind": "func",
     "declaration": "public func markDirty()",
-    "abstract": "Mark this node's measurement as stale (call after content changes). Yoga only permits this on leaf nodes that own a measure callback; callers should guard with `hasMeasureFunc` when applying generic modifiers.",
+    "abstract": "Mark this node's measurement as stale (call after content changes). Taffy only permits this on leaf nodes that own a measure callback; callers should guard with `hasMeasureFunc` when applying generic modifiers.",
     "discussion": []
    },
    {
     "name": "hasMeasureFunc",
     "kind": "var",
     "declaration": "public var hasMeasureFunc: Bool",
-    "abstract": "True iff Yoga has a measure callback installed. Use to gate `markDirty()` from generic modifiers.",
+    "abstract": "True iff Taffy has a measure callback installed. Use to gate `markDirty()` from generic modifiers.",
     "discussion": []
    },
    {
@@ -9612,7 +9612,7 @@
   "name": "LayoutTree",
   "kind": "class",
   "declaration": "public final class LayoutTree",
-  "abstract": "Phase 3 wrapper around the Yoga-backed layout tree. Phase 6 dropped the auxiliary `TextMeasureCache` (NSMapTable) — the per-`LayoutNode` text measure cache now lives directly on `LayoutNode.textMeasure` as a typed stored property in Runtime. Phase 7 removed the `LayoutTreeHolder` shim because no primitive reads the active LayoutTree by global lookup any more.",
+  "abstract": "Phase 3 wrapper around the Taffy-backed layout tree. Phase 6 dropped the auxiliary `TextMeasureCache` (NSMapTable) — the per-`LayoutNode` text measure cache now lives directly on `LayoutNode.textMeasure` as a typed stored property in Runtime. Phase 7 removed the `LayoutTreeHolder` shim because no primitive reads the active LayoutTree by global lookup any more.",
   "discussion": [],
   "availability": [],
   "conforms": [],
@@ -10364,7 +10364,7 @@
     "declaration": "public func flush()",
     "abstract": "Depth-first traversal that resets layout and render invalidation flags on every reachable node.",
     "discussion": [
-     "Layout (`LayoutTree`/Yoga) and draw (`LayerAwareNodeRenderer`) are\ndriven directly by `ViewGraph` and `EngineHost.tick`; this method\nonly clears the per-`Node` dirty flags after each frame so the next\nrecompose can detect new mutations."
+     "Layout (`LayoutTree`/Taffy) and draw (`LayerAwareNodeRenderer`) are\ndriven directly by `ViewGraph` and `EngineHost.tick`; this method\nonly clears the per-`Node` dirty flags after each frame so the next\nrecompose can detect new mutations."
     ]
    }
   ],
@@ -10462,7 +10462,7 @@
     "declaration": "public func render(width: Int, height: Int, contentScale: Float = 1) -> DrawListSnapshot?",
     "abstract": "Render one frame. Must be called on the main thread, after all observed state writes for this frame have been applied.",
     "discussion": [
-     "Recomposes dirty scopes, runs Yoga layout, renders the node tree into a\n`DrawList`, snapshots the result, for the recording thread."
+     "Recomposes dirty scopes, runs Taffy layout, renders the node tree into a\n`DrawList`, snapshots the result, for the recording thread."
     ]
    },
    {
@@ -11315,7 +11315,7 @@
     "name": "computeLayout",
     "kind": "func",
     "declaration": "public func computeLayout(width: Float, height: Float)",
-    "abstract": "Run a Yoga layout pass over the layout tree and write the resulting frames back to the corresponding `Node`s.",
+    "abstract": "Run a Taffy layout pass over the layout tree and write the resulting frames back to the corresponding `Node`s.",
     "discussion": [
      "Call once per frame after `recomposer.commitAll()` and before draw."
     ]
@@ -11324,7 +11324,7 @@
     "name": "computeLayoutIfNeeded",
     "kind": "func",
     "declaration": "public func computeLayoutIfNeeded(width: Float, height: Float) -> Bool",
-    "abstract": "Run layout only when Yoga says some layout node is dirty or the root viewport size changed since the last pass.",
+    "abstract": "Run layout only when Taffy says some layout node is dirty or the root viewport size changed since the last pass.",
     "discussion": []
    },
    {

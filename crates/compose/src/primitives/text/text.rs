@@ -223,8 +223,32 @@ impl Text {
                     return cove_core::Size::default();
                 };
                 let metrics = Self::metrics_for_layout(&layout, &environment);
+                if width_mode == MeasureMode::MinContent {
+                    // Measure unbreakable runs without emergency character wrapping.
+                    // Truncating text can shrink to zero; nowrap text keeps its natural width.
+                    if snapshot.truncates { return cove_core::Size::default(); }
+                    if snapshot.line_limit != Some(1) {
+                        let mut breaks: Vec<_> = cove_core::line_break_opportunities(&snapshot.string).into_iter().collect();
+                        breaks.push(snapshot.string.len());
+                        breaks.sort_unstable();
+                        breaks.dedup();
+                        let mut start = 0;
+                        let mut minimum = 0.0_f32;
+                        for end in breaks {
+                            if end > start && snapshot.string.is_char_boundary(end) {
+                                let run = snapshot.string[start..end].trim();
+                                let measured = environment.cached_layout(run, Some(&metrics.font), Some(metrics.line_height),
+                                    f32::INFINITY, snapshot.alignment, metrics.letter_spacing);
+                                minimum = minimum.max(measured.total_width);
+                                start = end;
+                            }
+                        }
+                        let (result, _) = snapshot.layout_result(&environment, None, &metrics, minimum);
+                        return cove_core::Size { width: minimum, height: result.total_height };
+                    }
+                }
                 let width = match width_mode {
-                    MeasureMode::Undefined => f32::INFINITY,
+                    MeasureMode::Undefined | MeasureMode::MinContent => f32::INFINITY,
                     MeasureMode::Exactly | MeasureMode::AtMost => width.max(0.0),
                 };
                 let (result, _) =

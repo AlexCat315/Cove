@@ -10,50 +10,12 @@ use super::super::{
 };
 use crate::Size;
 use taffy::style::{
-    AlignContent, AlignItems, Dimension, JustifyContent, LengthPercentage, LengthPercentageAuto,
+    AlignContent, AlignItems, JustifyContent, LengthPercentage, LengthPercentageAuto,
 };
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub enum LayoutStyleValue {
-    #[default]
-    Auto,
-    Points(f32),
-    Percent(f32),
-}
-impl LayoutStyleValue {
-    pub(super) fn is_auto(self) -> bool {
-        matches!(self, Self::Auto)
-    }
-    fn dimension(self) -> Dimension {
-        match self {
-            Self::Auto => Dimension::auto(),
-            Self::Points(value) => Dimension::length(value),
-            Self::Percent(percent) => Dimension::percent(percent / 100.0),
-        }
-    }
-    /// `Auto` is "unset" for insets that have no auto keyword.
-    fn length_percentage(self) -> LengthPercentage {
-        match self {
-            Self::Auto => LengthPercentage::length(0.0),
-            Self::Points(value) => LengthPercentage::length(value),
-            Self::Percent(percent) => LengthPercentage::percent(percent / 100.0),
-        }
-    }
-    fn length_percentage_auto(self) -> LengthPercentageAuto {
-        match self {
-            Self::Auto => LengthPercentageAuto::auto(),
-            Self::Points(value) => LengthPercentageAuto::length(value),
-            Self::Percent(percent) => LengthPercentageAuto::percent(percent / 100.0),
-        }
-    }
-    /// Margins keep the Yoga-port contract: an unset margin is zero.
-    fn margin(self) -> LengthPercentageAuto {
-        match self {
-            Self::Auto => LengthPercentageAuto::length(0.0),
-            value => value.length_percentage_auto(),
-        }
-    }
-}
+pub use super::value::{LayoutCalc, LayoutStyleValue};
+use super::value::CalcStorage;
+use super::grid::GridStyle;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct LayoutInsets {
@@ -187,7 +149,7 @@ impl StyleBorder {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct LayoutStyle {
     pub direction: Direction,
     pub flex_direction: FlexDirection,
@@ -204,10 +166,10 @@ pub struct LayoutStyle {
     pub flex_basis: LayoutStyleValue,
     pub width: LayoutStyleValue,
     pub height: LayoutStyleValue,
-    pub min_width: Option<f32>,
-    pub max_width: Option<f32>,
-    pub min_height: Option<f32>,
-    pub max_height: Option<f32>,
+    pub min_width: LayoutStyleValue,
+    pub max_width: LayoutStyleValue,
+    pub min_height: LayoutStyleValue,
+    pub max_height: LayoutStyleValue,
     pub position: StyleEdges,
     pub margin: StyleEdges,
     pub padding: StyleEdges,
@@ -215,6 +177,7 @@ pub struct LayoutStyle {
     pub gap_row: LayoutStyleValue,
     pub gap_column: LayoutStyleValue,
     pub box_sizing: BoxSizing,
+    pub grid: GridStyle,
 }
 impl Default for LayoutStyle {
     fn default() -> Self {
@@ -234,10 +197,10 @@ impl Default for LayoutStyle {
             flex_basis: LayoutStyleValue::Auto,
             width: LayoutStyleValue::Auto,
             height: LayoutStyleValue::Auto,
-            min_width: None,
-            max_width: None,
-            min_height: None,
-            max_height: None,
+            min_width: LayoutStyleValue::Auto,
+            max_width: LayoutStyleValue::Auto,
+            min_height: LayoutStyleValue::Auto,
+            max_height: LayoutStyleValue::Auto,
             position: StyleEdges::default(),
             margin: StyleEdges::default(),
             padding: StyleEdges::default(),
@@ -245,6 +208,7 @@ impl Default for LayoutStyle {
             gap_row: LayoutStyleValue::Auto,
             gap_column: LayoutStyleValue::Auto,
             box_sizing: BoxSizing::BorderBox,
+            grid: GridStyle::default(),
         }
     }
 }
@@ -257,18 +221,17 @@ impl LayoutStyle {
         direction: Direction,
         debug_padding: Option<super::LayoutInsets>,
         floor: Option<Size>,
+        calc: &CalcStorage,
     ) -> taffy::Style {
-        let minimum = |authored: Option<f32>, floor: Option<f32>| {
-            // Yoga has no automatic minimum size: an unset minimum is zero.
-            let value = match (authored, floor) {
-                (Some(authored), Some(floor)) => authored.max(floor),
-                (authored, floor) => authored.or(floor).unwrap_or(0.0),
-            };
-            LengthPercentageAuto::length(value)
+        let minimum = |value: LayoutStyleValue, floor: Option<f32>| {
+            match (value, floor) {
+                (LayoutStyleValue::Auto, floor) => LengthPercentageAuto::length(floor.unwrap_or(0.0)),
+                (LayoutStyleValue::Points(value), floor) => LengthPercentageAuto::length(value.max(floor.unwrap_or(0.0))),
+                (value, Some(floor)) => LengthPercentageAuto::calc(calc.insert(value.as_calc().with_minimum(floor))),
+                (value, None) => value.length_percentage_auto(calc),
+            }
         };
-        let maximum = |value: Option<f32>| {
-            value.map_or(LengthPercentageAuto::auto(), LengthPercentageAuto::length)
-        };
+        let maximum = |value: LayoutStyleValue| value.length_percentage_auto(calc);
         let padding = match debug_padding {
             Some(insets) => taffy::Rect {
                 left: LengthPercentage::length(insets.left),
@@ -278,15 +241,16 @@ impl LayoutStyle {
             },
             None => self
                 .padding
-                .map(direction, LayoutStyleValue::length_percentage),
+                .map(direction, |value| value.length_percentage(calc)),
         };
         let gap = |value: LayoutStyleValue| match value {
             LayoutStyleValue::Auto => LengthPercentage::length(0.0),
-            value => value.length_percentage(),
+            value => value.length_percentage(calc),
         };
-        taffy::Style {
+        let mut result = taffy::Style {
             display: match self.display {
                 Display::None => taffy::Display::None,
+                Display::Grid => taffy::Display::Grid,
                 Display::Flex | Display::Contents => taffy::Display::Flex,
             },
             box_sizing: match self.box_sizing {
@@ -315,10 +279,10 @@ impl LayoutStyle {
             },
             inset: self
                 .position
-                .map(direction, LayoutStyleValue::length_percentage_auto),
+                .map(direction, |value| value.length_percentage_auto(calc)),
             size: taffy::Size {
-                width: self.width.dimension(),
-                height: self.height.dimension(),
+                width: self.width.dimension(calc),
+                height: self.height.dimension(calc),
             },
             min_size: taffy::Size {
                 width: minimum(self.min_width, floor.map(|floor| floor.width)),
@@ -328,7 +292,7 @@ impl LayoutStyle {
                 width: maximum(self.max_width),
                 height: maximum(self.max_height),
             },
-            margin: self.margin.map(direction, LayoutStyleValue::margin),
+            margin: self.margin.map(direction, |value| value.margin(calc)),
             padding,
             border: taffy::Rect {
                 left: LengthPercentage::length(self.border.left),
@@ -365,15 +329,17 @@ impl LayoutStyle {
                 Wrap::Wrap => taffy::FlexWrap::Wrap,
                 Wrap::WrapReverse => taffy::FlexWrap::WrapReverse,
             },
-            flex_basis: self.flex_basis.dimension(),
+            flex_basis: self.flex_basis.dimension(calc),
             flex_grow: self.flex_grow,
             flex_shrink: self.flex_shrink,
             ..taffy::Style::DEFAULT
-        }
+        };
+        self.grid.apply(&mut result, calc);
+        result
     }
 }
 
-fn align_items(align: Align) -> AlignItems {
+pub(super) fn align_items(align: Align) -> AlignItems {
     match align {
         Align::Auto | Align::Stretch => AlignItems::STRETCH,
         Align::FlexStart => AlignItems::FLEX_START,

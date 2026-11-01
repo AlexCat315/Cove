@@ -10,9 +10,9 @@ use crate::{
 use cove_core::scene::{Direction, LayoutNode, Node, Point, Rect, Size};
 use cove_core::{Size as CoreSize, State};
 
-use super::columns::{GridColumn, GridTrackResolver, GridTracks};
+use super::columns::{GridColumn, GridTrackResolver};
 use super::named_columns::{ColumnVisibilityPlan, ColumnVisibilityTrack, GridNamedColumns};
-use super::span::{GridSpan, GridSpanKey, GridSpanPlacement};
+use super::span::GridSpanKey;
 
 /// A general row-major grid built on the public measurement and placement
 /// contract. Row heights come from the tallest measured child in each row.
@@ -75,215 +75,67 @@ impl GridLayout {
         }
     }
 
-    fn arrangement(
-        &self,
-        proposal: ProposedViewSize,
-        subviews: &[LayoutSubview],
-    ) -> GridArrangement {
+    /// Taffy owns track sizing, spanning and row placement. Proxy leaves bridge
+    /// the public custom-layout measurement contract without reparenting views.
+    fn arrangement(&self, proposal: ProposedViewSize, subviews: &[LayoutSubview]) -> NativeArrangement {
+        use cove_core::scene::{Display, GridStyle, GridPlacement, Gutter, MeasureMode};
         if self.columns.is_empty() || subviews.is_empty() {
-            return GridArrangement::empty();
+            return NativeArrangement { frames: vec![None; subviews.len()], size: Size::default() };
         }
         let gap = GridTrackResolver::finite_nonnegative(self.column_spacing);
         let named = GridNamedColumns::tracks(&self.columns);
-        let plan = named.as_ref().map(|tracks| {
-            ColumnVisibilityPlan::resolve(
-                tracks,
-                &self.column_visibility,
-                proposal.width.unwrap_or(f32::INFINITY),
-                gap,
-                &Default::default(),
-            )
-        });
-        let mapping: Option<HashMap<usize, usize>> = plan.as_ref().map(|plan| {
-            plan.indices
-                .iter()
-                .enumerate()
-                .map(|(offset, &source)| (source, offset))
-                .collect()
-        });
-        let presented_column = |source: usize| -> Option<usize> {
-            mapping
-                .as_ref()
-                .map_or(Some(source), |mapping| mapping.get(&source).copied())
-        };
-        let visible_columns: Vec<GridColumn> = plan
-            .as_ref()
-            .map(|plan| {
-                plan.indices
-                    .iter()
-                    .map(|&index| self.columns[index].clone())
-                    .collect()
-            })
-            .unwrap_or_else(|| self.columns.clone());
-        let mut intrinsic_widths: Vec<f32> = Vec::new();
-        if proposal.width.is_none() {
-            intrinsic_widths = vec![0.0_f32; visible_columns.len()];
-            for index in 0..subviews.len() {
-                let column = index % self.columns.len();
-                if let Some(presented) = presented_column(column) {
-                    intrinsic_widths[presented] = intrinsic_widths[presented].max(
-                        subviews[index]
-                            .size_that_fits(ProposedViewSize::UNSPECIFIED)
-                            .width,
-                    );
-                }
-            }
+        let visible: Vec<usize> = named.as_ref().map(|tracks| {
+            ColumnVisibilityPlan::resolve(tracks, &self.column_visibility,
+                proposal.width.unwrap_or(f32::INFINITY), gap, &Default::default()).indices
+        }).unwrap_or_else(|| (0..self.columns.len()).collect());
+        if visible.is_empty() {
+            return NativeArrangement { frames: vec![None; subviews.len()], size: Size::default() };
         }
-        let widths =
-            GridTrackResolver::widths(&visible_columns, proposal.width, gap, &intrinsic_widths);
-        let source_column_count = if named.is_none() {
-            widths.count
-        } else {
-            self.columns.len()
-        };
-        let row_count = subviews.len() / source_column_count
-            + usize::from(!subviews.len().is_multiple_of(source_column_count));
-        let mut heights = vec![0.0f32; row_count];
-        let mut active_rows = vec![false; row_count];
-        let mut sizes = Vec::with_capacity(subviews.len());
-        for index in 0..subviews.len() {
-            let source = index % source_column_count;
-            let presented = presented_column(source);
-            let size = presented
-                .map(|presented| {
-                    subviews[index]
-                        .size_that_fits(ProposedViewSize::new(Some(widths.get(presented)), None))
-                })
-                .unwrap_or_default();
-            sizes.push(size);
-            let row = index / source_column_count;
-            if presented.is_some() {
-                active_rows[row] = true;
-            }
-            heights[row] = heights[row].max(size.height);
-        }
-        let active_count = active_rows.iter().filter(|active| **active).count();
-        let size = Size {
-            width: widths.total_width,
-            height: heights.iter().sum::<f32>()
-                + GridTrackResolver::finite_nonnegative(self.row_spacing)
-                    * active_count.saturating_sub(1) as f32,
-        };
-        GridArrangement {
-            widths,
-            heights,
-            item_sizes: sizes,
-            source_column_count,
-            mapping,
-            active_rows,
-            size,
-        }
-    }
-
-    // MARK: - Spanning cells
-
-    /// Spans apply to anonymous columns only; `None` keeps the one-cell path.
-    fn spans(&self, subviews: &[LayoutSubview]) -> Option<Vec<GridSpan>> {
-        if self.columns.is_empty() || GridNamedColumns::tracks(&self.columns).is_some() {
-            return None;
-        }
-        let spans: Vec<GridSpan> = subviews
-            .iter()
-            .map(|subview| subview.value::<GridSpanKey>())
-            .collect();
-        if spans.iter().any(|span| *span != GridSpan::SINGLE) {
-            Some(spans)
-        } else {
-            None
-        }
-    }
-
-    fn span_arrangement(
-        &self,
-        proposal: ProposedViewSize,
-        subviews: &[LayoutSubview],
-        spans: &[GridSpan],
-    ) -> SpanArrangement {
-        let gap = GridTrackResolver::finite_nonnegative(self.column_spacing);
-        let row_gap = GridTrackResolver::finite_nonnegative(self.row_spacing);
-        let mut intrinsic = Vec::new();
-        if proposal.width.is_none() {
-            let draft = GridSpanPlacement::new(spans, self.columns.len());
-            intrinsic = vec![0.0_f32; self.columns.len()];
-            for (index, cell) in draft.cells.iter().enumerate() {
-                if cell.span.columns == 1 {
-                    intrinsic[cell.column] = intrinsic[cell.column].max(
-                        subviews[index]
-                            .size_that_fits(ProposedViewSize::UNSPECIFIED)
-                            .width,
-                    );
-                }
-            }
-        }
-        let widths = GridTrackResolver::widths(&self.columns, proposal.width, gap, &intrinsic);
-        let placement = GridSpanPlacement::new(spans, widths.count);
-        let mut sizes = Vec::with_capacity(subviews.len());
-        for (index, cell) in placement.cells.iter().enumerate() {
-            let width = (cell.column..(cell.column + cell.span.columns))
-                .map(|column| widths.get(column))
-                .sum::<f32>()
-                + gap * (cell.span.columns - 1) as f32;
-            sizes.push(subviews[index].size_that_fits(ProposedViewSize::new(Some(width), None)));
-        }
-        let heights = placement.row_heights(
-            &sizes.iter().map(|size| size.height).collect::<Vec<_>>(),
-            row_gap,
-        );
-        let height = heights.iter().sum::<f32>() + row_gap * heights.len().saturating_sub(1) as f32;
-        let total_width = widths.total_width;
-        SpanArrangement {
-            widths,
-            placement,
-            heights,
-            item_sizes: sizes,
-            size: Size {
-                width: total_width,
-                height,
-            },
-        }
-    }
-
-    fn place_spanning(&self, bounds: Rect, subviews: &[LayoutSubview], spans: &[GridSpan]) {
-        let plan = self.span_arrangement(
-            ProposedViewSize::new(Some(bounds.width), None),
-            subviews,
-            spans,
-        );
-        let gap = GridTrackResolver::finite_nonnegative(self.column_spacing);
-        let row_gap = GridTrackResolver::finite_nonnegative(self.row_spacing);
-        let rtl = subviews
-            .first()
-            .map(|subview| subview.layout_direction == Direction::Rtl)
-            .unwrap_or(false);
-        let (horizontal, vertical) = self.alignment_components();
-        let mut row_tops = Vec::with_capacity(plan.heights.len());
-        let mut y = bounds.y;
-        for height in &plan.heights {
-            row_tops.push(y);
-            y += height + row_gap;
-        }
-        for (index, cell) in plan.placement.cells.iter().enumerate() {
-            let cell_width = plan.width_of(cell, gap);
-            let cell_height = (cell.row..(cell.row + cell.span.rows))
-                .map(|row| plan.heights[row])
-                .sum::<f32>()
-                + row_gap * (cell.span.rows - 1) as f32;
-            let offset = plan.x_of_column(cell.column, gap);
-            let item = plan.item_sizes[index];
-            let cell_x = if rtl {
-                bounds.max_x() - offset - cell_width
+        let columns: Vec<_> = visible.iter().map(|&i| self.columns[i].sizing().clone()).collect();
+        let direction = subviews.first().map_or(Direction::Ltr, |v| v.layout_direction);
+        let root = LayoutNode::new();
+        root.set_display(Display::Grid);
+        root.set_gap(gap, Gutter::Column);
+        root.set_gap(GridTrackResolver::finite_nonnegative(self.row_spacing), Gutter::Row);
+        let tracks = native_columns(&columns, proposal.width, gap);
+        let column_count = tracks.len();
+        root.set_grid_style(GridStyle { columns: tracks, ..Default::default() });
+        // Stretch proxies to obtain the cell width, while the public alignment
+        // still controls each measured view inside that cell.
+        let mut proxies = Vec::with_capacity(subviews.len());
+        for (index, subview) in subviews.iter().enumerate() {
+            let proxy = LayoutNode::new();
+            let mut grid = GridStyle::default();
+            let is_visible = if named.is_some() {
+                let source = index % self.columns.len();
+                if let Some(column) = visible.iter().position(|&value| value == source) {
+                    grid.column = [GridPlacement::Line(((column + 1) as i16).into()), GridPlacement::Span(1)];
+                    grid.row = [GridPlacement::Line(((index / self.columns.len() + 1) as i16).into()), GridPlacement::Span(1)];
+                    true
+                } else { false }
             } else {
-                bounds.x + offset
+                let span = subview.value::<GridSpanKey>();
+                grid.column = [GridPlacement::Auto, GridPlacement::Span(span.columns.max(1).min(column_count).min(u16::MAX as usize) as u16)];
+                grid.row = [GridPlacement::Auto, GridPlacement::Span(span.rows.max(1).min(u16::MAX as usize) as u16)];
+                true
             };
-            subviews[index].place(
-                Point::new(
-                    cell_x + Self::horizontal_offset(horizontal, cell_width - item.width, rtl),
-                    row_tops[cell.row] + Self::vertical_offset(vertical, cell_height - item.height),
-                ),
-                ProposedViewSize::new(Some(cell_width), Some(item.height)),
-                true,
-            );
+            proxy.set_grid_style(grid);
+            if !is_visible { proxy.set_display(Display::None); }
+            let view = subview.clone();
+            proxy.set_measure_func(Some(Rc::new(move |width, mode, _, _| {
+                let width = if mode == MeasureMode::Undefined { None } else { Some(width) };
+                view.size_that_fits(ProposedViewSize::new(width, None))
+            })));
+            root.add_child(&proxy);
+            proxies.push((proxy, is_visible));
         }
+        root.calculate_layout(proposal.width, None, direction);
+        let frames: Vec<_> = proxies.iter().map(|(node, visible)| visible.then(|| node.frame())).collect();
+        // CSS tracks may overflow a constrained root. Report the occupied
+        // extent to Cove's enclosing ScrollView so required columns stay reachable.
+        let left = frames.iter().flatten().map(|frame| frame.x).fold(0.0, f32::min);
+        let right = frames.iter().flatten().map(|frame| frame.max_x()).fold(root.frame().width, f32::max);
+        NativeArrangement { frames, size: Size { width: right - left, height: root.frame().height } }
     }
 }
 impl Default for GridLayout {
@@ -293,122 +145,70 @@ impl Default for GridLayout {
 }
 impl Layout for GridLayout {
     fn size_that_fits(&self, proposal: ProposedViewSize, subviews: &[LayoutSubview]) -> Size {
-        if let Some(spans) = self.spans(subviews) {
-            return self.span_arrangement(proposal, subviews, &spans).size;
-        }
         self.arrangement(proposal, subviews).size
     }
-
-    fn place_subviews(
-        &self,
-        bounds: Rect,
-        _proposal: ProposedViewSize,
-        subviews: &[LayoutSubview],
-    ) {
-        if let Some(spans) = self.spans(subviews) {
-            self.place_spanning(bounds, subviews, &spans);
-            return;
-        }
-        let arrangement =
-            self.arrangement(ProposedViewSize::new(Some(bounds.width), None), subviews);
-        if arrangement.widths.is_empty() {
-            for child in subviews {
-                child.place(Point::new(0.0, 0.0), ProposedViewSize::ZERO, false);
-            }
-            return;
-        }
-        let gap = GridTrackResolver::finite_nonnegative(self.column_spacing);
-        let row_gap = GridTrackResolver::finite_nonnegative(self.row_spacing);
-        let rtl = subviews
-            .first()
-            .map(|subview| subview.layout_direction == Direction::Rtl)
-            .unwrap_or(false);
+    fn place_subviews(&self, bounds: Rect, _proposal: ProposedViewSize, subviews: &[LayoutSubview]) {
+        let plan = self.arrangement(ProposedViewSize::new(Some(bounds.width), None), subviews);
+        let rtl = subviews.first().is_some_and(|view| view.layout_direction == Direction::Rtl);
         let (horizontal, vertical) = self.alignment_components();
-        let mut y = bounds.y;
-        let mut row = 0usize;
-        let mut x = 0.0f32;
-        for index in 0..subviews.len() {
-            let column = index % arrangement.source_column_count;
-            if column == 0 {
-                x = 0.0;
-            }
-            if let Some(presented) = arrangement.presented_column(column) {
-                let cell_width = arrangement.widths.get(presented);
-                let item_size = arrangement.item_sizes[index];
-                let horizontal_offset =
-                    Self::horizontal_offset(horizontal, cell_width - item_size.width, rtl);
-                let vertical_offset =
-                    Self::vertical_offset(vertical, arrangement.heights[row] - item_size.height);
-                let cell_x = if rtl {
-                    bounds.max_x() - x - cell_width
-                } else {
-                    bounds.x + x
-                };
-                subviews[index].place(
-                    Point::new(cell_x + horizontal_offset, y + vertical_offset),
-                    ProposedViewSize::new(Some(cell_width), Some(item_size.height)),
-                    true,
-                );
-                x += cell_width + gap;
-            } else {
-                subviews[index].place(Point::new(0.0, 0.0), ProposedViewSize::ZERO, false);
-            }
-            if column + 1 == arrangement.source_column_count || index + 1 == subviews.len() {
-                if arrangement.active_rows.get(row).copied().unwrap_or(false) {
-                    y += arrangement.heights[row] + row_gap;
-                }
-                row += 1;
-            }
+        for (view, frame) in subviews.iter().zip(plan.frames) {
+            let Some(frame) = frame else {
+                view.place(Point::new(0.0, 0.0), ProposedViewSize::ZERO, false);
+                continue;
+            };
+            let size = view.size_that_fits(ProposedViewSize::new(Some(frame.width), None));
+            view.place(Point::new(
+                bounds.x + frame.x + Self::horizontal_offset(horizontal, frame.width - size.width, rtl),
+                bounds.y + frame.y + Self::vertical_offset(vertical, frame.height - size.height),
+            ), ProposedViewSize::new(Some(frame.width), Some(size.height)), true);
         }
     }
 }
-
-#[derive(Clone, Debug)]
-struct GridArrangement {
-    widths: GridTracks,
-    heights: Vec<f32>,
-    item_sizes: Vec<Size>,
-    source_column_count: usize,
-    mapping: Option<HashMap<usize, usize>>,
-    active_rows: Vec<bool>,
+struct NativeArrangement {
+    frames: Vec<Option<Rect>>,
     size: Size,
 }
-impl GridArrangement {
-    fn presented_column(&self, source: usize) -> Option<usize> {
-        self.mapping
-            .as_ref()
-            .map_or(Some(source), |mapping| mapping.get(&source).copied())
-    }
-    fn empty() -> Self {
-        Self {
-            widths: GridTracks::new(vec![], 0.0),
-            heights: vec![],
-            item_sizes: vec![],
-            source_column_count: 1,
-            mapping: None,
-            active_rows: vec![],
-            size: Size::default(),
+
+fn native_track(column: &GridColumn) -> cove_core::scene::GridTrack {
+    use cove_core::scene::{GridTrack, GridBreadth, LayoutStyleValue as Value};
+    match column.sizing() {
+        GridColumn::Fixed(value) => GridTrack::length(Value::Points(GridTrackResolver::finite_nonnegative(*value))),
+        GridColumn::Flexible { minimum, maximum } | GridColumn::Adaptive { minimum, maximum } => {
+            let minimum = GridTrackResolver::finite_nonnegative(*minimum);
+            let max = if maximum.is_finite() { GridBreadth::Length(Value::Points(maximum.max(minimum))) }
+                else { GridBreadth::Fraction(1.0) };
+            GridTrack::minmax(GridBreadth::Length(Value::Points(minimum)), max)
         }
+        GridColumn::Named { .. } => unreachable!("sizing unwraps named columns"),
     }
 }
 
-struct SpanArrangement {
-    widths: GridTracks,
-    placement: GridSpanPlacement,
-    heights: Vec<f32>,
-    item_sizes: Vec<Size>,
-    size: Size,
-}
-impl SpanArrangement {
-    fn x_of_column(&self, column: usize, gap: f32) -> f32 {
-        (0..column).map(|index| self.widths.get(index) + gap).sum()
-    }
-    fn width_of(&self, cell: &super::span::GridSpanCell, gap: f32) -> f32 {
-        (cell.column..(cell.column + cell.span.columns))
-            .map(|index| self.widths.get(index))
-            .sum::<f32>()
-            + gap * (cell.span.columns - 1) as f32
-    }
+/// Adaptive columns are a Cove policy: allocate each group with native Grid,
+/// then expand its slots. Taffy solves the final tracks and child placement.
+/// This also supports multiple adaptive groups (CSS permits one auto-repeat).
+fn native_columns(columns: &[GridColumn], width: Option<f32>, gap: f32) -> Vec<cove_core::scene::GridTemplateTrack> {
+    use cove_core::scene::{Display, GridStyle, Gutter};
+    let initial: Vec<_> = columns.iter().map(|column| {
+        let group = match column.sizing() {
+            GridColumn::Adaptive { minimum, .. } => GridColumn::flexible(*minimum, f32::INFINITY),
+            value => value.clone(),
+        };
+        native_track(&group).into()
+    }).collect();
+    if !columns.iter().any(|column| matches!(column.sizing(), GridColumn::Adaptive { .. })) { return initial; }
+    let root = LayoutNode::new();
+    root.set_display(Display::Grid);
+    root.set_gap(gap, Gutter::Column);
+    root.set_grid_style(GridStyle { columns: initial.clone(), ..Default::default() });
+    let cells: Vec<_> = columns.iter().map(|_| { let node = LayoutNode::new(); root.add_child(&node); node }).collect();
+    root.calculate_layout(width, None, Direction::Ltr);
+    columns.iter().zip(cells).flat_map(|(column, cell)| {
+        let count = if let GridColumn::Adaptive { minimum, .. } = column.sizing() {
+            let minimum = GridTrackResolver::finite_nonnegative(*minimum).max(1.0);
+            ((cell.frame().width + gap) / (minimum + gap)).floor().max(1.0).min(32767.0) as usize
+        } else { 1 };
+        std::iter::repeat_n(native_track(column).into(), count)
+    }).collect()
 }
 
 /// Places each direct child in one cell. Use `LazyGrid` for large collections.

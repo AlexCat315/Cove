@@ -7,9 +7,12 @@
 mod custom;
 mod engine;
 mod style;
+mod value;
+mod grid;
+pub use grid::*;
 
 pub use custom::{CustomLayoutState, CustomMeasure, CustomPlace};
-pub use style::{LayoutInsets, LayoutStyle, LayoutStyleValue, StyleBorder, StyleEdges};
+pub use style::{LayoutCalc, LayoutInsets, LayoutStyle, LayoutStyleValue, StyleBorder, StyleEdges};
 
 use super::{
     Align, BoxSizing, Direction, Display, Edge, FlexDirection, Gutter, Justify, Overflow,
@@ -28,6 +31,8 @@ pub enum MeasureMode {
     /// No constraint.
     #[default]
     Undefined,
+    /// Intrinsic size with every soft wrapping opportunity taken.
+    MinContent,
     /// Must be exactly this size.
     Exactly,
     /// Up to this size.
@@ -216,12 +221,12 @@ impl LayoutNode {
     // MARK: - Style
 
     pub fn style(&self) -> LayoutStyle {
-        self.data().style
+        self.data().style.clone()
     }
     fn update_style(&self, change: impl FnOnce(&mut LayoutStyle)) {
         let changed = {
             let mut data = self.data_mut();
-            let before = data.style;
+            let before = data.style.clone();
             change(&mut data.style);
             data.style != before
         };
@@ -230,6 +235,19 @@ impl LayoutNode {
             self.mark_layout_dirty_hint();
         }
     }
+    /// Update authored styles and invalidate the affected layout path.
+    pub fn edit_style(&self, change: impl FnOnce(&mut LayoutStyle)) { self.update_style(change); }
+    pub fn set_grid_style(&self, grid: GridStyle) { self.update_style(|style| style.grid = grid); }
+    pub fn set_width_value(&self, value: LayoutStyleValue) { self.update_style(|style| style.width = value); }
+    pub fn set_height_value(&self, value: LayoutStyleValue) { self.update_style(|style| style.height = value); }
+    pub fn set_min_width_value(&self, value: LayoutStyleValue) { self.update_style(|style| style.min_width = value); }
+    pub fn set_max_width_value(&self, value: LayoutStyleValue) { self.update_style(|style| style.max_width = value); }
+    pub fn set_min_height_value(&self, value: LayoutStyleValue) { self.update_style(|style| style.min_height = value); }
+    pub fn set_max_height_value(&self, value: LayoutStyleValue) { self.update_style(|style| style.max_height = value); }
+    pub fn set_flex_basis_value(&self, value: LayoutStyleValue) { self.update_style(|style| style.flex_basis = value); }
+    pub fn set_padding_value(&self, value: LayoutStyleValue, edge: Edge) { self.update_style(|style| style.padding.set(edge, value)); }
+    pub fn set_margin_value(&self, value: LayoutStyleValue, edge: Edge) { self.update_style(|style| style.margin.set(edge, value)); }
+    pub fn set_position_value(&self, value: LayoutStyleValue, edge: Edge) { self.update_style(|style| style.position.set(edge, value)); }
     pub fn direction(&self) -> Direction {
         self.data().style.direction
     }
@@ -351,28 +369,28 @@ impl LayoutNode {
         self.update_style(|style| style.height = LayoutStyleValue::Percent(value));
     }
     pub fn min_width(&self) -> Option<f32> {
-        self.data().style.min_width
+        self.data().style.min_width.points()
     }
     pub fn set_min_width(&self, value: Option<f32>) {
-        self.update_style(|style| style.min_width = value);
+        self.update_style(|style| style.min_width = value.map_or(LayoutStyleValue::Auto, LayoutStyleValue::Points));
     }
     pub fn max_width(&self) -> Option<f32> {
-        self.data().style.max_width
+        self.data().style.max_width.points()
     }
     pub fn set_max_width(&self, value: Option<f32>) {
-        self.update_style(|style| style.max_width = value);
+        self.update_style(|style| style.max_width = value.map_or(LayoutStyleValue::Auto, LayoutStyleValue::Points));
     }
     pub fn min_height(&self) -> Option<f32> {
-        self.data().style.min_height
+        self.data().style.min_height.points()
     }
     pub fn set_min_height(&self, value: Option<f32>) {
-        self.update_style(|style| style.min_height = value);
+        self.update_style(|style| style.min_height = value.map_or(LayoutStyleValue::Auto, LayoutStyleValue::Points));
     }
     pub fn max_height(&self) -> Option<f32> {
-        self.data().style.max_height
+        self.data().style.max_height.points()
     }
     pub fn set_max_height(&self, value: Option<f32>) {
-        self.update_style(|style| style.max_height = value);
+        self.update_style(|style| style.max_height = value.map_or(LayoutStyleValue::Auto, LayoutStyleValue::Points));
     }
     /// A transient layout floor, independent of authored minimum constraints.
     ///
@@ -437,7 +455,7 @@ impl LayoutNode {
     pub fn set_gap_percent(&self, value: f32, gutter: Gutter) {
         self.set_gap_value(LayoutStyleValue::Percent(value), gutter);
     }
-    fn set_gap_value(&self, value: LayoutStyleValue, gutter: Gutter) {
+    pub fn set_gap_value(&self, value: LayoutStyleValue, gutter: Gutter) {
         self.update_style(|style| match gutter {
             Gutter::Row => style.gap_row = value,
             Gutter::Column => style.gap_column = value,

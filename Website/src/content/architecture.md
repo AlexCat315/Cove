@@ -38,7 +38,7 @@ Cove 采用清晰的分层架构，把跨平台差异收敛到最底层，向上
 `Sources`、`Portable` 与 `Text` 共同构成 UI 层：
 
 - 声明式视图与视图组合（`CoveUI` / `CoveUICompose`）
-- 基于 Yoga 的 Flexbox 布局
+- 基于 Taffy 的 Flexbox 布局
 - FreeType 光栅化 + HarfBuzz 文本塑形
 - 图像管线：GPU 生产的图像通过 `TextureImage` 进入绘制与资源持有流程
 - 离屏视图通过 `OffscreenView` 返回绘制快照

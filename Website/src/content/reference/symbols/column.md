@@ -7,4 +7,4 @@ Column(alignment: .leading, spacing: 8) {
 }
 ```
 
-`alignment` 默认为 `.leading`，写入 Yoga 的 `alignItems`。需要主轴分布、换行或反向排列时改用 `Box`。
+`alignment` 默认为 `.leading`，写入 Taffy 的 `alignItems`。需要主轴分布、换行或反向排列时改用 `Box`。

@@ -4,6 +4,8 @@ pub mod adaptive;
 mod any_view;
 mod around_applying_modifier;
 mod box_view;
+mod css_grid;
+pub use css_grid::*;
 mod composition_local_provider;
 mod identified_view;
 pub mod layout;

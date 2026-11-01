@@ -29,11 +29,11 @@ try Application.run(config: ApplicationConfiguration(title: "Greeting")) {
 
 `View` 只要求一个 `body`。`body` 由 `ViewGraph` 读取并物化为节点，应用代码不应直接调用它。
 
-原始视图（`Text`、`Box`、`ScrollView` 等）遵循 `_PrimitiveView`，直接产出节点与 Yoga 布局节点；组合视图只负责拼装子视图。
+原始视图（`Text`、`Box`、`ScrollView` 等）遵循 `_PrimitiveView`，直接产出节点与 Taffy 布局节点；组合视图只负责拼装子视图。
 
 ## 布局
 
-布局由 Yoga 的 flexbox 实现。`Box` 暴露 `direction`、`alignItems`、`justifyContent`、`wrap` 与 `spacing`，`Row` 与 `Column` 是固定方向的薄封装。尺寸与伸缩通过修饰符表达：
+布局由 Taffy 的 flexbox 实现。`Box` 暴露 `direction`、`alignItems`、`justifyContent`、`wrap` 与 `spacing`，`Row` 与 `Column` 是固定方向的薄封装。尺寸与伸缩通过修饰符表达：
 
 ```swift
 Row(spacing: 12) {

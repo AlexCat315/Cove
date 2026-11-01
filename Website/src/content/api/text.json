@@ -809,7 +809,7 @@
   "name": "Text",
   "kind": "struct",
   "declaration": "public struct Text: _PrimitiveView",
-  "abstract": "Static text primitive. Participates in flexbox layout via Yoga's measure callback so a label sized by its parent will wrap; an unconstrained label reports its natural single-line width.",
+  "abstract": "Static text primitive. Participates in flexbox layout via Taffy's measure callback so a label sized by its parent will wrap; an unconstrained label reports its natural single-line width.",
   "discussion": [],
   "availability": [],
   "conforms": [

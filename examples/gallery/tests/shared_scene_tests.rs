@@ -1,7 +1,7 @@
 //! Translation of `Examples/Counter/Tests/CounterExampleTests/SharedSceneTests.swift`.
 //!
 //! Behaviour checklist:
-//! - the shared counter mounts on Yoga and keeps its node identities across a
+//! - the shared counter mounts on Taffy and keeps its node identities across a
 //!   state write and a resize
 //! - `counter.value` republishes the new count through its text attachment
 //! - the snapshot's input and render inventories agree, and the invalidation log
@@ -61,7 +61,7 @@ fn same_node(left: &Node, right: &Node) -> bool {
 }
 
 #[test]
-fn shared_compose_uses_yoga_and_retains_nodes_across_state_and_resize() {
+fn shared_compose_uses_taffy_and_retains_nodes_across_state_and_resize() {
     support::GlobalTestLock::with_scheduler(|| {
         support::with_text_environment(|| {
             let counter = CounterView::new();

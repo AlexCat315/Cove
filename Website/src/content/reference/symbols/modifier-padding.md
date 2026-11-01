@@ -11,4 +11,4 @@ Column(spacing: 8) { /* … */ }
 Text("Card").padding(horizontal: 12, vertical: 8)
 ```
 
-内边距写入 Yoga 布局节点，参与布局测量，不影响视图身份。
+内边距写入 Taffy 布局节点，参与布局测量，不影响视图身份。

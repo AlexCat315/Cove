@@ -1,5 +1,7 @@
 //! Layout modifiers for padding, flex, absolute positioning and frames.
 pub mod frame_capture;
+mod values;
+pub use values::*;
 pub use frame_capture::*;
 
 use crate::{ModifiedContent, View, ViewExt, ViewModifier};
@@ -186,18 +188,8 @@ impl ViewModifier for AbsolutePositionModifier {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum FrameDimension {
-    Points(f32),
-    Percent(f32),
-    Auto,
-}
-#[derive(Clone, Copy, Debug, PartialEq)]
-enum FrameDimensionSpec {
-    Points(f32),
-    Percent(f32),
-    Auto,
-}
+pub use cove_core::scene::LayoutStyleValue as FrameDimension;
+type FrameDimensionSpec = FrameDimension;
 
 const FRAME_WIDTH_KEY: &str = "__layout.frame.width";
 const FRAME_HEIGHT_KEY: &str = "__layout.frame.height";
@@ -235,27 +227,13 @@ impl FrameModifier {
         }
     }
 
-    fn spec(value: FrameDimension) -> FrameDimensionSpec {
-        match value {
-            FrameDimension::Points(value) => FrameDimensionSpec::Points(value),
-            FrameDimension::Percent(value) => FrameDimensionSpec::Percent(value),
-            FrameDimension::Auto => FrameDimensionSpec::Auto,
-        }
-    }
+    fn spec(value: FrameDimension) -> FrameDimensionSpec { value }
     fn apply_width(spec: FrameDimensionSpec, layout: &LayoutNode) {
-        match spec {
-            FrameDimensionSpec::Auto => layout.set_width(None),
-            FrameDimensionSpec::Points(value) => layout.set_width(Some(value)),
-            FrameDimensionSpec::Percent(value) => layout.set_width_percent(value),
-        }
+        layout.set_width_value(spec);
         layout.set_attachment(FRAME_WIDTH_ATTACHMENT, spec);
     }
     fn apply_height(spec: FrameDimensionSpec, layout: &LayoutNode) {
-        match spec {
-            FrameDimensionSpec::Auto => layout.set_height(None),
-            FrameDimensionSpec::Points(value) => layout.set_height(Some(value)),
-            FrameDimensionSpec::Percent(value) => layout.set_height_percent(value),
-        }
+        layout.set_height_value(spec);
         layout.set_attachment(FRAME_HEIGHT_ATTACHMENT, spec);
     }
     fn current_width(layout: &LayoutNode) -> FrameDimensionSpec {

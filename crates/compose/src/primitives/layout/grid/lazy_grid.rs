@@ -425,10 +425,12 @@ impl PrimitiveView for LazyGridFixedHeight {
     fn make_layout_node(&self) -> Option<LayoutNode> {
         let layout = LayoutNode::new();
         layout.set_height(Some(self.height));
+        layout.set_width_percent(100.0);
         Some(layout)
     }
     fn update_layout(&self, layout: &LayoutNode) {
         layout.set_height(Some(self.height));
+        layout.set_width_percent(100.0);
     }
     fn children(&self, _node: &cove_core::scene::Node) -> Vec<AnyView> {
         vec![self.content.clone()]

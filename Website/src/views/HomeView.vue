@@ -40,7 +40,7 @@ const features = [
   {
     icon: 'M12 3v18M3 12h18',
     title: '弹性布局引擎',
-    desc: '基于 Yoga 的 Flexbox 布局，跨平台像素级一致，从手表到桌面从容伸缩。',
+    desc: '基于 Taffy 的 Flexbox 布局，跨平台像素级一致，从手表到桌面从容伸缩。',
   },
   {
     icon: 'M4 4h16v12H4zM2 20h20',

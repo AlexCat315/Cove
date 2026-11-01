@@ -47,7 +47,7 @@ Composition anchors without a flex layout box reject non-null padding edits.
 {"selectedID":"17","hoveredID":"18","picking":true,"canUndo":true,"canRedo":false,"overrideCount":1}
 ```
 
-Node summaries include optional `layout` with Yoga-resolved padding/margin/border,
+Node summaries include optional `layout` with Taffy-resolved padding/margin/border,
 content width/height, flex direction/alignment/justification/grow/shrink, and
 optional `style` with effective background/inherited foreground hex colors and
 the names of overridden properties. Missing colors mean transparent or inherited
@@ -67,7 +67,7 @@ the selected gesture's release before app handlers or recording. Escape cancels.
 The native Inspector can pick directly in the app window on all supported desktop
 platforms; mirror picking requires the existing macOS ImageIO mirror capability.
 
-Overrides live separately from authored node/Yoga styles. Recomposition and app
+Overrides live separately from authored node/Taffy styles. Recomposition and app
 style writes keep updating the underlying values; clear/undo reveals the latest
 app value, including authored percentage and logical/RTL padding. Removing a node
 clears its overrides; history never recreates nodes. Custom native painters must

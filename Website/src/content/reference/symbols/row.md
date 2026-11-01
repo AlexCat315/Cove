@@ -8,4 +8,4 @@ Row(alignment: .center, spacing: 12) {
 }
 ```
 
-`alignment` 默认为 `.center`，写入 Yoga 的 `alignItems`；`spacing` 大于零时写入 gap。需要反向排列、换行或主轴对齐时改用 `Box`。
+`alignment` 默认为 `.center`，写入 Taffy 的 `alignItems`；`spacing` 大于零时写入 gap。需要反向排列、换行或主轴对齐时改用 `Box`。

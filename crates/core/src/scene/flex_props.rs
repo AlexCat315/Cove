@@ -102,6 +102,7 @@ pub enum Overflow {
 pub enum Display {
     #[default]
     Flex,
+    Grid,
     None,
     Contents,
 }

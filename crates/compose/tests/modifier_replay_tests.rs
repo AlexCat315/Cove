@@ -220,9 +220,10 @@ fn a_width_only_caller_preserves_owned_height_and_auto_clears_the_axis() {
             Default::default(),
         );
 
-        let cases: [(FrameDimension, f32); 3] = [
+        let cases: [(FrameDimension, f32); 4] = [
             (FrameDimension::Points(240.0), 120.0),
             (FrameDimension::Points(240.0), 200.0),
+            (FrameDimension::calc(50.0, -12.0), 140.0),
             (FrameDimension::Auto, 160.0),
         ];
         for (next_width, next_height) in cases {
@@ -247,7 +248,8 @@ fn a_width_only_caller_preserves_owned_height_and_auto_clears_the_axis() {
                     ".auto explicitly clears the axis, width was {}",
                     frame.width
                 ),
-                FrameDimension::Percent(_) => {}
+                FrameDimension::Calc(value) => assert_eq!(frame.width, value.resolve(800.0)),
+                _ => unreachable!("the cases above cover points, calc and auto"),
             }
         }
     });

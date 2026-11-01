@@ -89,7 +89,7 @@ hosts advertise tree, selection, log, timing and configured state providers,
 and omit the unavailable mirror capability.
 
 For a headless connection test, use the `cove_devtools::probe` module
-(`cargo test -p cove-devtools`). It serves a real Node/Yoga diagnostic tree without GPU dependencies.
+(`cargo test -p cove-devtools`). It serves a real Node/Taffy diagnostic tree without GPU dependencies.
 
 ## Pick, inspect layout, edit styles
 
@@ -163,7 +163,7 @@ development network.
 ## Shared Compose and reproducible input
 
 The [Wasm host](../Browser/README.md) and desktop `CoveUIDemo --shared-counter`
-run one Compose source with real ViewGraph, Yoga and input dispatch. Their Inspector
+run one Compose source with real ViewGraph, Taffy and input dispatch. Their Inspector
 supports Capture/Restore/Diff and Record/Stop/Replay. `state.diff` accepts the baseline
 string dictionary and returns `{added, removed, changed: {key: {before, after}}}`.
 The tree invalidation log attributes State writes to their Compose scope.
