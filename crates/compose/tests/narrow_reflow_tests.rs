@@ -26,7 +26,7 @@
 
 mod support;
 
-use cove_composition::{AnyView, View};
+use cove_composition::AnyView;
 use cove_core::scene::{AccessibilityRole, Node};
 use cove_core::{Binding, Environment, InputCapabilities, State};
 use cove_ui_compose::Scancode;

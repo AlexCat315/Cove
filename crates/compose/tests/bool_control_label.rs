@@ -13,7 +13,7 @@ mod support;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use cove_composition::{AnyView, View};
+use cove_composition::AnyView;
 use cove_core::Binding;
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
 use cove_ui_compose::BoxView;
@@ -44,7 +44,7 @@ fn toggle_and_checkbox_expose_label_slot_with_one_control_each() {
                     move |value| set.store(value, Ordering::SeqCst),
                 )
             };
-            let check_binding = {
+            let _check_binding = {
                 let get = checked.clone();
                 let set = checked.clone();
                 Binding::new(

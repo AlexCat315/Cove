@@ -19,7 +19,7 @@ mod support;
 
 use std::rc::Rc;
 
-use cove_composition::{AnyView, TupleView, View, ViewExt};
+use cove_composition::{AnyView, TupleView, View};
 use cove_core::scene::{
     Align, AnimatorScheduler, FlexDirection, FocusChainHolder, InteractionRegistryHolder, Justify,
     Node, PointerCaptureHolder, WindowRevealContext, Wrap,

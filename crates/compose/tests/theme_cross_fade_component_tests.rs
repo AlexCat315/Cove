@@ -29,7 +29,7 @@
 
 mod support;
 
-use cove_composition::{AnyView, DynamicField, View, ViewExt};
+use cove_composition::{AnyView, DynamicField, View};
 use cove_core::State;
 use cove_core::scene::{Animation, AnimationCurve, AnimatorScheduler, Node};
 use cove_ui_compose::modifiers::animation_value::AnimationValueExt;

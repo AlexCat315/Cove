@@ -44,7 +44,7 @@ use std::rc::Rc;
 use cove_composition::layout::LayoutDirectionExt as _;
 use cove_composition::layout::{Layout, LayoutContainer, LayoutSubview, ProposedViewSize};
 use cove_composition::{
-    AnyView, Column, LayoutDebugExt, Row, TupleView, VerticalAlignment, View, ViewExt, ViewGraph,
+    AnyView, Column, LayoutDebugExt, Row, TupleView, VerticalAlignment, ViewExt, ViewGraph,
 };
 use cove_core::scene::{Direction, Edge, HitTester, LayoutNode, Node, PlatformInputContext};
 use cove_core::{Point, Rect, Size};

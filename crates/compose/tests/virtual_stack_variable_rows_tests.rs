@@ -33,7 +33,7 @@ mod support;
 
 use std::rc::Rc;
 
-use cove_composition::{AnyView, LayoutDebugExt, View, ViewExt, ViewGraph};
+use cove_composition::{AnyView, LayoutDebugExt, View, ViewGraph};
 use cove_core::State;
 use cove_core::scene::Node;
 use cove_ui_compose::BoxView;

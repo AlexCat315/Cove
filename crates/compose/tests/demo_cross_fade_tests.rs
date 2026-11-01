@@ -12,7 +12,7 @@
 
 mod support;
 
-use cove_composition::{AnyView, View, ViewExt};
+use cove_composition::{AnyView, View};
 use cove_core::State;
 use cove_core::scene::{Animation, AnimatorScheduler, Node};
 use cove_ui_compose::modifiers::animation_value::AnimationValueExt;

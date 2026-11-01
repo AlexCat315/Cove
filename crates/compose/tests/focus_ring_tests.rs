@@ -15,7 +15,7 @@ mod support;
 
 use std::rc::Rc;
 
-use cove_composition::{AnyView, LayoutDebugExt, View};
+use cove_composition::{AnyView, LayoutDebugExt};
 use cove_core::scene::{FocusChain, FocusChainHolder, Node};
 use cove_ui_compose::primitives::controls::button::Button;
 use cove_ui_compose::primitives::controls::fields::range_slider::RangeSlider;

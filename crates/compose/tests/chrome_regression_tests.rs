@@ -12,7 +12,7 @@
 
 mod support;
 
-use cove_composition::{AnyView, View, ViewExt};
+use cove_composition::AnyView;
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
 use cove_core::{Binding, DrawList, Point};
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};

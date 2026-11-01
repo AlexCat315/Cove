@@ -296,7 +296,7 @@ fn windows_keep_independent_images() {
     let first_pixels = read(&device, a.texture, a.width, a.height);
     assert!(
         first_pixels
-            .chunks_exact(4)
+            .as_chunks::<4>().0.iter()
             .all(|pixel| pixel == [0, 0, 255, 255]),
         "the first drawable is uniformly red: {:?}",
         &first_pixels[0..4],
@@ -304,7 +304,7 @@ fn windows_keep_independent_images() {
     let second_pixels = read(&device, b.texture, b.width, b.height);
     assert!(
         second_pixels
-            .chunks_exact(4)
+            .as_chunks::<4>().0.iter()
             .all(|pixel| pixel == [0, 255, 0, 255]),
         "the second drawable is uniformly green: {:?}",
         &second_pixels[0..4],

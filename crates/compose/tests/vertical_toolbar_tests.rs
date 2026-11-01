@@ -44,7 +44,7 @@
 
 mod support;
 
-use cove_composition::{AnyView, View, ViewExt};
+use cove_composition::{AnyView, ViewExt};
 use cove_core::scene::{AccessibilityRole, FocusChainHolder, Node};
 use cove_ui_compose::Scancode;
 use cove_ui_compose::modifiers::interaction::AccessibilityExt;

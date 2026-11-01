@@ -12,7 +12,7 @@
 
 mod support;
 
-use cove_composition::{AnyView, View};
+use cove_composition::AnyView;
 use cove_core::Binding;
 use cove_core::scene::AccessibilityRole;
 use cove_ui_compose::primitives::layout::sidebar::{

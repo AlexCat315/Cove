@@ -123,7 +123,7 @@ fn transient_resolve_preserves_pixels_and_rejects_invalid_targets() {
     };
 
     let mut commands = CommandBuffer::new();
-    commands.render_pass(RenderPassDescriptor::new(vec![resolve.clone()]), |_| {});
+    commands.render_pass(RenderPassDescriptor::new(vec![resolve]), |_| {});
     device.begin_frame().expect("the frame opens");
     device
         .submit(&commands, QueueClass::Graphics, &[], &[], None)
@@ -142,7 +142,7 @@ fn transient_resolve_preserves_pixels_and_rejects_invalid_targets() {
         );
     }
     assert!(
-        pixels.chunks_exact(4).all(|pixel| {
+        pixels.as_chunks::<4>().0.iter().all(|pixel| {
             [64_u8, 128, 191, 255]
                 .into_iter()
                 .enumerate()
@@ -159,24 +159,24 @@ fn transient_resolve_preserves_pixels_and_rejects_invalid_targets() {
 
     let variants: Vec<(&str, RenderColorTarget)> = vec![
         ("wrong size", {
-            let mut target = resolve.clone();
+            let mut target = resolve;
             target.resolve_texture = Some(wrong_size.texture());
             target
         }),
         ("wrong format", {
-            let mut target = resolve.clone();
+            let mut target = resolve;
             target.resolve_texture = Some(wrong_format.texture());
             target
         }),
         ("aliasing the source", {
-            let mut target = resolve.clone();
+            let mut target = resolve;
             target.resolve_texture = Some(source.texture());
             target
         }),
         ("single-sample source claiming a resolve", {
             let mut target = RenderColorTarget {
                 texture: output.texture(),
-                ..resolve.clone()
+                ..resolve
             };
             target.resolve_texture = Some(wrong_format.texture());
             target
@@ -320,7 +320,7 @@ fn hdr_and_depth_resolve() {
 
     let mut commands = CommandBuffer::new();
     commands.render_pass(
-        RenderPassDescriptor::new(vec![color.clone()]).with_depth(
+        RenderPassDescriptor::new(vec![color]).with_depth(
             RenderDepthTarget::new(depth.texture())
                 .with_load_action(DepthLoadAction::Clear(0.75))
                 .without_store(),
@@ -347,14 +347,14 @@ fn hdr_and_depth_resolve() {
             &mut bytes,
         )
         .expect("the HDR resolve destination reads back");
-    for (index, chunk) in bytes.chunks_exact(2).enumerate() {
+    for (index, chunk) in bytes.as_chunks::<2>().0.iter().enumerate() {
         bits[index] = u16::from_le_bytes([chunk[0], chunk[1]]);
     }
 
     // IEEE-754 binary16 bit patterns for 0.25, 2, 4 and 0.5 — the values Swift
     // compared against `Float16(...).bitPattern`.
     let expected = [0x3400u16, 0x4000, 0x4400, 0x3800];
-    for pixel in bits.chunks_exact(4) {
+    for pixel in bits.as_chunks::<4>().0 {
         assert_eq!(
             pixel, expected,
             "every resolved pixel carries the cleared HDR colour exactly"

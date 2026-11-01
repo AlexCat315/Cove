@@ -19,7 +19,7 @@
 
 mod support;
 
-use cove_composition::{AnyView, View};
+use cove_composition::AnyView;
 use cove_core::scene::Node;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::primitives::feedback::StatusTone;

@@ -25,7 +25,7 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use cove_composition::layout::LayoutDirectionExt;
-use cove_composition::{AnyView, LayoutDebugExt, Scancode, View};
+use cove_composition::{AnyView, LayoutDebugExt, Scancode};
 use cove_core::scene::{AccessibilityRole, Direction, EventDispatcher, Node, PlatformInputContext};
 use cove_core::{Environment, InputCapabilities};
 use cove_platform::{InputEvent, KeyEvent, KeyModifiers, MouseButton, MouseButtonEvent, WindowId};
@@ -38,9 +38,9 @@ use cove_ui_compose::primitives::controls::toolbar::{ToolbarItem, ToolbarItemPla
 use cove_ui_compose::primitives::layout::insets::safe_area::{
     SafeArea, SafeAreaEdges, safe_area_insets,
 };
-use cove_ui_compose::primitives::media::ui_icon_catalog::{action, navigation};
+use cove_ui_compose::primitives::media::ui_icon_catalog::action;
 use cove_ui_compose::primitives::overlays::menu::MenuItem;
-use cove_ui_compose::primitives::overlays::portal::{LayerRoot, PortalStore, PortalStoreAmbient};
+use cove_ui_compose::primitives::overlays::portal::{PortalStore, PortalStoreAmbient};
 use cove_ui_compose::theme::TextScalerViewExt;
 use cove_ui_compose::theme::tokens::ReducedMotionViewExt;
 use cove_ui_compose::theme::{Theme, ThemeViewExt};
@@ -365,7 +365,7 @@ fn three_widths_keep_commands_and_fit_the_title() {
                             "the bar fills its allocation ({context_label})"
                         );
 
-                        if width == 390.0 && scale == 1.0 && !dark {}
+                        
                         let visible: Vec<Node> = nodes_of(&chrome)
                             .into_iter()
                             .filter(|node| node.is_focusable() && node.accepts_subtree_input())

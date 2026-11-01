@@ -25,10 +25,10 @@ mod support;
 
 use std::rc::Rc;
 
-use cove_composition::{AnyView, LayoutDebugExt, ViewExt};
+use cove_composition::{AnyView, LayoutDebugExt};
 use cove_core::State;
 use cove_core::scene::{
-    AccessibilityRole, Align, EventPhase, EventResult, FlexDirection, FocusChainHolder,
+    Align, EventPhase, EventResult, FlexDirection,
     InteractionRegistry, InteractionRegistryHolder, Justify, Node, Wrap,
 };
 use cove_platform::{KeyEvent, KeyModifiers};

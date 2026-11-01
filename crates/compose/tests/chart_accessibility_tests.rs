@@ -236,7 +236,7 @@ fn a_chart_reads_one_value_at_a_time() {
     // accessibility actions.
     GlobalTestLock::locked(|| {
         support::with_test_text_environment(|| {
-            use cove_composition::{AnyView, View};
+            use cove_composition::AnyView;
             use cove_ui_compose::modifiers::layout::LayoutFrameExt;
             use cove_ui_compose::primitives::data::chart::model::{ChartConfiguration, ChartStyle};
             use cove_ui_compose::primitives::data::chart::plot::ChartGuides;
@@ -332,7 +332,7 @@ fn a_chart_reads_one_value_at_a_time() {
 fn stepping_skips_a_gap() {
     GlobalTestLock::locked(|| {
         support::with_test_text_environment(|| {
-            use cove_composition::{AnyView, View};
+            use cove_composition::AnyView;
             use cove_ui_compose::modifiers::layout::LayoutFrameExt;
             use cove_ui_compose::primitives::data::chart::model::{ChartConfiguration, ChartStyle};
             use cove_ui_compose::primitives::data::chart::plot::ChartGuides;
@@ -408,7 +408,7 @@ fn stepping_skips_a_gap() {
 fn a_pie_reads_one_slice_at_a_time_with_its_share() {
     GlobalTestLock::locked(|| {
         support::with_test_text_environment(|| {
-            use cove_composition::{AnyView, View};
+            use cove_composition::AnyView;
             use cove_ui_compose::modifiers::layout::LayoutFrameExt;
             use cove_ui_compose::primitives::data::chart::model::{ChartConfiguration, ChartStyle};
             use cove_ui_compose::primitives::data::chart::view::Chart;
@@ -472,7 +472,7 @@ fn a_pie_reads_one_slice_at_a_time_with_its_share() {
 fn turning_value_exposure_off_leaves_the_summary_and_offers_no_stepping() {
     GlobalTestLock::locked(|| {
         support::with_test_text_environment(|| {
-            use cove_composition::{AnyView, View};
+            use cove_composition::AnyView;
             use cove_ui_compose::modifiers::layout::LayoutFrameExt;
             use cove_ui_compose::primitives::data::chart::model::{ChartConfiguration, ChartStyle};
             use cove_ui_compose::primitives::data::chart::plot::ChartGuides;
@@ -542,7 +542,7 @@ fn the_first_increment_skips_the_first_point() {
     // every "one ahead" assertion above.
     GlobalTestLock::locked(|| {
         support::with_test_text_environment(|| {
-            use cove_composition::{AnyView, View};
+            use cove_composition::AnyView;
             use cove_ui_compose::modifiers::layout::LayoutFrameExt;
             use cove_ui_compose::primitives::data::chart::model::{ChartConfiguration, ChartStyle};
             use cove_ui_compose::primitives::data::chart::plot::ChartGuides;
@@ -604,7 +604,7 @@ fn the_pie_readout_keeps_the_middle_dot() {
     // value runs into its share.
     GlobalTestLock::locked(|| {
         support::with_test_text_environment(|| {
-            use cove_composition::{AnyView, View};
+            use cove_composition::AnyView;
             use cove_ui_compose::modifiers::layout::LayoutFrameExt;
             use cove_ui_compose::primitives::data::chart::model::{ChartConfiguration, ChartStyle};
             use cove_ui_compose::primitives::data::chart::view::Chart;

@@ -26,7 +26,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use cove_composition::AnyView;
-use cove_core::scene::Node;
 use cove_core::{Binding, Environment, InputCapabilities};
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;

@@ -495,7 +495,7 @@ fn a_right_axis_series_fits_its_own_scale() {
         );
 
         let single = ChartValueAxes::resolve(
-            &vec![ChartSeries::bar(vec![2.0, 4.0])],
+            &[ChartSeries::bar(vec![2.0, 4.0])],
             &[true],
             &style,
             &ChartGuides::default(),

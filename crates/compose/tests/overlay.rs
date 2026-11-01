@@ -11,7 +11,7 @@ mod support;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cove_composition::{AnyView, LayoutDebugExt, View, ViewExt};
+use cove_composition::{AnyView, LayoutDebugExt};
 use cove_core::scene::{Align, EventDispatcher, FlexDirection, Justify, Node, Wrap};
 use cove_platform::{InputEvent, MouseButton, MouseButtonEvent, WindowId};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
@@ -114,7 +114,7 @@ fn overlay_keeps_the_base_size_and_aligns_its_content() {
 #[test]
 fn overlay_content_receives_pointer_input_before_the_base() {
     GlobalTestLock::locked(|| {
-        let mut scene = support::TestScene::new();
+        let scene = support::TestScene::new();
         let hits: Rc<RefCell<Vec<&'static str>>> = Rc::new(RefCell::new(Vec::new()));
 
         let base_hits = hits.clone();
@@ -162,7 +162,7 @@ fn overlay_content_receives_pointer_input_before_the_base() {
 #[test]
 fn an_overlapping_click_outside_the_overlay_reaches_the_base() {
     GlobalTestLock::locked(|| {
-        let mut scene = support::TestScene::new();
+        let scene = support::TestScene::new();
         let hits: Rc<RefCell<Vec<&'static str>>> = Rc::new(RefCell::new(Vec::new()));
 
         let base_hits = hits.clone();
