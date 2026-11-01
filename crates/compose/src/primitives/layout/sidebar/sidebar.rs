@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use std::rc::Rc;
 
 use crate::modifiers::interaction::AccessibilityExt;
-use crate::modifiers::layout::{FlexExt, PaddingExt};
+use crate::modifiers::layout::{FlexExt, FrameDimension, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{Button, ButtonRole};
 use crate::primitives::overlays::roving_focus::{
@@ -289,6 +289,20 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
                 AnyView::new(self.footer.clone().flex_with(0.0, 0.0, None)),
             ])),
         ));
+        // At rest the edge between navigation and content is the change of
+        // surface; the resize handle draws a line only while grabbed.
+        let rail_width = self.presentation.rail_width();
+        let body = AnyView::new(
+            AnyView::new(body.semantic_background(crate::theme::SemanticColorRef::surface()))
+                .frame(
+                    rail_width.map(FrameDimension::Points),
+                    None,
+                    Some(0.0),
+                    Some(0.0),
+                    None,
+                    None,
+                ),
+        );
         AnyView::new(body.accessibility(|semantics| {
             semantics.role = AccessibilityRole::List;
         }))

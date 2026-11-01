@@ -11,7 +11,7 @@ use cove_hosts::desktop::application::configuration::AppFrameDrivePolicy;
 use cove_hosts::desktop::diagnostics::ApplicationCheckpoint;
 use cove_hosts::{Application, ApplicationCallbacks, ApplicationConfiguration};
 use cove_ui_compose::adaptive::{SurfaceEnvironmentExt, SurfaceReader};
-use cove_ui_compose::theme::Appearance;
+use cove_ui_compose::theme::styles::appearance_modifier::Appearance;
 use cove_ui_compose::theme::tokens::ReducedMotionViewExt;
 
 fn configuration(launch: &ShowcaseLaunch) -> ApplicationConfiguration {
@@ -60,13 +60,16 @@ fn main() -> Result<(), String> {
     let launch = ShowcaseLaunch::new(&arguments);
     let configuration = configuration(&launch);
     if launch.shared_counter {
-        let content = CounterContent::new(CounterView::new());
-        let capture = content.clone();
-        let restore = content.clone();
+        // The counter view shares its state, so the checkpoint and the
+        // rendered content observe the same values.
+        let counter = CounterView::new();
+        let capture = counter.clone();
+        let restore = counter.clone();
         let checkpoint = ApplicationCheckpoint::new(
             move || capture.checkpoint(),
             move |values| restore.restore(values),
         );
+        let content = CounterContent::new(counter);
         return Application::run(
             configuration,
             None,

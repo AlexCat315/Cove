@@ -8,7 +8,7 @@
 
 | 层 | 所有者 | 公开产品 | 职责 | 实现需求 |
 |---|---|---|---|---|
-| L0 | `Core/` | `CoveUICore` | 状态、观察、布局、场景图、动画、DrawList、帧快照与资源持有契约 | 基础值与绘制数据为 Swift；当前场景布局仍依赖 Yoga，见下文 |
+| L0 | `Core/` | `CoveUICore` | 状态、观察、布局、场景图、动画、DrawList、帧快照与资源持有契约 | 布局为 Taffy（纯 Rust），见下文 |
 | L1 | `Text/` | `CoveUIText` | 字体发现、字体实例、整形、字形光栅化、图集、文本环境与缓存 | FreeType、HarfBuzz；平台字体发现/彩色字形适配 |
 | L2 | `Imaging/` | `CoveUIImaging` | 位图/动画解码、矢量栅格化、方向、图片缓存和图片所有权接口 | lunasvg、plutovg、webp、sharpyuv；可选平台格式 |
 | L3 | `Graphics/` | `CoveUIGraphics` | RHI、图形设备/资源、DrawList GPU 渲染、纹理驻留与图集上传 | Metal、D3D12、Vulkan |
@@ -67,11 +67,9 @@ Core + Composition + Text + Inspection ← Browser
 
 部署标签描述完整依赖闭包，而非文件使用的语言。`Compose` 使用 Swift 实现，不意味着使用其完整图片和文本功能时没有原生库依赖。CLI 只选择协议闭包，Browser 原型选择基础组合、检查和 Wasm 字体实现，原生应用选择完整 Runtime。
 
-## Core 的纯 Swift 要求
+## Core 布局
 
-当前 `LayoutNode`、`FlexProps` 和自定义布局仍使用 Yoga。此次迁移保持布局语义和应用 API，将 Yoga 留在 Core 内部，不把这一现状标成「纯 Swift Core」。基础状态、几何和 DrawList target 本身没有原生依赖。
-
-严格实现题设的纯 Swift L0，尚需替换 Yoga 布局实现，或让 Core 定义布局后端契约、由宿主明确注入后端。后者必须覆盖节点所有权、脏标记、约束/百分比/RTL、文字测量、自定义布局的探测与放置，且 Core 自身仍须有可用的 Swift 默认后端；只把 Yoga 改名或放到另一个目录不满足要求。应以现有场景布局测试及 Gallery 几何行为作为替换验收，不能用缺少布局能力的空实现获得「无原生依赖」。
+`LayoutNode`、`FlexProps` 和自定义布局由 `cove-core` 内的 Taffy（纯 Rust）实现，语义沿用 Swift 版的 Yoga：默认列方向、`flex-shrink: 0`、无自动最小尺寸、布局时解析 logical 边。Taffy 通过底层 trait 直接遍历 `LayoutNode` 树，每个节点自带样式、缓存和父节点相对的结果；自定义布局的探测与放置见 `crates/core/src/scene/layout_node/custom.rs`。Core 没有原生布局依赖。
 
 ## 检查与验收
 

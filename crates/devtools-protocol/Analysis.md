@@ -34,7 +34,7 @@ ancestor location in the client.
 
 `count` excludes initial materialisation and counts real body evaluation plus
 reconciliation, including parent-driven updates. Durations use a monotonic clock
-in milliseconds and exclude Yoga layout and rendering. They are inclusive of
+in milliseconds and exclude flex layout and rendering. They are inclusive of
 child work, so summed rows do not represent frame time. Last reasons contain up
 to 16 distinct entries, each with a bounded `kind` (64 characters), optional
 `detail` (160 characters) and optional decimal `originScopeID`. Current kinds:

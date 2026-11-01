@@ -123,7 +123,7 @@ impl PrimitiveView for SidebarLayer {
         if self.geometry.is_modal
             && let (Some(resource), Some(chain)) = (resource.as_ref(), chain.as_ref())
         {
-            resource.bind(node, Some(chain.clone()), true);
+            resource.bind(node, Some(chain.clone()), false);
         }
         let is_modal = self.geometry.is_modal;
         let weak = node.downgrade();

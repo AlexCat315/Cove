@@ -39,7 +39,7 @@ Padding requires all four physical edges in logical points, finite and within
 0…4096. Color syntax is ASCII `#RRGGBB` or `#RRGGBBAA`; transparent colors may use
 alpha `00`. `null` removes that property's override. Omitted properties retain
 their existing overrides. Unsupported properties/unknown keys fail atomically.
-Composition anchors without a Yoga layout box reject non-null padding edits.
+Composition anchors without a flex layout box reject non-null padding edits.
 
 `tree.snapshot` and `tree.delta` include optional `inspection`:
 

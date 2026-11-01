@@ -1081,7 +1081,7 @@ fn install_interaction(
     let layout_node = node.downgrade();
     let layout_observers = view.clone_for_report();
     node.set_layout_did_update(Some(Rc::new(move |owner: &Node| {
-        // Retained responsive panes suppress Yoga layout for the whole subtree.
+        // Retained responsive panes suppress flex layout for the whole subtree.
         // Zero frames are not new scroll geometry: publishing them would clamp
         // the user's saved offset to zero while hidden.
         if is_layout_suppressed(owner) {

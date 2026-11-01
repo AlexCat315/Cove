@@ -40,6 +40,7 @@ repository = "https://github.com/AlexCat315/Cove"
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
 thiserror = "2"
+taffy = { version = "0.15.1", default-features = false, features = ["std", "flexbox"] }
 cc = "1"
 cmake = "0.1"
 cove-native-build = { path = "crates/native-build" }

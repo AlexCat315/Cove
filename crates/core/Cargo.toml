@@ -8,6 +8,7 @@ license.workspace = true
 [dependencies]
 serde.workspace = true
 thiserror.workspace = true
+taffy.workspace = true
 unicode-general-category.workspace = true
 unicode-segmentation.workspace = true
 cove-platform.workspace = true

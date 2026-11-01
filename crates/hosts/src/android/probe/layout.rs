@@ -5,7 +5,7 @@ use cove_core::Rect;
 use cove_core::scene::{FlexDirection, InvalidationSource, LayoutNode, LayoutPass, Node, NodeTree};
 
 impl ProbeContext {
-    /// Verifies the shared scene graph, Yoga layout and the invalidation/reset
+    /// Verifies the shared scene graph, flex layout and the invalidation/reset
     /// contract in one pass.
     pub fn layout(&self) -> Result<String, ProbeFailure> {
         let root = LayoutNode::new();
@@ -29,7 +29,7 @@ impl ProbeContext {
         let (a_frame, b_frame): (Rect, Rect) = (a.frame(), b.frame());
         require(
             a_frame.width == 20.0 && b_frame.x == 20.0 && b_frame.width == 44.0,
-            "Yoga layout mismatch",
+            "flex layout mismatch",
         )?;
 
         let mut nodes = NodeTree::new();
@@ -45,6 +45,6 @@ impl ProbeContext {
             nodes.has_render_updates(),
             "scene invalidation did not propagate",
         )?;
-        Ok("shared CoveUI scene graph, Yoga layout and invalidation/reset verified".to_owned())
+        Ok("shared CoveUI scene graph, flex layout and invalidation/reset verified".to_owned())
     }
 }

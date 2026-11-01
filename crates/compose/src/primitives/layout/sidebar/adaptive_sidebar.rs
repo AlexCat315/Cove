@@ -11,19 +11,29 @@ use crate::adaptive::ContainerSizeReader;
 use crate::animation::content::AnimatedVisibility;
 use crate::animation::transition::Transition;
 use crate::modifiers::interaction::AccessibilityExt;
-use crate::modifiers::layout::PaddingExt;
+use crate::adaptive::SurfaceReader;
+use crate::animation::transition::TransitionEdge;
+use crate::modifiers::layout::{
+    AbsolutePositionModifier, FlexExt, FrameDimension, LayoutFrameExt, PaddingExt,
+};
+use crate::modifiers::style::AppearanceExt;
+use crate::primitives::interaction::horizontal_swipe::{HorizontalSwipe, HorizontalSwipeDirection};
+use crate::primitives::overlays::modal::ModalDismissal;
+use crate::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
+use crate::ViewExt;
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
 use cove_core::Binding;
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
 
 use super::adaptive_hosts::{SidebarBackdrop, SidebarLayer, SidebarShellHost, SidebarTriggerHost};
+use super::resize_handle::SidebarResizeHandle;
 use super::adaptive_options::{AdaptiveSidebarOptions, SidebarGeometry, SidebarMode};
 use super::focus_handoff::SidebarFocusHandoff;
 use super::items::SidebarSection;
 use super::presentation::SidebarToggle;
 use super::sidebar::Sidebar;
 
-#[expect(dead_code, reason = "ported from Swift but not wired in yet")]
+/// Width of the leading strip that starts an opening edge swipe.
 const EDGE_SWIPE_WIDTH: f32 = 24.0;
 
 /// Navigation plus content, switching between docked, rail and drawer.
@@ -101,7 +111,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
         }
     }
 
-    fn geometry(&self, width: f32) -> SidebarGeometry {
+    fn geometry(&self, width: f32, handle_extent: f32) -> SidebarGeometry {
         SidebarGeometry::new(
             width,
             &self.options.layout,
@@ -109,7 +119,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
             self.collapsed(),
             self.width.as_ref().map(|binding| binding.get()),
             &self.options.resizing,
-            7.0,
+            handle_extent,
         )
     }
 
@@ -220,7 +230,11 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
             sidebar = sidebar.expanded(expanded);
         }
 
-        let mut column: Vec<AnyView> = vec![AnyView::new(sidebar)];
+        let mut column: Vec<AnyView> = vec![AnyView::new(
+            AnyView::new(sidebar)
+                .flex_with(1.0, 1.0, Some(0.0))
+                .frame(None, None, Some(0.0), Some(0.0), None, None),
+        )];
         if geometry.mode == SidebarMode::Expanded {
             let collapse = self.collapse.clone();
             let local = self.local_collapse.clone();
@@ -313,6 +327,24 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
         self
     }
 
+    /// Leading navigation chrome above the sections.
+    pub fn header(mut self, header: impl View + 'static) -> Self {
+        self.header = AnyView::new(header);
+        self
+    }
+
+    /// Trailing navigation chrome below the sections.
+    pub fn footer(mut self, footer: impl View + 'static) -> Self {
+        self.footer = AnyView::new(footer);
+        self
+    }
+
+    /// Binds the docked sidebar's collapsed (rail) state.
+    pub fn collapse(mut self, is_collapsed: Binding<bool>) -> Self {
+        self.collapse = Some(is_collapsed);
+        self
+    }
+
     /// Binds the drawer's presented state, so a caller can open it.
     pub fn presentation(mut self, is_presented: Binding<bool>) -> Self {
         self.presentation = Some(is_presented);
@@ -363,6 +395,13 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
         let snapshot = self.snapshot();
         AnyView::new(AdaptiveShell { snapshot })
     }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        vec![
+            cove_composition::DynamicField::state("local_presentation", &self.local_presentation),
+            cove_composition::DynamicField::state("local_collapse", &self.local_collapse),
+        ]
+    }
 }
 
 struct AdaptiveShell<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> {
@@ -386,47 +425,187 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Primi
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
         let snapshot = self.snapshot.clone();
-        vec![AnyView::new(ContainerSizeReader::new(
-            move |size: cove_core::Size| {
-                let width = if size.width > 0.0 { size.width } else { 0.0 };
-                let geometry = snapshot.geometry(width);
-                let navigation = snapshot.navigation(geometry);
-                let dismiss = {
-                    let snapshot = snapshot.clone();
-                    move || snapshot.set_presented(false)
-                };
-                let layer = SidebarLayer::new(
-                    geometry,
-                    snapshot.focus.clone(),
-                    crate::primitives::overlays::modal::ModalDismissal::default(),
-                    dismiss.clone(),
-                    AnyView::new(TupleView::new(vec![
-                        AnyView::new(AnimatedVisibility::new(
-                            geometry.is_modal,
-                            Transition::opacity(),
-                            None,
-                            false,
-                            None,
-                            AnyView::new(SidebarBackdrop::new(
-                                crate::primitives::overlays::modal::ModalDismissal::default(),
-                                dismiss,
-                            )),
-                        )),
-                        AnyView::new(navigation),
-                    ])),
-                );
-                AnyView::new(SidebarShellHost::new(
-                    geometry,
-                    snapshot.focus.clone(),
-                    AnyView::new(TupleView::new(vec![
-                        AnyView::new(snapshot.content.clone()),
-                        AnyView::new(layer),
-                    ])),
-                ))
-            },
-        ))]
+        let shell = SurfaceReader::new(move |surface: &cove_core::Environment| {
+            let snapshot = snapshot.clone();
+            let surface = surface.clone();
+            AnyView::new(ContainerSizeReader::new(move |size: cove_core::Size| {
+                snapshot.shell(size, &surface)
+            }))
+            .flex_with(1.0, 1.0, None)
+        });
+        vec![AnyView::new(AnyView::new(shell).flex_with(1.0, 1.0, None))]
     }
 }
+
+impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> AdaptiveSnapshot<Id> {
+    /// Content beside a docked lane, with the navigation layer absolutely
+    /// positioned inside the lane so a drawer can extend past it.
+    fn shell(&self, size: cove_core::Size, surface: &cove_core::Environment) -> AnyView {
+        let touch = surface.input.contains(cove_core::InputCapabilities::TOUCH);
+        let width = if size.width > 0.0 {
+            size.width
+        } else {
+            surface.viewport.width
+        };
+        let handle = if touch {
+            surface.minimum_control_extent()
+        } else {
+            7.0
+        };
+        let geometry = self.geometry(width, handle);
+        let fill = |view: AnyView| {
+            AnyView::new(
+                view.flex_with(1.0, 1.0, Some(0.0))
+                    .frame(None, None, Some(0.0), Some(0.0), None, None),
+            )
+        };
+
+        let compact_bar = AnyView::new(AnyView::new(AnimatedVisibility::new(
+            geometry.mode == SidebarMode::Compact,
+            Transition::identity(),
+            None,
+            false,
+            None,
+            AnyView::new(
+                BoxView::new(
+                    FlexDirection::Row,
+                    Align::Center,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    0.0,
+                    AnyView::new(SidebarTriggerHost::new(self.focus.clone(), self.open_button())),
+                )
+                .padding_edges(12.0, 4.0)
+                .semantic_background(SemanticColorRef::surface()),
+            ),
+        ))
+        .flex_with(0.0, 0.0, None));
+        let main = fill(AnyView::new(BoxView::new(
+            FlexDirection::Column,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            0.0,
+            AnyView::new(TupleView::new(vec![
+                compact_bar,
+                fill(self.content.clone()),
+            ])),
+        )));
+
+        let mut handle_view = SidebarResizeHandle::new(
+            geometry.resize_range,
+            geometry.viewport_width,
+            geometry.docked_width,
+        )
+        .extent(geometry.resize_handle_width)
+        .label(self.options.resizing.label.clone());
+        if let Some(width) = self.width.clone() {
+            handle_view = handle_view.value(width);
+        }
+
+        let dismiss = {
+            let snapshot = self.clone();
+            move || snapshot.set_presented(false)
+        };
+        let pinned = |view: AnyView, width: f32| {
+            AnyView::new(view.frame(
+                Some(FrameDimension::Points(width)),
+                Some(FrameDimension::Percent(100.0)),
+                None,
+                None,
+                None,
+                None,
+            )
+            .modifier(AbsolutePositionModifier::new(Some(0.0), Some(0.0), None, None)))
+        };
+        let backdrop = pinned(
+            AnyView::new(AnimatedVisibility::new(
+                geometry.is_modal,
+                Transition::opacity(),
+                None,
+                false,
+                None,
+                AnyView::new(SidebarBackdrop::new(ModalDismissal::default(), dismiss.clone())),
+            )),
+            geometry.viewport_width,
+        );
+        let panel = pinned(
+            AnyView::new(AnimatedVisibility::new(
+                geometry.is_visible(),
+                if geometry.mode == SidebarMode::Expanded {
+                    Transition::identity()
+                } else {
+                    Transition::move_edge(TransitionEdge::Leading, geometry.panel_width)
+                },
+                None,
+                false,
+                None,
+                fill(self.navigation(geometry)),
+            )),
+            geometry.panel_width,
+        );
+        let layer = AnyView::new(AnyView::new(SidebarLayer::new(
+            geometry,
+            self.focus.clone(),
+            ModalDismissal::default(),
+            dismiss,
+            AnyView::new(TupleView::new(vec![backdrop, panel])),
+        ))
+        .frame(
+            Some(FrameDimension::Points(geometry.docked_width)),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .flex_with(0.0, 0.0, None)
+        .z_index(100.0));
+
+        let row = fill(AnyView::new(BoxView::new(
+            FlexDirection::RowReverse,
+            Align::Stretch,
+            Justify::FlexStart,
+            Wrap::NoWrap,
+            0.0,
+            AnyView::new(TupleView::new(vec![main, AnyView::new(handle_view), layer])),
+        )));
+
+        let presentation = self.presentation.clone();
+        let local = self.local_presentation.clone();
+        let swipe = HorizontalSwipe::new(
+            move |direction: HorizontalSwipeDirection| {
+                if direction == HorizontalSwipeDirection::Right {
+                    match presentation.as_ref() {
+                        Some(binding) => binding.set(true),
+                        None => local.set(true),
+                    }
+                }
+            },
+            row,
+        )
+        .enabled(
+            self.options.allows_edge_swipe
+                && touch
+                && geometry.mode == SidebarMode::Compact
+                && !geometry.is_modal,
+        )
+        .should_begin(|event, node| {
+            let x = event.x - node.absolute_frame().x;
+            (0.0..EDGE_SWIPE_WIDTH).contains(&x)
+        });
+
+        AnyView::new(
+            AnyView::new(SidebarShellHost::new(
+                geometry,
+                self.focus.clone(),
+                AnyView::new(swipe).flex_with(1.0, 1.0, Some(0.0)),
+            ))
+            .flex_with(1.0, 1.0, Some(0.0)),
+        )
+    }
+}
+
 impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
     for AdaptiveShell<Id>
 {

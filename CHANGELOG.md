@@ -4,6 +4,27 @@
 
 ## Unreleased
 
+- **布局引擎改为 Taffy，布局树重构（2026-11-01，破坏性）**：
+  - `LayoutNode` 改为目录模块（`style`、`engine`、`custom`）。手写 flex 实现替换为 Taffy 0.15 的底层
+    trait，直接挂在 `LayoutNode` 树上：每个节点自带样式、布局缓存和结果，脏标记只清理所在路径，
+    重新布局只访问脏路径。此前没有测量缓存，嵌套测量按深度指数增长。
+  - 与 Yoga 语义对齐：默认列方向、`flex-shrink: 0`、`align-content: flex-start`、无自动最小尺寸、
+    RTL 由引擎镜像；logical `start`/`end` 在布局时按生效方向解析并优先于 `left`/`right`；
+    `StyleEdges::set` 不再接受方向参数。
+  - `LayoutNode::frame()` 改为父节点相对坐标（Yoga 约定），`ViewGraph` 原样写回。此前子节点被放到祖父
+    坐标系、写回时再减去父原点，而自定义布局放置的是局部坐标，两套坐标混用导致侧栏行错位、
+    自定义布局子节点偏移。
+  - 自定义布局按 Swift `CustomLayout.swift` 移植：对 flexbox 是测量叶子，子节点在 flex-start 列式
+    probe 中布局，每个子节点缓存 4 个 proposal，放置在 flex 之后、仅在 bounds 或方向变化时执行。
+  - 最小尺寸下限改存 `LayoutNodeData::minimum_size_floor`（原 `__minimumSizeFloor` attachment）。
+- **修复 gallery 白屏与外壳布局（2026-11-01）**：
+  - `LayerRoot` 改回 Swift 的单节点结构（`[content, portal layer]` 两个子节点）。此前返回双元素
+    `TupleView`，外层修饰符同时作用到 portal 层，背景色把整个窗口盖成白色。
+  - `AdaptiveSidebar` 按 Swift 补全外壳：rowReverse 内容与停靠栏、紧凑模式触发条、调宽手柄、绝对定位
+    的遮罩与导航面板、边缘滑动；新增 `header`、`footer`、`collapse` builder（文档已提到但未实现）。
+  - gallery 外壳按 Swift 使用 `SafeArea`、`LayerRoot`、`AdaptiveSidebar` 与 `.appearance(_, .circular())`；
+    删除只写节点背景、不传递主题的 `WorkspaceAppearanceModifier`。
+
 - **原生依赖改为 Cargo 构建脚本直接编译（2026-11-01，破坏性）**：
   - 新增 `cove-native-build`（`crates/native-build`），用 `cmake` crate 把 `third-party/` 子模块编译进各
     crate 的 `OUT_DIR` 并静态链接，统一处理 macOS/iOS 部署目标、Android NDK、wasi-sdk 与 MSVC 运行时。

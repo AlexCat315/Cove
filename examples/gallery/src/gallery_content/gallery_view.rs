@@ -25,13 +25,16 @@ use cove_ui_compose::primitives::controls::fields::select::{Select, SelectOption
 use cove_ui_compose::primitives::controls::toggle::Checkbox;
 use cove_ui_compose::primitives::layout::responsive::view_that_fits::ViewThatFits;
 use cove_ui_compose::primitives::layout::scroll_view::ScrollView;
+use cove_ui_compose::primitives::layout::insets::SafeArea;
 use cove_ui_compose::primitives::layout::sidebar::{
-    Sidebar, SidebarItem, SidebarPresentation, SidebarSection,
+    AdaptiveSidebar, AdaptiveSidebarOptions, SidebarItem, SidebarSection,
 };
+use cove_ui_compose::primitives::overlays::portal::LayerRoot;
 use cove_ui_compose::primitives::media::ui_icon_catalog as icons;
 use cove_ui_compose::primitives::text::Text;
 use cove_ui_compose::primitives::text::text_buffer::TextBuffer;
-use cove_ui_compose::theme::styles::appearance_modifier::Appearance;
+use cove_ui_compose::theme::styles::appearance_modifier::{Appearance, AppearanceViewExt};
+use cove_ui_compose::theme::styles::circular_appearance::ThemeTransition;
 use cove_ui_compose::theme::styles::buttons::{
     ButtonStyleViewExt, GhostButtonStyle, SecondaryButtonStyle,
 };
@@ -154,55 +157,62 @@ impl GalleryView {
 
 impl View for GalleryView {
     fn body(&self) -> AnyView {
-        let sections = self.navigation_sections();
         let content = GalleryPagePane {
             page: self.page.clone(),
             options: self.options.clone(),
             reset_generation: self.reset_generation.clone(),
             text_scale: self.text_scale.clone(),
         };
-        let header = self.navigation_header();
-        let footer = self.navigation_footer();
-
-        let docked = Sidebar::new(self.selection_binding(), sections.clone())
-            .presentation(SidebarPresentation::Expanded)
-            .header(header.clone())
-            .footer(footer.clone())
-            .minimum_row_height(38.0);
-        let rail = Sidebar::new(self.selection_binding(), sections)
-            .presentation(SidebarPresentation::Rail {
-                shows_labels: false,
-            })
-            .header(self.navigation_header_compact())
-            .footer(self.navigation_footer_compact())
-            .minimum_row_height(38.0);
-
-        let shell = erased(
-            AnyView::new(ViewThatFits::threshold(
-                NAVIGATION_RAIL_THRESHOLD,
-                docked,
-                rail,
-            ))
-            .modifier(GallerySidebarFrame {
-                width: self.navigation_width.get(),
-            })
-            .debug_name("gallery-shell"),
-        );
-        let split = AnyView::new(WorkspaceSplitRow {
-            sidebar: shell,
-            content,
-        })
-        .flex_with(1.0, 1.0, Some(0.0))
-        .frame_min_width(0.0);
-
-        let themed =
-            AnyView::new(cove_ui_compose::primitives::overlays::portal::LayerRoot::new(split))
-                .flex_with(1.0, 1.0, Some(0.0));
-        erased(AnyView::new(themed).modifier(GalleryShellFrame).modifier(
-            WorkspaceAppearanceModifier {
-                appearance: self.appearance.get(),
-            },
+        let mut options = AdaptiveSidebarOptions::default();
+        options.allows_edge_swipe = true;
+        options.layout.shows_rail_labels = false;
+        let navigation = AdaptiveSidebar::new(
+            "CoveUI navigation",
+            self.selection_binding(),
+            self.navigation_sections(),
+        )
+        .presentation(self.navigation_open.binding())
+        .collapse(self.navigation_collapsed.binding())
+        .width(self.navigation_width.binding())
+        .options(options)
+        .header(ViewThatFits::threshold(
+            NAVIGATION_RAIL_THRESHOLD,
+            self.navigation_header(),
+            self.navigation_header_compact(),
         ))
+        .footer(ViewThatFits::threshold(
+            NAVIGATION_RAIL_THRESHOLD,
+            self.navigation_footer(),
+            self.navigation_footer_compact(),
+        ))
+        .content(content);
+        let shell = AnyView::new(navigation)
+            .flex_with(1.0, 1.0, Some(0.0))
+            .frame(None, None, None, Some(0.0), None, None)
+            .debug_name("gallery-shell");
+        let root = AnyView::new(SafeArea::all(LayerRoot::new(shell)))
+            .flex_with(1.0, 1.0, Some(0.0))
+            .modifier(GalleryShellFrame)
+            // The app background paints behind the system bars; the window is
+            // white, the sidebar carries the surface fill, and the cards carry
+            // their own edge.
+            .semantic_background(SemanticColorRef::background());
+        erased(AnyView::new(root).appearance(self.appearance.get(), ThemeTransition::circular()))
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        use cove_composition::DynamicField;
+        vec![
+            DynamicField::state("page", &self.page),
+            DynamicField::state("search", &self.search),
+            DynamicField::state("appearance", &self.appearance),
+            DynamicField::state("options", &self.options),
+            DynamicField::state("reset_generation", &self.reset_generation),
+            DynamicField::state("text_scale", &self.text_scale),
+            DynamicField::state("navigation_open", &self.navigation_open),
+            DynamicField::state("navigation_collapsed", &self.navigation_collapsed),
+            DynamicField::state("navigation_width", &self.navigation_width),
+        ]
     }
 }
 
@@ -396,23 +406,6 @@ impl cove_composition::ViewModifier for GalleryShellFrame {
         layout.set_height_percent(100.0);
         layout.set_min_width(Some(0.0));
         layout.set_min_height(Some(0.0));
-    }
-}
-
-/// `.appearance(...)` on the shell: swaps the theme for the whole subtree.
-struct WorkspaceAppearanceModifier {
-    appearance: Appearance,
-}
-
-impl cove_composition::ViewModifier for WorkspaceAppearanceModifier {
-    fn apply_node(&self, node: &Node) {
-        let theme = self.appearance.theme();
-        node.set_background_color(Some(theme.colors.background));
-        node.set_attachment(
-            LayoutDebugAttachmentKey::LAYOUT_ROLE,
-            "gallery-shell".to_owned(),
-        );
-        node.set_composition_value(&cove_ui_compose::theme::ThemeEnvironment::key(), theme);
     }
 }
 

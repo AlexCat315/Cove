@@ -38,31 +38,7 @@ impl LayerRoot {
     }
 }
 
-impl View for LayerRoot {
-    fn body(&self) -> AnyView {
-        let content = AnyView::new(LayerRootContent {
-            content: self.content.clone(),
-        });
-        let portals = AnyView::new(
-            AnyView::new(PortalLayer {
-                content: self.portals.clone(),
-            })
-            .z_index(PORTAL_LAYER_Z_INDEX),
-        );
-        AnyView::new(cove_composition::TupleView::new(vec![content, portals]))
-    }
-
-    fn tag(&self) -> &'static str {
-        std::any::type_name::<Self>()
-    }
-}
-
-/// The ordinary-content half of the root: a stretching column.
-struct LayerRootContent {
-    content: AnyView,
-}
-
-impl PrimitiveView for LayerRootContent {
+impl PrimitiveView for LayerRoot {
     fn make_node(&self) -> Node {
         let node = Node::new();
         node.set_is_hit_testable(false);
@@ -86,11 +62,21 @@ impl PrimitiveView for LayerRootContent {
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
-        vec![self.content.clone()]
+        // Portal layer must always win hit-test priority over any sibling
+        // content (title bars, panels).
+        vec![
+            self.content.clone(),
+            AnyView::new(
+                AnyView::new(PortalLayer {
+                    content: self.portals.clone(),
+                })
+                .z_index(PORTAL_LAYER_Z_INDEX),
+            ),
+        ]
     }
 }
 
-impl_primitive_view!(LayerRootContent);
+impl_primitive_view!(LayerRoot);
 
 /// The portal half: absolutely positioned over the whole root.
 struct PortalLayer {

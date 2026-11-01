@@ -191,7 +191,7 @@ without reading values. Check individual fields to watch their current summaries
 or filter to the selected component. Custom hosts can register providers on
 `graph.stateRegistry`. Registration follows component lifetime.
 
-**Record timeline** captures actual component/commit, Yoga layout and draw-list
+**Record timeline** captures actual component/commit, flex layout and draw-list
 CPU spans. Filter stages, click a component span to inspect it, then stop and
 **Export trace** for a Chrome/Perfetto-compatible JSON capture. The web client
 subscribes automatically via **Auto trace** while connected; the recorder

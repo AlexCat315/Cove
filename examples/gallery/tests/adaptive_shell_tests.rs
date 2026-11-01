@@ -10,18 +10,13 @@
 //!   closes the drawer and the theme toggles update in both shells
 //!
 //! Named differences (GAP assertions):
-//! - Page switch: `GalleryView::select_page` writes state the mounted view does
-//!   not observe, so the Button page stays mounted (Swift switches to Slider and
-//!   marks `sidebar-item-slider` selected). `current_page()` does report Slider.
+//! - Page switch: Swift marks `sidebar-item-slider` selected; Rust emits no
+//!   `sidebar-item-*` names.
 //! - Recomposition metrics: no `GalleryView` view tag and no
 //!   `SidebarDestination` nodes exist, so the per-row recomposition count Swift
 //!   measured (>80 rows, ≤3 changed) cannot be observed.
 //! - Toolbar names: `gallery-size`, `gallery-text-scale`, `gallery-reset` and
 //!   `sidebar-item-*` are never emitted.
-//! - Reflow: the Rust shell has no compact or rail form; the docked 240pt
-//!   sidebar stays at every width, so `gallery-content` starts at x=240 (Swift:
-//!   0 / 56 / 247) and there is no "Open navigation" control, so the compact
-//!   and rail navigation session is unreachable.
 
 mod support;
 
@@ -112,9 +107,8 @@ fn page_switch_isolation() {
             "the toolbar survives the page switch"
         );
         assert!(
-            scene.named("button-0").is_some() && scene.named("slider-0").is_none(),
-            "GAP: Swift mounts the Slider story after select_page; the Rust shell does \
-             not observe the write and keeps the Button story"
+            scene.named("slider-0").is_some() && scene.named("button-0").is_none(),
+            "select_page mounts the Slider story"
         );
         assert!(
             scene.named("sidebar-item-slider").is_none(),
@@ -143,19 +137,18 @@ fn reflow() {
                 content.height > 250.0,
                 "the content pane keeps its height at {width}"
             );
+            let inset = if width < 600.0 {
+                0.0
+            } else if width < 1000.0 {
+                56.0
+            } else {
+                247.0
+            };
             assert_eq!(
-                content.x,
-                240.0,
-                "GAP: Swift insets the content by {} at width {width}; the Rust shell keeps \
-                 its docked 240pt sidebar at every width",
-                if width < 600.0 {
-                    0.0
-                } else if width < 1000.0 {
-                    56.0
-                } else {
-                    247.0
-                }
+                content.x, inset,
+                "the compact, rail or docked sidebar insets the content at {width}"
             );
+            assert!(content.x + content.width <= width + 0.5);
             let toolbar = scene.require_named("gallery-toolbar").absolute_frame();
             assert!(
                 toolbar.y + toolbar.height <= content.y + 0.5,
@@ -176,19 +169,23 @@ fn navigation_session() {
     scene(|_, scene| {
         let search = control(scene, "Search components…");
         settle_at(scene, 390.0);
-        assert!(
-            control(scene, "Open navigation").is_none(),
-            "GAP: Swift's compact shell offers an \"Open navigation\" control; Rust has no \
-             compact shell, so the drawer session cannot open"
-        );
+        let open = control(scene, "Open navigation").expect("the compact shell offers navigation");
+        scene.click(&open);
+        settle_at(scene, 390.0);
+        assert!(scene.focus.has_modal_scope(), "the drawer opens as a modal scope");
         assert!(
             search.is_some() && scene.named("gallery-search").is_some(),
             "the search field stays mounted"
         );
-        assert!(!scene.focus.has_modal_scope());
+        settle_at(scene, 1280.0);
         assert!(
-            scene.named("gallery-theme-rail").is_some(),
-            "the rail theme control is mounted"
+            !scene.focus.has_modal_scope(),
+            "the docked shell has no modal scope"
+        );
+        settle_at(scene, 720.0);
+        assert!(
+            scene.focus.has_modal_scope(),
+            "the open navigation session survives the expanded interval"
         );
     });
 }
