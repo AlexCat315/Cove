@@ -295,100 +295,95 @@ fn the_placement_playground_keeps_its_trigger_inside_the_story() {
     use cove_ui_compose::theme::TextScalerViewExt;
     use cove_ui_compose::theme::tokens::TextScaler;
 
-    support::with_text_environment(|| {
-        support::GlobalTestLock::with_scheduler(|| {
-            for width in [300.0f32, 390.0, 720.0] {
-                for scale in [1.0f32, 2.0] {
-                    let story = std::rc::Rc::new(PlacementExample::new(GalleryOptions::default()));
-                    let mounted = story.clone();
-                    let section_width = width;
-                    GalleryScene::run(
-                        width,
-                        1000.0,
-                        move |_| {
-                            AnyView::new(
-                                AnyView::new(PlacementStory(mounted))
-                                    .frame(
-                                        Some(FrameDimension::Points(section_width)),
-                                        None,
-                                        None,
-                                        None,
-                                        None,
-                                        None,
-                                    )
-                                    .text_scaler(TextScaler::new(scale)),
+    // `GalleryScene::run` takes the global lock and installs the text
+    // environment itself; wrapping it in `with_scheduler` again deadlocks.
+    for width in [300.0f32, 390.0, 720.0] {
+        for scale in [1.0f32, 2.0] {
+            let story = std::rc::Rc::new(PlacementExample::new(GalleryOptions::default()));
+            let mounted = story.clone();
+            let section_width = width;
+            GalleryScene::run(
+                width,
+                1000.0,
+                move |_| {
+                    AnyView::new(
+                        AnyView::new(PlacementStory(mounted))
+                            .frame(
+                                Some(FrameDimension::Points(section_width)),
+                                None,
+                                None,
+                                None,
+                                None,
+                                None,
                             )
-                        },
-                        |scene| {
-                            scene.settle_n(8);
-                            let section = scene
-                                .graph
-                                .layout_snapshot()
-                                .into_iter()
-                                .find(|entry| {
-                                    entry
-                                        .debug_name
-                                        .as_deref()
-                                        .is_some_and(|name| name.starts_with("story-section-"))
-                                })
-                                .unwrap_or_else(|| {
-                                    panic!("no story section at width {width} scale {scale}")
-                                });
-                            let section_frame = section.absolute_frame;
-                            assert!(
-                                section_frame.width > 0.0 && section_frame.height > 0.0,
-                                "the section has a real box at width {width}"
-                            );
-
-                            let trigger = scene
-                                .all(|node| {
-                                    node.accessibility().is_some_and(|semantics| {
-                                        semantics.role
-                                            == cove_core::scene::AccessibilityRole::Button
-                                            && !semantics.label.is_empty()
-                                    })
-                                })
-                                .into_iter()
-                                .next()
-                                .unwrap_or_else(|| {
-                                    panic!("no labelled trigger at width {width} scale {scale}")
-                                });
-                            let frame = trigger.absolute_frame();
-                            assert!(
-                                frame.x >= section_frame.x - 1.0
-                                    && frame.y >= section_frame.y - 1.0
-                                    && frame.x + frame.width
-                                        <= section_frame.x + section_frame.width + 1.0,
-                                "the trigger {frame:?} escapes its section {section_frame:?} \
-                                 at width {width} scale {scale}"
-                            );
-
-                            for index in 0..VARIANTS.len() {
-                                let trigger = scene
-                                    .all(|node| {
-                                        node.accessibility().is_some_and(|semantics| {
-                                            semantics.role
-                                                == cove_core::scene::AccessibilityRole::Button
-                                                && !semantics.label.is_empty()
-                                        })
-                                    })
-                                    .into_iter()
-                                    .next()
-                                    .expect("trigger");
-                                scene.click(&trigger);
-                                scene.settle_n(2);
-                                assert_eq!(
-                                    story.selected(),
-                                    (index + 1) % VARIANTS.len(),
-                                    "the trigger cycles to the next placement"
-                                );
-                            }
-                        },
+                            .text_scaler(TextScaler::new(scale)),
+                    )
+                },
+                |scene| {
+                    scene.settle_n(8);
+                    let section = scene
+                        .graph
+                        .layout_snapshot()
+                        .into_iter()
+                        .find(|entry| {
+                            entry
+                                .debug_name
+                                .as_deref()
+                                .is_some_and(|name| name.starts_with("story-section-"))
+                        })
+                        .unwrap_or_else(|| {
+                            panic!("no story section at width {width} scale {scale}")
+                        });
+                    let section_frame = section.absolute_frame;
+                    assert!(
+                        section_frame.width > 0.0 && section_frame.height > 0.0,
+                        "the section has a real box at width {width}"
                     );
-                }
-            }
-        });
-    });
+
+                    let trigger = scene
+                        .all(|node| {
+                            node.accessibility().is_some_and(|semantics| {
+                                semantics.role == cove_core::scene::AccessibilityRole::Button
+                                    && !semantics.label.is_empty()
+                            })
+                        })
+                        .into_iter()
+                        .next()
+                        .unwrap_or_else(|| {
+                            panic!("no labelled trigger at width {width} scale {scale}")
+                        });
+                    let frame = trigger.absolute_frame();
+                    assert!(
+                        frame.x >= section_frame.x - 1.0
+                            && frame.y >= section_frame.y - 1.0
+                            && frame.x + frame.width <= section_frame.x + section_frame.width + 1.0,
+                        "the trigger {frame:?} escapes its section {section_frame:?} \
+                         at width {width} scale {scale}"
+                    );
+
+                    for index in 0..VARIANTS.len() {
+                        let trigger = scene
+                            .all(|node| {
+                                node.accessibility().is_some_and(|semantics| {
+                                    semantics.role == cove_core::scene::AccessibilityRole::Button
+                                        && !semantics.label.is_empty()
+                                })
+                            })
+                            .into_iter()
+                            .next()
+                            .expect("trigger");
+                        scene.click(&trigger);
+                        scene.settle_n(2);
+                        assert_eq!(
+                            story.selected(),
+                            (index + 1) % VARIANTS.len(),
+                            "the trigger cycles to the next placement"
+                        );
+                    }
+                },
+            );
+        }
+    }
 }
 
 /// Shares the placement story's state with the test body.
