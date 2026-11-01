@@ -51,7 +51,10 @@ fn main() {
     let status = build
         .status()
         .unwrap_or_else(|error| panic!("could not run zig to build libghostty-vt: {error}"));
-    assert!(status.success(), "zig build of libghostty-vt failed: {build:?}");
+    assert!(
+        status.success(),
+        "zig build of libghostty-vt failed: {build:?}"
+    );
 
     println!("cargo:include={}", source.join("include").display());
     println!(

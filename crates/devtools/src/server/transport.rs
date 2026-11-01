@@ -322,9 +322,7 @@ fn handshake(mut stream: TcpStream, access_token: Option<&str>) -> Option<Arc<St
 }
 
 fn respond_forbidden(stream: &mut TcpStream) -> io::Result<()> {
-    stream.write_all(
-        b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
-    )
+    stream.write_all(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
 }
 
 /// Read frames until the peer closes. Fragments are reassembled with a total

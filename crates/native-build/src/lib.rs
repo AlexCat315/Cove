@@ -81,11 +81,7 @@ fn apple_arch() -> &'static str {
 
 /// A CMake build of `source` into `OUT_DIR/<name>`, configured for the target.
 pub fn cmake(name: &str, source: &Path) -> cmake::Config {
-    for variable in [
-        "ANDROID_NDK_HOME",
-        "ANDROID_NDK_ROOT",
-        "COVE_WASI_SDK_PATH",
-    ] {
+    for variable in ["ANDROID_NDK_HOME", "ANDROID_NDK_ROOT", "COVE_WASI_SDK_PATH"] {
         println!("cargo:rerun-if-env-changed={variable}");
     }
     let target = target();

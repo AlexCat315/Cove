@@ -359,13 +359,9 @@ mod tests {
     #[test]
     fn writes_request_heads_with_owned_framing() {
         let url = Url::parse("http://a.test:8080/p?q").unwrap();
-        let headers: Headers = [
-            ("Host", "evil"),
-            ("X-Key", "1"),
-            ("Accept", "text/plain"),
-        ]
-        .into_iter()
-        .collect();
+        let headers: Headers = [("Host", "evil"), ("X-Key", "1"), ("Accept", "text/plain")]
+            .into_iter()
+            .collect();
         let head = String::from_utf8(request_head("POST", &url, &headers, 3, "T/1")).unwrap();
         assert_eq!(
             head,

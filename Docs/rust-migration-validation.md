@@ -16,6 +16,10 @@
 
 最终目录验证进行中。原目录基线完成编译并运行了 754 个通过的用例后，主动停止以进行目录迁移；该轮不是全量通过结论。
 
+原生依赖构建（2026-11-01，macOS arm64 主机）：`cove-text`、`cove-shell`、`cove-imaging`、`cove-terminal`
+从 `third-party/` 子模块编译通过，四个 crate 的测试全部通过；`aarch64-linux-android`（NDK r30）与
+`aarch64-apple-ios-sim` 交叉编译通过（仅 rlib，未链接 APK/应用，未上设备）。Windows、Linux 未在本机验证。
+
 ## 已知限制
 
 测试目标存在、通过本机测试和达到 Swift 行为等价是三个不同的结论。既有测试中存在明确记录的 `GAP` / `Named differences`：例如自适应侧栏的布局、模态焦点及动画，Table/DataTable 的字号缩放，富文本选择及编辑行为。测试固定这些差异，不代表差异已经修复。

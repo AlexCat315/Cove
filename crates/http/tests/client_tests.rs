@@ -89,9 +89,7 @@ fn posts_a_body_and_reads_headers() {
     assert_eq!(response.bytes(1024).unwrap(), br#"{"ok":true}"#);
     let received = requests.recv().unwrap();
     assert!(
-        received
-            .head
-            .starts_with("POST /v1/items?x=1 HTTP/1.1\r\n"),
+        received.head.starts_with("POST /v1/items?x=1 HTTP/1.1\r\n"),
         "{}",
         received.head
     );
@@ -178,8 +176,7 @@ fn returns_the_redirect_when_following_is_off() {
 #[test]
 fn enforces_body_limits() {
     let (base, _requests) = serve(vec![
-        b"HTTP/1.1 200 OK\r\nContent-Length: 10\r\nConnection: close\r\n\r\n0123456789"
-            .to_vec(),
+        b"HTTP/1.1 200 OK\r\nContent-Length: 10\r\nConnection: close\r\n\r\n0123456789".to_vec(),
         b"HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n0123456789".to_vec(),
     ]);
     let response = client().send(Request::get(format!("{base}/a"))).unwrap();
