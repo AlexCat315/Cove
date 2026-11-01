@@ -4,6 +4,7 @@
 //! (`MasonryStory`, `MasonrySample`) and the grid sections of
 //! `GalleryContent/Stories/Layout/FoundationExamples.swift`.
 
+use cove_composition::Scope;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{State, TextScale};
 use cove_ui_compose::modifiers::layout::{LayoutFrameExt, PaddingExt};
@@ -65,7 +66,7 @@ impl MasonryStory {
 }
 
 impl View for MasonryStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
         let add = {
             let extra = self.extra_cards.clone();
@@ -144,7 +145,7 @@ struct MasonryCards {
 }
 
 impl View for MasonryCards {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(cove_ui_compose::TupleView::new(
             (0..self.count)
                 .map(|index| AnyView::new(MasonryCard { index }))
@@ -159,7 +160,7 @@ struct MasonryCard {
 }
 
 impl View for MasonryCard {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let height = masonry_height(self.index);
         // Even cards use `surface`, odd use `surfaceVariant`.
         let fill = if self.index.is_multiple_of(2) {
@@ -210,7 +211,7 @@ impl View for MasonryCard {
 pub struct MasonrySample;
 
 impl View for MasonrySample {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(
             Masonry::new(
                 220.0,
@@ -240,7 +241,7 @@ struct MasonrySampleCard {
 }
 
 impl View for MasonrySampleCard {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let fill = if self.index.is_multiple_of(2) {
             SemanticColorRef::surface()
         } else {
@@ -283,7 +284,7 @@ impl LayoutGridStory {
 }
 
 impl View for LayoutGridStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
         // Fixed 100pt, then two flexible tracks with a 120pt minimum.
         let measured = AnyView::new(
@@ -390,7 +391,7 @@ impl GridCell {
 }
 
 impl View for GridCell {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(
             BoxView::new(
                 FlexDirection::Column,
@@ -417,7 +418,7 @@ impl View for GridCell {
 pub struct LazyGridStory;
 
 impl View for LazyGridStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         // 100,000 cells in 4 fixed-height columns.
         let dense = AnyView::new(
             LazyGrid::new(
@@ -496,7 +497,7 @@ impl LazyCell {
 }
 
 impl View for LazyCell {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(
             Text::new(self.label.clone())
                 .padding(8.0)

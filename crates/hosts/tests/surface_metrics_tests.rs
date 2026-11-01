@@ -23,6 +23,7 @@
 //!   an open keyboard leaves the content bounds unchanged; Swift re-resolved
 //!   the padding on every `updateSurface`.
 
+use cove_composition::Scope;
 use cove_composition::adaptive::SurfaceReader;
 use cove_composition::{AnyView, LayoutDebugExt, TupleView, View};
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
@@ -64,7 +65,7 @@ fn marker(name: &str) -> AnyView {
 }
 
 impl View for MetricsProbe {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(SurfaceReader::new(move |surface: &Environment| {
             let keyboard = surface.keyboard.height;
             let factor = surface.text_scale.factor();

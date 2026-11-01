@@ -1,3 +1,4 @@
+use crate::Scope;
 use crate::{AnyView, View};
 use std::rc::Rc;
 #[derive(Clone)]
@@ -14,7 +15,7 @@ impl<K> MemoizedView<K> {
     }
 }
 impl<K: PartialEq + 'static> View for MemoizedView<K> {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         (self.content)()
     }
     fn same_inputs(&self, other: &dyn View) -> bool {

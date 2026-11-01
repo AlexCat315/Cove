@@ -32,6 +32,7 @@
 //! - The Rust `Sidebar` leaves its first `ScrollView` mounted as a zero-height
 //!   orphan after the first recomposition; `live_nodes` skips it.
 
+use cove_composition::Scope;
 mod support;
 
 use cove_composition::{AnyView, DynamicField, Scancode, TupleView, View};
@@ -88,7 +89,7 @@ impl SidebarScene {
 }
 
 impl View for SidebarScene {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let icons = self.icons.get();
         let icon =
             |item: SidebarItem<String>, resource| if icons { item.icon(resource) } else { item };
@@ -145,7 +146,7 @@ struct SlotScene {
 }
 
 impl View for SlotScene {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let row = |spacing: f32, children: Vec<AnyView>| {
             BoxView::new(
                 FlexDirection::Row,

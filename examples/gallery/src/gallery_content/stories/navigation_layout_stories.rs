@@ -7,6 +7,7 @@
 //! measurable behaviour (rail width, label visibility, disabled-item skipping and
 //! badge preservation) lives here as plain data the tests can assert against.
 
+use cove_composition::Scope;
 use cove_core::State;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
@@ -158,7 +159,7 @@ impl DrawerStory {
 }
 
 impl View for DrawerStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
         let open_state = self.is_open.clone();
         let label = Text::new("Browse destinations without losing the current workspace.");
@@ -217,6 +218,10 @@ impl View for DrawerStory {
 
     fn tag(&self) -> &'static str {
         "DrawerStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; is_open, selection, closes_on_selection, allows_swipe)
     }
 }
 
@@ -306,7 +311,7 @@ impl RailStory {
 }
 
 impl View for RailStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let labels = Text::new("Show labels")
             .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption());
         let rows = AnyView::new(BoxView::new(
@@ -333,5 +338,9 @@ impl View for RailStory {
 
     fn tag(&self) -> &'static str {
         "RailStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; selection, shows_labels)
     }
 }

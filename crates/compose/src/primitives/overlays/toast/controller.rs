@@ -5,6 +5,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use cove_core::Signal;
+
 use crate::primitives::feedback::StatusTone;
 use crate::theme::styles::buttons::ButtonRole;
 
@@ -145,10 +147,18 @@ struct ToastSession {
     is_paused: bool,
 }
 
-/// Window/application-owned toast queue.
+/// Window/application-owned toast queue. Reading the visible notifications
+/// subscribes the reader; every queue change invalidates it.
 pub struct ToastController {
     pub max_visible: usize,
     sessions: RefCell<Vec<ToastSession>>,
+    changed: Signal<()>,
+}
+
+impl Drop for ToastController {
+    fn drop(&mut self) {
+        self.changed.dispose();
+    }
 }
 
 impl ToastController {
@@ -156,10 +166,12 @@ impl ToastController {
         Rc::new(Self {
             max_visible: max_visible.max(1),
             sessions: RefCell::new(Vec::new()),
+            changed: Signal::detached(()),
         })
     }
 
     pub fn notifications(&self) -> Vec<ToastNotification> {
+        self.changed.track();
         self.sessions
             .borrow()
             .iter()
@@ -169,6 +181,7 @@ impl ToastController {
     }
 
     pub fn queued_count(&self) -> usize {
+        self.changed.track();
         self.sessions
             .borrow()
             .len()
@@ -191,29 +204,47 @@ impl ToastController {
             notification,
             is_paused: false,
         };
-        let mut sessions = self.sessions.borrow_mut();
-        match sessions
-            .iter()
-            .position(|existing| existing.notification.id == session.notification.id)
         {
-            Some(index) => sessions[index] = session,
-            None => sessions.push(session),
+            let mut sessions = self.sessions.borrow_mut();
+            match sessions
+                .iter()
+                .position(|existing| existing.notification.id == session.notification.id)
+            {
+                Some(index) => sessions[index] = session,
+                None => sessions.push(session),
+            }
         }
+        self.changed.notify();
     }
 
     pub fn dismiss(&self, id: &str) {
-        let mut sessions = self.sessions.borrow_mut();
-        sessions.retain(|session| session.notification.id != id);
+        let removed = {
+            let mut sessions = self.sessions.borrow_mut();
+            let before = sessions.len();
+            sessions.retain(|session| session.notification.id != id);
+            sessions.len() != before
+        };
+        if removed {
+            self.changed.notify();
+        }
     }
 
     pub fn set_paused(&self, paused: bool, id: &str) {
-        let mut sessions = self.sessions.borrow_mut();
-        if let Some(session) = sessions
-            .iter_mut()
-            .find(|session| session.notification.id == id)
-            && session.is_paused != paused
-        {
-            session.is_paused = paused;
+        let changed = {
+            let mut sessions = self.sessions.borrow_mut();
+            match sessions
+                .iter_mut()
+                .find(|session| session.notification.id == id)
+            {
+                Some(session) if session.is_paused != paused => {
+                    session.is_paused = paused;
+                    true
+                }
+                _ => false,
+            }
+        };
+        if changed {
+            self.changed.notify();
         }
     }
 
@@ -223,6 +254,7 @@ impl ToastController {
             return;
         }
         let mut sessions = self.sessions.borrow_mut();
+        let previous_count = sessions.len();
         let visible: Vec<String> = sessions
             .iter()
             .take(self.max_visible)
@@ -241,9 +273,18 @@ impl ToastController {
                 && !session.is_paused
                 && visible.contains(&session.notification.id))
         });
+        let expired = sessions.len() != previous_count;
+        drop(sessions);
+        if expired {
+            self.changed.notify();
+        }
     }
 
     pub fn clear(&self) {
+        let had_any = !self.sessions.borrow().is_empty();
         self.sessions.borrow_mut().clear();
+        if had_any {
+            self.changed.notify();
+        }
     }
 }

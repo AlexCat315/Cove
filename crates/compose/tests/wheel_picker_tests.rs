@@ -34,6 +34,7 @@
 //!   220pt-wide wheel; the Rust wheel column is 68pt wide, fixed by
 //!   `TimePicker`, so only the height is comparable.
 
+use cove_composition::Scope;
 mod support;
 
 use cove_composition::{AnyView, View};
@@ -149,7 +150,7 @@ struct Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let options = TimePickerOptions {
             hour_cycle: TimeHourCycle::TwentyFour,
             minute_step: 60,

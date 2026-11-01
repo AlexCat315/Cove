@@ -7,6 +7,7 @@
 //! classifications already exist as pure functions on `cove_core::Viewport`, so
 //! this module ports the reporting logic and keeps the view a thin wrapper.
 
+use cove_composition::Scope;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{Environment, Idiom, Orientation, SizeClass};
 use cove_ui_compose::adaptive::SurfaceReader;
@@ -133,7 +134,7 @@ impl Default for ViewportTraitsStory {
 }
 
 impl View for ViewportTraitsStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(SurfaceReader::new(|surface: &Environment| {
             let traits = ViewportTraits::new(surface);
             let line = |text: String, name: &'static str| {

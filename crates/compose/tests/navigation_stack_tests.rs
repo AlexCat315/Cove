@@ -25,6 +25,7 @@
 //!   path change is therefore accepted.
 //!   `mid_transition_path_changes_are_accepted_not_rejected` pins that.
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::RefCell;
@@ -66,7 +67,7 @@ impl Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let path = path_binding(&self.path);
         let path_for_back = self.path.clone();
         let root_count = self.root_count.clone();

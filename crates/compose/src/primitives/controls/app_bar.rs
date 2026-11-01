@@ -2,6 +2,7 @@
 //!
 //! A bounded application header. The host owns safe-area insets; the bar owns a
 //! full-name heading, back action and at most one/three inline commands.
+use crate::Scope;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -184,7 +185,7 @@ fn has_unique_ids(primary: Option<&ToolbarItem>, actions: &[ToolbarItem]) -> boo
 }
 
 impl View for AppBar {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let bar = self.snapshot();
         // Container size decides compactness, so the whole bar rebuilds when the
         // allocation crosses the breakpoint.

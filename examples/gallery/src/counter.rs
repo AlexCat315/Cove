@@ -7,6 +7,7 @@
 //! stores a plain [`CounterTextRun`] attachment and leaves painting to a
 //! [`CounterText::painter`] supplied by the host through a composition local.
 
+use cove_composition::Scope;
 use cove_core::scene::{
     Align, CompositionLocal, EventPhase, EventResult, FlexDirection, FocusChainHolder, HoverPhase,
     InputHandlerRoute, InteractionRegistryHolder, Justify, LayoutNode, Node, PointerCaptureHolder,
@@ -196,7 +197,7 @@ impl Default for CounterView {
 }
 
 impl View for CounterView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let dark = self.dark.clone();
         let foreground = if dark.get() {
             Color::from_rgba8(241, 245, 249, 255)

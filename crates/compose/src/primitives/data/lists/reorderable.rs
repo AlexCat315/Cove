@@ -19,6 +19,7 @@
 //!   capture and focus survive auto-scrolling
 //! - the dragged row stays as a dimmed placeholder while the lifted copy follows
 
+use crate::Scope;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -326,7 +327,7 @@ where
     Id: Eq + std::hash::Hash + Clone + Send + Sync + 'static,
     RowContent: Fn(&Item, bool) -> AnyView + 'static,
 {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         self.publish();
         let row_height = self.row_height;
         let row_spacing = self.row_spacing;

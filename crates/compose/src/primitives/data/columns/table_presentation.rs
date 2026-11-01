@@ -10,6 +10,7 @@
 //! - the picker model is only built when at least one column is optional; an
 //!   all-required table shows no affordance
 //! - the content receives the resolved plan and grows into the remaining space
+use crate::Scope;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
 
@@ -138,7 +139,7 @@ impl<Record: 'static> TableColumns<Record> {
 }
 
 impl<Record: 'static> View for TableColumns<Record> {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let columns = self.columns.clone();
         let widths = self.widths.clone();
         let overrides = self.overrides.clone();

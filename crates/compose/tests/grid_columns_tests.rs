@@ -42,6 +42,7 @@
 //! - The Rust `Popover` trigger is a plain labelled text node, not a focusable
 //!   control, so `owned_popup` clicks the node carrying the trigger label.
 
+use cove_composition::Scope;
 #[allow(dead_code)]
 mod support;
 
@@ -112,7 +113,7 @@ struct Counter {
 }
 
 impl View for Counter {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let label = format!("{} {}", self.title, self.count.get());
         let count = self.count.clone();
         AnyView::new(
@@ -131,7 +132,7 @@ struct DraftField {
 }
 
 impl View for DraftField {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let draft = self.draft.clone();
         AnyView::new(TextField::new(
             "Notes draft",
@@ -152,7 +153,7 @@ struct CellPopup {
 }
 
 impl View for CellPopup {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let open = self.open.clone();
         let presented = Binding::new(
             {
@@ -219,7 +220,7 @@ impl Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let mut content: Vec<AnyView> = vec![AnyView::new(
             Button::title("Open one", || {}).accessibility_label("Open one"),
         )];

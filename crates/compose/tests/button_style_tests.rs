@@ -14,6 +14,7 @@
 //! - the toggle style pairs an accent fill with an on-accent foreground when
 //!   selected, and paints no fill when unselected
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::RefCell;
@@ -476,7 +477,7 @@ struct StatefulStyleHarness {
 }
 
 impl View for StatefulStyleHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let active = self.active.get();
         let toggle = self.active.clone();
         AnyView::new(

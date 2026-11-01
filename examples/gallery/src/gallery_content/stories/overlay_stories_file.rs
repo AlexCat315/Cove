@@ -8,6 +8,7 @@
 //! 100-command scroll case) and tab closing, where the fallback must pick the
 //! nearest remaining tab rather than jumping to the first.
 
+use cove_composition::Scope;
 use cove_core::State;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
@@ -201,7 +202,7 @@ impl MenuStory {
 }
 
 impl View for MenuStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let status = Text::new(self.status())
             .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
             .semantic_foreground(SemanticColorRef::on_surface_muted());
@@ -214,6 +215,10 @@ impl View for MenuStory {
 
     fn tag(&self) -> &'static str {
         "MenuStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; status, checked)
     }
 }
 
@@ -256,7 +261,7 @@ impl PopoverStory {
 }
 
 impl View for PopoverStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let caption = Text::new(format!("Name: {}", self.name()))
             .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
             .semantic_foreground(SemanticColorRef::on_surface_muted());
@@ -269,6 +274,10 @@ impl View for PopoverStory {
 
     fn tag(&self) -> &'static str {
         "PopoverStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; is_open, name)
     }
 }
 
@@ -319,7 +328,7 @@ impl ModalStory {
 }
 
 impl View for ModalStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let status = Text::new(self.status())
             .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
             .semantic_foreground(SemanticColorRef::on_surface_muted());
@@ -332,6 +341,10 @@ impl View for ModalStory {
 
     fn tag(&self) -> &'static str {
         "ModalStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; is_open, status, name)
     }
 }
 
@@ -371,7 +384,7 @@ impl DisclosureStory {
 }
 
 impl View for DisclosureStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(StorySection::new(
             "Collapsible content",
             "Expansion is caller-owned, so search and Expand All can control it.",
@@ -384,6 +397,10 @@ impl View for DisclosureStory {
 
     fn tag(&self) -> &'static str {
         "DisclosureStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; is_expanded, draft)
     }
 }
 
@@ -506,7 +523,7 @@ impl TabsStory {
 }
 
 impl View for TabsStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let caption = Text::new(format!("Active tab: {}", self.selection()))
             .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
             .semantic_foreground(SemanticColorRef::on_surface_muted());
@@ -519,5 +536,9 @@ impl View for TabsStory {
 
     fn tag(&self) -> &'static str {
         "TabsStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; selection, segment, documents, document_selection)
     }
 }

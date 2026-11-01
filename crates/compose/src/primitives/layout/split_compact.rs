@@ -1,6 +1,7 @@
 //! Translation of Primitives/Layout/Split/Compact.swift.
 //!
 //! Opt-in single-pane presentation for a split that has room for only one pane.
+use crate::Scope;
 use std::rc::Rc;
 
 use cove_composition::{AnyView, View};
@@ -84,7 +85,7 @@ impl SplitPaneSelector {
 }
 
 impl View for SplitPaneSelector {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let presentation = self.presentation.clone();
         let selection = self.selection.clone();
 

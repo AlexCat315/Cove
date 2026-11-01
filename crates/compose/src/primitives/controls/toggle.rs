@@ -2,6 +2,7 @@
 //!
 //! Boolean on/off controls: a switch track with a movable thumb, and a check box
 //! that additionally reports a mixed state for partially selected collections.
+use crate::Scope;
 use std::rc::Rc;
 
 use crate::modifiers::layout::LayoutFrameExt;
@@ -111,7 +112,7 @@ impl Toggle {
 }
 
 impl View for Toggle {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let control = AnyView::new(BoolControlHost {
             is_on: self.is_on.clone(),
             is_enabled: self.is_enabled,
@@ -188,7 +189,7 @@ impl Checkbox {
 }
 
 impl View for Checkbox {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let mixed = self.state.get() == CheckboxState::Mixed;
         let is_on = Binding::new(
             {

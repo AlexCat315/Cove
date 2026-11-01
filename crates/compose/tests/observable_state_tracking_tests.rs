@@ -34,6 +34,7 @@
 //!   the remaining dependency-replacement cases use direct body reads, which
 //!   Rust does track.
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::{Cell, RefCell};
@@ -135,7 +136,7 @@ struct ObservedValueView {
 }
 
 impl View for ObservedValueView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         bump(&self.counter);
         AnyView::new(Probe {
             value: self.store.value(),
@@ -149,7 +150,7 @@ struct ReaderObservedValueView {
 }
 
 impl View for ReaderObservedValueView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         bump(&self.counter);
         let store = self.store.clone();
         AnyView::new(ThemeReader::new(move |_theme: &Theme| Probe {
@@ -164,7 +165,7 @@ struct ConditionalObservedValueView {
 }
 
 impl View for ConditionalObservedValueView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         bump(&self.counter);
         let value = if self.store.should_read() {
             self.store.value()
@@ -181,7 +182,7 @@ struct ObservedOtherValueView {
 }
 
 impl View for ObservedOtherValueView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         bump(&self.counter);
         AnyView::new(Probe {
             value: self.store.other_value(),
@@ -196,7 +197,7 @@ struct TwoObservedValuesView {
 }
 
 impl View for TwoObservedValuesView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(Row::new(
             VerticalAlignment::Center,
             0.0,
@@ -267,7 +268,7 @@ impl ObservedObjectLeaf {
 }
 
 impl View for ObservedObjectLeaf {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(Probe {
             value: self.observed.get(),
         })
@@ -285,7 +286,7 @@ struct ObservedRebuildHarness {
 }
 
 impl View for ObservedRebuildHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let _ = self.tick.get();
         AnyView::new(ObservedObjectLeaf::new(self.object.clone()))
     }
@@ -302,7 +303,7 @@ struct ConditionalObservedHarness {
 }
 
 impl View for ConditionalObservedHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         if self.is_visible.get() {
             AnyView::new(ObservedObjectLeaf::new(self.object.clone()))
         } else {

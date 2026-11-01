@@ -16,6 +16,7 @@
 //! - Escape closes an open row; reduced motion snaps without animating
 //! - a click inside the row selects it; Escape and selection live on the row
 
+use crate::Scope;
 use std::rc::Rc;
 
 use crate::adaptive::SurfaceEnvironment;
@@ -36,7 +37,7 @@ use cove_core::scene::{
     EventResult, FlexDirection, HoverPhase, InputHandlerRoute, InteractionRegistryHolder, Justify,
     LayoutNode, Node, PointerCaptureAttachmentKey, PointerCaptureHolder, PointerPhase, Wrap,
 };
-use cove_core::{Binding, Environment, InputCapabilities, State};
+use cove_core::{Binding, Environment, InputCapabilities, Signal, State};
 use cove_platform::{KeyEvent, MouseButton, SystemCursor};
 
 /// One trailing action on a `SwipeList` row.
@@ -235,7 +236,7 @@ where
     Id: Ord + Clone + Send + Sync + 'static,
     RowContent: Fn(&Item, bool) -> AnyView + 'static,
 {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let total_height: f32 = {
             let count = self.data.len() as f32;
             (count * (self.row_height + self.row_spacing) - self.row_spacing).max(0.0)
@@ -354,6 +355,10 @@ where
             }
         }))
     }
+
+    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
+        crate::dynamic_fields!(self; cursor)
+    }
 }
 
 /// Row content plus the swipe reveal. Reveal state lives in the view so
@@ -375,12 +380,12 @@ impl SwipeRow {
 }
 
 impl View for SwipeRow {
-    fn body(&self) -> AnyView {
+    fn body(&self, cx: &Scope) -> AnyView {
         let actions = self.visible_actions().to_vec();
         let max_reveal = swipe_action_extent(1000.0, actions.len()) * actions.len() as f32;
         let row_height = self.row_height;
         let is_enabled = self.is_enabled;
-        let reveal = State::new(0.0_f32);
+        let reveal = cx.state(|| 0.0_f32);
 
         let actions_menu: Rc<dyn Fn() -> Vec<MenuEntry>> = {
             let actions = self.actions.clone();
@@ -527,7 +532,7 @@ struct SwipeRowHost {
     is_enabled: bool,
     row_height: f32,
     max_reveal: f32,
-    reveal: State<f32>,
+    reveal: Signal<f32>,
     on_select: Rc<dyn Fn()>,
     content: AnyView,
     action_row: Option<AnyView>,
@@ -657,6 +662,17 @@ impl PrimitiveView for SwipeRowHost {
                             pointer_node.set_attachment(SWIPE_BASE, pointer_reveal.get());
                             pointer_node.set_attachment(SWIPE_ACTIVE, false);
                             pointer_node.set_attachment(SWIPE_REJECTED, false);
+                            // Keep motion on the row instead of its ancestor's
+                            // long-press host; vertical scrolling may still take
+                            // over this tentative capture.
+                            if pointer_node
+                                .composition_value(&crate::adaptive::SurfaceEnvironment::key())
+                                .input
+                                .contains(InputCapabilities::TOUCH)
+                                && let Some(capture) = PointerCaptureHolder::current()
+                            {
+                                capture.acquire(&pointer_node, true);
+                            }
                             EventResult::Ignored
                         }
                         PointerPhase::Up => {

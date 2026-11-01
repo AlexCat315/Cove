@@ -20,6 +20,7 @@
 //! `Option` (Swift's `decodeIfPresent`), and `Recomposer::invalidate_tracked`
 //! takes an explicit animation argument rather than reading an ambient one.
 
+use cove_composition::Scope;
 mod support;
 
 use std::collections::HashSet;
@@ -76,7 +77,7 @@ impl View for DiagnosticLeaf {
 struct BoxedLeaf;
 
 impl View for BoxedLeaf {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(BoxView::new(
             FlexDirection::Column,
             Align::Stretch,
@@ -92,7 +93,7 @@ impl View for BoxedLeaf {
 struct ConcreteLeafBody;
 
 impl View for ConcreteLeafBody {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(DiagnosticLeaf::new("leaf"))
     }
 }

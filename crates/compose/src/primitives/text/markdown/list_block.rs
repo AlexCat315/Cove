@@ -3,6 +3,7 @@
 //! Bulleted, numbered and task lists. Markers sit in a fixed-width gutter on the
 //! first line of their item, so wrapped lines and nested blocks align to the
 //! item text rather than to the marker.
+use crate::Scope;
 use std::rc::Rc;
 
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
@@ -63,7 +64,7 @@ impl MarkdownListView {
 }
 
 impl View for MarkdownListView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let gutter = self.gutter();
         let start = self.list.start.unwrap_or(1);
         let depth = self.depth;

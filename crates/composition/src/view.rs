@@ -1,5 +1,5 @@
 use crate::{
-    AnyView, DynamicField, PrimitiveView, identified_view::IdentifiedView,
+    AnyView, DynamicField, PrimitiveView, Scope, identified_view::IdentifiedView,
     modified_content_materialise::AnyModifiedContent, source_location::SourceLocatedView,
 };
 use std::any::Any;
@@ -21,8 +21,12 @@ pub enum ViewKind<'a> {
     Source(&'a SourceLocatedView),
 }
 /// A value description of UI. Primitive and structural views are handled through kind().
+///
+/// `body` receives the view's composition [`Scope`]: state created with
+/// `cx.state` lives as long as this view keeps its place in the tree, and every
+/// signal the body reads subscribes the scope to recomposition.
 pub trait View: AsAny {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         panic!("this view is materialized directly through ViewGraph")
     }
     fn kind(&self) -> ViewKind<'_> {

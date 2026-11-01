@@ -4,6 +4,7 @@
 //! counterpart). The roster content and its row primitives are complete so the
 //! trigger can be hosted by whichever overlay primitive lands; `AvatarMemberListTrigger`
 //! exposes `content()` for that host.
+use crate::Scope;
 use std::cell::Cell;
 use std::rc::Rc;
 
@@ -93,7 +94,7 @@ impl AvatarMemberListTrigger {
     }
 }
 impl View for AvatarMemberListTrigger {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         // Popover is unresolved; the marker remains the visual/accessible
         // trigger and content() is the complete popover body.
         AnyView::new(self.marker.clone())

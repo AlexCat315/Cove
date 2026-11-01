@@ -24,6 +24,7 @@
 //! environment per density without disturbing the caller's — is what is
 //! asserted here, alongside the surface facts the suite is about.
 
+use cove_composition::Scope;
 use cove_composition::{AnyView, LayoutDebugExt, View};
 use cove_core::State;
 use cove_hosts::android::integration::{AndroidContentSession, Rendering};
@@ -50,7 +51,7 @@ struct Content {
 }
 
 impl View for Content {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let read = self.count.clone();
         let bump = self.count.clone();
         AnyView::new(

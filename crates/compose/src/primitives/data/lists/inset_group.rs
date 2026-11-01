@@ -4,6 +4,7 @@
 //! surface, separated by hairlines that start at the row content. The shape
 //! phones use for settings and detail screens; touch surfaces get taller rows
 //! and rounder corners.
+use crate::Scope;
 use std::rc::Rc;
 
 use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
@@ -45,7 +46,7 @@ impl ListGroup {
 }
 
 impl View for ListGroup {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let title = self.title.clone();
         let footer = self.footer.clone();
         let content = self.content.clone();

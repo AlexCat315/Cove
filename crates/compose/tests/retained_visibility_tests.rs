@@ -8,6 +8,7 @@
 //!   re-showing
 //! - the painter keeps the same element identity across every toggle
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::Cell;
@@ -60,7 +61,7 @@ struct Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let painter = AnyView::new(
             AnyView::new(Painter {
                 paints: self.paints.clone(),

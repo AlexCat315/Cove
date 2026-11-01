@@ -10,12 +10,13 @@
 //! Keyboard is the primary path — arrows move, Return runs, Escape closes — and
 //! the search field keeps focus throughout, so the hands never leave the
 //! keyboard.
+use crate::Scope;
 use std::rc::Rc;
 
 use cove_core::scene::{
     AccessibilityRole, AccessibilityState, Align, FlexDirection, Justify, Node, Wrap,
 };
-use cove_core::{Binding, State};
+use cove_core::{Binding, Signal};
 use cove_imaging::BundleImageResource;
 use cove_platform::KeyEvent;
 
@@ -123,22 +124,23 @@ impl PaletteCommand {
     }
 }
 
-/// Session state owned by the palette, so it survives recomposition.
+/// Session state owned by the palette's scope, so it survives recomposition.
+#[derive(Clone, Copy)]
 struct PaletteState {
-    query: State<TextBuffer>,
-    highlighted_id: State<Option<String>>,
-    focus_token: State<u64>,
-    recent_ids: State<Vec<String>>,
+    query: Signal<TextBuffer>,
+    highlighted_id: Signal<Option<String>>,
+    focus_token: Signal<u64>,
+    recent_ids: Signal<Vec<String>>,
 }
 
 impl PaletteState {
-    fn new() -> Rc<Self> {
-        Rc::new(Self {
-            query: State::new(TextBuffer::empty()),
-            highlighted_id: State::new(None),
-            focus_token: State::new(0),
-            recent_ids: State::new(Vec::new()),
-        })
+    fn new(cx: &Scope) -> Self {
+        Self {
+            query: cx.state(TextBuffer::empty),
+            highlighted_id: cx.state(|| None),
+            focus_token: cx.state(|| 0),
+            recent_ids: cx.state(Vec::new),
+        }
     }
 }
 
@@ -154,7 +156,6 @@ pub struct CommandPalette {
     pub shows_recent_commands: bool,
     pub recent_command_limit: usize,
     footer: Option<AnyView>,
-    state: Rc<PaletteState>,
 }
 
 impl CommandPalette {
@@ -171,7 +172,6 @@ impl CommandPalette {
             shows_recent_commands: true,
             recent_command_limit: 3,
             footer: None,
-            state: PaletteState::new(),
         }
     }
 
@@ -202,13 +202,15 @@ impl CommandPalette {
         self
     }
 
-    fn trimmed_query(&self) -> String {
-        self.state.query.get().string_value().trim().to_string()
+    fn trimmed_query(state: PaletteState) -> String {
+        state
+            .query
+            .with(|query| query.string_value().trim().to_string())
     }
 
-    fn visible(&self) -> Vec<PaletteCommand> {
+    fn visible(&self, state: PaletteState) -> Vec<PaletteCommand> {
         let items: Vec<CommandItem> = self.items.iter().map(PaletteCommand::item).collect();
-        ranked(&items, &self.trimmed_query())
+        ranked(&items, &Self::trimmed_query(state))
             .into_iter()
             .filter_map(|ranked_item| {
                 self.items
@@ -219,12 +221,12 @@ impl CommandPalette {
             .collect()
     }
 
-    fn entries(&self, visible: &[PaletteCommand]) -> Vec<CommandEntry> {
+    fn entries(&self, state: PaletteState, visible: &[PaletteCommand]) -> Vec<CommandEntry> {
         let items: Vec<CommandItem> = visible.iter().map(PaletteCommand::item).collect();
-        let query_empty = self.trimmed_query().is_empty();
+        let query_empty = Self::trimmed_query(state).is_empty();
         display_entries(
             &items,
-            &self.state.recent_ids.get(),
+            &state.recent_ids.get(),
             self.shows_recent_commands && query_empty,
             self.recent_command_limit,
             query_empty,
@@ -240,8 +242,8 @@ impl CommandPalette {
             .collect()
     }
 
-    fn effective_highlight(&self, selectable: &[CommandItem]) -> Option<String> {
-        self.state
+    fn effective_highlight(state: PaletteState, selectable: &[CommandItem]) -> Option<String> {
+        state
             .highlighted_id
             .get()
             .filter(|id| selectable.iter().any(|item| &item.id == id))
@@ -250,15 +252,13 @@ impl CommandPalette {
 }
 
 impl View for CommandPalette {
-    fn body(&self) -> AnyView {
-        let visible = self.visible();
-        let entries = self.entries(&visible);
+    fn body(&self, cx: &Scope) -> AnyView {
+        let state = PaletteState::new(cx);
+        let visible = self.visible(state);
+        let entries = self.entries(state, &visible);
         let selectable = Self::selectable(&entries);
-        let effective = self.effective_highlight(&selectable);
-        let on_highlight = {
-            let state = self.state.clone();
-            Rc::new(move |id: String| state.highlighted_id.set(Some(id)))
-        };
+        let effective = Self::effective_highlight(state, &selectable);
+        let on_highlight = { Rc::new(move |id: String| state.highlighted_id.set(Some(id))) };
         let highlighted_entry_index = effective.as_ref().and_then(|id| {
             entries.iter().position(|entry| match entry {
                 CommandEntry::Item(item) => &item.id == id,
@@ -268,14 +268,12 @@ impl View for CommandPalette {
 
         let is_presented = self.is_presented.clone();
         let footer = self.footer.clone();
-        let state = self.state.clone();
         let limit = self.recent_command_limit;
         let total = self.items.len();
         let visible_count = visible.len();
         let items: Rc<Vec<PaletteCommand>> = Rc::new(self.items.clone());
 
         let on_present = {
-            let state = state.clone();
             let binding = is_presented.clone();
             let items = items.clone();
             move || {
@@ -292,7 +290,6 @@ impl View for CommandPalette {
         };
 
         let on_move = {
-            let state = state.clone();
             let items = items.clone();
             Rc::new(move |delta: i64, wraps: bool| {
                 let selectable = first_selectable_all(&items);
@@ -310,7 +307,6 @@ impl View for CommandPalette {
         };
 
         let run_command = {
-            let state = state.clone();
             let items = items.clone();
             let binding = is_presented.clone();
             Rc::new(move |id: &str| {
@@ -330,7 +326,6 @@ impl View for CommandPalette {
         };
 
         let on_run_highlighted = {
-            let state = state.clone();
             let items = items.clone();
             let run_command = run_command.clone();
             Rc::new(move || {
@@ -352,7 +347,6 @@ impl View for CommandPalette {
         };
 
         let on_change = {
-            let state = state.clone();
             let items = items.clone();
             Rc::new(move |buffer: &TextBuffer| {
                 let query = buffer.string_value().trim().to_string();
@@ -373,8 +367,8 @@ impl View for CommandPalette {
             empty_title: self.empty_title.clone(),
             empty_message: self.empty_message.clone(),
             footer,
-            query: state.query.clone(),
-            focus_token: state.focus_token.clone(),
+            query: state.query,
+            focus_token: state.focus_token,
             total,
             visible_count,
             on_move,
@@ -438,8 +432,8 @@ struct PaletteBody {
     empty_title: String,
     empty_message: String,
     footer: Option<AnyView>,
-    query: State<TextBuffer>,
-    focus_token: State<u64>,
+    query: Signal<TextBuffer>,
+    focus_token: Signal<u64>,
     total: usize,
     visible_count: usize,
     on_move: Rc<dyn Fn(i64, bool)>,
@@ -452,7 +446,7 @@ struct PaletteBody {
 }
 
 impl View for PaletteBody {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         // Fires once per presentation so the palette resets its transient state.
         let settled = PresentWatcher {
             on_present: self.on_present.clone(),
@@ -595,13 +589,6 @@ impl View for PaletteBody {
     fn tag(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
-
-    /// `body` reads `focus_token` from `State`, so the
-    /// scope must declare those dependencies. Without this the writes never
-    /// subscribe and the view keeps its first layout forever.
-    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
-        vec![crate::DynamicField::state("focus_token", &self.focus_token)]
-    }
 }
 
 /// Fires once per presentation so the palette can reset its transient state.
@@ -651,7 +638,7 @@ struct PaletteResults {
 }
 
 impl View for PaletteResults {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         if self.entries.is_empty() {
             return AnyView::new(
                 EmptyState::new(self.empty_title.clone(), self.empty_message.clone())
@@ -740,7 +727,7 @@ struct CommandRow {
 }
 
 impl View for CommandRow {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let item = self.item.clone();
         let on_run = self.on_run.clone();
         let id = item.id.clone();
@@ -860,7 +847,7 @@ struct PaletteFooter {
 }
 
 impl View for PaletteFooter {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let hint = |key: &str, label: &str| {
             AnyView::new(Row::new(
                 VerticalAlignment::Center,

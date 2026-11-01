@@ -1,5 +1,6 @@
 //! Compatibility facade around the retained AnimatedVisibility lifecycle.
 use super::{AnimatedVisibility, Transition};
+use crate::Scope;
 use crate::theme::SemanticMotionRef;
 use crate::{AnyView, View};
 use std::time::Duration;
@@ -37,7 +38,7 @@ impl TransitionView {
 }
 
 impl View for TransitionView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let transition =
             Transition::asymmetric(self.transition, self.removal.unwrap_or(self.transition));
         AnyView::new(

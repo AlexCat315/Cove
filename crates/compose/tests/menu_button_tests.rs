@@ -3,21 +3,8 @@
 //! Behaviour checklist:
 //! - a closed `MenuButton` publishes no portal entry
 //! - a disabled `MenuButton` never opens
-//!
-//! Named difference (production gap, recorded rather than fixed):
-//! - **A `Binding`-driven view has no observable dependency, so `Popover::body`
-//!   is never re-entered.** `Popover` decides `is_presented` from a
-//!   `Binding<bool>` read inside `body()`, but the composition runtime can only
-//!   subscribe to a `State<T>`: `DynamicField::state` takes a `&State<T>`, and
-//!   `Binding::new` stores only get/set closures, deliberately dropping the
-//!   `State` handle. There is no variant that lets a `Binding` report that it
-//!   changed, so writing the binding cannot invalidate the `Popover` scope. The
-//!   trigger's click closure does flip the binding, but the retained
-//!   `AnchoredOverlayHost { is_presented: false }` is never replaced, and the menu
-//!   cannot open by any route: click, accessibility activate, or a direct write.
-//!   This is an architectural gap in the composition runtime, not a missing
-//!   `dynamic_properties` line. `opening_the_menu_does_not_yet_mount_a_portal`
-//!   pins it.
+//! - clicking the trigger mounts one portal entry, and activating an item runs
+//!   it and closes the menu
 
 mod support;
 
@@ -51,14 +38,16 @@ fn item(scene: &InteractiveScene, label: &str) -> Node {
 }
 
 #[test]
-fn opening_the_menu_does_not_yet_mount_a_portal() {
-    // Gap: see the module note. Nothing can open the menu until `Popover`
-    // declares `dynamic_properties`.
+fn opening_the_menu_mounts_a_portal_and_an_item_closes_it() {
     InteractiveScene::run(800.0, 600.0, |scene| {
+        let runs = std::rc::Rc::new(std::cell::Cell::new(0));
+        let tally = runs.clone();
         scene.install(AnyView::new(LayerRoot::new(AnyView::new(
             MenuButtonTitle::new(
                 "Options",
-                vec![MenuEntry::Item(MenuItem::new(1, "Save", || {}))],
+                vec![MenuEntry::Item(MenuItem::new(1, "Save", move || {
+                    tally.set(tally.get() + 1)
+                }))],
             ),
         ))));
 
@@ -69,14 +58,11 @@ fn opening_the_menu_does_not_yet_mount_a_portal() {
 
         let trigger = trigger(scene);
         scene.click(&trigger, 1);
-        assert!(
-            scene.portal.entries().is_empty(),
-            "the menu still cannot open: Popover never re-runs its body"
-        );
-        assert!(
-            !scene.graph.recomposer.has_pending(),
-            "the click leaves nothing pending either, which is the tell"
-        );
+        assert_eq!(scene.portal.entries().len(), 1, "the click opens the menu");
+
+        scene.click(&item(scene, "Save"), 1);
+        assert_eq!(runs.get(), 1, "the item ran");
+        assert!(scene.portal.entries().is_empty(), "the menu closed");
     });
 }
 

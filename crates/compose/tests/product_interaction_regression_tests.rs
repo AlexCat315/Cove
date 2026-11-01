@@ -65,6 +65,7 @@
 //! - A Rust button activates on key-up, so the link case dispatches Return's
 //!   `KeyUp` as well as `KeyDown`; Swift's button activates on `keyDown` alone.
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::Cell;
@@ -303,7 +304,7 @@ fn command_palette_filters_through_real_input() {
         assert_eq!(
             labelled("Go Disabled"),
             1,
-            "GAP: the palette never re-renders on a query change, so the disabled result stays; Swift removes it"
+            "GAP: the disabled command stays in the results; Swift removes it"
         );
 
         dispatcher.dispatch(&InputEvent::KeyDown(key(Scancode::PAGE_UP)));
@@ -321,11 +322,9 @@ fn command_palette_filters_through_real_input() {
                 .and_then(|node| node.accessibility())
                 .is_some_and(|semantics| semantics.state.is_selected)
         };
-        // GAP: the highlight lives in `State` that the palette body never
-        // subscribes to, so paging changes nothing on screen.
         assert!(
-            is_selected("Go First") && !is_selected("Go Last"),
-            "GAP: the mount-time highlight never moves; Swift clamps a page-down onto Go Last"
+            is_selected("Go Last") && !is_selected("Go First"),
+            "Page Down clamps the highlight onto the last enabled command"
         );
 
         dispatcher.dispatch(&InputEvent::KeyDown(key(Scancode::RETURN)));
@@ -778,7 +777,7 @@ struct ToolbarAvailabilityScene {
 }
 
 impl View for ToolbarAvailabilityScene {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let action = self.action.clone();
         AnyView::new(
             Toolbar::new(Button::title("Run", move || action())).options(ToolbarOptions {

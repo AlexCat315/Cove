@@ -27,6 +27,7 @@
 //!   tests assert the measured `LayoutStyleValue::Percent` the spec writes and
 //!   the scheduler lifecycle instead of attachment presence.
 
+use cove_composition::Scope;
 mod support;
 
 use std::rc::Rc;
@@ -106,7 +107,7 @@ struct BgHarness {
 }
 
 impl View for BgHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(DebugNode::new("x").background_color(self.color.get()))
     }
     fn dynamic_properties(&self) -> Vec<DynamicField> {
@@ -119,7 +120,7 @@ struct FgHarness {
 }
 
 impl View for FgHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(DebugNode::new("x").foreground_color(self.color.get()))
     }
     fn dynamic_properties(&self) -> Vec<DynamicField> {
@@ -132,7 +133,7 @@ struct CornerHarness {
 }
 
 impl View for CornerHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(DebugNode::new("x").corner_radius(self.radius.get()))
     }
     fn dynamic_properties(&self) -> Vec<DynamicField> {
@@ -145,7 +146,7 @@ struct FrameWidthHarness {
 }
 
 impl View for FrameWidthHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(SizedLeaf { label: "x" }.frame(
             Some(FrameDimension::Points(self.width.get())),
             None,
@@ -165,7 +166,7 @@ struct PaddingHarness {
 }
 
 impl View for PaddingHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(SizedLeaf { label: "x" }.padding_insets(self.insets.get()))
     }
     fn dynamic_properties(&self) -> Vec<DynamicField> {
@@ -178,7 +179,7 @@ struct MaxFrameHarness {
 }
 
 impl View for MaxFrameHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(SizedLeaf { label: "x" }.frame(
             None,
             None,
@@ -198,7 +199,7 @@ struct MaxHeightFrameHarness {
 }
 
 impl View for MaxHeightFrameHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(SizedLeaf { label: "x" }.frame(
             None,
             None,
@@ -218,7 +219,7 @@ struct PercentFrameHarness {
 }
 
 impl View for PercentFrameHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(SizedLeaf { label: "x" }.frame(
             Some(FrameDimension::Percent(self.ratio.get())),
             None,
@@ -238,7 +239,7 @@ struct PercentHeightFrameHarness {
 }
 
 impl View for PercentHeightFrameHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(SizedLeaf { label: "x" }.frame(
             None,
             Some(FrameDimension::Percent(self.ratio.get())),
@@ -258,7 +259,7 @@ struct WidthModeSwitchHarness {
 }
 
 impl View for WidthModeSwitchHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         if self.use_percent.get() {
             AnyView::new(SizedLeaf { label: "x" }.frame(
                 Some(FrameDimension::Percent(50.0)),
@@ -289,7 +290,7 @@ struct HeightModeSwitchHarness {
 }
 
 impl View for HeightModeSwitchHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         if self.use_percent.get() {
             AnyView::new(SizedLeaf { label: "x" }.frame(
                 None,
@@ -320,7 +321,7 @@ struct TypedDimensionHarness {
 }
 
 impl View for TypedDimensionHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(SizedLeaf { label: "x" }.frame(
             Some(self.width.get()),
             None,

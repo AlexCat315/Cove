@@ -3,6 +3,7 @@
 //! Toast cards anchor at the top trailing edge at every width, matching a
 //! notification banner rather than a bottom snackbar. The portal fit clamps the
 //! final frame inside the window.
+use crate::Scope;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -21,7 +22,7 @@ use crate::theme::{ControlSizeViewExt, SemanticFontRef, ThemeReader};
 use crate::{AnyView, BoxView, PrimitiveView, View, impl_primitive_view};
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::scene::{AnimatorScheduler, AnyAnimationController, LayoutNode, Node, NodeResource};
-use cove_core::{Point, Rect};
+use cove_core::{Point, Rect, Signal};
 
 use super::controller::{ToastAction, ToastController, ToastNotification};
 use super::exit_retention::{ToastPresentation, ToastPresentationEntry};
@@ -79,13 +80,6 @@ pub struct NotificationHost {
     pub controller: Rc<ToastController>,
     pub width: f32,
     pub position: ToastPosition,
-    /// One reconciler instance must survive every `body()` call so it can carry
-    /// cards in and out across recompositions (`NotificationHost.swift:38`).
-    /// `ToastPresentation` holds `Rc<dyn Fn()>` actions and so is not `Send`; a
-    /// `State` cannot hold it. The reconciler therefore lives in a shared
-    /// `RefCell` and a separate `State<u64>` revision is what recomposes.
-    presentation: Rc<std::cell::RefCell<ToastPresentation>>,
-    revision: cove_core::State<u64>,
 }
 
 impl NotificationHost {
@@ -94,8 +88,6 @@ impl NotificationHost {
             controller,
             width: 360.0,
             position: ToastPosition::Automatic,
-            presentation: Rc::new(std::cell::RefCell::new(ToastPresentation::new())),
-            revision: cove_core::State::new(0),
         }
     }
 
@@ -111,10 +103,16 @@ impl NotificationHost {
 }
 
 impl View for NotificationHost {
-    fn body(&self) -> AnyView {
-        // Reading the revision subscribes this scope, so a post re-runs `body`.
-        let _revision = self.revision.get();
-        let entries = self.presentation.borrow().update(
+    fn body(&self, cx: &Scope) -> AnyView {
+        // One reconciler survives every body so cards can animate in and out
+        // across recompositions; a card finishing its exit invalidates the host.
+        let presentation = ToastPresentationHandle {
+            reconciler: cx.remember(|| Rc::new(std::cell::RefCell::new(ToastPresentation::new()))),
+            changed: cx.state(|| ()),
+        };
+        presentation.changed.track();
+        // Reading the queue subscribes this scope, so a post re-runs `body`.
+        let entries = presentation.reconciler.borrow_mut().update(
             &self.controller.notifications(),
             self.controller.max_visible,
         );
@@ -123,24 +121,17 @@ impl View for NotificationHost {
             entries,
             width: self.width,
             position: self.position.resolved(),
-            // Hand the presenter the *same* reconciler the update above touched.
-            // It used to build a brand-new empty one, so every entry the install
-            // pass computed was discarded and `ToastPresenter` called `remove()`
-            // on a reconciler that had never held them — no toast card ever
-            // mounted, at any tick.
-            presentation: Rc::clone(&self.presentation),
+            presentation,
         })
-    }
-
-    /// `body` reconciles against the controller's queue, so the scope must
-    /// declare the revision it re-reads. Without this a post never re-entered
-    /// `body` and no toast card ever mounted.
-    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
-        vec![crate::DynamicField::state("revision", &self.revision)]
     }
 }
 
-type ToastPresentationHandle = Rc<std::cell::RefCell<ToastPresentation>>;
+/// The exit reconciler plus the signal its removals raise.
+#[derive(Clone)]
+struct ToastPresentationHandle {
+    reconciler: Rc<std::cell::RefCell<ToastPresentation>>,
+    changed: Signal<()>,
+}
 
 struct ToastPresenter {
     controller: Rc<ToastController>,
@@ -242,7 +233,8 @@ fn present(
             true,
             Some(Rc::new(move |visible| {
                 if !visible {
-                    presentation.borrow_mut().remove(&id, revision);
+                    presentation.reconciler.borrow_mut().remove(&id, revision);
+                    presentation.changed.notify();
                 }
             })),
             AnyView::new(ToastCard {
@@ -308,7 +300,7 @@ impl ToastCard {
 }
 
 impl View for ToastCard {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let notification = self.notification.clone();
         let controller = self.controller.clone();
         AnyView::new(ThemeReader::new(move |theme: &crate::theme::Theme| {

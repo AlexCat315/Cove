@@ -2,6 +2,7 @@
 //!
 //! A drop zone that registers itself with a process-wide registry and paints
 //! accept/reject chrome while an asset is dragged.
+use crate::Scope;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -179,7 +180,7 @@ impl AssetDropTarget {
 }
 
 impl View for AssetDropTarget {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(AssetDropTargetHost {
             active_payload: self.active_payload.clone(),
             accepted_kinds: self.accepted_kinds.clone(),

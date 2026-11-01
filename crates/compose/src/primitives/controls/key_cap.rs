@@ -1,4 +1,5 @@
 //! Translation of Primitives/Controls/KeyCap.swift.
+use crate::Scope;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
@@ -89,7 +90,7 @@ impl KeyCap {
 }
 
 impl View for KeyCap {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let caps: Vec<AnyView> = self.keys.iter().map(|key| self.cap(key)).collect();
         let spoken = self.spoken_form();
         AnyView::new(

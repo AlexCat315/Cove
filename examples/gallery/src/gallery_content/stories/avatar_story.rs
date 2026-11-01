@@ -6,6 +6,7 @@
 //! painting and hit testing, so the story's limit/overflow/overlap controls drive
 //! it directly and the tests assert against it.
 
+use cove_composition::Scope;
 use cove_core::State;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
@@ -169,7 +170,7 @@ impl AvatarStory {
 }
 
 impl View for AvatarStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
 
         // Unicode initials: two-word initials or two graphemes from one name.
@@ -263,5 +264,9 @@ impl View for AvatarStory {
 
     fn tag(&self) -> &'static str {
         "AvatarStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; source, limit, overflow, overlap, selected_member)
     }
 }

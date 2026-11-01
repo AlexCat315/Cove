@@ -9,6 +9,7 @@
 //! width probe) plus `LayoutThatFits` (which owns the candidate selection and
 //! the "last candidate wins" fallback), so both halves are exercised here.
 
+use cove_composition::Scope;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{Binding, State};
 use cove_ui_compose::adaptive::ContainerSizeReader;
@@ -78,7 +79,7 @@ impl Default for ViewThatFitsStory {
 }
 
 impl View for ViewThatFitsStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let narrow_state = self.narrow.clone();
         let toggle = AnyView::new(
             AnyView::new(
@@ -187,7 +188,7 @@ impl FitChip {
 }
 
 impl View for FitChip {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(
             // Each `*Ext` call returns `ModifiedContent`, which has no further
             // inherent methods, so the chain is erased between modifier groups.

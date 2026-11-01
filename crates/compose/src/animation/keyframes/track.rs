@@ -1,4 +1,5 @@
 //! Triggered and repeating keyframe tracks translated from Animation/Keyframes/Track.swift.
+use crate::Scope;
 use crate::{AnyView, DynamicField, PrimitiveView, View, ViewKind};
 use cove_core::State;
 use cove_core::scene::{
@@ -52,7 +53,7 @@ where
     Value: Interpolatable + Send,
     Trigger: Clone + Eq + 'static,
 {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(TrackHost {
             timeline: self.timeline.clone(),
             trigger: self.trigger.clone(),

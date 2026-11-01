@@ -18,6 +18,7 @@
 //! - Toolbar names: `gallery-size`, `gallery-text-scale`, `gallery-reset` and
 //!   `sidebar-item-*` are never emitted.
 
+use cove_composition::Scope;
 mod support;
 
 use std::rc::Rc;
@@ -33,8 +34,8 @@ use support::GalleryScene;
 struct Shared(Rc<GalleryView>);
 
 impl View for Shared {
-    fn body(&self) -> AnyView {
-        View::body(self.0.as_ref())
+    fn body(&self, cx: &Scope) -> AnyView {
+        View::body(self.0.as_ref(), cx)
     }
     fn dynamic_properties(&self) -> Vec<DynamicField> {
         self.0.dynamic_properties()

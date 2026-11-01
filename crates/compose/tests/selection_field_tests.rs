@@ -30,6 +30,7 @@
 //!   rendered. Rust's text measure is recorded on the layout node during layout,
 //!   so the same evidence is read without rendering.
 
+use cove_composition::Scope;
 #[allow(dead_code)]
 mod support;
 
@@ -97,7 +98,7 @@ struct SelectionHarness {
 }
 
 impl View for SelectionHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let state = &self.state;
         let options = options();
         let field = match self.kind {
@@ -430,7 +431,7 @@ struct PopoverHarness {
 }
 
 impl View for PopoverHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let mut popover = Popover::new(
             AnyView::new(Button::title("Preferences", || {}).accessibility_label("Preferences")),
             AnyView::new(Text::new("Menu")),

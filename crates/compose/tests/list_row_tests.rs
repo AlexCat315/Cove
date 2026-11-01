@@ -15,6 +15,7 @@
 //! - title-only, leading-only and conditional-trailing rows keep nonzero text
 //!   and a stable title node
 
+use cove_composition::Scope;
 mod support;
 
 use std::collections::BTreeSet;
@@ -195,7 +196,7 @@ impl Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let width = self.width.get();
         let mut surface = Environment {
             input: self.input.get(),
@@ -643,7 +644,7 @@ struct EmptySlots {
 }
 
 impl View for EmptySlots {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let conditional = if self.selected.get() {
             AnyView::new(Badge::new("Selected").tone(StatusTone::Info))
         } else {

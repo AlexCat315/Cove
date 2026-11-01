@@ -8,6 +8,7 @@
 //! interactive chrome is inset. `SafeArea` consumes the insets this root
 //! publishes, so screens that own a status bar, navigation bar or keyboard get
 //! the correct avoidance without a letterboxed surface.
+use crate::Scope;
 use crate::adaptive::SurfaceEnvironment;
 use crate::modifiers::layout::{EdgeInsets, FlexExt, LayoutFrameExt};
 use crate::theme::{TextScaler, TextScalerEnvironment, node_text_scaler};
@@ -50,7 +51,7 @@ impl SurfaceRoot {
 }
 
 impl View for SurfaceRoot {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let environment = self.environment.clone();
         let content = AnyView::new(
             BoxView::new(

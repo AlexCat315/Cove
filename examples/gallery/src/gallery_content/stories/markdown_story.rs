@@ -7,6 +7,7 @@
 //! exercised separately; what this story pins is that each document survives
 //! parsing with the block structure it advertises.
 
+use cove_composition::Scope;
 use cove_core::State;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
@@ -113,7 +114,7 @@ impl MarkdownStory {
 }
 
 impl View for MarkdownStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let opened = self.last_opened.clone();
         let viewer = MarkdownView::new(DOCUMENT).on_open_link(move |destination| {
             opened.set(destination.to_owned());
@@ -149,5 +150,9 @@ impl View for MarkdownStory {
 
     fn tag(&self) -> &'static str {
         "MarkdownStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; draft, last_opened)
     }
 }

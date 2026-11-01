@@ -33,6 +33,7 @@
 //! - The Rust `Sidebar` leaves its first `ScrollView` mounted as a zero-height
 //!   orphan after the first recomposition; `live_nodes` skips it.
 
+use cove_composition::Scope;
 mod support;
 
 use cove_composition::{AnyView, DynamicField, Scancode, TupleView, View};
@@ -61,7 +62,7 @@ struct Header {
 }
 
 impl View for Header {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(TextField::new("Navigation note", self.text.binding()).padding(12.0))
     }
     fn dynamic_properties(&self) -> Vec<DynamicField> {
@@ -107,7 +108,7 @@ impl Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let mut surface = Environment::default();
         surface.viewport.width = 1280.0;
         surface.input = self.input.get();

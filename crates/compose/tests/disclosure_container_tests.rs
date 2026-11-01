@@ -49,6 +49,7 @@
 //! reports the same collapsed values. Both gaps are asserted at their current
 //! values below, with the Swift expectation named.
 
+use cove_composition::Scope;
 mod support;
 
 use std::collections::{BTreeSet, HashSet};
@@ -84,7 +85,7 @@ struct AccordionSceneView {
 }
 
 impl View for AccordionSceneView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         self.scene.view()
     }
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {

@@ -23,6 +23,7 @@
 //! - the touch handle measures 44pt wide but only 36pt tall, where Swift asserts
 //!   both axes reach 44.
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::RefCell;
@@ -48,7 +49,7 @@ struct Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let items = self.items.get();
         let reordered = self.items.clone();
         let moves = self.moves.clone();

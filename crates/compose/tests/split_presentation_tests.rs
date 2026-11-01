@@ -51,6 +51,7 @@
 //!   directly. The toolbox's draft redaction cannot be exercised here; the
 //!   retained hidden field's value is asserted to be unchanged instead.
 
+use cove_composition::Scope;
 mod support;
 
 use std::rc::Rc;
@@ -97,7 +98,7 @@ impl PaneState {
 struct Pane(PaneState);
 
 impl View for Pane {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let state = self.0.clone();
         let draft = state.draft.binding();
         let action_count = state.count.clone();
@@ -188,7 +189,7 @@ impl Harness {
 struct HarnessView(Rc<Harness>);
 
 impl View for HarnessView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let h = &self.0;
         let mut surface = Environment::default();
         surface.viewport.width = 1280.0;

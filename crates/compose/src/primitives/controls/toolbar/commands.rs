@@ -2,18 +2,19 @@
 //!
 //! Measure commands at their natural size, then move lower-priority commands into
 //! a menu. Icon commands retain their full title as help and semantics.
+use crate::Scope;
 use std::rc::Rc;
 
 use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::controls::button::{Button, ButtonRole};
+use crate::primitives::layout::scroll_view::{ScrollAxis, ScrollView, ScrollbarGutter};
 use crate::primitives::media::ui_icon_catalog;
 use crate::primitives::overlays::anchored::{PopoverOverflow, PopoverPlacement, PopoverSurface};
 use crate::primitives::overlays::menu::{Menu, MenuEntry};
 use crate::primitives::overlays::popover::Popover;
-use crate::primitives::layout::scroll_view::{ScrollAxis, ScrollView, ScrollbarGutter};
-use cove_core::State;
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, ViewExt};
+use cove_core::State;
 use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 
 use super::{ToolbarAxis, ToolbarItem, ToolbarOverflowLayout};
@@ -185,7 +186,7 @@ impl cove_composition::ViewModifier for ActionControlLabel {
 }
 
 impl View for ToolbarCommands {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         if !self.is_enabled {
             if self.is_presented.get() {
                 self.is_presented.set(false);
@@ -197,11 +198,11 @@ impl View for ToolbarCommands {
         let reader = crate::adaptive::ContainerSizeReader::new(move |size: cove_core::Size| {
             let mut commands = commands.snapshot();
             let fits_content = commands.available_width.is_some();
-            commands.available_width = Some(
-                commands
-                    .available_width
-                    .unwrap_or(if vertical { size.height } else { size.width }),
-            );
+            commands.available_width = Some(commands.available_width.unwrap_or(if vertical {
+                size.height
+            } else {
+                size.width
+            }));
             let overflow_focus = commands.overflow_focus.clone();
             let body = ToolbarCommandsBody {
                 commands,

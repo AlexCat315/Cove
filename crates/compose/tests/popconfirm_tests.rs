@@ -13,16 +13,7 @@
 //! - every explicit side is retained by the actual portal
 //! - a generic `Popover` uses the same bubble surface
 //!
-//! Named differences (GAP assertions):
-//! - Presentation: the Rust `Popconfirm` keeps `is_presented` in a `State` it
-//!   never declares through `dynamic_properties`, so neither Return, a click nor
-//!   the accessibility activate re-renders its `Popover`: no portal, no bubble,
-//!   no Keep/Remove buttons ever appear. Every case that depends on the open
-//!   bubble (focus cycling, confirm-once, Escape/outside dismissal, the
-//!   width/scale/theme/direction/input matrix and its painting, live title
-//!   updates, diagnostics discovery and the named-side portal checks) pins that
-//!   it stays closed, while the parts that do not need it (disabled trigger,
-//!   teardown, geometry) are asserted directly.
+//! Named differences:
 //! - Diagnostics: Swift queried `UIDiagnostics` (`query_ui_nodes`); the Compose
 //!   crate does not depend on the agent toolbox, so discovery counts dialog
 //!   accessibility nodes directly.
@@ -32,6 +23,7 @@
 //! - Trigger and action buttons carry no accessibility label of their own; they
 //!   are found by `AccessibilityTree::resolved_label`.
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::Cell;
@@ -101,7 +93,7 @@ impl Harness {
 struct HarnessView(Rc<Harness>);
 
 impl View for HarnessView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let h = &self.0;
         let mut surface = Environment::default();
         surface.viewport.width = h.width.get();
@@ -193,6 +185,17 @@ fn settle(scene: &InteractiveScene) {
     scene.settle(8, 1.0);
 }
 
+/// Swift's suite lays out at the harness's own window size.
+fn settle_window(scene: &InteractiveScene, h: &Harness) {
+    for _ in 0..8 {
+        scene.graph.recomposer.commit_all();
+        scene.graph.compute_layout(h.width.get(), h.height.get());
+        cove_core::scene::AnimatorScheduler::current().tick(1.0);
+    }
+    scene.graph.recomposer.commit_all();
+    scene.graph.compute_layout(h.width.get(), h.height.get());
+}
+
 fn with_harness(body: impl FnOnce(&InteractiveScene, &Rc<Harness>)) {
     InteractiveScene::run(640.0, 480.0, |scene| {
         let harness = Harness::new();
@@ -216,46 +219,90 @@ fn dialog_count(scene: &InteractiveScene, title: &str) -> usize {
         .len()
 }
 
-const NEVER_OPENS: &str = "GAP: Swift presents the confirmation bubble; the Rust Popconfirm keeps \
-    is_presented in a State it never declares through dynamic_properties, so the Popover \
-    never re-renders and no portal opens";
-
 #[test]
 fn lifecycle() {
     with_harness(|scene, h| {
         let trigger = trigger(scene);
+        let focused = || scene.focus.focused().map(|node| node.id());
+        let expanded = |trigger: &Node| {
+            trigger
+                .accessibility()
+                .and_then(|semantics| semantics.state.is_expanded)
+        };
+        assert_eq!(
+            expanded(&trigger),
+            Some(false),
+            "a closed trigger reports collapsed"
+        );
+
         scene.focus.focus(Some(&trigger), true);
         scene.key(Scancode::RETURN, KeyModifiers::default());
         settle(scene);
-        assert!(
-            scene.portal.entries().is_empty() && button(scene, "Keep").is_none(),
-            "{NEVER_OPENS}"
-        );
+        let keep = button(scene, "Keep").expect("Return opens the bubble");
+        let remove = button(scene, "Remove").expect("the bubble offers Remove");
+        assert_eq!(expanded(&trigger), Some(true));
+        assert_eq!(focused(), Some(keep.id()), "focus moves into the bubble");
+        scene.key(Scancode::TAB, KeyModifiers::default());
+        settle(scene);
+        assert_eq!(focused(), Some(remove.id()), "Tab cycles to Remove");
+        scene.key(Scancode::TAB, KeyModifiers::default());
+        settle(scene);
+        assert_eq!(focused(), Some(keep.id()), "Tab cycles back to Keep");
+        scene.key(Scancode::RETURN, KeyModifiers::default());
+        settle(scene);
+        assert_eq!(h.count.get(), 0, "Keep cancels");
+        assert!(scene.portal.entries().is_empty());
         assert_eq!(
-            trigger
-                .accessibility()
-                .and_then(|semantics| semantics.state.is_expanded),
-            Some(false),
-            "the trigger reports itself collapsed"
+            focused(),
+            Some(trigger.id()),
+            "cancel returns focus to the trigger"
         );
+
         scene.click(&trigger, 1);
         settle(scene);
-        assert!(
-            scene.portal.entries().is_empty() && button(scene, "Remove").is_none(),
-            "{NEVER_OPENS}"
-        );
-        let activate = trigger
-            .accessibility_actions()
-            .activate
-            .expect("the trigger exposes activate");
-        activate();
+        let confirm = button(scene, "Remove")
+            .and_then(|node| node.accessibility_actions().activate)
+            .expect("Remove exposes activate");
+        confirm();
+        confirm();
         settle(scene);
-        assert!(scene.portal.entries().is_empty(), "{NEVER_OPENS}");
+        assert_eq!(h.count.get(), 1, "confirm runs exactly once");
+        assert!(scene.portal.entries().is_empty());
+        assert_eq!(expanded(&trigger), Some(false));
+
+        scene.click(&trigger, 1);
+        settle(scene);
         scene.key(Scancode::ESCAPE, KeyModifiers::default());
+        settle(scene);
+        assert_eq!(h.count.get(), 1);
+        assert!(scene.portal.entries().is_empty(), "Escape dismisses");
+        assert_eq!(
+            focused(),
+            Some(trigger.id()),
+            "Escape returns focus to the trigger"
+        );
+
+        scene.click(&trigger, 1);
+        settle(scene);
         scene.click_at_point(cove_core::Point::new(12.0, 12.0), 1);
         settle(scene);
-        assert_eq!(h.count.get(), 0, "nothing confirms without the bubble");
-        assert!(scene.portal.entries().is_empty());
+        assert!(
+            scene.portal.entries().is_empty(),
+            "an outside click dismisses"
+        );
+        assert_eq!(h.count.get(), 1);
+
+        scene.click(&trigger, 1);
+        settle(scene);
+        scene.click(&trigger, 1);
+        settle(scene);
+        assert_eq!(
+            scene.portal.entries().len(),
+            1,
+            "GAP: Swift toggles the open bubble closed from its trigger; in Rust the second \
+             press never reaches the trigger while the bubble is open, so it stays open"
+        );
+        assert_eq!(h.count.get(), 1);
     });
 }
 
@@ -349,11 +396,10 @@ fn placements() {
 #[test]
 fn matrix_and_painting() {
     with_harness(|scene, h| {
-        let activate = trigger(scene)
+        (trigger(scene)
             .accessibility_actions()
             .activate
-            .expect("activate");
-        activate();
+            .expect("activate"))();
         settle(scene);
         for width in [390.0_f32, 720.0, 1280.0] {
             for scale in [1.0_f32, 2.0] {
@@ -375,25 +421,80 @@ fn matrix_and_painting() {
                             h.rtl.set(rtl);
                             h.input.set(modality);
                             h.placement.set(PopoverPlacement::BottomTrailing);
-                            settle(scene);
-                            assert!(
-                                button(scene, "Delete project").is_some(),
-                                "the trigger stays mounted"
+                            settle_window(scene, h);
+                            let case = format!(
+                                "width {width}, scale {scale}, dark {dark}, rtl {rtl}, input {modality:?}"
                             );
+                            let surface = panel(scene).unwrap_or_else(|| {
+                                panic!("the bubble surface is mounted ({case})")
+                            });
+                            let keep = button(scene, "Keep").expect("Keep");
+                            let remove = button(scene, "Remove").expect("Remove");
+                            let frame = surface.absolute_frame();
+                            let sheet = modality.contains(InputCapabilities::TOUCH)
+                                && !modality.contains(InputCapabilities::POINTER);
+                            let inset = if sheet { 0.0 } else { 8.0 };
                             assert!(
-                                panel(scene).is_none()
-                                    && button(scene, "Keep").is_none()
-                                    && dialog_count(scene, &h.title.get()) == 0
-                                    && scene.portal.entries().is_empty(),
-                                "{NEVER_OPENS} (width {width}, scale {scale}, dark {dark}, rtl {rtl})"
+                                frame.x >= inset
+                                    && frame.max_x() <= width - inset
+                                    && frame.max_y() <= if sheet { 820.0 } else { 812.0 },
+                                "the bubble stays inside the window ({case}): {frame:?}"
                             );
-                            assert!(!scene.graph.recomposer.has_pending());
+                            let body = Rect::new(
+                                frame.x + 10.0,
+                                frame.y + 10.0,
+                                frame.width - 20.0,
+                                frame.height - 20.0,
+                            );
+                            let (keep_frame, remove_frame) =
+                                (keep.absolute_frame(), remove.absolute_frame());
+                            assert!(
+                                contains(body, keep_frame) && contains(body, remove_frame),
+                                "both actions sit inside the bubble ({case})"
+                            );
+                            assert!(!intersects(keep_frame, remove_frame), "{case}");
+                            if (keep_frame.y - remove_frame.y).abs() < 0.5 {
+                                if rtl {
+                                    assert!(keep_frame.x >= remove_frame.max_x(), "{case}");
+                                } else {
+                                    assert!(keep_frame.max_x() <= remove_frame.x, "{case}");
+                                }
+                            } else {
+                                assert!(keep_frame.max_y() <= remove_frame.y, "{case}");
+                            }
+                            let target = if modality.contains(InputCapabilities::TOUCH) {
+                                44.0
+                            } else {
+                                32.0
+                            };
+                            assert!(keep.frame().height >= target, "{case}");
+                            assert!(remove.frame().height >= target, "{case}");
+                            assert_eq!(dialog_count(scene, &h.title.get()), 1, "{case}");
+                            assert_eq!(scene.portal.entries().len(), 1, "{case}");
+                            assert!(!scene.graph.recomposer.has_pending(), "{case}");
+                            if !sheet {
+                                assert!(
+                                    surface.draw().is_some(),
+                                    "the bubble paints its card ({case})"
+                                );
+                            }
                         }
                     }
                 }
             }
         }
     });
+}
+
+fn contains(outer: Rect, inner: Rect) -> bool {
+    inner.x >= outer.x
+        && inner.y >= outer.y
+        && inner.max_x() <= outer.max_x()
+        && inner.max_y() <= outer.max_y()
+}
+
+fn intersects(a: Rect, b: Rect) -> bool {
+    a.x < b.max_x() && b.x < a.max_x() && a.y < b.max_y() && b.y < a.max_y()
 }
 
 #[test]
@@ -406,14 +507,19 @@ fn updates_and_teardown() {
         h.dark.set(true);
         h.scale.set(2.0);
         settle(scene);
-        assert!(
-            dialog_count(scene, &h.title.get()) == 0 && scene.portal.entries().is_empty(),
-            "{NEVER_OPENS}"
+        assert_eq!(
+            dialog_count(scene, &h.title.get()),
+            1,
+            "open content follows the new title"
         );
+        assert_eq!(scene.portal.entries().len(), 1);
         h.enabled.set(false);
         settle(scene);
         let trigger = button(scene, "Delete project").expect("trigger");
-        assert!(scene.portal.entries().is_empty());
+        assert!(
+            scene.portal.entries().is_empty(),
+            "disabling closes the bubble"
+        );
         assert_eq!(
             trigger
                 .accessibility()
@@ -426,9 +532,12 @@ fn updates_and_teardown() {
         );
         h.enabled.set(true);
         settle(scene);
-        scene.focus.focus(
-            Some(&button(scene, "Delete project").expect("trigger")),
-            true,
+        scene.click(&button(scene, "Delete project").expect("trigger"), 1);
+        settle(scene);
+        assert_eq!(
+            scene.portal.entries().len(),
+            1,
+            "re-enabling allows reopening"
         );
         h.mounted.set(false);
         settle(scene);
@@ -449,14 +558,29 @@ fn discovery() {
             0,
             "a closed popconfirm exposes no dialog"
         );
-        let activate = trigger(scene)
+        (trigger(scene)
             .accessibility_actions()
             .activate
-            .expect("activate");
-        activate();
+            .expect("activate"))();
         settle(scene);
-        assert_eq!(dialog_count(scene, &h.title.get()), 0, "{NEVER_OPENS}");
-        assert!(button(scene, "Remove").is_none(), "{NEVER_OPENS}");
+        assert_eq!(
+            dialog_count(scene, &h.title.get()),
+            1,
+            "the open dialog is discoverable"
+        );
+        assert!(
+            button(scene, "Remove").is_some(),
+            "its actions are discoverable"
+        );
+        (button(scene, "Keep")
+            .and_then(|node| node.accessibility_actions().activate)
+            .expect("Keep exposes activate"))();
+        settle(scene);
+        assert_eq!(
+            dialog_count(scene, &h.title.get()),
+            0,
+            "dismissal removes the dialog"
+        );
         assert_eq!(h.count.get(), 0);
     });
 }
@@ -464,21 +588,42 @@ fn discovery() {
 #[test]
 fn named_sides() {
     with_harness(|scene, h| {
-        let activate = trigger(scene)
+        (trigger(scene)
             .accessibility_actions()
             .activate
-            .expect("activate");
-        activate();
+            .expect("activate"))();
         settle(scene);
         for placement in PopoverPlacement::ALL {
             for rtl in [false, true] {
                 h.placement.set(placement);
                 h.rtl.set(rtl);
                 settle(scene);
-                assert!(button(scene, "Delete project").is_some());
+                let anchor = trigger(scene).absolute_frame();
+                let surface = panel(scene)
+                    .unwrap_or_else(|| panic!("the bubble is mounted for {placement:?} rtl {rtl}"))
+                    .absolute_frame();
+                let edge = if rtl && !placement.edge().is_vertical() {
+                    placement.edge().opposite()
+                } else {
+                    placement.edge()
+                };
+                let placed = match edge {
+                    PopoverEdge::Top => surface.max_y() <= anchor.y - 3.0,
+                    PopoverEdge::Bottom => surface.y >= anchor.max_y() + 3.0,
+                    PopoverEdge::Left => surface.max_x() <= anchor.x - 3.0,
+                    PopoverEdge::Right => surface.x >= anchor.max_x() + 3.0,
+                };
+                // GAP: with too little room on its side, Swift constrains the
+                // bubble's width so it still clears the trigger; Rust keeps the
+                // authored 300pt and slides it over the trigger instead.
+                let crowded = !edge.is_vertical()
+                    && match edge {
+                        PopoverEdge::Left => anchor.x - 3.0 - 8.0 < 300.0,
+                        _ => h.width.get() - 8.0 - (anchor.max_x() + 3.0) < 300.0,
+                    };
                 assert!(
-                    panel(scene).is_none() && scene.portal.entries().is_empty(),
-                    "{NEVER_OPENS}"
+                    placed || crowded,
+                    "{placement:?} rtl {rtl} keeps its side: {surface:?} vs {anchor:?}"
                 );
             }
         }
@@ -492,30 +637,15 @@ fn shared_card() {
             open: State::new(true),
         });
         settle(scene);
-        assert!(
-            panel(scene).is_none(),
-            "GAP: Swift names the bubble `anchored-surface`; the Rust portal carries only \
-             `portal-N` debug names, so the portal slot is measured instead"
-        );
-        let surface = scene
-            .first(|node| support::debug_name(node).as_deref() == Some("portal-1"))
-            .expect("the open popover mounts a portal slot");
+        let surface = panel(scene).expect("the open popover mounts its bubble surface");
         let frame = surface.absolute_frame();
-        assert_eq!(
-            surface.frame().width,
-            300.0,
-            "the bubble keeps its authored width"
-        );
+        assert_eq!(surface.frame().width, 300.0, "the bubble keeps its authored width");
         assert!(
-            frame.y + frame.height <= 237.0,
+            frame.max_y() <= 237.0,
             "the top placement sits above the trigger: {frame:?}"
         );
+        assert!(surface.draw().is_some(), "the bubble surface paints its own card");
         assert_eq!(scene.portal.entries().len(), 1);
-        assert!(
-            surface.draw().is_none(),
-            "GAP: Swift's bubble surface node paints its own card (`draw != nil`); the Rust \
-             portal slot has no painter of its own"
-        );
         let done = button(scene, "Done").expect("the Done action");
         (done.accessibility_actions().activate.expect("activate"))();
         settle(scene);
@@ -528,7 +658,7 @@ struct SharedCardScene {
 }
 
 impl View for SharedCardScene {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let open = self.open.clone();
         let popover = Popover::new(
             Text::new("Open details"),

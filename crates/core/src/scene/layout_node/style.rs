@@ -136,11 +136,7 @@ impl StyleEdges {
             (self.start, self.end)
         };
         let pick = |logical: LayoutStyleValue, physical| {
-            if logical.is_auto() {
-                physical
-            } else {
-                logical
-            }
+            if logical.is_auto() { physical } else { logical }
         };
         (pick(leading, self.left), pick(trailing, self.right))
     }
@@ -270,8 +266,9 @@ impl LayoutStyle {
             };
             LengthPercentageAuto::length(value)
         };
-        let maximum =
-            |value: Option<f32>| value.map_or(LengthPercentageAuto::auto(), LengthPercentageAuto::length);
+        let maximum = |value: Option<f32>| {
+            value.map_or(LengthPercentageAuto::auto(), LengthPercentageAuto::length)
+        };
         let padding = match debug_padding {
             Some(insets) => taffy::Rect {
                 left: LengthPercentage::length(insets.left),

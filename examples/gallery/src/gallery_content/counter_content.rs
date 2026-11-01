@@ -4,6 +4,7 @@
 //! [`CounterTextRun`] attachments and leaves painting to the host; this wrapper
 //! supplies the painter that shapes each run into the shared font atlas.
 
+use cove_composition::Scope;
 use cove_core::DrawList;
 use cove_core::scene::{Node, Point};
 use cove_text::{DrawListText, TextEnvironmentHolder};
@@ -73,7 +74,7 @@ fn paint_with_font_service(run: &CounterTextRun, list: &mut DrawList, origin: Po
 }
 
 impl View for CounterContent {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(CounterHost {
             counter: self.counter.clone(),
             painter: self.painter.clone(),
@@ -88,8 +89,9 @@ struct CounterHost {
 }
 
 impl CounterHost {
-    fn body_view(&self) -> AnyView {
-        self.counter.body()
+    /// Inlines the counter's body, so its state lives in this host's scope.
+    fn body_view(&self, cx: &Scope) -> AnyView {
+        self.counter.body(cx)
     }
 }
 
@@ -102,11 +104,11 @@ impl PrimitiveView for CounterHost {
 }
 
 impl View for CounterHost {
-    fn body(&self) -> AnyView {
+    fn body(&self, cx: &Scope) -> AnyView {
         let provided = self.painter.clone();
         AnyView::new(
             BodyProxy {
-                body: self.body_view(),
+                body: self.body_view(cx),
             }
             .composition_local(CounterText::painter(), Some(provided)),
         )
@@ -123,7 +125,7 @@ struct BodyProxy {
 }
 
 impl View for BodyProxy {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         self.body.clone()
     }
 }

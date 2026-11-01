@@ -40,6 +40,7 @@
 //!   (production hang), so that case stops before it. Each case pins its
 //!   measurements with `GAP:` messages.
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::RefCell;
@@ -78,7 +79,7 @@ struct Routed {
 }
 
 impl View for Routed {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         self.counts.borrow_mut().shell += 1;
         let counts = self.counts.clone();
         AnyView::new(RouteOutlet::new(self.selection.binding(), move |route| {
@@ -104,7 +105,7 @@ struct MemoHarness {
 }
 
 impl View for MemoHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let input = self.input.get();
         let counts = self.counts.clone();
         let local = self.local.clone();
@@ -134,7 +135,7 @@ struct MemoChild {
 }
 
 impl View for MemoChild {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         self.counts.borrow_mut().child += 1;
         let local = self.local.clone();
         AnyView::new(
@@ -394,7 +395,7 @@ struct StackHost {
 }
 
 impl View for StackHost {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(AnyView::new(self.stack.clone()).frame_size(200.0, 1_000.0))
     }
 }

@@ -14,6 +14,7 @@
 //! the context is restored even if the body unwinds — is asserted with
 //! `catch_unwind` instead of a `do/catch`.
 
+use cove_composition::Scope;
 mod support;
 
 use cove_composition::{AnyView, DynamicField, View};
@@ -34,7 +35,7 @@ struct OpacityHarness {
 }
 
 impl View for OpacityHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(DebugNode::new("x").opacity(self.alpha.get()))
     }
     fn dynamic_properties(&self) -> Vec<DynamicField> {

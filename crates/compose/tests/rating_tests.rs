@@ -40,6 +40,7 @@
 //!   `rating.paint` attachment; Rust has none, so the custom-symbol case
 //!   compares the painted texture ids instead.
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::RefCell;
@@ -103,7 +104,7 @@ impl Harness {
 struct HarnessView(Rc<Harness>);
 
 impl View for HarnessView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let _ = self.0.tick.get();
         let state = self.0.value.clone();
         let build = self.0.build.borrow().clone();
@@ -825,7 +826,7 @@ fn a_rebuilt_rating_drops_its_press_session() {
         let tick = State::new(0_u32);
         struct Rebuilt(State<u32>);
         impl View for Rebuilt {
-            fn body(&self) -> AnyView {
+            fn body(&self, _cx: &Scope) -> AnyView {
                 let _ = self.0.get();
                 AnyView::new(Rating::new("", 2.0, |_| {}))
             }

@@ -15,6 +15,7 @@
 //! `dynamic_properties`, so writing them recomposes the tree exactly as Swift's
 //! `@State` does.
 
+use cove_composition::Scope;
 mod support;
 
 use cove_composition::{AnyView, TupleView, View, ViewExt};
@@ -39,7 +40,7 @@ struct Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let tall = self.tall.get();
         let interactive = self.interactive.get();
 

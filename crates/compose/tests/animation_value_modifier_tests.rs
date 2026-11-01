@@ -7,6 +7,7 @@
 //! - `frame(width:)`, `frame(maxWidth:)`, `frame(maxHeight:)` animate implicitly
 //! - `frame(width: .percent())` and `frame(height: .percent())` animate implicitly
 
+use cove_composition::Scope;
 mod support;
 
 use cove_composition::{AnyView, DynamicField, View};
@@ -81,7 +82,7 @@ struct OpacityHarness {
 }
 
 impl View for OpacityHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let alpha = self.alpha.get();
         let animation = if self.animated {
             Some(Animation::new(1.0, AnimationCurve::Linear))
@@ -104,7 +105,7 @@ struct FrameWidthHarness {
 }
 
 impl View for FrameWidthHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let width = self.width.get();
         AnyView::new(
             SizedLeaf { label: "x" }
@@ -129,7 +130,7 @@ struct MaxWidthHarness {
 }
 
 impl View for MaxWidthHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let max_width = self.max_width.get();
         AnyView::new(
             SizedLeaf { label: "x" }
@@ -147,7 +148,7 @@ struct MaxHeightHarness {
 }
 
 impl View for MaxHeightHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let max_height = self.max_height.get();
         AnyView::new(
             SizedLeaf { label: "x" }
@@ -165,7 +166,7 @@ struct PercentWidthHarness {
 }
 
 impl View for PercentWidthHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let ratio = self.ratio.get();
         AnyView::new(
             SizedLeaf { label: "x" }
@@ -190,7 +191,7 @@ struct PercentHeightHarness {
 }
 
 impl View for PercentHeightHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let ratio = self.ratio.get();
         AnyView::new(
             SizedLeaf { label: "x" }

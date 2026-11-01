@@ -1,4 +1,4 @@
-use crate::{DynamicField, View, ViewKind};
+use crate::{DynamicField, Scope, View, ViewKind};
 use std::rc::Rc;
 #[derive(Clone)]
 pub struct AnyView {
@@ -33,8 +33,8 @@ impl AnyView {
     }
 }
 impl View for AnyView {
-    fn body(&self) -> AnyView {
-        self.storage.body()
+    fn body(&self, cx: &Scope) -> AnyView {
+        self.storage.body(cx)
     }
     fn kind(&self) -> ViewKind<'_> {
         self.storage.kind()

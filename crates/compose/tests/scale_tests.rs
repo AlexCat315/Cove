@@ -18,6 +18,7 @@
 //! `TransitionEffect` is crate-private and only `Transition` is exposed, so the
 //! effect-algebra cases assert the same facts through the mounted node's
 //! transform — which is where those effects are observable in production.
+use cove_composition::Scope;
 mod support;
 
 use cove_composition::{AnyView, LayoutDebugExt, View, ViewExt};
@@ -71,7 +72,7 @@ struct Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let panel = AnyView::new(NamedPanel("panel", 200.0, 100.0));
         AnyView::new(
             AnyView::new(

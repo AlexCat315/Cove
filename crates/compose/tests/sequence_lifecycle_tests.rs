@@ -12,6 +12,7 @@
 //! percentages and divided back to an opacity in the content closure. The
 //! observable behaviour — resting at 0 and completing at 1 — is unchanged.
 
+use cove_composition::Scope;
 mod support;
 
 use cove_composition::{AnyView, LayoutDebugExt, TupleView, View};
@@ -36,7 +37,7 @@ struct Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let revision = self.revision.get();
         let reduced = self.reduced.get();
 

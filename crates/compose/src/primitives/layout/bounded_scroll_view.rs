@@ -1,6 +1,7 @@
 //! Translation of Primitives/Layout/BoundedScrollView.swift.
 //!
 //! A scroll view whose height is the content's extent clamped into a range.
+use crate::Scope;
 use crate::modifiers::layout::LayoutFrameExt;
 use crate::primitives::layout::{ScrollAxis, ScrollView, ScrollbarGutter};
 use crate::{AnyView, View};
@@ -71,7 +72,7 @@ impl BoundedScrollView {
 }
 
 impl View for BoundedScrollView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let viewport = self.viewport_height();
         AnyView::new(
             ScrollView::new(self.axes, self.content.clone())

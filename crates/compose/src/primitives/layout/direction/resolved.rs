@@ -1,4 +1,5 @@
 //! Translation of Compose/Sources/CoveUICompose/Primitives/Layout/Direction/Resolved.swift.
+use crate::Scope;
 use std::rc::Rc;
 
 use crate::{AnyView, PrimitiveView, View, ViewKind};
@@ -24,7 +25,7 @@ impl<Content: View + 'static> ResolvedLayoutDirection<Content> {
     }
 }
 impl<Content: View + 'static> View for ResolvedLayoutDirection<Content> {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let direction = self.direction.clone();
         AnyView::new(LayoutDirectionObserver::new(
             AnyView::new((self.content)(self.direction.get())),

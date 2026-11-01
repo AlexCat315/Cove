@@ -1,6 +1,7 @@
 //! Translation of Primitives/Layout/Sidebar/Presentation.swift.
 //!
 //! Present the same destination nodes as a full sidebar or a narrow rail.
+use crate::Scope;
 use crate::primitives::controls::button::{Button, ButtonIconSource};
 use crate::theme::styles::buttons::{ButtonRole, ButtonStyleViewExt, GhostButtonStyle};
 use crate::{AnyView, PrimitiveView, View};
@@ -111,7 +112,7 @@ impl SidebarToggle {
 }
 
 impl View for SidebarToggle {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(SidebarToggleBody {
             label: self.label.clone(),
             is_expanded: self.is_expanded,

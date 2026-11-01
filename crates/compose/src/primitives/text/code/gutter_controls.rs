@@ -12,6 +12,7 @@
 //! - a breakpoint control shows the glyph; a fold/summary control shows a
 //!   chevron or the hidden-line badge; a markers control opens its actions
 //! - every control carries a label and, for breakpoints, its selected state
+use crate::Scope;
 use std::rc::Rc;
 
 use crate::modifiers::interaction::AccessibilityExt;
@@ -273,7 +274,7 @@ impl TextGutterControls {
 }
 
 impl View for TextGutterControls {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let controls = self.session.controls();
         let first = controls.first().map(|control| control.id.clone());
         let ids: Vec<String> = controls.iter().map(|control| control.id.clone()).collect();
@@ -317,6 +318,10 @@ impl View for TextGutterControls {
                 None,
             ),
         )
+    }
+
+    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
+        crate::dynamic_fields!(self; selected)
     }
 }
 

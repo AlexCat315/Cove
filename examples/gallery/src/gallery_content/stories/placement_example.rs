@@ -6,6 +6,7 @@
 //! the side the placement asks for. The mirror math is ordinary arithmetic with
 //! three branches that are easy to transpose, so it lives here as a function.
 
+use cove_composition::Scope;
 use cove_core::State;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
@@ -181,7 +182,7 @@ impl PlacementExample {
 }
 
 impl View for PlacementExample {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
         let title = Text::new("Placement playground")
             .semantic_font(cove_ui_compose::theme::SemanticFontRef::body_strong());
@@ -220,5 +221,9 @@ impl View for PlacementExample {
 
     fn tag(&self) -> &'static str {
         "PopoverPlacementExample"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; selected, last_action)
     }
 }

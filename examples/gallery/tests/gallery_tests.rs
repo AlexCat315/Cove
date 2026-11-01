@@ -36,6 +36,7 @@
 //! crate, because the Rust shell has no `AdaptiveApplicationContent`
 //! equivalent — `GalleryView` is mounted bare.
 
+use cove_composition::Scope;
 mod support;
 
 use std::collections::BTreeSet;
@@ -390,8 +391,8 @@ fn the_placement_playground_keeps_its_trigger_inside_the_story() {
 struct PlacementStory(std::rc::Rc<cove_examples::gallery_content::stories::PlacementExample>);
 
 impl cove_composition::View for PlacementStory {
-    fn body(&self) -> AnyView {
-        cove_composition::View::body(self.0.as_ref())
+    fn body(&self, cx: &Scope) -> AnyView {
+        cove_composition::View::body(self.0.as_ref(), cx)
     }
 }
 

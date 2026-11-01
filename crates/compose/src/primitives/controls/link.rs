@@ -1,4 +1,5 @@
 //! Translation of Primitives/Controls/Link.swift.
+use crate::Scope;
 use crate::modifiers::style::AppearanceExt;
 use crate::primitives::controls::button::{
     ActionControlAccessibility, Button, ButtonIcon, ButtonIconSource,
@@ -82,7 +83,7 @@ impl Link {
 }
 
 impl View for Link {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let mut content = vec![self.label.clone()];
         let trailing_icon = self.icon.clone().or_else(|| {
             self.is_external

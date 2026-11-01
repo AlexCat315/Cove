@@ -3,6 +3,7 @@
 //! A GFM table: columns sized to their content within a readable range, a tinted
 //! header, row rules, and horizontal scrolling when the table is wider than its
 //! container.
+use crate::Scope;
 use std::rc::Rc;
 
 use crate::LayoutContainer;
@@ -175,7 +176,7 @@ impl MarkdownTableView {
 }
 
 impl View for MarkdownTableView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let columns = self
             .table
             .header

@@ -21,6 +21,7 @@
 //!   label with no reserved slot, so the row is exactly the title's height.
 //!   `a_metadata_free_row_adds_no_blank_line` pins the current height.
 
+use cove_composition::Scope;
 #[allow(dead_code)]
 mod support;
 
@@ -75,7 +76,7 @@ fn default_events() -> Vec<TimelineEvent> {
 }
 
 impl View for TimelineHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let mut surface = Environment::default();
         surface.viewport.width = 1280.0;
         surface.viewport.height = 2000.0;

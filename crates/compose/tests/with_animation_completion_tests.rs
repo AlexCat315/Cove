@@ -8,6 +8,7 @@
 //! - with no callback the scheduler is untouched
 //! - enabling reduced motion finishes the current target and its completion
 
+use cove_composition::Scope;
 mod support;
 
 use cove_composition::{AnyView, DynamicField, View};
@@ -30,7 +31,7 @@ struct Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(DebugNode::new("x").opacity(self.alpha.get()))
     }
     fn dynamic_properties(&self) -> Vec<DynamicField> {
@@ -44,7 +45,7 @@ struct ReducedHarness {
 }
 
 impl View for ReducedHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(
             AnyView::new(DebugNode::new("reduced").opacity(self.alpha.get()))
                 .reduced_motion(self.reduced.get()),

@@ -6,6 +6,7 @@
 //! extends from the anchor, Cmd/Ctrl-click toggles, Shift+Arrow extends, Space
 //! toggles the cursor row and Cmd/Ctrl+A selects everything. Visual chrome is
 //! delegated to the active list row style.
+use crate::Scope;
 use std::rc::Rc;
 
 use crate::adaptive::SurfaceReader;
@@ -441,7 +442,7 @@ impl<Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> List<Id> {
 }
 
 impl<Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View for List<Id> {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let rows = self.rows_view();
         let list = self.snapshot();
         let host = AnyView::new(SelectionKeyHost::new(rows, true, move |event| {

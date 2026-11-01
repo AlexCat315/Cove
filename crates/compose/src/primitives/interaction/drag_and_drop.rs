@@ -5,6 +5,7 @@
 //! is portal-rendered above clipping; dropping calls the target's typed
 //! callback. Keyboard reordering is not implied: use a reorderable list when the
 //! same collection needs an Up/Down path.
+use crate::Scope;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -264,7 +265,7 @@ impl DragScope {
 }
 
 impl View for DragScope {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let revision = self.revision.get();
         AnyView::new(
             crate::BoxView::new(
@@ -311,7 +312,7 @@ impl Draggable {
 }
 
 impl View for Draggable {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(DragSourceHost {
             payload: self.payload,
             preview: self.preview.clone(),
@@ -455,7 +456,7 @@ impl DropTarget {
 }
 
 impl View for DropTarget {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(DropTargetHost {
             accepts: self.accepts.clone(),
             on_drop: self.on_drop.clone(),

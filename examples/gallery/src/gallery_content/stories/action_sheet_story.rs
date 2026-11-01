@@ -6,6 +6,7 @@
 //! arrow navigation but still rendered, and the close control sits outside the
 //! scrolling list so it stays reachable.
 
+use cove_composition::Scope;
 use cove_core::State;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::button::ButtonRole;
@@ -123,7 +124,7 @@ impl ActionSheetStory {
 }
 
 impl View for ActionSheetStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
         let trigger = Text::new("Project actions");
 
@@ -166,6 +167,10 @@ impl View for ActionSheetStory {
 
     fn tag(&self) -> &'static str {
         "ActionSheetStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; open, many_open, last_action, export_enabled)
     }
 }
 

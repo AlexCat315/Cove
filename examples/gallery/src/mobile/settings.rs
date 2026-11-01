@@ -10,6 +10,7 @@
 //! - the sheet offers exactly System, Light and Dark
 //! - sign-out is destructive and carries no toggle
 
+use cove_composition::Scope;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -162,7 +163,7 @@ impl SettingsScreen {
 }
 
 impl View for SettingsScreen {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let title =
             Text::new("Settings").semantic_font(cove_ui_compose::theme::SemanticFontRef::display());
 
@@ -227,5 +228,9 @@ impl View for SettingsScreen {
 
     fn tag(&self) -> &'static str {
         "SettingsScreen"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; is_choosing_appearance, notifications, sync_over_cellular, reduce_motion)
     }
 }

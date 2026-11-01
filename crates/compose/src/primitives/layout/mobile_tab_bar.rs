@@ -3,11 +3,12 @@
 //! Bottom tab bar for touch surfaces. Up to four tabs stay visible; when there
 //! are more, the fourth slot follows the selection and the rest open from a
 //! "more" menu.
+use crate::Scope;
 use std::rc::Rc;
 
 use cove_composition::{AnyView, View};
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Wrap};
-use cove_core::{Binding, State};
+use cove_core::{Binding, Signal};
 
 use crate::BoxView;
 use crate::modifiers::interaction::AccessibilityExt;
@@ -67,11 +68,11 @@ impl<Id: std::hash::Hash + Eq + Clone + PartialEq + 'static> MobileTabBar<Id> {
 impl<Id: std::hash::Hash + Eq + Clone + PartialEq + Send + Sync + 'static> View
     for MobileTabBar<Id>
 {
-    fn body(&self) -> AnyView {
+    fn body(&self, cx: &Scope) -> AnyView {
         let tabs = self.tabs.clone();
         let selection = self.selection.clone();
         let is_enabled = self.is_enabled;
-        let shows_more: State<bool> = State::new(false);
+        let shows_more = cx.state(|| false);
 
         let visible = self.visible_tabs();
         let visible_ids: std::collections::HashSet<u64> =
@@ -194,7 +195,7 @@ fn more_item<Id: std::hash::Hash + Eq + Clone + PartialEq + Send + Sync + 'stati
     hidden: Vec<TabItem<Id>>,
     selection: Binding<Id>,
     bar_enabled: bool,
-    shows_more: State<bool>,
+    shows_more: Signal<bool>,
 ) -> AnyView {
     let mut menu_entries: Vec<MenuEntry> = Vec::new();
     for tab in &hidden {

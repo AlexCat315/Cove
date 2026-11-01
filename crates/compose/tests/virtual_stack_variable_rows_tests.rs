@@ -29,6 +29,7 @@
 //!   contract from those and the case asserts the same values. Recorded as a
 //!   surface difference, not a behaviour gap: every number Swift asserts holds.
 
+use cove_composition::Scope;
 mod support;
 
 use std::rc::Rc;
@@ -335,7 +336,7 @@ fn row_height(id: usize) -> f32 {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let ids: Vec<i32> = (0..self.count.get()).map(|index| index as i32).collect();
         let heights: Vec<f32> = ids.iter().map(|id| row_height(*id as usize)).collect();
         let width = self.width.get();

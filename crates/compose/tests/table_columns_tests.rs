@@ -42,6 +42,7 @@
 //!   tree. Because authored-order planning hides `Category` rather than `Notes`
 //!   at 390pt, that query names `Category`.
 
+use cove_composition::Scope;
 mod support;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -186,7 +187,7 @@ impl Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let widths = bind(&self.widths);
         let enabled = self.enabled.get();
         let table: AnyView = if self.data {

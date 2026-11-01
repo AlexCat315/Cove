@@ -5,6 +5,7 @@
 //! one tip at a time, the innermost target wins, and a tip that follows another
 //! within the warm window skips the rest delay so the pointer can travel along a
 //! toolbar.
+use crate::Scope;
 use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
 
@@ -762,7 +763,7 @@ impl Tooltip {
 }
 
 impl View for Tooltip {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         if let Some(anchor) = self.anchor {
             return AnyView::new(CoordinateTooltipHost {
                 anchor,

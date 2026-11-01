@@ -6,6 +6,7 @@
 //!
 //! Sheets, dialogs and menus present in the layer root's portal layer, so the
 //! root wraps `LayerRoot` rather than a plain column.
+use cove_composition::Scope;
 use cove_core::State;
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
@@ -77,7 +78,7 @@ pub fn make_application_content() -> MobileRoot {
 }
 
 impl View for MobileRoot {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let tabs = vec![
             cove_ui_compose::primitives::layout::tab_view::TabItem::new(
                 MobileTab::Today,

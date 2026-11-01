@@ -4,6 +4,7 @@
 //! An edge sheet: a rounded panel flush to one window edge, sized along the
 //! axis it slides on. The bottom sheet keeps its own detent model; this is the
 //! simpler single-extent form used for inspector panels and settings trays.
+use crate::Scope;
 use cove_core::Binding;
 
 use crate::primitives::overlays::modal::Modal;
@@ -142,7 +143,7 @@ impl Sheet {
 }
 
 impl View for Sheet {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let mut geometry = self.options.geometry();
         geometry.validate();
         let options = ModalOptions {

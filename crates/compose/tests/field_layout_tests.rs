@@ -17,6 +17,7 @@
 //! asserted directly on `absolute_frame()`, which is what the diagnostics query
 //! reports.
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::Cell;
@@ -163,7 +164,7 @@ impl View for HarnessView {
         ]
     }
 
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let width = self.width.get();
         let mut surface = Environment::default();
         // Deliberately different from the content width: decisions belong to the

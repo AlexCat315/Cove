@@ -25,6 +25,7 @@
 //! What is asserted is the geometry and semantics the shipped story does expose,
 //! across the same width / scale / direction / theme matrix.
 
+use cove_composition::Scope;
 mod support;
 
 use std::rc::Rc;
@@ -52,7 +53,7 @@ struct Mounted {
 }
 
 impl cove_composition::View for Mounted {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let inner = StoryView(self.story.clone());
         AnyView::new(
             AnyView::new(inner)
@@ -79,8 +80,8 @@ impl cove_composition::View for Mounted {
 struct StoryView(Rc<RatingSample>);
 
 impl cove_composition::View for StoryView {
-    fn body(&self) -> AnyView {
-        cove_composition::View::body(self.0.as_ref())
+    fn body(&self, cx: &Scope) -> AnyView {
+        cove_composition::View::body(self.0.as_ref(), cx)
     }
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
         cove_composition::View::dynamic_properties(self.0.as_ref())

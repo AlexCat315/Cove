@@ -14,7 +14,7 @@ use cove_core::scene::{
     LocalInvalidationHandle, Node, NodeKey, NodeTree, ObservableStateTracking, RecompositionReason,
     RenderTree, StateRegistry, TextInputAreaResolver, TextInputAttachmentKey,
 };
-use cove_core::{Point, Rect, with_deferred_evaluation};
+use cove_core::{Observer, Point, Rect, with_deferred_evaluation};
 use cove_platform::TextInputArea;
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
@@ -23,7 +23,7 @@ use std::rc::{Rc, Weak};
 use crate::layout_debug_modifier::LayoutDebugAttachmentKey;
 use crate::{
     AnyView, AsAny, DynamicField, EmptyView, IdentifiedView, LayoutTree, ModifierReplay,
-    PrimitiveView, SourceLocatedView, View, ViewKind,
+    PrimitiveView, Scope, SourceLocatedView, View, ViewKind,
 };
 
 pub struct LayoutSnapshotEntry {
@@ -770,6 +770,17 @@ pub(crate) fn slot_tag(view: &dyn View) -> String {
         }
         break;
     }
+    // Swift's `ModifiedContent<Content, Modifier>` is generic over both, so a
+    // modified view is only the same slot as another with the same modifier
+    // around the same content. One erased tag for every modified view let the
+    // reconciler update a header in place with a row's content.
+    if let Some(modified) = current.as_any().downcast_ref::<crate::ModifiedContent>() {
+        return format!(
+            "{}<{}>",
+            modified.modifier_ref().modifier_name(),
+            slot_tag(modified.content())
+        );
+    }
     current.tag().to_string()
 }
 
@@ -904,6 +915,8 @@ pub(crate) struct ViewScope {
     fields: Vec<DynamicField>,
     state_registrations: Vec<String>,
     read_invalidation: Option<LocalInvalidationHandle>,
+    cx: Scope,
+    observer: Option<Rc<Observer>>,
 }
 
 impl ViewScope {
@@ -924,14 +937,38 @@ impl ViewScope {
             fields: Vec::new(),
             state_registrations: Vec::new(),
             read_invalidation: None,
+            cx: Scope::default(),
+            observer: None,
         }
     }
 
     /// Wire state observers and materialise the body for the first time.
     fn install(scope: &Rc<RefCell<Self>>, graph: &Rc<ViewGraph>) {
-        scope.borrow_mut().installed = true;
+        let weak_scope = Rc::downgrade(scope);
+        let weak_graph = Rc::downgrade(graph);
+        let observer = Observer::new(move || {
+            let (Some(scope), Some(graph)) = (weak_scope.upgrade(), weak_graph.upgrade()) else {
+                return;
+            };
+            Self::schedule(&scope, &graph, RecompositionReason::new("signal"));
+        });
+        {
+            let mut scope = scope.borrow_mut();
+            scope.installed = true;
+            scope.observer = Some(Rc::new(observer));
+        }
         Self::wire_dynamic_properties(scope, graph);
         Self::materialise_body(scope, graph);
+    }
+
+    /// Evaluate `run` under this scope's observer: the body and the
+    /// primitives it materialises directly subscribe to the signals they read.
+    fn observed<R>(scope: &Rc<RefCell<Self>>, run: impl FnOnce() -> R) -> R {
+        let observer = scope.borrow().observer.clone();
+        match observer {
+            Some(observer) => observer.track(run),
+            None => run(),
+        }
     }
 
     fn uninstall(scope: &Rc<RefCell<Self>>, graph: &ViewGraph) {
@@ -947,7 +984,11 @@ impl ViewScope {
             }
             scope.anchor.id()
         };
-        scope.borrow_mut().read_invalidation.take();
+        {
+            let mut scope = scope.borrow_mut();
+            scope.read_invalidation.take();
+            scope.observer.take();
+        }
         ObservableStateTracking::remove_scope(cove_core::ReadScopeId(anchor_id.0));
     }
 
@@ -1048,8 +1089,8 @@ impl ViewScope {
             .active_recomposition_scope
             .replace(Some(anchor.id().0));
         let trace = graph.timeline_begin();
-        let body = Self::body(scope);
-        ObservableStateTracking::observe_reads(|| {
+        Self::observed(scope, || {
+            let body = Self::body(scope);
             graph.reconcile_children(&anchor, layout_parent.as_ref(), std::slice::from_ref(&body));
         });
         graph.active_recomposition_scope.set(previous);
@@ -1099,8 +1140,8 @@ impl ViewScope {
             .active_recomposition_scope
             .replace(Some(anchor.id().0));
         let trace = graph.timeline_begin();
-        let body = Self::body(scope);
-        ObservableStateTracking::observe_reads(|| {
+        Self::observed(scope, || {
+            let body = Self::body(scope);
             let _ = graph.materialise(&body, &anchor, layout_parent.as_ref());
         });
         graph.active_recomposition_scope.set(previous);
@@ -1133,29 +1174,31 @@ impl ViewScope {
     }
 
     fn body(scope: &Rc<RefCell<Self>>) -> AnyView {
-        let (view, scope_id, invalidate, invalidate_tracked) = {
+        let (view, cx, tracking) = {
             let scope = scope.borrow();
-            let Some(read_invalidation) = scope.read_invalidation.as_ref() else {
-                return if Self::is_materialised_directly(scope.view.storage.as_ref()) {
-                    scope.view.clone()
-                } else {
-                    scope.view.body()
-                };
-            };
-            (
-                scope.view.clone(),
-                cove_core::ReadScopeId(scope.anchor.id().0),
-                read_invalidation.invalidator(),
-                Some(read_invalidation.tracked()),
-            )
+            let tracking = scope.read_invalidation.as_ref().map(|read_invalidation| {
+                (
+                    cove_core::ReadScopeId(scope.anchor.id().0),
+                    read_invalidation.invalidator(),
+                    read_invalidation.tracked(),
+                )
+            });
+            (scope.view.clone(), scope.cx.clone(), tracking)
         };
-        ObservableStateTracking::with_scope(scope_id, invalidate, invalidate_tracked, || {
+        let evaluate = || {
             if Self::is_materialised_directly(view.storage.as_ref()) {
-                view
+                view.clone()
             } else {
-                view.body()
+                cx.begin();
+                view.body(&cx)
             }
-        })
+        };
+        match tracking {
+            Some((scope_id, invalidate, tracked)) => {
+                ObservableStateTracking::with_scope(scope_id, invalidate, Some(tracked), evaluate)
+            }
+            None => evaluate(),
+        }
     }
 
     /// Defensive guard for bodyless view forms. These normally get handled by

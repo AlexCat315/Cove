@@ -6,6 +6,7 @@
 //!
 //! Reads from the text environment for shaping; without one installed the field
 //! still accepts input but renders no glyphs.
+use crate::Scope;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -260,7 +261,7 @@ impl TextField {
 }
 
 impl View for TextField {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(TextFieldHost {
             field: self.snapshot(),
         })

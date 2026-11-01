@@ -6,6 +6,7 @@
 //! trailing count, interactive pin) and a detail pane that follows the selection.
 //! The story also embeds the resizable and nested examples directly.
 
+use cove_composition::Scope;
 use cove_core::State;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
@@ -292,7 +293,7 @@ impl SidebarStory {
 }
 
 impl View for SidebarStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let detail = self.detail();
         let caption = Text::new(
             "Selection belongs to the application. This content updates when a destination is clicked or reached with the keyboard.",
@@ -342,5 +343,9 @@ impl View for SidebarStory {
 
     fn tag(&self) -> &'static str {
         "SidebarStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; selection, shows_icons, shows_badges, is_drawer_open, is_pinned)
     }
 }

@@ -5,6 +5,7 @@
 //! Swift file are listed in [`crate::gallery_content::routing::MigrationPending`]
 //! because they need widgets that have no view component yet.
 
+use cove_composition::Scope;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{Binding, State};
 use cove_ui_compose::primitives::controls::Button;
@@ -67,7 +68,7 @@ impl ButtonStory {
 }
 
 impl View for ButtonStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
 
         // Variants: Primary keeps the ambient style; the rest override it with a
@@ -251,7 +252,7 @@ impl CheckboxStory {
 }
 
 impl View for CheckboxStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
         let checked = self.checked.clone();
         let mixed = self.mixed.clone();
@@ -352,7 +353,7 @@ impl ToggleStory {
 }
 
 impl View for ToggleStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
         let notifications = self.notifications.clone();
         let telemetry = self.telemetry.clone();

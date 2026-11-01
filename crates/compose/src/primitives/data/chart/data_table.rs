@@ -13,6 +13,7 @@
 //! - a categorical x axis gives one row per position with one cell per series
 //! - a missing or non-finite value reads as a gap, not a zero
 
+use crate::Scope;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -242,7 +243,7 @@ impl ChartDataTable {
 }
 
 impl View for ChartDataTable {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let header = AnyView::new(
             AnyView::new(ChartDataTableRow {
                 label: self.axis_label.clone(),
@@ -316,7 +317,7 @@ struct ChartDataTableRow {
 }
 
 impl View for ChartDataTableRow {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let mut items: Vec<(String, Option<String>)> = vec![(self.label.clone(), None)];
         for (index, cell) in self.cells.iter().enumerate() {
             items.push((cell.clone(), self.columns.get(index).cloned()));
@@ -368,7 +369,7 @@ struct ChartDataTableCell {
 }
 
 impl View for ChartDataTableCell {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let alignment = if self.column.is_none() {
             TextAlignment::Leading
         } else {

@@ -17,6 +17,7 @@
 //!   400 instead of 520. `scroll_anchor` pins both the anchored result (through
 //!   a local marker modifier) and the unmarked result.
 
+use cove_composition::Scope;
 mod support;
 
 use std::rc::Rc;
@@ -54,7 +55,7 @@ struct Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(
             ScrollView::new(
                 ScrollAxis::Vertical,
@@ -90,7 +91,7 @@ struct AnchorHarness {
 }
 
 impl View for AnchorHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let rows: Vec<AnyView> = self
             .rows
             .get()
@@ -136,7 +137,7 @@ struct TimedHarness {
 }
 
 impl View for TimedHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let mut scroll = ScrollView::new(
             ScrollAxis::Vertical,
             empty_box().frame_height(1_000.0).flex_with(0.0, 0.0, None),

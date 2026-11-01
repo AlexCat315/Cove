@@ -9,20 +9,6 @@
 //! - the picker lists only accepted kinds and writes the full value back
 //! - clearing the value removes the clear action but keeps the picker
 //! - a disabled field exposes no activation path and never mutates the value
-//!
-//! Named differences against the Swift suite:
-//! 1. `AssetPicker` builds its `Popover` without a presentation binding, so the
-//!    picker keeps `Binding::constant(false)` and can never open; the picker's
-//!    kind filtering and write-back are asserted on `accepted_picker_options`,
-//!    the same model path the view consumes.
-//! 2. The picker trigger publishes its description as a dead `__popover.label`
-//!    node attachment instead of the `ActionControlAccessibility.label`/`.value`
-//!    composition locals Swift installs, so it reaches assistive technology with
-//!    an empty label.
-//! 3. `AssetRefField` declares no `DynamicField` for its `value` binding, so a
-//!    write from inside the field schedules no recomposition and the chrome
-//!    keeps rendering the previous asset. The binding itself is written
-//!    correctly, which is what the assertions cover.
 
 mod support;
 
@@ -104,39 +90,17 @@ fn picker_options_visible(nodes: &[Node]) -> Vec<AssetRef> {
     field.accepted_picker_options()
 }
 
-/// The popover trigger carrying the picker's trigger description.
+/// The popover trigger, named by its trigger description.
 fn picker_trigger(nodes: &[Node]) -> Node {
     nodes
         .iter()
         .find(|node| {
-            node.attachment::<String>("__popover.label").as_deref() == Some("Choose asset")
+            node.accessibility()
+                .is_some_and(|semantics| semantics.role == AccessibilityRole::Button)
+                && cove_core::scene::AccessibilityTree::resolved_label(node) == "Choose asset"
         })
-        .and_then(|node| {
-            let mut cursor = node.clone();
-            loop {
-                if cursor
-                    .accessibility()
-                    .is_some_and(|semantics| semantics.role == AccessibilityRole::Button)
-                {
-                    return Some(cursor);
-                }
-                match cursor.parent() {
-                    Some(parent) => cursor = parent,
-                    None => return None,
-                }
-            }
-        })
-        .or_else(|| {
-            nodes
-                .iter()
-                .find(|node| {
-                    node.accessibility().is_some_and(|semantics| {
-                        semantics.role == AccessibilityRole::Button && semantics.label.is_empty()
-                    })
-                })
-                .cloned()
-        })
-        .expect("the picker trigger materialises")
+        .cloned()
+        .expect("the picker trigger materialises with its accessible label")
 }
 
 fn nodes_of(root: &Node) -> Vec<Node> {
@@ -279,25 +243,11 @@ fn touch_actions_fit_the_field_and_the_picker_respects_kinds() {
                                     "the clear action stays inside the field ({context_label})"
                                 );
 
-                                // Named difference: `AssetPicker` publishes its trigger
-                                // description as a `__popover.label` node attachment, but
-                                // nothing consumes it, so the trigger button reaches
-                                // assistive technology with an empty label. Swift installs
-                                // `ActionControlAccessibility.label`/`.value` composition
-                                // locals on the trigger (`Popover.swift:61`). Pinned below.
                                 let trigger = picker_trigger(&nodes);
-                                let trigger_semantics =
-                                    trigger.accessibility().expect("trigger semantics");
                                 assert_eq!(
-                                    (trigger_semantics.role, trigger_semantics.label.as_str()),
-                                    (AccessibilityRole::Button, ""),
-                                    "the picker trigger keeps its empty accessible label ({context_label})"
-                                );
-                                assert!(
-                                    nodes.iter().any(|node| node
-                                        .attachment::<String>("__popover.label")
-                                        .is_some_and(|label| label == "Choose asset")),
-                                    "the trigger description is parked on a node attachment ({context_label})"
+                                    cove_core::scene::AccessibilityTree::resolved_label(&trigger),
+                                    "Choose asset",
+                                    "the picker trigger is named by its description ({context_label})"
                                 );
                                 assert!(
                                     contains_rect(

@@ -13,6 +13,7 @@
 //! - activating an item runs its action and then the sheet's dismissal
 //! - labels, separators and plain submenu entries are not actionable rows
 
+use crate::Scope;
 use std::rc::Rc;
 
 use crate::modifiers::interaction::AccessibilityExt;
@@ -27,7 +28,7 @@ use crate::theme::{SemanticColorRef, SemanticFontRef};
 use crate::{AnyView, BoxView, TupleView, View};
 use cove_composition::LayoutDebugExt;
 use cove_composition::Scancode;
-use cove_core::State;
+use cove_core::Signal;
 use cove_core::scene::{
     AccessibilityRole, AccessibilitySemantics, Align, FlexDirection, Justify, Wrap,
 };
@@ -90,8 +91,6 @@ impl TouchMenuLevel {
 pub struct TouchMenu {
     pub entries: Vec<MenuEntry>,
     pub on_item_activated: Option<Rc<dyn Fn()>>,
-    path: State<Vec<u64>>,
-    highlighted: State<Option<u64>>,
 }
 
 impl TouchMenu {
@@ -99,8 +98,6 @@ impl TouchMenu {
         Self {
             entries,
             on_item_activated: None,
-            path: State::new(Vec::new()),
-            highlighted: State::new(None),
         }
     }
 
@@ -109,36 +106,12 @@ impl TouchMenu {
         self
     }
 
-    fn level(&self) -> TouchMenuLevel {
-        TouchMenuLevel::resolve(&self.entries, &self.path.get())
-    }
-
-    /// The roving stop: the highlighted row while it is still enabled, else the
-    /// first enabled row.
-    pub fn active(&self) -> Option<u64> {
-        let level = self.level();
-        let enabled = level.enabled_ids();
-        match self.highlighted.get() {
-            Some(id) if enabled.contains(&id) => Some(id),
-            _ => enabled.first().copied(),
-        }
-    }
-
-    pub fn pop(&self) {
-        let mut path = self.path.get();
-        path.pop();
-        self.path.set(path);
-        self.highlighted.set(None);
-    }
-
-    pub fn push(&self, id: u64) {
-        let mut path = self.path.get();
-        path.push(id);
-        self.path.set(path);
-        self.highlighted.set(None);
-    }
-
-    fn entry_view(&self, entry: &MenuEntry, active: Option<u64>) -> AnyView {
+    fn entry_view(
+        &self,
+        menu: TouchMenuSession,
+        entry: &MenuEntry,
+        active: Option<u64>,
+    ) -> AnyView {
         let Some(row) = entry.row() else {
             return match entry {
                 MenuEntry::Label { title, .. } => AnyView::new(
@@ -160,7 +133,6 @@ impl TouchMenu {
         let activate = {
             let entry = entry.clone();
             let on_item = self.on_item_activated.clone();
-            let menu = self.session();
             Rc::new(move || match &entry {
                 MenuEntry::Item(item) => {
                     (item.action)();
@@ -195,47 +167,61 @@ impl TouchMenu {
             }),
         )
     }
-
-    /// The path store, cloned so row closures do not borrow the view.
-    fn session(&self) -> TouchMenuSession {
-        TouchMenuSession {
-            path: self.path.clone(),
-            highlighted: self.highlighted.clone(),
-        }
-    }
 }
 
-#[derive(Clone)]
+/// The navigation path and roving highlight, owned by the menu's scope.
+#[derive(Clone, Copy)]
 struct TouchMenuSession {
-    path: State<Vec<u64>>,
-    highlighted: State<Option<u64>>,
+    path: Signal<Vec<u64>>,
+    highlighted: Signal<Option<u64>>,
 }
 
 impl TouchMenuSession {
+    fn level(&self, entries: &[MenuEntry]) -> TouchMenuLevel {
+        self.path
+            .with(|path| TouchMenuLevel::resolve(entries, path))
+    }
+
+    /// The roving stop: the highlighted row while it is still enabled, else the
+    /// first enabled row.
+    fn active(&self, level: &TouchMenuLevel) -> Option<u64> {
+        let enabled = level.enabled_ids();
+        match self.highlighted.get() {
+            Some(id) if enabled.contains(&id) => Some(id),
+            _ => enabled.first().copied(),
+        }
+    }
+
     fn push(&self, id: u64) {
-        let mut path = self.path.get();
-        path.push(id);
-        self.path.set(path);
-        self.highlighted.set(None);
+        cove_core::batch(|| {
+            self.path.update(|path| path.push(id));
+            self.highlighted.set(None);
+        });
     }
 
     fn pop(&self) {
-        let mut path = self.path.get();
-        path.pop();
-        self.path.set(path);
-        self.highlighted.set(None);
+        cove_core::batch(|| {
+            self.path.update(|path| {
+                path.pop();
+            });
+            self.highlighted.set(None);
+        });
     }
 }
 
 impl View for TouchMenu {
-    fn body(&self) -> AnyView {
-        let level = self.level();
+    fn body(&self, cx: &Scope) -> AnyView {
+        let menu = TouchMenuSession {
+            path: cx.state(Vec::new),
+            highlighted: cx.state(|| None),
+        };
+        let level = menu.level(&self.entries);
         let enabled = level.enabled_ids();
-        let active = self.active();
+        let active = menu.active(&level);
 
         let mut children = Vec::new();
         if let Some(title) = &level.title {
-            let back = self.session();
+            let back = menu;
             children.push(AnyView::new(
                 AnyView::new(
                     crate::primitives::controls::Button::new(
@@ -279,7 +265,7 @@ impl View for TouchMenu {
         }
 
         for entry in &level.entries {
-            children.push(self.entry_view(entry, active));
+            children.push(self.entry_view(menu, entry, active));
         }
 
         let body = AnyView::new(
@@ -295,14 +281,11 @@ impl View for TouchMenu {
             .debug_name("touch-menu"),
         );
 
-        let highlighted = self.highlighted.clone();
+        let highlighted = menu.highlighted;
         AnyView::new(
             RovingFocusHost::new(
                 enabled,
-                {
-                    let highlighted = highlighted.clone();
-                    move || highlighted.get()
-                },
+                move || highlighted.get(),
                 move |id: u64| highlighted.set(Some(id)),
                 |id: &u64| *id,
                 body,
@@ -328,7 +311,7 @@ struct TouchMenuRow {
 }
 
 impl View for TouchMenuRow {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let row = self.row.clone();
         let activate = self.activate.clone();
         let role = if row.role == MenuItemRole::Destructive {

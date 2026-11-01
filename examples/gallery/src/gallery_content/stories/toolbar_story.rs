@@ -6,6 +6,7 @@
 //! `Always` never moves, `Overflow` never inlines, and larger automatic
 //! priorities survive longer while ties keep source order.
 
+use cove_composition::Scope;
 use cove_core::State;
 use cove_ui_compose::modifiers::layout::PaddingExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
@@ -121,7 +122,7 @@ impl ToolbarStory {
 }
 
 impl View for ToolbarStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
         let apply = self.applied_action.clone();
         let note = Text::new(
@@ -172,5 +173,9 @@ impl View for ToolbarStory {
 
     fn tag(&self) -> &'static str {
         "ToolbarStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; is_playing, applied_action)
     }
 }

@@ -12,6 +12,7 @@
 //! - a tag mismatch tears the node down
 //! - a modifier re-applies to the reused node when its value changes
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::Cell;
@@ -82,7 +83,7 @@ struct StateHarness {
 }
 
 impl View for StateHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(Labelled(self.state.get()))
     }
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
@@ -427,7 +428,7 @@ fn a_same_shape_recompose_reuses_the_node_and_its_attachments() {
             counting: CountingNode,
         }
         impl View for Harness {
-            fn body(&self) -> AnyView {
+            fn body(&self, _cx: &Scope) -> AnyView {
                 AnyView::new(CountingNode(self.counting.0.clone(), self.value.get()))
             }
             fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
@@ -477,7 +478,7 @@ fn a_tag_mismatch_tears_down_the_old_node() {
             flag: Rc<State<bool>>,
         }
         impl View for Harness {
-            fn body(&self) -> AnyView {
+            fn body(&self, _cx: &Scope) -> AnyView {
                 if self.flag.get() {
                     AnyView::new(CountingNode(Rc::new(Cell::new(0)), 100))
                 } else {
@@ -520,7 +521,7 @@ fn a_modifier_reapplies_to_the_reused_node() {
             y: Rc<State<f32>>,
         }
         impl View for Harness {
-            fn body(&self) -> AnyView {
+            fn body(&self, _cx: &Scope) -> AnyView {
                 AnyView::new(AnyView::new(Labelled(0)).modifier(MarkerModifier(self.y.get())))
             }
             fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {

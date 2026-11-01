@@ -1,24 +1,27 @@
 //! Translation of Primitives/Controls/MenuButton.swift.
 //!
-//! A button that opens a menu anchored to itself. It uses the regular popover
-//! trigger contract, so the menu escapes clipping, closes on Escape or an
-//! outside click, and exposes expanded state to accessibility.
-use std::sync::{Arc, Mutex};
+//! A button that opens a menu anchored to itself. With a native menu backend on
+//! a pointer surface it shows the system menu; otherwise it uses the regular
+//! popover trigger contract, so the menu escapes clipping, closes on Escape or
+//! an outside click, and exposes expanded state to accessibility.
+use crate::Scope;
+use cove_core::scene::{Align, FlexDirection, Justify, NativeMenuPresenter, Node, Wrap};
+use cove_core::{Environment, Point, Rect, Signal};
 
-use cove_core::Binding;
-use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
-
-use crate::modifiers::layout::LayoutFrameExt;
-use crate::primitives::controls::button::{Button, ButtonRole};
+use crate::adaptive::SurfaceReader;
+use crate::modifiers::layout::{CaptureFrameExt, FrameBox, LayoutFrameExt};
+use crate::primitives::controls::button::{ActionControlAccessibility, Button, ButtonRole};
 use crate::primitives::overlays::anchored::PopoverPlacement;
-use crate::primitives::overlays::menu::{Menu, MenuEntry};
-use crate::primitives::overlays::popover::Popover;
+use crate::primitives::overlays::menu::{Menu, MenuEntry, NativeMenuBuilder};
+use crate::primitives::overlays::modal::uses_sheet;
+use crate::primitives::overlays::popover::{Popover, PopoverTriggerDescription};
 use crate::primitives::text::Text;
 use crate::theme::SemanticFontRef;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, SecondaryButtonStyle};
-use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, impl_primitive_view};
+use crate::{AnyView, BoxView, PrimitiveView, TupleView, View, ViewExt, impl_primitive_view};
 
 /// A button that opens a menu.
+#[derive(Clone)]
 pub struct MenuButton<Label: View + Clone + 'static> {
     pub entries: Vec<MenuEntry>,
     pub is_enabled: bool,
@@ -27,7 +30,6 @@ pub struct MenuButton<Label: View + Clone + 'static> {
     pub accessibility_label: Option<String>,
     pub tooltip: Option<String>,
     pub label: Label,
-    presented: Arc<Mutex<bool>>,
 }
 
 impl<Label: View + Clone + 'static> MenuButton<Label> {
@@ -40,7 +42,6 @@ impl<Label: View + Clone + 'static> MenuButton<Label> {
             accessibility_label: None,
             tooltip: None,
             label,
-            presented: Arc::new(Mutex::new(false)),
         }
     }
 
@@ -69,71 +70,94 @@ impl<Label: View + Clone + 'static> MenuButton<Label> {
         self
     }
 
-    /// The popover trigger, exposed for hosts that need the chrome alone.
-    pub fn menu(&self) -> Menu {
+    /// The menu the popover presents; activating an item closes it.
+    pub fn menu(&self, presented: Signal<bool>) -> Menu {
         let menu = Menu::new(self.entries.clone());
         let menu = match self.width {
             Some(width) => menu.width(width),
             None => menu,
         };
-        let presented = self.presented.clone();
-        menu.on_item_activated(move || {
-            *presented
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner()) = false;
-        })
+        menu.on_item_activated(move || presented.set(false))
+    }
+
+    /// A button that opens the system menu anchored at its own corner.
+    fn native_button(&self) -> AnyView {
+        let frame = FrameBox::new();
+        let captured = frame.clone();
+        let entries = self.entries.clone();
+        let placement = self.placement;
+        let button = Button::with_options(
+            self.label.clone(),
+            move || {
+                let Some(rect) = captured.current() else {
+                    return;
+                };
+                let built = NativeMenuBuilder::build(&entries);
+                if let Some(chosen) =
+                    NativeMenuPresenter::present(&built.snapshot, anchor(rect, placement))
+                {
+                    built.run(chosen);
+                }
+            },
+            ButtonRole::Normal,
+            self.is_enabled,
+            false,
+            false,
+            self.tooltip.clone(),
+        )
+        .button_style(SecondaryButtonStyle)
+        .capture_frame(frame);
+        match &self.accessibility_label {
+            Some(label) => AnyView::new(
+                button.composition_local(ActionControlAccessibility::label(), Some(label.clone())),
+            ),
+            None => AnyView::new(button),
+        }
+    }
+
+    fn popover_button(&self, presented: Signal<bool>) -> AnyView {
+        let mut popover = Popover::new(self.label.clone(), self.menu(presented))
+            .is_presented(presented.into())
+            .enabled(self.is_enabled)
+            .placement(self.placement)
+            .trigger_style(SecondaryButtonStyle);
+        if let Some(width) = self.width {
+            popover = popover.width(width);
+        }
+        if let Some(label) = &self.accessibility_label {
+            popover = popover.trigger_description(PopoverTriggerDescription {
+                label: label.clone(),
+                value: String::new(),
+                help: self.tooltip.clone(),
+            });
+        }
+        AnyView::new(popover)
+    }
+}
+
+/// The anchor for a menu at a button's corner: bottom corners for bottom and
+/// side placements, top corners for top placements.
+fn anchor(frame: Rect, placement: PopoverPlacement) -> Point {
+    use PopoverPlacement::*;
+    match placement {
+        TopLeading | Top | LeadingTop => Point::new(frame.x, frame.y),
+        TopTrailing | TrailingTop => Point::new(frame.max_x(), frame.y),
+        Leading | LeadingBottom | BottomLeading | Bottom => Point::new(frame.x, frame.max_y()),
+        Trailing | TrailingBottom | BottomTrailing => Point::new(frame.max_x(), frame.max_y()),
     }
 }
 
 impl<Label: View + Clone + 'static> View for MenuButton<Label> {
-    fn body(&self) -> AnyView {
-        let presented = Binding::new(
-            {
-                let state = self.presented.clone();
-                move || {
-                    *state
-                        .lock()
-                        .unwrap_or_else(|poisoned| poisoned.into_inner())
-                }
-            },
-            {
-                let state = self.presented.clone();
-                move |value: bool| {
-                    *state
-                        .lock()
-                        .unwrap_or_else(|poisoned| poisoned.into_inner()) = value;
-                }
-            },
-        );
-        let label = AnyView::new(
-            Button::with_options(
-                self.label.clone(),
-                || {},
-                ButtonRole::Normal,
-                self.is_enabled,
-                false,
-                false,
-                self.tooltip.clone(),
-            )
-            .button_style(SecondaryButtonStyle),
-        );
-        let mut popover = Popover::new(label, AnyView::new(self.menu()))
-            .is_presented(presented)
-            .enabled(self.is_enabled)
-            .placement(self.placement);
-        if let Some(width) = self.width {
-            popover = popover.width(width);
-        }
-        if let Some(label) = self.accessibility_label.as_ref() {
-            popover = popover.trigger_description(
-                crate::primitives::overlays::popover::PopoverTriggerDescription {
-                    label: label.clone(),
-                    value: String::new(),
-                    help: self.tooltip.clone(),
-                },
-            );
-        }
-        AnyView::new(popover)
+    fn body(&self, cx: &Scope) -> AnyView {
+        let presented = cx.state(|| false);
+        let this = self.clone();
+        AnyView::new(SurfaceReader::new(move |surface: &Environment| {
+            if NativeMenuPresenter::is_installed() && !uses_sheet(surface) {
+                this.native_button()
+            } else {
+                this.popover_button(presented)
+            }
+        }))
     }
 }
 
@@ -146,7 +170,6 @@ pub struct MenuButtonTitle {
     pub width: Option<f32>,
     pub placement: PopoverPlacement,
     pub tooltip: Option<String>,
-    presented: Arc<Mutex<bool>>,
 }
 
 impl MenuButtonTitle {
@@ -158,7 +181,6 @@ impl MenuButtonTitle {
             width: None,
             placement: PopoverPlacement::BottomLeading,
             tooltip: None,
-            presented: Arc::new(Mutex::new(false)),
         }
     }
 
@@ -184,7 +206,7 @@ impl MenuButtonTitle {
 }
 
 impl View for MenuButtonTitle {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let title = self.title.clone();
         let label = MenuButton::new(
             self.entries.clone(),
@@ -253,26 +275,6 @@ impl MenuButtonTitle {
     }
 }
 
-impl<Label: View + Clone + 'static> MenuButton<Label> {
-    /// Whether the menu is currently open.
-    pub fn is_presented(&self) -> bool {
-        *self
-            .presented
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-    }
-}
-
-impl MenuButtonTitle {
-    /// Whether the menu is currently open.
-    pub fn is_presented(&self) -> bool {
-        *self
-            .presented
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-    }
-}
-
 impl Clone for MenuButtonTitle {
     fn clone(&self) -> Self {
         Self {
@@ -282,22 +284,6 @@ impl Clone for MenuButtonTitle {
             width: self.width,
             placement: self.placement,
             tooltip: self.tooltip.clone(),
-            presented: self.presented.clone(),
-        }
-    }
-}
-
-impl<Label: View + Clone + 'static> Clone for MenuButton<Label> {
-    fn clone(&self) -> Self {
-        Self {
-            entries: self.entries.clone(),
-            is_enabled: self.is_enabled,
-            width: self.width,
-            placement: self.placement,
-            accessibility_label: self.accessibility_label.clone(),
-            tooltip: self.tooltip.clone(),
-            label: self.label.clone(),
-            presented: self.presented.clone(),
         }
     }
 }

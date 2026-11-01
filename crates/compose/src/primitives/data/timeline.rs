@@ -4,6 +4,7 @@
 //! connector line is what turns a stack of rows into a sequence, and the glyph
 //! on each node is what lets the reader scan by outcome before reading a title.
 
+use crate::Scope;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -296,7 +297,7 @@ impl Timeline {
 }
 
 impl View for Timeline {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let groups = self.groups.clone();
         let shows_trailing_connector = self.shows_trailing_connector;
         let spacing = self.spacing;

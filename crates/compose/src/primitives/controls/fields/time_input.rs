@@ -5,6 +5,7 @@
 //! the next, Left/Right move between segments, and the first letter of AM/PM
 //! chooses the half of the day. All stepping and digit buffering lives in
 //! [`TimeInputState`]; this module is the view half.
+use crate::Scope;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -99,7 +100,7 @@ impl TimeInput {
 }
 
 impl View for TimeInput {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let mut segments = vec![
             self.segment(TimeSegment::Hour),
             Self::separator(),

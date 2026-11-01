@@ -33,6 +33,7 @@
 //! - Swift's `MenuItem` identity is a string; Rust menu rows are keyed by
 //!   `u64`, so the command row is looked up as row id 0.
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::Cell;
@@ -66,7 +67,7 @@ struct MenuHarness {
 }
 
 impl View for MenuHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let binding = Binding::new(
             {
                 let shown = self.shown.clone();
@@ -281,23 +282,29 @@ fn context_menu_reveal() {
 
         press(scene, MouseButton::Right, 100.0, 60.0);
         let scheduler = AnimatorScheduler::current();
+        let host = reveal_host(scene).expect("the menu grows from a transform host");
         assert!(
-            reveal_host(scene).is_none(),
-            "GAP: Swift grows the menu from the pointer with a 0.94 scale; Rust has no transform host"
-        );
-        assert_eq!(
-            scene.portal.entries().len(),
-            0,
-            "GAP: Swift opens a menu at the pointer; Rust's CHROME-priority route consumes the capture sweep, so the target phase never opens it"
+            (host.transform().scale - 0.94).abs() < 0.0001,
+            "the menu starts at a 0.94 scale"
         );
         assert!(
-            command_row(scene).is_none(),
-            "GAP: the command row never materialises because the menu never opens"
+            !host.transform().scales_shadow,
+            "the reveal does not scale elevation"
         );
-        assert_eq!(
-            actions.get(),
-            0,
-            "GAP: the command cannot run during an entry that never starts"
+        let command = command_row(scene).expect("the command row is mounted");
+        scheduler.tick(0.08);
+        settle(scene);
+        let frame = command.absolute_frame();
+        press(
+            scene,
+            MouseButton::Left,
+            frame.x + frame.width / 2.0,
+            frame.y + frame.height / 2.0,
+        );
+        assert_eq!(actions.get(), 1, "the command runs");
+        assert!(
+            !command.accepts_subtree_input(),
+            "the exiting row takes no input"
         );
 
         scheduler.tick(1.0);

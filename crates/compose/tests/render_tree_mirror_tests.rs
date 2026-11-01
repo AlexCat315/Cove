@@ -22,6 +22,7 @@
 //!   locates leaves by their recorded label attachment and walks to the parent
 //!   instead; the asserted classification, identity and ordering are unchanged.
 
+use cove_composition::Scope;
 mod support;
 
 use std::collections::HashMap;
@@ -125,7 +126,7 @@ struct Single {
 }
 
 impl View for Single {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         (self.content)()
     }
     fn tag(&self) -> &'static str {
@@ -138,7 +139,7 @@ struct Pair {
 }
 
 impl View for Pair {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         (self.content)()
     }
     fn tag(&self) -> &'static str {

@@ -28,6 +28,7 @@ use super::view::{
     WorkspaceResizeGeometry, chrome_rail_slots, collapsed_groups_on, rail_groups, rail_plan,
     renderable_layout, visible_chrome_rail_slots, visible_groups,
 };
+use cove_composition::Scope;
 use cove_composition::{
     AnyView, EmptyView, LayoutDebugAttachmentKey, PrimitiveView, View, ViewExt, impl_primitive_view,
 };
@@ -110,7 +111,7 @@ impl WorkspaceView {
 }
 
 impl View for WorkspaceView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let document = self.document();
         let maximized = self.controller.borrow().maximized_panel_id().cloned();
 
@@ -226,7 +227,7 @@ struct WorkspaceSurfaceReader {
 }
 
 impl View for WorkspaceSurfaceReader {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let build = self.build.clone();
         AnyView::new(cove_composition::adaptive::ContainerSizeReader::new(
             move |size: cove_core::Size| build(size.width),
@@ -244,7 +245,7 @@ struct WorkspaceThemeProvider {
 }
 
 impl View for WorkspaceThemeProvider {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         erased(
             self.content
                 .clone()
@@ -486,7 +487,7 @@ struct WorkspaceShell {
 }
 
 impl View for WorkspaceShell {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let extent = WorkspaceExtent::new();
         let document = self.document.clone();
         let controller = self.controller.clone();
@@ -663,7 +664,7 @@ struct WorkspaceMainRow {
 }
 
 impl View for WorkspaceMainRow {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let extent = WorkspaceExtent::new();
         let document = self.document.clone();
         let controller = self.controller.clone();
@@ -889,7 +890,7 @@ struct WorkspaceCenterColumn {
 }
 
 impl View for WorkspaceCenterColumn {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let extent = WorkspaceExtent::new();
         let document = self.document.clone();
         let controller = self.controller.clone();
@@ -1027,7 +1028,7 @@ struct WorkspaceSlotView {
 }
 
 impl View for WorkspaceSlotView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let inner = match renderable_layout(&self.slot_id, &self.document) {
             Some(node) => AnyView::new(WorkspaceLayoutNodeView {
                 node,
@@ -1059,7 +1060,7 @@ struct WorkspaceBottomSlot {
 }
 
 impl View for WorkspaceBottomSlot {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let inner: AnyView =
             if visible_groups(&WorkspaceSlotID::bottom(), &self.document).is_empty() {
                 AnyView::new(EmptyView)
@@ -1101,7 +1102,7 @@ struct WorkspaceChromeSlot {
 }
 
 impl View for WorkspaceChromeSlot {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let horizontal = matches!(self.edge, WorkspaceEdge::Top | WorkspaceEdge::Bottom);
         let rail = AnyView::new(WorkspaceRail {
             slot_id: self.slot_id.clone(),
@@ -1167,7 +1168,7 @@ pub struct WorkspaceRailReserve {
 }
 
 impl View for WorkspaceRailReserve {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let horizontal = matches!(self.edge, WorkspaceEdge::Top | WorkspaceEdge::Bottom);
         erased(
             AnyView::new(EmptyView)
@@ -1212,7 +1213,7 @@ pub struct WorkspaceLayoutNodeView {
 }
 
 impl View for WorkspaceLayoutNodeView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         match &self.node {
             WorkspaceLayoutNode::Group(group_id) => {
                 match self.document.groups.get(group_id).cloned() {
@@ -1713,7 +1714,7 @@ impl WorkspaceTabGroupView {
 }
 
 impl View for WorkspaceTabGroupView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let active = self
             .group
             .active_panel_id
@@ -1777,7 +1778,7 @@ struct WorkspaceTabBar {
 }
 
 impl View for WorkspaceTabBar {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let active = self
             .group
             .active_panel_id
@@ -1934,7 +1935,7 @@ impl WorkspaceTabOverflow {
 }
 
 impl View for WorkspaceTabOverflow {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let menu = Menu::new(self.entries()).width(240.0);
         let trigger = AnyView::new(
             WorkspaceBox::row()
@@ -1956,6 +1957,10 @@ impl View for WorkspaceTabOverflow {
                 &format!("workspace-tabs-overflow-{}", self.group.id.raw_value()),
             )),
         )
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; presented)
     }
 }
 
@@ -2325,7 +2330,7 @@ struct WorkspaceRailButton {
 }
 
 impl View for WorkspaceRailButton {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let controller = self.controller.clone();
         let group_id = self.group_id.clone();
         let panel_id = self.panel_id.clone();
@@ -2390,7 +2395,7 @@ struct RailTitleLabel {
 }
 
 impl View for RailTitleLabel {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(RailTitleHost {
             title: self.title.clone(),
         })
@@ -2478,7 +2483,7 @@ impl WorkspaceRail {
 }
 
 impl View for WorkspaceRail {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let edge = self.edge();
         let horizontal = matches!(edge, WorkspaceEdge::Top | WorkspaceEdge::Bottom);
         let groups = self
@@ -2565,7 +2570,7 @@ struct WorkspaceFloatingLayer {
 }
 
 impl View for WorkspaceFloatingLayer {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let mut windows: Vec<WorkspaceFloatingWindow> = self.document.floating_windows.clone();
         windows.sort_by(|left, right| {
             left.z_index
@@ -2626,7 +2631,7 @@ struct WorkspaceFloatingWindowView {
 }
 
 impl View for WorkspaceFloatingWindowView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let metrics = WorkspaceLayoutMetrics::default();
         let frame = WorkspaceSizingResolver::with_metrics(&self.document, metrics).floating_frame(
             self.window.frame,
@@ -2920,7 +2925,7 @@ struct WorkspaceCompactView {
 }
 
 impl View for WorkspaceCompactView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let mut panels: Vec<super::model::WorkspacePanel> = self
             .document
             .panels
@@ -2992,6 +2997,10 @@ impl View for WorkspaceCompactView {
             .modifier(WorkspaceFillModifier),
         )
     }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; presented)
+    }
 }
 
 #[cfg(test)]
@@ -3037,7 +3046,7 @@ mod tests {
         let view = WorkspaceView::new(controller, Rc::new(|_| AnyView::new(EmptyView)));
         // A composed body exists; the shell is reached through the surface
         // reader once the container measures itself.
-        let _ = view.body();
+        let _ = view.body(&Scope::detached());
     }
 
     #[test]
@@ -3049,6 +3058,6 @@ mod tests {
                 "viewport",
             )));
         let view = WorkspaceView::new(controller, Rc::new(|_| AnyView::new(EmptyView)));
-        let _ = view.body();
+        let _ = view.body(&Scope::detached());
     }
 }

@@ -4,6 +4,7 @@
 //! row's laid-out height replaces the estimate for the current width and text
 //! scale. Recording a new height bumps a revision so the next frame recomputes
 //! the window.
+use crate::Scope;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -152,7 +153,7 @@ impl<Id: Ord + Clone + 'static> EstimatedVirtualStack<Id> {
 }
 
 impl<Id: Ord + Clone + 'static> View for EstimatedVirtualStack<Id> {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let viewport = self.viewport.get();
         self.synchronize(viewport.size.width, viewport);
         let mut state = self.state.borrow_mut();

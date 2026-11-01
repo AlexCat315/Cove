@@ -3,6 +3,7 @@
 //! A controlled star rating with pointer preview, whole or fractional steps,
 //! custom symbols and a single Tab stop. Hover and press state live with the
 //! mounted node; the value is always the caller's.
+use crate::Scope;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -338,7 +339,7 @@ impl Rating {
 }
 
 impl View for Rating {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(RatingBody {
             rating: self.snapshot(),
         })

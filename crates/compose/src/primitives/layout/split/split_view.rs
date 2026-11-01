@@ -5,6 +5,7 @@
 //! draggable divider that writes clamped fractions back through the binding, so
 //! the application can persist the requested proportion. `compact` switches to
 //! retained single panes when the container is smaller than its threshold.
+use crate::Scope;
 use std::rc::Rc;
 
 use cove_core::scene::{Align, FlexDirection, FocusChainHolder, Justify, LayoutNode, Node, Wrap};
@@ -179,7 +180,7 @@ impl SplitView {
 }
 
 impl View for SplitView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let thickness = match self.fraction {
             // A user-resizable divider needs a real grab target on touch.
             None => self.divider_thickness,

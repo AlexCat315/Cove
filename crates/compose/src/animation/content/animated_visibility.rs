@@ -1,5 +1,6 @@
 //! Retained insertion/removal lifecycle from Animation/AnimatedVisibility.swift.
 use super::super::Transition;
+use crate::Scope;
 use crate::animation::transition::TransitionEffect;
 use crate::modifiers::layout::FlexExt;
 use crate::theme::{SemanticMotionRef, theme_for_node};
@@ -128,7 +129,7 @@ impl AnimatedVisibility {
 }
 
 impl View for AnimatedVisibility {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let revision = self.completion_revision.clone();
         let settled = self.on_visibility_settled.clone();
         let visible = self.is_visible;

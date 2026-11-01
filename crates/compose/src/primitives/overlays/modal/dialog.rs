@@ -4,6 +4,7 @@
 //! On touch phones it rises from the bottom edge and is dragged away by its
 //! grabber.
 
+use crate::Scope;
 use std::rc::Rc;
 
 use crate::adaptive::SurfaceReader;
@@ -93,7 +94,7 @@ impl Dialog {
 }
 
 impl View for Dialog {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let is_presented = self.is_presented.clone();
         let title = self.title.clone();
         let options = self.options.clone();
@@ -346,7 +347,7 @@ impl AlertDialog {
 }
 
 impl View for AlertDialog {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let is_presented = self.is_presented.clone();
         let title = self.title.clone();
         let message = self.message.clone();

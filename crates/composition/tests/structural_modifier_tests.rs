@@ -23,6 +23,7 @@
 //!   when its identity changes
 //! - identified arrays reorder as groups and reset removed groups on return
 
+use cove_composition::Scope;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Mutex, MutexGuard, OnceLock};
@@ -123,7 +124,7 @@ impl Clone for Counter {
 }
 
 impl View for Counter {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let count = self.count.clone();
         AnyView::new(Probe {
             name: self.name.clone(),
@@ -188,7 +189,7 @@ struct ConditionalHarness {
 }
 
 impl View for ConditionalHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let revision = self.revision.get();
         let content = if self.shown.get() {
             AnyView::new(Some(Counter::new("counter")))
@@ -265,7 +266,7 @@ struct ArrayHarness {
 }
 
 impl View for ArrayHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let revision = self.revision.get();
         let views: Vec<AnyView> = self
             .names
@@ -331,7 +332,7 @@ struct IdentifiedConditional {
 }
 
 impl View for IdentifiedConditional {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let revision = self.revision.get();
         let identity = self.identity.get();
         AnyView::new(
@@ -408,7 +409,7 @@ struct IdentifiedArrays {
 }
 
 impl View for IdentifiedArrays {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let names = self.names.get();
         let nested: Vec<AnyView> = self
             .groups

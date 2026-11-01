@@ -1,4 +1,5 @@
 //! Translation of Primitives/Controls/Form.swift.
+use crate::Scope;
 use crate::adaptive::ContainerSizeReader;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
@@ -140,7 +141,7 @@ impl Form {
 }
 
 impl View for Form {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let visible: Vec<FormField> = self
             .fields
             .iter()
@@ -226,7 +227,7 @@ struct FormFieldView {
 }
 
 impl View for FormFieldView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let field = self.field.clone();
         let layout = self.layout.clone();
         let error = self.error.clone();

@@ -3,6 +3,7 @@
 //! Compatibility wrapper for the portal system. New roots should use
 //! `LayerRoot` with an explicit portal host, so overlays never participate in
 //! normal flex layout.
+use crate::Scope;
 use crate::primitives::overlays::portal::PortalHost;
 use crate::{AnyView, View};
 
@@ -22,7 +23,7 @@ impl Default for OverlayHost {
 }
 
 impl View for OverlayHost {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(PortalHost::new())
     }
 

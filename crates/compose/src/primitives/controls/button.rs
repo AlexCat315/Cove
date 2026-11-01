@@ -1,4 +1,5 @@
 //! Stateful action buttons and their style-driven presentation.
+use crate::Scope;
 use crate::primitives::media::{Image, ImageContentMode, ImageRenderingMode, ImageSource};
 use crate::primitives::text::Text;
 pub use crate::theme::styles::buttons::ButtonRole;
@@ -129,7 +130,7 @@ impl Button {
     }
 }
 impl View for Button {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let label = if self.is_loading {
             let label = self.label.clone();
             if self.is_icon_only {
@@ -222,7 +223,7 @@ impl ButtonIcon {
     }
 }
 impl View for ButtonIcon {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let source = self.source.clone();
         let size = self.size;
         let tint = self.tint;

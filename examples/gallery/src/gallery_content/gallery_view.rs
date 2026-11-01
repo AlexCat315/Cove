@@ -12,6 +12,7 @@
 //! icon-only affordances below it — and the header/footer content is authored
 //! once and placed in each branch, which is what the Swift `wide`/`compact`
 //! builder pairs did.
+use cove_composition::Scope;
 use cove_composition::{
     AnyView, LayoutDebugAttachmentKey, LayoutDebugExt, PrimitiveView, View, ViewExt,
     impl_primitive_view,
@@ -156,7 +157,7 @@ impl GalleryView {
 }
 
 impl View for GalleryView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let content = GalleryPagePane {
             page: self.page.clone(),
             options: self.options.clone(),
@@ -458,7 +459,7 @@ struct GalleryPagePane {
 }
 
 impl View for GalleryPagePane {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let page = self.page.get();
         let options = self.options.get();
         let generation = self.reset_generation.get();
@@ -536,6 +537,10 @@ impl View for GalleryPagePane {
             .frame_min_width(0.0),
         )
     }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; page, options, reset_generation, text_scale)
+    }
 }
 
 struct GalleryPageFrame;
@@ -576,7 +581,7 @@ struct GalleryPendingStory {
 }
 
 impl View for GalleryPendingStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         erased(
             AnyView::new(
                 Text::new(
@@ -796,7 +801,7 @@ impl GalleryStorySection {
 }
 
 impl View for GalleryStorySection {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let card = erased(
             AnyView::new(cove_ui_compose::BoxView::new(
                 FlexDirection::Column,

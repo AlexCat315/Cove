@@ -11,6 +11,7 @@
 //! paint into another window. The process-shared fallback store is deliberately
 //! not pinned — it is not ownership evidence.
 
+use crate::Scope;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -23,7 +24,7 @@ use cove_core::scene::{
     Edge, InputHandlerRoute, InteractionRegistryHolder, LayoutNode, Node, PointerPhase,
     PositionType, WheelRoutingAttachmentKey, WheelRoutingPriority,
 };
-use cove_core::{Point, Rect, Size, State};
+use cove_core::{Point, Rect, Signal, Size};
 
 use super::portal_placement::{PortalPlacement, portal_window_bounds};
 use super::portal_registry::{PortalEntry, PortalStore, PortalStoreEnvironment, PortalStoreHolder};
@@ -36,51 +37,35 @@ const OBSERVER_TOKEN: &str = "CoveUICompose.portalHost.token";
 const ENTRY_OWNER: &str = "CoveUICompose.portalHost.entry";
 
 /// Renders the portal entries registered in the owning window's store.
-pub struct PortalHost {
-    /// Resolved once, then retained for the life of the host.
-    store: Rc<RefCell<Option<Rc<PortalStore>>>>,
-    /// Invalidation token. Incremented rather than storing the store's raw
-    /// revision, so a late window-store capture and its first entry (both `1`)
-    /// cannot collide into an equality no-op.
-    revision: State<u64>,
-}
+#[derive(Default)]
+pub struct PortalHost;
 
 impl PortalHost {
     pub fn new() -> Self {
-        Self {
-            store: Rc::new(RefCell::new(None)),
-            revision: State::new(0),
-        }
-    }
-}
-
-impl Default for PortalHost {
-    fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 
 impl View for PortalHost {
-    fn body(&self) -> AnyView {
+    fn body(&self, cx: &Scope) -> AnyView {
         AnyView::new(PortalHostPrimitive {
-            store: self.store.clone(),
-            revision: self.revision.clone(),
+            // Resolved once, then retained for the life of the host.
+            store: cx.remember(|| Rc::new(RefCell::new(None))),
+            // Incremented rather than mirroring the store's raw revision, so a
+            // late window-store capture and its first entry (both `1`) cannot
+            // collide into an equality no-op.
+            revision: cx.state(|| 0),
         })
     }
 
     fn tag(&self) -> &'static str {
         std::any::type_name::<Self>()
     }
-
-    /// Swift keeps `revision` in `@State`: a store change re-renders the host.
-    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
-        vec![cove_composition::DynamicField::state("revision", &self.revision)]
-    }
 }
 
 struct PortalHostPrimitive {
     store: Rc<RefCell<Option<Rc<PortalStore>>>>,
-    revision: State<u64>,
+    revision: Signal<u64>,
 }
 
 impl PortalHostPrimitive {
@@ -161,7 +146,7 @@ impl PrimitiveView for PortalHostPrimitive {
             }
             let revision = self.revision.clone();
             let token = resolved.add_observer(Rc::new(move |_| {
-                revision.set(revision.get().wrapping_add(1));
+                revision.update(|revision| *revision = revision.wrapping_add(1));
             }));
             node.set_attachment(BOUND_STORE, resolved);
             node.set_attachment(OBSERVER_TOKEN, token);

@@ -6,6 +6,7 @@
 //! Authored sample values are deterministic. Actions change real component
 //! state; the gallery reset recreates this story and restores the initial data.
 
+use cove_composition::Scope;
 use cove_core::Binding;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{Color, State};
@@ -50,7 +51,7 @@ impl DashboardCard {
 }
 
 impl View for DashboardCard {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let content = self.content.clone();
         AnyView::new(ThemeReader::new(move |theme| {
             let border = theme.colors.border.multiplied_alpha(0.55);
@@ -115,7 +116,7 @@ impl MetricCard {
 }
 
 impl View for MetricCard {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         // `TextScalerReader` widens the card with the text scaler; the minimum
         // stays at 180 points and the flex basis at max(200, scale(180)).
         let title = self.title.clone();
@@ -219,7 +220,7 @@ impl ActivityRow {
 }
 
 impl View for ActivityRow {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(BoxView::new(
             FlexDirection::Row,
             Align::FlexStart,
@@ -257,7 +258,7 @@ impl View for ActivityRow {
 struct DashboardSpacer;
 
 impl View for DashboardSpacer {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(cove_composition::EmptyView)
     }
 }
@@ -363,7 +364,7 @@ impl IntroductionStory {
 }
 
 impl View for IntroductionStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
 
         // Period switcher: `today` / `week`, controlled by the story state.

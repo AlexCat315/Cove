@@ -21,6 +21,7 @@
 //! Row heights are additive: each row contributes its own height, so the tests
 //! compare gaps *between* configurations instead of absolute row offsets.
 
+use cove_composition::Scope;
 mod support;
 
 use cove_composition::{AnyView, View, ViewExt};
@@ -59,7 +60,7 @@ struct CollapseHarness {
 }
 
 impl View for CollapseHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let binding = self.collapsed.binding();
         let timeline = Timeline::groups(vec![
             TimelineGroup::new(
@@ -84,7 +85,7 @@ struct ZoomHarness {
 }
 
 impl View for ZoomHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let binding = self.factor.binding();
         let timeline = Timeline::new(vec![
             TimelineEvent::new("First").id("first").date(START),

@@ -33,6 +33,7 @@
 //!    consumed by nothing, which `field_chrome_style_is_inert` pins as a canary
 //!    for whoever eventually wires it.
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::RefCell;
@@ -60,7 +61,7 @@ struct SwitchHarness {
 }
 
 impl View for SwitchHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let bound = self.enabled.clone();
         AnyView::new(Toggle::new(Binding::new(
             {

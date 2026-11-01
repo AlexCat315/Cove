@@ -19,23 +19,15 @@
 //! `__textfield_state`.
 //!
 //! Named differences from the Swift suite (each pinned by a `GAP:` assertion):
-//! - **Resize writes never re-lay out.** The handle writes a height `State`
-//!   that `ResizableEditor`, `ResizableTextArea` and `JsonField` create inside
-//!   their constructors and never register as dynamic properties, so keyboard,
-//!   assistive and End/Home/Page writes leave the viewport unchanged.
 //! - **The scroll view steals the handle press.** A press on the handle is
 //!   captured by the enclosing `ScrollView`, so dragging does not resize and
 //!   the capture outlives Escape and disabling.
-//! - **Fixed editor lane.** `ResizableEditor` hard-codes a 12pt handle extent
-//!   instead of the 44pt touch / 28pt pointer lane, so a density change never
-//!   releases its capture.
-//! - **Undersized editor viewport.** With 1..2pt limits the editor viewport is
-//!   20pt (32pt floor minus the 12pt lane) instead of 44pt.
 //! - **Slider value unit.** The handle value reads `"<n> pt"`, not the bare
 //!   height.
 //! - **Disabled state.** A disabled handle drops focus and hit testing but
 //!   still reports `is_enabled`.
 
+use cove_composition::Scope;
 #[allow(dead_code)]
 mod support;
 
@@ -102,7 +94,7 @@ struct Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let state = &self.state;
         let mut surface = Environment::default();
         surface.viewport.width = state.width.get();
@@ -336,15 +328,7 @@ fn matrix() {
                             } else {
                                 28.0
                             };
-                            if kind == Kind::Editor {
-                                assert_eq!(
-                                    grip.frame().height,
-                                    12.0,
-                                    "GAP: Swift gives the ResizableEditor handle a {lane}pt lane for this input; Rust's ResizableEditor hard-codes a 12pt extent ({context})"
-                                );
-                            } else {
-                                assert_eq!(grip.frame().height, lane, "touch lane ({context})");
-                            }
+                            assert_eq!(grip.frame().height, lane, "touch lane ({context})");
                             assert!(
                                 grip.absolute_frame().y >= text.absolute_frame().max_y(),
                                 "below text {:?} {:?} ({context})",
@@ -424,8 +408,8 @@ fn interactions() {
             key(scene, Scancode::ARROW_DOWN, false);
             settle(scene);
             assert!(
-                height(scene) == before && scene.focus.is_focus_visible(),
-                "GAP: Swift ArrowDown grows the viewport by 16pt with visible focus; Rust's handle writes a height State the editor never registers as a dynamic property, so the viewport never re-lays out ({kind:?}: {})",
+                height(scene) == before + 16.0 && scene.focus.is_focus_visible(),
+                "{kind:?} ArrowDown grows the viewport by 16pt with visible focus: {}",
                 height(scene)
             );
             key(scene, Scancode::ARROW_UP, true);
@@ -438,50 +422,34 @@ fn interactions() {
             settle(scene);
             assert_eq!(
                 height(scene),
-                shrunk,
-                "GAP: Swift increment grows the viewport by 16pt; Rust's handle writes a height State the editor never registers as a dynamic property, so the viewport never re-lays out ({kind:?})"
+                shrunk + 16.0,
+                "{kind:?} increment grows by 16pt"
             );
             let grip = handle(scene).expect("handle");
             if let Some(decrement) = grip.accessibility_actions().decrement {
                 decrement();
             }
             settle(scene);
-            assert!(
-                height(scene) == shrunk,
-                "{kind:?} decrement {} vs {shrunk}",
-                height(scene)
-            );
+            assert_eq!(height(scene), shrunk, "{kind:?} decrement shrinks by 16pt");
             let grip = handle(scene).expect("handle");
             if let Some(set) = grip.accessibility_actions().set_value.clone() {
                 set("200");
                 settle(scene);
-                assert_eq!(
-                    height(scene),
-                    before,
-                    "GAP: Swift set_value(200) sets a 200pt viewport; Rust's handle writes a height State the editor never registers as a dynamic property, so the viewport never re-lays out ({kind:?})"
-                );
+                assert_eq!(height(scene), 200.0, "{kind:?} set_value(200)");
                 for invalid in ["nan", "inf", "invalid"] {
                     set(invalid);
                 }
             }
             settle(scene);
-            assert_eq!(
-                height(scene),
-                before,
-                "GAP: Swift ignores non-finite values and keeps 200pt; Rust's handle writes a height State the editor never registers as a dynamic property, so the viewport never re-lays out ({kind:?})"
-            );
+            assert_eq!(height(scene), 200.0, "{kind:?} ignores non-finite values");
             key(scene, Scancode::HOME, false);
             settle(scene);
             let minimum = if kind == Kind::Editor { 56.0 } else { 100.0 };
-            if kind == Kind::Editor {
-                assert_eq!(
-                    height(scene),
-                    before,
-                    "GAP: Swift Home shrinks the editor to its {minimum}pt minimum; Rust's handle writes a height State the editor never registers as a dynamic property, so the viewport never re-lays out"
-                );
-            } else {
-                assert_eq!(height(scene), minimum, "{kind:?} home");
-            }
+            assert_eq!(
+                height(scene),
+                minimum,
+                "{kind:?} Home shrinks to the minimum"
+            );
             key(scene, Scancode::END, false);
             settle(scene);
             let maximum = match kind {
@@ -489,11 +457,7 @@ fn interactions() {
                 Kind::Area => 300.0,
                 Kind::Json => 360.0,
             };
-            assert_eq!(
-                height(scene),
-                before,
-                "GAP: Swift End grows the viewport to its {maximum}pt maximum; Rust's handle writes a height State the editor never registers as a dynamic property, so the viewport never re-lays out ({kind:?})"
-            );
+            assert_eq!(height(scene), maximum, "{kind:?} End grows to the maximum");
             key(scene, Scancode::PAGE_UP, false);
             settle(scene);
             let smaller = height(scene);
@@ -501,8 +465,8 @@ fn interactions() {
             settle(scene);
             assert_eq!(
                 height(scene),
-                smaller,
-                "GAP: Swift PageDown grows the viewport by 64pt; Rust's handle writes a height State the editor never registers as a dynamic property, so the viewport never re-lays out ({kind:?})"
+                (smaller + 64.0).min(maximum),
+                "{kind:?} PageDown grows by 64pt"
             );
             key(scene, Scancode::TAB, false);
             settle(scene);
@@ -566,19 +530,11 @@ fn lifecycle() {
                 .input
                 .set(InputCapabilities::POINTER | InputCapabilities::KEYBOARD);
             settle(scene);
-            if kind == Kind::Editor {
-                assert!(
-                    captured(scene).is_some_and(|node| node.id() == grip.id())
-                        && grip.frame().height == 12.0,
-                    "GAP: Swift releases capture on a density change and narrows the lane to 28pt; Rust's ResizableEditor keeps a fixed 12pt extent, so its basis never changes and the handle keeps the capture"
-                );
-            } else {
-                assert!(
-                    captured(scene).is_none() && grip.frame().height == 28.0,
-                    "{kind:?} density releases capture, lane {}",
-                    grip.frame().height
-                );
-            }
+            assert!(
+                captured(scene).is_none() && grip.frame().height == 28.0,
+                "{kind:?} density releases capture, lane {}",
+                grip.frame().height
+            );
             down(scene, &grip);
             state.shown.set(false);
             settle(scene);
@@ -607,23 +563,12 @@ fn minimum_and_invalid_bounds() {
             state.maximum.set(2.0);
             settle(scene);
             let grip = handle(scene).expect("handle");
-            if kind == Kind::Editor {
-                assert!(
-                    height(scene) == 20.0 && grip.frame().height == 12.0,
-                    "GAP: Swift keeps a 44pt editable viewport and a 44pt touch handle for undersized \
-                     limits; Rust's ResizableEditor clamps to its 32pt floor minus the fixed 12pt lane \
-                     (text {}, lane {})",
-                    height(scene),
-                    grip.frame().height
-                );
-            } else {
-                assert!(
-                    height(scene) == 44.0 && grip.frame().height == 44.0,
-                    "{kind:?} undersized text {} lane {}",
-                    height(scene),
-                    grip.frame().height
-                );
-            }
+            assert!(
+                height(scene) == 44.0 && grip.frame().height == 44.0,
+                "{kind:?} undersized text {} lane {}",
+                height(scene),
+                grip.frame().height
+            );
             down(scene, &grip);
             state.minimum.set(f32::NAN);
             state.maximum.set(f32::INFINITY);
@@ -673,8 +618,9 @@ fn reveals_after_resize() {
                 }));
             settle(scene);
             assert!(
-                scroll.content_offset().y == 0.0 && before == 0.0,
-                "GAP: Swift End grows the editor so the reveal scrolls the 200pt viewport and an upward wheel then scrolls back; Rust's handle writes a height State the editor never registers as a dynamic property, so the viewport never re-lays out, nothing needs revealing and the wheel cannot scroll above 0 ({kind:?})"
+                scroll.content_offset().y < before,
+                "{kind:?} End grows the editor past the viewport, and an upward wheel scrolls back ({before} -> {})",
+                scroll.content_offset().y
             );
         });
     }

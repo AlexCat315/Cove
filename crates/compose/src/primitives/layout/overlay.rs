@@ -1,4 +1,5 @@
 //! Translation of Compose/Sources/CoveUICompose/Primitives/Layout/Overlay.swift.
+use crate::Scope;
 use crate::{
     Alignment, AnyView, HorizontalAlignment, Layout, LayoutContainer, LayoutSubview,
     ProposedViewSize, VerticalAlignment, View,
@@ -107,7 +108,7 @@ impl Overlay {
     }
 }
 impl View for Overlay {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let pair = crate::TupleView::new(vec![self.base.clone(), self.overlay.clone()]);
         AnyView::new(
             LayoutContainer::<OverlayLayout, AnyView>::with_erased_content(

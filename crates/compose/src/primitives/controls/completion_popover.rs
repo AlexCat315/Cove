@@ -6,6 +6,7 @@
 //! The request and item models already live in
 //! `primitives::text::text_completion_rebase`; this module re-exports them
 //! alongside the provider/resolver callback types and the view half.
+use crate::Scope;
 use std::ops::Range;
 use std::sync::Arc;
 
@@ -113,7 +114,7 @@ impl Clone for CompletionPopover {
 }
 
 impl View for CompletionPopover {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(CompletionPanel {
             view: self.snapshot(),
         })

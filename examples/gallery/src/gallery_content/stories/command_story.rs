@@ -6,6 +6,7 @@
 //! from `CommandSearch`, so this story pins the authored catalogue and the
 //! recent-command ordering the prose promises.
 
+use cove_composition::Scope;
 use cove_core::State;
 use cove_ui_compose::LayoutDebugExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
@@ -139,7 +140,7 @@ impl CommandStory {
 }
 
 impl View for CommandStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
         let open = self.is_presented.clone();
         let open_custom = self.is_custom_presented.clone();
@@ -182,5 +183,9 @@ impl View for CommandStory {
 
     fn tag(&self) -> &'static str {
         "CommandStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; is_presented, is_custom_presented, last_run, recent)
     }
 }

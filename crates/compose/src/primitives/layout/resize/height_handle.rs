@@ -249,6 +249,11 @@ impl PrimitiveView for EditorHeightHandle {
 
         node.set_accessibility_actions(AccessibilityActions::default());
 
+        // A stale action captured while enabled must not resize a handle that
+        // has since been disabled or detached.
+        fn accepts_write(node: &Node) -> bool {
+            node.accepts_subtree_input() && node.is_hit_testable()
+        }
         let increment_node = node.downgrade();
         let increment_binding = self.value.clone();
         let increment_limits = self.limits;
@@ -260,7 +265,7 @@ impl PrimitiveView for EditorHeightHandle {
         let set_limits = self.limits;
         node.set_accessibility_actions(AccessibilityActions {
             increment: Some(Rc::new(move || {
-                if let Some(owner) = Node::upgrade(&increment_node) {
+                if let Some(owner) = Node::upgrade(&increment_node).filter(accepts_write) {
                     let next = increment_limits.clamp(increment_binding.get() + 16.0);
                     if increment_binding.get() != next {
                         owner.set_attachment(REVEAL, true);
@@ -269,7 +274,7 @@ impl PrimitiveView for EditorHeightHandle {
                 }
             })),
             decrement: Some(Rc::new(move || {
-                if let Some(owner) = Node::upgrade(&decrement_node) {
+                if let Some(owner) = Node::upgrade(&decrement_node).filter(accepts_write) {
                     let next = decrement_limits.clamp(decrement_binding.get() - 16.0);
                     if decrement_binding.get() != next {
                         owner.set_attachment(REVEAL, true);
@@ -284,7 +289,7 @@ impl PrimitiveView for EditorHeightHandle {
                 if !next.is_finite() {
                     return;
                 }
-                if let Some(owner) = Node::upgrade(&set_node) {
+                if let Some(owner) = Node::upgrade(&set_node).filter(accepts_write) {
                     let next = set_limits.clamp(next);
                     if set_binding.get() != next {
                         owner.set_attachment(REVEAL, true);

@@ -4,6 +4,7 @@
 //! content can adapt to the space actually available to it — a container query
 //! rather than a window query. Measurement runs after composition, so the first
 //! build receives zero and the next frame publishes the measured size.
+use crate::Scope;
 use crate::{AnyView, DynamicField, PrimitiveView, View, ViewKind};
 use cove_core::Size;
 use cove_core::State;
@@ -70,7 +71,7 @@ impl<Content: View> ContainerSizeReader<Content> {
     }
 }
 impl<Content: View + 'static> View for ContainerSizeReader<Content> {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let content = self.content.clone();
         AnyView::new(ContainerSizeProbe {
             size: self.size.clone(),

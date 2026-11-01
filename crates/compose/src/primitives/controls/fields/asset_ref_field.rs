@@ -6,6 +6,7 @@
 //! Kind-to-glyph matching, picker filtering and the field description live in
 //! [`icon_for`], [`picker_options`], [`placeholder_kind`],
 //! [`field_description`] and [`field_tooltip`].
+use crate::Scope;
 use std::collections::BTreeSet;
 use std::rc::Rc;
 
@@ -13,6 +14,7 @@ use cove_core::Binding;
 use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
 use cove_imaging::BundleImageResource;
 
+use crate::LayoutDebugExt;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::SemanticStyleViewExt;
@@ -21,12 +23,16 @@ use crate::primitives::controls::fields::asset_ref_model::{
     AssetIconKind, AssetRef, field_description, field_tooltip, has_preview, icon_for,
     picker_options, placeholder_kind,
 };
+use crate::primitives::media::Icon;
+use crate::primitives::overlays::anchored::{PopoverOverflow, PopoverPlacement};
 use crate::primitives::overlays::asset_drop_target::{AssetDropPayload, AssetDropTarget};
 use crate::primitives::overlays::menu::{Menu, MenuEntry, MenuItem};
 use crate::primitives::overlays::popover::Popover;
 use crate::primitives::text::Text;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
-use crate::theme::{SemanticColorRef, SemanticFontRef, theme_for_node};
+use crate::theme::{
+    ControlSize, ControlSizeViewExt, SemanticColorRef, SemanticFontRef, theme_for_node,
+};
 use crate::{
     AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View, impl_primitive_view,
 };
@@ -166,7 +172,7 @@ pub fn icon_resource(kind: AssetIconKind) -> BundleImageResource {
 }
 
 impl View for AssetRefField {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let field = self.snapshot();
         let value = self.value.clone();
         let content = AnyView::new(AssetFieldContent {
@@ -434,55 +440,32 @@ struct AssetPicker {
     field: AssetRefField,
 }
 
-impl PrimitiveView for AssetPicker {
-    fn make_node(&self) -> Node {
-        let node = Node::new();
-        node.set_is_hit_testable(false);
-        node
-    }
-
-    fn make_layout_node(&self) -> Option<cove_core::scene::LayoutNode> {
-        None
-    }
-
-    fn update_node(&self, _node: &Node) {}
-
-    fn children(&self, _node: &Node) -> Vec<AnyView> {
+impl View for AssetPicker {
+    fn body(&self, cx: &Scope) -> AnyView {
+        let presented = cx.state(|| false);
         let entries = self.field.menu_entries();
         let is_enabled = self.field.is_enabled && !entries.is_empty();
-        let trigger = AnyView::new(
-            Button::with_options(
-                AnyView::new(
-                    ButtonIcon::new(
-                        ButtonIconSource::resource(
-                            crate::primitives::media::ui_icon_catalog::navigation::dropdown_chevron_down(),
-                        ),
-                        Some(12.0),
-                        None,
-                    )
-                    .semantic_foreground(SemanticColorRef::on_surface_muted()),
-                ),
-                || {},
-                ButtonRole::Normal,
-                is_enabled,
-                false,
-                false,
-                None,
-            )
-            .button_style(GhostButtonStyle),
-        );
+        let chevron = if presented.get() {
+            crate::primitives::media::ui_icon_catalog::navigation::dropdown_chevron_up()
+        } else {
+            crate::primitives::media::ui_icon_catalog::navigation::dropdown_chevron_down()
+        };
+        let trigger = Icon::with_semantic(chevron, 12.0, SemanticColorRef::on_surface_muted());
         let current = self.field.value.get();
-        vec![AnyView::new(
+        AnyView::new(
             Popover::new(
                 trigger,
-                AnyView::new(
-                    Menu::new(entries)
-                        .width(PICKER_WIDTH)
-                        .max_visible_rows(PICKER_ROWS),
-                ),
+                Menu::new(entries)
+                    .width(PICKER_WIDTH)
+                    .max_visible_rows(PICKER_ROWS)
+                    .on_item_activated(move || presented.set(false)),
             )
+            .is_presented(presented.into())
             .enabled(is_enabled)
             .width(PICKER_WIDTH)
+            .placement(PopoverPlacement::BottomTrailing)
+            .overflow(PopoverOverflow::Flip)
+            .trigger_style(GhostButtonStyle)
             .trigger_description(
                 crate::primitives::overlays::popover::PopoverTriggerDescription {
                     label: "Choose asset".to_string(),
@@ -491,11 +474,12 @@ impl PrimitiveView for AssetPicker {
                         .unwrap_or_else(|| self.field.placeholder.clone()),
                     help: None,
                 },
-            ),
-        )]
+            )
+            .control_size(ControlSize::Mini)
+            .debug_name("asset-picker"),
+        )
     }
 }
-impl_primitive_view!(AssetPicker);
 
 impl AssetRefField {
     /// The touch-aware minimum height of the field.

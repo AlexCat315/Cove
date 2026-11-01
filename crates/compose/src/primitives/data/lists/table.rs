@@ -5,6 +5,7 @@
 //! A fixed header and virtualized rows sharing one horizontal scroll coordinate
 //! system. Cell content may include editors; embedded controls receive input
 //! before row selection.
+use crate::Scope;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -485,7 +486,7 @@ impl<Record: 'static, Id: PartialEq + Clone + 'static> Table<Record, Id> {
 }
 
 impl<Record: 'static, Id: PartialEq + Clone + 'static> View for Table<Record, Id> {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let layout = self.options.layout.clone().validated();
         let sort = self.sort();
         let order = Self::sorted(&self.records, &self.columns, sort.as_ref());

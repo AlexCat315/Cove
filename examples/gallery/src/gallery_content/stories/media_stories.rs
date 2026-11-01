@@ -2,6 +2,7 @@
 //!
 //! Swift sources: `GalleryContent/Stories/Feedback/{SkeletonStory,RatingSample}.swift`.
 
+use cove_composition::Scope;
 use cove_core::State;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::layout::{LayoutFrameExt, PaddingExt};
@@ -65,7 +66,7 @@ impl SkeletonStory {
 }
 
 impl View for SkeletonStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
         let loading = self.loading.get();
         let animated = self.animated.get();
@@ -186,6 +187,10 @@ impl View for SkeletonStory {
     fn tag(&self) -> &'static str {
         "SkeletonStory"
     }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; loading, animated, reduced_motion)
+    }
 }
 
 /// `RatingSample`: a rating strip with its details below it.
@@ -210,7 +215,7 @@ impl RatingSample {
 }
 
 impl View for RatingSample {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
         let value = self.value.get();
         let setter = self.value.clone();
@@ -252,5 +257,9 @@ impl View for RatingSample {
 
     fn tag(&self) -> &'static str {
         "RatingSample"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; value, limit)
     }
 }

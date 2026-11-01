@@ -8,26 +8,6 @@
 //! - reduced motion snaps in both directions and leaves no exit clocks
 //! - reposting during an exit rejects the stale completion, and rapid changes
 //!   keep a bounded tree
-//!
-//! GAP: no toast card ever mounts.
-//! Swift keeps the reconciler in `@State` — `NotificationHost.swift:38`
-//! `@State private var presentation = ToastPresentation()` — so one instance
-//! survives every `body()` call and accumulates the cards. The Rust
-//! `NotificationHost` (`primitives/overlays/toast/notification_host.rs:82`)
-//! stores the same value as a plain field, calls
-//! `self.presentation.update(..)` inside `body()`, and then hands
-//! `ToastPresenter` a **second, freshly constructed** `ToastPresentation`
-//! (`:117  presentation: Rc::new(ToastPresentation::new())`). Because
-//! `NotificationHost` also exposes no `dynamic_properties`, `body()` never
-//! re-runs after `ToastController::post`, and the entries computed on the
-//! install pass go to a throwaway reconciler. Measured: after posting, the
-//! controller reports 1 notification while `PortalStore::entries()` stays `0`
-//! and no "Saved" title node ever materialises, at any tick.
-//!
-//! The reconciler logic itself is migrated at full Swift strength: the
-//! `ToastPresentation` tests (stale-revision rejection, bounded tree) exercise
-//! the same value Swift's `@State` held, so only the widget-level lifecycle is
-//! pinned.
 
 mod support;
 
@@ -40,6 +20,7 @@ use cove_ui_compose::primitives::overlays::portal::{LayerRoot, PortalStore, Port
 use cove_ui_compose::primitives::overlays::toast::{
     NotificationHost, ToastController, ToastNotification, ToastPresentation,
 };
+use cove_ui_compose::theme::tokens::ReducedMotionViewExt;
 
 use support::GlobalTestLock;
 
@@ -74,7 +55,7 @@ fn frame(graph: &cove_composition::ViewGraph, delta: f64) {
 }
 
 /// Installs the host and returns the graph plus its controller.
-fn scene() -> (Rc<cove_composition::ViewGraph>, Rc<ToastController>) {
+fn scene(reduced_motion: bool) -> (Rc<cove_composition::ViewGraph>, Rc<ToastController>) {
     let graph = support::graph();
     let controller = ToastController::new(1);
     graph.install_view(
@@ -82,11 +63,17 @@ fn scene() -> (Rc<cove_composition::ViewGraph>, Rc<ToastController>) {
             AnyView::new(LayerRoot::new(AnyView::new(NotificationHost::new(
                 controller.clone(),
             ))))
-            .frame_size(WIDTH, HEIGHT),
+            .frame_size(WIDTH, HEIGHT)
+            .reduced_motion(reduced_motion),
         ),
         Default::default(),
     );
     (graph, controller)
+}
+
+/// Effective opacity: the node's own times every ancestor's.
+fn opacity(node: &Node) -> f32 {
+    node.opacity() * node.parent().map_or(1.0, |parent| opacity(&parent))
 }
 
 /// The rendered title node, if the card mounted.
@@ -103,56 +90,56 @@ fn a_posted_card_fades_in_and_dismissal_releases_the_portal() {
     GlobalTestLock::locked(|| {
         support::with_test_text_environment(|| {
             PortalStoreHolder::set_current(Some(Rc::new(PortalStore::new())));
-            let (graph, controller) = scene();
+            let (graph, controller) = scene(false);
+            let scheduler = cove_core::scene::AnimatorScheduler::current();
 
             controller.post(ToastNotification::new("Saved").id("saved").duration(None));
             frame(&graph, 0.0);
-
-            // GAP: the host never presents, so there is no card to fade in.
-            assert_eq!(
-                controller.notifications().len(),
-                1,
-                "the controller accepted the notification"
-            );
-            assert!(
-                title(&graph, "Saved").is_none(),
-                "no card mounts; Swift renders the title and starts its entry fade"
-            );
-            assert_eq!(
-                PortalStoreHolder::current().entries().len(),
-                0,
-                "the toast portal stays empty; Swift publishes one entry"
-            );
-
+            let saved = title(&graph, "Saved").expect("posting mounts the card");
+            assert_eq!(opacity(&saved), 0.0, "the card starts transparent");
             frame(&graph, 0.08);
-            frame(&graph, 1.0);
+            let mid = opacity(&saved);
             assert!(
-                title(&graph, "Saved").is_none(),
-                "the card still never mounts after the entry window"
+                mid > 0.0 && mid < 1.0,
+                "the entry fade is in flight ({mid})"
             );
+            frame(&graph, 1.0);
+            assert_eq!(opacity(&saved), 1.0, "the entry fade finishes opaque");
 
+            let dismiss = all(&graph)
+                .into_iter()
+                .find(|node| {
+                    node.accessibility()
+                        .is_some_and(|semantics| semantics.label == "Dismiss notification")
+                })
+                .expect("the card has a dismiss button");
             controller.dismiss("saved");
             frame(&graph, 0.0);
             assert!(
                 controller.notifications().is_empty(),
-                "dismissal clears the controller immediately"
+                "dismissal clears the controller"
             );
             assert!(
-                all(&graph).iter().all(|node| {
-                    node.accessibility()
-                        .is_none_or(|semantics| semantics.label != "Dismiss notification")
-                }),
-                "no dismiss button remains once the controller is empty"
+                !PortalStoreHolder::current().entries().is_empty(),
+                "the portal stays for the exit animation"
             );
-            assert_eq!(
-                PortalStoreHolder::current().entries().len(),
-                0,
-                "the portal stays empty through the exit window"
+            assert!(
+                !dismiss.accepts_subtree_input(),
+                "the exiting card takes no input"
             );
             frame(&graph, 0.08);
+            let exiting = opacity(&saved);
+            assert!(
+                exiting > 0.0 && exiting < 1.0,
+                "the exit fade is in flight ({exiting})"
+            );
             frame(&graph, 1.0);
             assert!(
-                !cove_core::scene::AnimatorScheduler::current().has_active_animations(),
+                PortalStoreHolder::current().entries().is_empty(),
+                "the portal is released after the exit"
+            );
+            assert!(
+                !scheduler.has_active_animations(),
                 "no animation outlives the exit"
             );
             PortalStoreHolder::set_current(Some(Rc::new(PortalStore::new())));
@@ -165,26 +152,23 @@ fn reduced_motion_leaves_no_exit_clocks() {
     GlobalTestLock::locked(|| {
         support::with_test_text_environment(|| {
             PortalStoreHolder::set_current(Some(Rc::new(PortalStore::new())));
-            let (graph, controller) = scene();
+            let (graph, controller) = scene(true);
+            let scheduler = cove_core::scene::AnimatorScheduler::current();
 
             controller.post(ToastNotification::new("Saved").id("saved").duration(None));
             frame(&graph, 0.0);
-
-            // GAP: nothing mounts, so there is no snap to observe either. What
-            // holds is that the host leaves no animation running.
-            assert!(
-                !cove_core::scene::AnimatorScheduler::current().has_active_animations(),
-                "reduced motion leaves no active animations"
-            );
+            let saved = title(&graph, "Saved").expect("posting mounts the card");
+            assert_eq!(opacity(&saved), 1.0, "reduced motion snaps the card in");
+            assert!(!scheduler.has_active_animations());
 
             controller.clear();
             frame(&graph, 0.0);
             assert!(
                 PortalStoreHolder::current().entries().is_empty(),
-                "clearing leaves the portal empty"
+                "reduced motion removes the card at once"
             );
             assert!(
-                !cove_core::scene::AnimatorScheduler::current().has_active_animations(),
+                !scheduler.has_active_animations(),
                 "clearing leaves no exit clocks"
             );
             PortalStoreHolder::set_current(Some(Rc::new(PortalStore::new())));

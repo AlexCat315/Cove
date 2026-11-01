@@ -1,4 +1,5 @@
 //! Discrete animation phases translated from Animation/Phases/Sequence.swift.
+use crate::Scope;
 use crate::{AnyView, DynamicField, PrimitiveView, View, ViewKind};
 use cove_core::State;
 use cove_core::scene::{
@@ -76,7 +77,7 @@ where
     Phase: Clone + Eq + 'static,
     Trigger: Clone + Eq + 'static,
 {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let index = self.index.get().min(self.phases.len() - 1);
         let animations = self
             .phases

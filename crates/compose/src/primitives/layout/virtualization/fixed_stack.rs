@@ -2,6 +2,7 @@
 //!
 //! Fixed-height rows are created only within the viewport plus overscan. Row
 //! identity survives scrolling; persistent row data belongs in the model.
+use crate::Scope;
 use std::hash::Hash;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -143,7 +144,7 @@ impl<Id: Clone + Hash + Eq + 'static> FixedVirtualStack<Id> {
 }
 
 impl<Id: Clone + Hash + Eq + 'static> View for FixedVirtualStack<Id> {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let stride = self.stride();
         let count = self.ids.len();
         let viewport = self.viewport.get();

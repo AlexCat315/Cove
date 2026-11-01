@@ -17,6 +17,7 @@
 //! Links are underlined body-copy links: they take the pointer cursor and
 //! activate on click; the Markdown views build whole documents from these
 //! paragraphs.
+use crate::Scope;
 use std::rc::Rc;
 
 use crate::modifiers::style::{text_style_font, text_style_line_height};
@@ -83,7 +84,7 @@ impl Default for RichText {
 }
 
 impl View for RichText {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(RichTextReader {
             runs: self.runs.clone(),
             alignment: self.alignment,

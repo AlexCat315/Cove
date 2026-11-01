@@ -128,7 +128,9 @@ impl PopoverAnchor {
         let mut candidate = self.owner.clone();
         while let Some(node) = candidate.as_ref() {
             if let Some(layout) = node.layout_node() {
-                return layout.direction() == cove_core::scene::Direction::Rtl;
+                // The direction the last layout pass resolved, not the
+                // authored style, which is `Inherit` under an RTL ancestor.
+                return layout.custom_layout_direction() == cove_core::scene::Direction::Rtl;
             }
             candidate = node.parent();
         }
@@ -458,9 +460,21 @@ impl PrimitiveView for AnchoredOverlayHost {
 impl_primitive_view!(AnchoredOverlayHost);
 
 /// Key host that owns Escape dismissal for an anchored overlay.
-struct MenuKeyHost {
+pub struct MenuKeyHost {
     on_key: Rc<dyn Fn(&cove_platform::KeyEvent) -> bool>,
     content: AnyView,
+}
+
+impl MenuKeyHost {
+    pub fn new(
+        on_key: impl Fn(&cove_platform::KeyEvent) -> bool + 'static,
+        content: AnyView,
+    ) -> Self {
+        Self {
+            on_key: Rc::new(on_key),
+            content,
+        }
+    }
 }
 
 impl PrimitiveView for MenuKeyHost {
@@ -539,6 +553,10 @@ impl PrimitiveView for PopoverSurfaceHost {
     fn update_node(&self, node: &Node) {
         self.anchor.set_surface(node);
         node.set_clips_to_bounds(true);
+        node.set_attachment(
+            crate::LayoutDebugAttachmentKey::DEBUG_NAME,
+            "anchored-surface".to_string(),
+        );
         let weak = node.downgrade();
         let placement = self.placement;
         node.update_draw(placement, move |list, origin| {

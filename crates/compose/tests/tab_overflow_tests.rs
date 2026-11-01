@@ -47,6 +47,7 @@
 //!   icon; `TabItem` takes a `BundleImageResource` that the suite does not
 //!   source.
 
+use cove_composition::Scope;
 mod support;
 
 use cove_composition::{AnyView, DynamicField, View};
@@ -76,7 +77,7 @@ struct CounterPanel {
 }
 
 impl View for CounterPanel {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let count = self.count.clone();
         let label = format!("Panel count {}", count.get());
         AnyView::new(Button::new(Text::new(label), move || {
@@ -120,7 +121,7 @@ impl Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let removed = self.removed.get();
         let long = self.long_title.get();
         let count = self.count.clone();

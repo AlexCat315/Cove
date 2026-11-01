@@ -24,6 +24,7 @@
 //!   item is 32pt, so no strip node reaches 44pt on a touch surface.
 //!   `strip_height_ignores_the_touch_control_extent` records the gap.
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::RefCell;
@@ -50,7 +51,7 @@ struct Panel {
 }
 
 impl View for Panel {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let count = self.count.clone();
         let clicks = self.clicks.clone();
         AnyView::new(

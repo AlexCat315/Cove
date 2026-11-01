@@ -4,15 +4,17 @@
 //! layouts. Breakpoints use this container's allocation. Optional presentation
 //! belongs to the caller's session and survives a temporary return to the
 //! expanded layout.
+use crate::Scope;
 use std::collections::HashSet;
 use std::rc::Rc;
 
+use crate::ViewExt;
 use crate::adaptive::ContainerSizeReader;
+use crate::adaptive::SurfaceReader;
 use crate::animation::content::AnimatedVisibility;
 use crate::animation::transition::Transition;
-use crate::modifiers::interaction::AccessibilityExt;
-use crate::adaptive::SurfaceReader;
 use crate::animation::transition::TransitionEdge;
+use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{
     AbsolutePositionModifier, FlexExt, FrameDimension, LayoutFrameExt, PaddingExt,
 };
@@ -20,17 +22,16 @@ use crate::modifiers::style::AppearanceExt;
 use crate::primitives::interaction::horizontal_swipe::{HorizontalSwipe, HorizontalSwipeDirection};
 use crate::primitives::overlays::modal::ModalDismissal;
 use crate::theme::tokens::{SemanticColorRef, SemanticStyleViewExt};
-use crate::ViewExt;
 use crate::{AnyView, BoxView, PrimitiveView, TupleView, View};
 use cove_core::Binding;
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Node, Wrap};
 
 use super::adaptive_hosts::{SidebarBackdrop, SidebarLayer, SidebarShellHost, SidebarTriggerHost};
-use super::resize_handle::SidebarResizeHandle;
 use super::adaptive_options::{AdaptiveSidebarOptions, SidebarGeometry, SidebarMode};
 use super::focus_handoff::SidebarFocusHandoff;
 use super::items::SidebarSection;
 use super::presentation::SidebarToggle;
+use super::resize_handle::SidebarResizeHandle;
 use super::sidebar::Sidebar;
 
 /// Width of the leading strip that starts an opening edge swipe.
@@ -231,9 +232,14 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
         }
 
         let mut column: Vec<AnyView> = vec![AnyView::new(
-            AnyView::new(sidebar)
-                .flex_with(1.0, 1.0, Some(0.0))
-                .frame(None, None, Some(0.0), Some(0.0), None, None),
+            AnyView::new(sidebar).flex_with(1.0, 1.0, Some(0.0)).frame(
+                None,
+                None,
+                Some(0.0),
+                Some(0.0),
+                None,
+                None,
+            ),
         )];
         if geometry.mode == SidebarMode::Expanded {
             let collapse = self.collapse.clone();
@@ -391,7 +397,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
 impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
     for AdaptiveSidebar<Id>
 {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let snapshot = self.snapshot();
         AnyView::new(AdaptiveShell { snapshot })
     }
@@ -454,32 +460,41 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
         };
         let geometry = self.geometry(width, handle);
         let fill = |view: AnyView| {
-            AnyView::new(
-                view.flex_with(1.0, 1.0, Some(0.0))
-                    .frame(None, None, Some(0.0), Some(0.0), None, None),
-            )
+            AnyView::new(view.flex_with(1.0, 1.0, Some(0.0)).frame(
+                None,
+                None,
+                Some(0.0),
+                Some(0.0),
+                None,
+                None,
+            ))
         };
 
-        let compact_bar = AnyView::new(AnyView::new(AnimatedVisibility::new(
-            geometry.mode == SidebarMode::Compact,
-            Transition::identity(),
-            None,
-            false,
-            None,
-            AnyView::new(
-                BoxView::new(
-                    FlexDirection::Row,
-                    Align::Center,
-                    Justify::FlexStart,
-                    Wrap::NoWrap,
-                    0.0,
-                    AnyView::new(SidebarTriggerHost::new(self.focus.clone(), self.open_button())),
-                )
-                .padding_edges(12.0, 4.0)
-                .semantic_background(SemanticColorRef::surface()),
-            ),
-        ))
-        .flex_with(0.0, 0.0, None));
+        let compact_bar = AnyView::new(
+            AnyView::new(AnimatedVisibility::new(
+                geometry.mode == SidebarMode::Compact,
+                Transition::identity(),
+                None,
+                false,
+                None,
+                AnyView::new(
+                    BoxView::new(
+                        FlexDirection::Row,
+                        Align::Center,
+                        Justify::FlexStart,
+                        Wrap::NoWrap,
+                        0.0,
+                        AnyView::new(SidebarTriggerHost::new(
+                            self.focus.clone(),
+                            self.open_button(),
+                        )),
+                    )
+                    .padding_edges(12.0, 4.0)
+                    .semantic_background(SemanticColorRef::surface()),
+                ),
+            ))
+            .flex_with(0.0, 0.0, None),
+        );
         let main = fill(AnyView::new(BoxView::new(
             FlexDirection::Column,
             Align::Stretch,
@@ -508,15 +523,22 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
             move || snapshot.set_presented(false)
         };
         let pinned = |view: AnyView, width: f32| {
-            AnyView::new(view.frame(
-                Some(FrameDimension::Points(width)),
-                Some(FrameDimension::Percent(100.0)),
-                None,
-                None,
-                None,
-                None,
+            AnyView::new(
+                view.frame(
+                    Some(FrameDimension::Points(width)),
+                    Some(FrameDimension::Percent(100.0)),
+                    None,
+                    None,
+                    None,
+                    None,
+                )
+                .modifier(AbsolutePositionModifier::new(
+                    Some(0.0),
+                    Some(0.0),
+                    None,
+                    None,
+                )),
             )
-            .modifier(AbsolutePositionModifier::new(Some(0.0), Some(0.0), None, None)))
         };
         let backdrop = pinned(
             AnyView::new(AnimatedVisibility::new(
@@ -525,7 +547,10 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
                 None,
                 false,
                 None,
-                AnyView::new(SidebarBackdrop::new(ModalDismissal::default(), dismiss.clone())),
+                AnyView::new(SidebarBackdrop::new(
+                    ModalDismissal::default(),
+                    dismiss.clone(),
+                )),
             )),
             geometry.viewport_width,
         );
@@ -544,23 +569,25 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Adapt
             )),
             geometry.panel_width,
         );
-        let layer = AnyView::new(AnyView::new(SidebarLayer::new(
-            geometry,
-            self.focus.clone(),
-            ModalDismissal::default(),
-            dismiss,
-            AnyView::new(TupleView::new(vec![backdrop, panel])),
-        ))
-        .frame(
-            Some(FrameDimension::Points(geometry.docked_width)),
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-        .flex_with(0.0, 0.0, None)
-        .z_index(100.0));
+        let layer = AnyView::new(
+            AnyView::new(SidebarLayer::new(
+                geometry,
+                self.focus.clone(),
+                ModalDismissal::default(),
+                dismiss,
+                AnyView::new(TupleView::new(vec![backdrop, panel])),
+            ))
+            .frame(
+                Some(FrameDimension::Points(geometry.docked_width)),
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .flex_with(0.0, 0.0, None)
+            .z_index(100.0),
+        );
 
         let row = fill(AnyView::new(BoxView::new(
             FlexDirection::RowReverse,

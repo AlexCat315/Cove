@@ -4,6 +4,7 @@
 //! surfaces and use `NavigationDrawer` for compact surfaces. The rail keeps the
 //! same destination nodes as the expanded sidebar, so switching presentation
 //! preserves selection and drafts.
+use crate::Scope;
 use std::collections::HashSet;
 
 use cove_core::Binding;
@@ -69,7 +70,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Navig
 impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
     for NavigationRail<Id>
 {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let mut sidebar = Sidebar::new(
             self.selection.clone(),
             vec![SidebarSection::new("rail", self.items.clone())],

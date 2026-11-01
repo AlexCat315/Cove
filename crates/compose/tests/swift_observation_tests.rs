@@ -22,6 +22,7 @@
 //!   Swift suite's dependency-cleaner counter becomes the observable outcome
 //!   ("writes schedule nothing") rather than an internal counter.
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::Cell;
@@ -102,7 +103,7 @@ struct Reader {
 }
 
 impl View for Reader {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         self.builds.set(self.builds.get() + 1);
         AnyView::new(Probe {
             value: self.observed.get(),
@@ -142,7 +143,7 @@ fn only_readers_recompose_and_dependencies_are_replaced() {
         }
 
         impl View for Root {
-            fn body(&self) -> AnyView {
+            fn body(&self, _cx: &Scope) -> AnyView {
                 self.root_builds.set(self.root_builds.get() + 1);
                 AnyView::new(cove_composition::TupleView::new(vec![
                     AnyView::new(Reader {
@@ -251,7 +252,7 @@ fn reader_closures_observe_projected_properties() {
         }
 
         impl View for Root {
-            fn body(&self) -> AnyView {
+            fn body(&self, _cx: &Scope) -> AnyView {
                 self.builds.set(self.builds.get() + 1);
                 let width = (self.observed.get() + 1) as f32;
                 AnyView::new(
@@ -299,7 +300,7 @@ fn detaching_the_graph_cancels_subscriptions() {
         }
 
         impl View for Root {
-            fn body(&self) -> AnyView {
+            fn body(&self, _cx: &Scope) -> AnyView {
                 self.builds.set(self.builds.get() + 1);
                 AnyView::new(Probe {
                     value: self.observed.get(),

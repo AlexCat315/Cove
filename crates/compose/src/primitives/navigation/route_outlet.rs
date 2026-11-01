@@ -1,4 +1,5 @@
 //! Composition boundary for the selected route.
+use crate::Scope;
 use crate::{AnyView, View, ViewExt};
 use cove_core::Binding;
 use std::hash::Hash;
@@ -34,7 +35,7 @@ where
     Route: Clone + Hash + Eq + 'static,
     Content: View + 'static,
 {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let route = self.selection.get();
         AnyView::new((self.destination)(route.clone()).id(route))
     }

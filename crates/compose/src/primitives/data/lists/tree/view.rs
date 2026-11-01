@@ -20,6 +20,7 @@
 //! - indent guides draw a branch line per depth with a continuation column
 //!   only where an ancestor still has a following sibling
 
+use crate::Scope;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -563,7 +564,7 @@ where
     Id: std::hash::Hash + Eq + Clone + Send + Sync + 'static,
     RowContent: Fn(&Element, bool, bool, usize) -> AnyView + 'static,
 {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let entries = self.entries();
         let (selected_ids, selected_keys) = self.selection_state();
         let uses_key_selection = self.uses_key_selection();

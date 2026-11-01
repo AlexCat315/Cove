@@ -2,6 +2,7 @@
 //!
 //! Title and fixed slots. Touch rows stay within their proposal; desktop rows
 //! retain horizontal overflow for dense, independently authored accessory slots.
+use crate::Scope;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
@@ -87,7 +88,7 @@ impl ListRow {
 }
 
 impl View for ListRow {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let title = self.title.clone();
         let options = self.options.clone();
         let leading = self.leading.clone();

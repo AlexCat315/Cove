@@ -8,6 +8,7 @@
 //! The logic worth pinning is the accordion's single-expansion rule and the
 //! pagination window arithmetic, both of which have real edge cases at the ends.
 
+use cove_composition::Scope;
 use std::collections::BTreeSet;
 
 use cove_core::State;
@@ -164,7 +165,7 @@ impl AccordionStory {
 }
 
 impl View for AccordionStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let caption = Text::new(self.caption())
             .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
             .semantic_foreground(SemanticColorRef::on_surface_muted());
@@ -177,6 +178,10 @@ impl View for AccordionStory {
 
     fn tag(&self) -> &'static str {
         "AccordionStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; expanded, allows_multiple, reduce_motion, project_name, autosave, diagnostics)
     }
 }
 
@@ -217,7 +222,7 @@ impl Default for BreadcrumbStory {
 }
 
 impl View for BreadcrumbStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let caption = Text::new(format!("Opened: {}", self.opened()))
             .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
             .semantic_foreground(SemanticColorRef::on_surface_muted());
@@ -230,6 +235,10 @@ impl View for BreadcrumbStory {
 
     fn tag(&self) -> &'static str {
         "BreadcrumbStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; is_open)
     }
 }
 
@@ -281,7 +290,7 @@ impl PaginationStory {
 }
 
 impl View for PaginationStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let caption = Text::new(self.caption())
             .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
             .semantic_foreground(SemanticColorRef::on_surface_muted());
@@ -294,6 +303,10 @@ impl View for PaginationStory {
 
     fn tag(&self) -> &'static str {
         "PaginationStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; page)
     }
 }
 
@@ -351,7 +364,7 @@ impl ButtonGroupStory {
 }
 
 impl View for ButtonGroupStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(StorySection::new(
             "View preference",
             "The selected segment is caller-owned. The group has one Tab stop; arrows skip the unavailable segment. Narrow groups wrap instead of shrinking segment labels.",
@@ -365,6 +378,10 @@ impl View for ButtonGroupStory {
 
     fn tag(&self) -> &'static str {
         "ButtonGroupStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; mode, category)
     }
 }
 
@@ -439,7 +456,7 @@ impl TagStory {
 }
 
 impl View for TagStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let caption = Text::new(format!("{} tags", self.tags.get().len()))
             .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
             .semantic_foreground(SemanticColorRef::on_surface_muted());
@@ -452,6 +469,10 @@ impl View for TagStory {
 
     fn tag(&self) -> &'static str {
         "TagStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; tags, filters)
     }
 }
 
@@ -510,7 +531,7 @@ impl Default for DialogStory {
 }
 
 impl View for DialogStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(StorySection::new(
             "Structured dialog",
             "Header, scrollable content and actions share the modal focus and dismissal policy.",
@@ -524,6 +545,10 @@ impl View for DialogStory {
 
     fn tag(&self) -> &'static str {
         "DialogStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; is_open, name, is_saved)
     }
 }
 
@@ -572,7 +597,7 @@ impl Default for AlertDialogStory {
 }
 
 impl View for AlertDialogStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(StorySection::new(
             "Confirm a destructive action",
             "The example only changes local state. Confirmation and cancellation have distinct visual roles.",
@@ -590,6 +615,10 @@ impl View for AlertDialogStory {
 
     fn tag(&self) -> &'static str {
         "AlertDialogStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; is_open, is_deleted)
     }
 }
 
@@ -626,7 +655,7 @@ impl Default for LabelStory {
 }
 
 impl View for LabelStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(StorySection::new(
             "Content labels",
             "Status badges, removable tags and key caps keep their full text inside narrow cards. Field labels below name and focus an input.",
@@ -644,6 +673,10 @@ impl View for LabelStory {
 
     fn tag(&self) -> &'static str {
         "LabelStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; shows_tag)
     }
 }
 
@@ -699,7 +732,7 @@ impl SheetStory {
 }
 
 impl View for SheetStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(StorySection::new(
             "Edge sheets",
             "Each panel enters and leaves through its chosen edge, with modal focus confinement and restoration.",
@@ -713,6 +746,10 @@ impl View for SheetStory {
 
     fn tag(&self) -> &'static str {
         "SheetStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; is_open, edge, setting)
     }
 }
 
@@ -775,7 +812,7 @@ impl BottomSheetStory {
 }
 
 impl View for BottomSheetStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(StorySection::new(
             "Bottom sheet",
             "Open the sheet, then drag its handle up for the larger detent or down to dismiss. On wide surfaces it degrades to a centered dialog-sized panel; Escape and the backdrop still dismiss through the modal contract.",
@@ -789,6 +826,10 @@ impl View for BottomSheetStory {
 
     fn tag(&self) -> &'static str {
         "BottomSheetStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; is_open, detent, notifications)
     }
 }
 
@@ -852,7 +893,7 @@ impl Default for NavigationStackStory {
 }
 
 impl View for NavigationStackStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(StorySection::new(
             "Page stack",
             "Push and pop keep the root mounted. Only the top page is painted and interactive; the incoming page slides in with a fade, and a non-empty initial path restores the same page on launch.",
@@ -866,5 +907,9 @@ impl View for NavigationStackStory {
 
     fn tag(&self) -> &'static str {
         "NavigationStackStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; path, draft)
     }
 }

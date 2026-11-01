@@ -3,6 +3,7 @@
 //! Presented modals are portal entries covering the window: a backdrop that owns
 //! dismissal plus one animated panel. The backing node stays mounted while the
 //! exit transition runs, so the panel animates out instead of vanishing.
+use crate::Scope;
 use std::rc::Rc;
 
 use crate::animation::content::AnimatedVisibility;
@@ -22,7 +23,7 @@ use cove_core::scene::{
     InputRoutingPriority, InteractionRegistryHolder, Justify, LayoutNode, Node, PointerPhase,
     PositionType,
 };
-use cove_core::{Binding, Color, Edge, Point, Rect, Size};
+use cove_core::{Binding, Color, Edge, Point, Rect, Signal, Size};
 use cove_platform::MouseButton;
 
 use super::modal_options::{ModalBackdrop, ModalGeometry, ModalOptions, ModalPlacement};
@@ -35,7 +36,6 @@ pub struct Modal {
     pub options: ModalOptions,
     fitting_geometry: Option<Rc<dyn Fn(&mut ModalGeometry, Size)>>,
     content: AnyView,
-    retained: cove_core::State<bool>,
 }
 
 impl Modal {
@@ -45,7 +45,6 @@ impl Modal {
             options: ModalOptions::default(),
             fitting_geometry: None,
             content: AnyView::new(content),
-            retained: cove_core::State::new(false),
         }
     }
 
@@ -61,29 +60,22 @@ impl Modal {
 }
 
 impl View for Modal {
-    fn body(&self) -> AnyView {
+    /// `retained` keeps the panel mounted and painting while it animates out,
+    /// so the exit transition plays instead of the portal vanishing.
+    fn body(&self, cx: &Scope) -> AnyView {
         AnyView::new(ModalPresenter {
             is_presented: self.is_presented.clone(),
-            retained: self.retained.clone(),
+            retained: cx.state(|| false),
             options: self.options.clone(),
             fitting_geometry: self.fitting_geometry.clone(),
             content: self.content.clone(),
         })
     }
-
-    /// `retained` keeps the panel mounted and painting while it animates out
-    /// (`Modal.swift:21-25`). `AnimatedVisibility::on_finished` writes it, but
-    /// nothing subscribed, so the portal was released in the dismissal frame and
-    /// the exit visibly snapped. `Sheet`, `Dialog`, `ActionSheet` and `Toast` all
-    /// route through `Modal`, so this fixes the whole modal family.
-    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
-        vec![crate::DynamicField::state("retained", &self.retained)]
-    }
 }
 
 struct ModalPresenter {
     is_presented: Binding<bool>,
-    retained: cove_core::State<bool>,
+    retained: Signal<bool>,
     options: ModalOptions,
     fitting_geometry: Option<Rc<dyn Fn(&mut ModalGeometry, Size)>>,
     content: AnyView,
@@ -146,7 +138,7 @@ impl_primitive_view!(ModalPresenter);
 fn present(
     node: &Node,
     is_presented: bool,
-    retained: &cove_core::State<bool>,
+    retained: &Signal<bool>,
     options: &ModalOptions,
     fitting: &Option<Rc<dyn Fn(&mut ModalGeometry, Size)>>,
     content: &AnyView,

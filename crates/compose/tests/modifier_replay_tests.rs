@@ -16,6 +16,7 @@
 //! returns the same values from `dynamic_properties`, which is the equivalent
 //! recomposition trigger. The asserted frames are Swift's own.
 
+use cove_composition::Scope;
 mod support;
 
 use cove_composition::{AnyView, DynamicField, LayoutDebugExt, View};
@@ -108,7 +109,7 @@ fn erased_declarations_keep_each_modifier_and_replace_parent_values() {
             content: std::rc::Rc<StatefulContent>,
         }
         impl View for Parent {
-            fn body(&self) -> AnyView {
+            fn body(&self, _cx: &Scope) -> AnyView {
                 let inner = AnyView::new(self.content.content(self.content.expanded.get()));
                 AnyView::new(
                     AnyView::new(AnyView::new(inner).frame_width(self.width.get()))
@@ -163,7 +164,7 @@ fn a_width_only_caller_preserves_owned_height_and_auto_clears_the_axis() {
             height: State<f32>,
         }
         impl View for SizedContent {
-            fn body(&self) -> AnyView {
+            fn body(&self, _cx: &Scope) -> AnyView {
                 AnyView::new(AnyView::new(empty_box()).frame_size(100.0, self.height.get()))
             }
             fn dynamic_properties(&self) -> Vec<DynamicField> {
@@ -179,7 +180,7 @@ fn a_width_only_caller_preserves_owned_height_and_auto_clears_the_axis() {
             height: State<f32>,
         }
         impl View for Parent {
-            fn body(&self) -> AnyView {
+            fn body(&self, _cx: &Scope) -> AnyView {
                 AnyView::new(
                     AnyView::new(
                         AnyView::new(SizedContent {
@@ -259,7 +260,7 @@ fn a_fixed_frame_and_outer_style_survive_a_branch_replacement() {
             expanded: State<bool>,
         }
         impl View for Forwarder {
-            fn body(&self) -> AnyView {
+            fn body(&self, _cx: &Scope) -> AnyView {
                 AnyView::new(
                     StatefulContent {
                         expanded: self.expanded.clone(),
@@ -320,7 +321,7 @@ fn modifier_values_update_in_declaration_order() {
             expanded: State<bool>,
         }
         impl View for Parent {
-            fn body(&self) -> AnyView {
+            fn body(&self, _cx: &Scope) -> AnyView {
                 AnyView::new(
                     AnyView::new(
                         StatefulContent {

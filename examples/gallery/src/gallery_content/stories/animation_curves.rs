@@ -4,6 +4,7 @@
 //! The story authors real curves through the shared `Animation` type, so it
 //! exercises the same evaluation the runtime uses.
 
+use cove_composition::Scope;
 use cove_core::State;
 use cove_core::scene::animation::{
     Animation, AnimationCurve, AnimationStepPosition, LinearTimingCurve, TimingPoint,
@@ -116,7 +117,7 @@ impl AnimationCurveExamples {
 }
 
 impl cove_ui_compose::View for AnimationCurveExamples {
-    fn body(&self) -> cove_ui_compose::AnyView {
+    fn body(&self, _cx: &Scope) -> cove_ui_compose::AnyView {
         use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
         use cove_ui_compose::modifiers::layout::LayoutFrameExt;
         use cove_ui_compose::modifiers::style::AppearanceExt;

@@ -4,6 +4,7 @@
 //! surfaces, centered dialog-like panel on expanded surfaces. The content owns
 //! its layout; this component owns the handle, detents and dismissal.
 
+use crate::Scope;
 use std::cell::Cell;
 use std::rc::Rc;
 
@@ -138,7 +139,7 @@ impl BottomSheet {
 }
 
 impl View for BottomSheet {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let is_presented = self.is_presented.clone();
         let options = self.options.clone();
         let content = self.content.clone();

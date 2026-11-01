@@ -8,6 +8,7 @@
 //! targets. The remaining stories are view compositions whose state is a single
 //! binding; they are ported for completeness but carry no algorithm.
 
+use cove_composition::Scope;
 use std::collections::BTreeSet;
 
 use cove_core::State;
@@ -217,7 +218,7 @@ impl TreeStory {
 }
 
 impl View for TreeStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(StorySection::new(
             "Scene hierarchy",
             "Search retains matching ancestors. Use arrows, Home and End; Option/Alt + Right expands all and Option/Alt + Left collapses all. Command/Control-click selects multiple nodes.",
@@ -232,6 +233,10 @@ impl View for TreeStory {
 
     fn tag(&self) -> &'static str {
         "TreeStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; selection, expanded, selected_ids, query)
     }
 }
 
@@ -276,7 +281,7 @@ impl Default for VirtualStackStory {
 }
 
 impl View for VirtualStackStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(StorySection::new(
             "Scroll to index",
             "The viewport materializes rows around the requested index.",
@@ -289,6 +294,10 @@ impl View for VirtualStackStory {
 
     fn tag(&self) -> &'static str {
         "VirtualStackStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; target)
     }
 }
 
@@ -360,7 +369,7 @@ impl Default for SwipeListStory {
 }
 
 impl View for SwipeListStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(StorySection::new(
             "Swipe actions",
             "Touch rows reveal up to two trailing actions. Every row also has an actions button and a right-click menu, so pointer, keyboard and assistive clients can run the same commands without swiping.",
@@ -374,6 +383,10 @@ impl View for SwipeListStory {
 
     fn tag(&self) -> &'static str {
         "SwipeListStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; selection, log)
     }
 }
 
@@ -432,7 +445,7 @@ impl Default for RefreshListStory {
 }
 
 impl View for RefreshListStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(StorySection::new(
             "Pull to refresh",
             "Touch pull past 64pt starts the caller-owned refresh; the indicator holds until the binding clears and freezes under reduced motion. Cmd+R or Ctrl+R is the keyboard path, and the explicit button is the pointer path.",
@@ -446,6 +459,10 @@ impl View for RefreshListStory {
 
     fn tag(&self) -> &'static str {
         "RefreshListStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; is_refreshing, refreshes)
     }
 }
 
@@ -496,7 +513,7 @@ impl Default for DragAndDropStory {
 }
 
 impl View for DragAndDropStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(StorySection::new(
             "Typed payloads",
             "Drag a tag into either lane. The preview is portal-rendered, the target highlights while hovered, and only a matching payload calls its drop closure. Escape is not required for a cancelled drag: releasing outside every target drops nothing.",
@@ -513,6 +530,10 @@ impl View for DragAndDropStory {
 
     fn tag(&self) -> &'static str {
         "DragAndDropStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; lane_a, lane_b)
     }
 }
 
@@ -545,7 +566,7 @@ impl Default for SectionedListStory {
 }
 
 impl View for SectionedListStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(StorySection::new(
             "Sectioned list",
             "Headers stay with their first row while scrolling.",
@@ -558,6 +579,10 @@ impl View for SectionedListStory {
 
     fn tag(&self) -> &'static str {
         "SectionedListStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; selection)
     }
 }
 

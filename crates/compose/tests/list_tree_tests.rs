@@ -49,6 +49,7 @@
 //!   leaf and its ancestors (Group, Second), dropping the non-matching
 //!   sibling; Swift kept three rows.
 
+use cove_composition::Scope;
 #[allow(dead_code)]
 mod support;
 
@@ -182,7 +183,7 @@ struct ListTestHarness {
 }
 
 impl View for ListTestHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let _ = self.selection.get();
         AnyView::new(
             List::new(

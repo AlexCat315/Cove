@@ -2,6 +2,7 @@
 //!
 //! An editable draft commits on Return or blur. Invalid text never overwrites
 //! the bound time: the field keeps the draft and shows the accepted range.
+use crate::Scope;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -146,7 +147,7 @@ impl TimeField {
 }
 
 impl View for TimeField {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let field = self.snapshot();
         let session = self.session.clone();
         let committed = self.committed();

@@ -1,9 +1,10 @@
 //! Translation of Primitives/Overlays/Popconfirm/Popconfirm.swift.
 //!
 //! An anchored question with explicit Cancel and Confirm actions.
+use crate::Scope;
 use std::rc::Rc;
 
-use cove_core::State;
+use cove_core::Signal;
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Justify, Wrap};
 use cove_imaging::BundleImageResource;
 
@@ -42,7 +43,6 @@ pub struct Popconfirm {
     placement: PopoverPlacement,
     is_enabled: bool,
     on_confirm: Rc<dyn Fn()>,
-    is_presented: State<bool>,
 }
 
 impl Popconfirm {
@@ -73,7 +73,6 @@ impl Popconfirm {
             placement,
             is_enabled,
             on_confirm: Rc::new(on_confirm),
-            is_presented: State::new(false),
         }
     }
 
@@ -125,9 +124,8 @@ impl Popconfirm {
         ))
     }
 
-    fn content(&self) -> AnyView {
+    fn content(&self, is_presented: Signal<bool>) -> AnyView {
         let question = self.question.clone();
-        let is_presented = self.is_presented.clone();
         let on_confirm = self.on_confirm.clone();
         let enabled = self.is_enabled;
         let cancel = {
@@ -204,9 +202,10 @@ impl Popconfirm {
 }
 
 impl View for Popconfirm {
-    fn body(&self) -> AnyView {
-        let popover = Popover::new(self.trigger_label(), self.content())
-            .is_presented(self.is_presented.binding())
+    fn body(&self, cx: &Scope) -> AnyView {
+        let is_presented = cx.state(|| false);
+        let popover = Popover::new(self.trigger_label(), self.content(is_presented))
+            .is_presented(is_presented.into())
             .enabled(self.is_enabled)
             .width(300.0)
             .placement(self.placement)

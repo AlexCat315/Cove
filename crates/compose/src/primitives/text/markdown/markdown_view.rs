@@ -8,6 +8,7 @@
 //!
 //! Links are reported to `on_open_link`; nothing is opened on the caller's
 //! behalf. Images render as their linked alternative text.
+use crate::Scope;
 use std::rc::Rc;
 
 use crate::modifiers::layout::PaddingExt;
@@ -43,7 +44,7 @@ impl MarkdownView {
 }
 
 impl View for MarkdownView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(MarkdownBlocks {
             blocks: super::parse::blocks(&self.source),
             depth: 0,

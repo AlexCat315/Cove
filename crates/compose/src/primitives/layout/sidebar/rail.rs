@@ -3,6 +3,7 @@
 //! Narrow rail presentation: one glyph per destination, optional labels, and no
 //! trailing accessories. The rail keeps the same destination nodes as the
 //! expanded sidebar, so switching presentation preserves selection and drafts.
+use crate::Scope;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
 use crate::primitives::controls::button::{ButtonIcon, ButtonIconSource};
@@ -85,7 +86,7 @@ impl PrimitiveView for RailPadded {
 crate::impl_primitive_view!(RailPadded);
 
 impl View for SidebarRail {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let mut children: Vec<AnyView> = Vec::new();
         for item in &self.items {
             let enabled = item.is_enabled;

@@ -42,6 +42,7 @@
 //! The story is mounted directly here, which is what Swift's own `AppBarTests`
 //! effectively tested — it asserted the story's nodes, not the shell's.
 
+use cove_composition::Scope;
 mod support;
 
 use std::rc::Rc;
@@ -58,15 +59,15 @@ use support::GalleryScene;
 struct StoryView(Rc<AppBarStory>);
 
 impl View for StoryView {
-    fn body(&self) -> AnyView {
-        View::body(self.0.as_ref())
+    fn body(&self, cx: &Scope) -> AnyView {
+        View::body(self.0.as_ref(), cx)
     }
 }
 
 struct Mounted(Rc<AppBarStory>, Appearance);
 
 impl View for Mounted {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(AnyView::new(StoryView(self.0.clone())).theme(self.1.theme()))
     }
 }

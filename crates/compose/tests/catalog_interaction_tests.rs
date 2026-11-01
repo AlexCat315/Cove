@@ -21,6 +21,7 @@
 //!   focus and registering no handlers — is asserted in
 //!   [`loading_blocks_activation`] for the loading path, which Rust does expose.
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::RefCell;
@@ -44,7 +45,7 @@ struct LoadingHarness {
 }
 
 impl View for LoadingHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let loading = *self.loading.borrow();
         AnyView::new(Button::new(Text::new("Save"), || {}).loading(loading))
     }

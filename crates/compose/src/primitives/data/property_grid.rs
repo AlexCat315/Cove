@@ -16,6 +16,7 @@
 //! - rows are only materialised for visible rows; a collapsed section's rows
 //!   are not built
 
+use crate::Scope;
 use std::collections::{BTreeMap, HashSet};
 use std::rc::Rc;
 
@@ -350,7 +351,7 @@ impl PropertyGrid {
 }
 
 impl View for PropertyGrid {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let collapsed = PropertyGridCollapsed {
             controlled: self.collapsed_section_ids.clone(),
             local: self.local_collapsed.clone(),
@@ -875,7 +876,7 @@ impl PropertyGridSurface {
 }
 
 impl View for PropertyGridSurface {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let mut children = Vec::new();
         if self.sections.is_empty() {
             children.push(self.empty_state());

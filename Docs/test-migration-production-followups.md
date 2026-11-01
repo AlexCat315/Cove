@@ -34,6 +34,8 @@ its own verification pass.
 | 23 | `SceneEditor::intercept` held a `RefMut` across a `borrow_mut()` (Rust 2024 temporary scope), panicking on every second mouse-up while picking | `editor_pick_borrow_regression` |
 | 24 | `PortalStoreAmbient` had no `ScopedAmbient` impl and was not re-exported, so no caller could scope a portal store through the runtime ambient; `Examples` had reimplemented it locally | `portal_scope_tests` |
 | `EmptyDashboardSpace` was the last empty `impl View` on a plain struct, panicking on mounting the Introduction page | `cargo test -p cove-examples --lib` |
+| `Binding`-driven views never recomposed, so no popover, menu or asset picker could open. State now lives in the composition scope as `Signal`s read through tracked `Binding`s | `signal_scope_tests`, `menu_button_tests`, `split_button_tests`, `popconfirm_tests` |
+| Every `ModifiedContent` shared one slot tag, so reconciliation updated unrelated modified views in place | `product_interaction_regression_tests::command_palette_filters_through_real_input` |
 | `StoryDispatch::new` allowlisted only 15 pages while `view()` implemented 58, so **43 fully ported gallery stories were unreachable dead code** and rendered the "not migrated" notice | `every_implemented_view_arm_is_reachable` |
 | `SwapchainImage` equality was field-based with a per-window `generation`, so a stale acquisition ticket compared equal to the current one and could consume the frame; Swift used reference identity | `swapchain_lifetime_tests` |
 
@@ -41,7 +43,6 @@ its own verification pass.
 
 | Defect | Why not fixed here |
 | --- | --- |
-| **`Binding` has no observability at all.** `DynamicField::state` takes `&State<T>`, but `Popover`, `AssetRefField`, `MenuButton`, `Menu` and `SplitButton` are driven by a `Binding`, and `Binding::new` stores only get/set closures — it discards the `State` handle, so a scope can never subscribe. Result: a `Binding`-driven view is invisible to recomposition, so `Popover::body` is never re-entered and **no popover, menu or asset picker can open**. Attempted fixes reach into `State::subscribe_local` lifetimes and the hot `State` path, so this needs a designed change (a `Binding` that carries an invalidation hook, or a `DynamicField` variant that owns its subscription) plus the full composition suite as a gate — not a drive-by | |
 | `WorkspaceView` has no view reactivity: `dispatch` bumps `version` but nothing invalidates the scope, so an installed tree never re-renders | Sources-owned; a live host would show a stale workspace forever |
 | `WorkspaceDocument` cannot be serialized: `WorkspaceLayoutNode` derives `Serialize` with `#[serde(tag = "kind")]` on a newtype `Group` variant | Persistence is impossible; decoding works |
 | `Diagnostics::capture_trace` is synchronous (`thread::sleep` on the only thread that could emit), so a capture can never observe a span; Swift's is async | Needs an async capture or frame-inbox bracket — a DevTools design change |

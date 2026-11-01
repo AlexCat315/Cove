@@ -40,6 +40,7 @@
 //!   the Rust `AdaptiveControlExamples` emits only `adaptive-preview-caption`.
 //!   Pinned by `the_adaptive_previews_emit_only_a_caption`.
 
+use cove_composition::Scope;
 mod support;
 
 use std::rc::Rc;
@@ -60,8 +61,8 @@ use support::GalleryScene;
 struct Shared<V: View>(Rc<V>);
 
 impl<V: View + 'static> View for Shared<V> {
-    fn body(&self) -> AnyView {
-        View::body(self.0.as_ref())
+    fn body(&self, cx: &Scope) -> AnyView {
+        View::body(self.0.as_ref(), cx)
     }
 }
 

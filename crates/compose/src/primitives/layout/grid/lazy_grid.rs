@@ -1,4 +1,5 @@
 //! Translation of Compose/Sources/CoveUICompose/Primitives/Layout/Grid/LazyGrid.swift.
+use crate::Scope;
 use std::ops::Range;
 use std::rc::Rc;
 
@@ -158,7 +159,7 @@ impl<T: Clone + 'static> LazyGrid<T> {
     }
 }
 impl<T: Clone + 'static> View for LazyGrid<T> {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let grid = self.scaled_grid(1.0);
         AnyView::new(crate::theme::TextScalerReader::new(move |scaler| {
             grid.scaled_grid(scaler.factor())
@@ -235,7 +236,7 @@ impl<T: Clone + 'static> LazyGridView<T> {
     }
 }
 impl<T: Clone + 'static> View for LazyGridView<T> {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let rows = self.rows();
         let row_count = rows.count;
         let visible = self.visible_rows.get();
@@ -550,7 +551,7 @@ struct LazyGridCellRow {
     children: Vec<AnyView>,
 }
 impl View for LazyGridCellRow {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(BoxView::new(
             cove_core::scene::FlexDirection::Row,
             cove_core::scene::Align::Stretch,

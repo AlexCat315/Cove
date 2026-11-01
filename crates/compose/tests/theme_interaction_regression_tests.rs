@@ -40,6 +40,7 @@
 //! - **Popover surface and presentation.** The Rust `Popover` is presented from
 //!   the binding it reads at build time and exposes the same portal lifetime.
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::{Cell, RefCell};
@@ -348,7 +349,7 @@ struct MenuHarness {
 }
 
 impl View for MenuHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let presented = self.presented.clone();
         let binding = Binding::new(
             {

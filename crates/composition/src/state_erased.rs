@@ -128,8 +128,14 @@ impl<T: Clone + Send + 'static> ErasedState for StateField<T> {
 }
 
 /// Build a `dynamic_properties` list without repeating the wrapper call.
+///
+/// `dynamic_fields!(self; a, b)` names each field after itself;
+/// `dynamic_fields!["a" => self.a]` keeps an explicit (e.g. legacy) name.
 #[macro_export]
 macro_rules! dynamic_fields {
+    ($owner:ident; $($field:ident),* $(,)?) => {
+        vec![$($crate::DynamicField::state(stringify!($field), &$owner.$field)),*]
+    };
     ($($name:literal => $state:expr),* $(,)?) => {
         vec![$($crate::DynamicField::state($name, &$state)),*]
     };

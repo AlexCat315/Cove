@@ -8,6 +8,7 @@
 //! directory: the email rule, the required-name rule, the airport matcher and its
 //! deliberate failure for one query.
 
+use cove_composition::Scope;
 use cove_core::State;
 use cove_ui_compose::LayoutDebugExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
@@ -254,7 +255,7 @@ impl RadioStory {
 }
 
 impl View for RadioStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let caption = Text::new(self.caption())
             .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
             .semantic_foreground(SemanticColorRef::on_surface_muted());
@@ -267,6 +268,10 @@ impl View for RadioStory {
 
     fn tag(&self) -> &'static str {
         "RadioStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; selection)
     }
 }
 
@@ -344,7 +349,7 @@ impl FormStory {
 }
 
 impl View for FormStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(StorySection::new(
             "Create an account",
             "Labels move above their inputs when space is limited. Resize or change text scale while editing; drafts and focus stay intact. Submit to see field errors.",
@@ -358,6 +363,10 @@ impl View for FormStory {
 
     fn tag(&self) -> &'static str {
         "FormStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; name, email, status)
     }
 }
 
@@ -414,7 +423,7 @@ impl ComboboxStory {
 }
 
 impl View for ComboboxStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let caption = Text::new(self.caption())
             .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
             .semantic_foreground(SemanticColorRef::on_surface_muted());
@@ -427,6 +436,10 @@ impl View for ComboboxStory {
 
     fn tag(&self) -> &'static str {
         "ComboboxStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; city, airport)
     }
 }
 
@@ -485,7 +498,7 @@ impl Default for NotificationStory {
 }
 
 impl View for NotificationStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let caption = Text::new(self.caption())
             .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
             .semantic_foreground(SemanticColorRef::on_surface_muted());
@@ -498,6 +511,10 @@ impl View for NotificationStory {
 
     fn tag(&self) -> &'static str {
         "NotificationStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; count)
     }
 }
 
@@ -513,7 +530,7 @@ impl TooltipStory {
 }
 
 impl View for TooltipStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(StorySection::new(
             "Tooltips",
             "Hover or focus a target to reveal its label. Long labels wrap inside the bubble.",

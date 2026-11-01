@@ -44,6 +44,7 @@
 //!   the same list in expanded mode, so crossing that boundary remounts every
 //!   row and focus falls out.
 
+use cove_composition::Scope;
 mod support;
 
 use std::rc::Rc;
@@ -131,7 +132,7 @@ struct RailHeader {
 }
 
 impl View for RailHeader {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let count = self.count.get();
         let state = self.count.clone();
         AnyView::new(
@@ -176,7 +177,7 @@ impl View for HarnessView {
         ]
     }
 
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let width = self.width.get();
         let presentation = self.presentation.get();
         let mut surface = Environment::default();

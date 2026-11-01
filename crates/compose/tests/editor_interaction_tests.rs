@@ -39,6 +39,7 @@
 //! - **Text metrics.** The shared harness installs an 16/20 text environment
 //!   where the Swift rig used 12/16; no assertion here depends on glyph metrics.
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::{Cell, RefCell};
@@ -451,7 +452,7 @@ struct ModalHarness {
 }
 
 impl View for ModalHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let actions = self.actions.clone();
         let modal_text = State::new(TextBuffer::new(""));
         AnyView::new(LayerRoot::new(column(
@@ -769,7 +770,7 @@ struct TransitionHarness {
 }
 
 impl View for TransitionHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(
             cove_ui_compose::animation::transition_view::TransitionView::new(
                 self.shown.get(),

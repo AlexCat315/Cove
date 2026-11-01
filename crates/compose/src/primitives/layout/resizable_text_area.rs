@@ -1,11 +1,12 @@
 //! Translation of Primitives/Layout/ResizableTextArea.swift.
 //!
 //! Multiline input with a draggable lower edge and internal text scrolling.
+use crate::Scope;
 use std::rc::Rc;
 
 use cove_composition::{AnyView, View, adaptive::SurfaceReader};
+use cove_core::Binding;
 use cove_core::scene::{Align, FlexDirection, Wrap};
-use cove_core::{Binding, State};
 
 use crate::BoxView;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
@@ -27,7 +28,6 @@ pub struct ResizableTextArea {
     on_focus: Option<Rc<dyn Fn()>>,
     on_blur: Option<Rc<dyn Fn()>>,
     code_editing: TextFieldCodeEditing,
-    height: State<f32>,
 }
 
 impl ResizableTextArea {
@@ -44,7 +44,6 @@ impl ResizableTextArea {
         on_blur: Option<Rc<dyn Fn()>>,
     ) -> Self {
         let limits = EditorHeightLimits::new(min_height.max(32.0), max_height);
-        let height = State::new(limits.minimum);
         Self {
             text,
             placeholder: placeholder.into(),
@@ -55,7 +54,6 @@ impl ResizableTextArea {
             on_focus,
             on_blur,
             code_editing,
-            height,
         }
     }
 
@@ -80,7 +78,7 @@ impl ResizableTextArea {
 }
 
 impl View for ResizableTextArea {
-    fn body(&self) -> AnyView {
+    fn body(&self, cx: &Scope) -> AnyView {
         let text = self.text.clone();
         let placeholder = self.placeholder.clone();
         let limits = self.limits;
@@ -90,7 +88,7 @@ impl View for ResizableTextArea {
         let on_focus = self.on_focus.clone();
         let on_blur = self.on_blur.clone();
         let code_editing = self.code_editing.clone();
-        let height_state = self.height.clone();
+        let height_state = cx.state(|| self.limits.minimum);
         let reader = SurfaceReader::new(move |surface| {
             let extent = surface.minimum_control_extent();
             let viewport_limits =

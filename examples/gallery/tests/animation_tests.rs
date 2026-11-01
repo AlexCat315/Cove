@@ -26,6 +26,7 @@
 //! equivalent claim — reduced motion must not interpolate — is vacuous when
 //! nothing interpolates, so it is recorded rather than faked.
 
+use cove_composition::Scope;
 mod support;
 
 use cove_composition::AnyView;
@@ -50,7 +51,7 @@ struct Mounted {
 }
 
 impl cove_composition::View for Mounted {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(AnyView::new(self.story.clone_view()).theme(self.appearance.theme()))
     }
 }
@@ -63,8 +64,8 @@ trait CloneView {
 struct StoryView(Rc<AnimationCurveExamples>);
 
 impl cove_composition::View for StoryView {
-    fn body(&self) -> AnyView {
-        cove_composition::View::body(self.0.as_ref())
+    fn body(&self, cx: &Scope) -> AnyView {
+        cove_composition::View::body(self.0.as_ref(), cx)
     }
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
         cove_composition::View::dynamic_properties(self.0.as_ref())

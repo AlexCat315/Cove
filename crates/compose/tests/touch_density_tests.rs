@@ -27,6 +27,7 @@
 //!   strip-geometry assertion is scoped to its strip container, because the
 //!   scroller keeps item-local frames.
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::RefCell;
@@ -256,7 +257,7 @@ fn switching_input_restores_authored_constraints_on_retained_nodes() {
                 input: State<InputCapabilities>,
             }
             impl View for Harness {
-                fn body(&self) -> AnyView {
+                fn body(&self, _cx: &Scope) -> AnyView {
                     let content = BoxView::new(
                         FlexDirection::Column,
                         Align::FlexStart,
@@ -457,7 +458,7 @@ fn custom_button_styles_clear_hover_on_a_pointer_to_touch_transition() {
                 recorder: Rc<HoverRecorder>,
             }
             impl View for Harness {
-                fn body(&self) -> AnyView {
+                fn body(&self, _cx: &Scope) -> AnyView {
                     let mut surface = Environment::default();
                     surface.input = self.input.get();
                     AnyView::new(
@@ -563,7 +564,7 @@ fn text_hover_queries_are_not_yet_wired() {
                 anchors: Rc<RefCell<Vec<bool>>>,
             }
             impl View for Harness {
-                fn body(&self) -> AnyView {
+                fn body(&self, _cx: &Scope) -> AnyView {
                     let anchors = self.anchors.clone();
                     let mut events = TextFieldEvents::default();
                     events.on_hover_change = Some(Rc::new(move |anchor| {

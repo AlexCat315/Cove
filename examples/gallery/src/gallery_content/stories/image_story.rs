@@ -6,6 +6,7 @@
 //! Both are ordinary state machines, so they live here as data the tests can
 //! assert against rather than only as view branches.
 
+use cove_composition::Scope;
 use cove_core::State;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
@@ -197,7 +198,7 @@ impl ImageStory {
 }
 
 impl View for ImageStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let caption = Text::new(format!("Source: {}", self.source().title()))
             .semantic_font(cove_ui_compose::theme::SemanticFontRef::body_strong());
         let request = Text::new(format!("Request: {}", self.request_number()))
@@ -242,5 +243,9 @@ impl View for ImageStory {
 
     fn tag(&self) -> &'static str {
         "ImageStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; source, retry, remote_url)
     }
 }

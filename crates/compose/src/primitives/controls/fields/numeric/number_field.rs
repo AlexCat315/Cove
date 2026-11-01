@@ -7,6 +7,7 @@
 //! chip horizontally scrubs the value (one step per 4 pt; hold Shift when
 //! starting for x10, Option/Alt for x0.1). With a `reset_value`, double-clicking
 //! the chip restores it.
+use crate::Scope;
 use std::rc::Rc;
 
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
@@ -180,7 +181,7 @@ impl NumberField {
 }
 
 impl View for NumberField {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let committed = match self.mixed_value_label.clone() {
             Some(_) => String::new(),
             None => self.format_value(self.normalized(self.value.get())),
@@ -319,6 +320,10 @@ impl View for NumberField {
             draft_changed,
             is_editing,
         })
+    }
+
+    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
+        crate::dynamic_fields!(self; draft, is_editing, draft_changed)
     }
 }
 

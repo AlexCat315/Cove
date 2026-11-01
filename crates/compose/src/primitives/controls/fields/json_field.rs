@@ -7,6 +7,7 @@
 //! Validation, normalization, pretty-printing and the labels live in
 //! [`JsonField`](super::json_field_model) helpers: [`validate`],
 //! [`pretty_printed`], [`normalized_commit_text`] and [`JsonFieldLabels`].
+use crate::Scope;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
@@ -266,7 +267,7 @@ impl JsonField {
 }
 
 impl View for JsonField {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let field = self.snapshot();
         let validation = self.validation();
 
@@ -383,7 +384,7 @@ impl View for JsonField {
             self.placeholder.clone(),
             self.draft_binding(),
             self.min_height,
-            520.0,
+            360.0,
             !self.is_enabled,
             self.labels.resize.clone(),
             TextFieldCodeEditing {

@@ -5,6 +5,7 @@
 //! Clipped scrolling with optional offset binding and viewport observations.
 //! Content must retain its natural extent on the scrolling axis. Large
 //! datasets belong in a virtualized collection instead.
+use crate::Scope;
 use std::cell::Cell;
 use std::rc::Rc;
 
@@ -1632,7 +1633,7 @@ fn color_bits(color: Color) -> (u32, u32, u32, u32) {
 }
 
 impl View for ScrollViewObservers {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(crate::EmptyView)
     }
 }

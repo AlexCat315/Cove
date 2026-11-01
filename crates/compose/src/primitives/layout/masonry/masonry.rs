@@ -1,4 +1,5 @@
 //! Translation of Compose/Sources/CoveUICompose/Primitives/Layout/Masonry/Masonry.swift.
+use crate::Scope;
 use crate::{
     Alignment, AnyView, HorizontalAlignment, Layout, LayoutContainer, LayoutSubview,
     ProposedViewSize, View,
@@ -259,7 +260,7 @@ impl Masonry {
     }
 }
 impl View for Masonry {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(
             LayoutContainer::<MasonryLayout, AnyView>::with_erased_content(
                 self.layout,

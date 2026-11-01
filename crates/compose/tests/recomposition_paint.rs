@@ -5,6 +5,7 @@
 //! - recomposing because an unrelated state (`tick`) changed does not repaint
 //! - changing the value that feeds the draw identity repaints
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::Cell;
@@ -90,7 +91,7 @@ impl PrimitiveView for Harness {
 impl cove_composition::View for Harness {
     /// `body` reads both states, exactly like Swift's `Harness.body`. Reading
     /// `tick` is what makes an *unrelated* recompose happen without repainting.
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let _tick = self.tick.get();
         let value = self.value.get();
         AnyView::new(

@@ -30,6 +30,7 @@
 //! equivalent recomposition trigger, so the same open/close drive the same
 //! layout passes.
 
+use cove_composition::Scope;
 mod support;
 
 use std::rc::Rc;
@@ -86,7 +87,7 @@ struct Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let open = self.open.clone();
         let presented = open.clone();
         let dismiss = open.clone();

@@ -3,6 +3,7 @@
 //! A keyboard-focusable disclosure header with naturally sized content.
 //! Expansion belongs to the caller, so it survives panel reconstruction and can
 //! also be controlled by search or an Expand All command.
+use crate::Scope;
 use cove_core::Binding;
 use cove_core::scene::{
     AccessibilityRole, AccessibilityState, Align, Edge, FlexDirection, Justify, LayoutNode, Node,
@@ -77,7 +78,7 @@ impl DisclosureGroup {
 }
 
 impl View for DisclosureGroup {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let is_expanded = self.is_expanded.get();
         let toggle_binding = self.is_expanded.clone();
         let is_enabled = self.is_enabled;

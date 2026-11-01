@@ -10,6 +10,7 @@
 //! duplicate suppression — lives in [`ComboboxSearchSession`]; the results area
 //! decides between spinner, failure, prompt, empty text and a dimmed list with
 //! [`results_presentation`].
+use crate::Scope;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
@@ -420,7 +421,7 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Combobox<Value> {
 }
 
 impl<Value: PartialEq + Clone + Send + Sync + 'static> View for Combobox<Value> {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let field = self.snapshot();
         let selected_label = self.selected_label();
         let title = selected_label

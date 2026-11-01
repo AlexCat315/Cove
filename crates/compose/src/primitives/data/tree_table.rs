@@ -16,6 +16,7 @@
 //! - the disclosure slot is only drawn for rows with children
 //! - the table model is rebuilt only when the projection or expansion changed
 
+use crate::Scope;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::rc::Rc;
@@ -472,7 +473,7 @@ where
     Record: Clone + 'static,
     Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static,
 {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let model = self.model();
         let mapped = self.mapped_columns();
         let options = &self.options;

@@ -1,6 +1,7 @@
 //! Translation of `Tests/CoveUIComposeTests/DesignSystemTests.swift`.
 //! Application tokens, local overrides, scaled controls and detached portals.
 
+use cove_composition::Scope;
 mod support;
 
 use cove_composition::{AnyView, LayoutDebugExt, View};
@@ -138,7 +139,7 @@ struct DynamicScale {
 }
 
 impl View for DynamicScale {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let scale = self.scale.clone();
         AnyView::new(LayerRoot::new(
             column(vec![

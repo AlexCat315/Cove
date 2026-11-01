@@ -29,6 +29,7 @@
 //! the cleared controller) is unchanged, and the size assertion states the
 //! current, documented behaviour.
 
+use cove_composition::Scope;
 mod support;
 
 use std::rc::Rc;
@@ -102,7 +103,7 @@ struct DualPropHarness {
 }
 
 impl View for DualPropHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let t = self.t.get();
         AnyView::new(
             AnyView::new(DebugLeaf("dual"))
@@ -128,7 +129,7 @@ struct DualNodeHarness {
 }
 
 impl View for DualNodeHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let t = self.t.get();
         AnyView::new(TupleView::new(vec![
             AnyView::new(AnyView::new(DebugLeaf("a")).opacity(t)),
@@ -148,7 +149,7 @@ struct SinglePropHarness {
 }
 
 impl View for SinglePropHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(AnyView::new(DebugLeaf("single")).opacity(self.t.get()))
     }
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
@@ -175,7 +176,7 @@ struct LayoutWidthHarness {
 }
 
 impl View for LayoutWidthHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(
             column_box(ComposeAnyView::new(AnyView::new(DebugLeaf("leaf")).frame(
                 Some(FrameDimension::Points(self.width.get())),
@@ -208,7 +209,7 @@ struct LayoutPaddingHarness {
 }
 
 impl View for LayoutPaddingHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(
             column_box(ComposeAnyView::new(AnyView::new(DebugLeaf("leaf")).frame(
                 Some(FrameDimension::Points(40.0)),
@@ -242,7 +243,7 @@ struct LayoutPercentWidthHarness {
 }
 
 impl View for LayoutPercentWidthHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(
             column_box(ComposeAnyView::new(AnyView::new(DebugLeaf("leaf")).frame(
                 Some(FrameDimension::Percent(self.width_ratio.get())),
@@ -278,7 +279,7 @@ struct LayoutPercentToAutoHarness {
 }
 
 impl View for LayoutPercentToAutoHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let width = if self.use_auto.get() {
             FrameDimension::Auto
         } else {
@@ -319,7 +320,7 @@ struct LayoutPercentHeightHarness {
 }
 
 impl View for LayoutPercentHeightHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(
             column_box(ComposeAnyView::new(AnyView::new(DebugLeaf("leaf")).frame(
                 Some(FrameDimension::Points(40.0)),
@@ -355,7 +356,7 @@ struct LayoutPercentHeightToAutoHarness {
 }
 
 impl View for LayoutPercentHeightToAutoHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let height = if self.use_auto.get() {
             FrameDimension::Auto
         } else {
@@ -397,7 +398,7 @@ struct LayoutPercentWithClampHarness {
 }
 
 impl View for LayoutPercentWithClampHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(
             column_box(ComposeAnyView::new(AnyView::new(DebugLeaf("leaf")).frame(
                 Some(FrameDimension::Percent(self.width_ratio.get())),
@@ -433,7 +434,7 @@ struct LayoutPercentToAutoWithMinHarness {
 }
 
 impl View for LayoutPercentToAutoWithMinHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let width = if self.use_auto.get() {
             FrameDimension::Auto
         } else {
@@ -475,7 +476,7 @@ struct LayoutPointsToPercentSwitchHarness {
 }
 
 impl View for LayoutPointsToPercentSwitchHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let width = if self.use_percent.get() {
             FrameDimension::Percent(30.0)
         } else {
@@ -517,7 +518,7 @@ struct LayoutPercentToAutoWithClampHarness {
 }
 
 impl View for LayoutPercentToAutoWithClampHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let width = if self.use_auto.get() {
             FrameDimension::Auto
         } else {

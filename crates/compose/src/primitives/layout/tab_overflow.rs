@@ -4,13 +4,14 @@
 //! Measures the same retained headers for both the strip and menu policy. Only
 //! the selected header may shrink; its non-text chrome stays intact. Tabs that do
 //! not fit are collected into a "more" menu.
+use crate::Scope;
 use std::collections::HashSet;
 use std::rc::Rc;
 
 use crate::{Layout, LayoutContainer, LayoutSubview, ProposedViewSize};
 use cove_composition::{AnyView, View};
 use cove_core::scene::{Align, Direction, FlexDirection, Point, Rect, Size, Wrap};
-use cove_core::{Binding, State};
+use cove_core::{Binding, Signal};
 
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::primitives::controls::button::{Button, ButtonIconSource};
@@ -219,14 +220,14 @@ impl<Id: std::hash::Hash + Eq + Clone + PartialEq + 'static> TabOverflowStrip<Id
 impl<Id: std::hash::Hash + Eq + Clone + PartialEq + Send + Sync + 'static> View
     for TabOverflowStrip<Id>
 {
-    fn body(&self) -> AnyView {
+    fn body(&self, cx: &Scope) -> AnyView {
         let tabs = self.tabs.clone();
         let selection = self.selection.clone();
         let is_enabled = self.is_enabled;
         let variant = self.variant;
         let indicator = self.indicator;
-        let hidden_state: State<Vec<usize>> = State::new(Vec::new());
-        let presented_state: State<bool> = State::new(false);
+        let hidden_state = cx.state(Vec::<usize>::new);
+        let presented_state = cx.state(|| false);
 
         let reader = crate::adaptive::ContainerSizeReader::new(move |size: Size| {
             let spacing = if variant == TabVariant::Segmented {

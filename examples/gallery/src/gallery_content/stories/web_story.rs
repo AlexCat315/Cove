@@ -13,6 +13,7 @@
 //! provides Apple, Windows, Linux and Android hosts, so every platform renders a
 //! real page rather than a "not supported" message.
 
+use cove_composition::Scope;
 use cove_core::State;
 use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
@@ -175,7 +176,7 @@ impl WebStory {
 }
 
 impl View for WebStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let status = Text::new(self.status())
             .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
             .semantic_foreground(SemanticColorRef::on_surface_muted());
@@ -205,6 +206,10 @@ impl View for WebStory {
 
     fn tag(&self) -> &'static str {
         "WebStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; sample, state, request_id)
     }
 }
 

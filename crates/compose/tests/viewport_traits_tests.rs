@@ -5,6 +5,7 @@
 //! - `WidthClassReader`, `HeightClassReader` and `OrientationReader` report the
 //!   surface environment, and recompose when it changes
 
+use cove_composition::Scope;
 mod support;
 
 use std::rc::Rc;
@@ -64,7 +65,7 @@ struct Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let (width, height) = self.viewport.get();
         let mut surface = Environment::default();
         surface.viewport.width = width;

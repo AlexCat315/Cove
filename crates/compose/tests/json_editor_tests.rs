@@ -20,6 +20,7 @@
 //!   and the transaction test asserts that no Apply exists, nothing commits and
 //!   focus stays on Expand.
 
+use cove_composition::Scope;
 #[allow(dead_code)]
 mod support;
 
@@ -63,7 +64,7 @@ struct HarnessState {
 struct Harness(Rc<HarnessState>);
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let state = &self.0;
         let mut surface = Environment::default();
         surface.viewport.width = state.width.get();

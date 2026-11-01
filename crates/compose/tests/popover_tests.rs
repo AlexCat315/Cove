@@ -18,6 +18,7 @@
 //! - `PopoverSurface` is private in Rust, so the harness uses the default
 //!   surface rather than authoring `.content` explicitly.
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::RefCell;
@@ -44,7 +45,7 @@ struct LeakHarness {
 }
 
 impl View for LeakHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let _show = self.show_popover.get();
         let fired = self.fired.clone();
         let popover = Popover::new(

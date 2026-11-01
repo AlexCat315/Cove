@@ -1,4 +1,5 @@
 //! Animated number text translated from Animation/Content/NumericText.swift.
+use crate::Scope;
 use crate::primitives::text::Text;
 use crate::theme::{SemanticMotionRef, theme_for_node};
 use crate::{AnyView, DynamicField, PrimitiveView, View, impl_primitive_view};
@@ -45,7 +46,7 @@ impl NumericText {
 }
 
 impl View for NumericText {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let displayed = self.displayed.get();
         AnyView::new(NumberHost {
             value: self.value,

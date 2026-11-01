@@ -33,6 +33,7 @@
 //!   `DatePicker` stores `is_presented` in a `RefCell` nothing observes, so
 //!   neither activate nor a click presents it.
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::RefCell;
@@ -251,7 +252,7 @@ impl Harness {
 struct HarnessView(Rc<Harness>);
 
 impl View for HarnessView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let harness = &self.0;
         let mut surface = Environment::default();
         surface.viewport.width = harness.width;
@@ -472,22 +473,15 @@ fn date_picker() {
             .expect("the trigger exposes an activate action");
         activate();
         scene.settle(4, 1.0);
+        let start = day(scene, initial).expect("activate presents the calendar");
+        scene.focus.focus(Some(&start), true);
+        assert_eq!(scene.portal.entries().len(), 1, "activate presents one portal");
+        scene.key(Scancode::PAGE_DOWN, KeyModifiers::default());
         assert!(
-            scene.portal.entries().is_empty() && day(scene, initial).is_none(),
-            "GAP: Swift's activate opens the calendar popover (one portal entry); the Rust \
-             DatePicker flips its RefCell flag without invalidating, so nothing presents"
-        );
-        scene.click(&button, 1);
-        assert!(
-            scene.portal.entries().is_empty() && day(scene, initial).is_none(),
-            "GAP: a pointer click does not present the Rust DatePicker calendar either, so \
-             the PageDown/Return commit-and-dismiss flow cannot be reached"
+            day(scene, date(2024, 2, 29)).is_none(),
+            "GAP: Swift's PageDown moves to Feb 29 and Return commits it; `CalendarView` keeps \
+             its month in a plain `RefCell` session, so the month change never re-renders"
         );
         assert_eq!(*selection.borrow(), Some(initial), "nothing is committed");
-        assert_eq!(
-            focused_id(scene),
-            Some(button.id()),
-            "focus stays on the trigger"
-        );
     });
 }

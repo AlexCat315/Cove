@@ -7,6 +7,7 @@
 //! meaning as the tone's colour, so the block still reads correctly when the
 //! palette is monochrome or the reader cannot distinguish the hues.
 
+use crate::Scope;
 use std::rc::Rc;
 
 use crate::modifiers::interaction::AccessibilityExt;
@@ -112,7 +113,7 @@ impl Alert {
 }
 
 impl View for Alert {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let title = self.title.clone();
         let message = self.message.clone();
         let tone = self.tone;

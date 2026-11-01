@@ -6,6 +6,7 @@
 //! revision) is the part the gallery actually drives, so it lives here as a
 //! type rather than being buried in a body closure.
 
+use cove_composition::Scope;
 use std::cell::Cell;
 use std::rc::Rc;
 
@@ -105,7 +106,7 @@ impl ChartExplorationStory {
 }
 
 impl View for ChartExplorationStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let focus = self.clone();
         let reset = self.clone();
         let update = self.clone();
@@ -250,7 +251,7 @@ impl AdaptiveTableSample {
 }
 
 impl View for AdaptiveTableSample {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
         let (columns, options) = adaptive_table_columns(enabled);
         let rows: Vec<usize> = (0..ADAPTIVE_TABLE_ROWS).collect();

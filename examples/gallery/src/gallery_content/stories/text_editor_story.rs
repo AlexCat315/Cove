@@ -12,6 +12,7 @@
 //! size, and its brace-fold scan deliberately ignores braces inside strings and
 //! comments.
 
+use cove_composition::Scope;
 use cove_core::State;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::text::Text;
@@ -461,7 +462,7 @@ impl TextEditorStory {
 }
 
 impl View for TextEditorStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let status = Text::new(self.status())
             .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
             .semantic_foreground(SemanticColorRef::on_surface_muted());
@@ -491,5 +492,9 @@ impl View for TextEditorStory {
 
     fn tag(&self) -> &'static str {
         "TextEditorStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; source, status, is_code_mode, shows_diagnostic, paused_preview, is_bookmarked, breakpoints, fold_regions, tokens)
     }
 }

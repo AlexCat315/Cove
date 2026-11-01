@@ -27,6 +27,7 @@
 //!   reason as the `TextField` marker: the row tint it looked up is reached
 //!   through the `List` case, which uses the identical selection-paint path.
 
+use cove_composition::Scope;
 mod support;
 
 use cove_composition::{AnyView, DynamicField, View};
@@ -59,7 +60,7 @@ struct ListHarness {
 }
 
 impl View for ListHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let appearance = self.appearance.get();
         let list = List::<u64>::new(
             CollectionSelection::single(State::new(Some(2u64)).binding()),
@@ -86,7 +87,7 @@ struct TabHarness {
 }
 
 impl View for TabHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let appearance = self.appearance.get();
         let selection = State::new(0i32);
         let tabs = TabView::new(

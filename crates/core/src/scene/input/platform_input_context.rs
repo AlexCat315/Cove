@@ -73,6 +73,10 @@ impl NativeMenuPresenter {
                 .and_then(|present| present(snapshot, at))
         })
     }
+    /// Whether a platform shell installed a presenter on this thread.
+    pub fn is_installed() -> bool {
+        NATIVE_MENU_PRESENTER.with(|slot| slot.borrow().is_some())
+    }
     pub fn set_present(present: Option<NativeMenuPresenterCallback>) {
         NATIVE_MENU_PRESENTER.with(|slot| *slot.borrow_mut() = present);
     }

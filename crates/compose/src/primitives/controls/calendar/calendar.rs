@@ -3,6 +3,7 @@
 //! Caller-owned selection, with transient browsing and one focusable cell per
 //! grid. The title drills up from days to a year of months to twelve years;
 //! picking a cell drills back down to the selection granularity.
+use crate::Scope;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -244,7 +245,7 @@ impl CalendarView {
 }
 
 impl View for CalendarView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(CalendarBody {
             view: self.snapshot(),
         })

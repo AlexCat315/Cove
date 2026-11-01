@@ -19,8 +19,8 @@ use std::rc::Rc;
 use taffy::{
     AvailableSpace, Cache, CacheTree, Layout, LayoutContainingBlock, LayoutFlexboxContainer,
     LayoutInput, LayoutOutput, LayoutPartialTree, Line, NodeId, RequestedAxis, ResolveOrZero,
-    RunMode, SizingMode, Style, TraversePartialTree, compute_cached_layout,
-    compute_flexbox_layout, compute_hidden_layout, compute_leaf_layout, compute_oof_layout,
+    RunMode, SizingMode, Style, TraversePartialTree, compute_cached_layout, compute_flexbox_layout,
+    compute_hidden_layout, compute_leaf_layout, compute_oof_layout,
 };
 
 const PROBE_BIT: usize = 1;
@@ -36,15 +36,15 @@ thread_local! {
 
 fn probe_style() -> Style {
     Style {
-    flex_direction: taffy::FlexDirection::Column,
-    align_items: taffy::AlignItems::FLEX_START,
-    align_content: taffy::AlignContent::FLEX_START,
-    position: taffy::Position::Relative,
-    min_size: taffy::Size {
-        width: taffy::LengthPercentageAuto::length(0.0),
-        height: taffy::LengthPercentageAuto::length(0.0),
-    },
-    ..Style::DEFAULT
+        flex_direction: taffy::FlexDirection::Column,
+        align_items: taffy::AlignItems::FLEX_START,
+        align_content: taffy::AlignContent::FLEX_START,
+        position: taffy::Position::Relative,
+        min_size: taffy::Size {
+            width: taffy::LengthPercentageAuto::length(0.0),
+            height: taffy::LengthPercentageAuto::length(0.0),
+        },
+        ..Style::DEFAULT
     }
 }
 
@@ -320,35 +320,45 @@ fn compute_node(
     };
     if let Some(measure) = custom {
         let children = node.data.borrow().children.clone();
-        return compute_leaf_layout(inputs, style_of(id), |_, _| 0.0, |_, available| {
-            let size = measure(
-                available.width.into_option(),
-                available.height.into_option(),
-                &children,
-            );
-            taffy::Size {
-                width: size.width,
-                height: size.height,
-            }
-        });
+        return compute_leaf_layout(
+            inputs,
+            style_of(id),
+            |_, _| 0.0,
+            |_, available| {
+                let size = measure(
+                    available.width.into_option(),
+                    available.height.into_option(),
+                    &children,
+                );
+                taffy::Size {
+                    width: size.width,
+                    height: size.height,
+                }
+            },
+        );
     }
     if has_children {
         refresh_children(node, resolved_direction(node));
         return compute_flexbox_layout(tree, id, inputs);
     }
     let known = inputs.known_dimensions;
-    compute_leaf_layout(inputs, style_of(id), |_, _| 0.0, |_, available| {
-        let Some(measure) = &measure else {
-            return taffy::Size::ZERO;
-        };
-        let (width, width_mode) = axis(known.width, available.width);
-        let (height, height_mode) = axis(known.height, available.height);
-        let size = measure(width, width_mode, height, height_mode);
-        taffy::Size {
-            width: size.width,
-            height: size.height,
-        }
-    })
+    compute_leaf_layout(
+        inputs,
+        style_of(id),
+        |_, _| 0.0,
+        |_, available| {
+            let Some(measure) = &measure else {
+                return taffy::Size::ZERO;
+            };
+            let (width, width_mode) = axis(known.width, available.width);
+            let (height, height_mode) = axis(known.height, available.height);
+            let size = measure(width, width_mode, height, height_mode);
+            taffy::Size {
+                width: size.width,
+                height: size.height,
+            }
+        },
+    )
 }
 
 /// Yoga's measure contract: a known extent is exact, a definite available

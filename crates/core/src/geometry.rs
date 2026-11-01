@@ -7,6 +7,7 @@ pub struct Point {
     pub y: f32,
 }
 impl Point {
+    pub const ZERO: Self = Self::new(0.0, 0.0);
     pub const fn new(x: f32, y: f32) -> Self {
         Self { x, y }
     }
@@ -27,6 +28,7 @@ pub struct Rect {
 }
 
 impl Rect {
+    pub const ZERO: Self = Self::new(0.0, 0.0, 0.0, 0.0);
     pub const fn new(x: f32, y: f32, width: f32, height: f32) -> Self {
         Self {
             x,

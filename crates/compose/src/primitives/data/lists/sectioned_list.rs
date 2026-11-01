@@ -13,6 +13,7 @@
 //! - the pinned header appears only once its inline row has scrolled past the
 //!   top, and the next header pushes it up
 
+use crate::Scope;
 use std::rc::Rc;
 
 use super::list::ListRowHost;
@@ -238,7 +239,7 @@ where
     Item: Clone + 'static,
     ItemId: Ord + Clone + Eq + std::hash::Hash + Send + Sync + 'static,
 {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let entries = flatten(&self.sections);
         let ids: Vec<SectionedEntryId<SectionId, ItemId>> = entries
             .iter()
@@ -278,6 +279,10 @@ where
             true,
             move |event: &KeyEvent| keys.handle_key(event),
         ))
+    }
+
+    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
+        crate::dynamic_fields!(self; cursor, scroll_offset)
     }
 }
 

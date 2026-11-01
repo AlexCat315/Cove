@@ -3,6 +3,7 @@
 //! A segmented single-selection control: one Tab stop across its items and
 //! wrapping arrow-key navigation, so the group reads as one control to the
 //! keyboard while each segment keeps its authored width.
+use crate::Scope;
 use std::rc::Rc;
 
 use crate::primitives::controls::button::{Button, ButtonRole};
@@ -73,7 +74,7 @@ impl<Id: PartialEq + Clone + std::hash::Hash + Send + Sync + 'static> ButtonGrou
 }
 
 impl<Id: PartialEq + Clone + std::hash::Hash + Send + Sync + 'static> View for ButtonGroup<Id> {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.enabled_ids();
         let tab_stop = self
             .selection

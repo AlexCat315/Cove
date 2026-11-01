@@ -17,6 +17,7 @@
 //! design: `window::native_menu` owns the installer (an action table plus the
 //! AppKit presenter) and the bridge routes chosen ids back to authored closures,
 //! so a separate target object would duplicate the action table.
+use cove_composition::Scope;
 use cove_composition::{
     AnyView, LayoutDebugAttachmentKey, PrimitiveView, View, ViewExt, impl_primitive_view,
 };
@@ -92,7 +93,7 @@ impl ImmersiveWindowTitleBar {
 }
 
 impl View for ImmersiveWindowTitleBar {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let style = self.control_style.resolve();
         let mut children: Vec<AnyView> = Vec::new();
         if style == ImmersiveWindowControlStyle::Native {
@@ -315,7 +316,7 @@ impl WindowChromeInteractiveRegion {
 }
 
 impl View for WindowChromeInteractiveRegion {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(
             self.content
                 .clone()
@@ -350,7 +351,7 @@ impl Default for WindowControlStrip {
 }
 
 impl View for WindowControlStrip {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let window_id = AppWindowChromeContextHolder::current().map(|context| context.window_id);
         let is_maximized = is_window_maximized(window_id);
 

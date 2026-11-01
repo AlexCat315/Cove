@@ -2,7 +2,7 @@
 pub mod anchoring;
 pub mod placement;
 
-pub use anchoring::{AnchoredOverlayHost, PopoverAnchor, PopoverSurfaceHost};
+pub use anchoring::{AnchoredOverlayHost, MenuKeyHost, PopoverAnchor, PopoverSurfaceHost};
 pub use placement::{
     PopoverEdge, PopoverGeometry, PopoverOverflow, PopoverPlacement, PopoverSurface,
 };

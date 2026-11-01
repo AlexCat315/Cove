@@ -5,6 +5,7 @@
 //! Three wheels (hour, minute, half-day) plus a volume wheel with a disabled top
 //! row. The option tables and the committed-value label are the contract.
 
+use cove_composition::Scope;
 use cove_core::State;
 use cove_ui_compose::modifiers::layout::FlexExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
@@ -141,7 +142,7 @@ impl WheelPickerStory {
 }
 
 impl View for WheelPickerStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
 
         let badge = Text::new(self.time_label())
@@ -189,5 +190,9 @@ impl View for WheelPickerStory {
 
     fn tag(&self) -> &'static str {
         "WheelPickerStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; hour, minute, period, volume, is_enabled)
     }
 }

@@ -25,6 +25,7 @@
 //! drives the same geometry through a `State<f32>` read in `body()`, so the
 //! retained-child and reselection assertions are unchanged.
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::RefCell;
@@ -82,7 +83,7 @@ struct Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let width = self.width.get();
         AnyView::new(
             AnyView::new(LayoutContainer::new(

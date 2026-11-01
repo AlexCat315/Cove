@@ -2,10 +2,10 @@
 //!
 //! A labelled trigger that opens a calendar in a popover. The trigger shows the
 //! selected period; clearing writes `None` without opening the popover.
-use std::cell::RefCell;
+use crate::Scope;
 use std::rc::Rc;
 
-use crate::foundation::{CalendarUnit, Date};
+use crate::foundation::Date;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::modifiers::style::SemanticStyleViewExt;
 use crate::primitives::controls::button::{Button, ButtonIcon, ButtonIconSource, ButtonRole};
@@ -16,6 +16,7 @@ use crate::primitives::text::Text;
 use crate::theme::SemanticFontRef;
 use crate::theme::styles::buttons::{ButtonStyleViewExt, GhostButtonStyle};
 use crate::{AnyView, BoxView, PrimitiveView, Row, TupleView, VerticalAlignment, View};
+use cove_core::Signal;
 use cove_core::scene::{AccessibilityRole, AccessibilitySemantics};
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 
@@ -74,7 +75,6 @@ pub struct DatePicker {
     pub selection: Rc<dyn Fn() -> Option<Date>>,
     pub set_selection: Rc<dyn Fn(Option<Date>)>,
     pub options: DatePickerOptions,
-    pub is_presented: Rc<RefCell<bool>>,
     pub cell_size: f32,
 }
 
@@ -90,7 +90,6 @@ impl DatePicker {
             selection,
             set_selection,
             options,
-            is_presented: Rc::new(RefCell::new(false)),
             cell_size,
         }
     }
@@ -149,9 +148,10 @@ fn month_name(month: u32) -> &'static str {
 }
 
 impl View for DatePicker {
-    fn body(&self) -> AnyView {
+    fn body(&self, cx: &Scope) -> AnyView {
         AnyView::new(DatePickerBody {
             picker: self.snapshot(),
+            is_presented: cx.state(|| false),
         })
     }
 }
@@ -162,7 +162,6 @@ impl DatePicker {
             selection: self.selection.clone(),
             set_selection: self.set_selection.clone(),
             options: self.options.clone(),
-            is_presented: self.is_presented.clone(),
             cell_size: self.cell_size,
         }
     }
@@ -170,6 +169,7 @@ impl DatePicker {
 
 struct DatePickerBody {
     picker: DatePicker,
+    is_presented: Signal<bool>,
 }
 
 impl PrimitiveView for DatePickerBody {
@@ -197,7 +197,7 @@ impl PrimitiveView for DatePickerBody {
                 None => String::new(),
             },
             state: cove_core::scene::AccessibilityState {
-                is_expanded: Some(*picker.is_presented.borrow()),
+                is_expanded: Some(self.is_presented.get()),
                 is_enabled: picker.options.presentation.is_enabled,
                 ..Default::default()
             },
@@ -209,7 +209,6 @@ impl PrimitiveView for DatePickerBody {
         let picker = self.picker.snapshot();
         let label = picker.label();
         let has_selection = (picker.selection)().is_some();
-        let is_presented = *picker.is_presented.borrow();
 
         let mut trigger: Vec<AnyView> = vec![AnyView::new(
             Text::new(label.clone())
@@ -253,21 +252,21 @@ impl PrimitiveView for DatePickerBody {
 
         let calendar_options = picker.options.calendar.clone();
         let set_selection = picker.set_selection.clone();
-        let presented = picker.is_presented.clone();
+        let presented = self.is_presented;
         let calendar = CalendarView::new(
             picker.selection.clone(),
             {
                 let set_selection = set_selection.clone();
-                let presented = presented.clone();
                 Rc::new(move |value: Option<Date>| {
                     set_selection(value);
                     // A pick closes the popover.
-                    *presented.borrow_mut() = false;
+                    presented.set(false);
                 })
             },
             calendar_options,
         );
         let popover = Popover::new(AnyView::new(trigger_view), AnyView::new(calendar))
+            .is_presented(presented.into())
             .width(CalendarView::width(
                 picker.cell_size,
                 &picker.options.calendar,
@@ -275,8 +274,6 @@ impl PrimitiveView for DatePickerBody {
             .surface(PopoverSurface::Content)
             .overflow(PopoverOverflow::Flip)
             .enabled(picker.options.presentation.is_enabled);
-        let _ = is_presented;
-        let _ = CalendarUnit::Day;
         vec![AnyView::new(
             BoxView::new(
                 FlexDirection::Column,

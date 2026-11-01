@@ -16,6 +16,7 @@
 //! `TabItem.init` does with `AnyView(content())`; this view only decides *which*
 //! one to mount. Nothing here builds a tab's body lazily, and nothing here holds
 //! a builder closure, so the caller owns materialisation and lifecycle.
+use crate::Scope;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -271,7 +272,7 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> TabView<Id> {
 }
 
 impl<Id: PartialEq + Clone + std::hash::Hash + 'static> View for TabView<Id> {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(TabViewBody {
             tabs_view: self.snapshot(),
         })

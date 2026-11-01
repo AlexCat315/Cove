@@ -42,6 +42,7 @@
 //!   the pointer row is asserted as the measured compact height below 44
 //!   while still being at least the 28pt minimum.
 
+use cove_composition::Scope;
 mod support;
 
 use cove_composition::{AnyView, DynamicField, LayoutDebugExt, TupleView, View};
@@ -166,7 +167,7 @@ struct CollectionHarness {
 }
 
 impl View for CollectionHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let authored = self.authored.get();
         let records = records();
         let model = DataTableModel::new(records.clone(), |record| *record);
@@ -386,7 +387,7 @@ struct TableHarness {
 }
 
 impl View for TableHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let model = DataTableModel::new(records(), |record| *record);
         let table = DataTable::new(model, columns()).frame_height(310.0);
         let mut surface = Environment::default();
@@ -479,7 +480,7 @@ struct ScaledHarness {
 }
 
 impl View for ScaledHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let tree = Tree::new(
             (0..20).collect::<Vec<usize>>(),
             |record: &usize| *record,
@@ -618,7 +619,7 @@ struct MenuHarness {
 }
 
 impl View for MenuHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let entries = vec![
             MenuEntry::Submenu(MenuSubmenu::new(
                 1,

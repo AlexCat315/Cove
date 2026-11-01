@@ -2,6 +2,7 @@
 //!
 //! Disclosure list with one Tab stop and wrapping arrow-key navigation. Single
 //! expansion by default; `allows_multiple` leaves every open panel open.
+use crate::Scope;
 use std::collections::BTreeSet;
 use std::rc::Rc;
 
@@ -106,7 +107,7 @@ impl<Id: PartialEq + Clone + Ord + std::hash::Hash + Send + Sync + 'static> Acco
 }
 
 impl<Id: PartialEq + Clone + Ord + std::hash::Hash + Send + Sync + 'static> View for Accordion<Id> {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let enabled: Vec<Id> = self
             .items
             .iter()
@@ -265,6 +266,10 @@ impl<Id: PartialEq + Clone + Ord + std::hash::Hash + Send + Sync + 'static> View
                 .corner_radius_metric(crate::theme::ThemeMetric::control_radius())
                 .clipped(),
         )
+    }
+
+    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
+        crate::dynamic_fields!(self; focused)
     }
 }
 

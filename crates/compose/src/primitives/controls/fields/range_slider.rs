@@ -8,6 +8,7 @@
 //! Like the single-thumb [`Slider`](super::slider::Slider), the public struct
 //! delegates to a focusable host leaf that owns hit testing, keyboard routing
 //! and the draw hook.
+use crate::Scope;
 use std::rc::Rc;
 
 use cove_core::scene::{
@@ -148,7 +149,7 @@ impl RangeSlider {
 }
 
 impl View for RangeSlider {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let snapshot = self.snapshot();
         AnyView::new(RangeSliderHost {
             values: snapshot.values,

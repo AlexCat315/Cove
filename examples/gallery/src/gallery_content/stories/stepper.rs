@@ -2,6 +2,7 @@
 //!
 //! Swift source: `GalleryContent/Stories/Controls/StepperStory.swift`.
 
+use cove_composition::Scope;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{Binding, State};
 use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
@@ -116,7 +117,7 @@ impl StepperStory {
 }
 
 impl View for StepperStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
 
         let horizontal = AnyView::new(

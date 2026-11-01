@@ -3,6 +3,7 @@
 //! Rows whose heights are known before layout. Heights are cached until the
 //! data, width, spacing or text scale change, and scrolling locates rows in
 //! O(log n).
+use crate::Scope;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -90,7 +91,7 @@ impl<Id: Ord + Clone + 'static> VariableVirtualStack<Id> {
 }
 
 impl<Id: Ord + Clone + 'static> View for VariableVirtualStack<Id> {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let viewport = self.viewport.get();
         // Wait for a real width rather than measuring the entire collection
         // twice during initial mount (first at zero, then at the viewport).

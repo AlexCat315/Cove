@@ -37,6 +37,7 @@
 //!   fill assertion is kept and the border assertion becomes "no focus-ring
 //!   border is drawn".
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::{Cell, RefCell};
@@ -74,7 +75,7 @@ struct Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let calls = self.calls.clone();
         let result = self.result.clone();
         let actions = if self.long.get() {

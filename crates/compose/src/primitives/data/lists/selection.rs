@@ -14,7 +14,7 @@ pub enum CollectionSelection<Id: Ord + Clone> {
     Multiple(Binding<BTreeSet<Id>>),
 }
 
-impl<Id: Ord + Clone> CollectionSelection<Id> {
+impl<Id: Ord + Clone + 'static> CollectionSelection<Id> {
     pub fn single(binding: Binding<Option<Id>>) -> Self {
         Self::Single(binding)
     }

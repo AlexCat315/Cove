@@ -13,6 +13,7 @@
 //! `cornerRadius(_)` is `corner_radius(..)`, and `SpringSolution.position(at:)`
 //! threads an explicit `start`/`velocity`/`target`.
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::Cell;
@@ -106,7 +107,7 @@ struct Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(DebugNode::new("x").corner_radius(self.radius.get()))
     }
     fn dynamic_properties(&self) -> Vec<DynamicField> {

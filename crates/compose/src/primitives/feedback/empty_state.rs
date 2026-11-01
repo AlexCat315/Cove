@@ -1,4 +1,5 @@
 //! Translation of Primitives/Feedback/EmptyState.swift.
+use crate::Scope;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
@@ -76,7 +77,7 @@ impl EmptyState {
 }
 
 impl View for EmptyState {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let title = self.title.clone();
         let message = self.message.clone();
         let icon = self.icon.clone();

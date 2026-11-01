@@ -10,6 +10,7 @@
 //! Name mapping: `layoutNode.textMeasure` is `LayoutNode::text_measure()`
 //! returning a `TextLayoutCacheEntry` whose `key.text` is the measured string.
 
+use cove_composition::Scope;
 mod support;
 
 use std::rc::Rc;
@@ -26,7 +27,7 @@ struct TextHarness {
 }
 
 impl View for TextHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let text = self.text.get();
         AnyView::new(Row::new(
             cove_composition::VerticalAlignment::Center,
@@ -45,7 +46,7 @@ struct StableTextPaintHarness {
 }
 
 impl View for StableTextPaintHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         use cove_ui_compose::modifiers::layout::LayoutFrameExt;
         let revision = self.revision.get();
         AnyView::new(Row::new(

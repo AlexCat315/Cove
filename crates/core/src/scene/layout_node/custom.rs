@@ -62,8 +62,9 @@ impl LayoutNode {
         if direction != super::Direction::Inherit {
             return direction;
         }
-        self.parent()
-            .map_or(super::Direction::Ltr, |parent| parent.custom_layout_direction())
+        self.parent().map_or(super::Direction::Ltr, |parent| {
+            parent.custom_layout_direction()
+        })
     }
     /// Size of this child of a custom layout under `width` x `height`.
     pub fn measure_for_custom_layout(&self, width: Option<f32>, height: Option<f32>) -> Size {
@@ -80,7 +81,9 @@ impl LayoutNode {
             state.invalidate();
         }
         let size = engine::layout_probe(self, width, height, direction);
-        self.0.engine.store_measurement(width, height, direction, size);
+        self.0
+            .engine
+            .store_measurement(width, height, direction, size);
         size
     }
     pub fn custom_layout_is_visible(&self) -> bool {

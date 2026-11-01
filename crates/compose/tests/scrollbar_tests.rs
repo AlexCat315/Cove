@@ -20,6 +20,7 @@
 //!   and fades it after the content rests; Rust applies the reveal and the
 //!   fade back-to-back without an animation context, so the chrome stays at 0.
 
+use cove_composition::Scope;
 mod support;
 
 use cove_composition::adaptive::SurfaceEnvironmentExt;
@@ -61,7 +62,7 @@ impl Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let bar = Scrollbar::new(ScrollbarAxis::Vertical, self.offset.binding(), 800.0, 240.0)
             .frame_size(12.0, 240.0);
         match self.surface {

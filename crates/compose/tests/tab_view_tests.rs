@@ -29,6 +29,7 @@
 //!    measured: after bumping tab A to `Count 1` and switching to tab B, tab B
 //!    also reads `Count 1`. Fixed: content is now identified per tab, so each tab
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::RefCell;
@@ -119,7 +120,7 @@ struct CountPanel {
 }
 
 impl View for CountPanel {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let count = self.count.clone();
         let label = format!("Count {}", count.get());
         AnyView::new(Button::new(Text::new(label), move || {
@@ -139,7 +140,7 @@ struct SwitchingTabs {
 }
 
 impl View for SwitchingTabs {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let read = self.selection.clone();
         let write = self.selection.clone();
         let tabs = vec![

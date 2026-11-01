@@ -12,13 +12,6 @@
 //!   icon policy follows the platform's raster encoding support
 //!
 //! Named differences from the Swift suite:
-//! - Swift swaps `NativeMenuPresenter.present` for a closure that returns the
-//!   chosen item id. Rust has no presenter seam at all: `NativeMenuBuilder`
-//!   builds the snapshot and `NativeMenuBuild::run` invokes the action, but
-//!   `MenuButton` is the self-drawn popover (`primitives/controls/menu_button.rs`)
-//!   and never consults the builder. The first test therefore drives the
-//!   builder directly, then pins that the mounted `MenuButton` neither opens a
-//!   portal nor runs an action (`GAP:` messages).
 //! - Swift rasterizes a menu icon to a template PNG through CoreGraphics/ImageIO
 //!   on Apple platforms. `NativeMenuBuilder::make_icon`
 //!   (`primitives/overlays/menu/native_menu_bridge.rs:175`) always returns
@@ -31,7 +24,7 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use cove_composition::AnyView;
-use cove_core::scene::AccessibilityRole;
+use cove_core::scene::{AccessibilityRole, NativeMenuPresenter};
 use cove_platform::NativeMenuKind;
 use cove_ui_compose::primitives::controls::menu_button::MenuButtonTitle;
 use cove_ui_compose::primitives::media::ui_icon_catalog;
@@ -81,6 +74,16 @@ fn menu_button_uses_the_native_presenter_and_runs_the_chosen_item() {
     InteractiveScene::run(800.0, 600.0, |scene| {
         let entries = entries.clone();
         PortalStoreHolder::current().clear();
+        let presented = Rc::new(Cell::new(None::<usize>));
+        let seen = presented.clone();
+        NativeMenuPresenter::set_present(Some(Rc::new(move |snapshot, _| {
+            seen.set(Some(snapshot.items.len()));
+            snapshot
+                .items
+                .iter()
+                .find(|item| item.kind == NativeMenuKind::Regular)
+                .map(|item| item.id)
+        })));
         scene.install(AnyView::new(LayerRoot::new(AnyView::new(
             MenuButtonTitle::new("Options", entries),
         ))));
@@ -91,15 +94,17 @@ fn menu_button_uses_the_native_presenter_and_runs_the_chosen_item() {
             })
             .expect("the menu button trigger is mounted");
         scene.click(&trigger, 1);
+        NativeMenuPresenter::set_present(None);
 
+        assert_eq!(
+            presented.get(),
+            Some(2),
+            "the presenter received both entries"
+        );
+        assert_eq!(runs.get(), 1, "the chosen item ran once");
         assert!(
             scene.portal.entries().is_empty(),
             "the native path never opens a self-drawn portal"
-        );
-        assert_eq!(
-            runs.get(),
-            0,
-            "GAP: Rust's MenuButton has no native presenter, so the chosen item never runs; Swift's presenter would run it once"
         );
     });
 }

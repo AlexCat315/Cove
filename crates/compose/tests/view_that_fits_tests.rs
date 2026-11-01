@@ -43,6 +43,7 @@
 //! the same: only the selected branch is live, each branch keeps its own count
 //! across a round trip, and the reselected node is the identical node.
 
+use cove_composition::Scope;
 mod support;
 
 use std::rc::Rc;
@@ -128,7 +129,7 @@ struct CounterBranch {
 }
 
 impl View for CounterBranch {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let _count = self.count.get();
         AnyView::new(counter(self.name, self.count.clone()))
     }
@@ -148,7 +149,7 @@ struct HarnessView {
 }
 
 impl View for HarnessView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(
             AnyView::new(ViewThatFits::threshold(
                 self.threshold.get(),
@@ -184,7 +185,7 @@ struct IntrinsicView {
 }
 
 impl View for IntrinsicView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(
             AnyView::new(ViewThatFits::intrinsic(
                 AnyView::new(CounterBranch {

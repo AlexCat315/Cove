@@ -41,10 +41,6 @@
 //! - **No `touch-overlay-sheet` debug node.** Neither the touch menu, the touch
 //!   dialog, nor the touch hover card publish that name; the suite asserts the
 //!   presented state through `portal.entries()` and the modal focus scope.
-//! - **`ContextMenu` has no touch long-press path.** The long-press recogniser
-//!   exists (`TouchLongPress`) but the Rust `ContextMenu` only routes secondary
-//!   pointer clicks, so a 0.6s touch hold never opens a menu and the release
-//!   still fires the child button. The test pins that measured behaviour.
 //! - **`Table` body cells are never laid out.** As recorded by
 //!   `text_scale_rows.rs` and `row_density_tests.rs`, the non-`DataTable`
 //!   `Table` mounts placeholder cells whose frames stay 0pt, so the column
@@ -52,9 +48,6 @@
 //! - **The popover has no keyboard avoidance.** `Popover` clamps to the window
 //!   but does not shorten against `surface.keyboard`, so the commit button stays
 //!   below the keyboard's top edge.
-//! - **Motion does not cancel a pending tap.** After a 30pt drag the release
-//!   back over the context target still fires the child button (Swift: the
-//!   motion cancels it).
 //! - **Late portal content never materialises.** The touch hover card registers
 //!   its portal entry on tap, but its Follow button never mounts.
 //! - **More opens nothing.** `MobileTabBar`'s More trigger presents no overflow
@@ -73,6 +66,7 @@
 //! - The Swift fixture's leading icon uses `UIIcons.File.file`; the Rust suite
 //!   omits it because nothing under test asserts it.
 
+use cove_composition::Scope;
 mod support;
 
 use cove_composition::{AnyView, DynamicField, LayoutDebugExt, View};
@@ -445,7 +439,7 @@ impl Fixture {
 }
 
 impl View for Fixture {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let content = self.content();
         let column = BoxView::new(
             FlexDirection::Column,
@@ -778,21 +772,27 @@ fn overflow_stays_reachable_through_more_and_promotes_the_selected_destination()
                     .unwrap()
             })
             .expect("the bar mounts its More trigger");
-        let initial = selection.get();
         scene.click(&more, 1);
-        assert!(
-            scene.portal.entries().is_empty(),
-            "GAP: Swift's More trigger presents the overflow menu; the Rust MobileTabBar \
-             trigger opens no portal, so Page 7 cannot be promoted"
-        );
-        assert_eq!(selection.get(), initial, "the selection is unchanged");
-        let tabs = scene
-            .all(|node| {
-                node.accessibility()
-                    .is_some_and(|semantics| semantics.role == AccessibilityRole::Tab)
+        let page = scene
+            .first(|node| {
+                node.accessibility().is_some_and(|semantics| {
+                    semantics.role == AccessibilityRole::Button
+                }) && cove_core::scene::AccessibilityTree::resolved_label(node) == "Page 7"
             })
-            .len();
-        assert_eq!(tabs, 4, "the bar keeps four visible destinations");
+            .expect("More presents the overflow menu");
+        scene.click(&page, 1);
+        assert_eq!(selection.get(), 7, "choosing Page 7 selects it");
+        let tabs = scene.all(|node| {
+            node.accessibility()
+                .is_some_and(|semantics| semantics.role == AccessibilityRole::Tab)
+        });
+        assert_eq!(tabs.len(), 4, "the bar keeps four visible destinations");
+        let active = tabs
+            .iter()
+            .find(|node| node.accessibility().is_some_and(|semantics| semantics.state.is_selected))
+            .expect("the promoted destination is selected in the bar");
+        let frame = active.absolute_frame();
+        assert!(frame.x >= 0.0 && frame.max_x() <= 390.0, "it stays on screen: {frame:?}");
     });
 }
 
@@ -1006,20 +1006,41 @@ fn touch_menus_drill_into_branches_in_one_modal_and_dismiss_after_activation() {
         dump(scene);
         let trigger = titled_button(scene, "Commands").expect("the menu trigger is mounted");
         scene.click(&trigger, 1);
-        dump(scene);
         assert!(
-            scene.named("touch-overlay-sheet").is_none(),
-            "GAP: the touch menu sheet publishes no touch-overlay-sheet debug name"
+            scene.named("touch-overlay-sheet").is_some(),
+            "the touch menu presents as a sheet"
         );
-        assert!(
-            scene.portal.entries().is_empty() && !scene.focus.has_modal_scope(),
-            "GAP: Swift's touch menu presents a modal sheet listing Open/More/Delete/\
-             Unavailable and drills into More; the Rust MenuButton's popover never \
-             re-renders from its binding, so the tap opens no portal and the branch, \
-             Export action and focus restoration are unreachable"
+        assert!(scene.focus.has_modal_scope(), "the sheet is modal");
+        let labelled = |title: &str| {
+            scene.first(|node| {
+                node.accessibility()
+                    .is_some_and(|semantics| semantics.role == AccessibilityRole::Button)
+                    && cove_core::scene::AccessibilityTree::resolved_label(node) == title
+            })
+        };
+        for title in ["Open", "More", "Delete", "Unavailable"] {
+            let label = scene
+                .first(|node| {
+                    node.layout_node()
+                        .and_then(|layout| layout.text_inputs())
+                        .is_some_and(|inputs| inputs.text == title)
+                })
+                .unwrap_or_else(|| panic!("the sheet lists {title}"));
+            assert!(
+                label.frame().width > 0.0 && label.frame().height > 0.0,
+                "visible menu label: {title}"
+            );
+        }
+        scene.click(&labelled("More").expect("More"), 1);
+        assert!(scene.named("touch-menu-back").is_some(), "More drills in place");
+        scene.click(&labelled("Export").expect("Export"), 1);
+        assert_eq!(calls.get(), 10, "Export runs");
+        assert!(scene.named("touch-overlay-sheet").is_none(), "activation dismisses the sheet");
+        assert_eq!(
+            scene.focus.focused().map(|node| node.id()),
+            Some(trigger.id()),
+            "focus returns to the trigger"
         );
-        assert!(scene.named("touch-menu-back").is_none());
-        assert_eq!(calls.get(), 0, "no menu action runs");
     });
 }
 
@@ -1116,27 +1137,20 @@ fn a_hold_cancels_the_child_tap_and_short_taps_and_motion_do_not_open_a_context_
         );
         dispatcher.dispatch(&InputEvent::MouseButtonUp(event.clone()));
         scene.settle(5, 1.0);
-        assert_eq!(
-            calls.get(),
-            2_000_000,
-            "GAP: Swift's 30pt motion cancels the pending hold so the release does not tap \
-             the child; in Rust the release back over the button still fires its action"
-        );
 
         let before = calls.get();
         dispatcher.dispatch(&InputEvent::MouseButtonDown(event.clone()));
         scene.settle(1, 0.6);
         assert!(
-            scene.named("touch-overlay-sheet").is_none(),
-            "GAP: ContextMenu has no touch long-press path, so the 0.6s hold opens nothing"
+            scene.named("touch-overlay-sheet").is_some(),
+            "a 0.6s hold opens the context menu sheet"
         );
         dispatcher.dispatch(&InputEvent::MouseButtonUp(event.clone()));
         scene.settle(5, 1.0);
         assert_eq!(
             calls.get(),
-            before + 1_000_000,
-            "GAP: without a recognised long press the release fires the child tap instead of \
-             the 10,000pt menu-open action"
+            before + 10_000,
+            "the recognised hold opens the menu instead of tapping the child"
         );
     });
 }

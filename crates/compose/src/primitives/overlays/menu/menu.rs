@@ -2,6 +2,7 @@
 //!
 //! Authored menu tree plus the level renderer. Rows own their hover, press and
 //! focus handling; the level owns highlight, submenu timing and type-ahead.
+use crate::Scope;
 use std::rc::Rc;
 
 use crate::modifiers::style::SemanticStyleViewExt;
@@ -327,7 +328,7 @@ impl MenuItem {
 }
 
 impl View for Menu {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(MenuPresentationHost {
             configuration: self.configuration(),
         })
@@ -351,7 +352,15 @@ impl PrimitiveView for MenuPresentationHost {
 
     fn update_node(&self, _node: &Node) {}
 
-    fn children(&self, _node: &Node) -> Vec<AnyView> {
+    fn children(&self, node: &Node) -> Vec<AnyView> {
+        // Inside a touch sheet the menu navigates its branches in place.
+        if crate::primitives::overlays::modal::TouchPresentation::is_sheet_menu(node) {
+            let activated = self.configuration.on_item_activated.clone();
+            return vec![AnyView::new(
+                super::touch_menu::TouchMenu::new(self.configuration.entries.clone())
+                    .on_item_activated(move || activated()),
+            )];
+        }
         vec![AnyView::new(MenuLevel::new(self.configuration.clone()))]
     }
 }
@@ -790,7 +799,7 @@ impl MenuLevel {
 }
 
 impl View for MenuLevel {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let rows = self.rows();
         let on_key: Rc<dyn Fn(&cove_platform::KeyEvent, &Node) -> bool> = Rc::new({
             let level = self.snapshot();

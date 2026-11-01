@@ -5,9 +5,9 @@
 //!
 //! Preset resolution, maximum-length validation and day counting live in
 //! [`DateRangeRules`] and [`DateRangePreset`].
+use crate::Scope;
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
 
 use crate::foundation::{CalendarUnit, Date};
 use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
@@ -342,7 +342,7 @@ impl DateRangeCalendar {
 }
 
 impl View for DateRangeCalendar {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(DateRangeCalendarBody {
             view: self.snapshot(),
         })
@@ -901,7 +901,6 @@ fn full_date_label(day: Date, calendar: &crate::foundation::Calendar) -> String 
 pub struct DateRangePicker {
     pub selection: Binding<Option<DateRange>>,
     pub options: DateRangePickerOptions,
-    is_presented: Arc<Mutex<bool>>,
 }
 
 impl DateRangePicker {
@@ -909,7 +908,6 @@ impl DateRangePicker {
         Self {
             selection,
             options: options.validated(),
-            is_presented: Arc::new(Mutex::new(false)),
         }
     }
 
@@ -917,7 +915,6 @@ impl DateRangePicker {
         DateRangePicker {
             selection: self.selection.clone(),
             options: self.options.clone(),
-            is_presented: self.is_presented.clone(),
         }
     }
 
@@ -948,7 +945,7 @@ fn medium_date(date: Date, options: &CalendarOptions) -> String {
 }
 
 impl View for DateRangePicker {
-    fn body(&self) -> AnyView {
+    fn body(&self, cx: &Scope) -> AnyView {
         let label = self.label();
         let has_selection = self.selection.get().is_some();
 
@@ -1001,24 +998,7 @@ impl View for DateRangePicker {
             .semantic_border(SemanticColorRef::border(), 1.0),
         );
 
-        let presented = Binding::new(
-            {
-                let state = self.is_presented.clone();
-                move || {
-                    *state
-                        .lock()
-                        .unwrap_or_else(|poisoned| poisoned.into_inner())
-                }
-            },
-            {
-                let state = self.is_presented.clone();
-                move |value: bool| {
-                    *state
-                        .lock()
-                        .unwrap_or_else(|poisoned| poisoned.into_inner()) = value
-                }
-            },
-        );
+        let presented = cx.state(|| false);
 
         let calendar = DateRangeCalendar::new(
             self.selection.clone(),
@@ -1026,7 +1006,7 @@ impl View for DateRangePicker {
             self.options.rules.clone(),
         );
         let popover = Popover::new(trigger, AnyView::new(calendar))
-            .is_presented(presented)
+            .is_presented(presented.into())
             .enabled(self.options.presentation.is_enabled)
             .width(self.options.presentation.width)
             .surface(PopoverSurface::Content)
@@ -1060,14 +1040,6 @@ impl Clone for DateRangePicker {
 }
 
 impl DateRangePicker {
-    /// Whether the popover is open, for hosts mirroring the state.
-    pub fn is_presented(&self) -> bool {
-        *self
-            .is_presented
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-    }
-
     /// Availability the calendar applies, exposed for hosts that pre-filter days.
     pub fn availability(&self) -> &DateAvailability {
         &self.options.calendar.availability

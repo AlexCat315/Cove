@@ -28,6 +28,7 @@
 //! status line, the code/plain state and the full lexer/fold/diagnostic contract
 //! the editor is built on — is asserted at full strength.
 
+use cove_composition::Scope;
 mod support;
 
 use std::rc::Rc;
@@ -50,7 +51,7 @@ struct Mounted {
 }
 
 impl cove_composition::View for Mounted {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(
             AnyView::new(StoryView(self.story.clone()))
                 .text_scaler(TextScaler::new(self.scale))
@@ -62,8 +63,8 @@ impl cove_composition::View for Mounted {
 struct StoryView(Rc<TextEditorStory>);
 
 impl cove_composition::View for StoryView {
-    fn body(&self) -> AnyView {
-        cove_composition::View::body(self.0.as_ref())
+    fn body(&self, cx: &Scope) -> AnyView {
+        cove_composition::View::body(self.0.as_ref(), cx)
     }
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
         cove_composition::View::dynamic_properties(self.0.as_ref())

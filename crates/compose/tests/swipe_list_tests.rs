@@ -37,6 +37,7 @@
 //!   the reveal has been opened by a swipe; `actions_menu` and
 //!   `pointer_does_not_swipe` assert that no action runs from the button press.
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::RefCell;
@@ -44,7 +45,7 @@ use std::rc::Rc;
 
 use cove_composition::layout::LayoutDirectionExt;
 use cove_composition::{AnyView, DynamicField, View};
-use cove_core::scene::{AccessibilityRole, Direction, EventDispatcher, Node};
+use cove_core::scene::{AccessibilityRole, AccessibilityTree, Direction, EventDispatcher, Node};
 use cove_core::{Environment, InputCapabilities, Point, State};
 use cove_platform::{InputEvent, MouseButton, MouseButtonEvent, MouseMotionEvent};
 use cove_ui_compose::adaptive::SurfaceEnvironmentExt;
@@ -87,7 +88,7 @@ impl Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let actions = self.actions.clone();
         let log_archive = actions.clone();
         let log_delete = actions.clone();
@@ -406,16 +407,19 @@ fn actions_menu() {
         );
         click(scene, &toggle(scene, "Item 2"));
         assert!(
-            harness.actions.borrow().is_empty(),
-            "GAP: actions button ran {:?} without opening the actions",
-            harness.actions.borrow()
+            reveal(scene, "Item 2") > 0.0,
+            "the actions button expands the row's actions"
         );
-        assert_eq!(
-            reveal(scene, "Item 2"),
-            0.0,
-            "GAP: actions button click opened the reveal at {}",
-            reveal(scene, "Item 2")
-        );
+        // GAP: rows that are not revealed still expose their action buttons to
+        // accessibility, so Swift's first "Delete" (the revealed row's) has to be
+        // located within Item 2 here.
+        let delete = row_buttons(scene, "Item 2")
+            .into_iter()
+            .find(|node| AccessibilityTree::resolved_label(node) == "Delete")
+            .expect("the expanded row offers Delete");
+        (delete.accessibility_actions().activate.expect("Delete exposes activate"))();
+        scene.settle(6, 0.05);
+        assert_eq!(*harness.actions.borrow(), vec!["delete-1".to_string()]);
     });
 }
 

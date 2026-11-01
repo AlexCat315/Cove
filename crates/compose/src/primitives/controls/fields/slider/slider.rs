@@ -3,6 +3,7 @@
 //! Continuous, single-thumb slider bound to a value within a range. Mirrors the
 //! `Button` pattern: the public struct delegates to a stateful composite while
 //! hit testing and drawing live in a leaf primitive host.
+use crate::Scope;
 use std::rc::Rc;
 
 use crate::theme::ControlSizeEnvironment;
@@ -84,7 +85,7 @@ impl Slider {
 }
 
 impl View for Slider {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let snapshot = self.snapshot();
         let _ = ControlSizeEnvironment::key();
         AnyView::new(SliderHost {

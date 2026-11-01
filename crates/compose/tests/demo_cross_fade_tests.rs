@@ -10,6 +10,7 @@
 //! - when the animation finishes the background is the new colour and the
 //!   scheduler is idle again
 
+use cove_composition::Scope;
 mod support;
 
 use cove_composition::{AnyView, View};
@@ -38,7 +39,7 @@ struct CrossFadeHarness {
 }
 
 impl View for CrossFadeHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let appearance = self.appearance.get();
         AnyView::new(
             DebugNode::new("x")

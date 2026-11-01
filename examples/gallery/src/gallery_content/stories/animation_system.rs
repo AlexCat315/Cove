@@ -4,6 +4,7 @@
 //! Every animation type the Swift story authors already exists in
 //! `cove_core::scene::animation`, so the state machines port exactly.
 
+use cove_composition::Scope;
 use cove_core::scene::animation::{Animation, AnimationCurve, AnimationKeyframe, KeyframeTimeline};
 use cove_core::{Point, State};
 
@@ -139,7 +140,7 @@ impl AnimationSystemExamples {
 }
 
 impl cove_ui_compose::View for AnimationSystemExamples {
-    fn body(&self) -> cove_ui_compose::AnyView {
+    fn body(&self, _cx: &Scope) -> cove_ui_compose::AnyView {
         use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
         use cove_ui_compose::modifiers::layout::{FlexExt, LayoutFrameExt};
 

@@ -38,6 +38,7 @@
 //!   a disabled bar clears focus and pointer capture the way the lifecycle case
 //!   expects.
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::Cell;
@@ -229,7 +230,7 @@ impl Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         self.view()
     }
 

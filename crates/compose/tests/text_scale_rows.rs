@@ -34,6 +34,7 @@
 //! - Swift reads the fixed grid cell's `textMeasure.font.size`; Rust records
 //!   the same measure on the layout node and the assertion is kept as-is.
 
+use cove_composition::Scope;
 mod support;
 
 use std::rc::Rc;
@@ -109,7 +110,7 @@ struct GeometryHarness {
 }
 
 impl View for GeometryHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let records: Vec<usize> = (0..2_000).collect();
         let selection = self.selection.clone();
         let get = selection.clone();
@@ -317,7 +318,7 @@ struct VariableGridHarness {
 }
 
 impl View for VariableGridHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let grid = LazyGrid::new(
             (0..7).collect::<Vec<usize>>(),
             Rc::new(|index: &usize| index.to_string()),
@@ -466,7 +467,7 @@ struct NavigationHarness {
 }
 
 impl View for NavigationHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let model = DataTableModel::new((0..1_000).collect::<Vec<usize>>(), |record| *record);
         let table = DataTable::new(model, columns()).frame_height(310.0);
         AnyView::new(

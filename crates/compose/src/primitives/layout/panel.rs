@@ -3,6 +3,7 @@
 //! Surface container with a labelled header bar. Visual chrome is delegated to
 //! the active `PanelStyle`; call sites only supply title, optional accessory and
 //! content.
+use crate::Scope;
 use crate::modifiers::layout::FlexExt;
 use crate::theme::styles::components::{PanelStyleConfiguration, PanelStyleEnvironment};
 use crate::theme::theme_for_node;
@@ -39,7 +40,7 @@ impl Panel {
 }
 
 impl View for Panel {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(PanelHost {
             title: self.title.clone(),
             is_active: self.is_active,

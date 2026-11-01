@@ -3,6 +3,7 @@
 //! Swift source: `GalleryContent/Stories/Feedback/FeedbackStories.swift`
 //! (`BadgeStory`, `AlertStory`, `ProgressStory`, `EmptyStory`).
 
+use cove_composition::Scope;
 use cove_core::State;
 use cove_core::scene::animation::AnimationCurve;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
@@ -43,7 +44,7 @@ pub fn tone_label(tone: StatusTone) -> &'static str {
 pub struct BadgeStory;
 
 impl View for BadgeStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let tones = AnyView::new(BoxView::new(
             FlexDirection::Row,
             Align::Center,
@@ -172,7 +173,7 @@ impl StorySection {
 }
 
 impl View for StorySection {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let title = self.title.clone();
         let detail = self.detail.clone();
         let content = self.content.clone();
@@ -252,7 +253,7 @@ impl Default for AlertStory {
 }
 
 impl View for AlertStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(
             BoxView::new(
                 FlexDirection::Column,
@@ -325,7 +326,7 @@ impl ProgressStory {
 }
 
 impl View for ProgressStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let value = self.progress.get();
         AnyView::new(
             BoxView::new(
@@ -449,7 +450,7 @@ impl Default for EmptyStory {
 }
 
 impl View for EmptyStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let created = self.created.get();
         let story = EmptyStoryButton {
             empty: !created,
@@ -489,7 +490,7 @@ struct EmptyStoryButton {
 }
 
 impl View for EmptyStoryButton {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         if self.empty {
             let created = self.story.created.clone();
             AnyView::new(EmptyState::with_action(
@@ -527,7 +528,7 @@ impl FictionSection {
 }
 
 impl View for FictionSection {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(StorySection::new(
             self.title.clone(),
             self.detail.clone(),

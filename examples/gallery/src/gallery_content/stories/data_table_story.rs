@@ -14,6 +14,7 @@
 //! - a tree flattens to exactly the rows whose ancestors are all expanded
 //! - navigating to a row sets both row and column and bumps the request id
 
+use cove_composition::Scope;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -395,7 +396,7 @@ impl DataTableStory {
 }
 
 impl View for DataTableStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let caption = Text::new("Return commits · Escape cancels · Tab moves to the next editable cell · Arrows / Page Up / Page Down / Home / End navigate".to_string())
         .semantic_font(cove_ui_compose::theme::SemanticFontRef::caption())
         .semantic_foreground(SemanticColorRef::on_surface_muted());
@@ -416,5 +417,9 @@ impl View for DataTableStory {
 
     fn tag(&self) -> &'static str {
         "DataTableStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; selection, status, is_frozen, order, expanded)
     }
 }

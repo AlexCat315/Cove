@@ -8,6 +8,7 @@
 //! localized accessibility name for that close control, so the component never
 //! writes interface copy such as "Cancel" or "Close" itself.
 
+use crate::Scope;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -223,7 +224,7 @@ impl ActionSheet {
 }
 
 impl View for ActionSheet {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let presentable = self.is_active();
         // A sheet with nothing to present cannot stay open.
         if !presentable && self.is_presented.get() {

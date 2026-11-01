@@ -1,6 +1,7 @@
 //! Shared select values and keyboard shortcut model from Fields/Select.swift.
 //! The popup-backed Select view is still being ported.
 
+use crate::Scope;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum KeyboardShortcutPlatform {
     MacOS,
@@ -256,7 +257,7 @@ impl<Value: PartialEq + Clone + Send + Sync + 'static> Select<Value> {
 }
 
 impl<Value: PartialEq + Clone + Send + Sync + 'static> View for Select<Value> {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let is_presented = Binding::new(
             {
                 let state = select_presentation_state();
@@ -336,7 +337,7 @@ struct SelectTrigger {
 }
 
 impl View for SelectTrigger {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let label = self.label.clone();
         let is_presented = self.is_presented;
         let is_enabled = self.is_enabled;

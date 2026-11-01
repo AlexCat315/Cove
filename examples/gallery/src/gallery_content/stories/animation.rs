@@ -5,6 +5,7 @@
 //! three `Foundation` animation stories, so this module owns the shared state and
 //! delegates the host-supplied sections.
 
+use cove_composition::Scope;
 use cove_core::State;
 use cove_ui_compose::animation::content::animated_visibility::AnimatedVisibility;
 use cove_ui_compose::animation::transition::{Transition, TransitionEdge};
@@ -68,7 +69,7 @@ impl AnimationStory {
 }
 
 impl cove_ui_compose::View for AnimationStory {
-    fn body(&self) -> cove_ui_compose::AnyView {
+    fn body(&self, _cx: &Scope) -> cove_ui_compose::AnyView {
         use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
         use cove_ui_compose::modifiers::layout::FlexExt;
         use cove_ui_compose::primitives::feedback::Alert;

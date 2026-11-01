@@ -2,6 +2,7 @@
 //!
 //! Navigation chrome with independent header/footer slots and one Tab stop among
 //! enabled destinations.
+use crate::Scope;
 use std::collections::HashSet;
 use std::rc::Rc;
 
@@ -128,7 +129,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Sideb
 }
 
 impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View for Sidebar<Id> {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let hierarchy = SidebarHierarchy::new(&self.sections);
         let expanded = self.expanded_set();
         let enabled = hierarchy.visible_enabled(&expanded);
@@ -306,6 +307,10 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View 
         AnyView::new(body.accessibility(|semantics| {
             semantics.role = AccessibilityRole::List;
         }))
+    }
+
+    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
+        crate::dynamic_fields!(self; local_expanded)
     }
 }
 

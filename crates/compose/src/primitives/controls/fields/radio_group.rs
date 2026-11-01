@@ -1,6 +1,7 @@
 //! Translation of Primitives/Controls/Fields/RadioGroup.swift.
 //!
 //! Controlled selection with one Tab stop and wrapping arrow-key navigation.
+use crate::Scope;
 use std::rc::Rc;
 
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt, PaddingExt};
@@ -99,7 +100,7 @@ impl<Value: PartialEq + Clone + std::hash::Hash + Send + Sync + 'static> RadioGr
 impl<Value: PartialEq + Clone + std::hash::Hash + Send + Sync + 'static> View
     for RadioGroup<Value>
 {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.enabled_values();
         let selection = self.selection.clone();
         let tab_stop = self

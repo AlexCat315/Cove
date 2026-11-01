@@ -31,6 +31,7 @@
 //!   a child node; the suite finds the buttons by a descendant text node and
 //!   asserts the measurement, matching the Swift `layoutNode.textInputs` checks.
 
+use cove_composition::Scope;
 mod support;
 
 use std::rc::Rc;
@@ -67,7 +68,7 @@ struct DialogSceneView {
 }
 
 impl View for DialogSceneView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let mut surface = Environment::default();
         surface.viewport.width = self.scene.width.get();
         surface.viewport.height = 820.0;

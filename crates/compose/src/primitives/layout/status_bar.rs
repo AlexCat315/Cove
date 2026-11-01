@@ -3,6 +3,7 @@
 //! One line of persistent context at the bottom of a window. Enforces a single
 //! height for every cell and leading/trailing slots that never fight for space.
 
+use crate::Scope;
 use crate::{Layout, LayoutContainer, LayoutSubview, ProposedViewSize};
 use cove_composition::{AnyView, View};
 use cove_core::scene::{AccessibilityRole, Align, FlexDirection, Point, Rect, Size, Wrap};
@@ -61,7 +62,7 @@ impl StatusBar {
 }
 
 impl View for StatusBar {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let leading = self.leading.clone();
         let trailing = self.trailing.clone();
         let shows_divider = self.shows_divider;
@@ -168,7 +169,7 @@ impl StatusBarText {
 }
 
 impl View for StatusBarText {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let text = self.text.clone();
         let detail = self.detail.clone();
         let icon = self.icon.clone();

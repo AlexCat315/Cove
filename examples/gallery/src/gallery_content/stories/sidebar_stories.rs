@@ -7,6 +7,7 @@
 //! threshold, so the thresholds and section builders live here as plain data the
 //! tests can assert against.
 
+use cove_composition::Scope;
 use cove_core::State;
 use cove_ui_compose::primitives::layout::sidebar::{SidebarItem, SidebarSection};
 use cove_ui_compose::primitives::overlays::menu::MenuEntry;
@@ -73,7 +74,7 @@ impl ResizableSidebarExample {
 }
 
 impl cove_ui_compose::View for ResizableSidebarExample {
-    fn body(&self) -> cove_ui_compose::AnyView {
+    fn body(&self, _cx: &Scope) -> cove_ui_compose::AnyView {
         use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 
         let content = cove_ui_compose::primitives::text::Text::new(self.requested_width_label());
@@ -221,7 +222,7 @@ impl NestedSidebarExample {
 }
 
 impl cove_ui_compose::View for NestedSidebarExample {
-    fn body(&self) -> cove_ui_compose::AnyView {
+    fn body(&self, _cx: &Scope) -> cove_ui_compose::AnyView {
         use cove_ui_compose::modifiers::layout::LayoutFrameExt;
 
         let selection = self.selection.get();

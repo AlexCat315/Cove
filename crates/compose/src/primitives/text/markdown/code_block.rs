@@ -2,6 +2,7 @@
 //!
 //! A fenced code block: authored lines in the mono face that scroll sideways
 //! rather than wrap, under a header with the language and a copy action.
+use crate::Scope;
 use std::cell::Cell;
 use std::rc::Rc;
 
@@ -39,12 +40,16 @@ impl MarkdownCodeBlock {
 }
 
 impl View for MarkdownCodeBlock {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(MarkdownCodeBlockBody {
             language: self.language.clone(),
             text: self.text.clone(),
             copied: self.copied.clone(),
         })
+    }
+
+    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
+        crate::dynamic_fields!(self; copied)
     }
 }
 

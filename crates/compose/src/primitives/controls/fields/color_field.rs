@@ -6,6 +6,7 @@
 //!
 //! Hex formatting, parsing and the panel width clamp live in
 //! [`hex_string`], [`parse_hex`] and [`panel_width`].
+use crate::Scope;
 use std::sync::{Arc, Mutex};
 
 use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
@@ -136,7 +137,7 @@ impl ColorField {
 }
 
 impl View for ColorField {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let field = self.snapshot();
         let presented = Binding::new(
             {

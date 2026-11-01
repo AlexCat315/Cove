@@ -9,6 +9,7 @@
 //! Vector formatting, parsing, clamping and the mixed-value rule live in
 //! [`Vec3Codec`], [`Vec3Constraints`], [`shows_mixed`] and
 //! [`minimum_axis_width`].
+use crate::Scope;
 use std::collections::HashSet;
 use std::rc::Rc;
 
@@ -210,7 +211,7 @@ impl Vec3Field {
 }
 
 impl View for Vec3Field {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let axes = vec![
             self.axis(Vec3Axis::X, self.x.clone()),
             self.axis(Vec3Axis::Y, self.y.clone()),

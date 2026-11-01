@@ -10,6 +10,7 @@
 //! - re-showing it restores painting, keeps the authored subtree opacity, and
 //!   keeps the same retained node, which hit testing finds again
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::Cell;
@@ -97,7 +98,7 @@ struct Fixture {
 }
 
 impl View for Fixture {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(LayoutContainer::new(
             VisibilityLayout {
                 visible: self.visible.get(),

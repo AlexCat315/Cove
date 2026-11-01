@@ -4,6 +4,7 @@
 //! Each column is a [`TimeWheel`] leaf whose option list, stepping and visible
 //! window come from the shared [`WheelPicker`] model, so disabled rows and
 //! end-stopping behave the same as a standalone wheel.
+use crate::Scope;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -282,7 +283,7 @@ impl TimePicker {
 }
 
 impl View for TimePicker {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let mut columns: Vec<AnyView> = vec![
             self.wheel("Hour", self.hours(), self.hour()),
             Self::separator(),

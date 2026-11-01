@@ -44,6 +44,7 @@
 //! - Rust has no touch `Popover` surface; the touch case drives the pointer
 //!   menu with a single tap (no hover), which publishes no back row.
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::Cell;
@@ -155,7 +156,7 @@ impl MenuHarness {
 }
 
 impl View for MenuHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let shown = self.shown.clone();
         let binding = Binding::new(
             {
@@ -674,11 +675,9 @@ fn four_portal_levels_flip_at_the_edge_and_leave_with_the_popup() {
             scene.portal.entries().is_empty(),
             "removing the root removes its child levels"
         );
-        // GAP: unregistering the owning portal drops its content but leaves the
-        // focus scope rooted in the removed subtree.
         assert!(
-            scene.focus.active_scope_root().is_some(),
-            "GAP: Swift clears the focus scope when the owning popup is removed; Rust leaves it active"
+            scene.focus.active_scope_root().is_none(),
+            "removing the owning popup clears its focus scope"
         );
     });
 }

@@ -33,6 +33,7 @@
 //!   menu and moves the tree selection here. The second test asserts the current
 //!   Rust behaviour (no portal, no selection, no action) with `GAP:` messages.
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::Cell;
@@ -74,7 +75,7 @@ struct Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let _ = self.shown.get();
         let probe = self.probe.clone();
         let shown = self.shown.clone();

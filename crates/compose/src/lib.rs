@@ -17,13 +17,13 @@ pub mod theme;
 pub use cove_composition::layout::*;
 pub use cove_composition::*;
 pub use cove_core as scene_core;
-/// Observable state and scene vocabulary that widgets reference through the
-/// crate root, matching the Swift module's flat namespace.
-pub use cove_core::State;
 pub use cove_core::scene::{
     AnimationCompletionCriteria, with_animation, with_animation_completion,
 };
 pub use cove_core::scene::{LayoutNode, Node};
+/// Observable state and scene vocabulary that widgets reference through the
+/// crate root, matching the Swift module's flat namespace.
+pub use cove_core::{Signal, State, batch, untrack};
 pub use modifiers::layout::FrameDimension;
 pub use observed::Observed;
 pub use primitives::layout::scroll_view::{

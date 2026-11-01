@@ -1,5 +1,6 @@
 //! Sprite drawing and scene overlay for the software pet.
 use super::{PetRenderState, PetSpriteSheet, PetWorld};
+use crate::Scope;
 use crate::primitives::media::Image;
 use crate::{AnyView, DynamicField, Observed, PrimitiveView, View, impl_primitive_view};
 use cove_core::scene::{LayoutNode, Node};
@@ -21,7 +22,7 @@ impl PetSpriteView {
     }
 }
 impl View for PetSpriteView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(PetSpriteCanvas::new(self.world.clone()))
     }
     fn dynamic_properties(&self) -> Vec<DynamicField> {
@@ -111,7 +112,7 @@ impl PetOverlay {
     }
 }
 impl View for PetOverlay {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(PetSpriteView::new(self.world.clone()))
     }
 }

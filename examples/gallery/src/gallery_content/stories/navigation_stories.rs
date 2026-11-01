@@ -5,6 +5,7 @@
 //! The header's state machine (long title toggle, text-vs-icon primary action,
 //! last performed action) is what the gallery drives, so it lives here as a type.
 
+use cove_composition::Scope;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
 use cove_ui_compose::primitives::controls::Checkbox;
@@ -115,7 +116,7 @@ impl AppBarStory {
 }
 
 impl View for AppBarStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
 
         let long_title = self.long_title.clone();

@@ -14,6 +14,7 @@
 //! - unmounting a transitioning subtree releases its scheduler entry without
 //!   reporting completion
 
+use cove_composition::Scope;
 mod support;
 
 use std::rc::Rc;
@@ -89,7 +90,7 @@ struct HarnessView {
 }
 
 impl View for HarnessView {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let completed = self.completed.clone();
         let content = AnyView::new(AnyView::new(
             AnyView::new(Button::new(Text::new("Content"), || {}))

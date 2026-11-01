@@ -6,11 +6,11 @@
 //!
 //! Matching, visibility, highlighting and key decisions live in
 //! [`SearchFieldState`]; this module renders that state and forwards events.
-use std::cell::RefCell;
+use crate::Scope;
 use std::rc::Rc;
 
-use cove_core::Binding;
 use cove_core::scene::{Align, FlexDirection, Justify, Node, Wrap};
+use cove_core::{Binding, Signal};
 
 use crate::modifiers::layout::{LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};
@@ -40,7 +40,6 @@ pub struct SearchField {
     pub clears_on_escape: bool,
     pub on_submit: Option<Rc<dyn Fn(String)>>,
     pub on_suggestion_selected: Option<Rc<dyn Fn(String)>>,
-    state: Rc<RefCell<SearchFieldState>>,
 }
 
 impl SearchField {
@@ -53,7 +52,6 @@ impl SearchField {
             clears_on_escape: true,
             on_submit: None,
             on_suggestion_selected: None,
-            state: Rc::new(RefCell::new(SearchFieldState::new())),
         }
     }
 
@@ -96,20 +94,28 @@ impl SearchField {
             clears_on_escape: self.clears_on_escape,
             on_submit: self.on_submit.clone(),
             on_suggestion_selected: self.on_suggestion_selected.clone(),
-            state: self.state.clone(),
         }
     }
+}
 
+/// The field's configuration plus its scope-owned suggestion state.
+#[derive(Clone)]
+struct SearchSession {
+    field: SearchField,
+    state: Signal<SearchFieldState>,
+}
+
+impl SearchSession {
     fn submit(&self) {
-        if let Some(handler) = self.on_submit.as_ref() {
-            handler(self.text.get().string_value());
+        if let Some(handler) = self.field.on_submit.as_ref() {
+            handler(self.field.text.get().string_value());
         }
     }
 
     fn choose(&self, suggestion: &str) {
-        self.text.set(TextBuffer::new(suggestion));
-        self.state.borrow_mut().choose();
-        if let Some(handler) = self.on_suggestion_selected.as_ref() {
+        self.field.text.set(TextBuffer::new(suggestion));
+        self.state.update(SearchFieldState::choose);
+        if let Some(handler) = self.field.on_suggestion_selected.as_ref() {
             handler(suggestion.to_string());
         }
     }
@@ -124,22 +130,25 @@ impl SearchField {
             crate::Scancode::KEYPAD_ENTER => SearchKey::KeypadEnter,
             _ => return false,
         };
-        let current = self.text.get().string_value();
-        let action = self.state.borrow_mut().handle_key(
-            key,
-            &current,
-            &self.suggestions,
-            self.clears_on_escape,
-        );
+        let current = self.field.text.get().string_value();
+        let mut action = SearchAction::None;
+        self.state.update(|state| {
+            action = state.handle_key(
+                key,
+                &current,
+                &self.field.suggestions,
+                self.field.clears_on_escape,
+            );
+        });
         match action {
             SearchAction::None => false,
             SearchAction::MoveHighlight => true,
             SearchAction::Clear => {
-                self.text.set(TextBuffer::empty());
+                self.field.text.set(TextBuffer::empty());
                 true
             }
             SearchAction::Choose(index) => {
-                let matches = SearchFieldState::matches(&current, &self.suggestions);
+                let matches = SearchFieldState::matches(&current, &self.field.suggestions);
                 if let Some(suggestion) = matches.get(index) {
                     self.choose(&suggestion.clone());
                 }
@@ -160,9 +169,12 @@ impl Clone for SearchField {
 }
 
 impl View for SearchField {
-    fn body(&self) -> AnyView {
-        let field = self.snapshot();
-        let state = self.state.clone();
+    fn body(&self, cx: &Scope) -> AnyView {
+        let state = cx.state(SearchFieldState::new);
+        let field = SearchSession {
+            field: self.snapshot(),
+            state,
+        };
         let suggestions = self.suggestions.clone();
 
         let input = TextField::new(self.placeholder.clone(), self.text.clone())
@@ -185,50 +197,31 @@ impl View for SearchField {
                     Rc::new(move |event: &cove_platform::KeyEvent| field.handle_key(event))
                 }),
                 on_change: Some({
-                    let state = state.clone();
                     let suggestions = suggestions.clone();
                     Rc::new(move |buffer: &TextBuffer| {
-                        state
-                            .borrow_mut()
-                            .on_change(&buffer.string_value(), &suggestions);
+                        state.update(|state| state.on_change(&buffer.string_value(), &suggestions));
                     })
                 }),
                 on_focus: Some({
-                    let state = state.clone();
                     let suggestions = suggestions.clone();
-                    let text = field.text.clone();
+                    let text = field.field.text.clone();
                     Rc::new(move || {
-                        state
-                            .borrow_mut()
-                            .on_focus(&text.get().string_value(), &suggestions);
+                        let current = text.get().string_value();
+                        state.update(|state| state.on_focus(&current, &suggestions));
                     })
                 }),
-                on_blur: Some({
-                    let state = state.clone();
-                    Rc::new(move || state.borrow_mut().on_blur())
-                }),
-                on_clear: Some({
-                    let state = state.clone();
-                    Rc::new(move || state.borrow_mut().on_clear())
-                }),
+                on_blur: Some(Rc::new(move || state.update(SearchFieldState::on_blur))),
+                on_clear: Some(Rc::new(move || state.update(SearchFieldState::on_clear))),
                 ..Default::default()
             });
 
-        let shows = {
-            let state = state.borrow();
-            state.shows_suggestions(
-                &self.text.get().string_value(),
-                &self.suggestions,
-                self.is_enabled,
-            )
-        };
+        let text = self.text.get().string_value();
+        let shows =
+            state.with(|state| state.shows_suggestions(&text, &self.suggestions, self.is_enabled));
 
         let mut column: Vec<AnyView> = vec![AnyView::new(input)];
         if shows {
-            column.push(AnyView::new(SuggestionList {
-                field: field.clone(),
-                state: state.clone(),
-            }));
+            column.push(AnyView::new(SuggestionList { session: field }));
         }
         AnyView::new(
             BoxView::new(
@@ -246,8 +239,7 @@ impl View for SearchField {
 
 /// The suggestion list beneath the field.
 struct SuggestionList {
-    field: SearchField,
-    state: Rc<RefCell<SearchFieldState>>,
+    session: SearchSession,
 }
 
 impl PrimitiveView for SuggestionList {
@@ -270,19 +262,20 @@ impl PrimitiveView for SuggestionList {
     }
 
     fn children(&self, _node: &Node) -> Vec<AnyView> {
-        let text = self.field.text.get().string_value();
-        let matches = SearchFieldState::matches(&text, &self.field.suggestions);
-        let highlighted = self.state.borrow().highlighted;
+        let field = &self.session.field;
+        let text = field.text.get().string_value();
+        let matches = SearchFieldState::matches(&text, &field.suggestions);
+        let highlighted = self.session.state.with(|state| state.highlighted);
         let mut rows: Vec<AnyView> = Vec::new();
         for (index, suggestion) in matches.into_iter().enumerate() {
-            let field = self.field.snapshot();
+            let session = self.session.clone();
             let value = suggestion.clone();
             rows.push(AnyView::new(
                 Button::with_options(
                     AnyView::new(Text::new(suggestion)),
-                    move || field.choose(&value),
+                    move || session.choose(&value),
                     ButtonRole::Normal,
-                    self.field.is_enabled,
+                    field.is_enabled,
                     false,
                     highlighted == Some(index),
                     None,

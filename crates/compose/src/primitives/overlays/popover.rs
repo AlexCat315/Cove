@@ -5,18 +5,31 @@
 //! portal-rendered, so it escapes any clipping or stacking context the trigger
 //! sits in, and it is dismissed by Escape, by losing the pointer, or by the
 //! trigger being pressed again.
+use crate::Scope;
 use std::rc::Rc;
 
-use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
+use crate::adaptive::SurfaceReader;
+use crate::modifiers::animation_value::AnimationValueExt;
+use crate::modifiers::interaction::AccessibilityExt;
+use crate::modifiers::layout::{EdgeInsets, FlexExt, FrameDimension, LayoutFrameExt, PaddingExt};
 use crate::modifiers::style::AppearanceExt;
 use crate::primitives::controls::button::{ActionControlAccessibility, Button, ButtonRole};
+use crate::primitives::layout::direction::ResolvedLayoutDirection;
+use crate::primitives::layout::{ScrollAxis, ScrollView, ScrollbarGutter};
 use crate::primitives::overlays::anchored::{
-    AnchoredOverlayHost, PopoverOverflow, PopoverPlacement, PopoverSurface,
+    AnchoredOverlayHost, MenuKeyHost, PopoverOverflow, PopoverPlacement, PopoverSurface,
 };
-use crate::theme::styles::buttons::{ButtonStyle, ButtonStyleConfiguration, ButtonStyleViewExt};
-use crate::{AnyView, BoxView, PrimitiveView, View, ViewExt, impl_primitive_view};
-use cove_core::Binding;
-use cove_core::scene::{Align, EventResult, FlexDirection, Justify, LayoutNode, Node, Wrap};
+use crate::primitives::overlays::modal::{
+    Modal, ModalBackdrop, ModalOptions, ModalPlacement, SheetDragHandle, TouchPresentation,
+    uses_sheet,
+};
+use crate::theme::SemanticMotionRef;
+use crate::theme::styles::buttons::{
+    AnyButtonStyle, ButtonStyle, ButtonStyleConfiguration, ButtonStyleViewExt,
+};
+use crate::{AnyView, BoxView, LayoutDebugExt, LayoutDirectionExt, View, ViewExt};
+use cove_core::scene::{Align, EventPhase, EventResult, FlexDirection, Justify, Wrap};
+use cove_core::{Binding, Environment, SizeClass};
 
 /// How the popup sizes itself.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -42,13 +55,15 @@ pub struct Popover {
     pub placement: PopoverPlacement,
     pub surface: PopoverSurface,
     pub overflow: PopoverOverflow,
-    pub on_key:
-        Option<Rc<dyn Fn(&cove_platform::KeyEvent, cove_core::scene::EventPhase) -> EventResult>>,
+    pub on_key: Option<KeyHandler>,
     pub sizing: PopoverSizing,
     pub trigger_description: Option<PopoverTriggerDescription>,
+    pub trigger_style: Option<AnyButtonStyle>,
     label: AnyView,
     content: AnyView,
 }
+
+type KeyHandler = Rc<dyn Fn(&cove_platform::KeyEvent, EventPhase) -> EventResult>;
 
 impl Popover {
     pub fn new(label: impl View + 'static, content: impl View + 'static) -> Self {
@@ -62,6 +77,7 @@ impl Popover {
             on_key: None,
             sizing: PopoverSizing::Content,
             trigger_description: None,
+            trigger_style: None,
             label: AnyView::new(label),
             content: AnyView::new(content),
         }
@@ -106,135 +122,251 @@ impl Popover {
         self.trigger_description = Some(description);
         self
     }
+
+    /// Replaces the focus-ring-only chrome, so a styled trigger is the
+    /// popover's own button rather than a second button nested inside it.
+    pub fn trigger_style(mut self, style: impl ButtonStyle + 'static) -> Self {
+        self.trigger_style = Some(AnyButtonStyle::new(style));
+        self
+    }
+
+    pub fn on_key(
+        mut self,
+        handler: impl Fn(&cove_platform::KeyEvent, EventPhase) -> EventResult + 'static,
+    ) -> Self {
+        self.on_key = Some(Rc::new(handler));
+        self
+    }
+
+    fn trigger(&self) -> AnyView {
+        let presented = self.is_presented.get() && self.is_enabled;
+        let toggle = self.is_presented.clone();
+        let button = Button::with_options(
+            self.label.clone(),
+            move || toggle.set(!toggle.get()),
+            ButtonRole::Normal,
+            self.is_enabled,
+            false,
+            presented,
+            self.trigger_description
+                .as_ref()
+                .and_then(|description| description.help.clone()),
+        );
+        let styled = match &self.trigger_style {
+            Some(style) => button.button_style_any(style.clone()),
+            None => button.button_style(PopoverTriggerStyle),
+        };
+        // A closed popover reports `Some(false)` rather than no state.
+        let trigger =
+            styled.composition_local(ActionControlAccessibility::expanded(), Some(presented));
+        match &self.trigger_description {
+            Some(description) => AnyView::new(
+                trigger
+                    .composition_local(
+                        ActionControlAccessibility::label(),
+                        Some(description.label.clone()),
+                    )
+                    .composition_local(
+                        ActionControlAccessibility::value(),
+                        description.value.clone(),
+                    ),
+            ),
+            None => AnyView::new(trigger),
+        }
+    }
 }
 
 impl View for Popover {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         // A popover disabled while open must close, not linger over a dead
         // trigger.
         if !self.is_enabled && self.is_presented.get() {
             self.is_presented.set(false);
         }
+        let overlay = AdaptiveOverlayHost {
+            is_presented: self.is_presented.clone(),
+            is_enabled: self.is_enabled,
+            width: self.width,
+            placement: self.placement,
+            sizing: self.sizing,
+            surface: self.surface,
+            overflow: self.overflow,
+            on_key: self.on_key.clone(),
+            content: self.content.clone(),
+        };
+        let raised = self.is_presented.get();
+        AnyView::new(
+            BoxView::new(
+                FlexDirection::Column,
+                if self.sizing == PopoverSizing::Anchor {
+                    Align::Stretch
+                } else {
+                    Align::FlexStart
+                },
+                Justify::FlexStart,
+                Wrap::NoWrap,
+                0.0,
+                AnyView::new(crate::TupleView::new(vec![
+                    self.trigger(),
+                    AnyView::new(overlay),
+                ])),
+            )
+            .z_index(if raised { 10_000.0 } else { 0.0 }),
+        )
+    }
+}
+
+/// Presents overlay content as a bottom sheet on touch surfaces and as an
+/// anchored panel for pointer input.
+pub(crate) struct AdaptiveOverlayHost {
+    pub is_presented: Binding<bool>,
+    pub is_enabled: bool,
+    pub width: Option<f32>,
+    pub placement: PopoverPlacement,
+    pub sizing: PopoverSizing,
+    pub surface: PopoverSurface,
+    pub overflow: PopoverOverflow,
+    pub on_key: Option<KeyHandler>,
+    pub content: AnyView,
+}
+
+impl View for AdaptiveOverlayHost {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let is_presented = self.is_presented.clone();
         let is_enabled = self.is_enabled;
-        // Swift provides the expanded state on the trigger inside `Popover.body`
-        // (`Popover.swift:79-83`), so a closed popover reports `Some(false)`
-        // rather than leaving assistive technology without a state.
-        let expanded = Some(self.is_presented.get() && is_enabled);
-        let trigger = AnyView::new(
-            AnyView::new(
-                Button::with_options(
-                    PopoverTriggerLabel {
-                        label: self.label.clone(),
-                        description: self.trigger_description.clone(),
-                    },
-                    move || is_presented.set(!is_presented.get()),
-                    ButtonRole::Normal,
-                    is_enabled,
-                    false,
-                    self.is_presented.get() && is_enabled,
-                    self.trigger_description
-                        .as_ref()
-                        .and_then(|description| description.help.clone()),
-                )
-                .button_style(PopoverTriggerStyle),
-            )
-            .composition_local(ActionControlAccessibility::expanded(), expanded),
-        );
-        let overlay = AnyView::new(
-            AnchoredOverlayHost::new(self.is_presented.get() && is_enabled, self.content.clone())
-                .width_opt(self.width)
-                .placement(self.placement)
-                .sizing_anchor(self.sizing == PopoverSizing::Anchor)
-                .surface(self.surface)
-                .overflow(self.overflow)
-                .on_dismiss({
-                    let binding = self.is_presented.clone();
-                    move || binding.set(false)
-                }),
-        );
-        AnyView::new(BoxView::new(
-            FlexDirection::Column,
-            if self.sizing == PopoverSizing::Anchor {
-                Align::Stretch
+        let width = self.width;
+        let placement = self.placement;
+        let sizing = self.sizing;
+        let surface = self.surface;
+        let overflow = self.overflow;
+        let on_key = self.on_key.clone();
+        let content = self.content.clone();
+        AnyView::new(SurfaceReader::new(move |environment: &Environment| {
+            if uses_sheet(environment) {
+                return AnyView::new(TouchOverlay {
+                    is_presented: is_presented.clone(),
+                    content: content.clone(),
+                    on_key: on_key.clone(),
+                });
+            }
+            let dismiss = is_presented.clone();
+            let mut host =
+                AnchoredOverlayHost::new(is_enabled && is_presented.get(), content.clone())
+                    .width_opt(width)
+                    .placement(placement)
+                    .sizing_anchor(sizing == PopoverSizing::Anchor)
+                    .surface(surface)
+                    .overflow(overflow)
+                    .on_dismiss(move || dismiss.set(false));
+            host.key_handler = on_key.clone();
+            AnyView::new(host)
+        }))
+    }
+}
+
+/// Touch presentation: a dimmed bottom sheet with a drag handle and scrolling
+/// content, padded clear of the safe area and the software keyboard.
+pub(crate) struct TouchOverlay {
+    pub is_presented: Binding<bool>,
+    pub content: AnyView,
+    pub on_key: Option<KeyHandler>,
+}
+
+impl View for TouchOverlay {
+    fn body(&self, _cx: &Scope) -> AnyView {
+        let is_presented = self.is_presented.clone();
+        let content = self.content.clone();
+        let on_key = self.on_key.clone();
+        AnyView::new(SurfaceReader::new(move |surface: &Environment| {
+            let safe = surface.safe_area.normalized();
+            let bottom = safe.bottom.max(surface.keyboard.height.max(0.0));
+            let available = (surface.viewport.height - safe.top - bottom - 12.0).max(0.0);
+            let mut options = ModalOptions::default();
+            options.geometry.placement = ModalPlacement::Bottom;
+            options.geometry.inset = 0.0;
+            options.geometry.width = if surface.viewport.width_class() == SizeClass::Compact {
+                f32::MAX
             } else {
-                Align::FlexStart
-            },
-            Justify::FlexStart,
-            Wrap::NoWrap,
-            0.0,
-            AnyView::new(crate::TupleView::new(vec![trigger, overlay])),
-        ))
+                560.0
+            };
+            options.geometry.height = (available + bottom).max(64.0);
+            options.geometry.corner_radius = 18.0;
+            options.fits_content_height = true;
+            options.backdrop = ModalBackdrop::Dimmed;
+
+            let is_presented = is_presented.clone();
+            let content = content.clone();
+            let on_key = on_key.clone();
+            AnyView::new(ResolvedLayoutDirection::new(move |direction| {
+                let dismiss = is_presented.clone();
+                let handle = SheetDragHandle::new(
+                    |_| {},
+                    move |distance, velocity| {
+                        if distance > 80.0 || (distance > 0.0 && velocity > 900.0) {
+                            dismiss.set(false);
+                        }
+                    },
+                )
+                .accessibility_hidden(true);
+                let scroller = ScrollView::new(
+                    ScrollAxis::Vertical,
+                    content
+                        .clone()
+                        .frame(
+                            Some(FrameDimension::Percent(100.0)),
+                            None,
+                            Some(0.0),
+                            None,
+                            None,
+                            None,
+                        )
+                        .composition_local(TouchPresentation::menu(), true),
+                )
+                .scrollbar_gutter(ScrollbarGutter::Overlay)
+                .frame(
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some((available - 56.0).max(0.0)),
+                );
+                let column = BoxView::new(
+                    FlexDirection::Column,
+                    Align::Stretch,
+                    Justify::FlexStart,
+                    Wrap::NoWrap,
+                    0.0,
+                    AnyView::new(crate::TupleView::new(vec![
+                        AnyView::new(handle),
+                        AnyView::new(scroller),
+                    ])),
+                )
+                .padding_insets(EdgeInsets::new(
+                    0.0,
+                    safe.leading.max(12.0),
+                    bottom + 12.0,
+                    safe.trailing.max(12.0),
+                ))
+                .layout_direction(direction)
+                .debug_name("touch-overlay-sheet");
+                let key = on_key.clone();
+                Modal::new(
+                    is_presented.clone(),
+                    MenuKeyHost::new(
+                        move |event| {
+                            key.as_ref().is_some_and(|key| {
+                                key(event, EventPhase::Target) == EventResult::Handled
+                            })
+                        },
+                        AnyView::new(column),
+                    ),
+                )
+                .options(options.clone())
+            }))
+        }))
     }
 }
-
-/// Trigger content with the accessibility description applied.
-struct PopoverTriggerLabel {
-    label: AnyView,
-    description: Option<PopoverTriggerDescription>,
-}
-
-impl PrimitiveView for PopoverTriggerLabel {
-    fn make_node(&self) -> Node {
-        let node = Node::new();
-        node.set_is_hit_testable(false);
-        node
-    }
-
-    fn make_layout_node(&self) -> Option<LayoutNode> {
-        None
-    }
-
-    fn update_node(&self, _node: &Node) {}
-
-    fn children(&self, _node: &Node) -> Vec<AnyView> {
-        let label = self
-            .description
-            .as_ref()
-            .map(|description| description.label.clone())
-            .unwrap_or_default();
-        let value = self
-            .description
-            .as_ref()
-            .map(|description| description.value.clone())
-            .unwrap_or_default();
-        vec![AnyView::new(PopoverLabelSemantics {
-            content: self.label.clone(),
-            label,
-            value,
-        })]
-    }
-}
-impl_primitive_view!(PopoverTriggerLabel);
-
-/// Applies the trigger's label and value to the control it wraps.
-struct PopoverLabelSemantics {
-    content: AnyView,
-    label: String,
-    value: String,
-}
-
-impl PrimitiveView for PopoverLabelSemantics {
-    fn make_node(&self) -> Node {
-        let node = Node::new();
-        node.set_is_hit_testable(false);
-        node
-    }
-
-    fn make_layout_node(&self) -> Option<LayoutNode> {
-        None
-    }
-
-    fn update_node(&self, node: &Node) {
-        node.set_attachment("__popover.label", self.label.clone());
-        node.set_attachment("__popover.value", self.value.clone());
-    }
-
-    fn children(&self, _node: &Node) -> Vec<AnyView> {
-        vec![self.content.clone()]
-    }
-}
-impl_primitive_view!(PopoverLabelSemantics);
 
 /// Trigger chrome: contributes only the keyboard focus ring, outside the
 /// trigger's own box. Pointer focus is invisible, which is why an open popover
@@ -267,7 +399,8 @@ impl ButtonStyle for PopoverTriggerStyle {
                     cove_core::Color::CLEAR
                 },
                 if configuration.is_focused { 2.0 } else { 0.0 },
-            ),
+            )
+            .animation_motion(SemanticMotionRef::snappy(), configuration.interaction_key()),
         )
     }
 }

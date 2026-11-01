@@ -19,6 +19,7 @@
 //! - Adaptive previews: Swift renders `adaptive-navigationRail-narrow/wide`;
 //!   Rust reports support but renders no such names.
 
+use cove_composition::Scope;
 mod support;
 
 use std::rc::Rc;
@@ -35,8 +36,8 @@ use support::GalleryScene;
 struct Shared(Rc<RailStory>);
 
 impl View for Shared {
-    fn body(&self) -> AnyView {
-        View::body(self.0.as_ref())
+    fn body(&self, cx: &Scope) -> AnyView {
+        View::body(self.0.as_ref(), cx)
     }
 }
 

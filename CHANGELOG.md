@@ -4,6 +4,30 @@
 
 ## Unreleased
 
+- **状态模型改为作用域持有的 Signal（2026-11-01，破坏性）**：
+  - `View::body` 改为 `fn body(&self, cx: &Scope) -> AnyView`。状态用 `cx.state(|| 初值)` 创建，归视图的
+    组合作用域所有：视图在树中身份不变，状态就保留；作用域卸载时随之释放。此前状态放在视图值里，
+    父视图每次重建都会新建 `State`，只能靠手写 `dynamic_properties` 按名字拷回，72 个视图漏写、
+    多处在 `body()` 内 `State::new`，导致状态重置或永不重组。
+  - 新增 `cove_core::reactive`：`Signal<T>` 是 `Copy`、`!Send` 的句柄，`get`/`with` 自动订阅当前观察者，
+    `set`/`update` 使订阅者失效；另有 `batch`、`untrack`、`set_if_changed`、`track`，以及跨线程写入用的
+    `SignalSender`（投递到场景线程收件箱）。热路径无锁。
+  - `Binding` 改为单线程（`Rc`），不再要求 `Send + Sync`；`Signal` 可直接转为 `Binding`，经 Binding
+    读取同样被追踪。由此修复 `Binding` 驱动的视图无法重组：`Popover`、`MenuButton`、`SplitButton`、
+    `Popconfirm`、资源选择器等此前都打不开。
+  - 组件的协调过程在其观察者下执行：组件直接物化的原语在 `update_node` 中读取 Binding 也会订阅该组件。
+  - `cx.remember` 保存非响应式的作用域值；`cx.keyed_state` 按键区分列表项状态。
+  - 修饰后视图的槽位标识包含修饰符类型与内容标识（对应 Swift 的 `ModifiedContent<Content, Modifier>`）。
+    此前所有修饰后视图共用一个标识，列表结构变化时会把标题节点原地更新成行内容。
+  - 已迁移：`MenuButton`、`Popover`、`ContextMenu`、`Modal`、`Popconfirm`、触屏 `HoverCard`、`TouchMenu`、
+    `PortalHost`、`NotificationHost`、`CommandPalette`、`SwipeRow`、`TabOverflowStrip`、`MobileTabBar`、
+    `ResizableEditor`、`ResizableTextArea`、资源选择器。旧 `State`/`DynamicField` 暂时保留，其余视图分批迁移后删除。
+- **补齐 Swift 行为（2026-11-01）**：
+  - `Popover` 增加 `trigger_style`、`on_key` 透传、打开时 `z_index` 提升，以及触屏 sheet 分支
+    （`AdaptiveOverlayHost`/`TouchOverlay`）；触发器的无障碍描述改用 composition local。
+  - `MenuButton` 不再嵌套两层按钮，并在安装原生菜单时使用系统菜单；`ContextMenu` 补上原生菜单、
+    触屏长按、触屏 sheet 与弹出过渡，新增 `ContextMenuExt`。
+  - `ToastController` 恢复可观察性：发布、关闭、暂停、到期都会使读取方重组，此前提示卡片从不出现。
 - **布局引擎改为 Taffy，布局树重构（2026-11-01，破坏性）**：
   - `LayoutNode` 改为目录模块（`style`、`engine`、`custom`）。手写 flex 实现替换为 Taffy 0.15 的底层
     trait，直接挂在 `LayoutNode` 树上：每个节点自带样式、布局缓存和结果，脏标记只清理所在路径，

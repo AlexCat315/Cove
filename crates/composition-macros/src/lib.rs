@@ -18,7 +18,7 @@ use syn::{
 /// ```ignore
 /// #[track_state_reads(count, profile)]
 /// impl View for Counter {
-///     fn body(&self) -> AnyView {
+///     fn body(&self, _cx: &Scope) -> AnyView {
 ///         text(self.count.get().value.to_string())
 ///     }
 /// }

@@ -21,6 +21,7 @@
 //! - sorting a column cycles ascending, descending, source order
 //! - a navigation request reveals its cell once per request identity
 
+use crate::Scope;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
@@ -254,7 +255,7 @@ impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
     for DataTable<Record, Id>
 {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let controller = self.controller();
         let probe = controller.clone();
         AnyView::new(crate::adaptive::ContainerSizeReader::new(
@@ -1106,7 +1107,7 @@ struct DataTableLanes<Record: 'static, Id: Ord + std::hash::Hash + Clone + Send 
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
     for DataTableLanes<Record, Id>
 {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let header = build_header(
             &self.controller,
             &self.plan,
@@ -1428,7 +1429,7 @@ struct LaneRows<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Sen
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
     for LaneRows<Record, Id>
 {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let mut children: Vec<AnyView> = Vec::new();
         let top = self.metrics.top(self.rows.start);
         if top > 0.0 {
@@ -1506,7 +1507,7 @@ struct FrozenLane<
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
     for FrozenLane<Record, Id>
 {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(LaneRows {
             controller: self.controller.clone(),
             plan: self.plan.clone(),
@@ -1540,7 +1541,7 @@ struct MovingRows<
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
     for MovingRows<Record, Id>
 {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(
             AnyView::new(LaneRows {
                 controller: self.controller.clone(),
@@ -1575,7 +1576,7 @@ struct DataTableRow<
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
     for DataTableRow<Record, Id>
 {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let Some(record) = self.controller.model.record_at(self.row) else {
             return AnyView::new(crate::EmptyView);
         };
@@ -1735,7 +1736,7 @@ struct DataTableCell<
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
     for DataTableCell<Record, Id>
 {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let title = self.column.title.clone();
         let draft = self
             .controller
@@ -1924,7 +1925,7 @@ struct DraftEditor<
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
     for DraftEditor<Record, Id>
 {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let controller = self.controller.clone();
         let plan = self.plan.clone();
         let input: Rc<RefCell<Option<Node>>> = Rc::new(RefCell::new(None));
@@ -2043,7 +2044,7 @@ struct HeaderCell<
 impl<Record: Clone + 'static, Id: Ord + std::hash::Hash + Clone + Send + Sync + 'static> View
     for HeaderCell<Record, Id>
 {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let column_id = self.column.id.clone();
         let sortable = self.column.compare.is_some();
         let is_sorted = self

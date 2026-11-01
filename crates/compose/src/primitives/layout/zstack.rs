@@ -1,4 +1,5 @@
 //! Translation of Compose/Sources/CoveUICompose/Primitives/Layout/ZStack.swift.
+use crate::Scope;
 use crate::{
     Alignment, AnyView, HorizontalAlignment, Layout, LayoutContainer, LayoutSubview,
     ProposedViewSize, VerticalAlignment, View,
@@ -93,7 +94,7 @@ impl ZStack {
     }
 }
 impl View for ZStack {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(
             LayoutContainer::<ZStackLayout, AnyView>::with_erased_content(
                 ZStackLayout::new(self.alignment),

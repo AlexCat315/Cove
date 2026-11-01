@@ -32,6 +32,7 @@
 //! (`SidebarDestination` emits none), so the search/selection assertions that
 //! keyed off them are re-expressed against the story's own state.
 
+use cove_composition::Scope;
 mod support;
 
 use std::rc::Rc;
@@ -53,8 +54,8 @@ use support::GalleryScene;
 struct StoryRef<T: cove_composition::View + 'static>(Rc<T>);
 
 impl<T: cove_composition::View + 'static> cove_composition::View for StoryRef<T> {
-    fn body(&self) -> AnyView {
-        cove_composition::View::body(self.0.as_ref())
+    fn body(&self, cx: &Scope) -> AnyView {
+        cove_composition::View::body(self.0.as_ref(), cx)
     }
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
         cove_composition::View::dynamic_properties(self.0.as_ref())
@@ -305,8 +306,8 @@ fn the_shell_search_narrows_the_navigation() {
 struct GalleryRef(Rc<cove_examples::gallery_content::GalleryView>);
 
 impl cove_composition::View for GalleryRef {
-    fn body(&self) -> AnyView {
-        cove_composition::View::body(self.0.as_ref())
+    fn body(&self, cx: &Scope) -> AnyView {
+        cove_composition::View::body(self.0.as_ref(), cx)
     }
     fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
         cove_composition::View::dynamic_properties(self.0.as_ref())

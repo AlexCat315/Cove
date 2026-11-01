@@ -3,6 +3,7 @@
 //! A controlled workflow navigator. The caller owns selection, outcomes and
 //! availability. Lock future steps with `StepperItem::is_enabled`; completing or
 //! selecting a step never changes another step's status.
+use crate::Scope;
 use std::rc::Rc;
 
 use crate::adaptive::ContainerSizeReader;
@@ -328,7 +329,7 @@ impl<Id: std::hash::Hash + PartialEq + Clone + 'static> Stepper<Id> {
 }
 
 impl<Id: std::hash::Hash + PartialEq + Clone + 'static> View for Stepper<Id> {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         if self.options.axis == StepperAxis::Vertical {
             return self.content(true);
         }

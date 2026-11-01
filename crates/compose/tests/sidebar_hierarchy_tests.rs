@@ -64,6 +64,7 @@
 //!   DevTools crate; `cove-ui-compose` does not depend on it, so `query()`
 //!   applies the same predicate to the node tree.
 
+use cove_composition::Scope;
 mod support;
 
 use std::collections::HashSet;
@@ -130,7 +131,7 @@ impl Document {
 }
 
 impl View for Document {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(
             BoxView::new(
                 FlexDirection::Column,
@@ -261,7 +262,7 @@ impl Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let width = self.width.get();
         let mut surface = Environment::default();
         surface.viewport.width = width;
@@ -863,34 +864,34 @@ fn local_and_rtl() {
 
         press(scene, &item(scene, &[PROJECTS]), MouseButton::Left);
         assert!(
-            row(scene, &["Welcome"]).is_none() && harness.expanded.get().is_empty(),
-            "GAP: an uncontrolled Swift sidebar keeps local disclosure state; Rust `Sidebar::new` recreates `local_expanded` on every body pass, so a press never discloses"
+            row(scene, &["Welcome"]).is_some() && harness.expanded.get().is_empty(),
+            "an uncontrolled sidebar keeps local disclosure state: the press discloses the branch"
         );
 
         harness.rail.set(true);
         scene.settle(10, 1.0);
         let rail_projects = item(scene, &[PROJECTS]);
-        assert_ne!(
+        assert_eq!(
             id(&rail_projects),
             id(&projects),
-            "GAP: Swift keeps the same row node across the rail switch; Rust remounts the row"
+            "the row node survives the rail switch"
         );
         assert!(
-            row(scene, &[WELCOME_PATH]).is_none(),
-            "GAP: Swift's rail row for the locally disclosed child is labelled `Projects / Welcome`; Rust never disclosed it"
+            row(scene, &[WELCOME_PATH]).is_some(),
+            "the rail row for the locally disclosed child is labelled `Projects / Welcome`"
         );
         assert_eq!(
             state_of(&rail_projects).is_expanded,
-            Some(false),
-            "the rail row reports the branch state"
+            Some(true),
+            "the rail row reports the disclosed branch"
         );
 
         scene.focus.focus(Some(&rail_projects), true);
         scene.key(Scancode::ARROW_RIGHT, KeyModifiers::default());
         assert_eq!(
             state_of(&item(scene, &[PROJECTS])).is_expanded,
-            Some(false),
-            "the branch ends collapsed, as in Swift"
+            Some(true),
+            "GAP: under RTL Swift's Right arrow collapses the disclosed branch; Rust ignores it"
         );
     });
 }

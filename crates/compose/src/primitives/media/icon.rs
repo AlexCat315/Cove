@@ -3,6 +3,7 @@
 //! Themed square icon: the asset's alpha channel is used as coverage and the
 //! foreground color as fill, so icons follow theme tokens instead of their
 //! source colors.
+use crate::Scope;
 use crate::primitives::media::{Image, ImageContentMode, ImageRenderingMode};
 use crate::theme::{
     IconMetrics, IconMetricsReader, SemanticColorRef, SemanticIconSize, Theme, ThemeReader,
@@ -104,7 +105,7 @@ impl Icon {
 }
 
 impl View for Icon {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let resource = self.resource.clone();
         let size = self.size.clone();
         let fill = self.fill.clone();

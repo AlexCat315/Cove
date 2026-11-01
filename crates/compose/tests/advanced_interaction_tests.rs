@@ -30,14 +30,6 @@
 //!   is never consulted. `field_undo_routing` pins those measured outcomes.
 //! - GAP: because paste never happens, the post-paste selection is not restored;
 //!   the field keeps the caret at the end of the typed text with no anchor.
-//! - GAP: `ContextMenuHost` opens only when its own node is the event target,
-//!   so a right click that lands on an interactive child (the Swift suite's
-//!   `Button`) never opens the panel; the row's accessibility action and the
-//!   keyed menu commands are therefore unreachable in that configuration.
-//! - GAP: dragging the `ResizableEditor` grip captures the pointer but does not
-//!   resize. The handle writes the editor's `height` `State`, yet `body` reads
-//!   it without declaring a `DynamicField`, so the write never recomposes and
-//!   the field viewport stays at its initial 148pt.
 //! - GAP: a wheel notch dispatched at the stack does not move its window, and
 //!   `VirtualStack::scroll_to_index` does not reveal the requested row on its
 //!   first mount. The Rust stack keeps its initial mounted range (row 0 stays
@@ -52,6 +44,7 @@
 //!   and placement mode, and `Transition::asymmetric` takes two `Transition`
 //!   values rather than Swift's `AnyTransition`.
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::{Cell, RefCell};
@@ -325,7 +318,7 @@ struct ModalHarness {
 }
 
 impl View for ModalHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let actions = self.actions.clone();
         let field = AnyView::new(
             TextField::new("", Binding::constant(TextBuffer::new("JSON")))
@@ -561,15 +554,10 @@ fn context_menu_lifecycle() {
         scene.settle(5, 1.0);
 
         assert_eq!(activations.get(), 0, "the right click does not activate");
-        // GAP: `ContextMenuHost` only opens when its own node is the hit target
-        // (`event_phase == Target`). The Swift modifier intercepted the press on
-        // any descendant, so right-clicking the Button opened the menu; Rust's
-        // Button is the hit target and the host never sees a target-phase press.
         assert_eq!(
             scene.portal.entries().len(),
-            0,
-            "GAP: Swift's context menu opens one portal panel from a right click on the Button; \
-             Rust's ContextMenu host is not the hit target, so nothing opens"
+            1,
+            "a right click on the Button inside the context menu opens one panel"
         );
         assert!(
             scene
@@ -578,18 +566,13 @@ fn context_menu_lifecycle() {
                         .as_deref()
                         == Some("portal-entry")
                 })
-                .is_none(),
-            "GAP: Swift's menu panel is a portal-entry slot inside the window"
+                .is_some(),
+            "the menu panel is a portal-entry slot inside the window"
         );
 
         scene.key(Scancode::ARROW_DOWN, KeyModifiers::default());
         scene.key(Scancode::RETURN, KeyModifiers::default());
-        assert_eq!(
-            action.get(),
-            0,
-            "GAP: Swift's Return runs the focused Delete item (2); with no menu open no item is \
-             reachable"
-        );
+        assert_eq!(action.get(), 2, "Return runs the focused Delete item");
         assert!(
             scene.portal.entries().is_empty(),
             "no menu panel remains open"
@@ -644,9 +627,9 @@ fn resizable_viewport_drag_grows_the_field() {
         scene.settle(3, 1.0);
         let grown = field.frame().height;
         assert_eq!(
-            grown, initial,
-            "GAP: dragging the grip 100pt should grow the field viewport (Swift: {initial}+100); \
-             the write never reaches layout, so it stays at {grown}"
+            grown,
+            initial + 100.0,
+            "dragging the grip 100pt grows the field viewport by 100pt"
         );
         input.dispatch(&InputEvent::MouseButtonUp(MouseButtonEvent {
             button: MouseButton::Left,
@@ -695,7 +678,7 @@ struct TransitionHarness {
 }
 
 impl View for TransitionHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let transition = Transition::asymmetric(
             Transition::opacity().combined(Transition::move_edge(TransitionEdge::Top, 20.0)),
             Transition::opacity().combined(Transition::move_edge(TransitionEdge::Bottom, 30.0)),

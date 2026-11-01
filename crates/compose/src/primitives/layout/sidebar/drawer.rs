@@ -3,6 +3,7 @@
 //! Modal navigation, sharing sidebar destinations and the standard modal
 //! lifecycle. The application owns presentation and selection, so resizing never
 //! resets them.
+use crate::Scope;
 use std::collections::HashSet;
 
 use crate::modifiers::layout::PaddingExt;
@@ -96,7 +97,7 @@ impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> Navig
 impl<Id: PartialEq + Eq + std::hash::Hash + Clone + Send + Sync + 'static> View
     for NavigationDrawer<Id>
 {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let mut geometry = ModalGeometry::default();
         // A drawer is a leading sheet flush with the window edge: no inset and
         // no rounding, so it reads as navigation rather than a dialog.

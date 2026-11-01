@@ -75,6 +75,7 @@
 //!   lives in crates `cove-ui-compose` does not depend on; the same queries run
 //!   over the node tree in `query()` below.
 
+use cove_composition::Scope;
 mod support;
 
 use cove_composition::{AnyView, LayoutDebugExt, Scancode, View};
@@ -139,7 +140,7 @@ impl Content {
 }
 
 impl View for Content {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let count = self.count.clone();
         let draft = self.draft.clone();
         let label = self.count_label();
@@ -243,7 +244,7 @@ impl Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let mut options = AdaptiveSidebarOptions::default();
         options.layout.compact_maximum_width = self.compact.get();
         options.layout.expanded_minimum_width = self.expanded_minimum.get();

@@ -30,6 +30,16 @@ fn wake_slot() -> &'static Mutex<Option<WakeCallback>> {
 pub fn set_scene_invalidation_wake(wake: Option<WakeCallback>) {
     *wake_slot().lock().unwrap_or_else(|e| e.into_inner()) = wake;
 }
+/// Ask the host to run the scene loop, which drains posted work.
+pub fn wake_scene_thread() {
+    let wake = wake_slot()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
+    if let Some(wake) = wake {
+        wake();
+    }
+}
 fn deliver(id: ReadScopeId, reason: RecompositionReason) {
     let callback = HANDLERS.with(|handlers| handlers.borrow().get(&id).cloned());
     if let Some(callback) = callback {
@@ -37,6 +47,7 @@ fn deliver(id: ReadScopeId, reason: RecompositionReason) {
     }
 }
 pub fn drain_scene_invalidations() {
+    crate::reactive::drain_posted_signal_updates();
     let pending = INBOX.with(|inbox| {
         std::mem::take(&mut *inbox.pending.lock().unwrap_or_else(|e| e.into_inner()))
     });
@@ -72,13 +83,7 @@ impl LocalInvalidationHandle {
                     .lock()
                     .unwrap_or_else(|e| e.into_inner())
                     .push((id, reason));
-                let wake = wake_slot()
-                    .lock()
-                    .unwrap_or_else(|e| e.into_inner())
-                    .clone();
-                if let Some(wake) = wake {
-                    wake();
-                }
+                wake_scene_thread();
             }
         });
         let callback = tracked.clone();

@@ -4,6 +4,7 @@
 //! Arrows at the edges, indicators underneath, left/right/Home/End on the
 //! keyboard, and a horizontal drag with the same threshold-based feel as a
 //! native swipe.
+use crate::Scope;
 mod autoplay;
 mod indicator;
 
@@ -567,11 +568,15 @@ impl<Id: PartialEq + Eq + Clone + Send + Sync + 'static> View for CarouselBodyHo
 }
 
 impl<Id: PartialEq + Eq + Clone + std::hash::Hash + Send + Sync + 'static> View for Carousel<Id> {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(CarouselBodyHost {
             actions: self.actions(),
             rotation: self.rotation.clone(),
             config: self.config(),
         })
+    }
+
+    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
+        crate::dynamic_fields!(self; internal_selection)
     }
 }

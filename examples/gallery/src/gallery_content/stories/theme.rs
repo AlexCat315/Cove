@@ -6,6 +6,7 @@
 //! family, icon size) and shows a preview that inherits a *local* theme while
 //! the surrounding gallery keeps its own.
 
+use cove_composition::Scope;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_core::{Binding, Font, FontWeight, State};
 use cove_ui_compose::modifiers::layout::{LayoutFrameExt, PaddingExt};
@@ -150,7 +151,7 @@ fn f64_binding(state: &State<f64>) -> Binding<f64> {
 }
 
 impl View for ThemeStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let family_options = AnyView::new(
             Select::new(
                 Binding::new(
@@ -343,7 +344,7 @@ struct PreviewCard {
 }
 
 impl View for PreviewCard {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let save_button = {
             let saved = self.saved.clone();
             AnyView::new(
@@ -419,6 +420,10 @@ impl View for PreviewCard {
             .semantic_border(SemanticColorRef::border(), 1.0)
             .debug_name("theme-preview"),
         )
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; name, saved)
     }
 }
 

@@ -1,4 +1,5 @@
 //! Translation of Primitives/Controls/FieldLabel.swift.
+use crate::Scope;
 use crate::modifiers::interaction::AccessibilityExt;
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
 use crate::modifiers::style::AppearanceExt;
@@ -34,7 +35,7 @@ impl FieldLabel {
 }
 
 impl View for FieldLabel {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(FieldLabelHost {
             title: self.title.clone(),
             options: self.options.clone(),

@@ -12,6 +12,7 @@
 //!   that fits; measurement uses an unspecified proposal so a parent width
 //!   cannot make a wrapping wide branch look like it fits.
 
+use crate::Scope;
 use cove_composition::adaptive::ContainerSizeReader;
 use cove_composition::{AnyView, PrimitiveView, View, ViewExt, impl_primitive_view};
 // Layout vocabulary is re-exported at the Compose crate root.
@@ -77,7 +78,7 @@ impl ViewThatFits {
 }
 
 impl View for ViewThatFits {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         match self.mode {
             ViewThatFitsMode::Threshold(threshold) => {
                 let wide = self.wide.clone();

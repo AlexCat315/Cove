@@ -14,6 +14,7 @@
 //! attachment, which survives materialisation; `max_marker` reads the label
 //! length instead of a frame coordinate and still needs no layout pass.
 
+use cove_composition::Scope;
 mod support;
 
 use std::rc::Rc;
@@ -113,7 +114,7 @@ struct ButtonHarness {
 }
 
 impl View for ButtonHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let counter = self.count.clone();
         let shown = self.count.get();
         AnyView::new(Column::new(
@@ -214,7 +215,7 @@ struct ButtonTextLabelHarness {
 }
 
 impl View for ButtonTextLabelHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(Button::new(
             AnyView::new(Marker::new(if self.flag.get() { "xxxxxxx" } else { "x" })),
             || {},
@@ -262,7 +263,7 @@ struct TextFieldHarness {
 }
 
 impl View for TextFieldHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let writer = self.text.clone();
         let observed = self.text.get();
         let mut events = TextFieldEvents::default();

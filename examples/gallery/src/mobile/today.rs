@@ -3,6 +3,7 @@
 //! Swift source: `Examples/Mobile/Sources/AppContent/Today.swift`
 //! (`TodayScreen`, `ProjectCard`).
 
+use cove_composition::Scope;
 use cove_core::Binding;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::layout::{FlexExt, PaddingExt};
@@ -37,7 +38,7 @@ impl TodayScreen {
 }
 
 impl View for TodayScreen {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let summary = AnyView::new(BoxView::new(
             FlexDirection::Row,
             Align::Center,
@@ -96,7 +97,7 @@ impl SummaryMetric {
 }
 
 impl View for SummaryMetric {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(
             BoxView::new(
                 FlexDirection::Column,
@@ -137,7 +138,7 @@ impl ProjectCard {
 }
 
 impl View for ProjectCard {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(
             BoxView::new(
                 FlexDirection::Column,

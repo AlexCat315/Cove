@@ -3,6 +3,7 @@
 //! Primary action plus an adjacent menu trigger. The primary button runs the
 //! default action; the arrow opens the same [`MenuEntry`] menu a `MenuButton`
 //! uses. The pair shares one Tab stop, and Left/Right moves between the zones.
+use crate::Scope;
 use std::rc::Rc;
 
 use cove_core::scene::{
@@ -84,7 +85,7 @@ impl Clone for SplitButton {
 }
 
 impl View for SplitButton {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let action = self.action.clone();
         let primary = Button::with_options(
             AnyView::new(Text::new(self.title.clone()).truncated()),

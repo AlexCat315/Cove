@@ -2,6 +2,7 @@
 //!
 //! Swift sources: `GalleryContent/Stories/Overlays/{PopconfirmStory,HoverStory}.swift`.
 
+use cove_composition::Scope;
 use cove_core::State;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
@@ -102,7 +103,7 @@ impl PopconfirmStory {
 }
 
 impl View for PopconfirmStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled && self.enabled.get();
 
         let delete_sink = self.last_action.clone();
@@ -181,6 +182,10 @@ impl View for PopconfirmStory {
     fn tag(&self) -> &'static str {
         "PopconfirmStory"
     }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; last_action, enabled)
+    }
 }
 
 /// `HoverCardStory`: hover reveals a detail card the keyboard can also reach.
@@ -208,7 +213,7 @@ impl HoverCardStory {
 }
 
 impl View for HoverCardStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
         let following = self.following.get();
         let toggle = self.following.clone();
@@ -291,5 +296,9 @@ impl View for HoverCardStory {
 
     fn tag(&self) -> &'static str {
         "HoverCardStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; following)
     }
 }

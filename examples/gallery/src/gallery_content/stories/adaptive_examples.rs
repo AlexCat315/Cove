@@ -12,6 +12,7 @@
 //! tests can assert the two agree.
 
 use crate::gallery_content::catalog::GalleryPage;
+use cove_composition::Scope;
 
 /// The widths every supported page is previewed at.
 pub const PREVIEW_WIDTHS: [f32; 2] = [390.0, 720.0];
@@ -322,7 +323,7 @@ impl AdaptiveControlExamples {
 }
 
 impl cove_ui_compose::View for AdaptiveControlExamples {
-    fn body(&self) -> cove_ui_compose::AnyView {
+    fn body(&self, _cx: &Scope) -> cove_ui_compose::AnyView {
         use cove_ui_compose::LayoutDebugExt;
         use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
         use cove_ui_compose::primitives::text::Text;

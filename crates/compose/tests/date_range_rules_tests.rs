@@ -26,6 +26,7 @@
 //!   start is lost. Swift keeps 10...10 after pressing the over-limit 15 and then
 //!   completes 10...13; Rust records 15...15 and then 13...13.
 
+use cove_composition::Scope;
 mod support;
 
 use std::sync::{Arc, Mutex};
@@ -75,7 +76,7 @@ struct RangeHarness {
 }
 
 impl View for RangeHarness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let mut options = CalendarOptions::default();
         options.calendar = self.calendar.clone();
         options.today = self.today;

@@ -14,6 +14,7 @@
 //!   series' range
 //! - a non-finite value is a gap, not a zero
 
+use crate::Scope;
 use std::rc::Rc;
 
 use crate::modifiers::layout::{FlexExt, LayoutFrameExt};
@@ -299,7 +300,7 @@ impl Chart {
 }
 
 impl View for Chart {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let hidden = self.hidden();
         let visible: Vec<bool> = (0..self.content.count())
             .map(|index| self.is_visible(index))
@@ -387,6 +388,10 @@ impl View for Chart {
             ))
             .frame(None, None, Some(0.0), None, None, None),
         )
+    }
+
+    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
+        crate::dynamic_fields!(self; own_hidden)
     }
 }
 

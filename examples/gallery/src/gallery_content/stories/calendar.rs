@@ -3,6 +3,7 @@
 //! Swift source: `GalleryContent/Stories/Data/DateTableStories.swift`
 //! (`CalendarStory`).
 
+use cove_composition::Scope;
 use cove_core::State;
 use cove_core::scene::{Align, FlexDirection, Justify, Wrap};
 use cove_ui_compose::foundation::{Date, weekday_of};
@@ -147,7 +148,7 @@ struct GranularityCalendar {
 }
 
 impl View for GranularityCalendar {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let (read, write) = selection_binding(&self.value);
         let calendar = CalendarView::new(
             read,
@@ -181,7 +182,7 @@ impl View for GranularityCalendar {
 }
 
 impl View for CalendarStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let (read, write) = selection_binding(&self.date);
         let day_calendar = AnyView::new(CalendarView::new(
             read,

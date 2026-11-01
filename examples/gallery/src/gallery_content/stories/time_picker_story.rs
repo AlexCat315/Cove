@@ -6,6 +6,7 @@
 //! shows 12 for midnight and noon, and with seconds enabled the field order is
 //! `HH:MM:SS` followed by the half-day marker.
 
+use cove_composition::Scope;
 use cove_core::State;
 use cove_ui_compose::modifiers::layout::FlexExt;
 use cove_ui_compose::modifiers::style::SemanticStyleViewExt;
@@ -105,7 +106,7 @@ impl TimePickerStory {
 }
 
 impl View for TimePickerStory {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let enabled = self.options.is_enabled;
         let state = self.time.clone();
 
@@ -172,5 +173,9 @@ impl View for TimePickerStory {
 
     fn tag(&self) -> &'static str {
         "TimePickerStory"
+    }
+
+    fn dynamic_properties(&self) -> Vec<cove_composition::DynamicField> {
+        cove_composition::dynamic_fields!(self; time, twelve_hour, shows_seconds)
     }
 }

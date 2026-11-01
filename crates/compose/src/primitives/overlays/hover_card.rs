@@ -3,6 +3,7 @@
 //! Pointer detail with delayed opening and a grace period for crossing onto
 //! interactive content. Touch surfaces have no hover, so a tap on the label
 //! opens the detail as a sheet.
+use crate::Scope;
 use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
 
@@ -115,7 +116,7 @@ impl HoverCard {
 }
 
 impl View for HoverCard {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let label = self.label.clone();
         let content = self.content.clone();
         let timing = self.timing();
@@ -496,7 +497,6 @@ struct TouchHoverCard {
     label: AnyView,
     content: AnyView,
     is_enabled: bool,
-    is_presented: cove_core::State<bool>,
 }
 
 impl TouchHoverCard {
@@ -505,17 +505,17 @@ impl TouchHoverCard {
             label,
             content,
             is_enabled,
-            is_presented: cove_core::State::new(false),
         }
     }
 }
 
 impl View for TouchHoverCard {
-    fn body(&self) -> AnyView {
-        if !self.is_enabled && self.is_presented.get() {
-            self.is_presented.set(false);
+    fn body(&self, cx: &Scope) -> AnyView {
+        let is_presented = cx.state(|| false);
+        if !self.is_enabled && is_presented.get() {
+            is_presented.set(false);
         }
-        let presented = self.is_presented.clone();
+        let presented = is_presented;
         let trigger = Button::with_options(
             self.label.clone(),
             move || presented.set(true),
@@ -527,7 +527,7 @@ impl View for TouchHoverCard {
         )
         .button_style(crate::theme::styles::buttons::plain());
         let sheet = BottomSheet::new(
-            self.is_presented.binding(),
+            is_presented.into(),
             self.content.clone().padding_edges(8.0, 0.0),
         );
         let column = BoxView::new(
@@ -542,15 +542,5 @@ impl View for TouchHoverCard {
             ])),
         );
         AnyView::new(column)
-    }
-
-    /// `body` reads `is_presented` from `State`, so the
-    /// scope must declare those dependencies. Without this the writes never
-    /// subscribe and the view keeps its first layout forever.
-    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
-        vec![crate::DynamicField::state(
-            "is_presented",
-            &self.is_presented,
-        )]
     }
 }

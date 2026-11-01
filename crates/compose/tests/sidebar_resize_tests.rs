@@ -44,6 +44,7 @@
 //!   `SidebarToggle`) the positional reconciler reused nodes across the switch
 //!   and the following document subtree went missing.
 
+use cove_composition::Scope;
 mod support;
 
 use cove_composition::layout::LayoutDirectionExt;
@@ -209,7 +210,7 @@ impl Document {
 }
 
 impl View for Document {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let text = self.text.clone();
         let field = AnyView::new(TextField::new(
             "Draft",
@@ -284,7 +285,7 @@ impl Shell {
 }
 
 impl View for Shell {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let mut options = AdaptiveSidebarOptions::default();
         options.layout = shell_policy(false, self.always_expanded.get());
         let sidebar = AdaptiveSidebar::new(
@@ -394,7 +395,7 @@ impl Lane {
 }
 
 impl View for Lane {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let policy = shell_policy(false, self.always_expanded.get());
         let geometry = self.geometry(self.document_frame_width());
         let sidebar = Sidebar::new(
@@ -606,7 +607,7 @@ fn embedded_height() {
             requested: State<f32>,
         }
         impl View for Embedded {
-            fn body(&self) -> AnyView {
+            fn body(&self, _cx: &Scope) -> AnyView {
                 let mut options = AdaptiveSidebarOptions::default();
                 options.layout.shows_rail_labels = false;
                 options.layout.expanded_minimum_width = 600.0;

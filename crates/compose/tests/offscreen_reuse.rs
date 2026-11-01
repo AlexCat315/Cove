@@ -6,6 +6,7 @@
 //! - changing the observed state rebuilds the text and changes vertex count
 //! - after trimming memory, the rebuilt geometry keeps the same x positions
 
+use cove_composition::Scope;
 mod support;
 
 use cove_core::State;
@@ -37,7 +38,7 @@ struct StateText {
 }
 
 impl View for StateText {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(Text::new(self.state.get()).frame(
             Some(FrameDimension::Points(100.0)),
             Some(FrameDimension::Points(30.0)),

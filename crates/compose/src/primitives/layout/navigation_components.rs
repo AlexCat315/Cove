@@ -2,6 +2,7 @@
 //!
 //! Breadcrumbs and pagination share one idea: a bounded row of navigation targets
 //! whose middle collapses when the row cannot hold them all.
+use crate::Scope;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -89,7 +90,7 @@ impl<Id: PartialEq + Clone + std::hash::Hash + 'static> Breadcrumb<Id> {
 }
 
 impl<Id: PartialEq + Clone + std::hash::Hash + 'static> View for Breadcrumb<Id> {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(BreadcrumbBody {
             trail: self.snapshot(),
         })
@@ -347,7 +348,7 @@ impl Pagination {
 }
 
 impl View for Pagination {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(PaginationBody {
             pager: self.snapshot(),
         })

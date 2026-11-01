@@ -8,6 +8,7 @@
 //! - a large collection mounts only the viewport and clamps after a data shrink
 //! - a variable-height grid keeps its full extent with a partial last row
 
+use cove_composition::Scope;
 mod support;
 
 use std::rc::Rc;
@@ -159,7 +160,7 @@ struct Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let build = self.probe.clone();
         let content = move |index: &usize| {
             build.count.set(build.count.get() + 1);

@@ -11,6 +11,10 @@ use std::rc::Rc;
 
 /// Modifies a view by setting node/layout properties or wrapping its content.
 pub trait ViewModifier {
+    /// The modifier's type, part of a modified view's structural identity.
+    fn modifier_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
     /// Write directly into the materialised node.
     fn apply_node(&self, _node: &Node) {}
     /// Write into the materialised layout node (padding/frame/flex/...).

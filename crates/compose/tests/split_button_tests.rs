@@ -5,28 +5,14 @@
 //!   zone runs only the primary action
 //! - a disabled `SplitButton` runs neither zone and opens no portal
 //! - Left/Right move the focus between the two zones
+//! - the menu zone is one button, opens its menu on click, and an activated
+//!   entry closes it
 //!
-//! Two more gaps are pinned alongside the menu-zone one below:
-//! - The pair does not share a single Tab stop. Swift kept exactly one of the two
-//!   zones in the Tab order and moved the stop with the rove. `is_tab_stop()`
-//!   defaults to `true` and `SplitButtonGroup` never calls `set_is_tab_stop`, so
-//!   both zones are always Tab stops. `both_zones_are_tab_stops` pins that.
-//! - The menu zone is two nested button hosts (a `Popover` trigger `Button`
-//!   wrapping the caller's label `Button`), so a split button exposes three
-//!   focusable buttons rather than Swift's two. `the_menu_zone_nests_two_buttons`
-//!   pins that.
-//!
-//! Named difference (production gap, recorded rather than fixed): the menu zone
-//! cannot open its menu yet. **A `Binding`-driven view has no observable
-//! dependency, so `Popover::body` is never re-entered.** `Popover` decides
-//! `is_presented` from a `Binding<bool>` read inside `body()`, but the runtime can
-//! only subscribe to a `State<T>` (`DynamicField::state` takes `&State<T>`, and
-//! `Binding::new` drops the `State` handle), so writing the binding cannot
-//! invalidate the scope and the retained `AnchoredOverlayHost { is_presented:
-//! false }` is never replaced. The Swift suite's "open the menu, activate the
-//! item, portal empties" case is pinned by
-//! `the_menu_zone_does_not_yet_open_a_portal`; the other Swift assertions (two
-//! zones, roving) hold.
+//! Remaining gap: the pair does not share a single Tab stop. Swift kept exactly
+//! one of the two zones in the Tab order and moved the stop with the rove.
+//! `is_tab_stop()` defaults to `true` and `SplitButtonGroup` never calls
+//! `set_is_tab_stop`, so both zones are always Tab stops.
+//! `both_zones_are_tab_stops` pins that.
 
 mod support;
 
@@ -194,10 +180,7 @@ fn arrow_keys_still_move_focus_between_the_zones() {
 }
 
 #[test]
-fn the_menu_zone_nests_two_buttons() {
-    // Gap: the menu zone is a `MenuButton`, whose `Popover` trigger wraps the
-    // caller's label `Button`, so a split button exposes three focusable buttons
-    // where Swift exposed two.
+fn the_menu_zone_is_one_button() {
     InteractiveScene::run(800.0, 600.0, |scene| {
         scene.install(AnyView::new(LayerRoot::new(AnyView::new(
             SplitButton::new(
@@ -215,18 +198,12 @@ fn the_menu_zone_nests_two_buttons() {
                     .is_some_and(|semantics| semantics.role == AccessibilityRole::Button)
             })
             .count();
-        assert_eq!(
-            buttons, 3,
-            "the primary zone plus two nested hosts in the menu zone"
-        );
+        assert_eq!(buttons, 2, "the primary zone and the menu zone");
     });
 }
 
 #[test]
-fn the_menu_zone_does_not_yet_open_a_portal() {
-    // Gap: see the module note. Swift asserted `portal.entries.count == 1` after
-    // clicking the menu zone, then that activating "Save as" ran the entry and
-    // emptied the portal.
+fn the_menu_zone_opens_its_menu_and_an_entry_closes_it() {
     InteractiveScene::run(800.0, 600.0, |scene| {
         let menu = Rc::new(Cell::new(0));
         let menu_runs = menu.clone();
@@ -242,14 +219,20 @@ fn the_menu_zone_does_not_yet_open_a_portal() {
 
         let hosts = zones(scene);
         scene.click(&hosts[1], 1);
+        assert_eq!(
+            scene.portal.entries().len(),
+            1,
+            "the menu zone opens its menu"
+        );
+
+        let entry = scene
+            .labelled("Save as", None)
+            .expect("the menu entry is mounted");
+        scene.click(&entry, 1);
+        assert_eq!(menu.get(), 1, "the entry ran");
         assert!(
             scene.portal.entries().is_empty(),
-            "the menu zone cannot open its menu: Popover never re-runs its body"
-        );
-        assert_eq!(menu.get(), 0, "no menu entry ran");
-        assert!(
-            !scene.graph.recomposer.has_pending(),
-            "the click leaves nothing pending, which is the tell"
+            "activating the entry closes the menu"
         );
     });
 }

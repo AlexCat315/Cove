@@ -32,6 +32,7 @@
 //!
 //! Everything the shipped story does have is asserted at full strength below.
 
+use cove_composition::Scope;
 mod support;
 
 use std::rc::Rc;
@@ -49,8 +50,8 @@ use support::GalleryScene;
 struct StoryView(Rc<AnimationSystemExamples>);
 
 impl View for StoryView {
-    fn body(&self) -> AnyView {
-        View::body(self.0.as_ref())
+    fn body(&self, cx: &Scope) -> AnyView {
+        View::body(self.0.as_ref(), cx)
     }
     fn dynamic_properties(&self) -> Vec<DynamicField> {
         View::dynamic_properties(self.0.as_ref())
@@ -63,7 +64,7 @@ struct Mounted {
 }
 
 impl View for Mounted {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         AnyView::new(AnyView::new(self.story.0.clone_view()).theme(self.appearance.theme()))
     }
 }
@@ -75,8 +76,8 @@ trait CloneView {
 struct Inner(Rc<AnimationSystemExamples>);
 
 impl View for Inner {
-    fn body(&self) -> AnyView {
-        View::body(self.0.as_ref())
+    fn body(&self, cx: &Scope) -> AnyView {
+        View::body(self.0.as_ref(), cx)
     }
     fn dynamic_properties(&self) -> Vec<DynamicField> {
         View::dynamic_properties(self.0.as_ref())

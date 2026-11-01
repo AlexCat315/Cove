@@ -3,6 +3,7 @@
 //! Session-owned page stack. The caller owns `path`; pushing appends a route,
 //! popping removes the last one, and a non-empty initial path restores a deep
 //! link on the first frame.
+use crate::Scope;
 use std::cell::{Cell, RefCell};
 use std::hash::Hash;
 use std::rc::Rc;
@@ -321,7 +322,7 @@ pub struct NavigationStackHost<Route: Hash + Clone + PartialEq + Send + Sync + '
 }
 
 impl<Route: Hash + Clone + PartialEq + Send + Sync + 'static> View for NavigationStackHost<Route> {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let width = self.width;
         let height = self.height;
         let sign = if self.direction == Direction::Rtl {
@@ -338,7 +339,7 @@ impl<Route: Hash + Clone + PartialEq + Send + Sync + 'static> View for Navigatio
 }
 
 impl<Route: Hash + Clone + PartialEq + Send + Sync + 'static> View for NavigationStack<Route> {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let stack = Rc::new(self.snapshot());
         let width_cell = Rc::new(Cell::new(0.0_f32));
         let height_cell = Rc::new(Cell::new(0.0_f32));

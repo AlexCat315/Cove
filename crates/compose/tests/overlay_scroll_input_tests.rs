@@ -27,6 +27,7 @@
 //! `.reducedMotion()` is `.reduced_motion(true)`, and
 //! `scroll.contentOffset` is `node.content_offset()`.
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::RefCell;
@@ -57,7 +58,7 @@ struct Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let _presented = self.presented.get();
         let selections = self.selections.clone();
         let clears = self.clears.clone();

@@ -1,4 +1,5 @@
 //! Translation of Compose/Sources/CoveUICompose/Primitives/Layout/Grid/Grid.swift.
+use crate::Scope;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -446,7 +447,7 @@ impl Grid {
     }
 }
 impl View for Grid {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let columns = self.layout.columns.clone();
         let column_spacing = self.layout.column_spacing;
         let row_spacing = self.layout.row_spacing;
@@ -490,6 +491,10 @@ impl View for Grid {
     }
     fn tag(&self) -> &'static str {
         std::any::type_name::<Self>()
+    }
+
+    fn dynamic_properties(&self) -> Vec<crate::DynamicField> {
+        crate::dynamic_fields!(self; local_visibility)
     }
 }
 

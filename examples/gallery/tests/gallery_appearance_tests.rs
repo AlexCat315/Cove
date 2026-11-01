@@ -15,6 +15,7 @@
 //! - Swift installed `gallery` directly; Rust wraps the same `GalleryView`
 //!   instance so the test can read `is_dark()` back from it.
 
+use cove_composition::Scope;
 mod support;
 
 use std::rc::Rc;
@@ -33,8 +34,8 @@ use support::GalleryScene;
 struct GalleryRoot(Rc<GalleryView>);
 
 impl View for GalleryRoot {
-    fn body(&self) -> AnyView {
-        View::body(self.0.as_ref())
+    fn body(&self, cx: &Scope) -> AnyView {
+        View::body(self.0.as_ref(), cx)
     }
 }
 

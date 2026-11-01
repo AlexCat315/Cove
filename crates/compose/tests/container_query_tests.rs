@@ -12,6 +12,7 @@
 //! - exactly half a point of change is still published
 //! - sub-tolerance jitter does not republish
 
+use cove_composition::Scope;
 mod support;
 
 use std::cell::RefCell;
@@ -73,7 +74,7 @@ struct Harness {
 }
 
 impl View for Harness {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let width = self.width.clone();
         let height = self.height.clone();
         let recorder = self.recorder.clone();

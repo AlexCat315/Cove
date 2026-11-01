@@ -3,6 +3,7 @@
 //! File or HTTP image with explicit loading/failure content. Decode happens off
 //! the UI loop; registration and publication use the captured host scheduler.
 //! The node owns cancellation, so an old request cannot replace a newer source.
+use crate::Scope;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -327,7 +328,7 @@ fn pixel_extent(points: f32, is_fill: bool) -> u32 {
 }
 
 impl View for AsyncImage {
-    fn body(&self) -> AnyView {
+    fn body(&self, _cx: &Scope) -> AnyView {
         let request = self.request();
         let phase = match self.session.status(&request) {
             AsyncImageStatus::Empty => AsyncImagePhase::Empty,
