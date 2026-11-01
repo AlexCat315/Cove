@@ -14,7 +14,12 @@ pub struct LayoutCalc {
 }
 impl LayoutCalc {
     pub const fn new(percent: f32, points: f32) -> Self {
-        Self { percent, points, minimum: None, maximum: None }
+        Self {
+            percent,
+            points,
+            minimum: None,
+            maximum: None,
+        }
     }
     pub fn with_minimum(mut self, minimum: f32) -> Self {
         self.minimum = Some(self.minimum.map_or(minimum, |old| old.max(minimum)));
@@ -26,8 +31,12 @@ impl LayoutCalc {
     }
     pub fn resolve(self, basis: f32) -> f32 {
         let mut value = self.percent / 100.0 * basis + self.points;
-        if let Some(maximum) = self.maximum { value = value.min(maximum); }
-        if let Some(minimum) = self.minimum { value = value.max(minimum); }
+        if let Some(maximum) = self.maximum {
+            value = value.min(maximum);
+        }
+        if let Some(minimum) = self.minimum {
+            value = value.max(minimum);
+        }
         value
     }
 }
@@ -49,9 +58,15 @@ impl LayoutStyleValue {
     pub const fn calc(percent: f32, points: f32) -> Self {
         Self::Calc(LayoutCalc::new(percent, points))
     }
-    pub(super) fn is_auto(self) -> bool { matches!(self, Self::Auto) }
+    pub(super) fn is_auto(self) -> bool {
+        matches!(self, Self::Auto)
+    }
     pub fn points(self) -> Option<f32> {
-        if let Self::Points(value) = self { Some(value) } else { None }
+        if let Self::Points(value) = self {
+            Some(value)
+        } else {
+            None
+        }
     }
     pub(super) fn as_calc(self) -> LayoutCalc {
         match self {
@@ -79,7 +94,9 @@ impl LayoutStyleValue {
             Self::Points(value) => LengthPercentage::length(value),
             Self::Percent(value) => LengthPercentage::percent(value / 100.0),
             Self::Calc(value) => LengthPercentage::calc(calc.insert(value)),
-            _ => panic!("intrinsic sizing keywords are not valid on edges, gaps or min/max constraints"),
+            _ => panic!(
+                "intrinsic sizing keywords are not valid on edges, gaps or min/max constraints"
+            ),
         }
     }
     pub(super) fn length_percentage_auto(self, calc: &CalcStorage) -> LengthPercentageAuto {
@@ -88,24 +105,35 @@ impl LayoutStyleValue {
             Self::Points(value) => LengthPercentageAuto::length(value),
             Self::Percent(value) => LengthPercentageAuto::percent(value / 100.0),
             Self::Calc(value) => LengthPercentageAuto::calc(calc.insert(value)),
-            _ => panic!("intrinsic sizing keywords are not valid on edges, gaps or min/max constraints"),
+            _ => panic!(
+                "intrinsic sizing keywords are not valid on edges, gaps or min/max constraints"
+            ),
         }
     }
     pub(super) fn margin(self, calc: &CalcStorage) -> LengthPercentageAuto {
         // Preserve Cove's existing unset-margin contract.
-        if self.is_auto() { LengthPercentageAuto::length(0.0) }
-        else { self.length_percentage_auto(calc) }
+        if self.is_auto() {
+            LengthPercentageAuto::length(0.0)
+        } else {
+            self.length_percentage_auto(calc)
+        }
     }
 }
 
 /// Boxes keep aligned handles stable as the vector grows. This storage is
 /// rebuilt with each engine style, and lives as long as that style's handles.
 #[derive(Default)]
+#[allow(
+    clippy::vec_box,
+    reason = "Taffy calc handles require stable addresses when storage grows"
+)]
 pub(super) struct CalcStorage(RefCell<Vec<Box<LayoutCalc>>>);
 impl CalcStorage {
     pub fn insert(&self, value: LayoutCalc) -> *const () {
         assert!(value.percent.is_finite() && value.points.is_finite());
-        assert!(value.minimum.is_none_or(f32::is_finite) && value.maximum.is_none_or(f32::is_finite));
+        assert!(
+            value.minimum.is_none_or(f32::is_finite) && value.maximum.is_none_or(f32::is_finite)
+        );
         let value = Box::new(value);
         let ptr = (&*value as *const LayoutCalc).cast();
         self.0.borrow_mut().push(value);

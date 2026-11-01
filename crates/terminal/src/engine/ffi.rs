@@ -3,9 +3,9 @@
 //! Layouts and enum values here are not transcribed from the header by hand:
 //! they were read out of the library's own ABI manifest
 //! (`ghostty_type_json()`), which is authoritative for the linked build. The
-//! `const` assertions at the bottom of this file check that every struct Rust
-//! lays out still agrees with the manifest's sizes and offsets, so a library
-//! upgrade that changes the ABI fails to compile instead of corrupting memory.
+//! `const` assertions guard the recorded layout sizes; the ABI test also
+//! compares sizes, alignment and field offsets with the linked library's
+//! current manifest when upgrading the dependency.
 //!
 //! Nothing outside `super` may use these types: Ghostty handles never cross the
 //! `engine` boundary.
@@ -987,3 +987,6 @@ const _: () = {
     assert!(std::mem::size_of::<GhosttyMousePosition>() == 8);
     assert!(std::mem::size_of::<GhosttySysImage>() == 24);
 };
+
+#[cfg(test)]
+mod abi_tests;

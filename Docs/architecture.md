@@ -63,13 +63,15 @@ Core + Composition + Text + Inspection ← Browser
 
 ## 部署标注
 
-原生依赖是 `third-party/` 下固定版本的 git 子模块。`cove-native-build` 在各 crate 的 `build.rs` 中用 CMake 将其编译进 `OUT_DIR` 并静态链接；libghostty-vt 由 `zig build` 编译。不使用预编译产物目录或环境变量覆盖。
+原生依赖是 `third-party/` 下固定版本的 git 子模块。`cove-native-build` 在各 crate 的 `build.rs` 中用 CMake 将其编译进 `OUT_DIR` 并静态链接；libghostty-vt 使用 Ghostty `v1.4.0` 源码，由 Zig 0.17.0 的 `zig build` 编译为静态库。不使用预编译产物目录或环境变量覆盖。
 
 部署标签描述完整依赖闭包，而非文件使用的语言。`Compose` 使用 Swift 实现，不意味着使用其完整图片和文本功能时没有原生库依赖。CLI 只选择协议闭包，Browser 原型选择基础组合、检查和 Wasm 字体实现，原生应用选择完整 Runtime。
 
 ## Core 布局
 
 `LayoutNode`、`FlexProps` 和自定义布局由 `cove-core` 内的 Taffy（纯 Rust）实现，语义沿用 Swift 版的 Yoga：默认列方向、`flex-shrink: 0`、无自动最小尺寸、布局时解析 logical 边。Taffy 通过底层 trait 直接遍历 `LayoutNode` 树，每个节点自带样式、缓存和父节点相对的结果；自定义布局的探测与放置见 `crates/core/src/scene/layout_node/custom.rs`。Core 没有原生布局依赖。
+
+Taffy 启用 Flexbox、CSS Grid 与 `calc`。`CssGrid` 直接参与保留布局树；普通 `Grid` 通过自定义布局测量契约接入 Taffy 求解，列显隐策略仍归 Compose，`LazyGrid` 保留虚拟化。尺寸表达式与接口见 [布局](layout.md)。
 
 ## 检查与验收
 

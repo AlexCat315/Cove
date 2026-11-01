@@ -423,6 +423,7 @@ dependencies = [
  "cove-text",
  "libc",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

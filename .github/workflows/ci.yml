@@ -21,7 +21,7 @@ jobs:
           submodules: recursive
       - uses: mlugg/setup-zig@v2
         with:
-          version: '0.16.0'
+          version: '0.17.0'
       - name: Rust toolchain
         run: rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
       - uses: ilammy/msvc-dev-cmd@v1
@@ -65,7 +65,7 @@ jobs:
           submodules: recursive
       - uses: mlugg/setup-zig@v2
         with:
-          version: '0.16.0'
+          version: '0.17.0'
       - name: Rust toolchain
         run: rustup toolchain install 1.99.1 --profile minimal --target ${{ matrix.target }}
       - name: Shared Rust workspace
@@ -78,7 +78,7 @@ jobs:
           submodules: recursive
       - uses: mlugg/setup-zig@v2
         with:
-          version: '0.16.0'
+          version: '0.17.0'
       - name: Rust toolchain
         run: rustup toolchain install 1.99.1 --profile minimal --target aarch64-linux-android
       - uses: android-actions/setup-android@v3

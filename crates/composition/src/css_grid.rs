@@ -11,7 +11,12 @@ pub struct CssGrid {
 }
 impl CssGrid {
     pub fn new(style: GridStyle, content: AnyView) -> Self {
-        Self { style, column_gap: LayoutStyleValue::Points(0.0), row_gap: LayoutStyleValue::Points(0.0), content }
+        Self {
+            style,
+            column_gap: LayoutStyleValue::Points(0.0),
+            row_gap: LayoutStyleValue::Points(0.0),
+            content,
+        }
     }
 }
 impl PrimitiveView for CssGrid {
@@ -21,13 +26,17 @@ impl PrimitiveView for CssGrid {
         node
     }
     fn update_node(&self, _node: &Node) {}
-    fn make_layout_node(&self) -> Option<LayoutNode> { Some(LayoutNode::new()) }
+    fn make_layout_node(&self) -> Option<LayoutNode> {
+        Some(LayoutNode::new())
+    }
     fn update_layout(&self, layout: &LayoutNode) {
         layout.set_display(Display::Grid);
         layout.set_grid_style(self.style.clone());
         layout.set_gap_value(self.column_gap, Gutter::Column);
         layout.set_gap_value(self.row_gap, Gutter::Row);
     }
-    fn children(&self, _node: &Node) -> Vec<AnyView> { vec![self.content.clone()] }
+    fn children(&self, _node: &Node) -> Vec<AnyView> {
+        vec![self.content.clone()]
+    }
 }
 impl_primitive_view!(CssGrid);

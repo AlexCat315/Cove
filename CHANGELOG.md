@@ -4,6 +4,23 @@
 
 ## Unreleased
 
+- **Taffy 布局能力与 Yoga 残留清理（2026-11-02，破坏性）**：
+  - 删除不再参与构建的 `crates/core/native/yoga` 桥接与头文件；对齐转换函数改为
+    `layout_justify`、`layout_align`、`layout_values`，官网、示例和开发工具文档同步更新布局引擎名称。
+  - 启用 Taffy `grid` 和 `calc`。`LayoutStyleValue` 支持百分比与逻辑点组合、上下限，以及
+    `min-content`、`max-content`、`fit-content` 尺寸；表达式贯通宽高、flex basis、定位、边距、间距和最小/最大约束。
+    `FrameDimension` 统一为该类型，新增 `FrameValues` 与 `LayoutValuesExt`；最小/最大约束改用统一尺寸值。
+  - 新增 `GridStyle` 与 `CssGrid`：支持 `fr`、`minmax`、重复轨道、命名线、自动放置与跨格。
+    普通 `Grid` 改用 Taffy 计算轨道与放置，保留命名列显隐和子视图身份；溢出轨道正确计入滚动范围。
+    `LazyGrid` 保留虚拟化与范围计算，固定行高单元格填满分配列宽，修复空内容宽度为零。
+  - 内容最小尺寸通过独立测量模式传递，文本按不可换行片段计算；根节点计算方向传递到自定义布局，
+    RTL 切换会重新放置。更新仍断言旧布局缺陷的回归测试。接口与边界见 `Docs/layout.md`。
+- **Ghostty 源码更新至 v1.4.0（2026-11-02）**：
+  - `third-party/ghostty` 固定到官方 `v1.4.0`（`83fb95624b0439ee660c2679b43b38c8b63769cd`），
+    `cove-terminal` 使用该版本附带的 libghostty-vt；VT 库上游版本仍为 `0.1.0-dev`。
+  - 源码构建使用 Zig 0.17.0，显式关闭 xcframework 与 macOS app 输出，只构建供 Rust 静态链接的 VT 库；Windows 链接新版 `ghostty-vt-static.lib`，各平台 CI 工具链同步更新。
+  - 新增与实际链接库 ABI 清单对照的测试，校验所有已用 FFI 结构体的大小、对齐和字段偏移。
+
 - **状态模型改为作用域持有的 Signal（2026-11-01，破坏性）**：
   - `View::body` 改为 `fn body(&self, cx: &Scope) -> AnyView`。状态用 `cx.state(|| 初值)` 创建，归视图的
     组合作用域所有：视图在树中身份不变，状态就保留；作用域卸载时随之释放。此前状态放在视图值里，

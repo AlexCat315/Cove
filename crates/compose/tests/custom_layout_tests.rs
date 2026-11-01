@@ -11,30 +11,7 @@
 //! - logical padding mirrors with the flex direction
 //! - nested safe areas consume logical edges once and resize with host insets
 //!
-//! Named differences (both reported as production gaps, neither fixed here):
-//! - **RTL logical padding is not mirrored.** Swift resolves a
-//!   `EdgeInsets(leading: 11, trailing: 23)` applied under `Direction::Rtl` to
-//!   `resolvedPadding.left == 23` / `.right == 11`. Rust resolves the physical
-//!   insets unmirrored (`left == 11`, `right == 23`), so every RTL row places
-//!   its children 12pt off. `logical_padding_does_not_mirror_in_rtl` pins it.
-//! - **Nested custom layouts place in the wrong coordinate space.**
-//!   `LayoutNode::place_custom_layouts` (`crates/core/src/scene/layout_node.rs:1597`)
-//!   feeds each nested container bounds relative to that container, but
-//!   `place_for_custom_layout` → `arrange` (`:1574`) consumes them as
-//!   parent-relative, so a nested container's children land at the negation of
-//!   its own offset. Swift places `nested-second` at `(0, 18)`; Rust places it
-//!   at `(-10, -19)` for a container sitting at `(10, 37)`.
-//!   `nested_custom_layouts_place_in_the_wrong_coordinate_space` pins it and the
-//!   main case asserts the single-level geometry, which is correct.
-//! - **The `calculate_layout` direction never reaches custom placements.**
-//!   `LayoutNode::custom_layout_direction` (`crates/core/src/scene/layout_node.rs:1543`)
-//!   reads only the node's own authored `direction` and then its parent chain,
-//!   so a direction passed to `calculate_layout` is invisible to a
-//!   `LayoutSubview`, which always reports `Inherit`-derived `Ltr`. Swift exposes
-//!   the calculation direction, so an RTL pass mirrors custom placements in
-//!   Rust while it changes nothing here.
-//!   `calculation_direction_does_not_reach_custom_placements` pins it; the LTR
-//!   half of the original case is asserted at full strength.
+//! Logical edges and nested frames follow the current Taffy layout contract.
 
 mod support;
 
@@ -287,9 +264,8 @@ fn calculation_direction_reaches_custom_placements() {
     );
     assert_eq!(
         child.frame().x,
-        0.0,
-        "documented gap: the RTL calculation direction never reaches the custom placement, \
-         so Swift's mirrored x=60 never happens"
+        60.0,
+        "the RTL calculation direction mirrors the custom placement"
     );
 }
 
@@ -569,7 +545,7 @@ fn logical_padding_mirrors_with_the_flex_direction() {
             second.x
         );
         assert_eq!(
-            first.x + first.width + 23.0,
+            first.x + first.width + 11.0,
             140.0,
             "the leading child sits against the trailing edge"
         );
@@ -581,8 +557,8 @@ fn logical_padding_mirrors_with_the_flex_direction() {
                 layout.resolved_padding().left,
                 layout.resolved_padding().right
             ),
-            (11.0, 23.0),
-            "documented gap: Swift resolves leading to the right edge in RTL, Rust keeps the physical sides"
+            (23.0, 11.0),
+            "logical leading padding resolves to the right edge in RTL"
         );
     });
 }
@@ -622,9 +598,8 @@ fn nested_safe_areas_consume_logical_edges_once() {
         );
         assert_eq!(
             named(&graph, "inner-safe").frame().x,
-            11.0,
-            "documented gap: the outer safe area already consumed the leading inset, \
-             and this build does not mirror the trailing one under RTL"
+            23.0,
+            "the outer safe area consumes the logical trailing inset on the left"
         );
         assert_eq!(
             named(&graph, "inner-safe").frame().width,
@@ -669,7 +644,7 @@ const _: fn() = || {
 };
 
 #[test]
-fn logical_padding_does_not_mirror_in_rtl() {
+fn logical_padding_resolves_start_and_end_in_rtl() {
     GlobalTestLock::locked(|| {
         let graph = support::graph();
         let row = Row::new(
@@ -709,19 +684,19 @@ fn logical_padding_does_not_mirror_in_rtl() {
                 layout.resolved_padding().left,
                 layout.resolved_padding().right
             ),
-            (11.0, 23.0),
-            "documented gap: Swift would resolve left=23 / right=11 under RTL"
+            (23.0, 11.0),
+            "logical padding mirrors under RTL"
         );
         assert_eq!(
             named(&graph, "first").frame().x,
-            97.0,
-            "documented gap: Swift would place the leading child at x=109"
+            109.0,
+            "the leading child sits inside the 11pt right inset"
         );
     });
 }
 
 #[test]
-fn nested_custom_layouts_place_in_the_wrong_coordinate_space() {
+fn nested_custom_layouts_use_parent_local_coordinates() {
     GlobalTestLock::locked(|| {
         let nested = LayoutContainer::new(
             TestColumnLayout { spacing: 3.0 },
@@ -780,22 +755,22 @@ fn nested_custom_layouts_place_in_the_wrong_coordinate_space() {
                 named(&graph, "nested-first").frame().x,
                 named(&graph, "nested-first").frame().y
             ),
-            (-10.0, -37.0),
-            "documented gap: the nested children land at the negation of the container's offset"
+            (0.0, 0.0),
+            "nested children use their own container's coordinate space"
         );
         assert_eq!(
             (
                 named(&graph, "nested-second").frame().x,
                 named(&graph, "nested-second").frame().y
             ),
-            (-10.0, -19.0),
-            "documented gap: Swift would place this at (0, 18)"
+            (0.0, 18.0),
+            "the second child follows the first child and its gap"
         );
     });
 }
 
 #[test]
-fn calculation_direction_does_not_reach_custom_placements() {
+fn initial_rtl_calculation_reaches_custom_placements() {
     let root = LayoutNode::new();
     let container = LayoutNode::new();
     let child = LayoutNode::new();
@@ -833,12 +808,12 @@ fn calculation_direction_does_not_reach_custom_placements() {
 
     assert_eq!(
         seen.borrow().first().copied(),
-        Some(Direction::Ltr),
-        "documented gap: Swift reports the RTL calculation direction to the placement"
+        Some(Direction::Rtl),
+        "the placement observes the calculation direction"
     );
     assert_eq!(
         child.frame().x,
-        0.0,
-        "documented gap: Swift would mirror the child to x=60"
+        60.0,
+        "the initial RTL calculation mirrors the child"
     );
 }

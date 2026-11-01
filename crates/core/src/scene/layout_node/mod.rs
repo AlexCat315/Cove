@@ -6,9 +6,9 @@
 //! paths. Frames are parent-relative, exactly as Yoga reports them.
 mod custom;
 mod engine;
+mod grid;
 mod style;
 mod value;
-mod grid;
 pub use grid::*;
 
 pub use custom::{CustomLayoutState, CustomMeasure, CustomPlace};
@@ -236,18 +236,42 @@ impl LayoutNode {
         }
     }
     /// Update authored styles and invalidate the affected layout path.
-    pub fn edit_style(&self, change: impl FnOnce(&mut LayoutStyle)) { self.update_style(change); }
-    pub fn set_grid_style(&self, grid: GridStyle) { self.update_style(|style| style.grid = grid); }
-    pub fn set_width_value(&self, value: LayoutStyleValue) { self.update_style(|style| style.width = value); }
-    pub fn set_height_value(&self, value: LayoutStyleValue) { self.update_style(|style| style.height = value); }
-    pub fn set_min_width_value(&self, value: LayoutStyleValue) { self.update_style(|style| style.min_width = value); }
-    pub fn set_max_width_value(&self, value: LayoutStyleValue) { self.update_style(|style| style.max_width = value); }
-    pub fn set_min_height_value(&self, value: LayoutStyleValue) { self.update_style(|style| style.min_height = value); }
-    pub fn set_max_height_value(&self, value: LayoutStyleValue) { self.update_style(|style| style.max_height = value); }
-    pub fn set_flex_basis_value(&self, value: LayoutStyleValue) { self.update_style(|style| style.flex_basis = value); }
-    pub fn set_padding_value(&self, value: LayoutStyleValue, edge: Edge) { self.update_style(|style| style.padding.set(edge, value)); }
-    pub fn set_margin_value(&self, value: LayoutStyleValue, edge: Edge) { self.update_style(|style| style.margin.set(edge, value)); }
-    pub fn set_position_value(&self, value: LayoutStyleValue, edge: Edge) { self.update_style(|style| style.position.set(edge, value)); }
+    pub fn edit_style(&self, change: impl FnOnce(&mut LayoutStyle)) {
+        self.update_style(change);
+    }
+    pub fn set_grid_style(&self, grid: GridStyle) {
+        self.update_style(|style| style.grid = grid);
+    }
+    pub fn set_width_value(&self, value: LayoutStyleValue) {
+        self.update_style(|style| style.width = value);
+    }
+    pub fn set_height_value(&self, value: LayoutStyleValue) {
+        self.update_style(|style| style.height = value);
+    }
+    pub fn set_min_width_value(&self, value: LayoutStyleValue) {
+        self.update_style(|style| style.min_width = value);
+    }
+    pub fn set_max_width_value(&self, value: LayoutStyleValue) {
+        self.update_style(|style| style.max_width = value);
+    }
+    pub fn set_min_height_value(&self, value: LayoutStyleValue) {
+        self.update_style(|style| style.min_height = value);
+    }
+    pub fn set_max_height_value(&self, value: LayoutStyleValue) {
+        self.update_style(|style| style.max_height = value);
+    }
+    pub fn set_flex_basis_value(&self, value: LayoutStyleValue) {
+        self.update_style(|style| style.flex_basis = value);
+    }
+    pub fn set_padding_value(&self, value: LayoutStyleValue, edge: Edge) {
+        self.update_style(|style| style.padding.set(edge, value));
+    }
+    pub fn set_margin_value(&self, value: LayoutStyleValue, edge: Edge) {
+        self.update_style(|style| style.margin.set(edge, value));
+    }
+    pub fn set_position_value(&self, value: LayoutStyleValue, edge: Edge) {
+        self.update_style(|style| style.position.set(edge, value));
+    }
     pub fn direction(&self) -> Direction {
         self.data().style.direction
     }
@@ -372,25 +396,33 @@ impl LayoutNode {
         self.data().style.min_width.points()
     }
     pub fn set_min_width(&self, value: Option<f32>) {
-        self.update_style(|style| style.min_width = value.map_or(LayoutStyleValue::Auto, LayoutStyleValue::Points));
+        self.update_style(|style| {
+            style.min_width = value.map_or(LayoutStyleValue::Auto, LayoutStyleValue::Points)
+        });
     }
     pub fn max_width(&self) -> Option<f32> {
         self.data().style.max_width.points()
     }
     pub fn set_max_width(&self, value: Option<f32>) {
-        self.update_style(|style| style.max_width = value.map_or(LayoutStyleValue::Auto, LayoutStyleValue::Points));
+        self.update_style(|style| {
+            style.max_width = value.map_or(LayoutStyleValue::Auto, LayoutStyleValue::Points)
+        });
     }
     pub fn min_height(&self) -> Option<f32> {
         self.data().style.min_height.points()
     }
     pub fn set_min_height(&self, value: Option<f32>) {
-        self.update_style(|style| style.min_height = value.map_or(LayoutStyleValue::Auto, LayoutStyleValue::Points));
+        self.update_style(|style| {
+            style.min_height = value.map_or(LayoutStyleValue::Auto, LayoutStyleValue::Points)
+        });
     }
     pub fn max_height(&self) -> Option<f32> {
         self.data().style.max_height.points()
     }
     pub fn set_max_height(&self, value: Option<f32>) {
-        self.update_style(|style| style.max_height = value.map_or(LayoutStyleValue::Auto, LayoutStyleValue::Points));
+        self.update_style(|style| {
+            style.max_height = value.map_or(LayoutStyleValue::Auto, LayoutStyleValue::Points)
+        });
     }
     /// A transient layout floor, independent of authored minimum constraints.
     ///

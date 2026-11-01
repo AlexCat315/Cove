@@ -62,9 +62,10 @@ impl LayoutNode {
         if direction != super::Direction::Inherit {
             return direction;
         }
-        self.parent().map_or(super::Direction::Ltr, |parent| {
-            parent.custom_layout_direction()
-        })
+        self.parent().map_or_else(
+            || engine::resolved_direction(&self.0),
+            |parent| parent.custom_layout_direction(),
+        )
     }
     /// Size of this child of a custom layout under `width` x `height`.
     pub fn measure_for_custom_layout(&self, width: Option<f32>, height: Option<f32>) -> Size {

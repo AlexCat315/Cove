@@ -13,9 +13,9 @@ use taffy::style::{
     AlignContent, AlignItems, JustifyContent, LengthPercentage, LengthPercentageAuto,
 };
 
-pub use super::value::{LayoutCalc, LayoutStyleValue};
-use super::value::CalcStorage;
 use super::grid::GridStyle;
+use super::value::CalcStorage;
+pub use super::value::{LayoutCalc, LayoutStyleValue};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct LayoutInsets {
@@ -223,13 +223,15 @@ impl LayoutStyle {
         floor: Option<Size>,
         calc: &CalcStorage,
     ) -> taffy::Style {
-        let minimum = |value: LayoutStyleValue, floor: Option<f32>| {
-            match (value, floor) {
-                (LayoutStyleValue::Auto, floor) => LengthPercentageAuto::length(floor.unwrap_or(0.0)),
-                (LayoutStyleValue::Points(value), floor) => LengthPercentageAuto::length(value.max(floor.unwrap_or(0.0))),
-                (value, Some(floor)) => LengthPercentageAuto::calc(calc.insert(value.as_calc().with_minimum(floor))),
-                (value, None) => value.length_percentage_auto(calc),
+        let minimum = |value: LayoutStyleValue, floor: Option<f32>| match (value, floor) {
+            (LayoutStyleValue::Auto, floor) => LengthPercentageAuto::length(floor.unwrap_or(0.0)),
+            (LayoutStyleValue::Points(value), floor) => {
+                LengthPercentageAuto::length(value.max(floor.unwrap_or(0.0)))
             }
+            (value, Some(floor)) => {
+                LengthPercentageAuto::calc(calc.insert(value.as_calc().with_minimum(floor)))
+            }
+            (value, None) => value.length_percentage_auto(calc),
         };
         let maximum = |value: LayoutStyleValue| value.length_percentage_auto(calc);
         let padding = match debug_padding {

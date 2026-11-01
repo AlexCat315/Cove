@@ -18,10 +18,11 @@ use crate::scene::Direction;
 use std::cell::{Cell, RefCell, UnsafeCell};
 use std::rc::Rc;
 use taffy::{
-    AvailableSpace, Cache, CacheTree, Layout, LayoutContainingBlock, LayoutFlexboxContainer, LayoutGridContainer, compute_grid_layout,
-    LayoutInput, LayoutOutput, LayoutPartialTree, Line, NodeId, RequestedAxis, ResolveOrZero,
-    RunMode, SizingMode, Style, TraversePartialTree, compute_cached_layout, compute_flexbox_layout,
-    compute_hidden_layout, compute_leaf_layout, compute_oof_layout,
+    AvailableSpace, Cache, CacheTree, Layout, LayoutContainingBlock, LayoutFlexboxContainer,
+    LayoutGridContainer, LayoutInput, LayoutOutput, LayoutPartialTree, Line, MaybeResolve, NodeId,
+    RequestedAxis, ResolveOrZero, RunMode, SizingMode, Style, TraversePartialTree,
+    compute_cached_layout, compute_flexbox_layout, compute_grid_layout, compute_hidden_layout,
+    compute_leaf_layout, compute_oof_layout,
 };
 
 const PROBE_BIT: usize = 1;
@@ -156,6 +157,7 @@ fn is_probe(id: NodeId) -> bool {
 /// `id` must name a node of the tree being laid out; the root's strong
 /// references keep every such cell alive for the whole pass.
 unsafe fn cell<'a>(id: NodeId) -> &'a LayoutCell {
+    // SAFETY: the caller guarantees the tagged address belongs to a live tree node.
     unsafe { &*((usize::from(id) & !PROBE_BIT) as *const LayoutCell) }
 }
 
@@ -170,9 +172,12 @@ fn refresh_style(cell: &LayoutCell, inherited: Direction) -> Direction {
     let redirected = engine.built_direction.get() != direction;
     if engine.style_stale.get() || redirected {
         let calc = CalcStorage::default();
-        let style = data
-            .style
-            .to_taffy(direction, data.debug_padding, data.minimum_size_floor, &calc);
+        let style = data.style.to_taffy(
+            direction,
+            data.debug_padding,
+            data.minimum_size_floor,
+            &calc,
+        );
         drop(data);
         // SAFETY: styles are only borrowed by the layout algorithm of the
         // node's parent, which refreshes them before taking any reference.
@@ -196,7 +201,7 @@ fn refresh_children(cell: &LayoutCell, direction: Direction) {
 }
 
 /// The resolved direction a node passes to its children.
-fn resolved_direction(cell: &LayoutCell) -> Direction {
+pub(super) fn resolved_direction(cell: &LayoutCell) -> Direction {
     cell.engine.built_direction.get()
 }
 
@@ -265,7 +270,9 @@ impl LayoutPartialTree for LayoutTree {
     type CoreContainerStyle<'a> = &'a Style;
     type CustomIdent = String;
 
-    fn resolve_calc_value(&self, ptr: *const (), basis: f32) -> f32 { resolve_calc(ptr, basis) }
+    fn resolve_calc_value(&self, ptr: *const (), basis: f32) -> f32 {
+        resolve_calc(ptr, basis)
+    }
 
     fn get_core_container_style(&self, id: NodeId) -> &Style {
         style_of(id)
@@ -309,7 +316,7 @@ fn compute_node(
     tree: &mut LayoutTree,
     node: &LayoutCell,
     id: NodeId,
-    inputs: LayoutInput,
+    mut inputs: LayoutInput,
 ) -> LayoutOutput {
     let (custom, has_children, measure) = {
         let data = node.data.borrow();
@@ -325,52 +332,132 @@ fn compute_node(
             data.measure.clone(),
         )
     };
+    // Taffy's leaf primitive does not resolve authored sizing keywords itself.
+    // Resolve the width before measuring its dependent height; otherwise a
+    // column's provisional stretched width can cache a single-line height.
+    if (custom.is_some() || !has_children)
+        && ((inputs.sizing_mode == SizingMode::InherentSize
+            && inputs.known_dimensions.width.is_none())
+            || (inputs.run_mode == RunMode::ComputeSize
+                && inputs.axis == RequestedAxis::Vertical
+                && inputs.known_dimensions.height.is_none()))
+        && let Some(width) = intrinsic_leaf_width(tree, node, id, inputs)
+    {
+        inputs.known_dimensions.width = Some(width);
+    }
     if let Some(measure) = custom {
         let children = node.data.borrow().children.clone();
-        return compute_leaf_layout(
-            inputs,
-            style_of(id),
-            resolve_calc,
-            |_, available| {
-                let size = measure(
-                    proposal_axis(available.width),
-                    proposal_axis(available.height),
-                    &children,
-                );
-                taffy::Size {
-                    width: size.width,
-                    height: size.height,
-                }
-            },
-        );
+        return compute_leaf_layout(inputs, style_of(id), resolve_calc, |_, available| {
+            let size = measure(
+                proposal_axis(available.width),
+                proposal_axis(available.height),
+                &children,
+            );
+            taffy::Size {
+                width: size.width,
+                height: size.height,
+            }
+        });
     }
     if has_children || style_of(id).display == taffy::Display::Grid {
         refresh_children(node, resolved_direction(node));
         return if style_of(id).display == taffy::Display::Grid {
             compute_grid_layout(tree, id, inputs)
-        } else { compute_flexbox_layout(tree, id, inputs) };
+        } else {
+            compute_flexbox_layout(tree, id, inputs)
+        };
     }
-    compute_leaf_layout(
-        inputs,
-        style_of(id),
-        resolve_calc,
-        |known, available| {
-            let Some(measure) = &measure else {
-                return taffy::Size::ZERO;
+    compute_leaf_layout(inputs, style_of(id), resolve_calc, |known, available| {
+        let Some(measure) = &measure else {
+            return taffy::Size::ZERO;
+        };
+        let (width, width_mode) = axis(known.width, available.width);
+        let (height, height_mode) = axis(known.height, available.height);
+        let size = measure(width, width_mode, height, height_mode);
+        taffy::Size {
+            width: size.width,
+            height: size.height,
+        }
+    })
+}
+
+fn intrinsic_leaf_width(
+    tree: &mut LayoutTree,
+    node: &LayoutCell,
+    id: NodeId,
+    inputs: LayoutInput,
+) -> Option<f32> {
+    use super::LayoutStyleValue as Value;
+    let value = node.data.borrow().style.width;
+    let mut probe = |space| {
+        let mut probe = inputs;
+        probe.sizing_mode = SizingMode::ContentSize;
+        probe.run_mode = RunMode::ComputeSize;
+        probe.axis = RequestedAxis::Horizontal;
+        probe.known_dimensions.width = None;
+        probe.known_dimensions.height = None;
+        probe.available_space.width = space;
+        compute_node(tree, node, id, probe).size.width
+    };
+    let result = match value {
+        Value::MinContent => Some(probe(AvailableSpace::MinContent)),
+        Value::MaxContent => Some(probe(AvailableSpace::MaxContent)),
+        Value::FitContent | Value::FitContentLimit(_) => {
+            let limit = match value {
+                Value::FitContentLimit(calc) => {
+                    let basis = inputs
+                        .parent_size
+                        .width
+                        .or((calc.percent == 0.0).then_some(0.0))?;
+                    calc.resolve(basis)
+                }
+                _ => inputs
+                    .known_dimensions
+                    .width
+                    .or(inputs.available_space.width.into_option())?,
             };
-            let (width, width_mode) = axis(known.width, available.width);
-            let (height, height_mode) = axis(known.height, available.height);
-            let size = measure(width, width_mode, height, height_mode);
-            taffy::Size {
-                width: size.width,
-                height: size.height,
-            }
-        },
-    )
+            let minimum = probe(AvailableSpace::MinContent);
+            let maximum = probe(AvailableSpace::MaxContent);
+            Some(limit.min(maximum).max(minimum))
+        }
+        _ => None,
+    };
+    result.map(|width| {
+        // Width-dependent height must use the constrained intrinsic width,
+        // including during the parent's content-size probes.
+        let style = style_of(id);
+        let adjustment = if style.box_sizing == taffy::BoxSizing::ContentBox {
+            let padding = style
+                .padding
+                .resolve_or_zero(inputs.parent_size.width, resolve_calc);
+            let border = style
+                .border
+                .resolve_or_zero(inputs.parent_size.width, resolve_calc);
+            padding.left + padding.right + border.left + border.right
+        } else {
+            0.0
+        };
+        let minimum = style
+            .min_size
+            .width
+            .maybe_resolve(inputs.parent_size.width, resolve_calc)
+            .map(|value| value + adjustment)
+            .unwrap_or(0.0);
+        let maximum = style
+            .max_size
+            .width
+            .maybe_resolve(inputs.parent_size.width, resolve_calc)
+            .map(|value| value + adjustment)
+            .unwrap_or(f32::INFINITY);
+        width.min(maximum).max(minimum)
+    })
 }
 
 fn proposal_axis(value: AvailableSpace) -> Option<f32> {
-    match value { AvailableSpace::MinContent => Some(0.0), value => value.into_option() }
+    match value {
+        AvailableSpace::MinContent => Some(0.0),
+        value => value.into_option(),
+    }
 }
 
 /// Yoga's measure contract: a known extent is exact, a definite available
@@ -432,8 +519,12 @@ impl LayoutFlexboxContainer for LayoutTree {
 impl LayoutGridContainer for LayoutTree {
     type GridContainerStyle<'a> = &'a Style;
     type GridItemStyle<'a> = &'a Style;
-    fn get_grid_container_style(&self, id: NodeId) -> &Style { style_of(id) }
-    fn get_grid_child_style(&self, id: NodeId) -> &Style { style_of(id) }
+    fn get_grid_container_style(&self, id: NodeId) -> &Style {
+        style_of(id)
+    }
+    fn get_grid_child_style(&self, id: NodeId) -> &Style {
+        style_of(id)
+    }
 }
 
 fn definite(value: Option<f32>) -> AvailableSpace {

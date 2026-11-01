@@ -42,7 +42,13 @@ fn main() {
     let mut build = Command::new(env::var_os("COVE_ZIG").unwrap_or_else(|| "zig".into()));
     build
         .current_dir(&source)
-        .args(["build", "-Demit-lib-vt=true", "-Doptimize=ReleaseFast"])
+        .args([
+            "build",
+            "-Demit-lib-vt=true",
+            "-Demit-xcframework=false",
+            "-Demit-macos-app=false",
+            "-Doptimize=ReleaseFast",
+        ])
         .arg(format!("-Dtarget={zig_target}"))
         .arg("--prefix")
         .arg(&prefix)
@@ -61,7 +67,12 @@ fn main() {
         "cargo:rustc-link-search=native={}",
         prefix.join("lib").display()
     );
-    println!("cargo:rustc-link-lib=static=ghostty-vt");
+    let library = if os == "windows" {
+        "ghostty-vt-static"
+    } else {
+        "ghostty-vt"
+    };
+    println!("cargo:rustc-link-lib=static={library}");
     if os == "windows" {
         // Zig's Windows build uses the system CSPRNG and process APIs.
         for library in ["advapi32", "bcrypt", "userenv"] {

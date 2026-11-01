@@ -2,7 +2,7 @@
 
 Rust 2024 跨平台 UI 工具包。工作区版本为 `0.3.0-dev`，尚未发布。
 
-需要 `rust-toolchain.toml` 固定的 Rust 工具链、C/C++ 编译器、CMake 和 Zig 0.16。首次构建前初始化原生依赖：
+需要 `rust-toolchain.toml` 固定的 Rust 工具链、C/C++ 编译器、CMake 和 Zig 0.17。首次构建前初始化原生依赖：
 
 ```sh
 git submodule update --init --recursive

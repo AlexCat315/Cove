@@ -1,8 +1,8 @@
 //! Layout modifiers for padding, flex, absolute positioning and frames.
 pub mod frame_capture;
 mod values;
-pub use values::*;
 pub use frame_capture::*;
+pub use values::*;
 
 use crate::{ModifiedContent, View, ViewExt, ViewModifier};
 use cove_core::scene::{Edge, Interpolatable, LayoutNode, Node, PositionType};
@@ -227,7 +227,9 @@ impl FrameModifier {
         }
     }
 
-    fn spec(value: FrameDimension) -> FrameDimensionSpec { value }
+    fn spec(value: FrameDimension) -> FrameDimensionSpec {
+        value
+    }
     fn apply_width(spec: FrameDimensionSpec, layout: &LayoutNode) {
         layout.set_width_value(spec);
         layout.set_attachment(FRAME_WIDTH_ATTACHMENT, spec);

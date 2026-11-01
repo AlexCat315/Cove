@@ -9,7 +9,7 @@ application template. Rust code lives in `crates/hosts/src/android`.
 - Rust target `aarch64-linux-android`
 - Android NDK r30 (`ANDROID_NDK_HOME`, or the newest r30 under the SDK's `ndk/`)
 - Android SDK (`ANDROID_HOME`): `platform-tools`, `platforms;android-36`, `build-tools;36.1.0`
-- JDK 21, CMake, Zig 0.16
+- JDK 21, CMake, Zig 0.17
 
 ```sh
 rustup target add aarch64-linux-android
