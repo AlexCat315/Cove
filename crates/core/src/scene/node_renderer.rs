@@ -5,7 +5,7 @@
 //! Convention: `Node::frame` is interpreted as parent-local; the renderer
 //! carries a placement down the tree rather than a bare origin, so a node's
 //! `transform` reaches the subtree it scales. Background fills and the
-//! `Node::draw` hook (used by crates/text/Image) are emitted in that order so custom
+//! `Node::draw` hook (used by Text/Image) are emitted in that order so custom
 //! content paints over its own background. `clips_to_bounds` pushes a scissor
 //! for the duration of the subtree.
 use super::rendering::{content_mask, paint_scaled};
@@ -109,7 +109,7 @@ fn render_node(node: &Node, list: &mut DrawList, placed: Affine2D) {
         emit_border(node, list, rect, radius, border_width);
     }
 
-    // 5. Custom content (crates/text/Image/etc). A rounded clipping container keeps it
+    // 5. Custom content (Text/Image/etc). A rounded clipping container keeps it
     //    and its children inside the inner rounded edge.
     let mask = content_mask(node, abs_x, abs_y, width, height, radius, border_width);
     if let Some(mask) = mask {

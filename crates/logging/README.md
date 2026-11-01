@@ -89,7 +89,7 @@ COVE_LOG_FORMAT=json COVE_LOG_DIRECTORY=/tmp/cove-logs cove doctor
 | `COVE_LOG_LEVEL` | trace/debug/info/notice/warning/error/critical，默认 info |
 | `COVE_LOG_MODULES` | JSON 对象，模块前缀到等级；最长路径段前缀匹配 |
 | `COVE_LOG_CONSOLE` / `COVE_LOG_FILES` | 1/0、true/false、yes/no |
-| `COVE_LOG_FORMAT` | crates/text/json |
+| `COVE_LOG_FORMAT` | text/json |
 | `COVE_LOG_DIRECTORY` | 文件根目录；Android 会改为设备私有目录 |
 | `COVE_LOG_RUN_ID` | CLI/子进程的关联 ID，通常自动生成 |
 

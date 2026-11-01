@@ -1,7 +1,7 @@
 //! WebSocket transport with no async runtime dependency.
 //!
 //! The Swift server used SwiftNIO. NIO is not in this workspace, so this module
-//! implements the same wire behaviour directly: an crates/http/1.1 handshake on
+//! implements the same wire behaviour directly: an HTTP/1.1 handshake on
 //! `127.0.0.1:<port>/?token=…`, RFC 6455 text framing with masking enforcement,
 //! ping/pong, close, and bounded fragment reassembly. It runs one accept thread
 //! plus one reader thread per connection and delivers events through a channel,
@@ -308,7 +308,7 @@ fn handshake(mut stream: TcpStream, access_token: Option<&str>) -> Option<Arc<St
         format!("{key}258EAFA5-E914-47DA-95CA-C5AB0DC85B11").as_bytes(),
     ));
     let response = format!(
-        "crates/http/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: {accept}\r\n\r\n"
+        "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: {accept}\r\n\r\n"
     );
     stream.write_all(response.as_bytes()).ok()?;
     stream.flush().ok()?;
@@ -323,7 +323,7 @@ fn handshake(mut stream: TcpStream, access_token: Option<&str>) -> Option<Arc<St
 
 fn respond_forbidden(stream: &mut TcpStream) -> io::Result<()> {
     stream.write_all(
-        b"crates/http/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+        b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
     )
 }
 

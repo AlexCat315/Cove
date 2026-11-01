@@ -1,4 +1,4 @@
-//! Header list plus the crates/http/1.1 framing the socket backend speaks.
+//! Header list plus the HTTP/1.1 framing the socket backend speaks.
 #![cfg_attr(not(cove_http_socket), allow(dead_code))]
 
 use crate::{HttpError, Url};
@@ -78,7 +78,7 @@ const FRAMING: [&str; 4] = ["host", "content-length", "transfer-encoding", "conn
 
 pub const MAX_HEAD_BYTES: usize = 64 * 1024;
 
-/// Serialises one crates/http/1.1 request head. The body follows unchanged.
+/// Serialises one HTTP/1.1 request head. The body follows unchanged.
 pub fn request_head(
     method: &str,
     url: &Url,
@@ -87,7 +87,7 @@ pub fn request_head(
     user_agent: &str,
 ) -> Vec<u8> {
     let mut head = format!(
-        "{method} {} crates/http/1.1\r\nHost: {}\r\n",
+        "{method} {} HTTP/1.1\r\nHost: {}\r\n",
         url.path, url.authority
     );
     if !headers.contains("user-agent") {
@@ -129,8 +129,8 @@ pub fn read_head(reader: &mut impl BufRead) -> Result<ResponseHead, HttpError> {
             .ok_or_else(|| invalid("connection closed before the response"))?;
         let mut parts = status_line.splitn(3, ' ');
         let version = parts.next().unwrap_or_default();
-        if !version.starts_with("crates/http/1.") {
-            return Err(invalid("not an crates/http/1.x response"));
+        if !version.starts_with("HTTP/1.") {
+            return Err(invalid("not an HTTP/1.x response"));
         }
         let status = parts
             .next()
@@ -362,14 +362,14 @@ mod tests {
         let headers: Headers = [
             ("Host", "evil"),
             ("X-Key", "1"),
-            ("Accept", "crates/text/plain"),
+            ("Accept", "text/plain"),
         ]
         .into_iter()
         .collect();
         let head = String::from_utf8(request_head("POST", &url, &headers, 3, "T/1")).unwrap();
         assert_eq!(
             head,
-            "POST /p?q crates/http/1.1\r\nHost: a.test:8080\r\nUser-Agent: T/1\r\nAccept-Encoding: identity\r\nX-Key: 1\r\nAccept: crates/text/plain\r\nContent-Length: 3\r\nConnection: close\r\n\r\n"
+            "POST /p?q HTTP/1.1\r\nHost: a.test:8080\r\nUser-Agent: T/1\r\nAccept-Encoding: identity\r\nX-Key: 1\r\nAccept: text/plain\r\nContent-Length: 3\r\nConnection: close\r\n\r\n"
         );
         let get = String::from_utf8(request_head("GET", &url, &Headers::new(), 0, "T/1")).unwrap();
         assert!(!get.contains("Content-Length"));
@@ -377,7 +377,7 @@ mod tests {
 
     #[test]
     fn parses_heads_and_skips_interim_responses() {
-        let mut input = &b"crates/http/1.1 100 Continue\r\n\r\nHTTP/1.1 201 Created\r\nX-A: 1\r\nx-a:  2 \r\nFold: a\r\n b\r\n\r\nbody"[..];
+        let mut input = &b"HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 201 Created\r\nX-A: 1\r\nx-a:  2 \r\nFold: a\r\n b\r\n\r\nbody"[..];
         let head = read_head(&mut input).unwrap();
         assert_eq!(head.status, 201);
         assert_eq!(head.headers.get_all("X-A").collect::<Vec<_>>(), ["1", "2"]);
@@ -389,14 +389,14 @@ mod tests {
     fn rejects_malformed_heads() {
         for input in [
             &b"FTP/1.0 200 OK\r\n\r\n"[..],
-            b"crates/http/1.1 2000 OK\r\n\r\n",
-            b"crates/http/1.1 200 OK\r\nbad\r\n\r\n",
-            b"crates/http/1.1 200 OK\r\nX: 1\r\n",
+            b"HTTP/1.1 2000 OK\r\n\r\n",
+            b"HTTP/1.1 200 OK\r\nbad\r\n\r\n",
+            b"HTTP/1.1 200 OK\r\nX: 1\r\n",
             b"",
         ] {
             assert!(read_head(&mut &input[..]).is_err());
         }
-        let mut huge = b"crates/http/1.1 200 OK\r\n".to_vec();
+        let mut huge = b"HTTP/1.1 200 OK\r\n".to_vec();
         huge.extend(std::iter::repeat_n(b'a', MAX_HEAD_BYTES));
         assert!(read_head(&mut &huge[..]).is_err());
     }

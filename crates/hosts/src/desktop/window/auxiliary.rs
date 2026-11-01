@@ -1,7 +1,7 @@
 //! Translation of Desktop/Sources/CoveUI/Window/Auxiliary.swift.
 //!
 //! An auxiliary window owns its own tree, view graph, portal store and
-//! presentation surface, sharing only the crates/text/image services and draw-list
+//! presentation surface, sharing only the text/image services and draw-list
 //! renderer of the application.
 
 use crate::desktop::application::composition::MainComposition;

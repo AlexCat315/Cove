@@ -2,7 +2,7 @@
 //! and the reflected-layout merge in Validation/ReflectedBindingLayout.swift.
 //!
 //! An offline compiler's output. The RHI consumes this contract without loading
-//! Slang or requiring its crates/runtime/reflection types in engine code.
+//! Slang or requiring its runtime/reflection types in engine code.
 use std::collections::HashMap;
 
 use super::{

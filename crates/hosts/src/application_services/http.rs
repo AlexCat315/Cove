@@ -2,7 +2,7 @@
 //!
 //! `cove-ui-compose` ships no HTTP client; its `ImageDownloadTransport` trait
 //! is the seam each host fills. Every platform uses the same adapter: the
-//! client picks NSURLSession, WinHTTP or crates/http/1.1 with OpenSSL.
+//! client picks NSURLSession, WinHTTP or HTTP/1.1 with OpenSSL.
 
 use cove_http::{Client, ClientConfig, HttpError, Request};
 use cove_ui_compose::primitives::media::image_data_download::{

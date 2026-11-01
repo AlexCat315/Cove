@@ -62,7 +62,7 @@ pub enum Edge {
     All,
 }
 
-/// crates/text/layout direction.
+/// text/layout direction.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum Direction {
     #[default]

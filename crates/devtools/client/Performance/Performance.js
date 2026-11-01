@@ -758,7 +758,7 @@ function jsonReport(report) {
 
 function exportMarkdown() {
   const report = buildReport();
-  download(`cove-performance-${timestampName()}.md`, markdownReport(report), "crates/text/markdown");
+  download(`cove-performance-${timestampName()}.md`, markdownReport(report), "text/markdown");
 }
 
 function exportJSON() {

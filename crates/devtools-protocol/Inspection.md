@@ -72,7 +72,7 @@ style writes keep updating the underlying values; clear/undo reveals the latest
 app value, including authored percentage and logical/RTL padding. Removing a node
 clears its overrides; history never recreates nodes. Custom native painters must
 read effective node foreground and resolved padding to honor these edits.
-Native `Text` and the shared crates/browser/desktop demo do so.
+Native `Text` and the shared browser/desktop demo do so.
 
 History holds at most 128 transactions and overrides at most 256 live nodes.
 Edits remain in memory and do not rewrite Swift sources. Native editing is owned

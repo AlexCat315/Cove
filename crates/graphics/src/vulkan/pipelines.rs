@@ -1,5 +1,5 @@
 //! Translation of NativeRHI/Vulkan/Backend/{Bindings,Pipelines}.swift: descriptor
-//! set layouts, pipeline layouts, descriptor sets, and crates/graphics/compute/mesh
+//! set layouts, pipeline layouts, descriptor sets, and graphics/compute/mesh
 //! pipeline creation.
 //!
 //! Swift wrapped every create-info in a `VulkanScratch` arena because the C

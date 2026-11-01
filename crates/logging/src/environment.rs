@@ -59,7 +59,7 @@ impl LoggingConfiguration {
         }
         #[cfg(target_os = "wasi")]
         {
-            // The crates/browser/WASI host has no persistent file sink.
+            // The browser/WASI host has no persistent file sink.
             self.storage.enabled = false;
         }
         self.validate()

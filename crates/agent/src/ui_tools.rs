@@ -110,7 +110,7 @@ impl Tool {
             ),
             Self::QueryUiMemory => AgentTool::new(
                 self.name(),
-                "Read logical crates/text/image cache and per-window target memory estimates. Excludes driver pools and external scene textures; this is not process physical footprint. Null means the host has no provider.",
+                "Read logical text/image cache and per-window target memory estimates. Excludes driver pools and external scene textures; this is not process physical footprint. Null means the host has no provider.",
                 object(BTreeMap::new(), Vec::new()),
                 true,
             ),

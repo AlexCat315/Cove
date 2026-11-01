@@ -1,9 +1,9 @@
 //! Blocking HTTP client with a streamed response body.
 //!
 //! Backends:
-//! - macOS/iOS: `NSURLSession` (system proxy, trust, crates/http/2)
+//! - macOS/iOS: `NSURLSession` (system proxy, trust, HTTP/2)
 //! - Windows: WinHTTP
-//! - Linux, Android and other Unix: crates/http/1.1 over `std::net`, TLS through the
+//! - Linux, Android and other Unix: HTTP/1.1 over `std::net`, TLS through the
 //!   system OpenSSL (`libssl`), loaded at runtime by a small C binding
 //!
 //! No async runtime: `send` blocks the calling thread until the response head

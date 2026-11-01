@@ -1,4 +1,4 @@
-//! crates/http/1.1 over `std::net`, with TLS from [`crate::tls`].
+//! HTTP/1.1 over `std::net`, with TLS from [`crate::tls`].
 use crate::tls::{self, TlsStream};
 use crate::{Capabilities, ClientConfig, HttpError, Request, Response, Url, io_error};
 use crate::{redirect, wire};

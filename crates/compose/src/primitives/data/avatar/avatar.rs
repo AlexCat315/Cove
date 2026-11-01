@@ -126,7 +126,7 @@ pub struct Avatar {
     /// Erased image content. When `None`, the generated initials fallback is
     /// used. `AsyncImage` has no Rust counterpart yet.
     pub image: Option<AnyView>,
-    /// Optional caller-provided fallback. Replaces the crates/text/icon fallback while
+    /// Optional caller-provided fallback. Replaces the text/icon fallback while
     /// preserving the avatar frame, clipping and accessibility.
     pub fallback: Option<AnyView>,
 }

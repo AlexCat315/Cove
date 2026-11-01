@@ -10,7 +10,7 @@
 //! Model difference: the Swift suite mounts the field and dispatches real key
 //! events. The Rust `SearchFieldState` exposes the same key contract as a plain
 //! method (`handle_key` returning a `SearchAction`), so these tests drive it
-//! directly with the same inputs and expected crates/text/highlight outcomes.
+//! directly with the same inputs and expected text/highlight outcomes.
 
 use cove_ui_compose::primitives::controls::fields::{SearchAction, SearchFieldState, SearchKey};
 

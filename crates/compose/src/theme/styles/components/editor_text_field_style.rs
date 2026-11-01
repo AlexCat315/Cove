@@ -1,6 +1,6 @@
 //! Translation of Theme/Styles/Components/EditorTextFieldStyle.swift.
 //!
-//! A flat document surface for crates/text/code editors whose caller owns the chrome.
+//! A flat document surface for text/code editors whose caller owns the chrome.
 //! Focus stays visible through the caret, selection and active code line.
 use crate::AnyView;
 use crate::modifiers::style::{AppearanceExt, SemanticStyleViewExt};

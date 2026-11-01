@@ -76,7 +76,7 @@ serialize the entire retained capture every frame.
 All stages share the recorder's monotonic clock. `component` spans measure body
 and reconciliation; `recomposition` spans cover committing pending scopes;
 `layout` spans measure actual Yoga passes and writing frames back; `draw` spans
-measure crates/text/geometry/draw-list generation in the host. Clean skipped layout
+measure text/geometry/draw-list generation in the host. Clean skipped layout
 passes create no event. Parent bodies and commits include child work, so their
 spans overlap and must not be summed. GPU execution/presentation is not part of
 these CPU spans. Native timing summaries remain unchanged; the browser also

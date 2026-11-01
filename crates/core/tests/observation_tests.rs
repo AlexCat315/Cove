@@ -26,9 +26,23 @@ impl GlobalTestLock {
     }
 
     fn locked<T>(body: impl FnOnce() -> T) -> T {
+        thread_local! {
+            static HELD: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+        }
+        if HELD.get() {
+            return body();
+        }
         let _guard: MutexGuard<'_, ()> = Self::mutex()
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
+        struct Release;
+        impl Drop for Release {
+            fn drop(&mut self) {
+                HELD.set(false);
+            }
+        }
+        HELD.set(true);
+        let _release = Release;
         body()
     }
 }

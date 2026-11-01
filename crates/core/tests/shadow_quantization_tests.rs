@@ -6,7 +6,7 @@
 //!
 //! Not ported: `compositingIsPreserved` and `occludedShadowKeepsRoundedCorners`.
 //! Both compare `NativeUIViewport` rasterisations across `samples` 1 and 4, which
-//! needs a live Metal device and belongs with the crates/graphics/Hosts owner — the same
+//! needs a live Metal device and belongs with the Graphics/Hosts owner — the same
 //! decision as `NativeWindowLifecycleTests`.
 //!
 //! Behaviour checklist:

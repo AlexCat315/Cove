@@ -1,4 +1,4 @@
-//! Client behaviour against a loopback crates/http/1.1 server.
+//! Client behaviour against a loopback HTTP/1.1 server.
 //!
 //! Run with `--features openssl` on macOS to exercise the socket + OpenSSL
 //! backend that Linux and Android use. `COVE_HTTP_NETWORK_TESTS=1` adds a
@@ -73,7 +73,7 @@ fn header<'a>(head: &'a str, name: &str) -> Option<&'a str> {
 #[test]
 fn posts_a_body_and_reads_headers() {
     let (base, requests) = serve(vec![
-        b"crates/http/1.1 201 Created\r\nContent-Type: application/json\r\nX-Trace: a\r\nContent-Length: 11\r\nConnection: close\r\n\r\n{\"ok\":true}".to_vec(),
+        b"HTTP/1.1 201 Created\r\nContent-Type: application/json\r\nX-Trace: a\r\nContent-Length: 11\r\nConnection: close\r\n\r\n{\"ok\":true}".to_vec(),
     ]);
     let response = client()
         .send(
@@ -91,7 +91,7 @@ fn posts_a_body_and_reads_headers() {
     assert!(
         received
             .head
-            .starts_with("POST /v1/items?x=1 crates/http/1.1\r\n"),
+            .starts_with("POST /v1/items?x=1 HTTP/1.1\r\n"),
         "{}",
         received.head
     );
@@ -102,7 +102,7 @@ fn posts_a_body_and_reads_headers() {
 #[test]
 fn streams_a_chunked_body() {
     let (base, _requests) = serve(vec![
-        b"crates/http/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n6\r\ndata: \r\n5\r\nhello\r\n0\r\n\r\n".to_vec(),
+        b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n6\r\ndata: \r\n5\r\nhello\r\n0\r\n\r\n".to_vec(),
     ]);
     let mut response = client()
         .send(Request::get(format!("{base}/stream")))
@@ -116,7 +116,7 @@ fn streams_a_chunked_body() {
 #[test]
 fn reports_error_statuses_as_responses() {
     let (base, _requests) = serve(vec![
-        b"crates/http/1.1 429 Too Many Requests\r\nRetry-After: 3\r\nContent-Length: 4\r\nConnection: close\r\n\r\nslow".to_vec(),
+        b"HTTP/1.1 429 Too Many Requests\r\nRetry-After: 3\r\nContent-Length: 4\r\nConnection: close\r\n\r\nslow".to_vec(),
     ]);
     let response = client().send(Request::get(format!("{base}/"))).unwrap();
     assert_eq!(response.status, 429);
@@ -127,8 +127,8 @@ fn reports_error_statuses_as_responses() {
 #[test]
 fn follows_redirects_and_rewrites_post_after_303() {
     let (base, requests) = serve(vec![
-        b"crates/http/1.1 303 See Other\r\nLocation: /done\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_vec(),
-        b"crates/http/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok".to_vec(),
+        b"HTTP/1.1 303 See Other\r\nLocation: /done\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_vec(),
+        b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok".to_vec(),
     ]);
     let response = client()
         .send(Request::post(format!("{base}/start"), b"payload".to_vec()))
@@ -146,7 +146,7 @@ fn follows_redirects_and_rewrites_post_after_303() {
 #[test]
 fn stops_after_the_redirect_budget() {
     let redirect =
-        b"crates/http/1.1 302 Found\r\nLocation: /again\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        b"HTTP/1.1 302 Found\r\nLocation: /again\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
             .to_vec();
     let (base, _requests) = serve(vec![redirect.clone(), redirect.clone(), redirect]);
     let client = Client::new(ClientConfig {
@@ -163,7 +163,7 @@ fn stops_after_the_redirect_budget() {
 #[test]
 fn returns_the_redirect_when_following_is_off() {
     let (base, _requests) = serve(vec![
-        b"crates/http/1.1 302 Found\r\nLocation: /elsewhere\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_vec(),
+        b"HTTP/1.1 302 Found\r\nLocation: /elsewhere\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_vec(),
     ]);
     let client = Client::new(ClientConfig {
         timeout: Duration::from_secs(5),
@@ -178,9 +178,9 @@ fn returns_the_redirect_when_following_is_off() {
 #[test]
 fn enforces_body_limits() {
     let (base, _requests) = serve(vec![
-        b"crates/http/1.1 200 OK\r\nContent-Length: 10\r\nConnection: close\r\n\r\n0123456789"
+        b"HTTP/1.1 200 OK\r\nContent-Length: 10\r\nConnection: close\r\n\r\n0123456789"
             .to_vec(),
-        b"crates/http/1.1 200 OK\r\nConnection: close\r\n\r\n0123456789".to_vec(),
+        b"HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n0123456789".to_vec(),
     ]);
     let response = client().send(Request::get(format!("{base}/a"))).unwrap();
     assert_eq!(response.bytes(4).unwrap_err(), HttpError::BodyTooLarge(4));
@@ -231,7 +231,7 @@ fn rejects_header_injection_and_bad_urls() {
 #[test]
 fn tls_to_a_plain_server_fails_cleanly() {
     let (base, _requests) = serve(vec![
-        b"crates/http/1.1 200 OK\r\nContent-Length: 0\r\n\r\n".to_vec(),
+        b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n".to_vec(),
     ]);
     let url = base.replace("http://", "https://");
     let capabilities = Client::capabilities();
