@@ -10,7 +10,19 @@
 	path = third-party/ghostty
 	url = https://github.com/ghostty-org/ghostty.git
 	shallow = true
-[submodule "Runtime/third-party/sdl3"]
-	path = Native/third-party/sdl3
+[submodule "third-party/sdl3"]
+	path = third-party/sdl3
 	url = https://github.com/libsdl-org/SDL.git
+	shallow = true
+[submodule "third-party/plutovg"]
+	path = third-party/plutovg
+	url = https://github.com/sammycage/plutovg.git
+	shallow = true
+[submodule "third-party/libwebp"]
+	path = third-party/libwebp
+	url = https://chromium.googlesource.com/webm/libwebp
+	shallow = true
+[submodule "third-party/lunasvg"]
+	path = third-party/lunasvg
+	url = https://github.com/sammycage/lunasvg.git
 	shallow = true
